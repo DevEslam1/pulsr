@@ -267,10 +267,29 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 val limit = call.argument<Int>("limit") ?: DEFAULT_SEARCH_LIMIT
                 runOffMainThread(result) { search(query, limit) }
             }
+            "searchContinuation" -> {
+                val token = call.argument<String>("continuation")?.trim()
+                if (token.isNullOrEmpty()) {
+                    result.error("YTM_INVALID_ARGUMENT", "continuation is required", null)
+                    return
+                }
+                val limit = call.argument<Int>("limit") ?: DEFAULT_SEARCH_LIMIT
+                runOffMainThread(result) { searchContinuation(token, limit) }
+            }
             "trending" -> {
                 captureLocale(call)
                 val limit = call.argument<Int>("limit") ?: DEFAULT_SEARCH_LIMIT
                 runOffMainThread(result) { trending(limit) }
+            }
+            "getCharts" -> {
+                captureLocale(call)
+                val limit = call.argument<Int>("limit") ?: DEFAULT_SEARCH_LIMIT
+                runOffMainThread(result) { browseMusicSection("FEmusic_charts", limit) }
+            }
+            "getMoods" -> {
+                captureLocale(call)
+                val limit = call.argument<Int>("limit") ?: DEFAULT_SEARCH_LIMIT
+                runOffMainThread(result) { browseMusicSection("FEmusic_moods_and_genres", limit) }
             }
             "getPlaylist" -> {
                 val url = call.argument<String>("url")?.trim()
@@ -475,14 +494,72 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
     }
 
     private fun trending(limit: Int): List<Map<String, Any?>> {
-        val kioskList = ServiceList.YouTube.kioskList
-        val kioskExtractor = kioskList.getExtractorById(kioskList.defaultKioskId, null)
-        kioskExtractor.fetchPage()
-        val kioskInfo = org.schabi.newpipe.extractor.kiosk.KioskInfo.getInfo(kioskExtractor)
-        return streamItemsToMaps(
-            kioskInfo.relatedItems.asSequence().filterIsInstance<StreamInfoItem>(),
-            limit,
-        )
+        // Prefer YouTube Music Charts via InnerTube — the previous kiosk pointed
+        // at generic YouTube Trending (gaming/news), not Music.
+        val ctx = context?.applicationContext
+        if (ctx != null) {
+            try {
+                YtmCookieStore.getInstance(ctx).readFromCookieManager()
+                val client = InnertubeClient(ctx)
+                // FEmusic_charts is the canonical Music charts browseId; fallback to
+                // FEmusic_moods_and_genres then generic kiosk if both fail.
+                val browseIds = listOf("FEmusic_charts", "FEmusic_moods_and_genres")
+                for (bid in browseIds) {
+                    try {
+                        val json = client.requestBrowse(bid)
+                        val tracks = parseInnertubeTracksFromJson(json, limit)
+                        if (tracks.isNotEmpty()) {
+                            Log.i(TAG, "trending: $bid returned ${tracks.size} tracks")
+                            return tracks.take(limit)
+                        }
+                    } catch (e: Throwable) {
+                        Log.w(TAG, "trending browse $bid failed: ${e.message}")
+                    }
+                }
+            } catch (e: Throwable) {
+                Log.w(TAG, "trending InnerTube path failed: ${e.message}")
+            }
+        }
+        // Fallback: generic YouTube kiosk (non-music) to avoid empty screen.
+        return try {
+            val kioskList = ServiceList.YouTube.kioskList
+            val kioskExtractor = kioskList.getExtractorById(kioskList.defaultKioskId, null)
+            kioskExtractor.fetchPage()
+            val kioskInfo = org.schabi.newpipe.extractor.kiosk.KioskInfo.getInfo(kioskExtractor)
+            streamItemsToMaps(
+                kioskInfo.relatedItems.asSequence().filterIsInstance<StreamInfoItem>(),
+                limit,
+            )
+        } catch (e: Throwable) {
+            Log.w(TAG, "trending kiosk fallback failed: ${e.message}")
+            emptyList()
+        }
+    }
+
+    private fun searchContinuation(token: String, limit: Int): List<Map<String, Any?>> {
+        val ctx = context?.applicationContext ?: return emptyList()
+        return try {
+            YtmCookieStore.getInstance(ctx).readFromCookieManager()
+            val client = InnertubeClient(ctx)
+            val json = client.requestContinuation(token)
+            parseInnertubeTracksFromJson(json, limit).take(limit)
+        } catch (e: Throwable) {
+            Log.w(TAG, "searchContinuation failed: ${e.message}")
+            emptyList()
+        }
+    }
+
+    private fun browseMusicSection(browseId: String, limit: Int): List<Map<String, Any?>> {
+        val ctx = context?.applicationContext ?: return emptyList()
+        return try {
+            YtmCookieStore.getInstance(ctx).readFromCookieManager()
+            val client = InnertubeClient(ctx)
+            val json = client.requestBrowse(browseId)
+            parseInnertubeTracksFromJson(json, limit).take(limit)
+        } catch (e: Throwable) {
+            Log.w(TAG, "browseMusicSection $browseId failed: ${e.message}")
+            emptyList()
+        }
     }
 
     /**
@@ -543,7 +620,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         }
 
         val tracks = streamItemsToMaps(allItems.asSequence(), limit)
-        val isTruncated = (nextPage != null && allItems.size >= limit) || pageCount >= 10
+        val isTruncated = nextPage != null
         return mapOf(
             "title" to playlistInfo.name,
             "uploader" to (playlistInfo.uploaderName ?: ""),

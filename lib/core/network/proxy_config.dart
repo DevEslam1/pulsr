@@ -14,6 +14,11 @@ enum AppProxyType {
   }
 }
 
+/// NOTE: SOCKS5 proxy requires native OkHttp (`YtmHttpClient`) — Dart
+/// `HttpClient` (used by `YtmAccountService`/`YtmService` Dart fallback) does
+/// NOT support SOCKS. When SOCKS is configured, Dart Innertube fallbacks will
+/// still use DIRECT/VPN. The native Kotlin extractor (primary path) handles
+/// SOCKS correctly via `Proxy.Type.SOCKS`.
 class ProxyConfig {
   final bool enabled;
   final AppProxyType type;

@@ -65,7 +65,9 @@ object DnsOverHttpsResolver {
     private fun resolveViaCloudflare(hostname: String): InetAddress? {
         return runCatching {
             val url = URL("https://1.1.1.1/dns-query?name=$hostname&type=A")
-            val conn = url.openConnection() as HttpURLConnection
+            // Bypass proxy — DoH must reach the resolver even when a custom
+            // proxy is dead, otherwise a bad proxy loops into DoH failure.
+            val conn = url.openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection
             conn.setRequestProperty("Accept", "application/dns-json")
             conn.connectTimeout = 4000
             conn.readTimeout = 4000
@@ -96,7 +98,7 @@ object DnsOverHttpsResolver {
     private fun resolveViaGoogle(hostname: String): InetAddress? {
         return runCatching {
             val url = URL("https://dns.google/resolve?name=$hostname&type=A")
-            val conn = url.openConnection() as HttpURLConnection
+            val conn = url.openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection
             conn.setRequestProperty("Accept", "application/dns-json")
             conn.connectTimeout = 4000
             conn.readTimeout = 4000

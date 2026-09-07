@@ -34,11 +34,25 @@ internal class JsDecipherCache(
             get() = System.currentTimeMillis() - cachedAt >= ttlMs
     }
 
+    data class CachedNTransform(
+        val playerHash: String,
+        val nSteps: List<String>,
+        val signatureTimestamp: Int? = null,
+        val cachedAt: Long = System.currentTimeMillis(),
+        val ttlMs: Long = 24 * 60 * 60 * 1000L
+    ) {
+        val isExpired: Boolean
+            get() = System.currentTimeMillis() - cachedAt >= ttlMs
+    }
+
     companion object {
         private const val TAG = "JsDecipherCache"
         private const val PREFS_NAME = "pulsr_ytm_decipher_cache"
         private const val KEY_PREFIX_RULES = "rules_"
         private const val KEY_PREFIX_TIME = "time_"
+        private const val KEY_PREFIX_N_RULES = "n_rules_"
+        private const val KEY_PREFIX_N_TIME = "n_time_"
+        private const val KEY_PREFIX_STS = "sts_"
         private const val DEFAULT_TTL_MS = 24 * 60 * 60 * 1000L
 
         @Volatile
@@ -148,8 +162,55 @@ internal class JsDecipherCache(
             ?.apply()
     }
 
+    // --- N-param transform (throttling) ---
+    private val nMemoryCache = ConcurrentHashMap<String, CachedNTransform>()
+
+    fun decipherN(n: String, playerHash: String = "default"): String {
+        val cached = getNTransform(playerHash) ?: return n
+        if (cached.isExpired || cached.nSteps.isEmpty()) return n
+        return applyTransforms(n, cached.nSteps)
+    }
+
+    fun getNTransform(playerHash: String): CachedNTransform? {
+        val inMem = nMemoryCache[playerHash]
+        if (inMem != null && !inMem.isExpired) return inMem
+        val stored = prefs?.getString(KEY_PREFIX_N_RULES + playerHash, null) ?: return null
+        val storedTime = prefs.getLong(KEY_PREFIX_N_TIME + playerHash, 0L)
+        if (System.currentTimeMillis() - storedTime >= DEFAULT_TTL_MS) {
+            clearNTransform(playerHash)
+            return null
+        }
+        val steps = stored.split(",").filter { it.isNotEmpty() }
+        val sts = prefs.getInt(KEY_PREFIX_STS + playerHash, -1).takeIf { it != -1 }
+        val entry = CachedNTransform(playerHash, steps, sts, storedTime)
+        nMemoryCache[playerHash] = entry
+        return entry
+    }
+
+    fun putNTransform(playerHash: String, steps: List<String>, signatureTimestamp: Int? = null) {
+        val now = System.currentTimeMillis()
+        nMemoryCache[playerHash] = CachedNTransform(playerHash, steps, signatureTimestamp, now)
+        val edit = prefs?.edit()
+            ?.putString(KEY_PREFIX_N_RULES + playerHash, steps.joinToString(","))
+            ?.putLong(KEY_PREFIX_N_TIME + playerHash, now)
+        if (signatureTimestamp != null) edit?.putInt(KEY_PREFIX_STS + playerHash, signatureTimestamp)
+        edit?.apply()
+        logD(TAG, "Cached n-transform for $playerHash sts=$signatureTimestamp steps=${steps.size}")
+    }
+
+    fun getSignatureTimestamp(playerHash: String = "default"): Int? {
+        val cached = getNTransform(playerHash) ?: return prefs?.getInt(KEY_PREFIX_STS + playerHash, -1)?.takeIf { it != -1 }
+        return cached.signatureTimestamp ?: prefs?.getInt(KEY_PREFIX_STS + playerHash, -1)?.takeIf { it != -1 }
+    }
+
+    fun clearNTransform(playerHash: String) {
+        nMemoryCache.remove(playerHash)
+        prefs?.edit()?.remove(KEY_PREFIX_N_RULES + playerHash)?.remove(KEY_PREFIX_N_TIME + playerHash)?.remove(KEY_PREFIX_STS + playerHash)?.apply()
+    }
+
     fun clearAll() {
         memoryCache.clear()
+        nMemoryCache.clear()
         prefs?.edit()?.clear()?.apply()
     }
 }

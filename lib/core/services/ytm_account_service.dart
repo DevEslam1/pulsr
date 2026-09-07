@@ -665,7 +665,9 @@ class YtmAccountService {
 
   /// Builds authenticated Innertube request headers with timestamped SAPISIDHASH, SAPISID3PHASH, or SAPISID1PHASH.
   Map<String, String> _buildHeaders(
-      {String userAgent = '', String origin = 'https://music.youtube.com'}) {
+      {String userAgent = '',
+      String origin = 'https://music.youtube.com',
+      String? fieldMask}) {
     final defaultUa = EmbeddedBrowserUa.desktop;
 
     final headers = <String, String>{
@@ -696,6 +698,9 @@ class YtmAccountService {
     final visitorId = _sessionVisitorData;
     if (visitorId != null && visitorId.isNotEmpty) {
       headers['X-Goog-Visitor-Id'] = visitorId;
+    }
+    if (fieldMask != null && fieldMask.isNotEmpty) {
+      headers['X-Goog-FieldMask'] = fieldMask;
     }
 
     return headers;
@@ -1915,15 +1920,15 @@ class YtmAccountService {
     final directUrl = format['url'] as String?;
     if (directUrl != null && directUrl.isNotEmpty) return directUrl;
 
+    // Ciphered formats require JS deciphering (signatureCipher `s` + `n` param).
+    // Dart has no Rhino engine; returning the raw `url` without `sig=` produces
+    // a 403. Let the native `InnertubeClient` / NewPipe tier (which does
+    // `JsDecipherCache.decipherSignature`) handle it. Returning null forces the
+    // Dart tier to be skipped and the native hedged race to run.
     final cipher = (format['signatureCipher'] ?? format['cipher']) as String?;
     if (cipher != null && cipher.isNotEmpty) {
-      try {
-        final uri = Uri.parse('?$cipher');
-        final extracted = uri.queryParameters['url'];
-        if (extracted != null && extracted.isNotEmpty) {
-          return extracted;
-        }
-      } catch (_) {}
+      debugPrint('[YTM_ACCOUNT] Skipping ciphered format (itag ${format['itag']}) — needs native decipher');
+      return null;
     }
     return null;
   }

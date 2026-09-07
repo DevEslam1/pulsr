@@ -302,8 +302,9 @@ internal class InnertubeClient(
                     return null
                 }
 
-                // Layer 6: Itag Ladder Ordering (140, 251, 139, 250, 249)
-                val itagLadder = listOf(140, 251, 139, 250, 249)
+                // Layer 6: Itag Ladder 2026 — Opus 251 (160kbps) preferred over AAC 140,
+                // matches YouTube.js / InnerTune: 251 > 140 > 139 > 250 > 249
+                val itagLadder = listOf(251, 140, 139, 250, 249)
                 val selectedPair = when (quality.lowercase()) {
                     "low" -> audioFormats.minByOrNull { it.first.optInt("bitrate", 0) }
                     "medium" -> audioFormats.minByOrNull { kotlin.math.abs(it.first.optInt("bitrate", 128000) - 128000) }
@@ -509,8 +510,11 @@ internal class InnertubeClient(
     }
 
     private fun extractUrlFromFormat(format: JSONObject): String? {
+        // Direct URL (may still contain throttling `n` param)
         val directUrl = format.optString("url")
-        if (directUrl.isNotEmpty()) return directUrl
+        if (directUrl.isNotEmpty()) {
+            return applyNTransformIfNeeded(directUrl)
+        }
 
         val cipher = format.optString("signatureCipher").ifEmpty { format.optString("cipher") }
         if (cipher.isNotEmpty()) {
@@ -532,7 +536,7 @@ internal class InnertubeClient(
                 }
 
                 if (rawUrl != null) {
-                    if (sig != null) {
+                    var resolved = if (sig != null) {
                         val decipherCache = JsDecipherCache.getInstance(context)
                         val deciphered = decipherCache.decipherSignature(sig)
                         val separator = if (rawUrl.contains("?")) "&" else "?"
@@ -540,6 +544,8 @@ internal class InnertubeClient(
                     } else {
                         rawUrl
                     }
+                    resolved = applyNTransformIfNeeded(resolved)
+                    resolved
                 } else {
                     null
                 }
@@ -549,6 +555,28 @@ internal class InnertubeClient(
             }
         }
         return null
+    }
+
+    private fun applyNTransformIfNeeded(url: String): String {
+        return try {
+            val uri = Uri.parse(url)
+            val n = uri.getQueryParameter("n") ?: return url
+            if (n.isEmpty()) return url
+            val cache = JsDecipherCache.getInstance(context)
+            val transformed = cache.decipherN(n)
+            if (transformed == n) return url // no rule cached → keep as-is (plays but throttled)
+            // Rebuild URL with transformed n
+            val newUri = uri.buildUpon().clearQuery().apply {
+                for (name in uri.queryParameterNames) {
+                    if (name == "n") appendQueryParameter("n", transformed)
+                    else uri.getQueryParameters(name).forEach { appendQueryParameter(name, it) }
+                }
+            }.build().toString()
+            newUri
+        } catch (t: Throwable) {
+            Log.w(TAG, "n-transform failed: ${t.message}")
+            url
+        }
     }
 
     /**
@@ -637,6 +665,21 @@ internal class InnertubeClient(
                     .header("X-Goog-Api-Key", API_KEY)
                     .header("x-youtube-client-name", clientType.effectiveClientNameId)
                     .header("x-youtube-client-version", clientType.effectiveClientVersion)
+                    .header(
+                        "X-Goog-FieldMask",
+                        when (bucket) {
+                            RateLimiter.Bucket.PLAYER -> "streamingData.adaptiveFormats,streamingData.formats,playabilityStatus,videoDetails,responseContext.datasyncId,responseContext.visitorData"
+                            RateLimiter.Bucket.SEARCH -> "contents.tabbedSearchResultsRenderer.tabs.tabRenderer.content.sectionListRenderer.contents.musicShelfRenderer.contents,contents.tabbedSearchResultsRenderer.tabs.tabRenderer.content.sectionListRenderer.contents.musicResponsiveListItemRenderer,continuationContents.sectionListContinuation.contents"
+                            RateLimiter.Bucket.BROWSE -> "contents.singleColumnBrowseResultsRenderer.tabs,contents.twoColumnBrowseResultsRenderer.tabs,contents.sectionListRenderer.contents,continuationContents,header,responseContext"
+                            else -> "*"
+                        }
+                    )
+                // 2026 rolloutToken (YouTubeSessionGenerator) — if present, improves
+                // session trust for WEB_REMIX. Optional but cheap.
+                val rollout = PoTokenManager.rolloutToken
+                if (rollout.isNotEmpty()) {
+                    reqBuilder.header("X-Goog-RolloutToken", rollout)
+                }
 
                 // Attach visitorData if available
                 val authedWeb = clientType.acceptsSessionAuth && cookieStore.isSessionValid()
@@ -654,7 +697,6 @@ internal class InnertubeClient(
                     reqBuilder.header("Origin", origin)
                     reqBuilder.header("Referer", "$origin/")
                     reqBuilder.header("X-Origin", origin)
-                    reqBuilder.header("x-origin", origin)
                     // Only an authenticated request has an "auth user" to index.
                     if (authedWeb) {
                         reqBuilder.header("x-goog-authuser", "0")
@@ -823,10 +865,17 @@ internal class InnertubeClient(
         }
 
         val playbackContext = JSONObject()
+        val sts = runCatching { JsDecipherCache.getInstance(context).getSignatureTimestamp() }.getOrNull()
         val contentPlaybackContext = JSONObject().apply {
             put("html5Preference", "HTML5_PREF_WANTS")
+            if (sts != null) put("signatureTimestamp", sts)
         }
+        // YouTube.js sends vis/lact/signatureTimestamp in contentPlaybackContext
         playbackContext.put("contentPlaybackContext", contentPlaybackContext)
+        // Also include top-level cpn helper as some clients expect it
+        if (sts != null) {
+            try { playbackContext.put("signatureTimestamp", sts) } catch (_: Throwable) {}
+        }
         root.put("playbackContext", playbackContext)
 
         // Only web clients consume a poToken. Computing readiness before this

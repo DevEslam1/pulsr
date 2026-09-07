@@ -103,7 +103,7 @@ internal object YtmHttpClient {
         private fun queryDoH(endpoint: String, hostname: String): List<InetAddress> {
             return try {
                 val dohUrl = "$endpoint?name=$hostname&type=A"
-                val conn = (java.net.URL(dohUrl).openConnection() as java.net.HttpURLConnection).apply {
+                val conn = (java.net.URL(dohUrl).openConnection(java.net.Proxy.NO_PROXY) as java.net.HttpURLConnection).apply {
                     connectTimeout = 3000
                     readTimeout = 3000
                     setRequestProperty("Accept", "application/dns-json")

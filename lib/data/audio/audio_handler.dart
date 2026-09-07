@@ -1037,6 +1037,7 @@ class PulsrAudioHandler extends BaseAudioHandler
 
     // Initialize audio effects & equalizer preferences
     await _equalizerManager.init();
+    await _restoreSkipSilence();
 
     // Register lifecycle observer to persist playback state and manage buffers on app background/resume
     _lifecycleObserver = _AudioHandlerLifecycleObserver(
@@ -1281,7 +1282,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       }
     }
     final quality = prefs.getString('setting_streaming_quality') ?? 'high';
-    final cacheKey = '$videoId-$quality';
+    final cacheKey = '$videoId:${quality.toLowerCase()}';
 
     if (!forceRefresh) {
       final cached = _streamCache[cacheKey];
@@ -1465,6 +1466,58 @@ class PulsrAudioHandler extends BaseAudioHandler
     _inFlightResolves.clear();
     _prefetching.clear();
     cancelPrefetches();
+  }
+
+  // --- SkipSilence + Normalization (InnerTune parity) ---
+  bool get skipSilenceEnabled => _activePlayer.skipSilenceEnabled;
+
+  Future<void> setSkipSilenceEnabled(bool enabled) async {
+    try {
+      await _playerA.setSkipSilenceEnabled(enabled);
+      await _playerB.setSkipSilenceEnabled(enabled);
+      final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
+      await prefs.setBool('skip_silence_enabled', enabled);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set skipSilence', error: e, stackTrace: st, category: 'AudioHandler');
+    }
+  }
+
+  Future<void> _restoreSkipSilence() async {
+    try {
+      final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
+      final enabled = prefs.getBool('skip_silence_enabled') ?? false;
+      if (enabled) {
+        await _playerA.setSkipSilenceEnabled(true);
+        await _playerB.setSkipSilenceEnabled(true);
+      }
+      final normEnabled = prefs.getBool('audio_normalization_enabled') ?? false;
+      if (normEnabled) {
+        // Apply mild loudness normalization for streams without ReplayGain tags
+        await _equalizerManager.setVolumeBoost(0.35);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> setAudioNormalizationEnabled(bool enabled) async {
+    try {
+      final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
+      await prefs.setBool('audio_normalization_enabled', enabled);
+      if (enabled) {
+        await _equalizerManager.setVolumeBoost(0.35);
+      } else {
+        await _equalizerManager.setVolumeBoost(0.0);
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set normalization', error: e, stackTrace: st, category: 'AudioHandler');
+    }
+  }
+
+  bool get isAudioNormalizationEnabled {
+    try {
+      return _cachedPrefs?.getBool('audio_normalization_enabled') ?? false;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Warms [_streamCache] for an upcoming YouTube track so track switching is instant.
@@ -2357,7 +2410,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         if (song.source == SongSource.youtube && song.remoteId != null) {
           debugPrint(
               '[AudioHandler] Playback error on ${song.title}: $playErr. Retrying with fresh stream URL...');
-          _streamCache.removeWhere((key, _) => key.startsWith(song.remoteId!));
+          _streamCache.removeWhere((key, _) => key.startsWith('${song.remoteId}:'));
           source = await _resolveAudioSource(song, item);
           if (generation != _playGeneration) return;
           final retryLazy = source is YtmResolvingSource;

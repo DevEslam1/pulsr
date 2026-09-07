@@ -62,6 +62,10 @@ object PoTokenManager {
     var sessionVisitorData: String = ""
         private set
 
+    @Volatile
+    var rolloutToken: String = ""
+        private set
+
     // A broken WebView is rarely permanent — an OOM-killed WebView provider or a
     // single BadWebViewException used to latch limited mode for the whole process
     // lifetime, silently downgrading every later resolution. Time-box it instead.

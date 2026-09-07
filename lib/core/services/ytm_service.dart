@@ -386,6 +386,24 @@ class YtmService {
     return _parseTracks(raw);
   }
 
+  Future<List<YtmTrack>> searchContinuation(String token,
+      {int limit = 30}) async {
+    if (token.trim().isEmpty) return const [];
+    try {
+      final raw = await _guard(
+        () => _channel.invokeMethod<List<Object?>>('searchContinuation', {
+          'continuation': token.trim(),
+          'limit': limit,
+        }),
+        timeout: _defaultSearchTimeout,
+      );
+      return _parseTracks(raw);
+    } catch (e) {
+      debugPrint('[YTM_SERVICE] searchContinuation failed: $e');
+      return const [];
+    }
+  }
+
   /// Search with fallback: First tries native extractor, then falls back to
   /// Innertube search if the extractor returns empty or throws.
   Future<List<YtmTrack>> searchWithFallback(String query,
@@ -445,6 +463,8 @@ class YtmService {
         'Referer': 'https://music.youtube.com/',
         'x-origin': 'https://music.youtube.com',
         'x-goog-authuser': '0',
+        'X-Goog-FieldMask':
+            'contents.tabbedSearchResultsRenderer.tabs.tabRenderer.content.sectionListRenderer.contents,continuationContents',
       };
 
       if (getIt.isRegistered<YtmAccountService>()) {
@@ -559,6 +579,34 @@ class YtmService {
     );
 
     return _parseTracks(raw);
+  }
+
+  Future<List<YtmTrack>> getCharts({int limit = 30}) async {
+    try {
+      final raw = await _guard(
+        () => _channel.invokeMethod<List<Object?>>('getCharts', {
+          'limit': limit,
+          ..._localeArgs(),
+        }),
+        timeout: _defaultSearchTimeout,
+      );
+      if (raw != null && raw.isNotEmpty) return _parseTracks(raw);
+    } catch (_) {}
+    return trending(limit: limit);
+  }
+
+  Future<List<YtmTrack>> getMoods({int limit = 30}) async {
+    try {
+      final raw = await _guard(
+        () => _channel.invokeMethod<List<Object?>>('getMoods', {
+          'limit': limit,
+          ..._localeArgs(),
+        }),
+        timeout: _defaultSearchTimeout,
+      );
+      if (raw != null && raw.isNotEmpty) return _parseTracks(raw);
+    } catch (_) {}
+    return const [];
   }
 
   Future<List<YtmTrack>> getPlaylistTracks(String urlOrId,

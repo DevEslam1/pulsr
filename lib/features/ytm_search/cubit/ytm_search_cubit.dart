@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/errors/ytm_error_classifier.dart';
 import '../../../core/services/file_intent_handler.dart';
@@ -19,6 +20,38 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
   YtmSearchCubit({required YtmService service})
       : _service = service,
         super(const YtmSearchState());
+
+  static const _historyKey = 'ytm_search_history';
+  static const _maxHistory = 20;
+
+  Future<List<String>> getSearchHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getStringList(_historyKey) ?? [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> _saveToHistory(String query) async {
+    final q = query.trim();
+    if (q.isEmpty || q.length < 2) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList(_historyKey) ?? [];
+      list.remove(q);
+      list.insert(0, q);
+      if (list.length > _maxHistory) list.removeRange(_maxHistory, list.length);
+      await prefs.setStringList(_historyKey, list);
+    } catch (_) {}
+  }
+
+  Future<void> clearHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_historyKey);
+    } catch (_) {}
+  }
 
   void onQueryChanged(String query) {
     emit(state.copyWith(query: query));
@@ -78,6 +111,7 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
       if (generation != _generation || isClosed) return;
       emit(state.copyWith(
           results: results, isLoading: false, errorMessage: null));
+      if (results.isNotEmpty) unawaited(_saveToHistory(query));
       // Speculative warm: the top hit is the most likely tap. Resolving its
       // stream URL now (one background player request) turns that tap into a
       // cache hit (~62ms) instead of a full multi-engine resolve (seconds).
