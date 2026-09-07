@@ -60,6 +60,8 @@ private:
     double sampleRate_ = 48000.0;
     double cornerHz_ = 80.0;
     double slopeDbPerOct_ = 24.0;
+    double targetSubGain_ = 0.8;
+    double smoothedSubGain_ = 0.8;
     double subGain_ = 0.8;
     bool enabled_ = false;
     bool cascade_ = true; // 24 dB/oct = two cascaded sections

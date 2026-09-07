@@ -32,7 +32,13 @@ object DnsOverHttpsResolver {
                 dnsCache.remove(entry.key)
             }
             if (dnsCache.size >= MAX_CACHE_SIZE) {
-                dnsCache.clear()
+                // Evict the oldest 25% of entries rather than clearing the entire cache
+                val toEvict = dnsCache.entries
+                    .sortedBy { it.value.second }
+                    .take((MAX_CACHE_SIZE / 4).coerceAtLeast(1))
+                for (entry in toEvict) {
+                    dnsCache.remove(entry.key)
+                }
             }
         }
         dnsCache[hostname] = address to now
@@ -45,14 +51,14 @@ object DnsOverHttpsResolver {
             return cached.first
         }
 
-        // Try Cloudflare DoH first
+        // Try Cloudflare DoH first (A, then AAAA)
         val cfResolved = resolveViaCloudflare(hostname)
         if (cfResolved != null) {
             putInCache(hostname, cfResolved, now)
             return cfResolved
         }
 
-        // Fallback to Google DoH
+        // Fallback to Google DoH (A, then AAAA)
         val googleResolved = resolveViaGoogle(hostname)
         if (googleResolved != null) {
             putInCache(hostname, googleResolved, now)
@@ -62,67 +68,50 @@ object DnsOverHttpsResolver {
         return null
     }
 
-    private fun resolveViaCloudflare(hostname: String): InetAddress? {
+    private fun queryDoH(baseUrl: String, hostname: String, recordType: String): InetAddress? {
         return runCatching {
-            val url = URL("https://1.1.1.1/dns-query?name=$hostname&type=A")
+            val url = URL("$baseUrl?name=$hostname&type=$recordType")
             // Bypass proxy — DoH must reach the resolver even when a custom
             // proxy is dead, otherwise a bad proxy loops into DoH failure.
             val conn = url.openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection
-            conn.setRequestProperty("Accept", "application/dns-json")
-            conn.connectTimeout = 4000
-            conn.readTimeout = 4000
-            conn.requestMethod = "GET"
+            try {
+                conn.setRequestProperty("Accept", "application/dns-json")
+                conn.connectTimeout = 4000
+                conn.readTimeout = 4000
+                conn.requestMethod = "GET"
 
-            if (conn.responseCode == 200) {
-                val json = conn.inputStream.bufferedReader().use { it.readText() }
-                val root = JSONObject(json)
-                val answers = root.optJSONArray("Answer")
-                if (answers != null && answers.length() > 0) {
-                    for (i in 0 until answers.length()) {
-                        val ans = answers.getJSONObject(i)
-                        val type = ans.optInt("type")
-                        // Type 1 = A, Type 28 = AAAA
-                        if (type == 1 || type == 28) {
-                            val ip = ans.optString("data")
-                            if (ip.isNotEmpty() && isNumericIp(ip)) {
-                                return@runCatching InetAddress.getByName(ip)
+                if (conn.responseCode == 200) {
+                    val json = conn.inputStream.bufferedReader().use { it.readText() }
+                    val root = JSONObject(json)
+                    val answers = root.optJSONArray("Answer")
+                    if (answers != null && answers.length() > 0) {
+                        for (i in 0 until answers.length()) {
+                            val ans = answers.getJSONObject(i)
+                            val type = ans.optInt("type")
+                            // Type 1 = A, Type 28 = AAAA
+                            if (type == 1 || type == 28) {
+                                val ip = ans.optString("data")
+                                if (ip.isNotEmpty() && isNumericIp(ip)) {
+                                    return@runCatching InetAddress.getByName(ip)
+                                }
                             }
                         }
                     }
                 }
+                null
+            } finally {
+                conn.disconnect()
             }
-            null
         }.getOrNull()
     }
 
-    private fun resolveViaGoogle(hostname: String): InetAddress? {
-        return runCatching {
-            val url = URL("https://dns.google/resolve?name=$hostname&type=A")
-            val conn = url.openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection
-            conn.setRequestProperty("Accept", "application/dns-json")
-            conn.connectTimeout = 4000
-            conn.readTimeout = 4000
-            conn.requestMethod = "GET"
+    private fun resolveViaCloudflare(hostname: String): InetAddress? {
+        return queryDoH("https://1.1.1.1/dns-query", hostname, "A")
+            ?: queryDoH("https://1.1.1.1/dns-query", hostname, "AAAA")
+    }
 
-            if (conn.responseCode == 200) {
-                val json = conn.inputStream.bufferedReader().use { it.readText() }
-                val root = JSONObject(json)
-                val answers = root.optJSONArray("Answer")
-                if (answers != null && answers.length() > 0) {
-                    for (i in 0 until answers.length()) {
-                        val ans = answers.getJSONObject(i)
-                        val type = ans.optInt("type")
-                        // Type 1 = A, Type 28 = AAAA
-                        if (type == 1 || type == 28) {
-                            val ip = ans.optString("data")
-                            if (ip.isNotEmpty() && isNumericIp(ip)) {
-                                return@runCatching InetAddress.getByName(ip)
-                            }
-                        }
-                    }
-                }
-            }
-            null
-        }.getOrNull()
+    private fun resolveViaGoogle(hostname: String): InetAddress? {
+        return queryDoH("https://dns.google/resolve", hostname, "A")
+            ?: queryDoH("https://dns.google/resolve", hostname, "AAAA")
     }
 }

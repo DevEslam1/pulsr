@@ -9,7 +9,6 @@
 
 DsdDecoder::DsdDecoder() {
     configure(DsdRate::DSD64, 176400, DsdBitOrder::LSB_FIRST);
-    reset();
 }
 
 void DsdDecoder::generateFilters() {
@@ -48,7 +47,9 @@ void DsdDecoder::generateFilters() {
 
 void DsdDecoder::configure(DsdRate rate, int targetPcmSampleRate, DsdBitOrder bitOrder) {
     dsdRate_ = rate;
-    targetRate_ = std::clamp(targetPcmSampleRate, 44100, 768000);
+    const double stage1Rate = (44100.0 * static_cast<double>(dsdRate_)) / 8.0;
+    const int maxTargetRate = std::min(768000, static_cast<int>(stage1Rate));
+    targetRate_ = std::clamp(targetPcmSampleRate, 44100, maxTargetRate);
     bitOrder_ = bitOrder;
 
     const double dsdFrequencyHz = 44100.0 * static_cast<double>(dsdRate_);

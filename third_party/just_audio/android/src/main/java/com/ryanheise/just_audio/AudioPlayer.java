@@ -110,6 +110,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
 
     private ExoPlayer player;
     private Integer audioSessionId;
+    // Pulsr fork: per-player DSP processor handle for the sample-accurate
+    // gain-ramp API (dspSetGainCurve / dspClearGainCurve).
+    private NativeDspAudioProcessor dspAudioProcessor;
     private Integer errorCode;
     private String errorMessage;
     private Integer currentIndex;
@@ -151,12 +154,12 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         List<Object> rawAudioEffects,
         Map<?, ?> audioOffloadPreferences,
         Boolean offloadSchedulingEnabled,
-        boolean useLazyPreparation
+        Boolean useLazyPreparation
     ) {
         this.context = applicationContext;
         this.rawAudioEffects = rawAudioEffects;
         this.offloadSchedulingEnabled = offloadSchedulingEnabled != null ? offloadSchedulingEnabled : false;
-        this.useLazyPreparation = useLazyPreparation;
+        this.useLazyPreparation = useLazyPreparation != null ? useLazyPreparation : false;
 
         if (audioOffloadPreferences != null) {
             this.audioOffloadPreferences = new AudioOffloadPreferences.Builder()
@@ -224,7 +227,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             this.audioSessionId = audioSessionId;
         }
         clearAudioEffects();
-        if (this.audioSessionId != null) {
+        if (this.audioSessionId != null && rawAudioEffects != null) {
             for (Object rawAudioEffect : rawAudioEffects) {
                 Map<?, ?> json = (Map<?, ?>)rawAudioEffect;
                 AudioEffect audioEffect = decodeAudioEffect(rawAudioEffect, this.audioSessionId);
@@ -465,6 +468,40 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             case "setVolume":
                 setVolume((float) ((double) ((Double) call.argument("volume"))));
                 result.success(new HashMap<String, Object>());
+                break;
+            case "dspSetGainCurve": {
+                // Pulsr fork: arm a sample-accurate piecewise-linear gain ramp
+                // on this player's NativeDspAudioProcessor. Responds false when
+                // unsupported so Dart falls back to stepped setVolume().
+                boolean applied = false;
+                try {
+                    List<?> gains = call.argument("gains");
+                    Integer segmentMs = call.argument("segmentMs");
+                    if (dspAudioProcessor != null && gains != null && !gains.isEmpty()) {
+                        double[] curve = new double[gains.size()];
+                        boolean valid = true;
+                        for (int i = 0; i < curve.length; i++) {
+                            Object g = gains.get(i);
+                            if (!(g instanceof Number)) {
+                                valid = false;
+                                break;
+                            }
+                            curve[i] = ((Number) g).doubleValue();
+                        }
+                        if (valid) {
+                            applied = dspAudioProcessor.setGainCurve(curve,
+                                    segmentMs == null ? 20 : segmentMs);
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "dspSetGainCurve failed: " + e.getMessage());
+                    applied = false;
+                }
+                result.success(applied);
+                break;
+            }
+            case "dspClearGainCurve":
+                result.success(dspAudioProcessor != null && dspAudioProcessor.clearGainCurve());
                 break;
             case "setSpeed":
                 setSpeed((float) ((double) ((Double) call.argument("speed"))));
@@ -759,6 +796,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     }
 
     private void load(final List<MediaSource> mediaSources, ShuffleOrder shuffleOrder, final long initialPosition, final Integer initialIndex, final Result result) {
+        if (dspAudioProcessor != null) {
+            dspAudioProcessor.clearGainCurve();
+        }
         currentIndex = initialIndex != null ? initialIndex : 0;
         final ProcessingState oldState = processingState;
         processingState = ProcessingState.loading;
@@ -787,7 +827,10 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     private void ensurePlayerInitialized() {
         if (player == null) {
             // Pulsr fork: the audio sink carries NativeDspAudioProcessor so the
-            // native DSP chain sees the decoded PCM stream.
+            // native DSP chain sees the decoded PCM stream. The instance is
+            // kept around so the gain-ramp method-channel API can reach it.
+            NativeDspAudioProcessor dspProcessor = new NativeDspAudioProcessor();
+            dspAudioProcessor = dspProcessor;
             DefaultRenderersFactory renderersFactoryImpl = new DefaultRenderersFactory(context) {
                 @Override
                 protected AudioSink buildAudioSink(Context context, boolean enableFloatOutput,
@@ -795,7 +838,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                     return new DefaultAudioSink.Builder(context)
                         .setEnableFloatOutput(enableFloatOutput)
                         .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
-                        .setAudioProcessors(new AudioProcessor[] { new NativeDspAudioProcessor() })
+                        .setAudioProcessors(new AudioProcessor[] { dspProcessor })
                         .build();
                 }
             };
@@ -1084,6 +1127,10 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             player = null;
             processingState = ProcessingState.idle;
             broadcastImmediatePlaybackEvent();
+        }
+        if (dspAudioProcessor != null) {
+            dspAudioProcessor.clearGainCurve();
+            dspAudioProcessor = null;
         }
         eventChannel.endOfStream();
         dataEventChannel.endOfStream();

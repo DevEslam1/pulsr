@@ -483,11 +483,15 @@ void ConvolutionReverb::setSampleRate(double sampleRate) {
     if (sampleRate_ > 48000.0) {
         wetInResampler_.setRates(sampleRate_, coreRate_);
         wetInResampler_.setEnabled(true);
+        wetInResampler_.reset();
         wetOutResampler_.setRates(coreRate_, sampleRate_);
         wetOutResampler_.setEnabled(true);
+        wetOutResampler_.reset();
     } else {
         wetInResampler_.setEnabled(false);
+        wetInResampler_.reset();
         wetOutResampler_.setEnabled(false);
+        wetOutResampler_.reset();
     }
 
     // A2 (B-05): Regenerate prepared IR for non-custom presets if not matching effective core rate
@@ -604,6 +608,18 @@ void ConvolutionReverb::preparePartitions() {
         inputHistoryFreqL_.resize(MAX_PREALLOC_PARTITIONS, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
         inputHistoryFreqR_.resize(MAX_PREALLOC_PARTITIONS, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
     }
+
+    // Clear history to prevent stale frequency-domain audio from convolving with new IR
+    std::fill(prevBlockL_.begin(), prevBlockL_.end(), 0.0f);
+    std::fill(prevBlockR_.begin(), prevBlockR_.end(), 0.0f);
+    std::fill(inputBlockL_.begin(), inputBlockL_.end(), 0.0f);
+    std::fill(inputBlockR_.begin(), inputBlockR_.end(), 0.0f);
+    for (auto& h : inputHistoryFreqL_) std::fill(h.begin(), h.end(), FftUtil::Complex(0.0f, 0.0f));
+    for (auto& h : inputHistoryFreqR_) std::fill(h.begin(), h.end(), FftUtil::Complex(0.0f, 0.0f));
+    std::fill(accumFreqL_.begin(), accumFreqL_.end(), FftUtil::Complex(0.0f, 0.0f));
+    std::fill(accumFreqR_.begin(), accumFreqR_.end(), FftUtil::Complex(0.0f, 0.0f));
+    inputBlockPos_ = 0;
+    historyHead_ = 0;
 }
 
 void ConvolutionReverb::reset() {

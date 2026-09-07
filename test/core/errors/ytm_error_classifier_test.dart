@@ -78,6 +78,19 @@ void main() {
       expect(
           infoCode.recoveryAction, equals(YtmRecoveryAction.rotatePath));
     });
+
+    test('classifies SABR enforced errors correctly', () {
+      const sabrEx = YtmException('SABR_ENFORCED', 'YouTube is forcing SABR streaming for this client');
+      final info = YtmErrorClassifier.classify(sabrEx);
+
+      expect(info.signal, equals(YtmBlockSignal.sabrEnforced));
+      expect(info.recoveryAction, equals(YtmRecoveryAction.rotateIdentity));
+
+      final strErr = Exception('server-based adaptive bitrate enforced');
+      final strInfo = YtmErrorClassifier.classify(strErr);
+      expect(strInfo.signal, equals(YtmBlockSignal.sabrEnforced));
+      expect(strInfo.recoveryAction, equals(YtmRecoveryAction.rotateIdentity));
+    });
   });
 
   // The playback path and the download path both have to answer "resolve a new

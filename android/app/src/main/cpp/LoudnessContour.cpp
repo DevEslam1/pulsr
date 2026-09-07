@@ -26,14 +26,16 @@ void LoudnessContour::configure(double intensity, double volumeLinear) {
 }
 
 void LoudnessContour::applyParams(const LoudnessContourParamSet& params) {
-    if (!params.enabled && enabled_) {
-        reset();
-    }
     enabled_ = params.enabled;
     configure(params.intensity, params.volumeLinear);
 }
 
 void LoudnessContour::updateTargetGains() {
+    if (!enabled_) {
+        targetBassDb_ = 0.0;
+        targetTrebleDb_ = 0.0;
+        return;
+    }
     // Equal-loudness approximation: lift grows as (1 - volume)^1.5 so the
     // contour is most active at low listening levels and vanishes at unity.
     const double loudnessWeight = std::pow(std::clamp(1.0 - volumeLinear_, 0.0, 1.0), 1.5);
@@ -97,7 +99,8 @@ void LoudnessContour::computeHighShelf(Biquad& bq, double f0, double gainDb, dou
 }
 
 void LoudnessContour::process(float* L, float* R, int frames) {
-    if (!enabled_ || !L || !R || frames <= 0) return;
+    if (!L || !R || frames <= 0) return;
+    if (!enabled_ && std::abs(currentBassDb_) < 1e-4 && std::abs(currentTrebleDb_) < 1e-4) return;
     rampTowardTarget(frames);
     if (std::abs(currentBassDb_) < 1e-6 && std::abs(currentTrebleDb_) < 1e-6) return;
 
@@ -130,7 +133,8 @@ void LoudnessContour::process(float* L, float* R, int frames) {
 }
 
 void LoudnessContour::processInterleaved(float* buffer, int frames, int channels) {
-    if (!enabled_ || !buffer || frames <= 0 || channels <= 0) return;
+    if (!buffer || frames <= 0 || channels <= 0) return;
+    if (!enabled_ && std::abs(currentBassDb_) < 1e-4 && std::abs(currentTrebleDb_) < 1e-4) return;
     rampTowardTarget(frames);
     if (std::abs(currentBassDb_) < 1e-6 && std::abs(currentTrebleDb_) < 1e-6) return;
 

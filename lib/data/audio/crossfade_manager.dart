@@ -1,6 +1,7 @@
 // lib/data/audio/crossfade_manager.dart
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:clock/clock.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:mutex/mutex.dart';
 import '../../core/utils/error_logger.dart';
@@ -155,6 +156,39 @@ class CrossfadeManager {
     }
   }
 
+  /// Sum-safe variant of [evaluateGainPair] for DUAL-PLAYER crossfades.
+  ///
+  /// The two players are mixed by Android AudioFlinger *after* each player's
+  /// DSP chain, and the mixer saturates at full scale. Equal-power gains keep
+  /// acoustic POWER constant (`cos²+sin²=1`), but their instantaneous sum
+  /// peaks at √2 ≈ 1.41 at the midpoint — whenever both tracks carry
+  /// coincident near-full-scale peaks (loud, dynamically compressed masters
+  /// do this constantly), the summed sample exceeds 1.0 and hard-clips as
+  /// crackle/distortion exactly during the overlap. HAL effects such as the
+  /// volume boost ([LoudnessEnhancer], up to +10 dB) push this further.
+  ///
+  /// The fix scales both gains by `k = sumCeiling / (oldGain + newGain)`
+  /// whenever the raw pair's sum exceeds [sumCeiling], guaranteeing
+  /// `oldGain + newGain <= sumCeiling` and therefore a worst-case summed
+  /// sample of exactly [sumCeiling] (1.0 = no clip even with all peaks
+  /// aligned). For UNCORRELATED music the true loudness cost is far below the
+  /// worst case: RMS of the sum is `k·sqrt(oldGain²+newGain²)`, so the dip is
+  /// at most −3 dB at the very midpoint (0 dB near the endpoints, where the
+  /// raw sum already fits under the ceiling), while eliminating the hard-clip
+  /// crackle. Endpoints remain exact: f=0 → (1,0), f=1 → (0,1) because the
+  /// raw sums there equal 1.0 and are never scaled.
+  (double oldGain, double newGain) evaluateSumSafeGainPair(double fraction,
+      {bool isRepeatOne = false, double sumCeiling = 1.0}) {
+    final (oldGain, newGain) =
+        evaluateGainPair(fraction, isRepeatOne: isRepeatOne);
+    final sum = oldGain + newGain;
+    if (sum > sumCeiling && sum > 0.0) {
+      final k = sumCeiling / sum;
+      return (oldGain * k, newGain * k);
+    }
+    return (oldGain, newGain);
+  }
+
   /// Arbitrates the transition between outgoing track and incoming track.
   /// Returns [TransitionType.gapless] or [TransitionType.crossfade].
   static TransitionDecision arbitrateTransition({
@@ -198,9 +232,53 @@ class CrossfadeManager {
     );
   }
 
+  /// True when the fade targets absolute silence (pure fade-out).
+  static bool _isPureFadeOut(double to) => to <= 0.0;
+
+  /// True when the fade starts from effective silence (pure fade-in).
+  static bool _isPureFadeIn(double from) => from <= 0.001;
+
+  /// Number of points used for native gain curves (~15 ms resolution, capped
+  /// so the platform-channel payload stays small even for long fades).
+  static int _curvePointCount(double totalMs) =>
+      (totalMs / 15).ceil().clamp(2, 401);
+
+  /// Arms a native sample-accurate gain curve if the platform (Pulsr Android
+  /// fork) supports it. Returns false — without throwing — on any other
+  /// platform or failure so callers can fall back to stepped ramps.
+  Future<bool> _armNativeCurve(
+      AudioPlayer player, List<double> gains, int segmentMs) async {
+    try {
+      return await player.dspSetGainCurve(gains, segmentMs: segmentMs) == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Best-effort native curve clear (ignore failures — platform may not
+  /// support it; a stale curve then still terminates at its last value).
+  void _clearNativeCurve(AudioPlayer player) {
+    player.dspClearGainCurve().catchError((_) => false);
+  }
+
   /// Gradually transitions the volume of [player] from [from] to [to] over [fadeDuration]
   /// using the selected [curve] sampled at 10ms intervals (~100 FPS) for
   /// zipper-free ramp. 16ms was still audible as hiss during the overlap.
+  ///
+  /// Curve interpolation uses the COMPLEMENTARY pair from [evaluateGainPair]
+  /// (`from·outGain + to·inGain`), which reduces to the plain curve shape for
+  /// linear/s-curve fades and fixes equal-power fade-OUTs: interpolating the
+  /// fade-in shape as `from + (to - from)·sin(f)` produced the mirrored
+  /// `1 - sin` gain instead of `cos`, ducking ~10 dB below the intended
+  /// midpoint and mismatching the matching fade-in.
+  ///
+  /// On the Pulsr Android fork the two "pure" fade directions (to silence /
+  /// from silence) are applied as per-sample gain ramps inside the audio sink
+  /// ([AudioPlayer.dspSetGainCurve]) instead of 10 ms stepped setVolume calls,
+  /// eliminating mixer-granularity zipper noise; Dart stepping remains the
+  /// fallback everywhere else. Mixed fades (both endpoints audible) keep the
+  /// stepped path because the native ramp is a multiplier on the player
+  /// volume and a mixed curve can exceed 1.0 mid-fade.
   Future<void> fadeVolume(
     AudioPlayer player,
     double from,
@@ -220,7 +298,32 @@ class CrossfadeManager {
     }
 
     final completer = Completer<void>();
-    final stopwatch = Stopwatch()..start();
+    final stopwatch = clock.stopwatch()..start();
+
+    // --- Native sample-accurate path (Pulsr Android fork) ---
+    // Fade-out: player volume stays at `from`, a 1→0 multiplier follows the
+    // fade-out side of the curve. Fade-in: the 0→1 multiplier is armed BEFORE
+    // the target volume is applied so the player can never leak through at
+    // full gain, then volume is pinned at `to` in one step.
+    final points = _curvePointCount(totalMs);
+    final segmentMs = (totalMs / (points - 1)).ceil().clamp(1, 1000);
+    var nativeArmed = false;
+    if (_isPureFadeOut(to)) {
+      final gains = List<double>.generate(
+          points, (i) => evaluateGainPair(i / (points - 1)).$1);
+      nativeArmed = await _armNativeCurve(player, gains, segmentMs);
+    } else if (_isPureFadeIn(from)) {
+      final gains = List<double>.generate(
+          points, (i) => evaluateGainPair(i / (points - 1)).$2);
+      nativeArmed = await _armNativeCurve(player, gains, segmentMs);
+      if (nativeArmed) {
+        try {
+          await player.setVolume(to.clamp(0.0, 1.0));
+        } catch (_) {
+          nativeArmed = false;
+        }
+      }
+    }
 
     late final Timer timer;
     timer = Timer.periodic(const Duration(milliseconds: 10), (t) {
@@ -234,25 +337,35 @@ class CrossfadeManager {
       final elapsed = stopwatch.elapsedMilliseconds.toDouble();
       final fraction = (elapsed / totalMs).clamp(0.0, 1.0);
 
-      final curveFraction = evaluateCurve(fraction);
-      final currentVol = from + (to - from) * curveFraction;
+      if (nativeArmed) {
+        // The sink applies the ramp per-sample; this timer only watches for
+        // cancellation and fade end.
+      } else {
+        final (outGain, inGain) = evaluateGainPair(fraction);
+        final currentVol = from * outGain + to * inGain;
 
-      try {
-        player.setVolume(currentVol.clamp(0.0, 1.0));
-      } catch (e, st) {
-        ErrorLogger.log(
-          'Error adjusting volume during fade',
-          error: e,
-          stackTrace: st,
-          category: 'CrossfadeManager',
-        );
-        t.cancel();
-        _activeTimers.remove(t);
-        if (!completer.isCompleted) completer.complete();
-        return;
+        try {
+          player.setVolume(currentVol.clamp(0.0, 1.0));
+        } catch (e, st) {
+          ErrorLogger.log(
+            'Error adjusting volume during fade',
+            error: e,
+            stackTrace: st,
+            category: 'CrossfadeManager',
+          );
+          t.cancel();
+          _activeTimers.remove(t);
+          if (!completer.isCompleted) completer.complete();
+          return;
+        }
       }
 
       if (fraction >= 1.0) {
+        // Guarantee the exact endpoint volume (also silences a native
+        // fade-out whose player volume still reads the pre-fade value).
+        try {
+          player.setVolume(to.clamp(0.0, 1.0));
+        } catch (_) {}
         t.cancel();
         _activeTimers.remove(t);
         if (!completer.isCompleted) completer.complete();
@@ -264,12 +377,25 @@ class CrossfadeManager {
   }
 
   /// Phase-locked crossfade driving *both* players from a single timer using
-  /// [evaluateGainPair]. Running two independent [fadeVolume] timers causes
+  /// [evaluateSumSafeGainPair]. Running two independent [fadeVolume] timers causes
   /// inter-timer jitter (one fires before the other) and — for equal-power —
   /// uses `1 - sin` for the fade-out instead of `cos`, producing a ~3 dB dip
   /// and audible stepping/zipper noise at the midpoint. A single timer
   /// guarantees `cos²+sin²=1` at every tick and 10 ms (~100 fps) granularity
   /// to eliminate the hiss that lasted until the outgoing buffer drained.
+  ///
+  /// Gains are sum-safe ([evaluateSumSafeGainPair]): the players are summed
+  /// and saturated by AudioFlinger AFTER each player's DSP chain, so equal-
+  /// power pairs peaking at √2 hard-clip on coincident track peaks exactly
+  /// during the overlap (user-audible crackle/distortion).
+  ///
+  /// On the Pulsr Android fork both ramps are applied per-sample inside the
+  /// audio sink ([AudioPlayer.dspSetGainCurve]): the outgoing player keeps its
+  /// absolute volume with a 1→0 multiplier curve, the incoming player has its
+  /// volume pinned at [toInactiveVol] with a 0→1 multiplier curve armed BEFORE
+  /// that volume is applied. Dart only watches the clock (no per-tick
+  /// platform-channel volume traffic). Every other platform falls back to the
+  /// 10 ms stepped timer below.
   Future<void> crossfadeVolumes({
     required AudioPlayer active,
     required AudioPlayer inactive,
@@ -291,7 +417,66 @@ class CrossfadeManager {
       return;
     }
     final completer = Completer<void>();
-    final stopwatch = Stopwatch()..start();
+    final stopwatch = clock.stopwatch()..start();
+
+    // --- Native sample-accurate path (Pulsr Android fork) ---
+    final points = _curvePointCount(totalMs);
+    final segmentMs = (totalMs / (points - 1)).ceil().clamp(1, 1000);
+    final oldCurve = List<double>.generate(points, (i) {
+      final (o, _) = evaluateSumSafeGainPair(i / (points - 1),
+          isRepeatOne: isRepeatOne);
+      return o;
+    });
+    final newCurve = List<double>.generate(points, (i) {
+      final (_, n) = evaluateSumSafeGainPair(i / (points - 1),
+          isRepeatOne: isRepeatOne);
+      return n;
+    });
+    final oldArmed = await _armNativeCurve(active, oldCurve, segmentMs);
+    final newArmed = await _armNativeCurve(inactive, newCurve, segmentMs);
+    var nativeReady = oldArmed && newArmed;
+    if (nativeReady) {
+      // Pin base volumes: outgoing keeps its ReplayGain-compensated level
+      // (the ramp multiplies it down), incoming jumps to its target while the
+      // curve still holds 0 — inaudible.
+      try {
+        await inactive.setVolume(toInactiveVol.clamp(0.0, 1.0));
+      } catch (_) {
+        // Volume never applied: the ramp would multiply a wrong base level.
+        nativeReady = false;
+      }
+    }
+    if ((oldArmed || newArmed) && !nativeReady) {
+      // Partial arming would double-attenuate the armed side once the stepped
+      // path drives volumes too — revert to stepping on both.
+      _clearNativeCurve(active);
+      _clearNativeCurve(inactive);
+    }
+    if (nativeReady) {
+      late final Timer timer;
+      timer = Timer.periodic(const Duration(milliseconds: 10), (t) {
+        if (_fadeId != fadeId) {
+          t.cancel();
+          _activeTimers.remove(t);
+          if (!completer.isCompleted) completer.complete();
+          return;
+        }
+        if (stopwatch.elapsedMilliseconds >= totalMs) {
+          // Exact endpoints — the curves hold their last values, mirror them
+          // onto the platform volumes so state stays consistent afterwards.
+          try {
+            active.setVolume(0.0);
+            inactive.setVolume(toInactiveVol.clamp(0.0, 1.0));
+          } catch (_) {}
+          t.cancel();
+          _activeTimers.remove(t);
+          if (!completer.isCompleted) completer.complete();
+        }
+      });
+      _activeTimers.add(timer);
+      return completer.future;
+    }
+
     late final Timer timer;
     timer = Timer.periodic(const Duration(milliseconds: 10), (t) {
       if (_fadeId != fadeId) {
@@ -302,10 +487,12 @@ class CrossfadeManager {
       }
       final elapsed = stopwatch.elapsedMilliseconds.toDouble();
       final fraction = (elapsed / totalMs).clamp(0.0, 1.0);
-      final (oldGain, newGain) =
-          evaluateGainPair(fraction, isRepeatOne: isRepeatOne);
+      final (oldGain, newGain) = evaluateSumSafeGainPair(fraction,
+          isRepeatOne: isRepeatOne);
       try {
-        // Gains are 0→1; scale by the ReplayGain-compensated peaks.
+        // Gains are 0→1; scale by the ReplayGain-compensated peaks. The
+        // sum-safe pair bounds oldGain+newGain <= 1 so the AudioFlinger
+        // mix of both players cannot exceed full scale.
         active.setVolume((oldGain * fromActiveVol).clamp(0.0, 1.0));
         inactive.setVolume((newGain * toInactiveVol).clamp(0.0, 1.0));
       } catch (e, st) {
@@ -356,6 +543,11 @@ class CrossfadeManager {
     pendingIndex = null;
 
     try {
+      // Clear any armed native gain curves BEFORE restoring volumes: a
+      // mid-fade curve would otherwise multiply the restored volume down to
+      // its held gain and leave the player audibly quiet after a cancel.
+      _clearNativeCurve(inactivePlayer);
+      _clearNativeCurve(activePlayer);
       await inactivePlayer.stop();
       await inactivePlayer.setVolume(restoreVolume.clamp(0.0, 1.0));
       await activePlayer.setVolume(restoreVolume.clamp(0.0, 1.0));

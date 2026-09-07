@@ -120,9 +120,11 @@ class DownloadService : Service() {
                 if (activeDownloads.isEmpty()) {
                     stopForegroundAndSelf()
                 } else {
-                    val display = if (activeDownloads.size == 1) title else "${activeDownloads.size} downloads"
+                    val remainingVid = activeDownloads.keys.first()
+                    val display = if (activeDownloads.size == 1) (downloadTitles[remainingVid] ?: title) else "${activeDownloads.size} downloads"
                     val avg = if (activeDownloads.isNotEmpty()) activeDownloads.values.average().toInt() else 0
-                    ensureForeground(display, avg, vid)
+                    val notifyVid = if (activeDownloads.size == 1) remainingVid else vid
+                    ensureForeground(display, avg, notifyVid)
                 }
             }
             ACTION_CANCEL -> {
@@ -221,6 +223,12 @@ class DownloadService : Service() {
                 mgr.createNotificationChannel(ch)
             }
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        activeDownloads.clear()
+        downloadTitles.clear()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

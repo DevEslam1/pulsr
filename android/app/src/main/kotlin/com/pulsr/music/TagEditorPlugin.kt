@@ -206,6 +206,7 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                             }
 
                         var effectiveArtworkBytes = rawArtworkBytes
+                        var effectiveArtworkMime = tags["artworkMimeType"] as? String ?: "image/jpeg"
                         if (effectiveArtworkBytes != null && effectiveArtworkBytes.size > 1024 * 1024) {
                             val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                             BitmapFactory.decodeByteArray(effectiveArtworkBytes, 0, effectiveArtworkBytes.size, options)
@@ -215,10 +216,27 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                                     if (bmp != null) {
                                         var scaled: Bitmap? = null
                                         try {
-                                            scaled = Bitmap.createScaledBitmap(bmp, 500, 500, true)
+                                            val maxDim = 500
+                                            val origW = bmp.width
+                                            val origH = bmp.height
+                                            val (targetW, targetH) = if (origW > maxDim || origH > maxDim) {
+                                                if (origW >= origH) {
+                                                    maxDim to (origH * maxDim / origW).coerceAtLeast(1)
+                                                } else {
+                                                    (origW * maxDim / origH).coerceAtLeast(1) to maxDim
+                                                }
+                                            } else {
+                                                origW to origH
+                                            }
+                                            scaled = if (targetW != origW || targetH != origH) {
+                                                Bitmap.createScaledBitmap(bmp, targetW, targetH, true)
+                                            } else {
+                                                bmp
+                                            }
                                             val stream = ByteArrayOutputStream()
                                             scaled.compress(Bitmap.CompressFormat.JPEG, 85, stream)
                                             effectiveArtworkBytes = stream.toByteArray()
+                                            effectiveArtworkMime = "image/jpeg"
                                         } catch (oom: OutOfMemoryError) {
                                             if (rawArtworkBytes.size > 5 * 1024 * 1024) {
                                                 throw IllegalArgumentException("Artwork exceeds 5MB limit and cannot be scaled down due to low memory")
@@ -246,8 +264,7 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                             try {
                                 val artwork = ArtworkFactory.getNew()
                                 artwork.binaryData = effectiveArtworkBytes
-                                val mime = tags["artworkMimeType"] as? String ?: "image/jpeg"
-                                artwork.mimeType = mime
+                                artwork.mimeType = effectiveArtworkMime
                                 tag.deleteArtworkField()
                                 tag.setField(artwork)
                             } catch (artEx: Exception) {
@@ -266,11 +283,14 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                             }
                         }
 
-                        // Trigger Android system MediaStore scan so changes are indexed immediately
-                        context?.let { ctx ->
-                            try {
-                                MediaScannerConnection.scanFile(ctx, arrayOf(path), null, null)
-                            } catch (_: Exception) {}
+                        // Trigger Android system MediaStore scan so filesystem changes are indexed immediately.
+                        // Skip for content:// URIs as they are managed directly by their DocumentProvider.
+                        if (!isContentUri) {
+                            context?.let { ctx ->
+                                try {
+                                    MediaScannerConnection.scanFile(ctx, arrayOf(path), null, null)
+                                } catch (_: Exception) {}
+                            }
                         }
 
                         android.os.Handler(android.os.Looper.getMainLooper()).post {

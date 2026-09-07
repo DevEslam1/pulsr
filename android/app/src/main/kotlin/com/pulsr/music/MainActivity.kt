@@ -13,7 +13,10 @@ import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import org.jaudiotagger.audio.AudioFileIO
+import org.jaudiotagger.audio.generic.AbstractTag
 import org.jaudiotagger.tag.FieldKey
+import org.jaudiotagger.tag.flac.FlacTag
+import org.jaudiotagger.tag.vorbiscomment.VorbisCommentTag
 import java.io.File
  
 class MainActivity : AudioServiceActivity() {
@@ -175,11 +178,16 @@ class MainActivity : AudioServiceActivity() {
                     try {
                         val file = if (filePath.startsWith("content:")) {
                             val uri = Uri.parse(filePath)
-                            tempFile = File.createTempFile("lyrics_", ".tmp", cacheDir)
-                            contentResolver.openInputStream(uri)?.use { input ->
-                                tempFile.outputStream().use { output -> input.copyTo(output) }
+                            val inputStream = contentResolver.openInputStream(uri)
+                            if (inputStream != null) {
+                                tempFile = File.createTempFile("lyrics_", ".tmp", cacheDir)
+                                inputStream.use { input ->
+                                    tempFile.outputStream().use { output -> input.copyTo(output) }
+                                }
+                                tempFile
+                            } else {
+                                null
                             }
-                            tempFile
                         } else {
                             File(filePath)
                         }
@@ -189,6 +197,36 @@ class MainActivity : AudioServiceActivity() {
                             try {
                                 val audioFile = AudioFileIO.read(file)
                                 lyrics = audioFile.tag?.getFirst(FieldKey.LYRICS)
+                                // 1b) FLAC/OGG store lyrics in Vorbis comments, but
+                                // most taggers write UNSYNCEDLYRICS / SYNCEDLYRICS,
+                                // which jaudiotagger 3.x has no FieldKey mapping for
+                                // (only "LYRICS" is mapped). Probe those keys by raw
+                                // name on the Vorbis-backed tags or they are missed.
+                                // SYNCED is preferred over UNSYNCED when both exist
+                                // (reader ids are uppercased on read, so these exact
+                                // names match any letter case the tagger used).
+                                if (lyrics.isNullOrBlank()) {
+                                    val vorbisTag: AbstractTag? = when (val tag = audioFile.tag) {
+                                        is FlacTag -> tag.vorbisCommentTag
+                                        is VorbisCommentTag -> tag
+                                        is AbstractTag -> tag
+                                        else -> null
+                                    }
+                                    if (vorbisTag != null) {
+                                        for (key in listOf(
+                                            "SYNCEDLYRICS",
+                                            "UNSYNCEDLYRICS",
+                                            "SYNCED LYRICS",
+                                            "UNSYNCED LYRICS"
+                                        )) {
+                                            val v = vorbisTag.getFirst(key)
+                                            if (!v.isNullOrBlank()) {
+                                                lyrics = v
+                                                break
+                                            }
+                                        }
+                                    }
+                                }
                             } catch (_: Exception) {}
                             // 2) MediaMetadataRetriever fallback – some OEMs write lyrics that jaudiotagger misses
                             if (lyrics.isNullOrBlank()) {

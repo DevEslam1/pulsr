@@ -56,6 +56,8 @@ class LrclibService {
         artistName: cand.artistName,
         albumName: albumName,
         durationSeconds: durationSeconds,
+        expectedArtist: artistName,
+        expectedDurationSec: durationSeconds,
       );
       if (result != null && result.lines.isNotEmpty) return result;
 
@@ -64,6 +66,8 @@ class LrclibService {
         result = await _tryGetLyrics(
           trackName: cand.trackName,
           artistName: cand.artistName,
+          expectedArtist: artistName,
+          expectedDurationSec: durationSeconds,
         );
         if (result != null && result.lines.isNotEmpty) return result;
       }
@@ -80,7 +84,11 @@ class LrclibService {
     }
 
     for (final q in searchQueries.take(3)) {
-      final result = await _trySearchLyrics(query: q);
+      final result = await _trySearchLyrics(
+        query: q,
+        expectedArtist: artistName,
+        expectedDurationSec: durationSeconds,
+      );
       if (result != null && result.lines.isNotEmpty) return result;
     }
 
@@ -221,11 +229,57 @@ class LrclibService {
         .trim();
   }
 
+  /// Guards against showing lyrics of a DIFFERENT song: LRCLIB lookups fall
+  /// back to fuzzy candidates, and search results especially can be a
+  /// same-titled track by another artist. Accept a result only when it is
+  /// anchored to the requested song by artist name overlap or duration
+  /// tolerance. Missing metadata on either side means "no evidence", which
+  /// keeps previously-working lookups (legacy behavior) intact.
+  static const int _durationToleranceSec = 5;
+
+  bool _namesOverlap(String? a, String? b) {
+    if (a == null || b == null) return false;
+    final la = a.toLowerCase().trim();
+    final lb = b.toLowerCase().trim();
+    if (la.isEmpty || lb.isEmpty) return false;
+    return lb.contains(la) || la.contains(lb);
+  }
+
+  bool _isRelevantMatch(
+    Map<String, dynamic> json, {
+    required String? expectedArtist,
+    required int? expectedDurationSec,
+  }) {
+    final resultArtist = (json['artistName'] as String?)?.trim();
+    final resultDuration = (json['duration'] as num?)?.toInt();
+
+    final hasExpectedArtist = expectedArtist != null && expectedArtist.isNotEmpty;
+    final hasExpectedDuration =
+        expectedDurationSec != null && expectedDurationSec > 0;
+
+    // No context at all to validate against — accept (legacy behavior).
+    if (!hasExpectedArtist && !hasExpectedDuration) return true;
+
+    final artistMatch =
+        hasExpectedArtist && _namesOverlap(expectedArtist, resultArtist);
+    final durationMatch = hasExpectedDuration &&
+        resultDuration != null &&
+        resultDuration > 0 &&
+        (resultDuration - expectedDurationSec).abs() <= _durationToleranceSec;
+
+    // No comparable fields in the response — cannot reject either.
+    if (resultArtist == null && resultDuration == null) return true;
+
+    return artistMatch || durationMatch;
+  }
+
   Future<LyricsResult?> _tryGetLyrics({
     required String trackName,
     required String artistName,
     String? albumName,
     int? durationSeconds,
+    String? expectedArtist,
+    int? expectedDurationSec,
   }) async {
     try {
       final queryParams = <String, String>{
@@ -249,6 +303,15 @@ class LrclibService {
       if (response.statusCode == 200) {
         final responseBody = await response.transform(utf8.decoder).join();
         final json = jsonDecode(responseBody) as Map<String, dynamic>;
+        // Swapped/normalized candidates can resolve a real but DIFFERENT
+        // song (e.g. "Hamaki" by "Adrenaline"); require relevance.
+        if (!_isRelevantMatch(
+          json,
+          expectedArtist: expectedArtist,
+          expectedDurationSec: expectedDurationSec,
+        )) {
+          return null;
+        }
         return _extractLyricsFromJson(json);
       } else {
         await response.drain();
@@ -259,7 +322,11 @@ class LrclibService {
     return null;
   }
 
-  Future<LyricsResult?> _trySearchLyrics({required String query}) async {
+  Future<LyricsResult?> _trySearchLyrics({
+    required String query,
+    String? expectedArtist,
+    int? expectedDurationSec,
+  }) async {
     try {
       final uri = Uri.https('lrclib.net', '/api/search', {'q': query});
       final request = await _client.getUrl(uri);
@@ -272,22 +339,27 @@ class LrclibService {
         final responseBody = await response.transform(utf8.decoder).join();
         final list = jsonDecode(responseBody);
         if (list is List && list.isNotEmpty) {
+          final relevant = list
+              .whereType<Map<String, dynamic>>()
+              .where((item) => _isRelevantMatch(
+                    item,
+                    expectedArtist: expectedArtist,
+                    expectedDurationSec: expectedDurationSec,
+                  ))
+              .toList();
+          if (relevant.isEmpty) return null;
           // Pass 1: Prioritize synced lyrics
-          for (final item in list) {
-            if (item is Map<String, dynamic>) {
-              final synced = item['syncedLyrics'] as String?;
-              if (synced != null && synced.trim().isNotEmpty) {
-                final res = _extractLyricsFromJson(item);
-                if (res != null && res.lines.isNotEmpty) return res;
-              }
-            }
-          }
-          // Pass 2: Fallback to plain lyrics
-          for (final item in list) {
-            if (item is Map<String, dynamic>) {
+          for (final item in relevant) {
+            final synced = item['syncedLyrics'] as String?;
+            if (synced != null && synced.trim().isNotEmpty) {
               final res = _extractLyricsFromJson(item);
               if (res != null && res.lines.isNotEmpty) return res;
             }
+          }
+          // Pass 2: Fallback to plain lyrics
+          for (final item in relevant) {
+            final res = _extractLyricsFromJson(item);
+            if (res != null && res.lines.isNotEmpty) return res;
           }
         }
       } else {

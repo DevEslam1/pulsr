@@ -89,8 +89,10 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetEqBandsBulk(
 
     jdouble* freqs = env->GetDoubleArrayElements(jFreqs, nullptr);
     jdouble* gains = env->GetDoubleArrayElements(jGains, nullptr);
-    jdouble* qs = jQs ? env->GetDoubleArrayElements(jQs, nullptr) : nullptr;
-    jint* types = jTypes ? env->GetIntArrayElements(jTypes, nullptr) : nullptr;
+    jsize qLen = jQs ? env->GetArrayLength(jQs) : 0;
+    jdouble* qs = (jQs && qLen > 0) ? env->GetDoubleArrayElements(jQs, nullptr) : nullptr;
+    jsize typeLen = jTypes ? env->GetArrayLength(jTypes) : 0;
+    jint* types = (jTypes && typeLen > 0) ? env->GetIntArrayElements(jTypes, nullptr) : nullptr;
     if (!freqs || !gains) {
         if (freqs) env->ReleaseDoubleArrayElements(jFreqs, freqs, JNI_ABORT);
         if (gains) env->ReleaseDoubleArrayElements(jGains, gains, JNI_ABORT);
@@ -103,11 +105,13 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetEqBandsBulk(
     std::vector<double> vGains(gains, gains + count);
     std::vector<double> vQs(count, 1.414);
     if (qs) {
-        for (int i = 0; i < count; ++i) vQs[i] = qs[i];
+        const jsize limit = std::min(count, qLen);
+        for (jsize i = 0; i < limit; ++i) vQs[i] = qs[i];
     }
     std::vector<int> vTypes(count, static_cast<int>(FilterType::Peaking));
     if (types) {
-        for (int i = 0; i < count; ++i) vTypes[i] = types[i];
+        const jsize limit = std::min(count, typeLen);
+        for (jsize i = 0; i < limit; ++i) vTypes[i] = types[i];
     }
 
     env->ReleaseDoubleArrayElements(jFreqs, freqs, JNI_ABORT);
@@ -335,6 +339,7 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeDecodeDsd(
         JNIEnv* env, jobject /* thiz */,
         jbyteArray dsdL, jbyteArray dsdR, jint byteCount, jint dsdRate, jint targetPcmSampleRate, jint bitOrder) {
     if (!dsdL || !dsdR || byteCount <= 0) return nullptr;
+    if (env->GetArrayLength(dsdL) < byteCount || env->GetArrayLength(dsdR) < byteCount) return nullptr;
     if (dsdRate != static_cast<jint>(DsdDecoder::DsdRate::DSD64) &&
         dsdRate != static_cast<jint>(DsdDecoder::DsdRate::DSD128) &&
         dsdRate != static_cast<jint>(DsdDecoder::DsdRate::DSD256)) {

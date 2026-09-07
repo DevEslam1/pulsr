@@ -131,19 +131,19 @@ int SincResampler::processInterleaved(float* buffer, int frames, int channels) {
 #if defined(__ARM_NEON)
             float32x4_t sumVec = vdupq_n_f32(0.0f);
             for (int tap = 0; tap < TAPS_PER_PHASE; tap += 4) {
-                const int readOffset0 = availableFrames_ - baseInt + (tap - HALF_TAPS);
+                const int readOffset0 = availableFrames_ - baseInt + (HALF_TAPS - tap);
                 int ringIndex0 = (writePos_ - readOffset0) % FIFO_CAPACITY;
                 if (ringIndex0 < 0) ringIndex0 += FIFO_CAPACITY;
 
-                const int readOffset1 = availableFrames_ - baseInt + (tap + 1 - HALF_TAPS);
+                const int readOffset1 = availableFrames_ - baseInt + (HALF_TAPS - (tap + 1));
                 int ringIndex1 = (writePos_ - readOffset1) % FIFO_CAPACITY;
                 if (ringIndex1 < 0) ringIndex1 += FIFO_CAPACITY;
 
-                const int readOffset2 = availableFrames_ - baseInt + (tap + 2 - HALF_TAPS);
+                const int readOffset2 = availableFrames_ - baseInt + (HALF_TAPS - (tap + 2));
                 int ringIndex2 = (writePos_ - readOffset2) % FIFO_CAPACITY;
                 if (ringIndex2 < 0) ringIndex2 += FIFO_CAPACITY;
 
-                const int readOffset3 = availableFrames_ - baseInt + (tap + 3 - HALF_TAPS);
+                const int readOffset3 = availableFrames_ - baseInt + (HALF_TAPS - (tap + 3));
                 int ringIndex3 = (writePos_ - readOffset3) % FIFO_CAPACITY;
                 if (ringIndex3 < 0) ringIndex3 += FIFO_CAPACITY;
 
@@ -168,7 +168,7 @@ int SincResampler::processInterleaved(float* buffer, int frames, int channels) {
             float sum = 0.0f;
             for (int tap = 0; tap < TAPS_PER_PHASE; ++tap) {
                 // Sinc history lookup relative to current write position & phase
-                const int readOffset = availableFrames_ - baseInt + (tap - HALF_TAPS);
+                const int readOffset = availableFrames_ - baseInt + (HALF_TAPS - tap);
                 int ringIndex = (writePos_ - readOffset) % FIFO_CAPACITY;
                 if (ringIndex < 0) ringIndex += FIFO_CAPACITY;
 
@@ -244,7 +244,7 @@ int SincResampler::processPlanar(const float* const* in, float* const* out, int 
         for (int ch = 0; ch < channels; ++ch) {
             float sum = 0.0f;
             for (int tap = 0; tap < TAPS_PER_PHASE; ++tap) {
-                const int readOffset = availableFrames_ - baseInt + (tap - HALF_TAPS);
+                const int readOffset = availableFrames_ - baseInt + (HALF_TAPS - tap);
                 int ringIndex = (writePos_ - readOffset) % FIFO_CAPACITY;
                 if (ringIndex < 0) ringIndex += FIFO_CAPACITY;
 

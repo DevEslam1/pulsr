@@ -17,10 +17,18 @@ class TripleBufferPipeline {
   final MediaItem Function(SongsTableData song, [Uri? fastArtworkUri])
       songToMediaItem;
 
+  /// Called after the (possibly slow) source resolve and again right before
+  /// [AudioPlayer.setAudioSource]; when it returns false the preload is
+  /// abandoned. Without this guard a YouTube resolve that takes seconds can
+  /// complete after the dual-player engine has already loaded/played or
+  /// swapped that same player, clobbering live playback.
+  final bool Function()? isLoadStillValid;
+
   TripleBufferPipeline({
     required this.getActivePlayer,
     required this.getInactivePlayer,
     this.prefetchPlayer,
+    this.isLoadStillValid,
     required this.resolveAudioSource,
     required this.songToMediaItem,
   });
@@ -31,6 +39,9 @@ class TripleBufferPipeline {
       final inactivePlayer = getInactivePlayer();
       final tag = songToMediaItem(nextSong);
       final source = await resolveAudioSource(nextSong, tag);
+      // The await above can outlast the track that scheduled this preload;
+      // never touch a player that is no longer the inactive one.
+      if (isLoadStillValid != null && !isLoadStillValid!()) return;
       await inactivePlayer.setAudioSource(source, preload: true);
     } catch (e) {
       ErrorLogger.log('Preload failed', error: e, category: 'TripleBuffer');

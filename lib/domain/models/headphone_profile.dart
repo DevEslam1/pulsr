@@ -25,9 +25,12 @@ class HeadphoneProfile {
   });
 
   factory HeadphoneProfile.fromJson(Map<String, dynamic> json) {
-    final rawGains = (json['gains'] as List<dynamic>)
-        .map((e) => (e as num).toDouble())
-        .toList();
+    // Null-guard gains like every sibling field: a stored profile missing the
+    // key must not throw and abort the whole profile load.
+    final rawGains = (json['gains'] as List<dynamic>?)
+            ?.map((e) => (e as num).toDouble())
+            .toList() ??
+        const <double>[];
     return HeadphoneProfile(
       id: json['id'] as String,
       name: json['name'] as String,

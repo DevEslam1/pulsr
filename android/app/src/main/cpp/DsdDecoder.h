@@ -46,7 +46,6 @@ private:
     // CIC stage 1 integrators & combs (signed 64-bit to prevent overflow/drift)
     struct CicState {
         int64_t int1 = 0, int2 = 0, int3 = 0;
-        int64_t comb1 = 0, comb2 = 0, comb3 = 0;
         int64_t comb1_d = 0, comb2_d = 0, comb3_d = 0;
     };
     CicState cicL_;

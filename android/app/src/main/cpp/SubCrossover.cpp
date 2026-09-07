@@ -19,7 +19,8 @@ void SubCrossover::configure(double cornerHz, double slopeDbPerOct, double subGa
     cornerHz_ = std::clamp(cornerHz, 60.0, 150.0);
     // Accept 12 or 24 dB/oct; anything between snaps to the nearest supported slope.
     slopeDbPerOct_ = (slopeDbPerOct < 18.0) ? 12.0 : 24.0;
-    subGain_ = std::clamp(subGain, 0.0, 1.0);
+    targetSubGain_ = std::clamp(subGain, 0.0, 1.0);
+    subGain_ = targetSubGain_;
     cascade_ = slopeDbPerOct_ >= 24.0;
     computeCoeffs();
 }
@@ -51,6 +52,7 @@ void SubCrossover::computeCoeffs() {
 }
 
 void SubCrossover::reset() {
+    smoothedSubGain_ = targetSubGain_;
     for (int p = 0; p < MAX_PAIRS; ++p) {
         stage1_[p].z1 = stage1_[p].z2 = 0.0;
         stage2_[p].z1 = stage2_[p].z2 = 0.0;
@@ -59,9 +61,14 @@ void SubCrossover::reset() {
 
 void SubCrossover::process(float* L, float* R, int frames) {
     if (!enabled_ || !L || !R || frames <= 0) return;
-    if (subGain_ <= 1e-6) return;
 
-    const float gain = static_cast<float>(subGain_);
+    constexpr double kTau = 0.020;
+    const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
+    smoothedSubGain_ += smoothFactor * (targetSubGain_ - smoothedSubGain_);
+
+    if (smoothedSubGain_ <= 1e-6 && targetSubGain_ <= 1e-6) return;
+
+    const float gain = static_cast<float>(smoothedSubGain_);
     const float makeup = 1.0f / (1.0f + gain * 0.5f);
     LpStage& s1 = stage1_[0];
     LpStage& s2 = stage2_[0];
@@ -79,10 +86,16 @@ void SubCrossover::process(float* L, float* R, int frames) {
 }
 
 void SubCrossover::processInterleaved(float* buffer, int frames, int channels) {
+    channels = std::clamp(channels, 2, MAX_CHANNELS);
     if (!enabled_ || !buffer || frames <= 0 || channels < 2) return;
-    if (subGain_ <= 1e-6) return;
 
-    const float gain = static_cast<float>(subGain_);
+    constexpr double kTau = 0.020;
+    const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
+    smoothedSubGain_ += smoothFactor * (targetSubGain_ - smoothedSubGain_);
+
+    if (smoothedSubGain_ <= 1e-6 && targetSubGain_ <= 1e-6) return;
+
+    const float gain = static_cast<float>(smoothedSubGain_);
     const float makeup = 1.0f / (1.0f + gain * 0.5f);
     // Redirect one mono sub tap per channel pair (stereo pairs stay coherent).
     for (int i = 0; i < frames; ++i) {

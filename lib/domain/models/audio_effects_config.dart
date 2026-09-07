@@ -224,7 +224,11 @@ class DynamicEqBandConfig {
       ratio: (json['ratio'] as num?)?.toDouble() ?? 3.0,
       attackMs: (json['attackMs'] as num?)?.toDouble() ?? 5.0,
       releaseMs: (json['releaseMs'] as num?)?.toDouble() ?? 120.0,
-      maxCutDb: (json['maxCutDb'] as num?)?.toDouble() ?? -12.0,
+      // Cut-only by contract: clamp positive stored values so a tampered or
+      // hand-edited preset cannot turn the dynamic EQ into a booster.
+      maxCutDb: ((json['maxCutDb'] as num?)?.toDouble() ?? -12.0)
+          .clamp(-96.0, 0.0)
+          .toDouble(),
       enabled: (json['enabled'] as bool?) ?? true,
     );
   }

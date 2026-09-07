@@ -64,15 +64,7 @@ void SpatialPanner::process(float* L, float* R, int frames) {
 }
 
 void SpatialPanner::processInterleaved(float* buffer, int frames, int channels) {
-    if (!buffer || frames <= 0) return;
-
-    if (channels == 1) {
-        // Mono channel
-        for (int i = 0; i < frames; ++i) {
-            buffer[i] *= 1.0f;
-        }
-        return;
-    }
+    if (!buffer || frames <= 0 || channels < 2) return;
 
     // Explicit 15ms time-constant smoothing derived from sampleRate_ and frame count
     constexpr double kTau = 0.015;

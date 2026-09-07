@@ -30,10 +30,11 @@ public class MainMethodCallHandler implements MethodCallHandler {
         case "init": {
             String id = call.argument("id");
             if (players.containsKey(id)) {
-                result.error("Platform player " + id + " already exists", null, null);
+                result.error("error", "Platform player " + id + " already exists", null);
                 break;
             }
             List<Object> rawAudioEffects = call.argument("androidAudioEffects");
+            Boolean useLazyPreparation = call.argument("useLazyPreparation");
             players.put(
                 id,
                 new AudioPlayer(
@@ -44,7 +45,7 @@ public class MainMethodCallHandler implements MethodCallHandler {
                     rawAudioEffects,
                     call.argument("androidAudioOffloadPreferences"),
                     call.argument("androidOffloadSchedulingEnabled"),
-		    call.argument("useLazyPreparation")
+                    useLazyPreparation != null ? useLazyPreparation : false
                 )
             );
             result.success(null);

@@ -35,9 +35,15 @@ object CellularFailoverHelper {
 
     /**
      * Executes an HTTP request strictly routed over the cellular network.
-     * Keeps the network active for the lifetime of the connection.
+     * Optionally accepts an [onCloseRef] to receive a callback that unregisters
+     * the network callback once the caller finishes streaming data.
      */
-    fun openCellularConnection(context: Context, targetUrl: String, timeoutMs: Int = 10000): HttpURLConnection? {
+    fun openCellularConnection(
+        context: Context,
+        targetUrl: String,
+        timeoutMs: Int = 10000,
+        onCloseRef: AtomicReference<(() -> Unit)?>? = null
+    ): HttpURLConnection? {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return null
         val latch = CountDownLatch(1)
         val selectedNetwork = AtomicReference<Network?>(null)
@@ -66,12 +72,26 @@ object CellularFailoverHelper {
             if (net != null) {
                 val url = URL(targetUrl)
                 val conn = net.openConnection(url) as? HttpURLConnection
-                // Keep the network callback alive during connection usage, auto-unregistering after 60s
-                unregisterNeeded = false
-                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                    runCatching { cm.unregisterNetworkCallback(callback) }
-                }, 60000L)
-                conn
+                if (conn != null) {
+                    val isUnregistered = java.util.concurrent.atomic.AtomicBoolean(false)
+                    val unregisterAction: () -> Unit = {
+                        if (isUnregistered.compareAndSet(false, true)) {
+                            runCatching { cm.unregisterNetworkCallback(callback) }
+                        }
+                    }
+                    unregisterNeeded = false
+                    if (onCloseRef != null) {
+                        onCloseRef.set(unregisterAction)
+                    } else {
+                        // Fallback: auto-unregister after 60s if caller did not supply a lifecycle ref
+                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                            unregisterAction()
+                        }, 60000L)
+                    }
+                    conn
+                } else {
+                    null
+                }
             } else {
                 null
             }

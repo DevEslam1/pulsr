@@ -38,8 +38,9 @@ class ScrobblerPlugin(private val context: Context) : MethodChannel.MethodCallHa
         }
     }
 
-    private var isScrobblerChecked = false
+    private var lastScrobblerCheckMs = 0L
     private var isScrobblerPresent = false
+    private val scrobblerCheckTtlMs = 60_000L // Re-check every 60s if not present
 
     private val knownScrobblerPackages = arrayOf(
         "com.adam.aslfms",
@@ -50,25 +51,33 @@ class ScrobblerPlugin(private val context: Context) : MethodChannel.MethodCallHa
     )
 
     private fun isScrobblerAvailable(): Boolean {
-        if (isScrobblerChecked) return isScrobblerPresent
+        val now = System.currentTimeMillis()
+        if (isScrobblerPresent && (now - lastScrobblerCheckMs) < 10 * 60_000L) {
+            return true
+        }
+        if (!isScrobblerPresent && (now - lastScrobblerCheckMs) < scrobblerCheckTtlMs) {
+            return false
+        }
+        lastScrobblerCheckMs = now
+        var found = false
         try {
             val intent = Intent("com.android.music.metachanged")
             val receivers = context.packageManager.queryBroadcastReceivers(intent, 0)
             if (receivers.isNotEmpty()) {
-                isScrobblerPresent = true
+                found = true
             } else {
                 for (pkg in knownScrobblerPackages) {
                     val pkgIntent = Intent("com.android.music.metachanged").setPackage(pkg)
                     if (context.packageManager.queryBroadcastReceivers(pkgIntent, 0).isNotEmpty()) {
-                        isScrobblerPresent = true
+                        found = true
                         break
                     }
                 }
             }
         } catch (_: Throwable) {
-            isScrobblerPresent = false
+            found = false
         }
-        isScrobblerChecked = true
+        isScrobblerPresent = found
         return isScrobblerPresent
     }
 

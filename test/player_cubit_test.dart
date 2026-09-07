@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:rxdart/rxdart.dart';
+import 'package:pulsr/core/errors/failures.dart';
+import 'package:pulsr/core/constants/prefs_keys.dart';
 import 'package:pulsr/core/telemetry/clock.dart';
 import 'package:pulsr/core/telemetry/playback_latency_tracker.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
@@ -387,6 +390,12 @@ class TestPulsrAudioHandler extends BaseAudioHandler
     int initialIndex = 0,
     Duration? initialPosition,
   }) async {}
+
+  double? lastSetSpeed;
+  @override
+  Future<void> setSpeed(double speed) async {
+    lastSetSpeed = speed;
+  }
 
   @override
   void dispose() {
@@ -1189,5 +1198,148 @@ void main() {
         expect(testAudioHandler.setVolumeCallCount, greaterThan(0));
       },
     );
+  });
+
+  group('PlayerCubit queue sync', () {
+    SongsTableData buildSong(int id, String title) => SongsTableData(
+          id: id,
+          title: title,
+          artist: 'Artist $id',
+          album: 'Album $id',
+          durationMs: 180000,
+          path: '/path/$id.mp3',
+          isFavorite: false,
+          isMissing: false,
+          isDownloaded: false,
+          playCount: 0,
+          lastPositionMs: 0,
+          source: SongSource.local,
+        );
+
+    test(
+      'cold-start restore: handler queue sync is not aborted by concurrent '
+      'mediaItem generation bumps and preserves playback order',
+      () async {
+        final song1 = buildSong(201, 'Song 1');
+        final song2 = buildSong(202, 'Song 2');
+        // DB may return rows in unspecified (rowid) order.
+        when(() => mockRepository.getSongsByIds(any()))
+            .thenAnswer((_) async => Right([song2, song1]));
+        when(() => mockRepository.getSongById(any()))
+            .thenAnswer((_) async => Right(song2));
+
+        final cubit = PlayerCubit(
+          audioHandler: testAudioHandler,
+          repository: mockRepository,
+          toggleFavoriteUseCase: mockToggleFavorite,
+        );
+        addTearDown(cubit.close);
+
+        // Cold-start restore emits mediaItem before queue; resolving the
+        // mediaItem bumps _mediaItemResolutionGen, which must no longer
+        // abort the queue sync.
+        testAudioHandler.emitMediaItem(const MediaItem(
+          id: '202',
+          title: 'Song 2',
+          artist: 'Artist 202',
+        ));
+        await Future<void>.delayed(Duration.zero);
+
+        testAudioHandler.emitQueue([
+          const MediaItem(id: '201', title: 'Song 1', artist: 'Artist 201'),
+          const MediaItem(id: '202', title: 'Song 2', artist: 'Artist 202'),
+        ]);
+        await pumpEventQueue();
+
+        // Order follows the handler's playback order, not the DB order.
+        expect(cubit.state.queue.map((s) => s.id).toList(), [201, 202]);
+        // Highlight is anchored to the running song.
+        expect(cubit.state.currentIndex, 1);
+        expect(cubit.state.currentSong?.id, 202);
+      },
+    );
+
+    test('restored queue slot keeps the persisted playback order', () async {
+      final song1 = buildSong(301, 'Song 1');
+      final song2 = buildSong(302, 'Song 2');
+      final song3 = buildSong(303, 'Song 3');
+      // Simulate getSongsByIds returning rows in unspecified (rowid) order.
+      when(() => mockRepository.getSongsByIds(any()))
+          .thenAnswer((_) async => Right([song3, song1, song2]));
+      when(() => mockRepository.getSongById(any()))
+          .thenAnswer((_) async => Left(DatabaseFailure('not found')));
+
+      SharedPreferences.setMockInitialValues({
+        PrefsKeys.queueSlots: jsonEncode({
+          '1': {
+            'songIds': [301, 302, 303],
+            'currentIndex': 2,
+            'positionMs': 0,
+            'speed': 1.25,
+          },
+        }),
+      });
+
+      final cubit = PlayerCubit(
+        audioHandler: testAudioHandler,
+        repository: mockRepository,
+        toggleFavoriteUseCase: mockToggleFavorite,
+      );
+      addTearDown(cubit.close);
+      await pumpEventQueue(); // let _restoreQueueSlots finish
+
+      await cubit.switchQueueSlot(1);
+
+      // Restored order follows the persisted songIds, not the DB row order.
+      expect(cubit.state.queue.map((s) => s.id).toList(), [301, 302, 303]);
+      // The saved current song stays the running one.
+      expect(cubit.state.currentIndex, 2);
+      expect(cubit.state.currentSong?.id, 303);
+      expect(testAudioHandler.lastSetSpeed, 1.25);
+    });
+
+    test('out-of-order handler queue events: only the latest sync applies',
+        () async {
+      final songA = buildSong(201, 'Song A');
+      final songB = buildSong(202, 'Song B');
+      // Isolate prefs: mock initial values leak across tests in the process,
+      // and a restored queue slot would consume a getSongsByIds call below.
+      SharedPreferences.setMockInitialValues({});
+      when(() => mockRepository.getSongById(any()))
+          .thenAnswer((_) async => Left(DatabaseFailure('not found')));
+
+      var calls = 0;
+      final firstGate = Completer<void>();
+      when(() => mockRepository.getSongsByIds(any())).thenAnswer((_) async {
+        calls++;
+        if (calls == 1) {
+          await firstGate.future; // first (older) sync stalls in flight
+          return Right([songA]);
+        }
+        return Right([songB, songA]);
+      });
+
+      final cubit = PlayerCubit(
+        audioHandler: testAudioHandler,
+        repository: mockRepository,
+        toggleFavoriteUseCase: mockToggleFavorite,
+      );
+      addTearDown(cubit.close);
+
+      testAudioHandler.emitQueue([
+        const MediaItem(id: '201', title: 'Song A', artist: 'Artist 201'),
+      ]);
+      await Future<void>.delayed(Duration.zero);
+      testAudioHandler.emitQueue([
+        const MediaItem(id: '202', title: 'Song B', artist: 'Artist 202'),
+        const MediaItem(id: '201', title: 'Song A', artist: 'Artist 201'),
+      ]);
+      await Future<void>.delayed(Duration.zero);
+      firstGate.complete();
+      await pumpEventQueue();
+
+      expect(calls, 2);
+      expect(cubit.state.queue.map((s) => s.id).toList(), [202, 201]);
+    });
   });
 }

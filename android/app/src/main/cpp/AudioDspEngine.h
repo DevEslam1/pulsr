@@ -73,8 +73,8 @@ public:
 
     AudioDspEngine();
     void setSampleRate(double sampleRate);
-    double getSampleRate() const { return sampleRate_; }
-    double getAppliedSampleRate() const { return sampleRate_; }
+    double getSampleRate() const { return sampleRate_.load(std::memory_order_acquire); }
+    double getAppliedSampleRate() const { return sampleRate_.load(std::memory_order_acquire); }
     uint64_t getLastAppliedGeneration() const { return lastAppliedGeneration_.load(); }
     uint64_t getPublishedGeneration() const { return snapshotGeneration_.load(); }
 
@@ -146,7 +146,7 @@ private:
     void applySampleRateLocked(double sampleRate);
     void resetInternal();
 
-    double sampleRate_ = 48000.0;
+    std::atomic<double> sampleRate_{48000.0};
     std::atomic<uint64_t> snapshotGeneration_{1};
     std::atomic<uint64_t> lastAppliedGeneration_{0};
     std::atomic<uint32_t> autoDegradedStages_{0};

@@ -41,18 +41,18 @@ class NowPlayingWidget : AppWidgetProvider() {
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action
         if (action != null && action.startsWith("com.pulsr.music.widget.")) {
-            // Enforce signature permission for internal widget broadcasts
-            try {
-                val check = context.checkCallingOrSelfPermission("com.pulsr.music.permission.WIDGET_CONTROL")
-                if (check != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                    // For non-signature callers, verify intent came from our package explicitly
-                    val caller = intent.`package`
-                    if (caller == null || caller != context.packageName) {
-                        android.util.Log.w("NowPlayingWidget", "Rejected widget action from ${caller ?: "unknown"} without permission")
-                        return
-                    }
-                }
-            } catch (_: Exception) {}
+            // Enforce authentic widget broadcast origin: either holds signature permission WIDGET_CONTROL,
+            // or carries the process token injected into PendingIntents created by our own AppWidget.
+            val token = intent.getStringExtra(EXTRA_WIDGET_TOKEN)
+            val isAuthenticInternal = token != null && token == WIDGET_INTERNAL_TOKEN
+            val hasSignaturePermission = runCatching {
+                context.checkCallingOrSelfPermission("com.pulsr.music.permission.WIDGET_CONTROL") == android.content.pm.PackageManager.PERMISSION_GRANTED
+            }.getOrDefault(false)
+
+            if (!isAuthenticInternal && !hasSignaturePermission) {
+                android.util.Log.w("NowPlayingWidget", "Rejected unauthorized widget action from untrusted sender")
+                return
+            }
             handleWidgetAction(context, intent)
             return
         }
@@ -204,6 +204,8 @@ class NowPlayingWidget : AppWidgetProvider() {
         const val ACTION_SHUFFLE = "com.pulsr.music.widget.SHUFFLE"
         const val ACTION_REPEAT = "com.pulsr.music.widget.REPEAT"
         const val EXTRA_RATIO = "extra_ratio"
+        private const val EXTRA_WIDGET_TOKEN = "com.pulsr.music.widget.extra.TOKEN"
+        private val WIDGET_INTERNAL_TOKEN = java.util.UUID.randomUUID().toString()
 
         private var cachedMediaBrowser: MediaBrowserCompat? = null
         private var cachedMediaController: MediaControllerCompat? = null
@@ -742,6 +744,7 @@ class NowPlayingWidget : AppWidgetProvider() {
         private fun createBroadcastPendingIntent(context: Context, actionName: String, requestCode: Int): PendingIntent {
             val intent = Intent(context, NowPlayingWidget::class.java).apply {
                 action = actionName
+                putExtra(EXTRA_WIDGET_TOKEN, WIDGET_INTERNAL_TOKEN)
                 `package` = context.packageName
             }
             val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -756,6 +759,7 @@ class NowPlayingWidget : AppWidgetProvider() {
             val intent = Intent(context, NowPlayingWidget::class.java).apply {
                 action = ACTION_SEEK_RATIO
                 putExtra(EXTRA_RATIO, ratio)
+                putExtra(EXTRA_WIDGET_TOKEN, WIDGET_INTERNAL_TOKEN)
                 `package` = context.packageName
             }
             val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {

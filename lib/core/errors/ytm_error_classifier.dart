@@ -125,6 +125,14 @@ class YtmErrorClassifier {
 
   /// Signal a well-known HTTP status maps to, or null when the status carries
   /// no verdict of its own (2xx/3xx and 5xx, which are YouTube-side hiccups).
+  ///
+  /// 403 from YouTube when behind a VPN is commonly a bot/reputation block on
+  /// the exit node, not a permanent IP ban — [botChallenge] with
+  /// [invalidatePoTokenAndRetry] gives the correct first-attempt recovery;
+  /// callers that still fail after a fresh poToken can escalate to rotatePath.
+  /// 407 is a proxy authentication failure (wrong credentials or proxy
+  /// misconfigured), so it maps to [ipBlocked]+rotatePath rather than being
+  /// conflated with a YouTube-side 403 verdict.
   static YtmBlockSignal? _signalForHttpStatus(int? status) {
     switch (status) {
       case 429:
@@ -132,7 +140,10 @@ class YtmErrorClassifier {
       case 401:
         return YtmBlockSignal.signInRequired;
       case 403:
+        // On VPN exits 403 is often a bot/reputation gate; try poToken first.
+        return YtmBlockSignal.botChallenge;
       case 407:
+        // Proxy authentication required — path/credential issue, not IP block.
         return YtmBlockSignal.ipBlocked;
       case 400:
         return YtmBlockSignal.clientDeprecated;
@@ -213,6 +224,13 @@ class YtmErrorClassifier {
         signal: YtmBlockSignal.poTokenInvalid,
         traceId: traceId,
       );
+    }
+
+    // 2.5 SABR enforced (server-based adaptive bitrate; client protocol state, not bot/geo)
+    if (errStr.contains('sabr') ||
+        errStr.contains('forcing sabr') ||
+        errStr.contains('server-based adaptive bitrate')) {
+      return _mapSignal(YtmBlockSignal.sabrEnforced, null, traceId);
     }
 
     // 3. Rate limited
@@ -347,7 +365,16 @@ class YtmErrorClassifier {
     if (_botWordPattern.hasMatch(combined) ||
         combined.contains('recaptcha') ||
         combined.contains('botguard') ||
-        combined.contains('unusual traffic')) {
+        combined.contains('unusual traffic') ||
+        // VPN exit reputation blocks — YouTube returns these in the detail
+        // text of an EXTRACTOR_ERROR. Without this check they fell through
+        // to rotateIdentity instead of the correct invalidatePoTokenAndRetry.
+        combined.contains('sign in to confirm') ||
+        combined.contains("confirm you're not") ||
+        combined.contains('not a bot') ||
+        combined.contains('automated queries') ||
+        combined.contains('bot_block') ||
+        combined.contains('confirm you')) {
       return _mapSignal(YtmBlockSignal.botChallenge, details, traceId);
     }
     if (combined.contains('too many requests') ||
@@ -357,6 +384,10 @@ class YtmErrorClassifier {
     }
     if (combined.contains('potoken') || combined.contains('po_token')) {
       return _mapSignal(YtmBlockSignal.poTokenInvalid, details, traceId);
+    }
+    if (combined.contains('sabr') ||
+        combined.contains('server-based adaptive bitrate')) {
+      return _mapSignal(YtmBlockSignal.sabrEnforced, details, traceId);
     }
     if (combined.contains('geo_blocked') ||
         combined.contains('geo_restricted') ||
@@ -512,6 +543,13 @@ class YtmErrorClassifier {
       case YtmBlockSignal.signatureDecipherFailed:
         return YtmErrorInfo(
           message: 'Signature deciphering unavailable for this format.',
+          recoveryAction: YtmRecoveryAction.rotateIdentity,
+          signal: signal,
+          traceId: traceId,
+        );
+      case YtmBlockSignal.sabrEnforced:
+        return YtmErrorInfo(
+          message: 'YouTube format restriction encountered. Rotating route…',
           recoveryAction: YtmRecoveryAction.rotateIdentity,
           signal: signal,
           traceId: traceId,

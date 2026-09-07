@@ -89,21 +89,25 @@ object ProxyManager {
             }
         }
 
-        // Also configure ProxyPool if host is non-empty
+        // Also configure ProxyPool if host is non-empty, unless an explicit multi-proxy pool was set
         if (enabled && this.host.isNotEmpty()) {
-            val pType = if (this.proxyType == "socks5" || this.proxyType == "socks") Proxy.Type.SOCKS else Proxy.Type.HTTP
-            val node = ProxyPool.ProxyNode(
-                id = "${this.host}:${this.port}",
-                type = pType,
-                host = this.host,
-                port = this.port,
-                username = this.username,
-                password = this.password,
-                isEnabled = true
-            )
-            ProxyPool.setProxies(listOf(node))
+            if (!ProxyPool.hasExplicitPool) {
+                val pType = if (this.proxyType == "socks5" || this.proxyType == "socks") Proxy.Type.SOCKS else Proxy.Type.HTTP
+                val node = ProxyPool.ProxyNode(
+                    id = "${this.host}:${this.port}",
+                    type = pType,
+                    host = this.host,
+                    port = this.port,
+                    username = this.username,
+                    password = this.password,
+                    isEnabled = true
+                )
+                ProxyPool.setProxies(listOf(node), isExplicit = false)
+            }
         } else if (!enabled) {
-            ProxyPool.setProxies(emptyList())
+            if (!ProxyPool.hasExplicitPool) {
+                ProxyPool.setProxies(emptyList(), isExplicit = false)
+            }
         }
 
         logI(TAG, "Proxy configured: enabled=$enabled, type=$proxyType, host=${this.host}:${this.port}, hasAuth=${this.username.isNotEmpty()}")
@@ -132,7 +136,7 @@ object ProxyManager {
         username = ""
         password = ""
         bypassList = emptyList()
-        ProxyPool.setProxies(emptyList())
+        ProxyPool.clearPool()
     }
 
     /**

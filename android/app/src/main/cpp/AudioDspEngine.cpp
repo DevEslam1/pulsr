@@ -21,19 +21,19 @@ AudioDspEngine::AudioDspEngine() {
 void AudioDspEngine::setSampleRateInternal(double sampleRate) {
     if (sampleRate < 8000.0) sampleRate = 8000.0;
     if (sampleRate > 768000.0) sampleRate = 768000.0;
-    sampleRate_ = sampleRate;
+    sampleRate_.store(sampleRate, std::memory_order_release);
 
-    eq_.setSampleRate(sampleRate_);
-    panner_.setSampleRate(sampleRate_);
-    crossfeed_.setSampleRate(sampleRate_);
-    limiter_.setSampleRate(sampleRate_);
-    reverb_.setSampleRate(sampleRate_);
-    resampler_.setRates(sampleRate_, sampleRate_);
-    saturation_.setSampleRate(sampleRate_);
-    stereoWidth_.setSampleRate(sampleRate_);
-    loudnessContour_.setSampleRate(sampleRate_);
-    subCrossover_.setSampleRate(sampleRate_);
-    dynamicEq_.setSampleRate(sampleRate_);
+    eq_.setSampleRate(sampleRate);
+    panner_.setSampleRate(sampleRate);
+    crossfeed_.setSampleRate(sampleRate);
+    limiter_.setSampleRate(sampleRate);
+    reverb_.setSampleRate(sampleRate);
+    resampler_.setRates(sampleRate, sampleRate);
+    saturation_.setSampleRate(sampleRate);
+    stereoWidth_.setSampleRate(sampleRate);
+    loudnessContour_.setSampleRate(sampleRate);
+    subCrossover_.setSampleRate(sampleRate);
+    dynamicEq_.setSampleRate(sampleRate);
 }
 
 void AudioDspEngine::applySampleRateLocked(double sampleRate) {
@@ -147,18 +147,20 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         }
 
         reverb_.applyParams(snapshot->reverb);
-        if (std::abs(snapshot->sampleRate - sampleRate_) > 0.5) {
-            sampleRate_ = snapshot->sampleRate;
-            eq_.setSampleRate(sampleRate_);
-            panner_.setSampleRate(sampleRate_);
-            crossfeed_.setSampleRate(sampleRate_);
-            limiter_.setSampleRate(sampleRate_);
-            reverb_.setSampleRate(sampleRate_);
-            saturation_.setSampleRate(sampleRate_);
-            stereoWidth_.setSampleRate(sampleRate_);
-            loudnessContour_.setSampleRate(sampleRate_);
-            subCrossover_.setSampleRate(sampleRate_);
-            dynamicEq_.setSampleRate(sampleRate_);
+        const double currentSr = sampleRate_.load(std::memory_order_acquire);
+        if (std::abs(snapshot->sampleRate - currentSr) > 0.5) {
+            sampleRate_.store(snapshot->sampleRate, std::memory_order_release);
+            const double sr = snapshot->sampleRate;
+            eq_.setSampleRate(sr);
+            panner_.setSampleRate(sr);
+            crossfeed_.setSampleRate(sr);
+            limiter_.setSampleRate(sr);
+            reverb_.setSampleRate(sr);
+            saturation_.setSampleRate(sr);
+            stereoWidth_.setSampleRate(sr);
+            loudnessContour_.setSampleRate(sr);
+            subCrossover_.setSampleRate(sr);
+            dynamicEq_.setSampleRate(sr);
         }
 
         eq_.applyParams(snapshot->eq);
@@ -198,8 +200,9 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
     }
 
     // Smooth ReplayGain across 20ms window
+    const double currentSr = sampleRate_.load(std::memory_order_relaxed);
     const double rgTau = 0.020;
-    const double rgSmoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * rgTau));
+    const double rgSmoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (currentSr * rgTau));
     smoothedReplayGain_ += rgSmoothFactor * (targetReplayGain_ - smoothedReplayGain_);
 
     // Net gain check for conditional limiter insertion
@@ -212,6 +215,12 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
                 break;
             }
         }
+    }
+    if (snapshot->loudness.enabled && snapshot->loudness.intensity > 0.01 && snapshot->loudness.volumeLinear < 0.99) {
+        hasNetPositiveGain = true;
+    }
+    if (snapshot->stereoWidth.enabled && snapshot->stereoWidth.width > 1.01) {
+        hasNetPositiveGain = true;
     }
 
     const uint32_t rawStages = snapshot->activeStages;
@@ -308,7 +317,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         } else {
             const auto blockEnd = std::chrono::steady_clock::now();
             const double elapsedSec = std::chrono::duration<double>(blockEnd - blockStart).count();
-            const double effectiveRate = (snapshot && snapshot->sampleRate > 0.0) ? snapshot->sampleRate : sampleRate_;
+            const double effectiveRate = (snapshot && snapshot->sampleRate > 0.0) ? snapshot->sampleRate : sampleRate_.load(std::memory_order_relaxed);
             const double budgetSec = static_cast<double>(frames) / effectiveRate;
             if (budgetSec > 1e-9) {
                 blockRtf = elapsedSec / budgetSec;

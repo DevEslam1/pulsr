@@ -3,10 +3,10 @@
 #include <cstring>
 
 namespace {
-// drive 0..1 maps to tanh sharpness k = 0..kMax. k=0 keeps the identity
-// (tanh(k*x)/tanh(k) -> x as k -> 0), so the drive slider is continuous
-// from transparent to heavily saturated.
-constexpr double kMaxDrive = 10.0;
+// drive 0..1 maps to tanh sharpness k = 0..kMax. Normalizing by (1/k) ensures
+// small-signal gain is identically unity (0 dB), preventing quiet audio from being
+// amplified while higher-energy transients undergo smooth tape-style saturation.
+constexpr double kMaxDrive = 5.0;
 // Tilt pre-emphasis one-pole highpass corner (~1.8 kHz): above this the
 // shaper is driven progressively harder, emulating tape HF bias.
 constexpr double kTiltHpHz = 1800.0;
@@ -60,7 +60,7 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
     const float mix = static_cast<float>(mix_);
     const float tilt = static_cast<float>(tilt_);
     const float hpCoeff = tiltHpCoeff_;
-    const float invTanhK = (k > 1e-9) ? static_cast<float>(1.0 / std::tanh(k)) : 1.0f;
+    const float invNorm = (k > 1e-9) ? static_cast<float>(1.0 / k) : 1.0f;
     float& hpL = hpState_[0];
     float& hpR = hpState_[1];
 
@@ -107,8 +107,8 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
                     emphR = subR + tilt * (subR - hpR);
                 }
 
-                sumL += std::tanh(k * emphL) * invTanhK;
-                sumR += std::tanh(k * emphR) * invTanhK;
+                sumL += std::tanh(k * emphL) * invNorm;
+                sumR += std::tanh(k * emphR) * invNorm;
             }
 
             wetL = sumL * (1.0f / static_cast<float>(OVERSAMPLE_FACTOR));
@@ -130,7 +130,7 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
     const float mix = static_cast<float>(mix_);
     const float tilt = static_cast<float>(tilt_);
     const float hpCoeff = tiltHpCoeff_;
-    const float invTanhK = (k > 1e-9) ? static_cast<float>(1.0 / std::tanh(k)) : 1.0f;
+    const float invNorm = (k > 1e-9) ? static_cast<float>(1.0 / k) : 1.0f;
 
     // Fast unrolled path for stereo (channels == 2)
     if (channels == 2) {
@@ -177,8 +177,8 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
                         emphR = subR + tilt * (subR - hpR);
                     }
 
-                    sumL += std::tanh(k * emphL) * invTanhK;
-                    sumR += std::tanh(k * emphR) * invTanhK;
+                    sumL += std::tanh(k * emphL) * invNorm;
+                    sumR += std::tanh(k * emphR) * invNorm;
                 }
 
                 wetL = sumL * (1.0f / static_cast<float>(OVERSAMPLE_FACTOR));
@@ -222,7 +222,7 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
                         emph = sub + tilt * (sub - hp);
                     }
 
-                    sum += std::tanh(k * emph) * invTanhK;
+                    sum += std::tanh(k * emph) * invNorm;
                 }
                 wet = sum * (1.0f / static_cast<float>(OVERSAMPLE_FACTOR));
             }

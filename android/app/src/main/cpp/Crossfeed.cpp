@@ -19,6 +19,7 @@ void Crossfeed::setSampleRate(double sampleRate) {
     if (sampleRate > 768000.0) sampleRate = 768000.0;
     sampleRate_ = sampleRate;
     configure(delayUs_, feedDb_, fcut_);
+    reset();
 }
 
 void Crossfeed::configure(double delayUs, double feedDb, double fcut) {
@@ -26,12 +27,14 @@ void Crossfeed::configure(double delayUs, double feedDb, double fcut) {
     feedDb_ = std::clamp(feedDb, -30.0, 0.0);
     fcut_ = std::clamp(fcut, 100.0, 5000.0);
 
-    delaySamplesFloat_ = std::clamp(static_cast<float>(sampleRate_ * delayUs_ / 1e6), 1.0f, static_cast<float>(MAX_DELAY_SAMPLES - 2));
+    targetDelaySamples_ = std::clamp(static_cast<float>(sampleRate_ * delayUs_ / 1e6), 1.0f, static_cast<float>(MAX_DELAY_SAMPLES - 2));
+    delaySamplesFloat_ = targetDelaySamples_;
     targetFeedLevel_ = static_cast<float>(std::pow(10.0, feedDb_ / 20.0));
 
     // One-pole lowpass filter for head-shadow simulation at fcut
     const double fc = fcut_ / sampleRate_;
-    lpCoeff_ = static_cast<float>(1.0 - std::exp(-2.0 * M_PI * fc));
+    targetLpCoeff_ = static_cast<float>(1.0 - std::exp(-2.0 * M_PI * fc));
+    lpCoeff_ = targetLpCoeff_;
 }
 
 void Crossfeed::setEnabled(bool enabled) {
@@ -50,17 +53,26 @@ void Crossfeed::reset() {
     lpL_ = 0.0f;
     lpR_ = 0.0f;
     smoothedFeedLevel_ = targetFeedLevel_;
+    smoothedDelaySamples_ = targetDelaySamples_;
+    smoothedLpCoeff_ = targetLpCoeff_;
 }
 
 void Crossfeed::process(float* L, float* R, int frames) {
     if (!enabled_ || !L || !R || frames <= 0) return;
 
-    // Smooth feed level transitions across 15ms window
+    // Smooth feed level, delay, and cutoff filter transitions across 15ms window
     constexpr double kTau = 0.015;
     const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
     smoothedFeedLevel_ += static_cast<float>(smoothFactor) * (targetFeedLevel_ - smoothedFeedLevel_);
+    smoothedLpCoeff_ += static_cast<float>(smoothFactor) * (targetLpCoeff_ - smoothedLpCoeff_);
+
+    const float startDelay = smoothedDelaySamples_;
+    smoothedDelaySamples_ += static_cast<float>(smoothFactor) * (targetDelaySamples_ - smoothedDelaySamples_);
+    const float delayStep = (smoothedDelaySamples_ - startDelay) / static_cast<float>(frames);
+    float currentDelay = startDelay;
 
     const float feedLevel = smoothedFeedLevel_;
+    const float lpCoeff = smoothedLpCoeff_;
     const float makeup = 1.0f / (1.0f + feedLevel);
 
     for (int i = 0; i < frames; ++i) {
@@ -69,13 +81,14 @@ void Crossfeed::process(float* L, float* R, int frames) {
         if (!std::isfinite(l)) l = 0.0f;
         if (!std::isfinite(r)) r = 0.0f;
 
-        lpL_ += lpCoeff_ * (l - lpL_);
-        lpR_ += lpCoeff_ * (r - lpR_);
+        lpL_ += lpCoeff * (l - lpL_);
+        lpR_ += lpCoeff * (r - lpR_);
 
         if (!std::isfinite(lpL_)) lpL_ = 0.0f;
         if (!std::isfinite(lpR_)) lpR_ = 0.0f;
 
-        float exactReadPos = static_cast<float>(writeIdx_) - delaySamplesFloat_;
+        currentDelay += delayStep;
+        float exactReadPos = static_cast<float>(writeIdx_) - currentDelay;
         while (exactReadPos < 0.0f) exactReadPos += static_cast<float>(MAX_DELAY_SAMPLES);
         const int rdIdx0 = static_cast<int>(exactReadPos) % MAX_DELAY_SAMPLES;
         const int rdIdx1 = (rdIdx0 + 1) % MAX_DELAY_SAMPLES;
@@ -96,12 +109,19 @@ void Crossfeed::process(float* L, float* R, int frames) {
 void Crossfeed::processInterleaved(float* buffer, int frames) {
     if (!enabled_ || !buffer || frames <= 0) return;
 
-    // Smooth feed level transitions across 15ms window
+    // Smooth feed level, delay, and cutoff filter transitions across 15ms window
     constexpr double kTau = 0.015;
     const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
     smoothedFeedLevel_ += static_cast<float>(smoothFactor) * (targetFeedLevel_ - smoothedFeedLevel_);
+    smoothedLpCoeff_ += static_cast<float>(smoothFactor) * (targetLpCoeff_ - smoothedLpCoeff_);
+
+    const float startDelay = smoothedDelaySamples_;
+    smoothedDelaySamples_ += static_cast<float>(smoothFactor) * (targetDelaySamples_ - smoothedDelaySamples_);
+    const float delayStep = (smoothedDelaySamples_ - startDelay) / static_cast<float>(frames);
+    float currentDelay = startDelay;
 
     const float feedLevel = smoothedFeedLevel_;
+    const float lpCoeff = smoothedLpCoeff_;
     const float makeup = 1.0f / (1.0f + feedLevel);
 
     for (int i = 0; i < frames; ++i) {
@@ -110,13 +130,14 @@ void Crossfeed::processInterleaved(float* buffer, int frames) {
         if (!std::isfinite(l)) l = 0.0f;
         if (!std::isfinite(r)) r = 0.0f;
 
-        lpL_ += lpCoeff_ * (l - lpL_);
-        lpR_ += lpCoeff_ * (r - lpR_);
+        lpL_ += lpCoeff * (l - lpL_);
+        lpR_ += lpCoeff * (r - lpR_);
 
         if (!std::isfinite(lpL_)) lpL_ = 0.0f;
         if (!std::isfinite(lpR_)) lpR_ = 0.0f;
 
-        float exactReadPos = static_cast<float>(writeIdx_) - delaySamplesFloat_;
+        currentDelay += delayStep;
+        float exactReadPos = static_cast<float>(writeIdx_) - currentDelay;
         while (exactReadPos < 0.0f) exactReadPos += static_cast<float>(MAX_DELAY_SAMPLES);
         const int rdIdx0 = static_cast<int>(exactReadPos) % MAX_DELAY_SAMPLES;
         const int rdIdx1 = (rdIdx0 + 1) % MAX_DELAY_SAMPLES;

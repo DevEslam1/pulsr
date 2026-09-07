@@ -121,19 +121,21 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
 
     private fun stopRecording() {
         capturing.set(false)
+        val record = audioRecord
+        audioRecord = null
+        try {
+            record?.stop()
+        } catch (_: Throwable) {}
+        try {
+            record?.release()
+        } catch (_: Throwable) {}
+
         val thread = captureThread
         captureThread = null
         try {
             thread?.interrupt()
-            thread?.join(1500)
+            thread?.join(500)
         } catch (_: Throwable) {}
-        try {
-            audioRecord?.stop()
-        } catch (_: Throwable) {}
-        try {
-            audioRecord?.release()
-        } catch (_: Throwable) {}
-        audioRecord = null
     }
 
     override fun onListen(arguments: Any?, sink: EventChannel.EventSink?) {

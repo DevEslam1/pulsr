@@ -189,10 +189,11 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                 if (!copied) {
                     return null
                 }
+                success = true
 
-                val updateCount = resolver.update(uri, ContentValues().apply { put(MediaStore.Audio.Media.IS_PENDING, 0) }, null, null)
-                if (updateCount > 0) {
-                    success = true
+                // Best-effort clear IS_PENDING
+                runCatching {
+                    resolver.update(uri, ContentValues().apply { put(MediaStore.Audio.Media.IS_PENDING, 0) }, null, null)
                 }
 
                 var path: String? = null

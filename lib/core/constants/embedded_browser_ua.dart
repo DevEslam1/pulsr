@@ -480,40 +480,15 @@ class EmbeddedBrowserUa {
     });
   } catch (e) {}
 
-  // ── 5.1 Geo & Timezone normalization (Egypt Region) ────────────────────────
-  try {
-    if (typeof Intl !== 'undefined' && Intl.DateTimeFormat && Intl.DateTimeFormat.prototype.resolvedOptions) {
-      var origResolved = Intl.DateTimeFormat.prototype.resolvedOptions;
-      Intl.DateTimeFormat.prototype.resolvedOptions = function () {
-        var res = origResolved.apply(this, arguments);
-        res.timeZone = 'Africa/Cairo';
-        return res;
-      };
-    }
-  } catch (e) {}
-  try {
-    if (typeof navigator !== 'undefined' && navigator.geolocation) {
-      var fakePos = {
-        coords: {
-          latitude: 30.0444,
-          longitude: 31.2357,
-          accuracy: 10,
-          altitude: null,
-          altitudeAccuracy: null,
-          heading: null,
-          speed: null
-        },
-        timestamp: Date.now()
-      };
-      navigator.geolocation.getCurrentPosition = function (success) {
-        if (success) success(fakePos);
-      };
-      navigator.geolocation.watchPosition = function (success) {
-        if (success) success(fakePos);
-        return 1;
-      };
-    }
-  } catch (e) {}
+  // ── 5.1 Geo & Timezone normalization ─────────────────────────────────────
+  // NOTE: Do NOT hardcode a timezone or geolocation here. When the user is on
+  // a VPN the exit IP reports a different country; spoofing the WebView
+  // timezone (e.g. 'Africa/Cairo') while the IP geolocates to the US/EU
+  // creates a timezone↔IP mismatch that BotGuard treats as an automation
+  // signal. The device's real timezone and its native geolocation are mutually
+  // consistent, so letting them pass through is the least suspicious choice.
+  // (Geolocation is blocked from the web context by Android permissions anyway.)
+
 
   // ── 6. Mask emulator / headless WebGL renderer ────────────────────────────
   try {

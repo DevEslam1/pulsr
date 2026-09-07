@@ -38,10 +38,10 @@ void DynamicEQ::setBand(int idx, const DynamicEqBandParam& params) {
 
 void DynamicEQ::applyParams(const DynamicEqParamSet& params) {
     enabled_ = params.enabled;
-    bandCount_ = std::clamp(params.bandCount, 0, MAX_BANDS);
     for (int i = 0; i < MAX_BANDS; ++i) {
         setBand(i, params.bands[i]);
     }
+    bandCount_ = std::clamp(params.bandCount, 0, MAX_BANDS);
 }
 
 void DynamicEQ::reset() {
@@ -177,8 +177,9 @@ void DynamicEQ::process(float* L, float* R, int frames) {
             const double envDb = 20.0 * std::log10(envMax + 1e-12);
             const double overDb = envDb - band.thresholdDb;
             const double maxCutDepth = -band.maxCutDb; // positive depth magnitude (e.g. 12 dB for maxCutDb = -12 dB)
+            const double ratio = std::max(1.0, band.ratio);
             const double targetCutDb = (overDb > 0.0)
-                ? -std::min(maxCutDepth, band.ratio * overDb)
+                ? -std::min(maxCutDepth, overDb * (1.0 - 1.0 / ratio))
                 : 0.0;
             const double cutCoeff = (targetCutDb < band.currentCutDb) ? attackCoeff : releaseCoeff;
             band.currentCutDb += cutCoeff * (targetCutDb - band.currentCutDb);
@@ -258,8 +259,9 @@ void DynamicEQ::processInterleaved(float* buffer, int frames, int channels) {
             const double envDb = 20.0 * std::log10(envMax + 1e-12);
             const double overDb = envDb - band.thresholdDb;
             const double maxCutDepth = -band.maxCutDb;
+            const double ratio = std::max(1.0, band.ratio);
             const double targetCutDb = (overDb > 0.0)
-                ? -std::min(maxCutDepth, band.ratio * overDb)
+                ? -std::min(maxCutDepth, overDb * (1.0 - 1.0 / ratio))
                 : 0.0;
             const double cutCoeff = (targetCutDb < band.currentCutDb) ? attackCoeff : releaseCoeff;
             band.currentCutDb += cutCoeff * (targetCutDb - band.currentCutDb);

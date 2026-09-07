@@ -265,7 +265,17 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
         if (songIds.isEmpty) continue;
         final songsResult = await _repository.getSongsByIds(songIds);
         if (_queueRestorationDone) return;
-        final songs = songsResult.fold((_) => <SongsTableData>[], (r) => r);
+        // getSongsByIds returns rows in unspecified (rowid) order; re-map to
+        // the persisted songIds order so the restored slot keeps the real
+        // playback order (previous / current / next) instead of id order.
+        final songsMap = {
+          for (final s in songsResult.fold((_) => <SongsTableData>[], (r) => r))
+            s.id: s
+        };
+        final songs = [
+          for (final id in songIds)
+            if (songsMap[id] != null) songsMap[id]!,
+        ];
         if (songs.isEmpty) continue;
         _queueSlots[slotIndex] = _QueueSlotData(
           songs: songs,
@@ -439,6 +449,13 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     return false;
   }
 
+  /// Monotonic per-event counter for handler-queue syncs: only the most
+  /// recent queue event may apply its resolved songs. Guarding this with
+  /// [_mediaItemResolutionGen] used to abort the sync whenever a concurrent
+  /// mediaItem/track resolution bumped that generation, leaving the queue
+  /// view stale (or empty after a cold-start session restore).
+  int _queueSyncGen = 0;
+
   bool _isSameQueue(List<SongsTableData> a, List<SongsTableData> b) {
     if (identical(a, b)) return true;
     if (a.length != b.length) return false;
@@ -571,13 +588,13 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
 
     autoSub(_audioHandler.queue, (mediaItems) async {
       if (mediaItems.isEmpty) return;
-      final gen = _mediaItemResolutionGen;
+      final gen = ++_queueSyncGen;
       final ids =
           mediaItems.map((m) => int.tryParse(m.id)).whereType<int>().toList();
       if (ids.isEmpty) return;
 
       final songsRes = await _repository.getSongsByIds(ids);
-      if (isClosed || gen != _mediaItemResolutionGen) return;
+      if (isClosed || gen != _queueSyncGen) return;
 
       final songsMap = {
         for (final s in songsRes.fold((_) => <SongsTableData>[], (r) => r))
@@ -607,10 +624,20 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
           ));
         }
       }
-      if (isClosed || gen != _mediaItemResolutionGen) return;
+      if (isClosed || gen != _queueSyncGen) return;
       if (restoredSongs.isNotEmpty &&
           !_isSameQueue(state.queue, restoredSongs)) {
-        safeEmit(state.copyWith(queue: restoredSongs));
+        // Re-anchor the highlight to the running song: at cold start the
+        // queue sync can land after the mediaItem resolution, and the stale
+        // index would mark the wrong row as "now playing".
+        final current = state.currentSong;
+        final anchoredIndex = current == null
+            ? -1
+            : restoredSongs.indexWhere((s) => _isSameTrack(s, current));
+        safeEmit(state.copyWith(
+          queue: restoredSongs,
+          currentIndex: anchoredIndex != -1 ? anchoredIndex : state.currentIndex,
+        ));
       }
     });
 

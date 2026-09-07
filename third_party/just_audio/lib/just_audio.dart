@@ -25,8 +25,7 @@ JustAudioPlatform get _pluginPlatform {
   // FlutterEngine...
   if (_pluginPlatformCache == null) {
     // Dispose of all existing players within this FlutterEngine. This helps to
-    // shut down existing players on a hot restart. TODO: Remove this hack once
-    // https://github.com/flutter/flutter/issues/10437 is implemented.
+    // shut down existing players on a hot restart.
     try {
       pluginPlatform.disposeAllPlayers(DisposeAllPlayersRequest());
     } catch (e) {
@@ -1097,8 +1096,6 @@ class AudioPlayer {
     final audioSession = await AudioSession.instance;
     if (!_handleAudioSessionActivation || await audioSession.setActive(true)) {
       if (!playing) return;
-      // TODO: rewrite this to more cleanly handle simultaneous load/play
-      // requests which each may result in platform play requests.
       final requireActive = _playlist.children.isNotEmpty;
       if (requireActive) {
         if (_active) {
@@ -1139,8 +1136,6 @@ class AudioPlayer {
     ));
     // Allow propagation to secondary streams.
     await playingStream.firstWhere((p) => p == playing);
-    // TODO: perhaps modify platform side to ensure new state is broadcast
-    // before this method returns.
     await (await _platform).pause(PauseRequest());
   }
 
@@ -1179,6 +1174,57 @@ class AudioPlayer {
     if (_disposed) return;
     _volumeSubject.add(volume);
     await (await _platform).setVolume(SetVolumeRequest(volume: volume));
+  }
+
+  /// Pulsr fork: arms a sample-accurate piecewise-linear gain curve on this
+  /// player's audio sink ([NativeDspAudioProcessor]). While the curve is
+  /// active, every PCM sample is multiplied by the interpolated gain, so
+  /// volume ramps are free of the platform-channel/mixer stepping that makes
+  /// 10 ms `setVolume` fades audible as zipper noise or crackle.
+  ///
+  /// [gains] are absolute multipliers (0.0–1.0); the first value is applied
+  /// immediately, one value per [segmentMs], and the last value is held after
+  /// the curve is exhausted (use [dspClearGainCurve] to return to unity).
+  ///
+  /// Returns `false` (without throwing) whenever the platform cannot honour
+  /// the request — any platform other than the Pulsr Android fork, the native
+  /// DSP disabled, or the player idle — so callers can fall back to stepped
+  /// [setVolume] ramps.
+  Future<bool> dspSetGainCurve(final List<double> gains,
+      {final int segmentMs = 20}) async {
+    if (_disposed || gains.isEmpty) return false;
+    try {
+      if (!_active) return false;
+      final platform = _platformValue;
+      if (platform == null) return false;
+      final channel =
+          MethodChannel('com.ryanheise.just_audio.methods.${platform.id}');
+      return await channel.invokeMethod<bool>('dspSetGainCurve', {
+            'gains': gains,
+            'segmentMs': segmentMs,
+          }) ??
+          false;
+    } catch (_) {
+      // Not the Pulsr Android fork (web/iOS/macOS/windows) or the native
+      // processor rejected the curve — signal the caller to step instead.
+      return false;
+    }
+  }
+
+  /// Pulsr fork: clears any gain curve armed via [dspSetGainCurve] and
+  /// restores transparent unity gain. Returns `false` if unsupported.
+  Future<bool> dspClearGainCurve() async {
+    if (_disposed) return false;
+    try {
+      if (!_active) return false;
+      final platform = _platformValue;
+      if (platform == null) return false;
+      final channel =
+          MethodChannel('com.ryanheise.just_audio.methods.${platform.id}');
+      return await channel.invokeMethod<bool>('dspClearGainCurve') ?? false;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Sets whether silence should be skipped in audio playback. (Currently
@@ -1909,7 +1955,6 @@ class PlaybackEvent {
   final IcyMetadata? icyMetadata;
 
   /// The index of the currently playing item, or `null` if no item is selected.
-  // TODO: Consider introducing currentAudioSourceId
   final int? currentIndex;
 
   /// The current Android AudioSession ID if set.
@@ -3485,7 +3530,6 @@ class LockCachingAudioSource extends StreamAudioSource {
       throw Exception('HTTP Status Error: ${response.statusCode}');
     }
     (await _partialCacheFile).createSync(recursive: true);
-    // TODO: Should close sink after done, but it throws an error.
     // ignore: close_sinks
     final sink = (await _partialCacheFile).openWrite();
     final sourceLength =
@@ -3700,7 +3744,6 @@ class _InProgressCacheResponse {
   // will likely be downloaded at a faster rate than the rate at which the
   // player is consuming audio data, it is also likely that this buffered data
   // will never be used.
-  // TODO: Improve this code.
   // ignore: close_sinks
   final controller = ReplaySubject<List<int>>();
   final int? end;
@@ -3847,7 +3890,6 @@ _ProxyHandler _proxyHandlerForUri(
           ['application/x-mpegURL', 'application/vnd.apple.mpegurl']
               .contains(request.headers.value(HttpHeaders.contentTypeHeader))) {
         // If this is an m3u8 file with headers, prepare the nested URIs.
-        // TODO: Handle other playlist formats similarly?
         final m3u8 = await originResponse.transform(utf8.decoder).join();
         for (var line in const LineSplitter().convert(m3u8)) {
           line = line.replaceAllMapped(

@@ -127,6 +127,9 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
             var iterations = 0
             val deadline = SystemClock.elapsedRealtime() + 15_000L // 15s timeout
 
+            var channelIndex = 0
+            var channelAcc = 0.0
+
             while (!sawOutputEOS) {
                 if (SystemClock.elapsedRealtime() > deadline) {
                     Log.w(TAG, "Waveform decode exceeded 15s timeout for $path; terminating loop")
@@ -165,53 +168,69 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
                             outBuf.limit(bufferInfo.offset + bufferInfo.size)
                             outBuf.order(ByteOrder.nativeOrder())
 
-                                var frameSumSq = 0.0
-                                var frames = 0
-                                if (pcmEncoding == AudioFormat.ENCODING_PCM_FLOAT) {
-                                    val fb = outBuf.asFloatBuffer()
-                                    val n = fb.remaining()
-                                    var i = 0
-                                    while (i < n) {
-                                        var acc = 0.0
-                                        var c = 0
-                                        while (c < channelCount && i < n) { acc += fb.get(i); i++; c++ }
-                                        val v = acc / c
+                            var frameSumSq = 0.0
+                            var frames = 0
+                            if (pcmEncoding == AudioFormat.ENCODING_PCM_FLOAT) {
+                                val fb = outBuf.asFloatBuffer()
+                                val n = fb.remaining()
+                                for (i in 0 until n) {
+                                    channelAcc += fb.get(i)
+                                    channelIndex++
+                                    if (channelIndex == channelCount) {
+                                        val v = channelAcc / channelCount
                                         frameSumSq += v * v
                                         frames++
-                                    }
-                                } else {
-                                    val sb = outBuf.asShortBuffer()
-                                    val n = sb.remaining()
-                                    var i = 0
-                                    while (i < n) {
-                                        var acc = 0.0
-                                        var c = 0
-                                        while (c < channelCount && i < n) { acc += sb.get(i) / 32768.0; i++; c++ }
-                                        val v = acc / c
-                                        frameSumSq += v * v
-                                        frames++
+                                        channelAcc = 0.0
+                                        channelIndex = 0
                                     }
                                 }
-
-                                if (frames > 0) {
-                                    totalFramesDecoded += frames
-                                    if (formatDurationUs > 0) {
-                                        val bucket = ((bufferInfo.presentationTimeUs.toDouble() / formatDurationUs) * count)
-                                            .toInt().coerceIn(0, count - 1)
-                                        sumSq[bucket] += frameSumSq
-                                        cnt[bucket] += frames
-                                    } else {
-                                        fallbackRms.add(sqrt(frameSumSq / frames))
+                            } else {
+                                val sb = outBuf.asShortBuffer()
+                                val n = sb.remaining()
+                                for (i in 0 until n) {
+                                    channelAcc += sb.get(i) / 32768.0
+                                    channelIndex++
+                                    if (channelIndex == channelCount) {
+                                        val v = channelAcc / channelCount
+                                        frameSumSq += v * v
+                                        frames++
+                                        channelAcc = 0.0
+                                        channelIndex = 0
                                     }
                                 }
                             }
-                            codec.releaseOutputBuffer(outIndex, false)
+
+                            if (frames > 0) {
+                                totalFramesDecoded += frames
+                                if (formatDurationUs > 0) {
+                                    val bucket = ((bufferInfo.presentationTimeUs.toDouble() / formatDurationUs) * count)
+                                        .toInt().coerceIn(0, count - 1)
+                                    sumSq[bucket] += frameSumSq
+                                    cnt[bucket] += frames
+                                } else {
+                                    fallbackRms.add(sqrt(frameSumSq / frames))
+                                }
+                            }
                         }
+                        codec.releaseOutputBuffer(outIndex, false)
+                    }
                         outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                         val of = codec.outputFormat
                         if (of.containsKey(MediaFormat.KEY_PCM_ENCODING)) pcmEncoding = of.getInteger(MediaFormat.KEY_PCM_ENCODING)
                         if (of.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) channelCount = of.getInteger(MediaFormat.KEY_CHANNEL_COUNT).coerceAtLeast(1)
                     }
+                }
+            }
+
+            if (channelIndex > 0) {
+                val v = channelAcc / channelIndex
+                totalFramesDecoded++
+                val lastBucket = count - 1
+                if (formatDurationUs > 0) {
+                    sumSq[lastBucket] += v * v
+                    cnt[lastBucket] += 1
+                } else {
+                    fallbackRms.add(sqrt(v * v))
                 }
             }
 

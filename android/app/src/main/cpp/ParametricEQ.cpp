@@ -64,6 +64,7 @@ void ParametricEQ::setBand(int idx, double freq, double gainDb, double q, Filter
     bands_[idx].q = std::clamp(q, 0.05, 30.0);
     bands_[idx].type = type;
     bands_[idx].enabled = enabled;
+    computeCoeffs(bands_[idx], bands_[idx].smoothedGainDb);
 }
 
 void ParametricEQ::setBandSolo(int idx, bool solo) {

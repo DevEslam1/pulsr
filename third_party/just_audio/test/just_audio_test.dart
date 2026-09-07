@@ -1620,7 +1620,6 @@ void runTests() {
             ?.automaticallyWaitsToMinimizeStalling,
         equals(audioLoadConfiguration
             .darwinLoadControl?.automaticallyWaitsToMinimizeStalling));
-    // TODO: check other fields.
     await player.dispose();
   });
 
@@ -1879,7 +1878,6 @@ class MockAudioPlayer extends AudioPlayerPlatform {
       _duration = (audioSource.end ?? audioSourceDuration) -
           (audioSource.start ?? Duration.zero);
     } else {
-      // TODO: pull the sequence out of the audio source and return the duration
       // of the first item in the sequence.
       _duration = audioSourceDuration;
     }
@@ -2018,21 +2016,18 @@ class MockAudioPlayer extends AudioPlayerPlatform {
   @override
   Future<ConcatenatingInsertAllResponse> concatenatingInsertAll(
       ConcatenatingInsertAllRequest request) async {
-    // TODO
     return ConcatenatingInsertAllResponse();
   }
 
   @override
   Future<ConcatenatingMoveResponse> concatenatingMove(
       ConcatenatingMoveRequest request) async {
-    // TODO
     return ConcatenatingMoveResponse();
   }
 
   @override
   Future<ConcatenatingRemoveRangeResponse> concatenatingRemoveRange(
       ConcatenatingRemoveRangeRequest request) async {
-    // TODO
     return ConcatenatingRemoveRangeResponse();
   }
 

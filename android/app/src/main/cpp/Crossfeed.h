@@ -34,9 +34,13 @@ private:
     double feedDb_ = -9.0;
     double fcut_ = 650.0;
     float delaySamplesFloat_ = 16.8f;
+    float targetDelaySamples_ = 16.8f;
+    float smoothedDelaySamples_ = 16.8f;
     float targetFeedLevel_ = 0.3548f;
     float smoothedFeedLevel_ = 0.3548f;
     float lpCoeff_ = 0.087f;
+    float targetLpCoeff_ = 0.087f;
+    float smoothedLpCoeff_ = 0.087f;
     bool enabled_ = false;
 
     float delayBufferL_[MAX_DELAY_SAMPLES] = {};

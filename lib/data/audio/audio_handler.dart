@@ -385,7 +385,11 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
 
     double preampDb;
-    if (gainDb != null && gainDb != 0.0) {
+    // Key the preamp off tag PRESENCE, not the value: a legitimately tagged
+    // 0.00 dB track must use preampWithRg, not the "without RG" fallback
+    // (default −3 dB), which made normalized tracks 3 dB quieter than every
+    // other ReplayGain-tagged track in the same mode.
+    if (gainDb != null) {
       preampDb = preampWithRg;
     } else {
       preampDb = preampWithoutRg;
@@ -702,6 +706,11 @@ class PulsrAudioHandler extends BaseAudioHandler
     _tripleBufferPipeline = TripleBufferPipeline(
       getActivePlayer: () => _activePlayer,
       getInactivePlayer: () => _inactivePlayer,
+      // Abort stale preloads: a resolve that outlives the track that
+      // scheduled it must never setAudioSource on the now-active player.
+      isLoadStillValid: () =>
+          !identical(_inactivePlayer, _activePlayer) &&
+          !_crossfadeManager.isCrossfading,
       resolveAudioSource: (song, tag) => _resolveAudioSource(song, tag),
       songToMediaItem: (song, [fastArtUri]) =>
           _songToMediaItem(song, fastArtUri),
@@ -730,9 +739,13 @@ class PulsrAudioHandler extends BaseAudioHandler
       buildAudioSources: (songs) => _buildAudioSources(songs),
       crossfadeToInactive: (active, inactive) async {
         final fadeId = _crossfadeManager.nextFadeId();
+        // Fade from the player's ACTUAL volume (ReplayGain-compensated), not
+        // the raw user volume: interpolating from `_volume` would jump the
+        // audible level to `_volume` on the first tick whenever ReplayGain
+        // has the player running below/above it.
         await _crossfadeManager.fadeVolume(
           active,
-          _volume,
+          active.volume,
           0.0,
           _crossfadeManager.duration,
           fadeId,
@@ -1764,20 +1777,36 @@ class PulsrAudioHandler extends BaseAudioHandler
         }
 
         await _inactivePlayer.setVolume(0.0);
-        // Wait for the inactive player to actually start at 0 before the
-        // gain ramp — otherwise the ramp has already advanced to ~0.3 when
-        // the decoder first emits, causing a pop/click and zipper noise that
-        // lasts until the outgoing track stops.
+        // Wait for the inactive player to be ACTUALLY playing at volume 0
+        // before starting the gain ramp. play() resolves when the command is
+        // sent, not when ExoPlayer has decoded its first frame — on slow
+        // decoders or buffered streams the ramp can advance to ~0.3 before
+        // any audio is emitted, causing a pop/click burst at the crossfade
+        // start. We poll processingState until it leaves 'loading' (≤300ms)
+        // and then give the mixer one extra period to settle at zero gain.
         try {
           await _inactivePlayer.play().timeout(const Duration(milliseconds: 800));
-          // Give ExoPlayer a single frame to settle at volume 0
-          await Future.delayed(const Duration(milliseconds: 30));
         } catch (_) {
-          // Fallback to unawaited if platform times out
           try {
             await _inactivePlayer.play();
           } catch (_) {}
         }
+        // Poll until the decoder has produced its first audio frame
+        // (processingState == ready/buffering with playing==true), or until
+        // 300ms have elapsed as a safety cap.
+        const maxSettleMs = 300;
+        var settleWaited = 0;
+        while (settleWaited < maxSettleMs) {
+          final ps = _inactivePlayer.processingState;
+          if (ps == ProcessingState.ready || ps == ProcessingState.buffering) {
+            break;
+          }
+          await Future.delayed(const Duration(milliseconds: 10));
+          settleWaited += 10;
+        }
+        // One extra mixer period so the audio sink has settled at zero before
+        // the gain ramp opens — eliminates the brief full-volume transient.
+        await Future.delayed(const Duration(milliseconds: 20));
 
         if (_crossfadeManager.currentFadeId != currentFadeId) {
           try {
@@ -1831,11 +1860,19 @@ class PulsrAudioHandler extends BaseAudioHandler
         _repository.recordPlayHistory(nextSong.id);
         _broadcastState(_activePlayer.playbackEvent);
 
-        // Let the zero-gain settle for one mixer period before tearing
-        // down the decoder — stopping at a non-zero sample causes the
-        // hiss/click that lingered until the first track's buffer drained.
-        await Future.delayed(const Duration(milliseconds: 25));
+        // Clear the native gain curve BEFORE stop() so the DSP flush path
+        // (EQ, limiter, reverb) sees a neutral multiplier — a stale fade-out
+        // curve combined with residual decoder samples causes a tail-end pop.
+        // Then wait 80ms for the DSP pipeline to drain at gain=0 before
+        // actually tearing down the decoder. 25ms was not enough on devices
+        // with long DSP tails (reverb, lookahead limiter).
+        try {
+          await active.dspClearGainCurve();
+        } catch (_) {}
+        await Future.delayed(const Duration(milliseconds: 80));
         await active.stop();
+        // Restore the player's volume so it is ready for the next crossfade
+        // reuse — the gain curve is already cleared so this is safe.
         await active.setVolume(_volume);
       } catch (e, st) {
         ErrorLogger.log('Error during crossfade playback',
@@ -1861,6 +1898,17 @@ class PulsrAudioHandler extends BaseAudioHandler
         if (_crossfadeManager.currentFadeId == currentFadeId) {
           _crossfadeManager.finishCrossfade();
         } else {
+          // Stale fade (a skip/stop superseded it): drop any native gain
+          // curves armed meanwhile so neither player keeps a fade multiplier
+          // applied after the volumes are restored here. Clear both players:
+          // depending on whether the post-fade swap ran, the outgoing player
+          // may be either one.
+          try {
+            await _inactivePlayer.dspClearGainCurve();
+          } catch (_) {}
+          try {
+            await _activePlayer.dspClearGainCurve();
+          } catch (_) {}
           try {
             await _inactivePlayer.stop();
           } catch (_) {}
@@ -3246,6 +3294,13 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (mediaId == 'recent' ||
         mediaId == 'root_recent' ||
         mediaId == AudioService.recentRootId) {
+      // External controllers (media resumption chip, Assistant, Wear/Auto
+      // reconnect) address the "recent" root to auto-play recently played
+      // music. Honoring it while a user queue is actively playing silently
+      // replaced the running queue — and the player-screen queue view — with
+      // the 20 most recently played tracks. Only honor it when nothing is
+      // playing.
+      if (_songs.isNotEmpty && _activePlayer.playing) return;
       final songsRes = await _repository.getRecentlyPlayed();
       songsRes.fold((l) => null, (songs) {
         if (songs.isNotEmpty) loadQueue(songs);

@@ -106,7 +106,12 @@ class SystemAudioEffectsController(private val context: Context) {
             }
 
             currentStatus = if (detectedBundles.isNotEmpty()) {
-                if (managedEffects.any { !it.enabled }) Status.BYPASSED else Status.ACTIVE
+                when {
+                    managedEffects.any { !it.enabled } -> Status.BYPASSED
+                    managedEffects.isNotEmpty() && managedEffects.all { it.enabled } -> Status.ACTIVE
+                    currentStatus == Status.BYPASSED || currentStatus == Status.ACTIVE -> currentStatus
+                    else -> Status.UNKNOWN
+                }
             } else {
                 Status.UNSUPPORTED_DEVICE
             }

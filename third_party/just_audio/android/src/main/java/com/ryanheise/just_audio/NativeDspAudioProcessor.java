@@ -34,6 +34,65 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
 
     private static native void nativeResyncForTrack(double sampleRate, int channels);
 
+    // ---- Pulsr fork: sample-accurate gain ramp ----
+    // Per-instance state (one processor per AudioPlayer) so the two crossfade
+    // players ramp independently. Applied AFTER the native DSP chain so the
+    // limiter/EQ still see the un-attenuated signal and the ramp can only
+    // attenuate (gains are clamped to [0, 1]).
+    private final Object rampLock = new Object();
+    private float[] rampGains = null;   // null => no ramp armed (transparent unity)
+    private int rampSegmentFrames = 0;  // frames covered by one curve segment
+    private long rampPosFrames = 0;     // frames consumed since the curve started
+    private float staticGain = 1.0f;    // gain applied when no curve is armed
+
+    /**
+     * Arms a piecewise-linear gain curve applied per-sample from the next
+     * queued buffer. The first gain takes effect immediately, one gain per
+     * {@code segmentMs}, and the last gain is held once the curve is exhausted
+     * (it becomes the static gain until {@link #clearGainCurve()} is called).
+     *
+     * @return true if the curve was armed (native DSP chain active), false if
+     *         the caller must fall back to stepped setVolume().
+     */
+    public boolean setGainCurve(double[] gains, int segmentMs) {
+        if (!NATIVE_AVAILABLE || gains == null || gains.length == 0 || segmentMs <= 0) {
+            return false;
+        }
+        double sampleRate = inputAudioFormat.sampleRate;
+        if (sampleRate <= 0) sampleRate = 48000.0; // sink not configured yet; close enough
+        int segFrames = Math.max(1, (int) Math.round(sampleRate * segmentMs / 1000.0));
+        float[] curve = new float[gains.length];
+        for (int i = 0; i < gains.length; i++) {
+            float g = (float) gains[i];
+            curve[i] = Math.max(0.0f, Math.min(1.0f, g));
+        }
+        synchronized (rampLock) {
+            rampGains = curve;
+            rampSegmentFrames = segFrames;
+            rampPosFrames = 0;
+            staticGain = curve[0]; // first curve gain applies immediately
+        }
+        return true;
+    }
+
+    /**
+     * Drops any armed curve and restores transparent unity gain.
+     *
+     * @return true if the state was reset (native DSP chain active).
+     */
+    public boolean clearGainCurve() {
+        if (!NATIVE_AVAILABLE) {
+            return false;
+        }
+        synchronized (rampLock) {
+            rampGains = null;
+            rampSegmentFrames = 0;
+            rampPosFrames = 0;
+            staticGain = 1.0f;
+        }
+        return true;
+    }
+
     private ByteBuffer scratch;
     private FloatBuffer scratchFloats;
 
@@ -67,9 +126,49 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
             processed = frameCount;
         }
 
+        // Snapshot ramp state and consume the frames we are about to emit.
+        // When the curve is exhausted it transitions into a static gain equal
+        // to its last value, so a fade-out stays silent and a fade-in becomes
+        // transparent instead of leaving a stale curve behind.
+        float[] curve;
+        int segFrames;
+        long startPos;
+        float idleGain;
+        synchronized (rampLock) {
+            curve = rampGains;
+            segFrames = rampSegmentFrames;
+            startPos = rampPosFrames;
+            idleGain = staticGain;
+            if (curve != null) {
+                rampPosFrames += processed;
+                if (rampPosFrames >= (long) (curve.length - 1) * segFrames) {
+                    staticGain = curve[curve.length - 1];
+                    rampGains = null;
+                    rampSegmentFrames = 0;
+                    rampPosFrames = 0;
+                }
+            }
+        }
+
+        final int lastIdx = curve == null ? 0 : curve.length - 1;
         ByteBuffer output = replaceOutputBuffer(processed * outputAudioFormat.bytesPerFrame);
         for (int i = 0; i < processed * channelCount; i++) {
-            int sample = Math.round(floats.get(i) * 32768f);
+            float gain = idleGain;
+            if (curve != null) {
+                // Piecewise-linear interpolation between curve points, per frame.
+                long frame = i / channelCount;
+                double exact = (startPos + frame) / (double) segFrames;
+                int seg = (int) exact;
+                if (seg >= lastIdx) {
+                    gain = curve[lastIdx];
+                } else {
+                    float frac = (float) (exact - seg);
+                    gain = curve[seg] + (curve[seg + 1] - curve[seg]) * frac;
+                }
+            }
+            float value = floats.get(i) * gain;
+            float scaled = value * (value < 0.0f ? 32768f : 32767f);
+            int sample = Math.round(scaled);
             output.putShort((short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, sample)));
         }
         inputBuffer.position(limit);
@@ -81,12 +180,23 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         if (NATIVE_AVAILABLE && inputAudioFormat.sampleRate > 0) {
             nativeResyncForTrack(inputAudioFormat.sampleRate, inputAudioFormat.channelCount);
         }
+        // Media3/ExoPlayer flushes on ordinary seeks within the same stream,
+        // not only on genuinely new sources. Do NOT reset an in-flight curve
+        // (rampPosFrames > 0), otherwise a seek snaps an active fade-out back
+        // to full volume (rampGains[0]). A newly armed curve already sets
+        // rampPosFrames = 0 and staticGain = rampGains[0] in setGainCurve().
     }
 
     @Override
     protected void onReset() {
         scratch = null;
         scratchFloats = null;
+        synchronized (rampLock) {
+            rampGains = null;
+            rampSegmentFrames = 0;
+            rampPosFrames = 0;
+            staticGain = 1.0f;
+        }
     }
 
     private FloatBuffer ensureScratch(int sampleCount) {
