@@ -83,8 +83,8 @@ abstract class SettingsState with _$SettingsState {
     @Default('localhost, 127.0.0.1') String proxyBypassHosts,
     @Default([]) List<ProxyEntry> proxyList,
     @Default(false) bool isTestingAllProxies,
-    // Extractor & Backend Settings
-    @Default(ExtractorEngine.auto) ExtractorEngine extractorEngine,
+    // Extractor & Backend Settings (remote yt-dlp backend decommissioned)
+    @Default(ExtractorEngine.onDevice) ExtractorEngine extractorEngine,
     @Default(false) bool ytdlpBackendEnabled,
     @Default('https://xdm-backend-10763667121.europe-west1.run.app')
     String ytdlpBackendUrl,

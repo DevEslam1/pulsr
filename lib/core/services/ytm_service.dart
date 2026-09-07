@@ -12,7 +12,6 @@ import 'package:injectable/injectable.dart';
 import '../constants/channels.dart';
 import '../constants/embedded_browser_ua.dart';
 import '../di/injection.dart';
-import 'xdm_backend_service.dart';
 import 'ytm_account_service.dart';
 import 'ytm_client_version_resolver.dart';
 import 'ytm_url_cache.dart';
@@ -619,11 +618,7 @@ class YtmService {
       _ => urlOrId.trim(),
     };
 
-    final resolvedUrl = cleanUrlOrId.startsWith('http')
-        ? cleanUrlOrId
-        : 'https://www.youtube.com/playlist?list=$cleanUrlOrId';
-
-    // 1. Native Extractor
+    // 1. Native Extractor (only engine; remote backend decommissioned)
     try {
       final raw = await _guard(
         () => _channel.invokeMethod<Map<Object?, Object?>>('getPlaylist', {
@@ -640,28 +635,6 @@ class YtmService {
       }
     } catch (e) {
       debugPrint('[YTM_SERVICE] Native getPlaylist failed: $e');
-    }
-
-    // 2. Engine 3: Remote yt-dlp backend fallback if enabled
-    try {
-      if (getIt.isRegistered<XdmBackendService>()) {
-        final xdm = getIt<XdmBackendService>();
-        if (await xdm.isEnabled()) {
-          final account = getIt.isRegistered<YtmAccountService>()
-              ? getIt<YtmAccountService>()
-              : null;
-          final playlistTracks = await xdm.getPlaylist(
-            resolvedUrl,
-            limit: limit,
-            cookies: account?.cookies,
-          );
-          if (playlistTracks.isNotEmpty) {
-            return playlistTracks;
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('[YTM_SERVICE] Remote yt-dlp playlist fallback: $e');
     }
 
     return const [];
@@ -686,7 +659,7 @@ class YtmService {
   /// Resolves audio stream using multi-tier fallback:
   /// (1) Direct authenticated account stream (if logged in)
   /// (2) Native Multi-Client Extractor (NewPipe -> WEB_REMIX -> ANDROID -> IOS -> TV)
-  /// (3) Engine 3: Remote yt-dlp backend (XdmBackendService)
+  /// Remote yt-dlp backend (Engine 3) is decommissioned.
   Future<YtmStream> resolveStream(String videoId,
       {String quality = 'high', bool forceRefresh = false}) async {
     // Check Task 2 in-memory URL cache first
@@ -818,42 +791,6 @@ class YtmService {
           (e.isBotBlocked || e.isThrottled || e.isIpBlocked)) {
         _noteBotChallenge(e);
       }
-    }
-
-    // 3. Engine 3: Remote yt-dlp backend fallback if enabled and healthy
-    try {
-      try {
-        _tracker?.markStage(PlaybackStage.clientRequestSent);
-      } catch (_) {}
-      if (getIt.isRegistered<XdmBackendService>()) {
-        final xdm = getIt<XdmBackendService>();
-        if (await xdm.isEnabled()) {
-          final account = getIt.isRegistered<YtmAccountService>()
-              ? getIt<YtmAccountService>()
-              : null;
-          final remoteStream = await xdm.resolveStream(
-            videoId,
-            quality: quality,
-            cookies: account?.cookies,
-          );
-          if (remoteStream != null) {
-            try {
-              _tracker?.markStage(PlaybackStage.urlObtained);
-            } catch (_) {}
-            urlCache?.putStream(remoteStream, quality: quality);
-            // The remote backend resolving does not clear a YouTube-side
-            // cooldown: it proves the *backend's* IP is fine, not this device's.
-            return remoteStream;
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint(
-          '[YTM_SERVICE] Remote yt-dlp backend stream resolution fallback: $e');
-      if (e is YtmException && (e.isBotBlocked || e.isThrottled)) {
-        rethrow;
-      }
-      firstError ??= e;
     }
 
     // All engines failed: surface the first classified engine error so the

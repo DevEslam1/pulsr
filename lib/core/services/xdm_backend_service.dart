@@ -42,15 +42,13 @@ class BackendHealthInfo {
 
 /// Service interfacing with the remote yt-dlp microservice (xdm-backend).
 ///
-/// Features:
-/// - Contract v2 Audio Ladder stream resolution (`/resolve/audio`).
-/// - Independent 3-failure / 15-minute circuit breaker.
-/// - 5-minute health polling avoiding degraded (503) backend nodes.
-/// - Secure token storage in FlutterSecureStorage.
-/// - Explicit user cookie sync opt-in gate.
-/// - Zero coupling to native identity rotation on infrastructure failures.
+/// DISABLED: the remote backend is fully decommissioned. This class is kept
+/// only so existing DI registrations/tests keep compiling. Every entry point
+/// below short-circuits without any network I/O. Do not re-enable.
 @lazySingleton
 class XdmBackendService {
+  /// Global kill-switch. Always true — the backend must never be used.
+  static const bool hardDisabled = true;
   static const String defaultBaseUrl =
       'https://xdm-backend-10763667121.europe-west1.run.app';
   static const String _tokenSecureKey = 'xdm_backend_token_secure';
@@ -60,16 +58,11 @@ class XdmBackendService {
   final http.Client _client;
   final FlutterSecureStorage _secureStorage;
 
-  // Circuit Breaker state
+  // Circuit Breaker state (retained for API compat; backend disabled)
   int _consecutiveInfraFailures = 0;
   DateTime? _circuitOpenUntil;
   static const int _infraFailureThreshold = 3;
   static const Duration _circuitRecoveryDuration = Duration(minutes: 15);
-
-  // Cached health state
-  DateTime? _lastHealthCheck;
-  BackendHealthInfo? _cachedHealth;
-  static const Duration _healthCacheTtl = Duration(minutes: 5);
 
   @factoryMethod
   XdmBackendService({
@@ -155,18 +148,13 @@ class XdmBackendService {
   }
 
   Future<bool> isEnabled() async {
-    final prefs = await SharedPreferences.getInstance();
-    final engineStr = prefs.getString(PrefsKeys.extractorEngine);
-    if (engineStr == 'onDevice') return false;
-    final enabled = prefs.getBool(PrefsKeys.ytdlpBackendEnabled) ?? true;
-    if (!enabled) return false;
-    if (isCircuitOpen) return false;
-    return true;
+    // DISABLED: remote backend decommissioned — never enabled.
+    return false;
   }
 
   Future<bool> isCookieSyncAllowed() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(PrefsKeys.syncCookiesToBackend) ?? false;
+    // DISABLED: never sync cookies to a remote backend.
+    return false;
   }
 
   Map<String, String> _headers(
@@ -187,79 +175,16 @@ class XdmBackendService {
 
   /// Checks server health, returning a typed BackendHealthInfo.
   Future<BackendHealthInfo> checkHealth({bool force = false}) async {
-    final now = DateTime.now();
-    if (!force &&
-        _lastHealthCheck != null &&
-        _cachedHealth != null &&
-        now.difference(_lastHealthCheck!) < _healthCacheTtl) {
-      return _cachedHealth!;
-    }
-
-    final stopwatch = Stopwatch()..start();
-    try {
-      final baseUrl = await _getBaseUrl();
-      final uri = Uri.parse('$baseUrl/health?strict=true');
-      final response =
-          await _client.get(uri).timeout(const Duration(seconds: 8));
-      stopwatch.stop();
-
-      final latency = stopwatch.elapsedMilliseconds;
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final ytdlpVer = data['ytdlp_version'] as String? ??
-            data['ytdlp'] as String? ??
-            'unknown';
-        final backendVer = data['backend_version'] as String? ?? '2.0.0';
-        final proxies = (data['proxy_pool_size'] as num?)?.toInt() ?? 0;
-        final status = data['status'] as String? ?? 'ok';
-        final isOk = status == 'ok';
-
-        final info = BackendHealthInfo(
-          ok: isOk,
-          backendVersion: backendVer,
-          ytdlpVersion: ytdlpVer,
-          proxyPoolSize: proxies,
-          latencyMs: latency,
-          circuitState: circuitState,
-          message: isOk
-              ? 'Connected (v$backendVer / yt-dlp v$ytdlpVer, $proxies proxies)'
-              : 'Backend degraded',
-        );
-        if (isOk) recordSuccess();
-        _lastHealthCheck = now;
-        _cachedHealth = info;
-        return info;
-      } else {
-        recordInfraFailure();
-        final info = BackendHealthInfo(
-          ok: false,
-          backendVersion: 'unknown',
-          ytdlpVersion: 'unknown',
-          proxyPoolSize: 0,
-          latencyMs: latency,
-          circuitState: circuitState,
-          message: 'Server returned HTTP ${response.statusCode}',
-        );
-        _lastHealthCheck = now;
-        _cachedHealth = info;
-        return info;
-      }
-    } catch (e) {
-      stopwatch.stop();
-      recordInfraFailure();
-      final info = BackendHealthInfo(
-        ok: false,
-        backendVersion: 'unknown',
-        ytdlpVersion: 'unknown',
-        proxyPoolSize: 0,
-        latencyMs: stopwatch.elapsedMilliseconds,
-        circuitState: circuitState,
-        message: 'Connection failed: $e',
-      );
-      _lastHealthCheck = now;
-      _cachedHealth = info;
-      return info;
-    }
+    // DISABLED: no network I/O.
+    return const BackendHealthInfo(
+      ok: false,
+      backendVersion: 'disabled',
+      ytdlpVersion: 'disabled',
+      proxyPoolSize: 0,
+      latencyMs: 0,
+      circuitState: BackendCircuitState.open,
+      message: 'Remote yt-dlp backend is disabled (on-device only).',
+    );
   }
 
   /// Resolves an audio stream for [videoId] via the Contract v2 /resolve/audio endpoint.

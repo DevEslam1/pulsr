@@ -13,7 +13,6 @@ import '../../../core/di/injection.dart';
 import '../../../core/network/app_http_overrides.dart';
 import '../../../core/network/proxy_config.dart';
 import '../../../core/services/hires_audio_service.dart';
-import '../../../core/services/xdm_backend_service.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../data/audio/audio_effects_channel.dart';
 import '../../../data/scanner/media_scanner_service.dart';
@@ -184,7 +183,8 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       ]);
       final prefs = results[0] as SharedPreferences;
       String proxyPassword = (results[1] as String?) ?? '';
-      String xdmToken = (results[2] as String?) ?? '';
+
+      // Remote backend decommissioned: drop any stored backend token.
 
       // Migration verification for proxy password
       if (prefs.containsKey(_keyProxyPassword) && proxyPassword.isEmpty) {
@@ -306,22 +306,16 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       // Legacy proxy password migration already handled above (lines 164-186)
       // No second migration needed.
 
-      if (xdmToken.isEmpty) {
-        final legacyToken =
-            prefs.getString(PrefsKeys.ytdlpBackendToken)?.trim();
-        if (legacyToken != null && legacyToken.isNotEmpty) {
-          xdmToken = legacyToken;
-          try {
-            await _secureStorage.write(
-              key: 'xdm_backend_token_secure',
-              value: legacyToken,
-            );
-            await prefs.remove(PrefsKeys.ytdlpBackendToken);
-          } catch (_) {}
-        } else {
-          xdmToken = XdmBackendService.defaultApiToken;
-        }
-      }
+      // Remote backend decommissioned: purge any stored backend token and
+      // force on-device prefs so legacy installs migrate on next launch.
+      try {
+        await _secureStorage.delete(key: 'xdm_backend_token_secure');
+        await prefs.remove(PrefsKeys.ytdlpBackendToken);
+        await prefs.setBool(PrefsKeys.ytdlpBackendEnabled, false);
+        await prefs.setString(
+            PrefsKeys.extractorEngine, ExtractorEngine.onDevice.name);
+        await prefs.setBool(PrefsKeys.syncCookiesToBackend, false);
+      } catch (_) {}
 
       final proxyBypassHosts =
           prefs.getString(_keyProxyBypassHosts) ?? 'localhost, 127.0.0.1';
@@ -419,18 +413,12 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
         hasProxyPassword: proxyPassword.isNotEmpty,
         proxyBypassHosts: proxyBypassHosts,
         proxyList: proxyList,
-        extractorEngine: ExtractorEngine.values.firstWhere(
-          (e) => e.name == prefs.getString(PrefsKeys.extractorEngine),
-          orElse: () => ExtractorEngine.auto,
-        ),
-        ytdlpBackendEnabled:
-            prefs.getBool(PrefsKeys.ytdlpBackendEnabled) ?? false,
+        extractorEngine: ExtractorEngine.onDevice,
+        ytdlpBackendEnabled: false,
         ytdlpBackendUrl:
             prefs.getString(PrefsKeys.ytdlpBackendUrl) ?? state.ytdlpBackendUrl,
-        ytdlpBackendToken:
-            xdmToken.isNotEmpty ? xdmToken : state.ytdlpBackendToken,
-        syncCookiesToBackend:
-            prefs.getBool(PrefsKeys.syncCookiesToBackend) ?? false,
+        ytdlpBackendToken: '',
+        syncCookiesToBackend: false,
         bitPerfectOutput:
             prefs.getBool(PrefsKeys.bitPerfectOutput) ?? state.bitPerfectOutput,
         bypassDspOnBitPerfect: prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ??
@@ -1050,99 +1038,65 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
   }
 
   Future<void> setExtractorEngine(ExtractorEngine engine) async {
+    // DISABLED: remote backend decommissioned — always on-device.
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(PrefsKeys.extractorEngine, engine.name);
-    final isBackendActive = engine != ExtractorEngine.onDevice;
-    await prefs.setBool(PrefsKeys.ytdlpBackendEnabled, isBackendActive);
+    await prefs.setString(
+        PrefsKeys.extractorEngine, ExtractorEngine.onDevice.name);
+    await prefs.setBool(PrefsKeys.ytdlpBackendEnabled, false);
     safeEmit(
       state.copyWith(
-        extractorEngine: engine,
-        ytdlpBackendEnabled: isBackendActive,
+        extractorEngine: ExtractorEngine.onDevice,
+        ytdlpBackendEnabled: false,
       ),
     );
   }
 
   Future<void> setYtdlpBackendEnabled(bool enabled) async {
+    // DISABLED: remote backend decommissioned — always off.
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(PrefsKeys.ytdlpBackendEnabled, enabled);
-    final newEngine = enabled ? ExtractorEngine.auto : ExtractorEngine.onDevice;
-    await prefs.setString(PrefsKeys.extractorEngine, newEngine.name);
+    await prefs.setBool(PrefsKeys.ytdlpBackendEnabled, false);
+    await prefs.setString(
+        PrefsKeys.extractorEngine, ExtractorEngine.onDevice.name);
     safeEmit(
-      state.copyWith(ytdlpBackendEnabled: enabled, extractorEngine: newEngine),
+      state.copyWith(
+          ytdlpBackendEnabled: false,
+          extractorEngine: ExtractorEngine.onDevice),
     );
   }
 
   Future<void> setYtdlpBackendUrl(String url) async {
-    final cleanUrl = url.trim();
-    if (cleanUrl.isNotEmpty) {
-      final parsed = Uri.tryParse(cleanUrl);
-      if (parsed == null ||
-          (!parsed.isScheme('http') && !parsed.isScheme('https')) ||
-          parsed.host.isEmpty) {
-        safeEmit(
-          state.copyWith(
-            errorMessage:
-                'Invalid backend URL format. Must be http:// or https://',
-          ),
-        );
-        return;
-      }
-    }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(PrefsKeys.ytdlpBackendUrl, cleanUrl);
-    safeEmit(state.copyWith(ytdlpBackendUrl: cleanUrl, errorMessage: null));
+    // DISABLED: no-op, kept for API compatibility.
+    return;
   }
 
   Future<void> setYtdlpBackendToken(String token) async {
-    final cleanToken = token.trim();
+    // DISABLED: purge instead of storing.
     try {
-      if (cleanToken.isNotEmpty) {
-        await _secureStorage.write(
-          key: 'xdm_backend_token_secure',
-          value: cleanToken,
-        );
-      } else {
-        await _secureStorage.delete(key: 'xdm_backend_token_secure');
-      }
+      await _secureStorage.delete(key: 'xdm_backend_token_secure');
     } catch (_) {}
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(PrefsKeys.ytdlpBackendToken);
-    safeEmit(state.copyWith(ytdlpBackendToken: cleanToken));
+    safeEmit(state.copyWith(ytdlpBackendToken: ''));
   }
 
   Future<void> setSyncCookiesToBackend(bool value) async {
+    // DISABLED: never sync cookies to a remote backend.
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(PrefsKeys.syncCookiesToBackend, value);
-    safeEmit(state.copyWith(syncCookiesToBackend: value));
+    await prefs.setBool(PrefsKeys.syncCookiesToBackend, false);
+    safeEmit(state.copyWith(syncCookiesToBackend: false));
   }
 
   Future<void> testYtdlpBackend() async {
     safeEmit(
       state.copyWith(
-        isTestingYtdlpBackend: true,
-        ytdlpBackendStatusMessage: null,
+        isTestingYtdlpBackend: false,
+        ytdlpBackendStatusMessage:
+            'Remote yt-dlp backend is disabled (on-device only).',
+        ytdlpBackendVersion: 'disabled',
+        ytdlpBackendProxyCount: 0,
+        ytdlpBackendCircuitState: 'open',
       ),
     );
-    try {
-      final xdm = getIt<XdmBackendService>();
-      final health = await xdm.checkHealth(force: true);
-      safeEmit(
-        state.copyWith(
-          isTestingYtdlpBackend: false,
-          ytdlpBackendStatusMessage: health.message,
-          ytdlpBackendVersion: health.backendVersion,
-          ytdlpBackendProxyCount: health.proxyPoolSize,
-          ytdlpBackendCircuitState: health.circuitState.name,
-        ),
-      );
-    } catch (e) {
-      safeEmit(
-        state.copyWith(
-          isTestingYtdlpBackend: false,
-          ytdlpBackendStatusMessage: 'Error: $e',
-        ),
-      );
-    }
   }
 
   Future<int> rescanLibrary() async {

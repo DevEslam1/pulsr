@@ -21,7 +21,6 @@ import '../constants/embedded_browser_ua.dart';
 import '../utils/error_logger.dart';
 import '../utils/lrc_parser.dart';
 import '../utils/ytm_rate_limiter.dart';
-import 'xdm_backend_service.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart'
     hide AndroidOptions;
 
@@ -1260,35 +1259,6 @@ class YtmAccountService {
       }
     } catch (e) {
       debugPrint('[YTM_ACCOUNT] Native Kotlin fallback failed: $e');
-    }
-
-    // Last resort: XDM yt-dlp backend — passes authenticated cookies server-side
-    // via the cookie pool and can access private playlists that InnerTube rejects.
-    try {
-      debugPrint(
-          '[YTM_ACCOUNT] Attempting XDM backend fallback for liked songs...');
-      final xdm = getIt<XdmBackendService>();
-      if (await xdm.isEnabled()) {
-        var tracks = await xdm.getPlaylist(
-          'https://www.youtube.com/playlist?list=LL',
-          limit: maxTracks,
-          cookies: _cookies,
-        );
-        if (tracks.isEmpty) {
-          tracks = await xdm.getPlaylist(
-            'https://music.youtube.com/playlist?list=LM',
-            limit: maxTracks,
-            cookies: _cookies,
-          );
-        }
-        if (tracks.isNotEmpty) {
-          debugPrint(
-              '[YTM_ACCOUNT] XDM backend returned ${tracks.length} liked songs');
-          return tracks.take(maxTracks).toList();
-        }
-      }
-    } catch (e) {
-      debugPrint('[YTM_ACCOUNT] XDM backend fallback failed: $e');
     }
 
     return [];

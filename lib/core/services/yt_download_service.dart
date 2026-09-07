@@ -24,8 +24,6 @@ import '../errors/ytm_error_classifier.dart';
 import '../utils/error_logger.dart';
 import '../utils/ytm_rate_limiter.dart';
 import '../widgets/cached_artwork.dart';
-import 'xdm_backend_service.dart';
-import 'ytm_account_service.dart';
 import 'ytm_service.dart';
 import 'ytm_url_cache.dart';
 
@@ -563,33 +561,8 @@ class YtDownloadService {
       getIt<YtmUrlCache>().invalidate(videoId);
     }
 
-    // 1. Backend-first for downloads (Engine 3 as primary download engine)
-    try {
-      if (getIt.isRegistered<XdmBackendService>()) {
-        final xdm = getIt<XdmBackendService>();
-        if (await xdm.isEnabled()) {
-          final account = getIt.isRegistered<YtmAccountService>()
-              ? getIt<YtmAccountService>()
-              : null;
-          // Respect the cookie-sync opt-out: never leak account cookies to
-          // the remote backend when the user disabled sync (XDM strips them
-          // itself, but don't send them in the first place).
-          final allowCookies = await xdm.isCookieSyncAllowed();
-          final backendStream = await xdm.resolveStream(
-            videoId,
-            quality: quality,
-            cookies: allowCookies ? account?.cookies : null,
-          );
-          if (backendStream != null) {
-            return backendStream.withResolvedExpiry();
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('[YtDownloadService] Backend download resolve fallback: $e');
-    }
-
-    // 2. Native resolution fallback
+    // Remote backend decommissioned: native resolution only.
+    // 1. Native resolution fallback
     final native = await _ytmService.resolveStream(videoId,
         quality: quality, forceRefresh: forceRefresh);
     return native.withResolvedExpiry();

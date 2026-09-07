@@ -22,24 +22,26 @@ void main() {
     await cubit.close();
   });
 
-  group('SettingsCubit URL Validation Tests', () {
-    test('rejects invalid backend URLs and sets error message in state',
-        () async {
+  group('SettingsCubit backend disabled Tests', () {
+    test('setYtdlpBackendUrl is a no-op (backend decommissioned)', () async {
+      final before = cubit.state.ytdlpBackendUrl;
       await cubit.setYtdlpBackendUrl('invalid-url-without-scheme');
-      expect(cubit.state.errorMessage, contains('Invalid backend URL format'));
+      expect(cubit.state.errorMessage, isNull);
+      expect(cubit.state.ytdlpBackendUrl, before);
 
-      await cubit.setYtdlpBackendUrl('ftp://example.com/api');
-      expect(cubit.state.errorMessage, contains('Invalid backend URL format'));
-    });
-
-    test('accepts valid http and https backend URLs', () async {
       await cubit.setYtdlpBackendUrl('http://192.168.1.50:8080');
       expect(cubit.state.errorMessage, isNull);
-      expect(cubit.state.ytdlpBackendUrl, 'http://192.168.1.50:8080');
+      expect(cubit.state.ytdlpBackendUrl, before);
+    });
 
-      await cubit.setYtdlpBackendUrl('https://yt-backend.example.com');
-      expect(cubit.state.errorMessage, isNull);
-      expect(cubit.state.ytdlpBackendUrl, 'https://yt-backend.example.com');
+    test('backend stays disabled and engine stays on-device', () async {
+      await cubit.setYtdlpBackendEnabled(true);
+      expect(cubit.state.ytdlpBackendEnabled, isFalse);
+
+      await cubit.setExtractorEngine(
+          // ignore: deprecated_member_use_from_same_package
+          cubit.state.extractorEngine);
+      expect(cubit.state.ytdlpBackendEnabled, isFalse);
     });
   });
 }

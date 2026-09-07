@@ -1,5 +1,4 @@
 // test/core/services/engine3_resolution_strategy_test.dart
-import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -55,7 +54,9 @@ void main() {
   });
 
   group('Engine 3 Resolution Strategy & Resilience Matrix', () {
-    test('INT-1: App resolves stream via Native when backend is unreachable/down', () async {
+    test(
+        'INT-1: App resolves stream via Native when backend is unreachable/down',
+        () async {
       // Backend is down (503 / exception)
       when(() => mockClient.get(
             any(),
@@ -90,57 +91,45 @@ void main() {
 
       // Clear mock
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(const MethodChannel(PulsrChannels.ytm), null);
+          .setMockMethodCallHandler(
+              const MethodChannel(PulsrChannels.ytm), null);
     });
 
-    test('INT-2: Engine 3 backend acts as fallback when Native extractor fails', () async {
+    test('INT-2: No backend fallback — native failure surfaces directly',
+        () async {
       // Native MethodChannel throws extraction failure
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(
         const MethodChannel(PulsrChannels.ytm),
         (MethodCall methodCall) async {
           if (methodCall.method == 'resolveStream') {
-            throw PlatformException(code: 'YTM_400', message: 'Client deprecated');
+            throw PlatformException(
+                code: 'YTM_400', message: 'Client deprecated');
           }
           return null;
         },
       );
 
-      // Backend returns stream successfully via /resolve/audio
-      when(() => mockClient.get(
-            Uri.parse('https://test-backend.app/resolve/audio?videoId=fallback_vid'),
-            headers: any(named: 'headers'),
-          )).thenAnswer((_) async => http.Response(
-            jsonEncode({
-              'videoId': 'fallback_vid',
-              'title': 'Fallback Track',
-              'author': 'Fallback Artist',
-              'audio': [
-                {
-                  'src': 'https://googlevideo.com/backend_fallback_stream',
-                  'ext': 'm4a',
-                  'codec': 'mp4a.40.2',
-                  'abr': 128,
-                  'expiresAt': 1800000000000,
-                }
-              ]
-            }),
-            200,
-          ));
-
-      final stream = await ytmService.resolveStream('fallback_vid');
-      expect(stream, isNotNull);
-      expect(stream.url, 'https://googlevideo.com/backend_fallback_stream');
-      expect(stream.title, 'Fallback Track');
+      // Remote backend decommissioned: must not be called, native error
+      // surfaces directly instead of falling back.
+      await expectLater(
+        ytmService.resolveStream('fallback_vid'),
+        throwsA(isA<YtmException>()),
+      );
+      verifyNever(() => mockClient.get(any(), headers: any(named: 'headers')));
 
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(const MethodChannel(PulsrChannels.ytm), null);
+          .setMockMethodCallHandler(
+              const MethodChannel(PulsrChannels.ytm), null);
     });
 
-    test('INT-3: Error code classification maps backend error codes to block signals', () {
+    test(
+        'INT-3: Error code classification maps backend error codes to block signals',
+        () {
       final botInfo = YtmErrorClassifier.classifyCode('BOT_CHECK');
       expect(botInfo.signal, YtmBlockSignal.botChallenge);
-      expect(botInfo.recoveryAction, YtmRecoveryAction.invalidatePoTokenAndRetry);
+      expect(
+          botInfo.recoveryAction, YtmRecoveryAction.invalidatePoTokenAndRetry);
 
       final rateInfo = YtmErrorClassifier.classifyCode('RATE_LIMITED');
       expect(rateInfo.signal, YtmBlockSignal.rateLimited);
@@ -158,38 +147,18 @@ void main() {
       expect(timeoutInfo.recoveryAction, YtmRecoveryAction.retryWithBackoff);
     });
 
-    test('INT-4: Cookie sync is blocked when syncCookiesToBackend is false', () async {
+    test('INT-4: Backend disabled — resolveStream never sends cookies',
+        () async {
       SharedPreferences.setMockInitialValues({
         PrefsKeys.ytdlpBackendEnabled: true,
         PrefsKeys.ytdlpBackendUrl: 'https://test-backend.app',
         PrefsKeys.syncCookiesToBackend: false,
       });
 
-      Map<String, String>? capturedHeaders;
-      when(() => mockClient.get(
-            any(),
-            headers: any(named: 'headers'),
-          )).thenAnswer((invocation) async {
-        capturedHeaders = invocation.namedArguments[#headers] as Map<String, String>?;
-        return http.Response(
-          jsonEncode({
-            'videoId': 'vid_test',
-            'title': 'Test',
-            'audio': [
-              {
-                'src': 'https://example.com/audio.m4a',
-                'ext': 'm4a',
-                'abr': 128,
-              }
-            ]
-          }),
-          200,
-        );
-      });
-
-      await xdmService.resolveStream('vid_test', cookies: 'sensitive_cookie=value');
-      expect(capturedHeaders, isNotNull);
-      expect(capturedHeaders!.containsKey('X-YouTube-Cookies'), isFalse);
+      final result = await xdmService.resolveStream('vid_test',
+          cookies: 'sensitive_cookie=value');
+      expect(result, isNull);
+      verifyNever(() => mockClient.get(any(), headers: any(named: 'headers')));
     });
 
     test('INT-5: YtmStream correctly reports isExpiringSoon and isExpired', () {
