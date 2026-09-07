@@ -69,6 +69,7 @@ internal class ResolutionStrategy(
         hasJsEngine: Boolean = false,
         trackType: String = ClientWinnerStore.TRACK_TYPE_MUSIC
     ): List<InnertubeClient.ClientType> {
+        SabrDemotionStore.init(context)
         val isVpn = try { CellularFailoverHelper.isVpnActive(context) } catch (_: Throwable) { false }
         val baseChain = when (op) {
             Operation.STREAM_RESOLVE -> {
@@ -149,7 +150,11 @@ internal class ResolutionStrategy(
         }
 
         val chain = if (limitedMode) primary else primary + secondary
-        return chain.ifEmpty {
+        // 2026-09 gap 1: SABR-demoted clients go to the BACK of the chain for
+        // 24h (never removed — a YouTube-side rollback self-heals at TTL).
+        val sabrDemoted = chain.filter { SabrDemotionStore.isSabrDemoted(it) }
+        val orderedChain = if (sabrDemoted.isEmpty()) chain else chain.filterNot { sabrDemoted.contains(it) } + sabrDemoted
+        return orderedChain.ifEmpty {
             // Absolute fallback filtered through capabilities
             listOf(InnertubeClient.ClientType.IOS_MUSIC, InnertubeClient.ClientType.ANDROID_VR).filter {
                 val cap = ClientCapabilityMatrix.getCapability(it)

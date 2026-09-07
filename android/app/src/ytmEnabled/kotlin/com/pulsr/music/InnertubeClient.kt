@@ -192,6 +192,25 @@ internal class InnertubeClient(
      * 3. Fallback sequential check for remaining clients
      * 4. Selects optimal itag via audio itag ladder (140, 251, 139, 250, 249)
      */
+    /**
+     * 2026-09 gap 4: GVS (googlevideo) gating is expanding per-client. For
+     * clients whose capability marks them poToken-requiring, append the
+     * streaming (gvs-context) poToken as 'pot='. Matrix-driven so capability
+     * overrides update behavior without a release. Idempotent.
+     */
+    private fun maybeAppendStreamPot(url: String, client: ClientType): String {
+        val host = runCatching { Uri.parse(url).host ?: "" }.getOrDefault("")
+        if (!host.contains("googlevideo.com")) return url
+        if (!ClientCapabilityMatrix.getCapability(client).requiresPoToken) return url
+        val token = PoTokenManager.streamingPoToken
+        if (token.isEmpty()) return url
+        return runCatching {
+            val uri = Uri.parse(url)
+            if (uri.getQueryParameter("pot") != null) return url
+            uri.buildUpon().appendQueryParameter("pot", token).toString()
+        }.getOrDefault(url)
+    }
+
     fun resolvePlayerStream(videoId: String, quality: String = "high"): Map<String, Any?> {
         val clientChain = resolutionStrategy.buildChain(
             ResolutionStrategy.Operation.STREAM_RESOLVE,
@@ -285,15 +304,37 @@ internal class InnertubeClient(
                 }
 
                 if (audioFormats.isEmpty()) {
-                    val hadFormatArrays = formatArrays.any { it.length() > 0 }
-                    val hadCiphered = formatArrays.any { arr ->
-                        (0 until arr.length()).any { idx ->
-                            val f = arr.optJSONObject(idx)
-                            f?.optString("signatureCipher")?.isNotEmpty() == true || f?.optString("cipher")?.isNotEmpty() == true
+                    // 2026-09: count urls/cipher across ALL formats so SABR-forced
+                    // clients (formats present, zero urls, zero cipher) are
+                    // classified SabrEnforced instead of VideoGone/PoTokenInvalid.
+                    var totalFormats = 0
+                    var totalUrls = 0
+                    var cipheredCount = 0
+                    for (array in formatArrays) {
+                        for (i in 0 until array.length()) {
+                            val f = array.optJSONObject(i) ?: continue
+                            totalFormats++
+                            if (!extractUrlFromFormat(f).isNullOrEmpty()) totalUrls++
+                            if (f.optString("signatureCipher").isNotEmpty() ||
+                                f.optString("cipher").isNotEmpty()) cipheredCount++
                         }
                     }
+                    val hadFormatArrays = totalFormats > 0
+                    val hadCiphered = cipheredCount > 0
                     lastSignalRef.set(
                         when {
+                            YtmBlockSignal.detectSabrStructural(
+                                hasStreamingData = streamingData != null,
+                                formatCount = totalFormats,
+                                urlCount = totalUrls,
+                                cipherCount = cipheredCount,
+                            ) -> {
+                                // Demote the client for 24h; do NOT invalidate
+                                // poTokens — SABR is not an attestation failure.
+                                SabrDemotionStore.markSabrEnforced(client)
+                                Log.w(TAG, "[$traceId] " + client.name + " SABR-enforced (formats=$totalFormats, urls=0) -> demoted")
+                                YtmBlockSignal.SabrEnforced
+                            }
                             hadCiphered -> YtmBlockSignal.SignatureDecipherFailed
                             hadFormatArrays -> YtmBlockSignal.VideoGone
                             else -> YtmBlockSignal.PoTokenInvalid
@@ -332,10 +373,11 @@ internal class InnertubeClient(
                 val author = videoDetails?.optString("author") ?: ""
 
                 Log.i(TAG, "[$traceId] Successfully resolved $videoId via ${client.name} (itag: ${selected.optInt("itag")}, bitrate: $selectedBitrate)")
-                YtmHttpClient.preConnect(selectedUrl)
+                val finalUrl = maybeAppendStreamPot(selectedUrl, client)
+                YtmHttpClient.preConnect(finalUrl)
                 return mapOf(
                     "videoId" to videoId,
-                    "url" to selectedUrl,
+                    "url" to finalUrl,
                     "mimeType" to selectedMime.split(";").first().trim(),
                     "container" to if (selectedMime.contains("mp4")) "m4a" else "webm",
                     "bitrateKbps" to (selectedBitrate / 1000),
@@ -349,7 +391,7 @@ internal class InnertubeClient(
                     // googlevideo URLs are time-boxed. Without this the Dart
                     // model's isExpired/isExpiringSoon are permanently false and
                     // both the player and the downloader run on dead URLs.
-                    "expiresAt" to parseUrlExpiryEpochSeconds(selectedUrl)
+                    "expiresAt" to parseUrlExpiryEpochSeconds(finalUrl)
                 )
             } catch (t: Throwable) {
                 Log.w(TAG, "[$traceId] Failed resolving with ${client.name}: ${t.message}")

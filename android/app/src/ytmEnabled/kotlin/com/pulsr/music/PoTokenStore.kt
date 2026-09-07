@@ -28,6 +28,7 @@ internal object PoTokenStore {
     private const val KEY_GENERATED_AT = "ytm_generated_at"
     private const val KEY_TTL_SECONDS = "ytm_ttl_seconds"
     private const val KEY_EXPIRY_INSTANT = "ytm_expiry_instant"
+    private const val KEY_EGRESS_ID = "ytm_egress_id"
 
     const val DEFAULT_TTL_SECONDS = 12 * 3600L // 12 hours
     const val REFRESH_MARGIN_SECONDS = 1800L // 30 minutes before expiry
@@ -39,7 +40,8 @@ internal object PoTokenStore {
         val dataSyncId: String,
         val generatedAt: Long,
         val ttlSeconds: Long,
-        val expiryInstant: Long
+        val expiryInstant: Long,
+        val egressId: String = ""
     ) {
         val isExpired: Boolean
             get() {
@@ -96,6 +98,7 @@ internal object PoTokenStore {
             val visitor = prefs.getString(KEY_VISITOR_DATA, "") ?: ""
             val integrity = prefs.getString(KEY_INTEGRITY_TOKEN, "") ?: ""
             val dataSync = prefs.getString(KEY_DATA_SYNC_ID, "") ?: ""
+            val egressId = prefs.getString(KEY_EGRESS_ID, "") ?: ""
             val genAt = prefs.getLong(KEY_GENERATED_AT, 0L)
             val ttl = prefs.getLong(KEY_TTL_SECONDS, DEFAULT_TTL_SECONDS)
             var expiry = prefs.getLong(KEY_EXPIRY_INSTANT, 0L)
@@ -112,7 +115,8 @@ internal object PoTokenStore {
                 dataSyncId = dataSync,
                 generatedAt = genAt,
                 ttlSeconds = ttl,
-                expiryInstant = expiry
+                expiryInstant = expiry,
+                egressId = egressId
             )
         } catch (t: Throwable) {
             Log.e(TAG, "Corrupt token store encountered; resetting store: ${t.message}", t)
@@ -131,7 +135,8 @@ internal object PoTokenStore {
         integrityToken: String = "",
         dataSyncId: String = "",
         ttlSeconds: Long = DEFAULT_TTL_SECONDS,
-        generatedAt: Long = Instant.now().epochSecond
+        generatedAt: Long = Instant.now().epochSecond,
+        egressId: String = ""
     ) {
         val prefs = getPrefs(context)
         val expiryInstant = generatedAt + ttlSeconds
@@ -144,6 +149,7 @@ internal object PoTokenStore {
                 .putLong(KEY_GENERATED_AT, generatedAt)
                 .putLong(KEY_TTL_SECONDS, ttlSeconds)
                 .putLong(KEY_EXPIRY_INSTANT, expiryInstant)
+                .putString(KEY_EGRESS_ID, egressId)
                 .apply()
         } catch (t: Throwable) {
             Log.e(TAG, "Failed to save token data to store: ${t.message}", t)

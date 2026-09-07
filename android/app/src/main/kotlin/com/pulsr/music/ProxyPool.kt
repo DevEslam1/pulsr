@@ -27,6 +27,9 @@ import java.util.concurrent.Executors
  */
 object ProxyPool {
     private const val TAG = "ProxyPool"
+
+    /** 2026-09: YouTube pre-flags datacenter IPs before cookie checks. */
+    enum class Quality { RESIDENTIAL, UNKNOWN, DATACENTER }
     private const val DEAD_TIMEOUT_MS = 15 * 60 * 1000L // 15 minutes
     private const val MAX_CONSECUTIVE_FAILURES = 3
 
@@ -62,7 +65,8 @@ object ProxyPool {
         var latencyMs: Long = -1L,
         var consecutiveFailures: Int = 0,
         var deadUntilTimestamp: Long = 0L,
-        var isEnabled: Boolean = true
+        var isEnabled: Boolean = true,
+        val quality: Quality = Quality.UNKNOWN
     ) {
         val isAlive: Boolean
             get() {
@@ -113,7 +117,10 @@ object ProxyPool {
             return null
         }
 
-        val selected = aliveList[activeProxyIndex % aliveList.size]
+        // 2026-09 gap 5: prefer residential > unknown > datacenter; stable
+        // within a tier so rotation behavior is preserved.
+        val ranked = aliveList.sortedBy { it.quality.ordinal }
+        val selected = ranked[activeProxyIndex % ranked.size]
         currentPathLabel = "${selected.type.name}:${selected.host}:${selected.port}"
 
         // Set authenticator if required

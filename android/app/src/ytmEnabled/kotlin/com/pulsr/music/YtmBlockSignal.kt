@@ -21,7 +21,8 @@ enum class YtmBlockSignal(val code: String) {
     SignInRequired("SIGN_IN_REQUIRED"),
     VideoGone("VIDEO_GONE"),
     NetworkUnavailable("YTM_NETWORK"),
-    SignatureDecipherFailed("SIGNATURE_DECIPHER_FAILED");
+    SignatureDecipherFailed("SIGNATURE_DECIPHER_FAILED"),
+    SabrEnforced("SABR_ENFORCED");
 
     companion object {
         private val BOT_SUBSTRINGS = listOf(
@@ -96,6 +97,27 @@ enum class YtmBlockSignal(val code: String) {
             "not available on this app"
         )
 
+        // 2026-09: SABR enforcement wording. Checked BEFORE geo/gone tables
+        // so a SABR-forced response is never misread as VideoGone/BotChallenge.
+        private val SABR_SUBSTRINGS = listOf(
+            "forcing sabr",
+            "sabr streaming",
+            "missing a url",
+            "server-based adaptive bitrate"
+        )
+
+        /**
+         * Structural SABR detection: streamingData present, formats exist, but
+         * NONE carries a direct url and none is ciphered. Must not be read as
+         * VideoGone (no backoff) or PoTokenInvalid (token is fine).
+         */
+        fun detectSabrStructural(
+            hasStreamingData: Boolean,
+            formatCount: Int,
+            urlCount: Int,
+            cipherCount: Int,
+        ): Boolean = hasStreamingData && formatCount > 0 && urlCount == 0 && cipherCount == 0
+
         private val DEPRECATED_SUBSTRINGS = listOf(
             "api key not valid",
             "bad request",
@@ -129,6 +151,11 @@ enum class YtmBlockSignal(val code: String) {
                 status.contains("BOT") ||
                 ((status == "LOGIN_REQUIRED" || status == "UNPLAYABLE") && BOT_SUBSTRINGS.any { combinedReasons.contains(it) })) {
                 return BotChallenge
+            }
+
+            // 1.5 SABR enforcement (2026-09): client-protocol state, not bot/geo.
+            if (SABR_SUBSTRINGS.any { combinedReasons.contains(it) }) {
+                return SabrEnforced
             }
 
             // 2. Rate Limited (HTTP 429 or explicit rate messages)

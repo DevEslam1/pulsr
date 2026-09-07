@@ -18,7 +18,8 @@ enum YtmBlockSignal {
   signInRequired,
   videoGone,
   networkUnavailable,
-  signatureDecipherFailed;
+  signatureDecipherFailed,
+  sabrEnforced;
 
   static YtmBlockSignal? fromCode(String code) {
     switch (code.toUpperCase()) {
@@ -43,6 +44,8 @@ enum YtmBlockSignal {
       case 'PO_TOKEN_INVALID':
       case 'YTM_PO_TOKEN_INVALID':
         return YtmBlockSignal.poTokenInvalid;
+      case 'SABR_ENFORCED':
+        return YtmBlockSignal.sabrEnforced;
       case 'CLIENT_DEPRECATED':
       case 'YTM_400':
         return YtmBlockSignal.clientDeprecated;

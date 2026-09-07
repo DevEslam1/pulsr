@@ -114,6 +114,16 @@ object PoTokenManager {
                 }
                 Log.d(TAG, "Loaded valid poToken from persistent store (valid until epoch $expiryInstant)")
             }
+
+            // 2026-09 gap 2: a stored token minted on a different egress is dead.
+            activeEgressId = currentEgressId()
+            if (stored.egressId.isNotEmpty() && stored.egressId != activeEgressId) {
+                Log.i(TAG, "Stored poToken egress '" + stored.egressId + "' != current '" + activeEgressId + "' -> treat as expired")
+                visitorData = ""
+                streamingPoToken = ""
+                expiryInstant = 0L
+                synchronized(tokenLru) { tokenLru.evictAll() }
+            }
         }
     }
 
@@ -194,6 +204,7 @@ object PoTokenManager {
      * Ensures attestation state and generator are ready.
      */
     suspend fun ensureReady(): Boolean = withContext(Dispatchers.IO) {
+        checkEgress()
         if (webViewBroken) {
             return@withContext visitorData.isNotEmpty()
         }
@@ -250,6 +261,38 @@ object PoTokenManager {
         }
     }
 
+    // 2026-09 gap 2: poTokens bind to the egress they were minted on. When the
+    // egress changes (ProxyPool rotation, wifi<->cellular, VPN toggle) cached
+    // tokens must not be replayed on the new path.
+    @Volatile
+    private var activeEgressId: String = ""
+
+    fun currentEgressId(): String = EgressTracker.egressId(
+        proxyLabel = runCatching { ProxyPool.currentPathLabel }.getOrDefault("DIRECT"),
+        vpnActive = runCatching { appContext?.let { CellularFailoverHelper.isVpnActive(it) } ?: false }.getOrDefault(false),
+        isCellular = false, // CellularFailoverHelper has no cellular query; proxy+vpn cover the dominant changes
+    )
+
+    /**
+     * Called on egress change (ProxyPool listener / lazy check). Drops cached
+     * tokens so the next mint happens on the NEW egress.
+     */
+    fun onEgressChanged(newEgressId: String) {
+        if (appContext == null) return
+        val old = activeEgressId
+        if (old.isNotEmpty() && old != newEgressId) {
+            Log.i(TAG, "Egress changed '" + old + "' -> '" + newEgressId + "': invalidating cached poTokens")
+            synchronized(tokenLru) { tokenLru.evictAll() }
+            invalidate()
+        }
+        activeEgressId = newEgressId
+    }
+
+    private fun checkEgress() {
+        if (appContext == null) return
+        onEgressChanged(currentEgressId())
+    }
+
     /**
      * Generates or retrieves a cached poToken bound to [identifier] — the
      * `visitorData` for a guest request, the `datasyncId` for a signed-in one.
@@ -257,6 +300,7 @@ object PoTokenManager {
      * Never blocks critical-path playback if a token is already cached or stored.
      */
     fun poTokenForSync(identifier: String): String {
+        checkEgress()
         val currentVisitor = visitorData
         val now = Instant.now().epochSecond
 
@@ -501,7 +545,8 @@ object PoTokenManager {
             integrityToken = integrityToken,
             dataSyncId = dataSyncId,
             ttlSeconds = effectiveTtlSeconds,
-            generatedAt = now
+            generatedAt = now,
+            egressId = activeEgressId
         )
 
         synchronized(tokenLru) {

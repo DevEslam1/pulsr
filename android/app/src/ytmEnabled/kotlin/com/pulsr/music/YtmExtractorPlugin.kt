@@ -71,6 +71,9 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             // EncryptedSharedPreferences, which is keystore-backed disk I/O and ran
             // during engine attach.
             context?.let { ctx -> plugin.executor.execute { runCatching { PoTokenManager.init(ctx) } } }
+            // 2026-09 gap 2: proxy rotation changes the egress -> re-mint tokens.
+            ProxyPool.setOnPathChangeListener { label -> EgressSignals.onEgressChanged?.invoke(label) }
+            EgressSignals.onEgressChanged = { id -> PoTokenManager.onEgressChanged(id) }
             return plugin
         }
     }
@@ -180,6 +183,23 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 val ctx = context?.applicationContext
                 val isVpn = if (ctx != null) CellularFailoverHelper.isVpnActive(ctx) else false
                 result.success(isVpn)
+            }
+            "updateClientCapabilities" -> {
+                val json = call.argument<String>("json") ?: ""
+                val ctx = context?.applicationContext
+                if (ctx == null) {
+                    result.success(false)
+                    return
+                }
+                runOffMainThread(result) { ClientCapabilityMatrix.applyRemoteCapabilities(json, ctx) }
+            }
+            "getClientCapabilitiesState" -> {
+                val ctx = context?.applicationContext
+                if (ctx == null) {
+                    result.success(null)
+                    return
+                }
+                result.success(ClientCapabilityMatrix.remoteState(ctx))
             }
             "clearNetworkCaches" -> {
                 // VPN up/down (or Wi-Fi <-> mobile) moves the egress IP, which

@@ -162,6 +162,7 @@ internal object ClientCapabilityMatrix {
             try {
                 val jsonString = context.assets.open(ASSET_FILE).bufferedReader().use { it.readText() }
                 loadFromJson(jsonString)
+                loadPersistedRemote(context)
                 loadState = CapabilityLoadState.LOADED_FROM_ASSETS
             } catch (e: Exception) {
                 Log.w(TAG, "Failed loading $ASSET_FILE from assets, using built-in matrix defaults: ${e.message}")
@@ -170,6 +171,46 @@ internal object ClientCapabilityMatrix {
             }
             isInitialized = true
         }
+    }
+
+    private const val REMOTE_FILE = "client_capabilities_remote.json"
+
+    /**
+     * 2026-09 gap 3: apply a remote capability override (transport-agnostic).
+     * Caller fetches the JSON (backend URL / Firestore / Remote Config) and
+     * pushes it here. Persisted under filesDir; loader precedence:
+     * built-in defaults -> APK asset -> persisted remote (newest wins).
+     * Returns false without side effects on invalid JSON.
+     */
+    fun applyRemoteCapabilities(jsonString: String, context: Context): Boolean {
+        return try {
+            loadFromJson(jsonString)
+            java.io.File(context.filesDir, REMOTE_FILE).writeText(jsonString)
+            Log.i(TAG, "Remote capability overrides applied and persisted")
+            true
+        } catch (e: Exception) {
+            Log.w(TAG, "Rejected remote capability JSON: " + e.message)
+            false
+        }
+    }
+
+    /** Re-applies the persisted remote override at startup (call after asset load). */
+    fun loadPersistedRemote(context: Context) {
+        val f = java.io.File(context.filesDir, REMOTE_FILE)
+        if (f.isFile) {
+            runCatching { loadFromJson(f.readText()) }
+                .onFailure { Log.w(TAG, "Persisted remote capabilities invalid, ignoring: " + it.message) }
+        }
+    }
+
+    /** Diagnostic state for the MethodChannel. */
+    fun remoteState(context: Context): Map<String, Any> {
+        val f = java.io.File(context.filesDir, REMOTE_FILE)
+        return mapOf(
+            "source" to loadState.name,
+            "remoteAppliedAtEpochMs" to (if (f.isFile) f.lastModified() else 0L),
+            "clientCount" to capabilities.size,
+        )
     }
 
     fun loadFromJson(jsonString: String) {
