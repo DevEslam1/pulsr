@@ -1,5 +1,6 @@
 // lib/features/player/presentation/themes/classic_player_theme.dart
 import 'dart:math' as math;
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -103,11 +104,11 @@ class ClassicPlayerTheme extends StatelessWidget {
           ),
         ),
 
-        // Ambient Bottom Glow (Near Controls)
+        // Ambient Bottom Glow (Near Controls) - Centered for visual symmetry
         Positioned(
-          bottom: -60,
-          right: -40,
-          width: isTablet ? 420 : 320,
+          bottom: -70,
+          left: 0,
+          right: 0,
           height: isTablet ? 420 : 320,
           child: IgnorePointer(
             child: AnimatedContainer(
@@ -115,11 +116,13 @@ class ClassicPlayerTheme extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: RadialGradient(
                   center: Alignment.center,
-                  radius: 0.75,
+                  radius: 0.85,
                   colors: [
-                    activeColor.withValues(alpha: 0.12),
+                    activeColor.withValues(alpha: 0.16),
+                    activeColor.withValues(alpha: 0.04),
                     Colors.transparent,
                   ],
+                  stops: const [0.0, 0.5, 1.0],
                 ),
               ),
             ),
@@ -132,10 +135,10 @@ class ClassicPlayerTheme extends StatelessWidget {
             children: [
               // Top Pull-down Handle Indicator
               Padding(
-                padding: const EdgeInsets.only(top: 4, bottom: 2),
+                padding: const EdgeInsets.only(top: 6, bottom: 4),
                 child: Center(
                   child: Container(
-                    width: 36,
+                    width: 38,
                     height: 4,
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.22),
@@ -145,42 +148,45 @@ class ClassicPlayerTheme extends StatelessWidget {
                 ),
               ),
 
-              // Top App Bar
+              // Top App Bar - Symmetrical Left/Right Touch Targets & Centered Header
               Padding(
                 padding: EdgeInsets.symmetric(
-                  horizontal: isTablet ? 24 : 16,
+                  horizontal: isTablet ? 28 : 20,
                   vertical: 4,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Dismiss Button
-                    Material(
-                      color: Colors.white.withValues(alpha: 0.08),
-                      shape: const CircleBorder(),
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          if (context.canPop()) {
-                            context.pop();
-                          } else {
-                            context.go('/');
-                          }
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            size: 26,
-                            color: p.textPrimary,
+                    // Dismiss Button (Symmetrical 40x40 circle)
+                    SizedBox(
+                      width: isTablet ? 44 : 40,
+                      height: isTablet ? 44 : 40,
+                      child: Material(
+                        color: Colors.white.withValues(alpha: 0.07),
+                        shape: const CircleBorder(),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            if (context.canPop()) {
+                              context.pop();
+                            } else {
+                              context.go('/');
+                            }
+                          },
+                          child: Center(
+                            child: Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              size: isTablet ? 26 : 24,
+                              color: p.textPrimary,
+                            ),
                           ),
                         ),
                       ),
                     ),
 
-                    // Center: "PLAYING FROM" Album Header
-                    Flexible(
+                    // Center: "PLAYING FROM" / Album Header (Symmetric & Centered)
+                    Expanded(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Column(
@@ -190,7 +196,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 WaveformLogo(
-                                  size: 14,
+                                  size: 13,
                                   color: state.isPlaying
                                       ? activeColor
                                       : p.textSecondary,
@@ -214,9 +220,16 @@ class ClassicPlayerTheme extends StatelessWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              song?.album ?? context.l10n.navLibrary,
+                              (song?.album != null &&
+                                      song!.album.trim().isNotEmpty)
+                                  ? song.album.trim()
+                                  : (song?.artist != null &&
+                                          song!.artist.trim().isNotEmpty)
+                                      ? song.artist.trim()
+                                      : context.l10n.navLibrary,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
                               style: Theme.of(context)
                                   .textTheme
                                   .titleSmall
@@ -231,27 +244,30 @@ class ClassicPlayerTheme extends StatelessWidget {
                       ),
                     ),
 
-                    // More Options Button
-                    Material(
-                      color: Colors.white.withValues(alpha: 0.08),
-                      shape: const CircleBorder(),
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          if (song != null) {
-                            showModalBottomSheet<void>(
-                              context: context,
-                              builder: (_) => SongInfoSheet(song: song),
-                            );
-                          }
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Icon(
-                            Icons.more_horiz_rounded,
-                            size: 24,
-                            color: p.textPrimary,
+                    // More Options Button (Symmetrical 40x40 circle)
+                    SizedBox(
+                      width: isTablet ? 44 : 40,
+                      height: isTablet ? 44 : 40,
+                      child: Material(
+                        color: Colors.white.withValues(alpha: 0.07),
+                        shape: const CircleBorder(),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            if (song != null) {
+                              showModalBottomSheet<void>(
+                                context: context,
+                                builder: (_) => SongInfoSheet(song: song),
+                              );
+                            }
+                          },
+                          child: Center(
+                            child: Icon(
+                              Icons.more_horiz_rounded,
+                              size: isTablet ? 24 : 22,
+                              color: p.textPrimary,
+                            ),
                           ),
                         ),
                       ),
@@ -269,15 +285,42 @@ class ClassicPlayerTheme extends StatelessWidget {
                     final isLandscape = context.isLandscape &&
                         (context.isTwoPane || constraints.maxWidth >= 680);
 
-                    // Dynamic sizing for artwork based on viewport dimensions
-                    final double portraitArtSize = math.min(
-                      constraints.maxWidth - (isTablet ? 64 : 48),
-                      (constraints.maxHeight - (isTablet ? 370 : 320))
-                          .clamp(240.0, isTablet ? 500.0 : 380.0),
-                    );
+                    // Dynamic vertical spacing ratio for balanced, centered content distribution
+                    final double heightRatio =
+                        (constraints.maxHeight / 720.0).clamp(0.85, 1.25);
+                    final double spacingTrackToSeek =
+                        (isTablet ? 16.0 : 12.0) * heightRatio;
+                    final double spacingSeekToControls =
+                        (isTablet ? 18.0 : 14.0) * heightRatio;
+                    final double spacingControlsToDock =
+                        (isTablet ? 18.0 : 14.0) * heightRatio;
+                    final double spacingBelowDock =
+                        (isTablet ? 14.0 : 10.0) * heightRatio;
+                    final double switcherTopPad =
+                        (isTablet ? 8.0 : 4.0) * heightRatio;
+                    final double switcherBottomPad =
+                        (isTablet ? 10.0 : 6.0) * heightRatio;
+
+                    // Prominent, modern artwork sizing filling the upper viewport harmoniously
+                    final double maxArtWidth =
+                        constraints.maxWidth - (isTablet ? 64 : 36);
+                    final double maxArtHeight = constraints.maxHeight -
+                        (isTablet ? 360 : (285.0 * heightRatio));
+                    final double portraitArtSize =
+                        math.min(maxArtWidth, maxArtHeight).clamp(
+                              isTablet ? 320.0 : 260.0,
+                              isTablet ? 540.0 : 400.0,
+                            );
 
                     final double landscapeArtSize =
                         (constraints.maxHeight - 80).clamp(280.0, 480.0);
+
+                    // Symmetrical twin pill capsule dimensions for top (view switcher) & bottom (eq dock)
+                    final double pillBarWidth = math.min(
+                      constraints.maxWidth - (isTablet ? 64 : 36),
+                      isTablet ? 440.0 : 336.0,
+                    );
+                    final double pillBarHeight = isTablet ? 50.0 : 44.0;
 
                     final viewSwitcher = _buildViewSwitcher(
                       context: context,
@@ -285,6 +328,8 @@ class ClassicPlayerTheme extends StatelessWidget {
                       cubit: cubit,
                       activeColor: activeColor,
                       isTablet: isTablet,
+                      barWidth: pillBarWidth,
+                      barHeight: pillBarHeight,
                     );
 
                     final centerDisplay = GestureDetector(
@@ -330,7 +375,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                                 : Center(
                                     key: const ValueKey('artwork_view'),
                                     child: AnimatedScale(
-                                      scale: state.isPlaying ? 1.0 : 0.93,
+                                      scale: state.isPlaying ? 1.0 : 0.97,
                                       duration:
                                           const Duration(milliseconds: 320),
                                       curve: Curves.easeOutCubic,
@@ -417,99 +462,153 @@ class ClassicPlayerTheme extends StatelessWidget {
                           )
                         : const SizedBox.shrink();
 
+                    final bool hasDownload = song != null &&
+                        (song.source == SongSource.youtube ||
+                            (song.remoteId != null &&
+                                song.remoteId!.isNotEmpty));
+
                     final controlsColumn = Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Title, Artist, Quality Badge, Download & Favorite
+                        // Symmetrical Track Header: [Action] Title/Artist [Favorite]
                         Padding(
                           padding: EdgeInsets.symmetric(
-                            horizontal: isTablet ? 24 : 20,
+                            horizontal: isTablet ? 28 : 20,
                             vertical: 2,
                           ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              // Title & Artist Column
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      song?.title ??
-                                          context.l10n.noTrackSelected,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: isTablet ? 24 : 20,
-                                        fontWeight: FontWeight.w900,
-                                        color: p.textPrimary,
-                                        height: 1.25,
-                                        letterSpacing: -0.3,
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  // Left Symmetrical Action: Download (stream) or Add to Playlist (local)
+                                  SizedBox(
+                                    width: isTablet ? 46 : 40,
+                                    height: isTablet ? 46 : 40,
+                                    child: hasDownload
+                                        ? Center(
+                                            child: YtmDownloadButton(
+                                              song: song,
+                                              activeColor: activeColor,
+                                              iconColor: p.textSecondary,
+                                              iconSize: isTablet ? 24 : 22,
+                                            ),
+                                          )
+                                        : Material(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.06),
+                                            shape: const CircleBorder(),
+                                            clipBehavior: Clip.antiAlias,
+                                            child: InkWell(
+                                              onTap: () {
+                                                if (song != null) {
+                                                  HapticFeedback.lightImpact();
+                                                  showModalBottomSheet<void>(
+                                                    context: context,
+                                                    useRootNavigator: true,
+                                                    isScrollControlled: true,
+                                                    backgroundColor:
+                                                        Colors.transparent,
+                                                    builder: (_) =>
+                                                        AddToPlaylistSheet(
+                                                            song: song),
+                                                  );
+                                                }
+                                              },
+                                              child: Center(
+                                                child: Icon(
+                                                  Icons.playlist_add_rounded,
+                                                  size: isTablet ? 24 : 22,
+                                                  color: p.textSecondary,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                  ),
+
+                                  // Center: Title & Artist (Symmetric & Centered)
+                                  Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            song?.title ??
+                                                context.l10n.noTrackSelected,
+                                            textAlign: TextAlign.center,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: isTablet ? 23 : 19,
+                                              fontWeight: FontWeight.w900,
+                                              color: p.textPrimary,
+                                              height: 1.22,
+                                              letterSpacing: -0.3,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            song?.artist ??
+                                                context.l10n.unknownArtist,
+                                            textAlign: TextAlign.center,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: isTablet ? 15 : 13.5,
+                                              fontWeight: FontWeight.w600,
+                                              color: p.textSecondary,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
-                                    Wrap(
-                                      crossAxisAlignment:
-                                          WrapCrossAlignment.center,
-                                      spacing: 8,
-                                      runSpacing: 4,
-                                      children: [
-                                        Text(
-                                          song?.artist ??
-                                              context.l10n.unknownArtist,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: isTablet ? 16 : 14.5,
-                                            fontWeight: FontWeight.w600,
-                                            color: p.textSecondary,
-                                          ),
-                                        ),
-                                        if (song != null)
-                                          AudioQualityBadge(
-                                            song: song,
-                                            activeColor: activeColor,
-                                            compact: true,
-                                          ),
-                                      ],
+                                  ),
+
+                                  // Right Symmetrical Action: Animated Favorite Button
+                                  SizedBox(
+                                    width: isTablet ? 46 : 40,
+                                    height: isTablet ? 46 : 40,
+                                    child: Material(
+                                      color: Colors.white
+                                          .withValues(alpha: 0.06),
+                                      shape: const CircleBorder(),
+                                      clipBehavior: Clip.antiAlias,
+                                      child: _AnimatedFavoriteButton(
+                                        isFavorite: song?.isFavorite == true,
+                                        favoriteColor: p.favorite,
+                                        inactiveColor: p.textSecondary,
+                                        iconSize: isTablet ? 24 : 22,
+                                        onTap: () {
+                                          if (song != null) {
+                                            cubit.toggleFavorite(song.id);
+                                          }
+                                        },
+                                      ),
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 8),
 
-                              // YTM Download Button (if available)
-                              if (song != null &&
-                                  (song.source == SongSource.youtube ||
-                                      (song.remoteId != null &&
-                                          song.remoteId!.isNotEmpty))) ...[
-                                YtmDownloadButton(
-                                  song: song,
-                                  activeColor: activeColor,
-                                  iconColor: p.textSecondary,
-                                  iconSize: isTablet ? 26 : 24,
+                              // Symmetrical Audio Quality Badge (Clean & Centered)
+                              if (song != null) ...[
+                                const SizedBox(height: 7),
+                                Center(
+                                  child: AudioQualityBadge(
+                                    song: song,
+                                    activeColor: activeColor,
+                                    compact: true,
+                                    showDevice: false,
+                                  ),
                                 ),
-                                const SizedBox(width: 4),
                               ],
-
-                              // Animated Favorite Heart Button
-                              _AnimatedFavoriteButton(
-                                isFavorite: song?.isFavorite == true,
-                                favoriteColor: p.favorite,
-                                inactiveColor: p.textSecondary,
-                                iconSize: isTablet ? 30 : 28,
-                                onTap: () {
-                                  if (song != null) {
-                                    cubit.toggleFavorite(song.id);
-                                  }
-                                },
-                              ),
                             ],
                           ),
                         ),
 
-                        SizedBox(height: isTablet ? 12 : 4),
+                        SizedBox(height: spacingTrackToSeek),
 
                         // Interactive Scrubber / Seek Bar
                         PlayerSeekBar(
@@ -520,7 +619,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                           onSeek: (pos) => cubit.seek(pos),
                         ),
 
-                        SizedBox(height: isTablet ? 10 : 4),
+                        SizedBox(height: spacingSeekToControls),
 
                         // Studio-grade Playback Controls
                         PlayerControls(
@@ -528,7 +627,8 @@ class ClassicPlayerTheme extends StatelessWidget {
                           isShuffle: state.isShuffle,
                           repeatMode: state.repeatMode,
                           primaryColor: activeColor,
-                          mainButtonSize: isTablet ? 74 : (isLandscape ? 58 : 66),
+                          mainButtonSize:
+                              isTablet ? 74 : (isLandscape ? 58 : 66),
                           onPlayPause: () => cubit.togglePlayPause(),
                           onNext: () => cubit.next(),
                           onPrevious: () => cubit.previous(),
@@ -536,17 +636,19 @@ class ClassicPlayerTheme extends StatelessWidget {
                           onToggleRepeat: () => cubit.toggleRepeat(),
                         ),
 
-                        SizedBox(height: isTablet ? 14 : 6),
+                        SizedBox(height: spacingControlsToDock),
 
-                        // Floating Glass Bottom Action Dock
+                        // Floating Glass Bottom Action Dock (Symmetric to View Switcher)
                         _buildBottomActionDock(
                           context: context,
                           props: props,
                           settingsState: settingsState,
                           isTablet: isTablet,
+                          barWidth: pillBarWidth,
+                          barHeight: pillBarHeight,
                         ),
 
-                        SizedBox(height: isTablet ? 10 : 6),
+                        SizedBox(height: spacingBelowDock),
                       ],
                     );
 
@@ -607,25 +709,25 @@ class ClassicPlayerTheme extends StatelessWidget {
                         // View Switcher Bar (Track | Lyrics | Queue)
                         Padding(
                           padding: EdgeInsets.only(
-                            top: isTablet ? 6 : 2,
-                            bottom: isTablet ? 10 : 6,
+                            top: switcherTopPad,
+                            bottom: switcherBottomPad,
                           ),
                           child: viewSwitcher,
                         ),
                         Expanded(
                           child: Center(
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: isTablet ? 32 : 24,
-                                vertical: 4,
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth: (state.isLyricsVisible ||
+                                        state.isQueueVisible)
+                                    ? (isTablet ? 560.0 : double.infinity)
+                                    : portraitArtSize,
+                                maxHeight: (state.isLyricsVisible ||
+                                        state.isQueueVisible)
+                                    ? double.infinity
+                                    : portraitArtSize,
                               ),
-                              child: ConstrainedBox(
-                                constraints: BoxConstraints(
-                                  maxHeight: portraitArtSize,
-                                  maxWidth: portraitArtSize,
-                                ),
-                                child: centerDisplay,
-                              ),
+                              child: centerDisplay,
                             ),
                           ),
                         ),
@@ -644,7 +746,7 @@ class ClassicPlayerTheme extends StatelessWidget {
   }
 
   // ---------------------------------------------------------------------------
-  // View Switcher Pill Bar (Track / Lyrics / Queue)
+  // View Switcher Pill Bar (Track / Lyrics / Queue) - Twin Capsule to EQ Dock
   // ---------------------------------------------------------------------------
   Widget _buildViewSwitcher({
     required BuildContext context,
@@ -652,86 +754,110 @@ class ClassicPlayerTheme extends StatelessWidget {
     required PlayerCubit cubit,
     required Color activeColor,
     required bool isTablet,
+    required double barWidth,
+    required double barHeight,
   }) {
     final isLyrics = state.isLyricsVisible;
     final isQueue = state.isQueueVisible;
     final isTrack = !isLyrics && !isQueue;
 
     return Center(
-      child: Container(
-        padding: const EdgeInsets.all(3.5),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.12),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.16),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: barWidth,
+          minWidth: barWidth,
+          maxHeight: barHeight,
+          minHeight: barHeight,
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _SwitcherItem(
-              label: 'Track',
-              icon: Icons.music_note_rounded,
-              isSelected: isTrack,
-              activeColor: activeColor,
-              isTablet: isTablet,
-              onTap: () {
-                if (!isTrack) {
-                  HapticFeedback.selectionClick();
-                  if (isLyrics) cubit.toggleLyricsVisibility();
-                  if (isQueue) cubit.toggleQueueVisibility();
-                }
-              },
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              padding: const EdgeInsets.all(3.0),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  width: 1.0,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.20),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _SwitcherItem(
+                      label: 'Track',
+                      icon: Icons.music_note_rounded,
+                      isSelected: isTrack,
+                      activeColor: activeColor,
+                      isTablet: isTablet,
+                      onTap: () {
+                        if (!isTrack) {
+                          HapticFeedback.selectionClick();
+                          if (isLyrics) cubit.toggleLyricsVisibility();
+                          if (isQueue) cubit.toggleQueueVisibility();
+                        }
+                      },
+                    ),
+                  ),
+                  Expanded(
+                    child: _SwitcherItem(
+                      label: 'Lyrics',
+                      icon: Icons.lyrics_rounded,
+                      isSelected: isLyrics,
+                      activeColor: activeColor,
+                      isTablet: isTablet,
+                      onTap: () {
+                        if (!isLyrics) {
+                          HapticFeedback.selectionClick();
+                          cubit.toggleLyricsVisibility();
+                        }
+                      },
+                    ),
+                  ),
+                  Expanded(
+                    child: _SwitcherItem(
+                      label: 'Queue',
+                      icon: Icons.queue_music_rounded,
+                      isSelected: isQueue,
+                      badgeCount: state.queue.length,
+                      activeColor: activeColor,
+                      isTablet: isTablet,
+                      onTap: () {
+                        if (!isQueue) {
+                          HapticFeedback.selectionClick();
+                          cubit.toggleQueueVisibility();
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
-            _SwitcherItem(
-              label: 'Lyrics',
-              icon: Icons.lyrics_rounded,
-              isSelected: isLyrics,
-              activeColor: activeColor,
-              isTablet: isTablet,
-              onTap: () {
-                if (!isLyrics) {
-                  HapticFeedback.selectionClick();
-                  cubit.toggleLyricsVisibility();
-                }
-              },
-            ),
-            _SwitcherItem(
-              label: 'Queue',
-              icon: Icons.queue_music_rounded,
-              isSelected: isQueue,
-              badgeCount: state.queue.length,
-              activeColor: activeColor,
-              isTablet: isTablet,
-              onTap: () {
-                if (!isQueue) {
-                  HapticFeedback.selectionClick();
-                  cubit.toggleQueueVisibility();
-                }
-              },
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
   // ---------------------------------------------------------------------------
-  // Floating Glass Bottom Action Dock (5 Actions)
+  // Floating Glass Bottom Action Dock (5 Actions) - Twin Capsule to Lyrics Bar
   // ---------------------------------------------------------------------------
   Widget _buildBottomActionDock({
     required BuildContext context,
     required PlayerThemeProps props,
     required SettingsState settingsState,
     required bool isTablet,
+    required double barWidth,
+    required double barHeight,
   }) {
     final song = props.state.currentSong;
     final p = context.palette;
@@ -750,131 +876,147 @@ class ClassicPlayerTheme extends StatelessWidget {
                 ? Icons.speaker_rounded
                 : Icons.headphones_rounded));
 
-    final dockMaxWidth = isTablet ? 500.0 : 420.0;
-
     return Center(
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: dockMaxWidth),
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
-          padding: EdgeInsets.symmetric(
-            horizontal: isTablet ? 14 : 10,
-            vertical: isTablet ? 4 : 3,
-          ),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.12),
+        constraints: BoxConstraints(
+          maxWidth: barWidth,
+          minWidth: barWidth,
+          maxHeight: barHeight,
+          minHeight: barHeight,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              padding: const EdgeInsets.all(3.0),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  width: 1.0,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.20),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  // 1. Equalizer & DSP
+                  Expanded(
+                    child: _DockIconButton(
+                      icon: Icons.tune_rounded,
+                      tooltip: context.l10n.equalizer,
+                      isActive: isEqActive,
+                      activeColor: props.activeColor,
+                      inactiveColor: p.textSecondary,
+                      isTablet: isTablet,
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        showModalBottomSheet<void>(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => const EqualizerSheet(),
+                        );
+                      },
+                    ),
+                  ),
+
+                  // 2. Audio Output & DAC
+                  Expanded(
+                    child: _DockIconButton(
+                      icon: outputIcon,
+                      tooltip: 'Audio Output & DAC',
+                      isActive: isUsb,
+                      activeColor: const Color(0xFFFFD700),
+                      inactiveColor: p.textSecondary,
+                      isTablet: isTablet,
+                      onTap: () {
+                        if (song != null) {
+                          HapticFeedback.lightImpact();
+                          AudioQualitySheet.show(
+                              context, song, props.activeColor);
+                        }
+                      },
+                    ),
+                  ),
+
+                  // 3. Playback Speed
+                  Expanded(
+                    child: _DockIconButton(
+                      icon: Icons.speed_rounded,
+                      tooltip: context.l10n.playbackSpeed,
+                      badgeText: speed != 1.0
+                          ? '${speed.toStringAsFixed(1)}x'
+                          : null,
+                      isActive: speed != 1.0,
+                      activeColor: props.activeColor,
+                      inactiveColor: p.textSecondary,
+                      isTablet: isTablet,
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        SpeedPickerSheet.show(context);
+                      },
+                    ),
+                  ),
+
+                  // 4. Sleep Timer
+                  Expanded(
+                    child: _DockIconButton(
+                      icon: Icons.timer_outlined,
+                      tooltip: context.l10n.sleepTimer,
+                      badgeText: hasTimer
+                          ? '${props.state.sleepTimerRemaining!.inMinutes}m'
+                          : null,
+                      isActive: hasTimer,
+                      activeColor: props.activeColor,
+                      inactiveColor: p.textSecondary,
+                      isTablet: isTablet,
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        showModalBottomSheet<void>(
+                          context: context,
+                          useRootNavigator: true,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => const SleepTimerSheet(),
+                        );
+                      },
+                    ),
+                  ),
+
+                  // 5. Add to Playlist
+                  Expanded(
+                    child: _DockIconButton(
+                      icon: Icons.playlist_add_rounded,
+                      tooltip: context.l10n.addToPlaylist,
+                      isActive: false,
+                      activeColor: props.activeColor,
+                      inactiveColor: p.textSecondary,
+                      isTablet: isTablet,
+                      onTap: () {
+                        if (song != null) {
+                          HapticFeedback.lightImpact();
+                          showModalBottomSheet<void>(
+                            context: context,
+                            useRootNavigator: true,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (_) => AddToPlaylistSheet(song: song),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.22),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              // 1. Equalizer & DSP
-              _DockIconButton(
-                icon: Icons.tune_rounded,
-                tooltip: context.l10n.equalizer,
-                isActive: isEqActive,
-                activeColor: props.activeColor,
-                inactiveColor: p.textSecondary,
-                isTablet: isTablet,
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  showModalBottomSheet<void>(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (_) => const EqualizerSheet(),
-                  );
-                },
-              ),
-
-              // 2. Audio Output & DAC
-              _DockIconButton(
-                icon: outputIcon,
-                tooltip: 'Audio Output & DAC',
-                isActive: isUsb,
-                activeColor: const Color(0xFFFFD700),
-                inactiveColor: p.textSecondary,
-                isTablet: isTablet,
-                onTap: () {
-                  if (song != null) {
-                    HapticFeedback.lightImpact();
-                    AudioQualitySheet.show(context, song, props.activeColor);
-                  }
-                },
-              ),
-
-              // 3. Playback Speed
-              _DockIconButton(
-                icon: Icons.speed_rounded,
-                tooltip: context.l10n.playbackSpeed,
-                badgeText: speed != 1.0
-                    ? '${speed.toStringAsFixed(1)}x'
-                    : null,
-                isActive: speed != 1.0,
-                activeColor: props.activeColor,
-                inactiveColor: p.textSecondary,
-                isTablet: isTablet,
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  SpeedPickerSheet.show(context);
-                },
-              ),
-
-              // 4. Sleep Timer
-              _DockIconButton(
-                icon: Icons.timer_outlined,
-                tooltip: context.l10n.sleepTimer,
-                badgeText: hasTimer
-                    ? '${props.state.sleepTimerRemaining!.inMinutes}m'
-                    : null,
-                isActive: hasTimer,
-                activeColor: props.activeColor,
-                inactiveColor: p.textSecondary,
-                isTablet: isTablet,
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  showModalBottomSheet<void>(
-                    context: context,
-                    useRootNavigator: true,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (_) => const SleepTimerSheet(),
-                  );
-                },
-              ),
-
-              // 5. Add to Playlist
-              _DockIconButton(
-                icon: Icons.playlist_add_rounded,
-                tooltip: context.l10n.addToPlaylist,
-                isActive: false,
-                activeColor: props.activeColor,
-                inactiveColor: p.textSecondary,
-                isTablet: isTablet,
-                onTap: () {
-                  if (song != null) {
-                    HapticFeedback.lightImpact();
-                    showModalBottomSheet<void>(
-                      context: context,
-                      useRootNavigator: true,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (_) => AddToPlaylistSheet(song: song),
-                    );
-                  }
-                },
-              ),
-            ],
           ),
         ),
       ),
@@ -909,19 +1051,16 @@ class _SwitcherItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(20),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOutCubic,
-        padding: EdgeInsets.symmetric(
-          horizontal: isTablet ? 18 : 14,
-          vertical: isTablet ? 7 : 6,
-        ),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: isSelected
               ? activeColor.withValues(alpha: 0.22)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(20),
           border: isSelected
               ? Border.all(
                   color: activeColor.withValues(alpha: 0.45),
@@ -930,28 +1069,33 @@ class _SwitcherItem extends StatelessWidget {
               : null,
         ),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
-              size: isTablet ? 16 : 15,
+              size: isTablet ? 16 : 14,
               color: isSelected ? activeColor : Colors.white60,
             ),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: isTablet ? 13 : 12,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                color: isSelected ? Colors.white : Colors.white60,
-                letterSpacing: 0.2,
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: isTablet ? 13 : 11.5,
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                  color: isSelected ? Colors.white : Colors.white60,
+                  letterSpacing: 0.2,
+                ),
               ),
             ),
             if (badgeCount != null && badgeCount! > 0) ...[
-              const SizedBox(width: 5),
+              const SizedBox(width: 4),
               Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? activeColor
@@ -961,7 +1105,7 @@ class _SwitcherItem extends StatelessWidget {
                 child: Text(
                   '$badgeCount',
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 9.5,
                     fontWeight: FontWeight.w800,
                     color: isSelected ? Colors.black : Colors.white70,
                   ),
@@ -986,37 +1130,31 @@ class _AnimatedFavoriteButton extends StatelessWidget {
     required this.isFavorite,
     required this.favoriteColor,
     required this.inactiveColor,
-    this.iconSize = 28,
+    this.iconSize = 24,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      shape: const CircleBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.mediumImpact();
-          onTap();
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 240),
-            transitionBuilder: (child, anim) => ScaleTransition(
-              scale: anim,
-              child: child,
-            ),
-            child: Icon(
-              isFavorite
-                  ? Icons.favorite_rounded
-                  : Icons.favorite_border_rounded,
-              key: ValueKey(isFavorite),
-              color: isFavorite ? favoriteColor : inactiveColor,
-              size: iconSize,
-            ),
+    return InkWell(
+      onTap: () {
+        HapticFeedback.mediumImpact();
+        onTap();
+      },
+      child: Center(
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 240),
+          transitionBuilder: (child, anim) => ScaleTransition(
+            scale: anim,
+            child: child,
+          ),
+          child: Icon(
+            isFavorite
+                ? Icons.favorite_rounded
+                : Icons.favorite_border_rounded,
+            key: ValueKey(isFavorite),
+            color: isFavorite ? favoriteColor : inactiveColor,
+            size: iconSize,
           ),
         ),
       ),
@@ -1047,72 +1185,65 @@ class _DockIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Tooltip(
-          message: tooltip,
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: isTablet ? 12 : 8,
-              vertical: isTablet ? 7 : 6,
-            ),
-            child: Stack(
-              clipBehavior: Clip.none,
-              alignment: Alignment.center,
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: EdgeInsets.all(isTablet ? 9 : 8),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isActive
-                        ? activeColor.withValues(alpha: 0.22)
-                        : Colors.transparent,
-                    border: isActive
-                        ? Border.all(
-                            color: activeColor.withValues(alpha: 0.45),
-                            width: 1.2,
-                          )
-                        : null,
-                  ),
-                  child: Icon(
-                    icon,
-                    size: isTablet ? 24 : 22,
-                    color: isActive ? activeColor : inactiveColor,
-                  ),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Tooltip(
+        message: tooltip,
+        child: Center(
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: EdgeInsets.all(isTablet ? 8 : 6),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isActive
+                      ? activeColor.withValues(alpha: 0.22)
+                      : Colors.transparent,
+                  border: isActive
+                      ? Border.all(
+                          color: activeColor.withValues(alpha: 0.45),
+                          width: 1.2,
+                        )
+                      : null,
                 ),
-                if (badgeText != null)
-                  Positioned(
-                    top: -2,
-                    right: -4,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 5, vertical: 1.5),
-                      decoration: BoxDecoration(
-                        color: activeColor,
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.3),
-                            blurRadius: 4,
-                          ),
-                        ],
-                      ),
-                      child: Text(
-                        badgeText!,
-                        style: const TextStyle(
-                          color: Colors.black,
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w900,
+                child: Icon(
+                  icon,
+                  size: isTablet ? 22 : 20,
+                  color: isActive ? activeColor : inactiveColor,
+                ),
+              ),
+              if (badgeText != null)
+                Positioned(
+                  top: -2,
+                  right: -4,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 4, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: activeColor,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 4,
                         ),
+                      ],
+                    ),
+                    child: Text(
+                      badgeText!,
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
         ),
       ),

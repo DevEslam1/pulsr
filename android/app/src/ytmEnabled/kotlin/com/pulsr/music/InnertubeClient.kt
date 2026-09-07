@@ -195,7 +195,8 @@ internal class InnertubeClient(
     fun resolvePlayerStream(videoId: String, quality: String = "high"): Map<String, Any?> {
         val clientChain = resolutionStrategy.buildChain(
             ResolutionStrategy.Operation.STREAM_RESOLVE,
-            limitedMode = PoTokenManager.isLimitedMode
+            limitedMode = PoTokenManager.isLimitedMode,
+            hasJsEngine = true
         )
 
         val traceId = UUID.randomUUID().toString()
@@ -665,15 +666,6 @@ internal class InnertubeClient(
                     .header("X-Goog-Api-Key", API_KEY)
                     .header("x-youtube-client-name", clientType.effectiveClientNameId)
                     .header("x-youtube-client-version", clientType.effectiveClientVersion)
-                    .header(
-                        "X-Goog-FieldMask",
-                        when (bucket) {
-                            RateLimiter.Bucket.PLAYER -> "streamingData.adaptiveFormats,streamingData.formats,playabilityStatus,videoDetails,responseContext.datasyncId,responseContext.visitorData"
-                            RateLimiter.Bucket.SEARCH -> "contents.tabbedSearchResultsRenderer.tabs.tabRenderer.content.sectionListRenderer.contents.musicShelfRenderer.contents,contents.tabbedSearchResultsRenderer.tabs.tabRenderer.content.sectionListRenderer.contents.musicResponsiveListItemRenderer,continuationContents.sectionListContinuation.contents"
-                            RateLimiter.Bucket.BROWSE -> "contents.singleColumnBrowseResultsRenderer.tabs,contents.twoColumnBrowseResultsRenderer.tabs,contents.sectionListRenderer.contents,continuationContents,header,responseContext"
-                            else -> "*"
-                        }
-                    )
                 // 2026 rolloutToken (YouTubeSessionGenerator) — if present, improves
                 // session trust for WEB_REMIX. Optional but cheap.
                 val rollout = PoTokenManager.rolloutToken

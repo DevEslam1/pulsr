@@ -463,8 +463,6 @@ class YtmService {
         'Referer': 'https://music.youtube.com/',
         'x-origin': 'https://music.youtube.com',
         'x-goog-authuser': '0',
-        'X-Goog-FieldMask':
-            'contents.tabbedSearchResultsRenderer.tabs.tabRenderer.content.sectionListRenderer.contents,continuationContents',
       };
 
       if (getIt.isRegistered<YtmAccountService>()) {

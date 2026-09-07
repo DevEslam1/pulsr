@@ -138,7 +138,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
         textDirection: TextDirection.ltr,
         child: RepaintBoundary(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [

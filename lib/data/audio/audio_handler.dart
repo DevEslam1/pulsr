@@ -1115,7 +1115,19 @@ class PulsrAudioHandler extends BaseAudioHandler
       return;
     }
 
+    if (!_activePlayer.playing) {
+      debugPrint('[AudioHandler] Resolution failed while paused — stopping loop.');
+      return;
+    }
     if (info.recoveryAction == YtmRecoveryAction.skipToNextTrack) {
+      // Already 2 rapid gaps means 3rd song in your loop → pause instead of skip
+      if (_consecutiveFailures >= 2 || _rapidGaplessChangeCount >= 1) {
+        _consecutiveFailures = 0;
+        _rapidGaplessChangeCount = 0;
+        _activePlayer.pause().ignore();
+        _broadcastState(_activePlayer.playbackEvent);
+        return;
+      }
       debugPrint('[AudioHandler] Track blocked/unavailable. Skipping to next.');
       unawaited(skipToNext());
       return;
@@ -1263,6 +1275,11 @@ class PulsrAudioHandler extends BaseAudioHandler
     final videoId = song.remoteId;
     if (videoId == null || videoId.isEmpty) {
       throw const YtmException('YTM_UNAVAILABLE', 'Missing video id');
+    }
+    // Guard against placeholder local IDs (e.g. n_1f2cbFnkQ) that would waste
+    // BotGuard + Innertube retries and then loop as VideoGone. Skip quietly.
+    if (!RegExp(r'^[A-Za-z0-9_-]{11}$').hasMatch(videoId) || videoId.startsWith('n_')) {
+      throw const YtmException('YTM_UNAVAILABLE', 'Invalid video id');
     }
 
     // Hot path: reuse the cached prefs (loaded once in _init) instead of an
@@ -1528,6 +1545,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         videoId.isEmpty) {
       return;
     }
+    if (!RegExp(r'^[A-Za-z0-9_-]{11}$').hasMatch(videoId) || videoId.startsWith('n_')) return;
     // Skip prefetch if downloaded/local file exists
     if (!song.path.startsWith('ytmusic://') &&
         song.path.isNotEmpty &&
@@ -1746,7 +1764,20 @@ class PulsrAudioHandler extends BaseAudioHandler
         }
 
         await _inactivePlayer.setVolume(0.0);
-        unawaited(_inactivePlayer.play());
+        // Wait for the inactive player to actually start at 0 before the
+        // gain ramp — otherwise the ramp has already advanced to ~0.3 when
+        // the decoder first emits, causing a pop/click and zipper noise that
+        // lasts until the outgoing track stops.
+        try {
+          await _inactivePlayer.play().timeout(const Duration(milliseconds: 800));
+          // Give ExoPlayer a single frame to settle at volume 0
+          await Future.delayed(const Duration(milliseconds: 30));
+        } catch (_) {
+          // Fallback to unawaited if platform times out
+          try {
+            await _inactivePlayer.play();
+          } catch (_) {}
+        }
 
         if (_crossfadeManager.currentFadeId != currentFadeId) {
           try {
@@ -1800,6 +1831,10 @@ class PulsrAudioHandler extends BaseAudioHandler
         _repository.recordPlayHistory(nextSong.id);
         _broadcastState(_activePlayer.playbackEvent);
 
+        // Let the zero-gain settle for one mixer period before tearing
+        // down the decoder — stopping at a non-zero sample causes the
+        // hiss/click that lingered until the first track's buffer drained.
+        await Future.delayed(const Duration(milliseconds: 25));
         await active.stop();
         await active.setVolume(_volume);
       } catch (e, st) {
@@ -2247,13 +2282,18 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
 
     // Detect rapid successive transitions caused by ExoPlayer auto-advancing
-    // past failing tracks in a loop.
+    // past failing tracks in a loop. If user paused, kill the loop immediately.
+    if (!_activePlayer.playing) {
+      _rapidGaplessChangeCount = 0;
+      _consecutiveFailures = 0;
+      return;
+    }
     final now = DateTime.now();
     if (_lastGaplessChangeTime != null &&
         now.difference(_lastGaplessChangeTime!).inMilliseconds < 1500) {
       _rapidGaplessChangeCount++;
       if (_rapidGaplessChangeCount >= 2) {
-        // Circuit breaker tripped: halt runaway skip loop
+        // Circuit breaker tripped: halt runaway skip loop (3rd song in your report)
         _rapidGaplessChangeCount = 0;
         _consecutiveFailures = 0;
         ErrorLogger.log(
@@ -2345,6 +2385,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     // Soft-landing fade so pause/stop doesn't click, then ensure the previous
     // MediaCodec EventHandler is fully released before creating a new decoder
     // — prevents LegacyMessageQueue dead-thread crash on rapid Hi-Res FLAC switch (LOG-12)
+    // The 120ms post-stop grace lets the codec's EventHandler thread die before
+    // the next setAudioSource creates a new decoder; without it the emulator
+    // logs `Handler on a dead thread` and `MediaCodec discarded an unknown buffer`.
     await _fadeOutForSwitch(_activePlayer);
     if (generation != _playGeneration) return;
     try {
@@ -2353,6 +2396,8 @@ class PulsrAudioHandler extends BaseAudioHandler
     try {
       await _activePlayer.stop().timeout(const Duration(milliseconds: 800));
     } catch (_) {}
+    // Grace period for MediaCodec thread teardown (emulator needs ~80-120ms)
+    await Future.delayed(const Duration(milliseconds: 120));
     await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
         restoreVolume: _volume);
     if (generation != _playGeneration) return;
@@ -2473,7 +2518,17 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   /// Shared failure handling for [playSongAt]: a fatal error pauses outright,
   /// otherwise skip forward until [_consecutiveFailures] trips the circuit.
+  /// Stops the loop if playback is already paused (user hit pause) or after
+  /// 3 consecutive failures — prevents infinite skip loop on bot-blocked IP.
   Future<void> _failCurrentPlayback({required bool fatal}) async {
+    // User paused during the failure chain → never auto-resume/skip.
+    if (!_activePlayer.playing) {
+      _consecutiveFailures = 0;
+      _rapidGaplessChangeCount = 0;
+      await _activePlayer.pause();
+      _broadcastState(_activePlayer.playbackEvent);
+      return;
+    }
     if (fatal) {
       _consecutiveFailures = 0;
       _rapidGaplessChangeCount = 0;

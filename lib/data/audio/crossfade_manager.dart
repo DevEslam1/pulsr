@@ -199,7 +199,8 @@ class CrossfadeManager {
   }
 
   /// Gradually transitions the volume of [player] from [from] to [to] over [fadeDuration]
-  /// using the selected [curve] sampled at 16ms intervals (~60 FPS).
+  /// using the selected [curve] sampled at 10ms intervals (~100 FPS) for
+  /// zipper-free ramp. 16ms was still audible as hiss during the overlap.
   Future<void> fadeVolume(
     AudioPlayer player,
     double from,
@@ -222,7 +223,7 @@ class CrossfadeManager {
     final stopwatch = Stopwatch()..start();
 
     late final Timer timer;
-    timer = Timer.periodic(const Duration(milliseconds: 16), (t) {
+    timer = Timer.periodic(const Duration(milliseconds: 10), (t) {
       if (_fadeId != fadeId) {
         t.cancel();
         _activeTimers.remove(t);
@@ -267,7 +268,8 @@ class CrossfadeManager {
   /// inter-timer jitter (one fires before the other) and — for equal-power —
   /// uses `1 - sin` for the fade-out instead of `cos`, producing a ~3 dB dip
   /// and audible stepping/zipper noise at the midpoint. A single timer
-  /// guarantees `cos²+sin²=1` at every tick and 16 ms (~60 fps) granularity.
+  /// guarantees `cos²+sin²=1` at every tick and 10 ms (~100 fps) granularity
+  /// to eliminate the hiss that lasted until the outgoing buffer drained.
   Future<void> crossfadeVolumes({
     required AudioPlayer active,
     required AudioPlayer inactive,
@@ -291,7 +293,7 @@ class CrossfadeManager {
     final completer = Completer<void>();
     final stopwatch = Stopwatch()..start();
     late final Timer timer;
-    timer = Timer.periodic(const Duration(milliseconds: 16), (t) {
+    timer = Timer.periodic(const Duration(milliseconds: 10), (t) {
       if (_fadeId != fadeId) {
         t.cancel();
         _activeTimers.remove(t);

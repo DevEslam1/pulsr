@@ -183,11 +183,23 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             }
             "clearNetworkCaches" -> {
                 // VPN up/down (or Wi-Fi <-> mobile) moves the egress IP, which
-                // invalidates cached googlevideo edges and any throttle verdict
-                // tied to the old IP. Dart already drops its URL caches.
+                // invalidates cached googlevideo edges, throttle verdicts, and
+                // BotGuard attestation (poToken+visitorData are IP-bound). Dart
+                // already drops its URL caches. 08-2026 fix: VPN datacenter IPs
+                // trigger BOT_CHALLENGE on WEB_REMIX even when logged in, so we
+                // invalidate visitorData/poToken (keep dataSyncId) and pre-warm a
+                // fresh one bound to the new IP in background.
                 runOffMainThread(result) {
                     YtmHttpClient.TtlDnsCache.instance.clear()
                     RateLimiter.shared.resetAfterNetworkChange()
+                    try {
+                        val isVpn = context?.let { CellularFailoverHelper.isVpnActive(it) } ?: false
+                        if (isVpn || PoTokenManager.isExpired() || PoTokenManager.webViewBroken) {
+                            PoTokenManager.invalidate()
+                            val ctx2 = context?.applicationContext
+                            if (ctx2 != null) PoTokenManager.preWarm(ctx2)
+                        }
+                    } catch (_: Throwable) {}
                     true
                 }
             }

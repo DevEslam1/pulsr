@@ -69,17 +69,45 @@ internal class ResolutionStrategy(
         hasJsEngine: Boolean = false,
         trackType: String = ClientWinnerStore.TRACK_TYPE_MUSIC
     ): List<InnertubeClient.ClientType> {
+        val isVpn = try { CellularFailoverHelper.isVpnActive(context) } catch (_: Throwable) { false }
         val baseChain = when (op) {
             Operation.STREAM_RESOLVE -> {
                 val winner = winnerStore.getWinningClient(trackType)
-                if (winner != null && DEFAULT_STREAM_CHAIN.contains(winner)) {
-                    listOf(winner) + (DEFAULT_STREAM_CHAIN - winner)
+                val defaultChain = if (isVpn) {
+                    // 08-2026: VPN datacenter IPs are flagged for BotGuard. WEB_REMIX (poToken+visitorData)
+                    // fails with LOGIN_REQUIRED/BOT_CHALLENGE while ANDROID_VR/IOS_MUSIC (no PoToken)
+                    // still succeed. Prioritize no-PoToken clients on VPN.
+                    listOf(
+                        InnertubeClient.ClientType.ANDROID_VR,
+                        InnertubeClient.ClientType.IOS_MUSIC,
+                        InnertubeClient.ClientType.WEB_REMIX,
+                        InnertubeClient.ClientType.ANDROID_MUSIC,
+                        InnertubeClient.ClientType.ANDROID_CREATOR,
+                        InnertubeClient.ClientType.WEB_EMBEDDED_PLAYER,
+                        InnertubeClient.ClientType.MWEB,
+                        InnertubeClient.ClientType.TVHTML5_SIMPLY_EMBEDDED_PLAYER,
+                        InnertubeClient.ClientType.ANDROID_TESTSUITE
+                    )
+                } else DEFAULT_STREAM_CHAIN
+                if (winner != null && defaultChain.contains(winner) && !isVpn) {
+                    listOf(winner) + (defaultChain - winner)
                 } else {
-                    DEFAULT_STREAM_CHAIN
+                    defaultChain
                 }
             }
-            Operation.SEARCH -> DEFAULT_SEARCH_CHAIN
-            Operation.BROWSE -> DEFAULT_BROWSE_CHAIN
+            Operation.SEARCH -> if (isVpn) listOf(
+                InnertubeClient.ClientType.IOS_MUSIC,
+                InnertubeClient.ClientType.ANDROID_VR,
+                InnertubeClient.ClientType.WEB_REMIX,
+                InnertubeClient.ClientType.MWEB,
+                InnertubeClient.ClientType.ANDROID_MUSIC
+            ) else DEFAULT_SEARCH_CHAIN
+            Operation.BROWSE -> if (isVpn) listOf(
+                InnertubeClient.ClientType.IOS_MUSIC,
+                InnertubeClient.ClientType.ANDROID_VR,
+                InnertubeClient.ClientType.WEB_REMIX,
+                InnertubeClient.ClientType.MWEB
+            ) else DEFAULT_BROWSE_CHAIN
         }
 
         val hasPoToken = !limitedMode && poTokenManager.isReady && !poTokenManager.webViewBroken
