@@ -29,6 +29,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
   static const String _keyGapless = 'setting_gapless';
   static const String _keyCrossfade = 'setting_crossfade';
   static const String _keyMinDuration = 'setting_min_duration';
+  static const String _keyMinFileSizeKb = 'setting_min_file_size_kb';
   static const String _keyAutoHideSystemMedia =
       'setting_auto_hide_system_media';
   static const String _keyDynamicTheme = 'setting_dynamic_theme';
@@ -576,6 +577,17 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     await prefs.setInt(_keyMinDuration, clamped);
   }
 
+  Future<int> getMinFileSizeKb() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_keyMinFileSizeKb) ?? 0;
+  }
+
+  Future<void> setMinFileSizeKb(int kb) async {
+    final clamped = kb.clamp(0, 5000);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_keyMinFileSizeKb, clamped);
+  }
+
   Future<void> setAutoHideSystemMedia(bool value) async {
     safeEmit(state.copyWith(autoHideSystemMedia: value));
     final prefs = await SharedPreferences.getInstance();
@@ -1108,9 +1120,12 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       ),
     );
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final minSizeKb = prefs.getInt(_keyMinFileSizeKb) ?? 0;
       final count = await _scannerService.scanDeviceLibrary(
         ignoreShortFiles: state.minDurationSec > 0,
         minDurationSec: state.minDurationSec,
+        minSizeKb: minSizeKb,
         autoHideSystemMedia: state.autoHideSystemMedia,
       );
       safeEmit(state.copyWith(isScanning: false, scanResultCount: count));

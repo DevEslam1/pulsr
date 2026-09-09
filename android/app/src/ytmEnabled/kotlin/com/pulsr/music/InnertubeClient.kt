@@ -225,12 +225,38 @@ internal class InnertubeClient(
         val lastSignalRef = java.util.concurrent.atomic.AtomicReference(YtmBlockSignal.RateLimited)
         val lastExceptionRef = java.util.concurrent.atomic.AtomicReference<Throwable?>(null)
 
-        // Track IP-level blocks to short-circuit early. The hedged race runs 2
-        // candidates up front, so a threshold of 2 fires before the sequential
-        // tail ever starts — the 7 remaining clients never get tried. 5 lets
-        // the tail prove itself (last-resort clients like ANDROID_TESTSUITE
-        // often survive a flagged IP) while still bailing out of a doomed
-        // sweep instead of burning ~10-20s per track.
+        // Priority-based signal update: a BotChallenge seen on client 1 must not
+        // be silently overwritten by a VideoGone from ANDROID_TESTSUITE (the last
+        // fallback). Higher priority = more actionable recovery action.
+        // VideoGone from the tail client was the entire VPN breakage: Dart got
+        // VIDEO_GONE, treated it as skipToNextTrack, never fired _noteBotChallenge,
+        // and every subsequent track burned the full 9-client chain with no cooldown.
+        fun signalPriority(s: YtmBlockSignal?): Int = when (s) {
+            YtmBlockSignal.BotChallenge            -> 8
+            YtmBlockSignal.PoTokenInvalid          -> 7
+            YtmBlockSignal.RateLimited             -> 6
+            YtmBlockSignal.IpBlocked               -> 5
+            YtmBlockSignal.SignatureDecipherFailed  -> 4
+            YtmBlockSignal.SabrEnforced            -> 3
+            YtmBlockSignal.SignInRequired          -> 2
+            YtmBlockSignal.ClientDeprecated        -> 2
+            YtmBlockSignal.GeoBlocked              -> 2
+            YtmBlockSignal.VideoGone               -> 1
+            YtmBlockSignal.NetworkUnavailable      -> 0
+            null                                   -> -1
+        }
+        fun updateBestSignal(newSignal: YtmBlockSignal?) {
+            if (newSignal == null) return
+            lastSignalRef.updateAndGet { current ->
+                if (signalPriority(newSignal) > signalPriority(current)) newSignal else current
+            }
+        }
+
+        // Track IP-level blocks AND bot challenges to short-circuit early.
+        // Previously only IpBlocked was counted, so a full VPN sweep (all clients
+        // returning BotChallenge) never short-circuited — 9 clients × ~1s each.
+        // Threshold 4 gives the first 3 clients a chance to prove the VPN exit
+        // is usable while still aborting a doomed sweep before the long tail.
         val blockSignalCount = java.util.concurrent.atomic.AtomicInteger(0)
         val blockClients = java.util.concurrent.CopyOnWriteArrayList<String>()
         // attemptClient cannot throw the short-circuit itself: its own
@@ -248,13 +274,18 @@ internal class InnertubeClient(
 
                 val playability = playerJson.optJSONObject("playabilityStatus")
                 val status = playability?.optString("status") ?: ""
+                val reason = playability?.optString("reason") ?: ""
+                val subreason = playability?.optJSONObject("errorScreen")
+                    ?.optJSONObject("playerErrorMessageRenderer")
+                    ?.optJSONObject("subreason")
+                    ?.optString("simpleText") ?: ""
 
                 if (status.equals("LOGIN_REQUIRED", ignoreCase = true) ||
                     status.equals("UNPLAYABLE", ignoreCase = true) ||
                     status.contains("BOT", ignoreCase = true)) {
                     val parsedSignal = YtmBlockSignal.parse(200, status, playability)
-                    lastSignalRef.set(parsedSignal)
-                    Log.w(TAG, "[$traceId] Client ${client.name} returned status $status -> $parsedSignal")
+                    updateBestSignal(parsedSignal)
+                    Log.w(TAG, "[$traceId] Client ${client.name} returned status $status (reason='$reason', sub='$subreason') -> $parsedSignal")
                     if ((parsedSignal == YtmBlockSignal.BotChallenge || parsedSignal == YtmBlockSignal.PoTokenInvalid) &&
                         (client == ClientType.ANDROID_MUSIC || client == ClientType.WEB_REMIX)) {
                         // Throttled: during an IP-flagged sweep every client hits
@@ -267,16 +298,21 @@ internal class InnertubeClient(
                             PoTokenManager.triggerBackgroundRefresh()
                         }
                     }
-                    if (parsedSignal == YtmBlockSignal.IpBlocked) {
+                    // Short-circuit on both IpBlocked AND BotChallenge: on VPN exits
+                    // every client returns BotChallenge but the old code only counted
+                    // IpBlocked, so all 9 clients ran serially (~10s) with no exit.
+                    // Threshold 4 gives early clients a chance to succeed while still
+                    // aborting a sweep that is clearly doomed.
+                    if (parsedSignal == YtmBlockSignal.IpBlocked || parsedSignal == YtmBlockSignal.BotChallenge) {
                         blockClients.add(client.name)
                         val count = blockSignalCount.incrementAndGet()
-                        if (count >= 5) {
-                            Log.w(TAG, "[$traceId] Short-circuiting chain: $count IP-level blocks (${blockClients.joinToString()})")
+                        if (count >= 4) {
+                            Log.w(TAG, "[$traceId] Short-circuiting chain: $count block signals ($parsedSignal) from (${blockClients.joinToString()}) for $videoId")
                             shortCircuit.compareAndSet(
                                 null,
                                 InnertubeException(
-                                    signal = parsedSignal,
-                                    message = "IP blocked by $count clients (${blockClients.joinToString()}) for video $videoId",
+                                    signal = lastSignalRef.get(),
+                                    message = "Blocked by $count clients (${blockClients.joinToString()}) for video $videoId",
                                     traceId = traceId
                                 )
                             )
@@ -321,7 +357,7 @@ internal class InnertubeClient(
                     }
                     val hadFormatArrays = totalFormats > 0
                     val hadCiphered = cipheredCount > 0
-                    lastSignalRef.set(
+                    updateBestSignal(
                         when {
                             YtmBlockSignal.detectSabrStructural(
                                 hasStreamingData = streamingData != null,
@@ -396,7 +432,7 @@ internal class InnertubeClient(
             } catch (t: Throwable) {
                 Log.w(TAG, "[$traceId] Failed resolving with ${client.name}: ${t.message}")
                 lastExceptionRef.set(t)
-                if (t is InnertubeException) lastSignalRef.set(t.signal)
+                if (t is InnertubeException) updateBestSignal(t.signal)
                 return null
             }
         }
@@ -529,7 +565,34 @@ internal class InnertubeClient(
         // is already being discarded.
         cancelAll()
 
-        shortCircuit.get()?.let { throw it }
+        fun tryPoTokenRecovery(): Map<String, Any?>? {
+            val sc = shortCircuit.get()
+            if (lastSignalRef.get() == YtmBlockSignal.BotChallenge || sc?.signal == YtmBlockSignal.BotChallenge) {
+                val refreshed = runCatching { PoTokenManager.ensureReadySync() }.getOrDefault(false)
+                if (refreshed && !PoTokenManager.isLimitedMode) {
+                    Log.i(TAG, "[$traceId] PoToken refreshed, retrying WEB_REMIX...")
+                    val webRes = attemptClient(ClientType.WEB_REMIX)
+                    if (webRes != null) {
+                        winnerStore.recordWinningClient(trackType, ClientType.WEB_REMIX)
+                        return webRes
+                    }
+                    Log.i(TAG, "[$traceId] WEB_REMIX retry failed, retrying ANDROID_MUSIC with fresh poToken...")
+                    val androidRes = attemptClient(ClientType.ANDROID_MUSIC)
+                    if (androidRes != null) {
+                        winnerStore.recordWinningClient(trackType, ClientType.ANDROID_MUSIC)
+                        return androidRes
+                    }
+                }
+            }
+            return null
+        }
+
+        shortCircuit.get()?.let { sc ->
+            if (sc.signal == YtmBlockSignal.BotChallenge) {
+                tryPoTokenRecovery()?.let { return it }
+            }
+            throw sc
+        }
 
         // Fallback: sequential check on remaining candidates in chain
         val remainingClients = clientChain.drop(2)
@@ -541,8 +604,15 @@ internal class InnertubeClient(
             } else {
                 winnerStore.recordFailure(trackType, client)
             }
-            shortCircuit.get()?.let { throw it }
+            shortCircuit.get()?.let { sc ->
+                if (sc.signal == YtmBlockSignal.BotChallenge) {
+                    tryPoTokenRecovery()?.let { return it }
+                }
+                throw sc
+            }
         }
+
+        tryPoTokenRecovery()?.let { return it }
 
         throw InnertubeException(
             signal = lastSignalRef.get(),
@@ -912,35 +982,30 @@ internal class InnertubeClient(
         }
         root.put("playbackContext", playbackContext)
 
-        // Only web clients consume a poToken. Computing readiness before this
-        // guard made ANDROID_VR / IOS_MUSIC block on ensureReadySync() — which
-        // spins up a BotGuard WebView — even though the entire reason those
-        // clients are in the chain is that they need no token.
-        if (clientType.isWeb) {
+        val requiresPo = clientType.isWeb || ClientCapabilityMatrix.getCapability(clientType).requiresPoToken
+        if (requiresPo) {
             val hasPo = PoTokenManager.isReady ||
                 (!PoTokenManager.webViewBroken && !PoTokenManager.isLimitedMode && PoTokenManager.ensureReadySync())
             if (hasPo) {
                 val dataSyncId = PoTokenManager.dataSyncId
-                // Only the client that actually carries the session may send an
-                // account-bound token. An embed/MWEB request is a guest request,
-                // and a datasyncId-bound token in a guest context is rejected.
                 val poToken = if (clientType.acceptsSessionAuth &&
                     cookieStore.isSessionValid() &&
                     dataSyncId.isNotEmpty()
                 ) {
                     PoTokenManager.accountPoTokenForSync(dataSyncId)
                 } else {
-                    // A token must be bound to visitorData. Minting one against a
-                    // videoId produces a token YouTube rejects outright, so with
-                    // no visitorData it is better to send none.
-                    val tokenTarget = PoTokenManager.visitorData
-                    if (tokenTarget.isEmpty()) "" else PoTokenManager.poTokenForSync(tokenTarget)
+                    PoTokenManager.streamingPoToken.ifEmpty {
+                        val tokenTarget = PoTokenManager.visitorData
+                        if (tokenTarget.isEmpty()) "" else PoTokenManager.poTokenForSync(tokenTarget)
+                    }
                 }
                 if (poToken.isNotEmpty()) {
                     root.put(
                         "serviceIntegrityDimensions",
                         JSONObject().put("poToken", poToken),
                     )
+                    contentPlaybackContext.put("poToken", poToken)
+                    Log.d(TAG, "[$clientType] Attached poToken (len=${poToken.length}, visitorData=${PoTokenManager.visitorData.take(15)}...)")
                 }
             }
         }

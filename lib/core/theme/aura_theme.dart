@@ -491,4 +491,67 @@ class AuraTheme {
       ),
     );
   }
+
+  static const List<AuraThemePreset> presets = [
+    AuraThemePreset(
+      name: 'Cyber Purple',
+      primaryColor: Color(0xFF0F0C29),
+      secondaryColor: Color(0xFF6A11CB),
+      accentColor: Color(0xFF9D4EDD),
+    ),
+    AuraThemePreset(
+      name: 'Deep Ocean',
+      primaryColor: Color(0xFF0F2027),
+      secondaryColor: Color(0xFF0072FF),
+      accentColor: Color(0xFF00C6FF),
+    ),
+    AuraThemePreset(
+      name: 'Emerald Velvet',
+      primaryColor: Color(0xFF071811),
+      secondaryColor: Color(0xFF059669),
+      accentColor: Color(0xFF10B981),
+    ),
+    AuraThemePreset(
+      name: 'Solar Flare',
+      primaryColor: Color(0xFF1F0F07),
+      secondaryColor: Color(0xFFE65100),
+      accentColor: Color(0xFFFF6B4A),
+    ),
+    AuraThemePreset(
+      name: 'Electric Rose',
+      primaryColor: Color(0xFF1C0916),
+      secondaryColor: Color(0xFFD81B60),
+      accentColor: Color(0xFFFF2E93),
+    ),
+    AuraThemePreset(
+      name: 'Midnight AMOLED',
+      primaryColor: Color(0xFF000000),
+      secondaryColor: Color(0xFF241542),
+      accentColor: Color(0xFF7C4DFF),
+      isAmoled: true,
+    ),
+  ];
 }
+
+class AuraThemePreset {
+  final String name;
+  final Color primaryColor;
+  final Color secondaryColor;
+  final Color accentColor;
+  final bool isAmoled;
+
+  const AuraThemePreset({
+    required this.name,
+    required this.primaryColor,
+    required this.secondaryColor,
+    required this.accentColor,
+    this.isAmoled = false,
+  });
+
+  LinearGradient get gradient => LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [primaryColor, secondaryColor],
+      );
+}
+

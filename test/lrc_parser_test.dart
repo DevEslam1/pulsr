@@ -112,5 +112,26 @@ Third line of plain lyric
           await LrcParser.resolveLyrics('/invalid/path/non_existent.mp3');
       expect(result, isNull);
     });
+
+    test('cacheLyricsResult and getCachedLyrics work across songId and path', () {
+      final mockResult = LyricsResult(
+        lines: [
+          LyricsLine(timestamp: const Duration(seconds: 1), text: 'Cached'),
+        ],
+        source: LyricsSource.lrclib,
+      );
+
+      LrcParser.cacheLyricsResult(mockResult, songId: 42, path: '/path/song.mp3');
+
+      expect(LrcParser.hasCachedLyrics(songId: 42), isTrue);
+      expect(LrcParser.getCachedLyrics(songId: 42), equals(mockResult));
+      expect(LrcParser.getCachedLyrics(path: '/path/song.mp3'), equals(mockResult));
+
+      LrcParser.invalidateSong(songId: 42);
+      expect(LrcParser.hasCachedLyrics(songId: 42), isFalse);
+
+      LrcParser.clearCache();
+      expect(LrcParser.hasCachedLyrics(path: '/path/song.mp3'), isFalse);
+    });
   });
 }

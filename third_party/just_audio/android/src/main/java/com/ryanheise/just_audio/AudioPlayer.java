@@ -1130,6 +1130,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         }
         if (dspAudioProcessor != null) {
             dspAudioProcessor.clearGainCurve();
+            dspAudioProcessor.release();
             dspAudioProcessor = null;
         }
         eventChannel.endOfStream();

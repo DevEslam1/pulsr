@@ -31,6 +31,11 @@ class SleepTimerManager {
   Stream<Duration?> get sleepTimerRemainingStream =>
       _sleepTimerRemainingSubject.stream;
 
+  final StreamController<int?> _sleepTimerRemainingTracksSubject =
+      StreamController<int?>.broadcast();
+  Stream<int?> get sleepTimerRemainingTracksStream =>
+      _sleepTimerRemainingTracksSubject.stream;
+
   double? _preFadeVolume;
   AudioPlayer Function()? _lastPlayerGetter;
   Future<void> Function()? _onTimerExpiredCallback;
@@ -59,6 +64,7 @@ class SleepTimerManager {
     final currentToken = ++_sleepFadeToken;
 
     _sleepTimerRemainingSubject.add(_remainingDuration);
+    _sleepTimerRemainingTracksSubject.add(null);
     _persistTimerState(duration);
 
     if (duration < const Duration(seconds: 1)) {
@@ -83,12 +89,6 @@ class SleepTimerManager {
       }
 
       final player = _lastPlayerGetter?.call();
-      final isPlaying = player?.playing ?? false;
-
-      // Monotonic guarantee: pause countdown when playback is paused
-      if (!isPlaying) {
-        return;
-      }
 
       if (_remainingDuration > const Duration(seconds: 1)) {
         _remainingDuration -= const Duration(seconds: 1);
@@ -124,6 +124,7 @@ class SleepTimerManager {
     _sleepFadeToken++;
     _sleepTimerRemainingSubject
         .add(const Duration(minutes: 1)); // Symbolic active state
+    _sleepTimerRemainingTracksSubject.add(1);
     _persistTimerState();
   }
 
@@ -145,6 +146,7 @@ class SleepTimerManager {
     _lastPlayerGetter = getActivePlayer;
     _sleepFadeToken++;
     _sleepTimerRemainingSubject.add(Duration(minutes: trackCount * 3));
+    _sleepTimerRemainingTracksSubject.add(trackCount);
     _persistTimerState();
   }
 
@@ -160,6 +162,9 @@ class SleepTimerManager {
       if (_remainingTracks <= 0) {
         final token = _sleepFadeToken;
         await _executeExpiration(token);
+      } else {
+        _sleepTimerRemainingSubject.add(Duration(minutes: _remainingTracks * 3));
+        _sleepTimerRemainingTracksSubject.add(_remainingTracks);
       }
     }
   }
@@ -210,6 +215,7 @@ class SleepTimerManager {
     _oneShotTimer?.cancel();
     _oneShotTimer = null;
     _sleepTimerRemainingSubject.add(null);
+    _sleepTimerRemainingTracksSubject.add(null);
   }
 
   void cancelSleepTimer() {
@@ -246,5 +252,6 @@ class SleepTimerManager {
   void dispose() {
     cancelSleepTimer();
     _sleepTimerRemainingSubject.close();
+    _sleepTimerRemainingTracksSubject.close();
   }
 }

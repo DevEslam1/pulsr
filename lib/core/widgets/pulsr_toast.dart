@@ -1,0 +1,175 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../constants/app_radii.dart';
+import '../theme/aura_theme.dart';
+import 'glass_container.dart';
+
+/// Lightweight, floating pill notification HUD styled in Pulsr's glass aesthetic.
+/// Provides immediate, non-intrusive feedback for actions like "Added to queue",
+/// "Playlist updated", "Timer set", etc.
+class PulsrToast {
+  static OverlayEntry? _activeEntry;
+  static Timer? _dismissTimer;
+
+  static void show(
+    BuildContext context, {
+    required String message,
+    IconData? icon,
+    Duration duration = const Duration(milliseconds: 2200),
+    bool isError = false,
+  }) {
+    _dismissTimer?.cancel();
+    _activeEntry?.remove();
+    _activeEntry = null;
+
+    HapticFeedback.lightImpact();
+
+    final overlayState = Overlay.of(context, rootOverlay: true);
+    final p = context.palette;
+
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (ctx) => _ToastWidget(
+        message: message,
+        icon: icon,
+        isError: isError,
+        palette: p,
+        onDismiss: () {
+          entry.remove();
+          if (_activeEntry == entry) _activeEntry = null;
+        },
+      ),
+    );
+
+    _activeEntry = entry;
+    overlayState.insert(entry);
+
+    _dismissTimer = Timer(duration, () {
+      if (_activeEntry == entry) {
+        entry.remove();
+        _activeEntry = null;
+      }
+    });
+  }
+}
+
+class _ToastWidget extends StatefulWidget {
+  final String message;
+  final IconData? icon;
+  final bool isError;
+  final PulsrPalette palette;
+  final VoidCallback onDismiss;
+
+  const _ToastWidget({
+    required this.message,
+    this.icon,
+    required this.isError,
+    required this.palette,
+    required this.onDismiss,
+  });
+
+  @override
+  State<_ToastWidget> createState() => _ToastWidgetState();
+}
+
+class _ToastWidgetState extends State<_ToastWidget>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _animController;
+  late final Animation<double> _fadeAnimation;
+  late final Animation<Offset> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 260),
+    );
+
+    _fadeAnimation = CurvedAnimation(
+      parent: _animController,
+      curve: Curves.easeOutCubic,
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0.0, 0.4),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _animController,
+      curve: Curves.easeOutBack,
+    ));
+
+    _animController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.palette;
+    final accentColor = widget.isError ? p.error : p.accent;
+
+    return SafeArea(
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 96, left: 24, right: 24),
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: SlideTransition(
+              position: _slideAnimation,
+              child: Material(
+                color: Colors.transparent,
+                child: GlassContainer(
+                  blur: 24,
+                  opacity: p.isDark ? 0.94 : 0.97,
+                  borderRadius: AppRadii.full,
+                  color: Color.alphaBlend(
+                    accentColor.withValues(alpha: p.isDark ? 0.12 : 0.08),
+                    p.surface,
+                  ),
+                  border: Border.all(
+                    color: accentColor.withValues(alpha: 0.35),
+                    width: 1.2,
+                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (widget.icon != null) ...[
+                        Icon(
+                          widget.icon,
+                          color: accentColor,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 10),
+                      ],
+                      Flexible(
+                        child: Text(
+                          widget.message,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: p.textPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

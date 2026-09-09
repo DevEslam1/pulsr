@@ -8,6 +8,8 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/di/injection.dart';
+import '../../../domain/usecases/playlist_usecases.dart';
 import '../../../core/utils/formatters.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../player/cubit/player_state.dart';
@@ -29,11 +31,25 @@ class QueueScreen extends StatelessWidget {
                 final cubit = context.read<PlayerCubit>();
                 switch (v) {
                   case 'clear':
-                    final confirm = await showDialog<bool>(context: context, builder: (c) => AlertDialog(title: Text(context.l10n.queue), content: const Text('Clear entire queue?'), actions: [TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Clear'))]));
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (c) => AlertDialog(
+                        title: Text(context.l10n.queue),
+                        content: const Text('Clear queue? (Playing track will be kept)'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(c, false),
+                            child: const Text('Cancel'),
+                          ),
+                          FilledButton(
+                            onPressed: () => Navigator.pop(c, true),
+                            child: const Text('Clear'),
+                          ),
+                        ],
+                      ),
+                    );
                     if (confirm == true) {
-                      for (int i = state.queue.length - 1; i >= 0; i--) {
-                        if (state.queue[i].id != state.currentSong?.id) await cubit.removeQueueItem(i);
-                      }
+                      await cubit.clearQueue();
                     }
                     break;
                   case 'shuffle':
@@ -43,11 +59,50 @@ class QueueScreen extends StatelessWidget {
                     if (current != null) await cubit.playSong(current, queue: shuffled);
                     break;
                   case 'save':
-                    final nameCtrl = TextEditingController(text: 'Queue ${DateTime.now().toIso8601String().substring(0,10)}');
-                    final name = await showDialog<String>(context: context, builder: (c) => AlertDialog(title: const Text('Save as playlist'), content: TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Playlist name'), autofocus: true), actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(c, nameCtrl.text.trim()), child: const Text('Save'))]));
-                    if (name != null && name.isNotEmpty) {
-                      if (!context.mounted) break;
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Queue saved as "$name" (${state.queue.length} tracks)')));
+                    final nameCtrl = TextEditingController(
+                      text: 'Queue ${DateTime.now().toIso8601String().substring(0, 10)}',
+                    );
+                    final name = await showDialog<String>(
+                      context: context,
+                      builder: (c) => AlertDialog(
+                        title: const Text('Save as playlist'),
+                        content: TextField(
+                          controller: nameCtrl,
+                          decoration: const InputDecoration(labelText: 'Playlist name'),
+                          autofocus: true,
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(c),
+                            child: const Text('Cancel'),
+                          ),
+                          FilledButton(
+                            onPressed: () => Navigator.pop(c, nameCtrl.text.trim()),
+                            child: const Text('Save'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (name != null && name.isNotEmpty && context.mounted) {
+                      final songIds = state.queue.map((s) => s.id).toList();
+                      final result = await getIt<PlaylistUseCases>().createPlaylist(name);
+                      result.fold(
+                        (failure) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Failed to save playlist: ${failure.message}')),
+                            );
+                          }
+                        },
+                        (playlistId) async {
+                          await getIt<PlaylistUseCases>().addSongsToPlaylist(playlistId, songIds);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Saved "$name" with ${songIds.length} tracks')),
+                            );
+                          }
+                        },
+                      );
                     }
                     break;
                 }

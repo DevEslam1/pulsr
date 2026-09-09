@@ -105,7 +105,7 @@ class MediaScannerService {
     }
     // Ignore only known system dot folders — user dot folders like .my_collection are now allowed
     final parts = lower.split('/');
-    const knownSystemDotFolders = {'.thumbnails', '.trash', '.cache', '.nomedia'};
+    const knownSystemDotFolders = {'.thumbnails', '.trash', '.cache'};
     if (parts.any((p) => knownSystemDotFolders.contains(p))) {
       return true;
     }
@@ -115,6 +115,7 @@ class MediaScannerService {
   Future<int> scanDeviceLibrary({
     bool ignoreShortFiles = true,
     int minDurationSec = 30,
+    int minSizeKb = 0,
     bool autoHideSystemMedia = true,
   }) async {
     _progressController.add(0.0);
@@ -144,6 +145,27 @@ class MediaScannerService {
         return 0;
       }
 
+      // Query genres mapping from MediaStore to populate genre names
+      final Map<int, String> songGenres = {};
+      try {
+        final genres = await _audioQuery.queryGenres();
+        for (final g in genres) {
+          final genreName = g.genre.trim();
+          if (genreName.isEmpty || genreName.toLowerCase() == '<unknown>') continue;
+          try {
+            final audios = await _audioQuery.queryAudiosFrom(
+              AudiosFromType.GENRE_ID,
+              g.id,
+            );
+            for (final a in audios) {
+              songGenres[a.id] = genreName;
+            }
+          } catch (_) {}
+        }
+      } catch (e) {
+        ErrorLogger.log('queryGenres failed', error: e, category: 'scanner');
+      }
+
       final minDurationMs = ignoreShortFiles ? minDurationSec * 1000 : 0;
       ErrorLogger.addBreadcrumb(
           'Scanner started with ${songs.length} raw MediaStore songs',
@@ -154,8 +176,10 @@ class MediaScannerService {
       // Offload CPU-heavy metadata parsing and aggregation to background isolate
       final parseInput = _ScanMediaInput(
         rawSongs: songs.map((s) => s.getMap).toList(),
+        songGenres: songGenres,
         excludedFolders: excludedFolders,
         minDurationMs: minDurationMs,
+        minSizeBytes: minSizeKb * 1024,
         autoHideSystemMedia: autoHideSystemMedia,
         pathSeparator: Platform.pathSeparator,
       );
@@ -363,15 +387,19 @@ class MediaScannerService {
 
 class _ScanMediaInput {
   final List<Map<dynamic, dynamic>> rawSongs;
+  final Map<int, String> songGenres;
   final List<String> excludedFolders;
   final int minDurationMs;
+  final int minSizeBytes;
   final bool autoHideSystemMedia;
   final String pathSeparator;
 
   _ScanMediaInput({
     required this.rawSongs,
+    this.songGenres = const {},
     required this.excludedFolders,
     required this.minDurationMs,
+    this.minSizeBytes = 0,
     required this.autoHideSystemMedia,
     required this.pathSeparator,
   });
@@ -418,6 +446,9 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
     final duration = parseInt(raw['duration']) ?? 0;
     if (duration < input.minDurationMs) continue;
 
+    final fileSize = parseInt(raw['_size']) ?? parseInt(raw['size']) ?? 0;
+    if (input.minSizeBytes > 0 && fileSize < input.minSizeBytes) continue;
+
     final path = parseString(raw['_data']) ?? parseString(raw['data']) ?? '';
     if (path.isEmpty || !AudioFormats.isSupportedExtension(path)) {
       continue;
@@ -455,7 +486,7 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
             ? rawAlbum
             : 'Unknown Album';
 
-    final rawGenre = parseString(raw['genre']);
+    final rawGenre = input.songGenres[id] ?? parseString(raw['genre']);
     final genre =
         (rawGenre != null && rawGenre.isNotEmpty && rawGenre != '<unknown>')
             ? rawGenre

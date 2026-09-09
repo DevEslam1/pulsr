@@ -26,4 +26,6 @@ abstract class AppRadii {
       BorderRadius.all(Radius.circular(miniPlayer));
   static const BorderRadius dialogRadius =
       BorderRadius.all(Radius.circular(dialog));
+  static const BorderRadius full =
+      BorderRadius.all(Radius.circular(999.0));
 }

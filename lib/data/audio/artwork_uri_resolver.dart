@@ -190,6 +190,10 @@ class ArtworkUriResolver {
         return parsed;
       }
     }
+    if (Platform.isAndroid && song.albumId != null && song.albumId! > 0) {
+      return Uri.parse('content://media/external/audio/albumart/${song.albumId}');
+    }
+
     var uri = await getArtworkUri(song.id);
     if (uri == null && song.albumId != null) {
       uri = await getAlbumArtUri(song.albumId!);

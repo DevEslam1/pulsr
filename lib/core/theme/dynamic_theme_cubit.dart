@@ -131,15 +131,16 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
               songId,
               ArtworkType.AUDIO,
               format: ArtworkFormat.JPEG,
-              size: 150,
-              quality: 75,
+              size: 64,
+              quality: 50,
             );
           } catch (_) {
             rawArt = null;
           }
         }
         if (rawArt != null && rawArt.isNotEmpty) {
-          imageProvider = MemoryImage(rawArt);
+          imageProvider =
+              ResizeImage(MemoryImage(rawArt), width: 64, height: 64);
         }
       }
 

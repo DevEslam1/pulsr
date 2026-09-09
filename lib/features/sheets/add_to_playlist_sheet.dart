@@ -153,8 +153,11 @@ class AddToPlaylistSheet extends StatelessWidget {
                       StreamBuilder(
                         stream: _useCases.watchPlaylists(),
                         builder: (context, snapshot) {
-                          final playlists = snapshot.data?.fold(
-                                  (l) => <PlaylistsTableData>[], (r) => r) ??
+                          final playlists = snapshot.data
+                                  ?.fold(
+                                      (l) => <PlaylistsTableData>[], (r) => r)
+                                  .where((p) => !p.isSmart)
+                                  .toList() ??
                               [];
                           if (playlists.isEmpty) {
                             return Padding(

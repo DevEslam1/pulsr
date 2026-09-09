@@ -24,11 +24,18 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
   List<FolderItem> _folders = [];
   bool _isLoading = true;
   String _searchQuery = '';
+  int _minFileSizeKb = 0;
 
   @override
   void initState() {
     super.initState();
     _loadFolders();
+    _loadMinFileSize();
+  }
+
+  Future<void> _loadMinFileSize() async {
+    final kb = await context.read<SettingsCubit>().getMinFileSizeKb();
+    if (mounted) setState(() => _minFileSizeKb = kb);
   }
 
   @override
@@ -350,6 +357,110 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                               ),
                             ],
                           ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Minimum File Size Filter Card
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: p.surfaceContainer,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: p.hairline),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 38,
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: p.accentContainer,
+                                    borderRadius: BorderRadius.circular(11),
+                                  ),
+                                  child: Icon(Icons.sd_storage_outlined,
+                                      color: p.accent, size: 19),
+                                ),
+                                const SizedBox(width: 14),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Min File Size',
+                                      style: TextStyle(
+                                        color: p.textPrimary,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Exclude small audio snippets & corrupt files',
+                                      style: TextStyle(
+                                          color: p.textSecondary,
+                                          fontSize: 12),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: p.accentContainer,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                _minFileSizeKb > 0
+                                    ? (_minFileSizeKb >= 1024
+                                        ? '${(_minFileSizeKb / 1024).toStringAsFixed(0)}MB'
+                                        : '${_minFileSizeKb}KB')
+                                    : 'Off',
+                                style: TextStyle(
+                                  color: p.accent,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [0, 50, 100, 200, 500, 1024].map((kb) {
+                            final isSelected = _minFileSizeKb == kb;
+                            final label = kb == 0
+                                ? 'Off'
+                                : kb >= 1024
+                                    ? '1 MB'
+                                    : '$kb KB';
+                            return ChoiceChip(
+                              label: Text(label),
+                              selected: isSelected,
+                              onSelected: (_) async {
+                                setState(() => _minFileSizeKb = kb);
+                                await cubit.setMinFileSizeKb(kb);
+                              },
+                              selectedColor: p.accent,
+                              labelStyle: TextStyle(
+                                color: isSelected ? p.onAccent : p.textPrimary,
+                                fontWeight: isSelected
+                                    ? FontWeight.w700
+                                    : FontWeight.normal,
+                                fontSize: 12,
+                              ),
+                            );
+                          }).toList(),
                         ),
                       ],
                     ),

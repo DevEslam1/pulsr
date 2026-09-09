@@ -112,15 +112,29 @@ class SearchCubit extends PulsrCubit<SearchState> {
 
       _searchSub = autoSub(
         _searchUseCase.searchSongs(boundedQuery, excludedFolders: excluded),
-        (result) {
+        (result) async {
           if (generation != _generation || isClosed) return;
-          result.fold(
-            (failure) => safeEmit(state.copyWith(
+          await result.fold(
+            (failure) async => safeEmit(state.copyWith(
                 isLoading: false, errorMessage: failure.message)),
-            (allResults) {
+            (allResults) async {
               final q = normalize(query);
               final filter = filterOverride ?? state.selectedFilter;
-              final filtered = _filterWithFuzzy(allResults, q, filter);
+              var filtered = _filterWithFuzzy(allResults, q, filter);
+
+              if (filtered.isEmpty && boundedQuery.length >= 2) {
+                // If strict SQL yielded 0 results (e.g. typos, Arabic normalized variants, or accents),
+                // fallback to evaluating across all songs so fuzzy/Levenshtein can match.
+                try {
+                  final allSongsRes = await _searchUseCase
+                      .searchSongs('', excludedFolders: excluded)
+                      .first;
+                  if (generation != _generation || isClosed) return;
+                  final allSongs =
+                      allSongsRes.fold((l) => <SongsTableData>[], (r) => r);
+                  filtered = _filterWithFuzzy(allSongs, q, filter);
+                } catch (_) {}
+              }
 
               safeEmit(state.copyWith(
                   results: filtered, isLoading: false, errorMessage: null));

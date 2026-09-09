@@ -13,6 +13,8 @@ import io.flutter.plugin.common.MethodChannel.Result
 import org.jaudiotagger.audio.AudioFileIO
 import org.jaudiotagger.tag.FieldKey
 import org.jaudiotagger.tag.images.ArtworkFactory
+import org.jaudiotagger.tag.flac.FlacTag
+import org.jaudiotagger.tag.vorbiscomment.VorbisCommentTag
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.logging.Level
@@ -105,7 +107,24 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                             tagMap["trackNumber"] = tag.getFirst(FieldKey.TRACK)
                             tagMap["discNumber"] = tag.getFirst(FieldKey.DISC_NO)
                             tagMap["composer"] = tag.getFirst(FieldKey.COMPOSER)
-                            tagMap["lyrics"] = tag.getFirst(FieldKey.LYRICS)
+                            var lyrics = tag.getFirst(FieldKey.LYRICS)
+                            if (lyrics.isNullOrBlank()) {
+                                val vorbisTag: VorbisCommentTag? = when (tag) {
+                                    is FlacTag -> tag.vorbisCommentTag
+                                    is VorbisCommentTag -> tag
+                                    else -> null
+                                }
+                                if (vorbisTag != null) {
+                                    for (key in listOf("SYNCEDLYRICS", "UNSYNCEDLYRICS", "SYNCED LYRICS", "UNSYNCED LYRICS")) {
+                                        val v = vorbisTag.getFirst(key)
+                                        if (!v.isNullOrBlank()) {
+                                            lyrics = v
+                                            break
+                                        }
+                                    }
+                                }
+                            }
+                            tagMap["lyrics"] = lyrics
                             tagMap["comment"] = tag.getFirst(FieldKey.COMMENT)
 
                             if (includeArtwork) {
@@ -195,8 +214,32 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                         tags["trackNumber"]?.let { tag.setField(FieldKey.TRACK, it.toString()) }
                         tags["discNumber"]?.let { tag.setField(FieldKey.DISC_NO, it.toString()) }
                         tags["composer"]?.let { tag.setField(FieldKey.COMPOSER, it.toString()) }
-                        tags["lyrics"]?.let { tag.setField(FieldKey.LYRICS, it.toString()) }
-                        tags["comment"]?.let { tag.setField(FieldKey.COMMENT, it.toString()) }
+                        if (tags.containsKey("lyrics")) {
+                            val lyricsVal = tags["lyrics"]?.toString()
+                            if (lyricsVal.isNullOrEmpty()) {
+                                runCatching { tag.deleteField(FieldKey.LYRICS) }
+                                val vorbisTag = when (tag) {
+                                    is FlacTag -> tag.vorbisCommentTag
+                                    is VorbisCommentTag -> tag
+                                    else -> null
+                                }
+                                if (vorbisTag != null) {
+                                    for (k in listOf("SYNCEDLYRICS", "UNSYNCEDLYRICS", "SYNCED LYRICS", "UNSYNCED LYRICS")) {
+                                        runCatching { vorbisTag.deleteField(k) }
+                                    }
+                                }
+                            } else {
+                                tag.setField(FieldKey.LYRICS, lyricsVal)
+                            }
+                        }
+                        if (tags.containsKey("comment")) {
+                            val commentVal = tags["comment"]?.toString()
+                            if (commentVal.isNullOrEmpty()) {
+                                runCatching { tag.deleteField(FieldKey.COMMENT) }
+                            } else {
+                                tag.setField(FieldKey.COMMENT, commentVal)
+                            }
+                        }
 
                         // Handle artwork update if provided via bytes or file path
                         val rawArtworkBytes = (tags["artworkBytes"] as? ByteArray)

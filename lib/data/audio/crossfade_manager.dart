@@ -366,6 +366,9 @@ class CrossfadeManager {
         try {
           player.setVolume(to.clamp(0.0, 1.0));
         } catch (_) {}
+        if (to > 0.0) {
+          _clearNativeCurve(player);
+        }
         t.cancel();
         _activeTimers.remove(t);
         if (!completer.isCompleted) completer.complete();

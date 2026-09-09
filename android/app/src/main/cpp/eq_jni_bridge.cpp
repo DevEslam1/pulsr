@@ -356,7 +356,9 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeDecodeDsd(
     }
 
     try {
-        auto dsdBitOrder = (bitOrder == 0) ? DsdDecoder::DsdBitOrder::LSB_FIRST : DsdDecoder::DsdBitOrder::MSB_FIRST;
+        // bitOrder contract: 0 = MSB first (DSF), 1 = LSB first (DFF),
+        // matching the Dart/Kotlin callers (decodeDsd in AudioEffectsPlugin.kt).
+        auto dsdBitOrder = (bitOrder == 0) ? DsdDecoder::DsdBitOrder::MSB_FIRST : DsdDecoder::DsdBitOrder::LSB_FIRST;
         DsdDecoder decoder;
         decoder.configure(
                 static_cast<DsdDecoder::DsdRate>(dsdRate), targetPcmSampleRate, dsdBitOrder);
@@ -529,15 +531,50 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetDynamicEqBand(
 
 // ---- ExoPlayer Media3 NativeDspAudioProcessor In-Stream Direct Buffer Bridge ----
 
+JNIEXPORT jlong JNICALL
+Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeCreateEngine(
+        JNIEnv* /* env */, jclass /* clazz */) {
+    try {
+        auto* engine = new AudioDspEngine();
+        DspEngineRegistry::instance().registerEngine(engine);
+        return reinterpret_cast<jlong>(engine);
+    } catch (...) {
+        return 0;
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeDestroyEngine(
+        JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle) {
+    if (engineHandle == 0) return;
+    try {
+        auto* engine = reinterpret_cast<AudioDspEngine*>(engineHandle);
+        DspEngineRegistry::instance().unregisterEngine(engine);
+        delete engine;
+    } catch (...) {}
+}
+
+JNIEXPORT void JNICALL
+Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeResetEngine(
+        JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle) {
+    auto* engine = reinterpret_cast<AudioDspEngine*>(engineHandle);
+    if (!engine) engine = &AudioDspEngine::instance();
+    try {
+        engine->reset();
+    } catch (...) {}
+}
+
 JNIEXPORT jint JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatBuffer(
-        JNIEnv* env, jclass /* clazz */, jobject byteBuffer, jint offsetBytes, jint frameCount, jint channels) {
+        JNIEnv* env, jclass /* clazz */, jlong engineHandle, jobject byteBuffer, jint offsetBytes, jint frameCount, jint channels) {
     if (!byteBuffer || frameCount <= 0 || channels <= 0 || channels > 8) return 0;
     void* addr = env->GetDirectBufferAddress(byteBuffer);
     if (!addr) return 0;
     float* floatBuffer = reinterpret_cast<float*>(static_cast<char*>(addr) + offsetBytes);
+    auto* engine = reinterpret_cast<AudioDspEngine*>(engineHandle);
+    if (!engine) engine = &AudioDspEngine::instance();
     try {
-        return static_cast<jint>(AudioDspEngine::instance().processInterleaved(floatBuffer, frameCount, channels));
+        return static_cast<jint>(engine->processInterleaved(floatBuffer, frameCount, channels));
     } catch (...) {
         return 0;
     }
@@ -545,8 +582,12 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
 
 JNIEXPORT void JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeResyncForTrack(
-        JNIEnv* /* env */, jclass /* clazz */, jdouble sampleRate, jint channels) {
-    AudioDspEngine::instance().resyncForTrack(sampleRate, channels);
+        JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle, jdouble sampleRate, jint channels) {
+    auto* engine = reinterpret_cast<AudioDspEngine*>(engineHandle);
+    if (!engine) engine = &AudioDspEngine::instance();
+    try {
+        engine->resyncForTrack(sampleRate, channels);
+    } catch (...) {}
 }
 
 } // extern "C"

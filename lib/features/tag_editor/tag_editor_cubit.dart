@@ -337,7 +337,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
             ));
           }
           try {
-            await _channel.invokeMethod('writeTags', {
+            final payload = <String, dynamic>{
               'path': s.path,
               'title': s.title, // keep individual title
               'artist': _batchArtistEdited
@@ -354,12 +354,17 @@ class TagEditorCubit extends Cubit<TagEditorState> {
                   : (state.year.isNotEmpty
                       ? state.year
                       : (s.year?.toString() ?? '')),
-              'trackNumber': _batchTrackEdited ? state.trackNumber : (s.trackNumber?.toString() ?? ''),
-              'comment': _batchCommentEdited ? state.comment : '',
-              'lyrics': '',
+              'trackNumber': _batchTrackEdited
+                  ? state.trackNumber
+                  : (s.trackNumber?.toString() ?? ''),
               'artworkPath': state.newArtworkPath,
               'removeArtwork': state.removeArtwork,
-            });
+            };
+            if (_batchCommentEdited) {
+              payload['comment'] = state.comment;
+            }
+            // Do NOT include 'lyrics' in batch mode to preserve each track's embedded lyrics
+            await _channel.invokeMethod('writeTags', payload);
             if (isClosed) return;
             await _scannerService.rescanSingleFile(s.path);
           } catch (e, st) {

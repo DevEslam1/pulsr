@@ -441,7 +441,21 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         }
         return when {
             e is ReCaptchaException -> "BOT_CHALLENGE"
-            e is ContentNotAvailableException -> "VIDEO_GONE"
+            e is ContentNotAvailableException -> {
+                // NewPipe wraps "Sign in to confirm that you're not a bot" as a
+                // ContentNotAvailableException. Without this check it was always
+                // reported as VIDEO_GONE, masking the real BotChallenge signal from
+                // the Dart recovery layer (no cooldown, no poToken refresh, infinite
+                // 9-client retry loop on every subsequent track while on VPN).
+                val m = e.message?.lowercase() ?: ""
+                if (m.contains("not a bot") || m.contains("sign in to confirm") ||
+                    m.contains("confirm you") || m.contains("bot") ||
+                    m.contains("recaptcha") || m.contains("automated")) {
+                    "BOT_CHALLENGE"
+                } else {
+                    "VIDEO_GONE"
+                }
+            }
             // A thrown IOException means the HTTP call never completed, so it is a
             // transport failure — YouTube's own blocks arrive as 403/429 *responses*.
             // Reporting these as IP_BLOCKED made Dart impose a multi-minute cooldown

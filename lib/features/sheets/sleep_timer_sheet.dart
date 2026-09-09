@@ -92,7 +92,11 @@ class SleepTimerSheet extends StatelessWidget {
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 8.0),
                                 child: Text(
-                                  'Music will stop in ${state.sleepTimerRemaining!.inMinutes}m ${state.sleepTimerRemaining!.inSeconds % 60}s',
+                                  cubit.sleepTimerRemainingTracks != null
+                                      ? (cubit.sleepTimerRemainingTracks == 1
+                                          ? 'Music will stop at the end of this track'
+                                          : 'Music will stop after ${cubit.sleepTimerRemainingTracks} songs')
+                                      : 'Music will stop in ${state.sleepTimerRemaining!.inMinutes}m ${state.sleepTimerRemaining!.inSeconds % 60}s',
                                   style: TextStyle(
                                     color: p.accent,
                                     fontWeight: FontWeight.w600,
@@ -101,7 +105,7 @@ class SleepTimerSheet extends StatelessWidget {
                               ),
                             const SizedBox(height: 16),
                             Text(
-                              context.l10n.presets,
+                              'By Songs',
                               style: TextStyle(
                                 color: p.textSecondary,
                                 fontWeight: FontWeight.w600,
@@ -128,6 +132,54 @@ class SleepTimerSheet extends StatelessWidget {
                                     Navigator.pop(context);
                                   },
                                 ),
+                                ChoiceChip(
+                                  label: const Text('2 songs'),
+                                  selected: false,
+                                  onSelected: (_) {
+                                    cubit.startAfterNTracksTimer(2);
+                                    Navigator.pop(context);
+                                  },
+                                ),
+                                ChoiceChip(
+                                  label: const Text('3 songs'),
+                                  selected: false,
+                                  onSelected: (_) {
+                                    cubit.startAfterNTracksTimer(3);
+                                    Navigator.pop(context);
+                                  },
+                                ),
+                                ChoiceChip(
+                                  label: const Text('5 songs'),
+                                  selected: false,
+                                  onSelected: (_) {
+                                    cubit.startAfterNTracksTimer(5);
+                                    Navigator.pop(context);
+                                  },
+                                ),
+                                ChoiceChip(
+                                  label: const Text('10 songs'),
+                                  selected: false,
+                                  onSelected: (_) {
+                                    cubit.startAfterNTracksTimer(10);
+                                    Navigator.pop(context);
+                                  },
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            Text(
+                              context.l10n.presets,
+                              style: TextStyle(
+                                color: p.textSecondary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
                                 ...presets.map((mins) {
                                   return ChoiceChip(
                                     label: Text('$mins min'),

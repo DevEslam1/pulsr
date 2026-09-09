@@ -185,8 +185,9 @@ class LrcParser {
     return null;
   }
 
-  /// Attempts to fetch embedded lyrics via platform channel.
+  /// Attempts to fetch embedded lyrics via platform channel (Android only).
   static Future<String?> getEmbeddedLyrics(String audioFilePath) async {
+    if (!Platform.isAndroid) return null;
     try {
       final String? lyrics = await _lyricsChannel.invokeMethod<String>(
         'getEmbeddedLyrics',
@@ -200,6 +201,72 @@ class LrcParser {
           error: e, stackTrace: st, category: 'LrcParser');
     }
     return null;
+  }
+
+  /// Checks if lyrics are already cached in memory (positive or valid negative cache).
+  static bool hasCachedLyrics({int? songId, String? path}) {
+    final cacheKey = songId != null ? 'song_$songId' : path;
+    if (cacheKey == null || !_lyricsCache.containsKey(cacheKey)) return false;
+    final cached = _lyricsCache[cacheKey];
+    if (cached == null) {
+      final cachedTime = _negativeCacheTimes[cacheKey];
+      if (cachedTime != null &&
+          DateTime.now().difference(cachedTime) > _negativeCacheTtl) {
+        _lyricsCache.remove(cacheKey);
+        _negativeCacheTimes.remove(cacheKey);
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// Retrieves cached lyrics from in-memory LRU cache if available.
+  static LyricsResult? getCachedLyrics({int? songId, String? path}) {
+    final cacheKey = songId != null ? 'song_$songId' : path;
+    if (cacheKey == null || !_lyricsCache.containsKey(cacheKey)) return null;
+    final cached = _lyricsCache[cacheKey];
+    if (cached == null) {
+      final cachedTime = _negativeCacheTimes[cacheKey];
+      if (cachedTime != null &&
+          DateTime.now().difference(cachedTime) > _negativeCacheTtl) {
+        _lyricsCache.remove(cacheKey);
+        _negativeCacheTimes.remove(cacheKey);
+        return null;
+      }
+    }
+    // Refresh LRU order
+    final restored = _lyricsCache.remove(cacheKey);
+    _lyricsCache[cacheKey] = restored;
+    return restored;
+  }
+
+  /// Manually cache a resolved lyrics result (e.g. from LRCLIB or YTM).
+  static void cacheLyricsResult(
+    LyricsResult? result, {
+    int? songId,
+    String? path,
+  }) {
+    final cacheKey = songId != null ? 'song_$songId' : path;
+    if (cacheKey == null) return;
+    if (_lyricsCache.length >= _maxCacheSize) {
+      final evictedKey = _lyricsCache.keys.first;
+      _lyricsCache.remove(evictedKey);
+      _negativeCacheTimes.remove(evictedKey);
+    }
+    _lyricsCache[cacheKey] = result;
+    if (result == null) {
+      _negativeCacheTimes[cacheKey] = DateTime.now();
+    } else {
+      _negativeCacheTimes.remove(cacheKey);
+    }
+    if (songId != null && path != null && path.isNotEmpty) {
+      _lyricsCache[path] = result;
+      if (result == null) {
+        _negativeCacheTimes[path] = DateTime.now();
+      } else {
+        _negativeCacheTimes.remove(path);
+      }
+    }
   }
 
   /// Resolves lyrics following the fallback chain with in-memory caching:
@@ -221,24 +288,8 @@ class LrcParser {
     Object? lrclibService,
   }) async {
     final cacheKey = songId != null ? 'song_$songId' : audioFilePath;
-    if (_lyricsCache.containsKey(cacheKey)) {
-      final cached = _lyricsCache[cacheKey];
-      // Negative cache (null) expires after TTL so new sidecar .lrc can be discovered
-      if (cached == null) {
-        final cachedTime = _negativeCacheTimes[cacheKey];
-        if (cachedTime != null && DateTime.now().difference(cachedTime) > _negativeCacheTtl) {
-          _lyricsCache.remove(cacheKey);
-          _negativeCacheTimes.remove(cacheKey);
-        } else {
-          final restored = _lyricsCache.remove(cacheKey);
-          _lyricsCache[cacheKey] = restored;
-          return restored;
-        }
-      } else {
-        final restored = _lyricsCache.remove(cacheKey);
-        _lyricsCache[cacheKey] = restored;
-        return restored;
-      }
+    if (hasCachedLyrics(songId: songId, path: audioFilePath)) {
+      return getCachedLyrics(songId: songId, path: audioFilePath);
     }
 
     LyricsResult? resolved;

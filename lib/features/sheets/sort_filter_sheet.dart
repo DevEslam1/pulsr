@@ -23,6 +23,7 @@ class SortFilterSheet extends StatelessWidget {
     final sortOptions = [
       {'key': 'title', 'label': context.l10n.title},
       {'key': 'artist', 'label': context.l10n.artist},
+      {'key': 'album', 'label': context.l10n.albums},
       {'key': 'dateAdded', 'label': context.l10n.recentlyAdded},
       {'key': 'duration', 'label': context.l10n.duration},
     ];

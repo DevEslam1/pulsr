@@ -232,6 +232,8 @@ class EqualizerManager {
           prefs.getDouble(PrefsKeys.lookaheadLimiterThresholdDb) ?? -0.2;
       limiterReleaseMs =
           prefs.getDouble(PrefsKeys.lookaheadLimiterReleaseMs) ?? 50.0;
+      limiterLookaheadMs =
+          prefs.getDouble(PrefsKeys.lookaheadLimiterLookaheadMs) ?? 3.0;
 
       isReverbEnabled =
           prefs.getBool(PrefsKeys.convolutionReverbEnabled) ?? false;
@@ -464,6 +466,7 @@ class EqualizerManager {
         PrefsKeys.lookaheadLimiterEnabled: isLimiterEnabled,
         PrefsKeys.lookaheadLimiterThresholdDb: limiterThresholdDb,
         PrefsKeys.lookaheadLimiterReleaseMs: limiterReleaseMs,
+        PrefsKeys.lookaheadLimiterLookaheadMs: limiterLookaheadMs,
         PrefsKeys.convolutionReverbEnabled: isReverbEnabled,
         PrefsKeys.convolutionReverbPreset: reverbPreset,
         PrefsKeys.convolutionReverbWetDry: reverbWetDry,
@@ -535,6 +538,10 @@ class EqualizerManager {
       await prefs.setDouble(
         PrefsKeys.lookaheadLimiterReleaseMs,
         limiterReleaseMs,
+      );
+      await prefs.setDouble(
+        PrefsKeys.lookaheadLimiterLookaheadMs,
+        limiterLookaheadMs,
       );
 
       await prefs.setBool(PrefsKeys.convolutionReverbEnabled, isReverbEnabled);
@@ -864,19 +871,22 @@ class EqualizerManager {
     isAbComparisonActive = true;
     _abComparisonGains = List.from(currentPreset.gains);
     final targetFreqs = is32BandMode ? custom32Frequencies : customFrequencies;
-    final flatGains = List<double>.filled(targetFreqs.length, 0.0);
     if (PlatformCapabilities.isAndroid) {
-      if (is32BandMode) {
-        final futures = <Future<void>>[];
-        for (int i = 0; i < targetFreqs.length; i++) {
-          futures.add(
-            _effectsChannel.setNativeEqBand(i, targetFreqs[i], 0.0, 1.414),
-          );
-        }
-        await Future.wait(futures);
-      } else {
-        await _effectsChannel.setEqBandGains(flatGains);
+      // Flatten BOTH EQ paths, mirroring applyCurrentPreset's dual push:
+      // the native parametric EQ and the HAL DynamicsProcessing postEq.
+      // Flattening only one left the other chain still applying the curve,
+      // so the "flat" A-side was not actually flat.
+      final futures = <Future<void>>[];
+      for (int i = 0; i < targetFreqs.length; i++) {
+        futures.add(
+          _effectsChannel.setNativeEqBand(i, targetFreqs[i], 0.0, 1.414),
+        );
       }
+      await Future.wait(futures);
+      // HAL postEq layout is the 10-band customFrequencies layout in both
+      // modes (32-band mode stores the interpolated curve there).
+      final halFlatGains = List<double>.filled(customFrequencies.length, 0.0);
+      await _effectsChannel.setEqBandGains(halFlatGains);
       // Persist flat state immediately so crash mid-A/B doesn't leave flat persisted
       await _savePreferences();
     }
@@ -888,19 +898,29 @@ class EqualizerManager {
       final targetFreqs =
           is32BandMode ? custom32Frequencies : customFrequencies;
       if (PlatformCapabilities.isAndroid) {
+        // Restore BOTH EQ paths (mirrors applyCurrentPreset's dual push).
+        final futures = <Future<void>>[];
+        for (int i = 0;
+            i < targetFreqs.length && i < _abComparisonGains.length;
+            i++) {
+          futures.add(
+            _effectsChannel.setNativeEqBand(
+              i,
+              targetFreqs[i],
+              _abComparisonGains[i],
+              1.414,
+            ),
+          );
+        }
+        await Future.wait(futures);
         if (is32BandMode) {
-          final futures = <Future<void>>[];
-          for (int i = 0; i < _abComparisonGains.length; i++) {
-            futures.add(
-              _effectsChannel.setNativeEqBand(
-                i,
-                targetFreqs[i],
-                _abComparisonGains[i],
-                1.414,
-              ),
-            );
-          }
-          await Future.wait(futures);
+          // HAL postEq holds the interpolated 10-band curve in 32-band mode.
+          await _effectsChannel.setEqBandGains(
+            EqPreset.interpolateGains(
+              _abComparisonGains,
+              targetFrequencies: customFrequencies,
+            ),
+          );
         } else {
           await _effectsChannel.setEqBandGains(_abComparisonGains);
         }
@@ -1084,9 +1104,10 @@ class EqualizerManager {
     isLimiterEnabled = enabled;
     if (thresholdDb != null) limiterThresholdDb = thresholdDb;
     if (releaseMs != null) limiterReleaseMs = releaseMs;
+    if (lookaheadMs != null) limiterLookaheadMs = lookaheadMs;
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setLimiterParams(
-        lookaheadMs ?? 3.0,
+        limiterLookaheadMs,
         limiterThresholdDb,
         limiterReleaseMs,
       );

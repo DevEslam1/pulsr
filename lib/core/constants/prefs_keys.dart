@@ -51,6 +51,8 @@ class PrefsKeys {
       'setting_lookahead_limiter_threshold_db';
   static const String lookaheadLimiterReleaseMs =
       'setting_lookahead_limiter_release_ms';
+  static const String lookaheadLimiterLookaheadMs =
+      'setting_lookahead_limiter_lookahead_ms';
   static const String convolutionReverbEnabled =
       'setting_convolution_reverb_enabled';
   static const String convolutionReverbPreset =

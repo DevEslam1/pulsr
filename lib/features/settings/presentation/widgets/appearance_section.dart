@@ -5,6 +5,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../player/presentation/widgets/audio_visualizer.dart';
+import '../../../../core/widgets/pulsr_toast.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
 import 'settings_section.dart';
@@ -148,6 +149,113 @@ class AppearanceSection extends StatelessWidget {
                                       : Colors.white,
                                 )
                               : null,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Curated Aura Presets',
+                style: TextStyle(
+                  color: p.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 10),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  children: AuraTheme.presets.map((preset) {
+                    final isSelected =
+                        state.customAccentColorValue ==
+                            preset.accentColor.toARGB32() &&
+                        (preset.isAmoled
+                            ? state.themeMode == AppThemeMode.amoled
+                            : true);
+
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: GestureDetector(
+                        onTap: () {
+                          cubit.setCustomAccentColor(preset.accentColor);
+                          cubit.setThemeColorSource(ThemeColorSource.custom);
+                          if (preset.isAmoled) {
+                            cubit.setThemeMode(AppThemeMode.amoled);
+                          }
+                          PulsrToast.show(
+                            context,
+                            message: 'Applied preset: ${preset.name}',
+                            icon: Icons.palette_rounded,
+                          );
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: 116,
+                          height: 58,
+                          decoration: BoxDecoration(
+                            gradient: preset.gradient,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isSelected
+                                  ? preset.accentColor
+                                  : Colors.white.withValues(alpha: 0.14),
+                              width: isSelected ? 2.0 : 1.0,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: preset.accentColor.withValues(
+                                    alpha: isSelected ? 0.4 : 0.15),
+                                blurRadius: isSelected ? 12 : 6,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: Stack(
+                            children: [
+                              Center(
+                                child: Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 6),
+                                  child: Text(
+                                    preset.name,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 11.5,
+                                      shadows: [
+                                        Shadow(
+                                          color: Colors.black54,
+                                          blurRadius: 4,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              if (isSelected)
+                                Positioned(
+                                  top: 6,
+                                  right: 6,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: BoxDecoration(
+                                      color: preset.accentColor,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.check_rounded,
+                                      size: 11,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
                       ),
                     );

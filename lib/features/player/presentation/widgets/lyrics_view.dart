@@ -1,4 +1,4 @@
-// lib/features/player/presentation/widgets/lyrics_view.dart
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -127,12 +127,9 @@ class _LyricsViewState extends State<LyricsView> {
   void didUpdateWidget(covariant LyricsView oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // LyricsView is recreated with a ValueKey per song, but during loading
-    // states the parent may emit new list instances; use identity check.
-    // Also handle content changes where length happens to be equal.
-    if (!identical(widget.lyrics, oldWidget.lyrics)) {
-      _syncLyricsToController();
-    } else if (widget.lyrics.length != oldWidget.lyrics.length ||
+    // Only reload the controller when the lyrics content or source actually changed,
+    // avoiding re-parsing and animation resets caused by Freezed state emissions.
+    if (!listEquals(widget.lyrics, oldWidget.lyrics) ||
         widget.source != oldWidget.source) {
       _syncLyricsToController();
     }

@@ -76,6 +76,37 @@ void AudioDspEngine::resyncForTrack(double sampleRate, int channels) {
     applySampleRateLocked(sampleRate);
 }
 
+DspEngineRegistry& DspEngineRegistry::instance() {
+    static DspEngineRegistry sRegistry;
+    return sRegistry;
+}
+
+void DspEngineRegistry::registerEngine(AudioDspEngine* engine) {
+    if (!engine) return;
+    std::lock_guard<std::mutex> lock(mutex_);
+    engines_.push_back(engine);
+    auto current = AudioDspEngine::instance().getParams();
+    if (current) {
+        engine->publishParams(current);
+    }
+}
+
+void DspEngineRegistry::unregisterEngine(AudioDspEngine* engine) {
+    if (!engine) return;
+    std::lock_guard<std::mutex> lock(mutex_);
+    engines_.erase(std::remove(engines_.begin(), engines_.end(), engine), engines_.end());
+}
+
+void DspEngineRegistry::broadcastParams(const std::shared_ptr<const DspParamSnapshot>& snapshot) {
+    if (!snapshot) return;
+    std::lock_guard<std::mutex> lock(mutex_);
+    for (auto* engine : engines_) {
+        if (engine && engine != &AudioDspEngine::instance()) {
+            engine->publishParams(snapshot);
+        }
+    }
+}
+
 void AudioDspEngine::updateParams(SnapshotMutator mutator) {
     if (!mutator) return;
     std::lock_guard<std::mutex> lock(publishMutex_);
@@ -84,7 +115,12 @@ void AudioDspEngine::updateParams(SnapshotMutator mutator) {
     updated->resetRequested = false; // Clear reset by default so reset() only fires once
     mutator(*updated);
     updated->generation = ++snapshotGeneration_;
-    currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(updated));
+    auto snap = std::const_pointer_cast<const DspParamSnapshot>(updated);
+    currentParams_.store(snap);
+
+    if (this == &AudioDspEngine::instance()) {
+        DspEngineRegistry::instance().broadcastParams(snap);
+    }
 }
 
 void AudioDspEngine::setActiveStages(uint32_t bitmask) {
@@ -102,6 +138,11 @@ void AudioDspEngine::publishParams(std::shared_ptr<const DspParamSnapshot> snaps
     if (!snapshot) return;
     std::lock_guard<std::mutex> lock(publishMutex_);
     auto mutableSnap = std::make_shared<DspParamSnapshot>(*snapshot);
+    // If this engine has its own track sample rate set, preserve it so global effect changes don't overwrite it
+    const double mySr = sampleRate_.load(std::memory_order_acquire);
+    if (mySr >= 8000.0) {
+        mutableSnap->sampleRate = mySr;
+    }
     mutableSnap->generation = ++snapshotGeneration_;
     currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(mutableSnap));
 }

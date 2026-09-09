@@ -29,10 +29,47 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         }
     }
 
+    private static native long nativeCreateEngine();
+    private static native void nativeDestroyEngine(long engineHandle);
+    private static native void nativeResetEngine(long engineHandle);
     private static native int nativeProcessDirectFloatBuffer(
-            ByteBuffer buffer, int offsetBytes, int frameCount, int channels);
+            long engineHandle, ByteBuffer buffer, int offsetBytes, int frameCount, int channels);
+    private static native void nativeResyncForTrack(
+            long engineHandle, double sampleRate, int channels);
 
-    private static native void nativeResyncForTrack(double sampleRate, int channels);
+    private long nativeEngineHandle = 0;
+
+    public NativeDspAudioProcessor() {
+        if (NATIVE_AVAILABLE) {
+            try {
+                nativeEngineHandle = nativeCreateEngine();
+            } catch (UnsatisfiedLinkError e) {
+                Log.w(TAG, "nativeCreateEngine failed: " + e.getMessage());
+                nativeEngineHandle = 0;
+            }
+        }
+    }
+
+    public void release() {
+        if (NATIVE_AVAILABLE && nativeEngineHandle != 0) {
+            long handle = nativeEngineHandle;
+            nativeEngineHandle = 0;
+            try {
+                nativeDestroyEngine(handle);
+            } catch (UnsatisfiedLinkError e) {
+                Log.w(TAG, "nativeDestroyEngine failed: " + e.getMessage());
+            }
+        }
+    }
+
+    @Override
+    protected void finalize() throws Throwable {
+        try {
+            release();
+        } finally {
+            super.finalize();
+        }
+    }
 
     // ---- Pulsr fork: sample-accurate gain ramp ----
     // Per-instance state (one processor per AudioPlayer) so the two crossfade
@@ -113,6 +150,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
             inputBuffer.position(limit);
             return;
         }
+
         int channelCount = inputAudioFormat.channelCount;
         FloatBuffer floats = ensureScratch(frameCount * channelCount);
 
@@ -120,7 +158,15 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
             floats.put(i, inputBuffer.getShort(position + i * 2) / 32768f);
         }
 
-        int processed = nativeProcessDirectFloatBuffer(scratch, 0, frameCount, channelCount);
+        int processed = frameCount;
+        if (NATIVE_AVAILABLE && nativeEngineHandle != 0) {
+            try {
+                processed = nativeProcessDirectFloatBuffer(
+                        nativeEngineHandle, scratch, 0, frameCount, channelCount);
+            } catch (UnsatisfiedLinkError e) {
+                processed = frameCount;
+            }
+        }
         if (processed <= 0 || processed > frameCount) {
             // Engine declined the block; scratch still holds the untouched input.
             processed = frameCount;
@@ -177,8 +223,17 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
 
     @Override
     protected void onFlush() {
-        if (NATIVE_AVAILABLE && inputAudioFormat.sampleRate > 0) {
-            nativeResyncForTrack(inputAudioFormat.sampleRate, inputAudioFormat.channelCount);
+        if (NATIVE_AVAILABLE && nativeEngineHandle != 0 && inputAudioFormat.sampleRate > 0) {
+            try {
+                nativeResyncForTrack(nativeEngineHandle, inputAudioFormat.sampleRate, inputAudioFormat.channelCount);
+            } catch (UnsatisfiedLinkError e) {
+                Log.w(TAG, "nativeResyncForTrack failed: " + e.getMessage());
+            }
+        }
+        synchronized (rampLock) {
+            if (rampGains == null) {
+                staticGain = 1.0f;
+            }
         }
         // Media3/ExoPlayer flushes on ordinary seeks within the same stream,
         // not only on genuinely new sources. Do NOT reset an in-flight curve
@@ -196,6 +251,13 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
             rampSegmentFrames = 0;
             rampPosFrames = 0;
             staticGain = 1.0f;
+        }
+        if (NATIVE_AVAILABLE && nativeEngineHandle != 0) {
+            try {
+                nativeResetEngine(nativeEngineHandle);
+            } catch (UnsatisfiedLinkError e) {
+                Log.w(TAG, "nativeResetEngine failed: " + e.getMessage());
+            }
         }
     }
 

@@ -10,6 +10,7 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
+import '../../../../core/widgets/marquee_text.dart';
 import '../../../../core/widgets/waveform_logo.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../settings/cubit/settings_cubit.dart';
@@ -535,12 +536,10 @@ class ClassicPlayerTheme extends StatelessWidget {
                                       child: Column(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Text(
-                                            song?.title ??
+                                          MarqueeText(
+                                            text: song?.title ??
                                                 context.l10n.noTrackSelected,
                                             textAlign: TextAlign.center,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
                                               fontSize: isTablet ? 23 : 19,
                                               fontWeight: FontWeight.w900,
@@ -550,12 +549,10 @@ class ClassicPlayerTheme extends StatelessWidget {
                                             ),
                                           ),
                                           const SizedBox(height: 3),
-                                          Text(
-                                            song?.artist ??
+                                          MarqueeText(
+                                            text: song?.artist ??
                                                 context.l10n.unknownArtist,
                                             textAlign: TextAlign.center,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
                                               fontSize: isTablet ? 15 : 13.5,
                                               fontWeight: FontWeight.w600,
@@ -972,7 +969,9 @@ class ClassicPlayerTheme extends StatelessWidget {
                       icon: Icons.timer_outlined,
                       tooltip: context.l10n.sleepTimer,
                       badgeText: hasTimer
-                          ? '${props.state.sleepTimerRemaining!.inMinutes}m'
+                          ? (props.cubit.sleepTimerRemainingTracks != null
+                              ? '${props.cubit.sleepTimerRemainingTracks} tr'
+                              : '${props.state.sleepTimerRemaining!.inMinutes}m')
                           : null,
                       isActive: hasTimer,
                       activeColor: props.activeColor,

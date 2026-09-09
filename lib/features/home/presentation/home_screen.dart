@@ -523,7 +523,11 @@ class _HomeScreenState extends State<HomeScreen> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SectionHeader(title: context.l10n.recentlyPlayed),
+                SectionHeader(
+                  title: context.l10n.recentlyPlayed,
+                  actionLabel: 'See All',
+                  onAction: () => context.push('/recents'),
+                ),
                 SizedBox(
                   height: isTablet ? 232 : 212,
                   child: ListView.builder(

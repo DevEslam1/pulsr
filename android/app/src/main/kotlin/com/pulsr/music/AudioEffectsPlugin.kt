@@ -2079,9 +2079,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                                 try { virtualizer?.enabled = isVirtualizerEnabled } catch (_: Exception) {}
                                 try { loudnessEnhancer?.enabled = volumeBoostMilliBels > 0 } catch (_: Exception) {}
                                 try { bassBoost?.enabled = bassBoostStrength > 0 } catch (_: Exception) {}
-                                val dynamicsActive = isDynamicsEnabled && currentDynamicsPreset != "off" && DYNAMICS_PRESETS.containsKey(currentDynamicsPreset)
-                                val needsBalanceMono = monoMix || abs(stereoBalance) > 0.001
-                                try { dynamicsProcessing?.enabled = isEqEnabled || dynamicsActive || isLimiterEnabled || needsBalanceMono } catch (_: Exception) {}
+                                // Same suppression-aware DP enable rule as everywhere else.
+                                updateDpEnabled()
                                 restoreNativeStateAfterBypass()
                             }
                         }
@@ -2239,12 +2238,16 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             return
         }
         try {
+            // HAL EQ suppressed (native/oem owns the band gains): keep the
+            // postEq flat even though this DP instance may be alive for the
+            // limiter/dynamics/balance-mono, or the curve gets applied twice.
+            val effectiveEqEnabled = isEqEnabled && !isHalEqSuppressed()
             for (ch in 0 until CHANNEL_COUNT) {
                 val eq = dp.getPostEqByChannelIndex(ch)
                 for (i in 0 until eqBandCount) {
                     val band = eq.getBand(i)
                     band.cutoffFrequency = eqCenterFreqs[i].toFloat()
-                    band.gain = if (isEqEnabled) eqBandGains[i].toFloat() else 0f
+                    band.gain = if (effectiveEqEnabled) eqBandGains[i].toFloat() else 0f
                     band.isEnabled = true
                 }
             }
@@ -2257,7 +2260,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private fun updatePreampInPlace() {
         val dp = dynamicsProcessing ?: return
         try {
-            val preampDb = if (isEqEnabled) eqPreampDb.toFloat() else 0f
+            // Preamp is applied natively when the HAL EQ is suppressed; adding
+            // it here too would double it (limiter postGain path).
+            val preampDb = if (isEqEnabled && !isHalEqSuppressed()) eqPreampDb.toFloat() else 0f
             // Apply preamp to the limiter's postGain instead of inputGain
             // to avoid driving the MBC stage into unwanted compression
             val baseLimiterGain = if (isDynamicsEnabled && currentDynamicsPreset != "off") {
@@ -2280,6 +2285,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         val dp = dynamicsProcessing
         if (dp != null) {
             configureDynamicsInPlace(dp, preset, enabled)
+            // A preset switch can turn dynamics on while DP was disabled
+            // (e.g. EQ-only while HAL EQ suppressed): re-evaluate the flag.
+            updateDpEnabled()
         } else {
             buildDynamicsProcessing()
         }
@@ -2296,7 +2304,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             return
         }
         try {
-            val preampDb = if (isEqEnabled) eqPreampDb.toFloat() else 0f
+            val preampDb = if (isEqEnabled && !isHalEqSuppressed()) eqPreampDb.toFloat() else 0f
             for (ch in 0 until CHANNEL_COUNT) {
                 val mbc = dp.getMbcByChannelIndex(ch)
                 for (i in 0 until minOf(MBC_BAND_COUNT, config.bands.size)) {
@@ -2328,7 +2336,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun neutralizeDynamics(dp: DynamicsProcessing) {
         try {
-            val preampDb = if (isEqEnabled) eqPreampDb.toFloat() else 0f
+            val preampDb = if (isEqEnabled && !isHalEqSuppressed()) eqPreampDb.toFloat() else 0f
             val shouldKeepLimiter = isDynamicsEnabled && currentDynamicsPreset != "off"
             for (ch in 0 until CHANNEL_COUNT) {
                 val mbc = dp.getMbcByChannelIndex(ch)
@@ -2352,10 +2360,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         if (dp != null) {
             updateEqInPlace()
             updatePreampInPlace()
-            // Ensure DP stays enabled if limiter or balance/mono is active even when EQ is toggled off
-            val dynamicsActive = isDynamicsEnabled && currentDynamicsPreset != "off"
-            val needsBalanceMono = monoMix || kotlin.math.abs(stereoBalance) > 0.001
-            try { dp.enabled = isEqEnabled || dynamicsActive || isLimiterEnabled || needsBalanceMono } catch (_: Exception) {}
+            // Keep DP enabled for any stage that still needs it (limiter,
+            // dynamics, balance/mono). The EQ term is suppression-aware so a
+            // suppressed EQ neither applies gains nor keeps DP alive.
+            updateDpEnabled()
         } else {
             buildDynamicsProcessing()
         }
@@ -2464,12 +2472,35 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
+    /**
+     * True when any audible stage routes through the DynamicsProcessing
+     * instance. The EQ term is suppression-aware: when the native parametric
+     * EQ owns the band gains (native/oem preference), an enabled EQ must not
+     * keep the HAL postEq applying the same curve on top of it.
+     */
+    private fun isDpNeeded(): Boolean {
+        if (isBitPerfectBypassActive) return false
+        val effectiveEqEnabled = isEqEnabled && !isHalEqSuppressed()
+        val dynamicsActive = isDynamicsEnabled && currentDynamicsPreset != "off"
+        val needsBalanceMono = monoMix || abs(stereoBalance) > 0.001
+        return effectiveEqEnabled || dynamicsActive || isLimiterEnabled || needsBalanceMono
+    }
+
+    private fun updateDpEnabled() {
+        val dp = dynamicsProcessing ?: return
+        try { dp.enabled = isDpNeeded() } catch (_: Exception) {}
+    }
+
     private fun buildPostEq(): DynamicsProcessing.Eq {
         val eq = DynamicsProcessing.Eq(true, true, eqBandCount)
+        // HAL EQ suppressed (native/oem owns the band gains): build the postEq
+        // flat so a DP instance kept alive by limiter/dynamics/balance-mono
+        // cannot apply the curve on top of the native EQ (double-processing).
+        val effectiveEqEnabled = isEqEnabled && !isHalEqSuppressed()
         for (i in 0 until eqBandCount) {
             val band = eq.getBand(i)
             band.cutoffFrequency = eqCenterFreqs[i].toFloat()
-            band.gain = if (isEqEnabled) eqBandGains[i].toFloat() else 0f
+            band.gain = if (effectiveEqEnabled) eqBandGains[i].toFloat() else 0f
             band.isEnabled = true
         }
         return eq
@@ -2548,8 +2579,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             }
 
             // Enable the engine whenever any stage is active (EQ, dynamics, limiter, or balance/mono).
-            // Use effectiveEqEnabled so OEM-suppressed EQ doesn't keep DP enabled unnecessarily.
-            dp.enabled = effectiveEqEnabled || dynamicsActive || isLimiterEnabled || needsBalanceMono
+            // isDpNeeded keeps the EQ term suppression-aware (single source of truth).
+            dp.enabled = isDpNeeded()
             dynamicsProcessing = dp
             updateLegacyEqualizer()
             // Wire the HAL limiter into the freshly-built DP instance
@@ -2723,7 +2754,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             return
         }
         try {
-            val preampDb = if (isEqEnabled) eqPreampDb.toFloat() else 0f
+            // Preamp is applied natively when the HAL EQ is suppressed; adding
+            // it here too would double it (limiter postGain path).
+            val preampDb = if (isEqEnabled && !isHalEqSuppressed()) eqPreampDb.toFloat() else 0f
             val baseGain = if (isDynamicsEnabled && currentDynamicsPreset != "off") {
                 DYNAMICS_PRESETS[currentDynamicsPreset]?.limiter?.postGain ?: 0f
             } else 0f
@@ -2743,6 +2776,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     limiter.postGain = baseGain + preampDb
                 }
             }
+            // Enabling the limiter must wake a DP instance that was disabled
+            // because no stage needed it (e.g. EQ-only while HAL EQ suppressed).
+            updateDpEnabled()
             Log.d(TAG, "HAL limiter applied: enabled=$isLimiterEnabled threshold=${limiterThresholdDb}dB attack=${limiterLookaheadMs}ms")
         } catch (e: Exception) {
             Log.w(TAG, "applyHalLimiter failed: ${e.message}")

@@ -80,6 +80,18 @@ class YtmResolvingSource extends StreamAudioSource {
   /// Set when the next creation must bypass every URL cache. Consumed once.
   bool _forceNextRefresh = false;
 
+  /// Set when resolution has permanently failed for this source (e.g. bot
+  /// challenge, video unavailable). Once set, every subsequent [request] call
+  /// re-throws immediately without touching the resolver, stopping the
+  /// ExoPlayer → just_audio proxy → HTTP 500 → retry spiral that otherwise
+  /// loops indefinitely during a bot-cooldown window.
+  Object? _permanentFailure;
+
+  /// The permanent failure stored on this source, if any. Used by the audio
+  /// handler to detect that a source error came from a known-permanent cause
+  /// (e.g. BOT_CHALLENGE) so it can skip to the next track rather than pausing.
+  Object? get permanentFailure => _permanentFailure;
+
   static final YtmCacheManager _cacheManager = YtmCacheManager();
 
   YtmUrlCache? get _effectiveUrlCache =>
@@ -93,6 +105,14 @@ class YtmResolvingSource extends StreamAudioSource {
 
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {
+    // Short-circuit immediately on permanent failures: a BOT_CHALLENGE or
+    // VIDEO_GONE that already fired once cannot resolve on re-request. Without
+    // this guard, ExoPlayer retries the just_audio proxy on every HTTP 500,
+    // the proxy calls request() again, hits the bot cooldown, returns 500 again
+    // — an infinite Release→Init→fail spiral every few seconds.
+    final pf = _permanentFailure;
+    if (pf != null) throw pf;
+
     // 1. Proactive expiry check: if URL is within 5 minutes of expiring, discard
     // & re-resolve. Dropping `_inner`/`_pending` alone was not enough: the URL
     // that is about to die is also the one sitting in `YtmUrlCache`, so the
@@ -143,19 +163,37 @@ class YtmResolvingSource extends StreamAudioSource {
           final classified = YtmErrorClassifier.classify(retryErr);
           debugPrint(
               '[YtmResolvingSource] Retry resolution failed ($retryErr): ${classified.message}');
+          if (_isFatalSignal(classified)) _permanentFailure = retryErr;
           onError?.call(retryErr);
           rethrow;
         }
       }
     } catch (err) {
+      if (err == _permanentFailure) rethrow; // already recorded above
       _discardInner();
       final classified = YtmErrorClassifier.classify(err);
       debugPrint(
           '[YtmResolvingSource] Initial resolution failed ($err): ${classified.message}');
+      // Mark permanent so ExoPlayer's retry loop doesn't re-enter the resolver.
+      // Only fatal signals qualify: bot challenges and unavailable tracks won't
+      // resolve on re-request; network blips should still get a retry.
+      if (_isFatalSignal(classified)) _permanentFailure = err;
       onError?.call(err);
       rethrow;
     }
   }
+
+  /// Whether [info] represents a signal that will not resolve on a retry, so
+  /// we should stop ExoPlayer from re-requesting through the local proxy.
+  static bool _isFatalSignal(YtmErrorInfo info) {
+    return info.signal == YtmBlockSignal.botChallenge ||
+        info.signal == YtmBlockSignal.ipBlocked ||
+        info.signal == YtmBlockSignal.videoGone ||
+        info.signal == YtmBlockSignal.signInRequired ||
+        info.signal == YtmBlockSignal.poTokenInvalid ||
+        info.signal == YtmBlockSignal.geoBlocked;
+  }
+
 
   /// Whether the stream URL itself is dead, as opposed to the connection to it.
   ///

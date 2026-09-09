@@ -357,19 +357,26 @@ class TestPulsrAudioHandler extends BaseAudioHandler
     sleepTimerDuration = stopTime.difference(DateTime.now());
   }
 
+  int? sleepTimerTracks;
+  @override
+  int? get sleepTimerRemainingTracks => sleepTimerTracks;
+
   @override
   void startEndOfTrackTimer({bool fadeOut = true}) {
     sleepTimerDuration = const Duration(minutes: 1);
+    sleepTimerTracks = 1;
   }
 
   @override
   void startAfterNTracksTimer(int trackCount, {bool fadeOut = true}) {
     sleepTimerDuration = Duration(minutes: trackCount * 3);
+    sleepTimerTracks = trackCount;
   }
 
   @override
   void cancelSleepTimer() {
     sleepTimerDuration = null;
+    sleepTimerTracks = null;
   }
 
   @override
@@ -562,6 +569,21 @@ void main() {
       cubit.cancelSleepTimer();
       expect(cubit.state.sleepTimerRemaining, isNull);
       expect(testAudioHandler.sleepTimerDuration, isNull);
+
+      // Track-based timer tests
+      cubit.startAfterNTracksTimer(3);
+      expect(testAudioHandler.sleepTimerTracks, 3);
+      expect(cubit.sleepTimerRemainingTracks, 3);
+      expect(cubit.state.sleepTimerRemaining, const Duration(minutes: 9));
+
+      cubit.startEndOfTrackTimer();
+      expect(testAudioHandler.sleepTimerTracks, 1);
+      expect(cubit.sleepTimerRemainingTracks, 1);
+
+      cubit.cancelSleepTimer();
+      expect(testAudioHandler.sleepTimerTracks, isNull);
+      expect(cubit.sleepTimerRemainingTracks, isNull);
+      expect(cubit.state.sleepTimerRemaining, isNull);
 
       cubit.close();
     });
@@ -1080,6 +1102,55 @@ void main() {
         await cubit.close();
       },
     );
+
+    test(
+      'playSong starts playing and maintains isPlaying true after selection',
+      () async {
+        final cubit = PlayerCubit(
+          audioHandler: testAudioHandler,
+          repository: mockRepository,
+          toggleFavoriteUseCase: mockToggleFavorite,
+        );
+
+        final song = SongsTableData(
+          id: 555,
+          title: 'Selected Song',
+          artist: 'Artist',
+          album: 'Album',
+          durationMs: 180000,
+          path: '/path/555.mp3',
+          isFavorite: false,
+          isMissing: false,
+          isDownloaded: false,
+          playCount: 0,
+          lastPositionMs: 0,
+          source: SongSource.local,
+        );
+
+        // Initially paused
+        expect(cubit.state.isPlaying, isFalse);
+
+        await cubit.playSong(song);
+
+        // PlaySong should set isPlaying to true
+        expect(cubit.state.isPlaying, isTrue);
+        expect(cubit.state.currentSong?.id, 555);
+
+        // AudioService updates playbackState to playing
+        testAudioHandler.emitPlaybackState(
+          PlaybackState(
+            playing: true,
+            processingState: AudioProcessingState.ready,
+          ),
+        );
+        await pumpEventQueue();
+
+        expect(cubit.state.isPlaying, isTrue);
+
+        await cubit.close();
+      },
+    );
+
     test('AudioService stream events update PlayerState', () async {
       final cubit = PlayerCubit(
         audioHandler: testAudioHandler,

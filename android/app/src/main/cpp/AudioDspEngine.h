@@ -202,3 +202,17 @@ private:
     SubCrossover subCrossover_;
     DynamicEQ dynamicEq_;
 };
+
+class DspEngineRegistry {
+public:
+    static DspEngineRegistry& instance();
+
+    void registerEngine(AudioDspEngine* engine);
+    void unregisterEngine(AudioDspEngine* engine);
+    void broadcastParams(const std::shared_ptr<const DspParamSnapshot>& snapshot);
+
+private:
+    std::mutex mutex_;
+    std::vector<AudioDspEngine*> engines_;
+};
+

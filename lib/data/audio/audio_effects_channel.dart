@@ -1055,6 +1055,7 @@ class AudioEffectsChannel {
     List<int> dsdR, {
     int dsdRate = 64,
     int targetSampleRate = 176400,
+    // 0 = MSB first (DSF), 1 = LSB first (DFF) - must match eq_jni_bridge.cpp
     int bitOrder = 0,
   }) async {
     if (!_isAndroid) return null;

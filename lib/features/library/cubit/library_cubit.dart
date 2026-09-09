@@ -226,10 +226,16 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
       currentFavs.removeWhere((s) => s.id == songId);
       safeEmit(state.copyWith(favorites: currentFavs, songs: songsWith(false)));
     } else {
-      final matchingSong = state.songs.cast<SongsTableData?>().firstWhere(
+      var matchingSong = state.songs.cast<SongsTableData?>().firstWhere(
             (s) => s?.id == songId,
             orElse: () => null,
           );
+      if (matchingSong == null && _musicRepository != null) {
+        try {
+          final res = await _musicRepository!.getSongsByIds([songId]);
+          matchingSong = res.fold((_) => null, (list) => list.firstOrNull);
+        } catch (_) {}
+      }
       if (matchingSong != null) {
         currentFavs.add(matchingSong.copyWith(isFavorite: true));
         safeEmit(state.copyWith(favorites: currentFavs, songs: songsWith(true)));

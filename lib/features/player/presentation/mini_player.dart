@@ -6,12 +6,13 @@ import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/glass_container.dart';
+import '../../../core/widgets/spinning_vinyl_disc.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../settings/cubit/settings_state.dart';
 import '../cubit/player_cubit.dart';
 import '../cubit/player_state.dart';
 
-class MiniPlayer extends StatelessWidget {
+class MiniPlayer extends StatefulWidget {
   final VoidCallback onTap;
   final VoidCallback? onSwipeDown;
   final VoidCallback? onSwipeUp;
@@ -23,17 +24,34 @@ class MiniPlayer extends StatelessWidget {
     this.onSwipeUp,
   });
 
-  void _handleSwipe(PlayerCubit cubit, MiniPlayerSwipeAction action,
-      {required bool isLeft}) {
-    switch (action) {
-      case MiniPlayerSwipeAction.next:
-        cubit.next();
-      case MiniPlayerSwipeAction.prev:
-        cubit.previous();
-      case MiniPlayerSwipeAction.volume:
-        cubit.adjustVolume(isLeft ? -0.15 : 0.15);
-      case MiniPlayerSwipeAction.none:
-        break;
+  @override
+  State<MiniPlayer> createState() => _MiniPlayerState();
+}
+
+class _MiniPlayerState extends State<MiniPlayer> {
+  PageController? _pageController;
+  int _lastKnownIndex = -1;
+  bool _isSwipingPage = false;
+  double _verticalDragDy = 0.0;
+
+  @override
+  void dispose() {
+    _pageController?.dispose();
+    super.dispose();
+  }
+
+  void _syncPageController(int targetIndex, int queueLength) {
+    if (queueLength == 0) return;
+    final safeIndex = targetIndex.clamp(0, queueLength - 1);
+    if (_pageController == null) {
+      _lastKnownIndex = safeIndex;
+      _pageController = PageController(initialPage: safeIndex);
+    } else if (!_isSwipingPage && _lastKnownIndex != safeIndex) {
+      _lastKnownIndex = safeIndex;
+      if (_pageController!.hasClients &&
+          _pageController!.page?.round() != safeIndex) {
+        _pageController!.jumpToPage(safeIndex);
+      }
     }
   }
 
@@ -49,84 +67,77 @@ class MiniPlayer extends StatelessWidget {
           a.currentSong?.artist != b.currentSong?.artist ||
           a.currentSong?.remoteArtworkUrl != b.currentSong?.remoteArtworkUrl ||
           a.isPlaying != b.isPlaying ||
-          a.duration != b.duration,
+          a.duration != b.duration ||
+          a.currentIndex != b.currentIndex ||
+          a.queue.length != b.queue.length,
       builder: (context, state) {
         final song = state.currentSong;
         if (song == null) return const SizedBox.shrink();
 
         final cubit = context.read<PlayerCubit>();
         final activeAccent = p.accent;
+        final queue = state.queue.isNotEmpty ? state.queue : [song];
+        final currentIndex = state.currentIndex.clamp(0, queue.length - 1);
 
-        double dragDx = 0;
-        double dragDy = 0;
+        _syncPageController(currentIndex, queue.length);
 
         return Semantics(
           label: 'Now playing: ${song.title} by ${song.artist}',
           button: true,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: onTap,
-            onPanStart: (_) {
-              dragDx = 0;
-              dragDy = 0;
+            onVerticalDragStart: (_) {
+              _verticalDragDy = 0.0;
             },
-            onPanUpdate: (d) {
-              dragDx += d.delta.dx;
-              dragDy += d.delta.dy;
+            onVerticalDragUpdate: (d) {
+              _verticalDragDy += d.delta.dy;
             },
-            onPanEnd: (d) {
-              final vx = d.velocity.pixelsPerSecond.dx;
+            onVerticalDragEnd: (d) {
               final vy = d.velocity.pixelsPerSecond.dy;
-              final absX = dragDx.abs();
-              final absY = dragDy.abs();
-
-              // If drag was very small, treat as tap
-              if (absX < 15 && absY < 15 && vx.abs() < 50 && vy.abs() < 50) {
-                onTap();
-                return;
-              }
-
-              // Check if swipe was predominantly vertical or horizontal
-              if (absY >= absX) {
-                // Vertical swipe:
-                if (dragDy > 20 || vy > 80) {
-                  onSwipeDown?.call();
-                } else if (dragDy < -20 || vy < -80) {
-                  if (onSwipeUp != null) {
-                    onSwipeUp!();
-                  } else {
-                    onTap();
-                  }
-                }
-              } else {
-                // Horizontal swipe:
-                if (dragDx < -20 || vx < -80) {
-                  _handleSwipe(cubit, settingsState.miniPlayerSwipeLeft,
-                      isLeft: true);
-                } else if (dragDx > 20 || vx > 80) {
-                  _handleSwipe(cubit, settingsState.miniPlayerSwipeRight,
-                      isLeft: false);
+              if (_verticalDragDy > 25 || vy > 120) {
+                widget.onSwipeDown?.call();
+              } else if (_verticalDragDy < -25 || vy < -120) {
+                if (widget.onSwipeUp != null) {
+                  widget.onSwipeUp!();
+                } else {
+                  widget.onTap();
                 }
               }
-              dragDx = 0;
-              dragDy = 0;
-            },
-            onPanCancel: () {
-              dragDx = 0;
-              dragDy = 0;
+              _verticalDragDy = 0.0;
             },
             child: Padding(
               padding: const EdgeInsetsDirectional.fromSTEB(12, 4, 12, 8),
-              child: RepaintBoundary(
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: AppRadii.miniPlayerRadius,
+                  boxShadow: [
+                    BoxShadow(
+                      color: activeAccent.withValues(
+                          alpha: p.isDark ? 0.22 : 0.15),
+                      blurRadius: 18,
+                      spreadRadius: -2,
+                      offset: const Offset(0, 4),
+                    ),
+                    BoxShadow(
+                      color: Colors.black
+                          .withValues(alpha: p.isDark ? 0.45 : 0.08),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
                 child: GlassContainer(
-                  blur: 16,
-                  opacity: p.isDark ? 0.92 : 0.96,
+                  blur: 20,
+                  opacity: p.isDark ? 0.93 : 0.97,
                   borderRadius: AppRadii.miniPlayerRadius,
                   color: Color.alphaBlend(
-                      activeAccent.withValues(alpha: p.isDark ? 0.12 : 0.08),
-                      p.surface),
+                    activeAccent.withValues(alpha: p.isDark ? 0.12 : 0.08),
+                    p.surface,
+                  ),
                   border: Border.all(
-                      color: activeAccent.withValues(alpha: 0.22), width: 1.2),
+                    color: activeAccent.withValues(alpha: 0.26),
+                    width: 1.2,
+                  ),
                   child: ClipRRect(
                     borderRadius: AppRadii.miniPlayerRadius,
                     child: Column(
@@ -135,53 +146,117 @@ class MiniPlayer extends StatelessWidget {
                         Directionality(
                           textDirection: TextDirection.ltr,
                           child: Padding(
-                            padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+                            padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
                             child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                Hero(
-                                  tag: 'now_playing_art_mini',
-                                  child: CachedArtwork(
-                                    id: song.id,
-                                    remoteUrl: song.remoteArtworkUrl,
-                                    type: ArtworkType.AUDIO,
-                                    size: 48,
-                                    borderRadius: 12,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
+                                // Interactive Swipeable Track Info Carousel
                                 Expanded(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        song.title,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: p.textPrimary,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 14.5,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        song.artist,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: p.textSecondary,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
+                                  child: SizedBox(
+                                    height: 52,
+                                    child: PageView.builder(
+                                      controller: _pageController,
+                                      physics: const BouncingScrollPhysics(),
+                                      itemCount: queue.length,
+                                      onPageChanged: (page) {
+                                        if (page != currentIndex &&
+                                            !_isSwipingPage) {
+                                          _isSwipingPage = true;
+                                          _lastKnownIndex = page;
+                                          cubit.skipToQueueItem(page);
+                                          Future.delayed(
+                                              const Duration(milliseconds: 300),
+                                              () {
+                                            if (mounted) {
+                                              _isSwipingPage = false;
+                                            }
+                                          });
+                                        }
+                                      },
+                                      itemBuilder: (context, index) {
+                                        final item = queue[index];
+                                        final isCurrent = index == currentIndex;
+
+                                        return GestureDetector(
+                                          behavior: HitTestBehavior.opaque,
+                                          onTap: widget.onTap,
+                                          child: Row(
+                                            children: [
+                                              // Artwork or Vinyl Disc
+                                              if (settingsState
+                                                      .playerThemeMode ==
+                                                  PlayerThemeMode.vinyl)
+                                                SpinningVinylDisc(
+                                                  id: item.id,
+                                                  remoteArtworkUrl:
+                                                      item.remoteArtworkUrl,
+                                                  size: 46,
+                                                  isPlaying: state.isPlaying &&
+                                                      isCurrent,
+                                                )
+                                              else
+                                                Hero(
+                                                  tag: isCurrent
+                                                      ? 'now_playing_art_mini'
+                                                      : 'queue_art_$index',
+                                                  child: CachedArtwork(
+                                                    id: item.id,
+                                                    remoteUrl:
+                                                        item.remoteArtworkUrl,
+                                                    type: ArtworkType.AUDIO,
+                                                    size: 46,
+                                                    borderRadius: 12,
+                                                  ),
+                                                ),
+                                              const SizedBox(width: 12),
+                                              // Track title & artist
+                                              Expanded(
+                                                child: Column(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  children: [
+                                                    Text(
+                                                      item.title,
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        color: isCurrent
+                                                            ? p.textPrimary
+                                                            : p.textSecondary,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        fontSize: 14.5,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 2),
+                                                    Text(
+                                                      item.artist,
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        color: p.textSecondary,
+                                                        fontSize: 12,
+                                                        fontWeight:
+                                                            FontWeight.w500,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    ),
                                   ),
                                 ),
-                                const SizedBox(width: 4),
+                                const SizedBox(width: 6),
+                                // Controls
                                 IconButton(
                                   tooltip: state.isPlaying
                                       ? context.l10n.pause
@@ -275,7 +350,7 @@ class _MiniPlayerProgressBar extends StatelessWidget {
                   }
                 },
                 child: SizedBox(
-                  height: 6.0,
+                  height: 4.5,
                   width: double.infinity,
                   child: Stack(
                     alignment: Alignment.centerLeft,
@@ -290,7 +365,7 @@ class _MiniPlayerProgressBar extends StatelessWidget {
                           widthFactor: progress,
                           alignment: Alignment.centerLeft,
                           child: Container(
-                            height: 6.0,
+                            height: 4.5,
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: [

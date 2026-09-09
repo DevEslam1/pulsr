@@ -17,6 +17,8 @@ import '../../features/library/presentation/library_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/player/presentation/now_playing_screen.dart';
 import '../../features/playlist_detail/presentation/playlist_detail_screen.dart';
+import '../../features/playlist_detail/presentation/manage_playlist_screen.dart';
+import '../../features/library/presentation/recents_screen.dart';
 import '../../features/playlists/presentation/playlists_screen.dart';
 import '../../features/queue/presentation/queue_screen.dart';
 import '../../features/search/presentation/search_screen.dart';
@@ -241,6 +243,27 @@ GoRouter createRouter(MediaScannerService scannerService) {
           }
           return PlaylistDetailScreen(playlist: playlist);
         },
+      ),
+      GoRoute(
+        path: '/playlist/manage',
+        name: 'manage-playlist',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final playlist = state.extra is PlaylistsTableData
+              ? state.extra as PlaylistsTableData
+              : null;
+          if (playlist == null) {
+            return const Scaffold(
+                body: Center(child: Text('Playlist not found')));
+          }
+          return ManagePlaylistScreen(playlist: playlist);
+        },
+      ),
+      GoRoute(
+        path: '/recents',
+        name: 'recents',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const RecentsScreen(),
       ),
       GoRoute(
         path: '/smart-playlist-builder',

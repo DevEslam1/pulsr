@@ -416,23 +416,24 @@ class _SearchScreenState extends State<SearchScreen> {
         onPrimaryAction: () => _clear(context),
       );
     }
-    return ListView(
+    return ListView.builder(
       padding: const EdgeInsets.only(bottom: 160, top: 4),
-      children: [
-        for (final song in state.results)
-          SongTile(
-            song: song,
-            subtitleOverride: '${song.artist} • ${song.album}',
-            onTap: () => playerCubit.playSong(song, queue: state.results),
-            onMorePressed: () => showModalBottomSheet(
-              context: context,
-              useRootNavigator: true,
-              isScrollControlled: true,
-              backgroundColor: Colors.transparent,
-              builder: (_) => SongInfoSheet(song: song),
-            ),
+      itemCount: state.results.length,
+      itemBuilder: (context, index) {
+        final song = state.results[index];
+        return SongTile(
+          song: song,
+          subtitleOverride: '${song.artist} • ${song.album}',
+          onTap: () => playerCubit.playSong(song, queue: state.results),
+          onMorePressed: () => showModalBottomSheet(
+            context: context,
+            useRootNavigator: true,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (_) => SongInfoSheet(song: song),
           ),
-      ],
+        );
+      },
     );
   }
 }

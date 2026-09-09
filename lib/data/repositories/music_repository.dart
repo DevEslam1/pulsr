@@ -80,6 +80,12 @@ class MusicRepository implements IMusicRepository {
               expression: t.durationMs,
               mode: ascending ? OrderingMode.asc : OrderingMode.desc)
         ]);
+      } else if (sortBy == 'album') {
+        query.orderBy([
+          (t) => OrderingTerm(
+              expression: t.album,
+              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
+        ]);
       }
 
       if (limit != null) {
@@ -382,6 +388,18 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
+  Future<Result<void>> clearRecentlyPlayed() async {
+    try {
+      await (_db.update(_db.songsTable)
+            ..where((t) => t.lastPlayed.isNotNull()))
+          .write(const SongsTableCompanion(lastPlayed: Value(null)));
+      return const Right(null);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to clear recently played history', e));
+    }
+  }
+
+  @override
   Stream<Result<List<SongsTableData>>> watchRecentlyAdded({int limit = 20}) {
     try {
       return (_db.select(_db.songsTable)
@@ -487,6 +505,11 @@ class MusicRepository implements IMusicRepository {
                   completed: Value(completed),
                 ),
               );
+          await _db.customStatement(
+            'DELETE FROM play_history WHERE id NOT IN ('
+            'SELECT id FROM play_history ORDER BY played_at DESC LIMIT 500'
+            ');',
+          );
         }
       });
       return const Right(null);
@@ -1018,13 +1041,15 @@ class MusicRepository implements IMusicRepository {
         return const Right(0);
       }
 
-      // 1. Fetch unscanned local songs outside the transaction
-      final unscannedSongs = await (_db.select(_db.songsTable)
+      // 1. Fetch all local songs and compute unscanned in Dart memory to avoid SQLite variable limits
+      final allLocalSongs = await (_db.select(_db.songsTable)
             ..where((t) =>
-                t.id.isNotIn(scannedSongIds) &
                 t.id.isBiggerThanValue(0) &
                 t.source.equals(SongSource.local)))
           .get();
+      final unscannedSongs = allLocalSongs
+          .where((s) => !scannedSongIds.contains(s.id))
+          .toList();
 
       // 2. Perform bounded async disk checks (max 16 concurrent) without blocking database locks
       final trulyMissingIds = <int>[];
@@ -1054,21 +1079,36 @@ class MusicRepository implements IMusicRepository {
 
       int markedMissingCount = 0;
       await _db.transaction(() async {
+        // Chunked updates to avoid SQLite parameter overflow (max 400 IDs per chunk)
+        const updateChunkSize = 400;
         if (trulyMissingIds.isNotEmpty) {
-          markedMissingCount = await (_db.update(_db.songsTable)
-                ..where((t) => t.id.isIn(trulyMissingIds)))
-              .write(
-            const SongsTableCompanion(isMissing: Value(true)),
-          );
+          for (var i = 0; i < trulyMissingIds.length; i += updateChunkSize) {
+            final end = (i + updateChunkSize < trulyMissingIds.length)
+                ? i + updateChunkSize
+                : trulyMissingIds.length;
+            final chunk = trulyMissingIds.sublist(i, end);
+            final count = await (_db.update(_db.songsTable)
+                  ..where((t) => t.id.isIn(chunk)))
+                .write(
+              const SongsTableCompanion(isMissing: Value(true)),
+            );
+            markedMissingCount += count;
+          }
         }
 
         // Ensure newly/currently scanned songs and reappeared songs are marked active (not missing)
-        final activeIds = {...scannedSongIds, ...reappearedIds};
+        final activeIds = [...scannedSongIds, ...reappearedIds];
         if (activeIds.isNotEmpty) {
-          await (_db.update(_db.songsTable)..where((t) => t.id.isIn(activeIds)))
-              .write(
-            const SongsTableCompanion(isMissing: Value(false)),
-          );
+          for (var i = 0; i < activeIds.length; i += updateChunkSize) {
+            final end = (i + updateChunkSize < activeIds.length)
+                ? i + updateChunkSize
+                : activeIds.length;
+            final chunk = activeIds.sublist(i, end);
+            await (_db.update(_db.songsTable)..where((t) => t.id.isIn(chunk)))
+                .write(
+              const SongsTableCompanion(isMissing: Value(false)),
+            );
+          }
         }
 
         // Recalculate song counts using active (non-missing) local songs

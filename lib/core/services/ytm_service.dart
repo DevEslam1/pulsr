@@ -137,7 +137,7 @@ class YtmService {
   /// down, [resolveStream] skips the native tiers and goes straight to the
   /// remote backend instead of piling up doomed chains (which also starves
   /// the native thread pool into cascading YTM_TIMEOUTs).
-  static const _botCooldown = Duration(seconds: 90);
+  static const _botCooldown = Duration(seconds: 25);
   /// Extended cooldown for IP-level blocks (every client fails instantly).
   static const _ipBlockCooldown = Duration(seconds: 180);
   DateTime _botChallengeUntil = DateTime.fromMillisecondsSinceEpoch(0);
@@ -679,7 +679,20 @@ class YtmService {
     // error (e.g. BOT_CHALLENGE → "verification" + poToken recovery) instead
     // of a generic YTM_FAILED that maps to recoveryAction.none (dead end).
     Object? firstError;
-    final inBotCooldown = isBotCoolingDown;
+    var inBotCooldown = isBotCoolingDown;
+    if (inBotCooldown) {
+      // If native PoTokenManager has already refreshed the token in the background,
+      // lift the cooldown immediately so resolution can succeed with the new token.
+      try {
+        final ready = await ensurePoTokenReady().timeout(const Duration(seconds: 4));
+        if (ready) {
+          debugPrint(
+              '[YTM_SERVICE] Native poToken is ready, lifting bot cooldown for $videoId');
+          _noteResolveSuccess();
+          inBotCooldown = false;
+        }
+      } catch (_) {}
+    }
     if (inBotCooldown) {
       debugPrint(
           '[YTM_SERVICE] Bot cooldown active, skipping native tiers for $videoId');

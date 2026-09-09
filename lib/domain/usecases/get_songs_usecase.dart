@@ -32,6 +32,10 @@ class GetSongsUseCase {
     return _repository.watchRecentlyPlayed(limit: limit);
   }
 
+  Future<Result<void>> clearRecentlyPlayed() {
+    return _repository.clearRecentlyPlayed();
+  }
+
   Stream<Result<List<SongsTableData>>> watchRecentlyAdded({int limit = 20}) {
     return _repository.watchRecentlyAdded(limit: limit);
   }

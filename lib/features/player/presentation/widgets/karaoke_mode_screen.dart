@@ -27,22 +27,30 @@ class KaraokeModeScreen extends StatelessWidget {
         final pos = state.position - audibleOffset;
         final song = state.currentSong;
 
+        // Prefer dynamic state.lyrics so track changes update immediately
+        final effectiveLyrics =
+            state.lyrics.isNotEmpty ? state.lyrics : lyrics;
+
         // Determine current active line index
         int activeIdx = -1;
-        for (int i = 0; i < lyrics.length; i++) {
-          if (pos >= lyrics[i].timestamp) {
+        for (int i = 0; i < effectiveLyrics.length; i++) {
+          if (pos >= effectiveLyrics[i].timestamp) {
             activeIdx = i;
           } else {
             break;
           }
         }
 
-        final activeLine = (activeIdx >= 0 && activeIdx < lyrics.length)
-            ? lyrics[activeIdx]
-            : null;
-        final nextLine = (activeIdx + 1 >= 0 && activeIdx + 1 < lyrics.length)
-            ? lyrics[activeIdx + 1]
-            : (activeIdx == -1 && lyrics.isNotEmpty ? lyrics[0] : null);
+        final activeLine =
+            (activeIdx >= 0 && activeIdx < effectiveLyrics.length)
+                ? effectiveLyrics[activeIdx]
+                : null;
+        final nextLine =
+            (activeIdx + 1 >= 0 && activeIdx + 1 < effectiveLyrics.length)
+                ? effectiveLyrics[activeIdx + 1]
+                : (activeIdx == -1 && effectiveLyrics.isNotEmpty
+                    ? effectiveLyrics[0]
+                    : null);
 
         return Scaffold(
           backgroundColor: const Color(0xFF08090E),

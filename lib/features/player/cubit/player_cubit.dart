@@ -17,6 +17,7 @@ import '../../../core/utils/lrc_parser.dart';
 import '../../../core/constants/audio_feature_info.dart';
 import '../../../data/audio/audio_handler.dart';
 import '../../../data/audio/equalizer_manager.dart';
+import '../../../data/audio/sleep_timer_manager.dart';
 import '../../../data/db/app_database.dart';
 import '../../../data/scanner/media_scanner_service.dart';
 import '../../../domain/models/audio_effects_config.dart';
@@ -747,6 +748,20 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
 
   Future<void> _loadLyricsForSong(SongsTableData song) async {
     if (isClosed) return;
+
+    // Check central in-memory cache first
+    final cached = LrcParser.getCachedLyrics(songId: song.id, path: song.path);
+    if (cached != null) {
+      if (_isSameTrack(state.currentSong, song)) {
+        safeEmit(state.copyWith(
+          isLoadingLyrics: false,
+          lyrics: cached.lines,
+          lyricsSource: cached.source,
+        ));
+      }
+      return;
+    }
+
     final gen = ++_lyricsLoadGen;
     safeEmit(state.copyWith(
       isLoadingLyrics: true,
@@ -773,11 +788,17 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
         return;
       }
 
-      // 2. Query LRCLIB for synchronized karaoke lyrics (works for local and online tracks)
-      if (lyricsResult == null || lyricsResult.lines.isEmpty) {
+      // 2. Query LRCLIB for synchronized karaoke lyrics (works for local and online tracks).
+      // If local source only produced plain unsynced text, still attempt to fetch synced LRC.
+      final hasSynced = lyricsResult != null &&
+          lyricsResult.lines.isNotEmpty &&
+          lyricsResult.isSynced;
+
+      if (!hasSynced) {
+        final plainFallback = lyricsResult;
         try {
           final lrclib = getIt<LrclibService>();
-          lyricsResult = await lrclib
+          final onlineResult = await lrclib
               .fetchLyrics(
                 trackName: song.title,
                 artistName: song.artist,
@@ -786,6 +807,15 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
                     song.durationMs > 0 ? song.durationMs ~/ 1000 : null,
               )
               .timeout(const Duration(seconds: 5), onTimeout: () => null);
+
+          if (onlineResult != null && onlineResult.lines.isNotEmpty) {
+            // Prefer synced online lyrics; if unsynced, only prefer if we had nothing
+            if (onlineResult.isSynced ||
+                plainFallback == null ||
+                plainFallback.lines.isEmpty) {
+              lyricsResult = onlineResult;
+            }
+          }
         } catch (e, st) {
           ErrorLogger.log('LRCLIB fetch error for ${song.title}',
               error: e, stackTrace: st, category: 'Lyrics');
@@ -812,6 +842,15 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
           ErrorLogger.log('YTM lyrics fetch error for $videoId',
               error: e, stackTrace: st, category: 'Lyrics');
         }
+      }
+
+      // Cache the resolved result (including null for negative caching)
+      if (lyricsResult != null || song.source == SongSource.youtube) {
+        LrcParser.cacheLyricsResult(
+          lyricsResult,
+          songId: song.id,
+          path: song.path,
+        );
       }
     } catch (e, st) {
       ErrorLogger.log('Lyrics load error for ${song.title}',
@@ -842,7 +881,14 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   }
 
   Future<void> playSong(SongsTableData song,
-      {List<SongsTableData>? queue, Duration? initialPosition}) async {
+      {List<SongsTableData>? queue, Duration? initialPosition, bool openPlayerIfPlaying = true}) async {
+    // If this song is already the active song and playing, expand the player instead of restarting from 0:00
+    if (openPlayerIfPlaying &&
+        initialPosition == null &&
+        _isSameTrack(state.currentSong, song)) {
+      safeEmit(state.copyWith(isExpanded: true));
+      return;
+    }
     // Task 0: start latency tracking from tap
     final videoIdForLatency = song.remoteId ?? song.id.toString();
     try {
@@ -937,6 +983,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
                 queue: swappedQueue,
                 currentSong: local,
               ));
+              unawaited(_loadLyricsForSong(local));
             }
           }
         } catch (_) {}
@@ -952,6 +999,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       try {
         _latencyTracker?.markStage(PlaybackStage.sourceSet);
       } catch (_) {}
+      if (_mediaItemResolutionGen == capturedGen && !isClosed) {
+        safeEmit(state.copyWith(isPlaying: true));
+      }
     } catch (e) {
       try {
         _latencyTracker?.finishWithError(e, stage: PlaybackStage.sourceSet);
@@ -974,8 +1024,17 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     }
     await _audioHandler.insertNextInQueue(song);
     final updatedQueue = List<SongsTableData>.from(state.queue);
-    final insertIdx = (state.currentIndex + 1).clamp(0, updatedQueue.length);
-    updatedQueue.insert(insertIdx, song);
+    final existingIdx = updatedQueue.indexWhere((s) => s.id == song.id);
+    final targetSlot = (state.currentIndex + 1).clamp(0, updatedQueue.length);
+    if (existingIdx != -1) {
+      if (existingIdx != state.currentIndex && existingIdx != targetSlot) {
+        final item = updatedQueue.removeAt(existingIdx);
+        final adjustedTarget = targetSlot > existingIdx ? targetSlot - 1 : targetSlot;
+        updatedQueue.insert(adjustedTarget.clamp(0, updatedQueue.length), item);
+      }
+    } else {
+      updatedQueue.insert(targetSlot, song);
+    }
     _queueSlots[state.activeQueueSlot] = _QueueSlotData(
       songs: updatedQueue,
       currentIndex: state.currentIndex,
@@ -992,7 +1051,16 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       return;
     }
     await _audioHandler.addToQueueEnd(song);
-    final updatedQueue = List<SongsTableData>.from(state.queue)..add(song);
+    final updatedQueue = List<SongsTableData>.from(state.queue);
+    final existingIdx = updatedQueue.indexWhere((s) => s.id == song.id);
+    if (existingIdx != -1) {
+      if (existingIdx != state.currentIndex && existingIdx != updatedQueue.length - 1) {
+        final item = updatedQueue.removeAt(existingIdx);
+        updatedQueue.add(item);
+      }
+    } else {
+      updatedQueue.add(song);
+    }
     _queueSlots[state.activeQueueSlot] = _QueueSlotData(
       songs: updatedQueue,
       currentIndex: state.currentIndex,
@@ -1001,6 +1069,20 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     );
     _debouncedPersistQueueSlots();
     safeEmit(state.copyWith(queue: updatedQueue));
+  }
+
+  Future<void> clearQueue() async {
+    await _audioHandler.clearQueue();
+    final current = state.currentSong;
+    final updatedQueue = current != null ? [current] : <SongsTableData>[];
+    _queueSlots[state.activeQueueSlot] = _QueueSlotData(
+      songs: updatedQueue,
+      currentIndex: 0,
+      position: state.position,
+      speed: state.playbackSpeed,
+    );
+    _debouncedPersistQueueSlots();
+    safeEmit(state.copyWith(queue: updatedQueue, currentIndex: 0));
   }
 
   Future<void> reorderQueue(int oldIndex, int newIndex) async {
@@ -1165,6 +1247,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     if (_audioHandler.playbackState.value.playing) {
       await _audioHandler.pause();
     } else {
+      if (state.currentSong == null && state.queue.isEmpty) {
+        return;
+      }
       await _audioHandler.play();
     }
   }
@@ -1174,6 +1259,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   Future<void> next() => _audioHandler.skipToNext();
 
   Future<void> previous() => _audioHandler.skipToPrevious();
+
+  Future<void> skipToQueueItem(int index) =>
+      _audioHandler.skipToQueueItem(index);
 
   Future<void> toggleShuffle() async {
     final next = !state.isShuffle;
@@ -1801,6 +1889,11 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     _audioHandler.cancelSleepTimer();
     safeEmit(state.copyWith(sleepTimerRemaining: null));
   }
+
+  int? get sleepTimerRemainingTracks => _audioHandler.sleepTimerRemainingTracks;
+  SleepTimerMode get sleepTimerMode => _audioHandler.sleepTimerMode;
+  Stream<int?> get sleepTimerRemainingTracksStream =>
+      _audioHandler.sleepTimerRemainingTracksStream;
 
   // Playback Speed
   Future<void> _loadPlaybackSpeed() async {
