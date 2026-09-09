@@ -231,6 +231,20 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       for (final entry in _queueSlots.entries) {
         data['${entry.key}'] = {
           'songIds': entry.value.songs.map((s) => s.id).toList(),
+          'onlineSongs': entry.value.songs
+              .where((s) => s.source == SongSource.youtube || s.id < 0)
+              .map((s) => {
+                    'id': s.id,
+                    'title': s.title,
+                    'artist': s.artist,
+                    'album': s.album,
+                    'durationMs': s.durationMs,
+                    'path': s.path,
+                    'source': s.source,
+                    'remoteId': s.remoteId,
+                    'remoteArtworkUrl': s.remoteArtworkUrl,
+                  })
+              .toList(),
           'currentIndex': entry.value.currentIndex,
           'positionMs': entry.value.position.inMilliseconds,
           'speed': entry.value.speed,
@@ -273,9 +287,38 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
           for (final s in songsResult.fold((_) => <SongsTableData>[], (r) => r))
             s.id: s
         };
+        final onlineSongsList =
+            (slotData['onlineSongs'] as List<dynamic>?) ?? [];
+        final onlineSongsMap = <int, SongsTableData>{};
+        for (final item in onlineSongsList) {
+          if (item is Map<String, dynamic>) {
+            final id = item['id'] as int?;
+            if (id != null) {
+              onlineSongsMap[id] = SongsTableData(
+                id: id,
+                title: item['title'] as String? ?? 'Unknown',
+                artist: item['artist'] as String? ?? 'Unknown Artist',
+                album: item['album'] as String? ?? '',
+                durationMs: item['durationMs'] as int? ?? 0,
+                path: item['path'] as String? ?? '',
+                source: item['source'] as String? ?? SongSource.youtube,
+                remoteId: item['remoteId'] as String?,
+                remoteArtworkUrl: item['remoteArtworkUrl'] as String?,
+                isFavorite: false,
+                isMissing: false,
+                isDownloaded: false,
+                playCount: 0,
+                lastPositionMs: 0,
+              );
+            }
+          }
+        }
         final songs = [
           for (final id in songIds)
-            if (songsMap[id] != null) songsMap[id]!,
+            if (songsMap[id] != null)
+              songsMap[id]!
+            else if (onlineSongsMap[id] != null)
+              onlineSongsMap[id]!,
         ];
         if (songs.isEmpty) continue;
         _queueSlots[slotIndex] = _QueueSlotData(

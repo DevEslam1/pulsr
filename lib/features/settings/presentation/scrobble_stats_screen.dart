@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -17,6 +18,7 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
   int _lastScrobbleTime = 0;
   int _totalScrobbles = 0;
   List<int> _last7DaysScrobbles = [0, 0, 0, 0, 0, 0, 0];
+  List<String> _dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   List<MapEntry<String, int>> _topArtists = [];
   bool _isLoading = true;
 
@@ -47,12 +49,30 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
     final sortedArtists = artistCounts.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
-    // Simulated 7-day distribution based on total and play counts
-    final rand = math.Random(42);
+    // Real 7-day distribution from scrobble_daily_log
+    Map<String, dynamic> dailyLog = {};
+    final rawDaily = prefs.getString('scrobble_daily_log');
+    if (rawDaily != null && rawDaily.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(rawDaily);
+        if (decoded is Map) {
+          dailyLog = Map<String, dynamic>.from(decoded);
+        }
+      } catch (_) {}
+    }
+
+    const weekdayLetters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    final now = DateTime.now();
     final days = List.generate(7, (i) {
-      if (total == 0) return 0;
-      return math.max(
-          1, (total ~/ 14) + rand.nextInt(math.max(2, total ~/ 10)));
+      final d = now.subtract(Duration(days: 6 - i));
+      final key =
+          '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+      return (dailyLog[key] as int?) ?? 0;
+    });
+
+    final labels = List.generate(7, (i) {
+      final d = now.subtract(Duration(days: 6 - i));
+      return weekdayLetters[d.weekday - 1];
     });
 
     if (mounted) {
@@ -60,6 +80,7 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
         _lastScrobbleTime = lastTime;
         _totalScrobbles = total;
         _last7DaysScrobbles = days;
+        _dayLabels = labels;
         _topArtists = sortedArtists.take(5).toList();
         _isLoading = false;
       });
@@ -189,6 +210,7 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
                           size: const Size(double.infinity, 130),
                           painter: _ScrobbleBarChartPainter(
                             data: _last7DaysScrobbles,
+                            labels: _dayLabels,
                             barColor: p.primary,
                             labelColor: p.textSecondary,
                           ),
@@ -274,11 +296,13 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
 
 class _ScrobbleBarChartPainter extends CustomPainter {
   final List<int> data;
+  final List<String> labels;
   final Color barColor;
   final Color labelColor;
 
   const _ScrobbleBarChartPainter({
     required this.data,
+    required this.labels,
     required this.barColor,
     required this.labelColor,
   });
@@ -294,8 +318,6 @@ class _ScrobbleBarChartPainter extends CustomPainter {
       ..color = barColor
       ..style = PaintingStyle.fill;
 
-    final daysOfWeek = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-
     for (int i = 0; i < data.length; i++) {
       final val = data[i];
       final heightRatio = val / maxVal;
@@ -310,7 +332,7 @@ class _ScrobbleBarChartPainter extends CustomPainter {
       canvas.drawRRect(rRect, paint);
 
       final textSpan = TextSpan(
-        text: daysOfWeek[i % daysOfWeek.length],
+        text: i < labels.length ? labels[i] : '',
         style: TextStyle(
             color: labelColor, fontSize: 11, fontWeight: FontWeight.w600),
       );

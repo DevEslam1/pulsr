@@ -27,6 +27,23 @@ class WidgetService {
 
   /// Whether an artwork resolve is currently in-flight (to avoid stacking).
   bool _artworkResolveInFlight = false;
+  SongsTableData? _pendingArtworkSong;
+
+  void _drainPendingArtwork() {
+    if (_artworkResolveInFlight) return;
+    final next = _pendingArtworkSong;
+    if (next == null || next.id == _lastSavedArtworkSongId) {
+      _pendingArtworkSong = null;
+      return;
+    }
+    _pendingArtworkSong = null;
+    _artworkResolveInFlight = true;
+    _lastSavedArtworkSongId = next.id;
+    unawaited(_resolveArtworkAsync(next).whenComplete(() {
+      _artworkResolveInFlight = false;
+      _drainPendingArtwork();
+    }));
+  }
 
   /// Fires-and-forgets artwork resolution so the widget text updates
   /// immediately while the (potentially slow) artwork arrives async.
@@ -75,16 +92,8 @@ class WidgetService {
           await HomeWidget.saveWidgetData<String>('nextTrack$i', title);
         }
         if (_lastSavedArtworkSongId != song.id) {
-          _lastSavedArtworkSongId = song.id;
-          // Resolve artwork without blocking the caller. If a previous
-          // resolve is still in-flight let it finish; we'll pick up the
-          // cached result on the next progress tick.
-          if (!_artworkResolveInFlight) {
-            _artworkResolveInFlight = true;
-            unawaited(_resolveArtworkAsync(song).whenComplete(() {
-              _artworkResolveInFlight = false;
-            }));
-          }
+          _pendingArtworkSong = song;
+          _drainPendingArtwork();
         }
       } else {
         await HomeWidget.saveWidgetData<int>('positionMs', 0);
@@ -93,6 +102,7 @@ class WidgetService {
           await HomeWidget.saveWidgetData<String>('nextTrack$i', '');
         }
         await HomeWidget.saveWidgetData<String>('artwork', '');
+        _pendingArtworkSong = null;
         _lastSavedArtworkSongId = null;
       }
 
@@ -120,6 +130,7 @@ class WidgetService {
           return null;
         },
       );
+      if (_lastSavedArtworkSongId != song.id) return;
       await HomeWidget.saveWidgetData<String>('artwork', artPath ?? '');
       await HomeWidget.updateWidget(
         name: androidWidgetName,

@@ -9,6 +9,7 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/lrc_parser.dart';
 import '../../../../domain/models/lyrics_line.dart';
 import '../../../settings/cubit/settings_cubit.dart';
+import '../../../settings/cubit/settings_state.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 
@@ -361,23 +362,44 @@ class _LyricsViewState extends State<LyricsView> {
       );
     }
 
+    Widget content = _buildContent();
+
+    // Listen to latency offset updates directly so offset slider reacts immediately while paused
+    try {
+      context.read<SettingsCubit>();
+      content = BlocListener<SettingsCubit, SettingsState>(
+        listenWhen: (prev, curr) =>
+            prev.audibleLatencyOffset != curr.audibleLatencyOffset,
+        listener: (context, settingsState) {
+          _audibleOffset = settingsState.audibleLatencyOffset;
+          Duration? curPos = widget.currentPosition;
+          if (curPos == null) {
+            try {
+              curPos = context.read<PlayerCubit>().state.position;
+            } catch (_) {}
+          }
+          if (curPos != null) {
+            _updateProgress(curPos);
+          }
+        },
+        child: content,
+      );
+    } catch (_) {}
+
     // When currentPosition is not explicitly passed, listen to PlayerCubit position ticks
     if (widget.currentPosition == null) {
       try {
-        context.read<PlayerCubit>();
-        return BlocListener<PlayerCubit, PlayerState>(
+        content = BlocListener<PlayerCubit, PlayerState>(
           listenWhen: (previous, current) =>
               previous.position != current.position,
           listener: (context, state) {
             _updateProgress(state.position);
           },
-          child: _buildContent(),
+          child: content,
         );
-      } catch (_) {
-        return _buildContent();
-      }
+      } catch (_) {}
     }
 
-    return _buildContent();
+    return content;
   }
 }

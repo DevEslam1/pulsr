@@ -603,7 +603,42 @@ class ScrobblerService {
       await prefs.setString('last_scrobble_key', dedupKey);
       await prefs.setInt('last_scrobble_time', now);
       await prefs.setInt('last_scrobbled_timestamp', now);
+      await _recordSuccessfulScrobble(prefs, timestamp.millisecondsSinceEpoch);
     }
+  }
+
+  static const String keyTotalScrobbleCount = 'total_scrobble_count';
+  static const String keyDailyScrobbleLog = 'scrobble_daily_log';
+
+  Future<void> _recordSuccessfulScrobble(SharedPreferences prefs, [int? timestampMs]) async {
+    try {
+      final total = (prefs.getInt(keyTotalScrobbleCount) ?? 0) + 1;
+      await prefs.setInt(keyTotalScrobbleCount, total);
+
+      final date = DateTime.fromMillisecondsSinceEpoch(
+          timestampMs ?? DateTime.now().millisecondsSinceEpoch);
+      final dateKey =
+          '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+      Map<String, dynamic> dailyLog = {};
+      final raw = prefs.getString(keyDailyScrobbleLog);
+      if (raw != null && raw.isNotEmpty) {
+        try {
+          dailyLog = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+        } catch (_) {}
+      }
+      dailyLog[dateKey] = ((dailyLog[dateKey] as int?) ?? 0) + 1;
+
+      // Keep only last 30 days to keep SharedPreferences clean
+      if (dailyLog.length > 30) {
+        final sortedKeys = dailyLog.keys.toList()..sort();
+        while (sortedKeys.length > 30) {
+          final oldest = sortedKeys.removeAt(0);
+          dailyLog.remove(oldest);
+        }
+      }
+      await prefs.setString(keyDailyScrobbleLog, jsonEncode(dailyLog));
+    } catch (_) {}
   }
 
   Future<void> flushOfflineQueue() async {
@@ -774,6 +809,7 @@ class ScrobblerService {
     if (anySuccess) {
       await prefs.setString('last_scrobble_key', dedupKey);
       await prefs.setInt('last_scrobble_time', now);
+      await _recordSuccessfulScrobble(prefs, timestamp.millisecondsSinceEpoch);
     }
   }
 }

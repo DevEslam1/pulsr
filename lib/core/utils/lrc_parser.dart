@@ -1,7 +1,10 @@
 // lib/core/utils/lrc_parser.dart
+import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../domain/models/lyrics_line.dart';
 import '../constants/channels.dart';
 import 'error_logger.dart';
@@ -240,6 +243,107 @@ class LrcParser {
     return restored;
   }
 
+  static Directory? _diskCacheDir;
+
+  static String _diskCacheKey(String key) {
+    var hash = 0xcbf29ce484222325;
+    for (final unit in key.codeUnits) {
+      hash ^= unit;
+      hash *= 0x100000001b3;
+    }
+    return (hash & 0x7FFFFFFFFFFFFFFF).toRadixString(16);
+  }
+
+  static Future<Directory?> _getDiskCacheDir() async {
+    if (_diskCacheDir != null) return _diskCacheDir;
+    try {
+      final baseDir = await getApplicationSupportDirectory();
+      final dir = Directory('${baseDir.path}/lyrics_cache');
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+      _diskCacheDir = dir;
+      return dir;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> _writeToDiskCache(
+      String cacheKey, LyricsResult result) async {
+    try {
+      final dir = await _getDiskCacheDir();
+      if (dir == null) return;
+      final file = File('${dir.path}/${_diskCacheKey(cacheKey)}.json');
+      final payload = {
+        'source': result.source.name,
+        'lines': result.lines
+            .map((l) => {
+                  'ms': l.timestamp.inMilliseconds,
+                  'text': l.text,
+                  'source': l.source.name,
+                })
+            .toList(),
+      };
+      await file.writeAsString(jsonEncode(payload), flush: true);
+    } catch (_) {}
+  }
+
+  static Future<LyricsResult?> _readFromDiskCache(String cacheKey) async {
+    try {
+      final dir = await _getDiskCacheDir();
+      if (dir == null) return null;
+      final file = File('${dir.path}/${_diskCacheKey(cacheKey)}.json');
+      if (!await file.exists()) return null;
+      final raw = await file.readAsString();
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      final sourceName = data['source'] as String? ?? 'none';
+      final source = LyricsSource.values.firstWhere(
+        (e) => e.name == sourceName,
+        orElse: () => LyricsSource.lrclib,
+      );
+      final linesList = (data['lines'] as List<dynamic>?) ?? [];
+      final lines = linesList.map((item) {
+        final map = item as Map<String, dynamic>;
+        final lineSrcName = map['source'] as String? ?? sourceName;
+        final lineSrc = LyricsSource.values.firstWhere(
+          (e) => e.name == lineSrcName,
+          orElse: () => source,
+        );
+        return LyricsLine(
+          timestamp: Duration(milliseconds: map['ms'] as int? ?? 0),
+          text: map['text'] as String? ?? '',
+          source: lineSrc,
+        );
+      }).toList();
+      return LyricsResult(lines: lines, source: source);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> _deleteFromDiskCache(String cacheKey) async {
+    try {
+      final dir = await _getDiskCacheDir();
+      if (dir == null) return;
+      final file = File('${dir.path}/${_diskCacheKey(cacheKey)}.json');
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {}
+  }
+
+  static Future<void> _clearDiskCache() async {
+    try {
+      final dir = await _getDiskCacheDir();
+      if (dir == null) return;
+      if (await dir.exists()) {
+        await dir.delete(recursive: true);
+        _diskCacheDir = null;
+      }
+    } catch (_) {}
+  }
+
   /// Manually cache a resolved lyrics result (e.g. from LRCLIB or YTM).
   static void cacheLyricsResult(
     LyricsResult? result, {
@@ -258,6 +362,7 @@ class LrcParser {
       _negativeCacheTimes[cacheKey] = DateTime.now();
     } else {
       _negativeCacheTimes.remove(cacheKey);
+      unawaited(_writeToDiskCache(cacheKey, result));
     }
     if (songId != null && path != null && path.isNotEmpty) {
       _lyricsCache[path] = result;
@@ -265,16 +370,18 @@ class LrcParser {
         _negativeCacheTimes[path] = DateTime.now();
       } else {
         _negativeCacheTimes.remove(path);
+        unawaited(_writeToDiskCache(path, result));
       }
     }
   }
 
   /// Resolves lyrics following the fallback chain with in-memory caching:
   /// 1. Check in-memory LRU cache
-  /// 2. Embedded lyrics via platform channel / tag reader
-  /// 3. External .lrc file
-  /// 4. Online LRCLIB database query
-  /// 5. null
+  /// 2. Check persistent disk cache (offline LRCLIB / online results)
+  /// 3. Embedded lyrics via platform channel / tag reader
+  /// 4. External .lrc file
+  /// 5. Online LRCLIB database query
+  /// 6. null
   static final Map<String, DateTime> _negativeCacheTimes = {};
   static const Duration _negativeCacheTtl = Duration(minutes: 10);
 
@@ -290,6 +397,13 @@ class LrcParser {
     final cacheKey = songId != null ? 'song_$songId' : audioFilePath;
     if (hasCachedLyrics(songId: songId, path: audioFilePath)) {
       return getCachedLyrics(songId: songId, path: audioFilePath);
+    }
+
+    // Check persistent disk cache before external searching or network lookups
+    final diskCached = await _readFromDiskCache(cacheKey);
+    if (diskCached != null) {
+      _lyricsCache[cacheKey] = diskCached;
+      return diskCached;
     }
 
     LyricsResult? resolved;
@@ -371,6 +485,7 @@ class LrcParser {
         _negativeCacheTimes[cacheKey] = DateTime.now();
       } else {
         _negativeCacheTimes.remove(cacheKey);
+        unawaited(_writeToDiskCache(cacheKey, resolved));
       }
     }
 
@@ -382,10 +497,12 @@ class LrcParser {
     if (songId != null) {
       _lyricsCache.remove('song_$songId');
       _negativeCacheTimes.remove('song_$songId');
+      unawaited(_deleteFromDiskCache('song_$songId'));
     }
     if (path != null) {
       _lyricsCache.remove(path);
       _negativeCacheTimes.remove(path);
+      unawaited(_deleteFromDiskCache(path));
     }
   }
 
@@ -393,5 +510,6 @@ class LrcParser {
   static void clearCache() {
     _lyricsCache.clear();
     _negativeCacheTimes.clear();
+    unawaited(_clearDiskCache());
   }
 }
