@@ -437,70 +437,98 @@ class AppearanceSection extends StatelessWidget {
     showModalBottomSheet<void>(
       context: context,
       useRootNavigator: true,
+      isScrollControlled: true,
       backgroundColor: surfaceColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Text(
-                'Select Player Theme',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
+      builder: (ctx) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.8,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 12),
+              Center(
+                child: Container(
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: outlineColor.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            ...themes.map((t) {
-              final isSelected = t.mode == currentMode;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: Material(
-                  color: isSelected
-                      ? primaryColor.withValues(alpha: 0.12)
-                      : cardColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(
-                      color: isSelected ? primaryColor : outlineColor,
-                      width: isSelected ? 1.5 : 1.0,
-                    ),
-                  ),
-                  child: ListTile(
-                    leading: Icon(
-                      t.icon,
-                      color: isSelected ? primaryColor : textSecondary,
-                    ),
-                    title: Text(
-                      t.title,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: isSelected ? primaryColor : textPrimary,
-                      ),
-                    ),
-                    subtitle: Text(
-                      t.subtitle,
-                      style: TextStyle(fontSize: 12, color: textSecondary),
-                    ),
-                    trailing: isSelected
-                        ? Icon(Icons.check_circle_rounded, color: primaryColor)
-                        : null,
-                    onTap: () {
-                      cubit.setPlayerThemeMode(t.mode);
-                      Navigator.pop(ctx);
-                    },
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                child: Text(
+                  'Select Player Theme',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: textPrimary,
                   ),
                 ),
-              );
-            }),
-          ],
+              ),
+              const SizedBox(height: 12),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: themes.length,
+                  itemBuilder: (context, index) {
+                    final t = themes[index];
+                    final isSelected = t.mode == currentMode;
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: Material(
+                        color: isSelected
+                            ? primaryColor.withValues(alpha: 0.12)
+                            : cardColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(
+                            color: isSelected ? primaryColor : outlineColor,
+                            width: isSelected ? 1.5 : 1.0,
+                          ),
+                        ),
+                        child: ListTile(
+                          leading: Icon(
+                            t.icon,
+                            color: isSelected ? primaryColor : textSecondary,
+                          ),
+                          title: Text(
+                            t.title,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: isSelected ? primaryColor : textPrimary,
+                            ),
+                          ),
+                          subtitle: Text(
+                            t.subtitle,
+                            style: TextStyle(fontSize: 12, color: textSecondary),
+                          ),
+                          trailing: isSelected
+                              ? Icon(Icons.check_circle_rounded, color: primaryColor)
+                              : null,
+                          onTap: () {
+                            cubit.setPlayerThemeMode(t.mode);
+                            Navigator.pop(ctx);
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
         ),
       ),
     );

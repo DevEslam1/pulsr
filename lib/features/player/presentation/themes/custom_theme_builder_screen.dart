@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/widgets/pulsr_back_button.dart';
+import '../../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 
 class CustomThemeBuilderScreen extends StatefulWidget {
@@ -31,12 +33,14 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
   Widget build(BuildContext context) {
     final p = context.palette;
 
-    return Scaffold(
-      backgroundColor: p.surface,
-      appBar: AppBar(
+    return PulsrPagePopScope(
+      child: Scaffold(
         backgroundColor: p.surface,
-        elevation: 0,
-        title: Text(
+        appBar: AppBar(
+          backgroundColor: p.surface,
+          elevation: 0,
+          leading: const PulsrBackButton(),
+          title: Text(
           'Custom Theme Studio',
           style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.bold),
         ),
@@ -203,6 +207,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
             onChanged: (val) => setState(() => _glowEnabled = val),
           ),
         ],
+      ),
       ),
     );
   }

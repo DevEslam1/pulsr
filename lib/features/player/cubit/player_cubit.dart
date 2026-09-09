@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,6 +11,7 @@ import '../../../core/constants/prefs_keys.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/lrclib_service.dart';
 import '../../../core/services/scrobbler_service.dart';
+import '../../../core/services/sponsorblock_service.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/telemetry/playback_latency_tracker.dart';
 import '../../../core/utils/error_logger.dart';
@@ -73,6 +75,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   StreamSubscription<void>? _widgetClickSub;
   DateTime? _lastWidgetUpdateTime;
   int _mediaItemResolutionGen = 0;
+  List<SponsorBlockSegment> _currentSponsorSegments = const [];
+  String? _sponsorSegmentsVideoId;
+  Duration? _lastSkippedSegmentEnd;
 
   Timer? _persistQueueDebounce;
   Timer? _scrobbleDebounce;
@@ -614,6 +619,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
             if (!isSameSong) {
               unawaited(_loadLyricsForSong(resolvedSong!));
               unawaited(_enrichAudioQuality(resolvedSong!, gen));
+              unawaited(_loadSponsorBlockSegments(resolvedSong!, gen));
             }
             if (gen != _mediaItemResolutionGen || isClosed) return;
             _updateWidgetThrottled(force: true);
@@ -739,6 +745,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       _audioHandler.positionStream
           .throttleTime(const Duration(milliseconds: 200), trailing: true),
       (pos) {
+        _checkSponsorBlockSkip(pos);
         safeEmit(state.copyWith(position: pos));
         if (state.isPlaying) {
           _updateWidgetProgressThrottled();
@@ -756,6 +763,51 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     autoSub(_audioHandler.audioSessionIdStream, (id) {
       safeEmit(state.copyWith(audioSessionId: id));
     });
+  }
+
+  Future<void> _loadSponsorBlockSegments(SongsTableData song, int gen) async {
+    final videoId = (song.remoteId != null && song.remoteId!.isNotEmpty)
+        ? song.remoteId!
+        : (song.path.startsWith('ytmusic://')
+            ? song.path.replaceFirst('ytmusic://', '').split('?').first
+            : null);
+    if (videoId == null || videoId.isEmpty) {
+      _currentSponsorSegments = const [];
+      _sponsorSegmentsVideoId = null;
+      _lastSkippedSegmentEnd = null;
+      return;
+    }
+    if (_sponsorSegmentsVideoId == videoId && _currentSponsorSegments.isNotEmpty) {
+      return;
+    }
+
+    try {
+      final service = getIt.isRegistered<SponsorBlockService>()
+          ? getIt<SponsorBlockService>()
+          : SponsorBlockService.instance;
+      final segments = await service.getSegments(videoId);
+      if (isClosed || gen != _mediaItemResolutionGen) return;
+      _currentSponsorSegments = segments;
+      _sponsorSegmentsVideoId = videoId;
+      _lastSkippedSegmentEnd = null;
+    } catch (_) {}
+  }
+
+  void _checkSponsorBlockSkip(Duration pos) {
+    if (_currentSponsorSegments.isEmpty || !state.isPlaying) return;
+    for (final segment in _currentSponsorSegments) {
+      if (segment.contains(pos)) {
+        if (_lastSkippedSegmentEnd != null &&
+            (pos - _lastSkippedSegmentEnd!).abs() < const Duration(seconds: 1)) {
+          continue;
+        }
+        _lastSkippedSegmentEnd = segment.end;
+        debugPrint(
+            '[SPONSORBLOCK] Auto-skipping segment (${segment.category}): ${segment.start} -> ${segment.end}');
+        _audioHandler.seek(segment.end + const Duration(milliseconds: 50));
+        break;
+      }
+    }
   }
 
   /// Reads real audio-header fields for a local song the first time it plays
@@ -1057,6 +1109,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     }
     if (isClosed || _mediaItemResolutionGen != capturedGen) return;
     unawaited(_loadLyricsForSong(song));
+    unawaited(_loadSponsorBlockSegments(song, capturedGen));
     _updateWidgetThrottled(force: true);
   }
 
@@ -1297,7 +1350,10 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     }
   }
 
-  Future<void> seek(Duration position) => _audioHandler.seek(position);
+  Future<void> seek(Duration position) {
+    _lastSkippedSegmentEnd = null;
+    return _audioHandler.seek(position);
+  }
 
   Future<void> next() => _audioHandler.skipToNext();
 
@@ -1989,6 +2045,15 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       isQueueVisible: !state.isQueueVisible,
       isLyricsVisible: false,
     ));
+  }
+
+  void resetOverlayViews() {
+    if (state.isLyricsVisible || state.isQueueVisible) {
+      safeEmit(state.copyWith(
+        isLyricsVisible: false,
+        isQueueVisible: false,
+      ));
+    }
   }
 
   @override

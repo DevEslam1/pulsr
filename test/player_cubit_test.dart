@@ -458,6 +458,7 @@ void main() {
   late MockToggleFavoriteUseCase mockToggleFavorite;
 
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
     testAudioHandler = TestPulsrAudioHandler();
     mockRepository = MockMusicRepository();
     mockToggleFavorite = MockToggleFavoriteUseCase();
@@ -939,13 +940,27 @@ void main() {
           lastPositionMs: 0,
           source: SongSource.local,
         );
+        final songQueueItem = SongsTableData(
+          id: 304,
+          title: 'Song Queue Item',
+          artist: 'Artist Q',
+          album: 'Album Q',
+          durationMs: 160000,
+          path: '/path/304.mp3',
+          isFavorite: false,
+          isMissing: false,
+          isDownloaded: false,
+          playCount: 0,
+          lastPositionMs: 0,
+          source: SongSource.local,
+        );
         await cubit.playSong(songA, queue: [songA]);
         await cubit.playNext(songB);
         expect(cubit.state.queue.length, equals(2));
-        await cubit.addToQueue(songA);
+        await cubit.addToQueue(songQueueItem);
         expect(cubit.state.queue.length, equals(3));
         await cubit.reorderQueue(0, 2);
-        await cubit.removeQueueItem(1);
+        await cubit.removeQueueItem(0);
         await cubit.next();
         await cubit.previous();
 

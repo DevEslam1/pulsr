@@ -6,6 +6,8 @@ import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/pulsr_back_button.dart';
+import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/models/year_item.dart';
@@ -39,10 +41,12 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
     final p = context.palette;
     final yearItem = widget.yearItem;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('${yearItem.year}'),
-      ),
+    return PulsrPagePopScope(
+      child: Scaffold(
+        appBar: AppBar(
+          leading: const PulsrBackButton(),
+          title: Text('${yearItem.year}'),
+        ),
       body: StreamBuilder<Result<List<SongsTableData>>>(
         stream: _useCase.watchYearSongs(yearItem.year),
         builder: (context, snapshot) {
@@ -204,6 +208,7 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
           );
         },
       ),
-    );
-  }
+    ),
+  );
+}
 }

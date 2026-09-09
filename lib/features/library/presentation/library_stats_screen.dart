@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/widgets/pulsr_back_button.dart';
+import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../cubit/library_cubit.dart';
 import '../cubit/library_state.dart';
 
@@ -12,12 +14,14 @@ class LibraryStatsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
 
-    return Scaffold(
-      backgroundColor: p.surface,
-      appBar: AppBar(
+    return PulsrPagePopScope(
+      child: Scaffold(
         backgroundColor: p.surface,
-        elevation: 0,
-        title: Text(
+        appBar: AppBar(
+          backgroundColor: p.surface,
+          elevation: 0,
+          leading: const PulsrBackButton(),
+          title: Text(
           'Library Statistics',
           style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.bold),
         ),
@@ -196,6 +200,7 @@ class LibraryStatsScreen extends StatelessWidget {
             ],
           );
         },
+      ),
       ),
     );
   }

@@ -102,6 +102,9 @@ class CachedArtwork extends StatefulWidget {
   /// that has not been downloaded yet. Takes precedence over [id].
   final String? remoteUrl;
 
+  /// Whether to fetch and render uncompressed/high-resolution artwork (e.g. for player screen).
+  final bool highQuality;
+
   const CachedArtwork({
     super.key,
     required this.id,
@@ -111,6 +114,7 @@ class CachedArtwork extends StatefulWidget {
     this.fallbackIcon,
     this.customCache,
     this.remoteUrl,
+    this.highQuality = false,
   });
 
   static String upgradeToHighResArtwork(String url) {
@@ -119,6 +123,11 @@ class CachedArtwork extends StatefulWidget {
         upgraded.contains('ggpht.com')) {
       upgraded = upgraded.replaceAll(RegExp(r'=w\d+-h\d+[^?]*'), '=s1200');
       upgraded = upgraded.replaceAll(RegExp(r'=s\d+[^?]*'), '=s1200');
+    } else if (upgraded.contains('i.ytimg.com') ||
+        upgraded.contains('img.youtube.com')) {
+      upgraded = upgraded.replaceAll(
+          RegExp(r'/(default|mqdefault|hqdefault|sddefault|hq720)\.jpg'),
+          '/maxresdefault.jpg');
     }
     return upgraded;
   }
@@ -129,14 +138,19 @@ class CachedArtwork extends StatefulWidget {
 
 class _CachedArtworkState extends State<CachedArtwork> {
   static final OnAudioQuery _audioQuery = OnAudioQuery();
-  static const int _maxRemoteBytes = 2 * 1024 * 1024; // 2 MB max
+  static const int _maxRemoteBytes = 10 * 1024 * 1024; // 10 MB max for HQ covers
   Uint8List? _cachedBytes;
   int _loadToken = 0;
 
+  bool get _isHighRes =>
+      widget.highQuality || widget.size > 250 || widget.size == double.infinity;
+
   ArtworkLruCache get _cache => widget.customCache ?? ArtworkLruCache();
 
-  String get _cacheKey =>
+  String get _baseKey =>
       widget.remoteUrl ?? '${widget.type.name}_${widget.id}';
+
+  String get _cacheKey => _isHighRes ? '${_baseKey}_hq' : _baseKey;
 
   @override
   void initState() {
@@ -149,34 +163,62 @@ class _CachedArtworkState extends State<CachedArtwork> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.id != widget.id ||
         oldWidget.type != widget.type ||
-        oldWidget.remoteUrl != widget.remoteUrl) {
+        oldWidget.remoteUrl != widget.remoteUrl ||
+        oldWidget.highQuality != widget.highQuality) {
       _loadToken++;
       _loadArtwork();
     }
   }
 
   static Future<Uint8List?> _fetchRemote(String url,
-      {bool lowQuality = true}) async {
-    final targetUrl = lowQuality
-        ? ArtworkCacheManager.toLowQualityArtworkUrl(url,
-            width: 220, height: 220)
-        : CachedArtwork.upgradeToHighResArtwork(url);
+      {bool highQuality = false, bool lowQuality = false}) async {
+    final targetUrl = highQuality
+        ? CachedArtwork.upgradeToHighResArtwork(url)
+        : (lowQuality
+            ? ArtworkCacheManager.toLowQualityArtworkUrl(url,
+                width: 220, height: 220)
+            : url);
 
     var uri = Uri.tryParse(targetUrl);
     if (uri == null || !uri.isScheme('https')) return null;
     HttpClientRequest? request;
     try {
-      request = await getIt<HttpClient>().getUrl(uri).timeout(const Duration(seconds: 8));
+      request = await getIt<HttpClient>()
+          .getUrl(uri)
+          .timeout(const Duration(seconds: 8));
       var response = await request.close().timeout(const Duration(seconds: 8));
 
-      // Fall back to original URL if low-res or transformed URL returned non-200
+      // Fall back through candidate URLs if high-res variant returned non-200
       if (response.statusCode != 200 && targetUrl != url) {
         await response.drain<void>();
-        final fallbackUri = Uri.tryParse(url);
-        if (fallbackUri != null) {
-          request = await getIt<HttpClient>().getUrl(fallbackUri).timeout(const Duration(seconds: 8));
-          response = await request.close().timeout(const Duration(seconds: 8));
+
+        // If maxresdefault failed on YouTube, try sddefault then original
+        final fallbackUrls = <String>[];
+        if (targetUrl.contains('maxresdefault.jpg')) {
+          fallbackUrls.add(targetUrl.replaceAll('maxresdefault.jpg', 'sddefault.jpg'));
+          fallbackUrls.add(targetUrl.replaceAll('maxresdefault.jpg', 'hqdefault.jpg'));
         }
+        fallbackUrls.add(url);
+
+        bool resolved = false;
+        for (final candidate in fallbackUrls) {
+          final candidateUri = Uri.tryParse(candidate);
+          if (candidateUri == null) continue;
+          try {
+            request = await getIt<HttpClient>()
+                .getUrl(candidateUri)
+                .timeout(const Duration(seconds: 6));
+            response =
+                await request.close().timeout(const Duration(seconds: 6));
+            if (response.statusCode == 200) {
+              resolved = true;
+              break;
+            } else {
+              await response.drain<void>();
+            }
+          } catch (_) {}
+        }
+        if (!resolved || response.statusCode != 200) return null;
       }
 
       if (response.statusCode != 200 ||
@@ -184,20 +226,25 @@ class _CachedArtworkState extends State<CachedArtwork> {
         await response.drain<void>();
         return null;
       }
-      final bytes = await consolidateHttpClientResponseBytes(response).timeout(const Duration(seconds: 8));
+      final bytes = await consolidateHttpClientResponseBytes(response)
+          .timeout(const Duration(seconds: 8));
       if (bytes.lengthInBytes > _maxRemoteBytes) return null;
       return bytes;
     } catch (_) {
-      try { request?.abort(); } catch (_) {}
+      try {
+        request?.abort();
+      } catch (_) {}
       return null;
     }
   }
 
   Future<void> _loadArtwork() async {
     final key = _cacheKey;
+    final baseKey = _baseKey;
     final token = ++_loadToken;
+    final isHq = _isHighRes;
 
-    // 1. Check in-memory LRU cache
+    // 1. Check in-memory LRU cache for target key
     if (_cache.containsKey(key)) {
       setState(() {
         _cachedBytes = _cache.get(key);
@@ -205,7 +252,13 @@ class _CachedArtworkState extends State<CachedArtwork> {
       return;
     }
 
-    // 2. Check persistent disk cache
+    // Progressive loading: if HQ requested, immediately show existing low-res thumbnail
+    // to avoid any blank or flashing UI while HQ is asynchronously queried/decoded.
+    if (isHq && _cache.containsKey(baseKey)) {
+      _cachedBytes = _cache.get(baseKey);
+    }
+
+    // 2. Check persistent disk cache for target key
     final diskBytes = await ArtworkCacheManager().get(key);
     if (diskBytes != null && diskBytes.isNotEmpty) {
       if (mounted && token == _loadToken) {
@@ -217,22 +270,36 @@ class _CachedArtworkState extends State<CachedArtwork> {
       return;
     }
 
-    // 3. Fetch remote or query local storage in low-medium quality
+    // If HQ disk cache is empty, check base disk cache as intermediate preview
+    if (isHq && _cachedBytes == null) {
+      final baseDiskBytes = await ArtworkCacheManager().get(baseKey);
+      if (baseDiskBytes != null && baseDiskBytes.isNotEmpty && mounted && token == _loadToken) {
+        _cache.put(baseKey, baseDiskBytes);
+        setState(() {
+          _cachedBytes = baseDiskBytes;
+        });
+      }
+    }
+
+    // 3. Fetch remote or query local storage
     final remoteUrl = widget.remoteUrl;
-    final isThumbnail = widget.size <= 220;
+    final isThumbnail = !isHq && widget.size <= 220;
 
     Future<Uint8List?> pending;
     if (remoteUrl != null && remoteUrl.isNotEmpty) {
-      pending =
-          _fetchRemote(remoteUrl, lowQuality: isThumbnail).then((remoteBytes) {
+      pending = _fetchRemote(
+        remoteUrl,
+        highQuality: isHq,
+        lowQuality: isThumbnail,
+      ).then((remoteBytes) {
         if (remoteBytes != null && remoteBytes.isNotEmpty) return remoteBytes;
         if (widget.id > 0) {
           return _audioQuery.queryArtwork(
             widget.id,
             widget.type,
             format: ArtworkFormat.JPEG,
-            size: isThumbnail ? 180 : 350,
-            quality: isThumbnail ? 65 : 80,
+            size: isHq ? 1000 : (isThumbnail ? 180 : 350),
+            quality: isHq ? 100 : (isThumbnail ? 65 : 80),
           );
         }
         return null;
@@ -242,8 +309,8 @@ class _CachedArtworkState extends State<CachedArtwork> {
         widget.id,
         widget.type,
         format: ArtworkFormat.JPEG,
-        size: isThumbnail ? 180 : 350,
-        quality: isThumbnail ? 65 : 80,
+        size: isHq ? 1000 : (isThumbnail ? 180 : 350),
+        quality: isHq ? 100 : (isThumbnail ? 65 : 80),
       );
     }
 
@@ -251,13 +318,13 @@ class _CachedArtworkState extends State<CachedArtwork> {
       if (mounted && token == _loadToken) {
         if (bytes != null && bytes.isNotEmpty) {
           _cache.put(key, bytes);
+          setState(() {
+            _cachedBytes = bytes;
+          });
         }
-        setState(() {
-          _cachedBytes = bytes;
-        });
       }
     }).catchError((_) {
-      if (mounted && token == _loadToken) {
+      if (mounted && token == _loadToken && _cachedBytes == null) {
         setState(() {
           _cachedBytes = null;
         });
@@ -286,7 +353,10 @@ class _CachedArtworkState extends State<CachedArtwork> {
           icon: widget.fallbackIcon,
         );
 
-        final decodeDim = (effectiveSize * 1.5).clamp(80, 800).round();
+        final isHq = _isHighRes;
+        final decodeDim = isHq
+            ? null
+            : (effectiveSize * 1.5).clamp(80, 800).round();
 
         final content = _cachedBytes != null
             ? Image.memory(
@@ -296,7 +366,8 @@ class _CachedArtworkState extends State<CachedArtwork> {
                 cacheWidth: decodeDim,
                 cacheHeight: decodeDim,
                 fit: BoxFit.cover,
-                filterQuality: FilterQuality.medium,
+                filterQuality:
+                    isHq ? FilterQuality.high : FilterQuality.medium,
                 errorBuilder: (context, error, stackTrace) => placeholder,
               )
             : placeholder;

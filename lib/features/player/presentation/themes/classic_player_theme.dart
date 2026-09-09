@@ -430,6 +430,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                                                       type: ArtworkType.AUDIO,
                                                       size: double.infinity,
                                                       borderRadius: 26.8,
+                                                      highQuality: true,
                                                     )
                                                   : const SizedBox.shrink(),
                                             ),

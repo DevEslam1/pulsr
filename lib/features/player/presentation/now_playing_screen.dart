@@ -18,8 +18,20 @@ import 'themes/player_theme.dart';
 import 'themes/vinyl_player_theme.dart';
 import 'themes/waveform_player_theme.dart';
 
-class NowPlayingScreen extends StatelessWidget {
+class NowPlayingScreen extends StatefulWidget {
   const NowPlayingScreen({super.key});
+
+  @override
+  State<NowPlayingScreen> createState() => _NowPlayingScreenState();
+}
+
+class _NowPlayingScreenState extends State<NowPlayingScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Always default to Cover (Track) view when opening Now Playing screen
+    context.read<PlayerCubit>().resetOverlayViews();
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -510,110 +510,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
 
-        // ---------- Recently played ----------
-        StreamBuilder<Result<List<SongsTableData>>>(
-          stream: getSongsUseCase.watchRecentlyPlayed(),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return _SectionError(onRetry: () => setState(() {}));
-            }
-            final songs =
-                snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
-            if (songs.isEmpty) return const SizedBox.shrink();
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SectionHeader(
-                  title: context.l10n.recentlyPlayed,
-                  actionLabel: 'See All',
-                  onAction: () => context.push('/recents'),
-                ),
-                SizedBox(
-                  height: isTablet ? 232 : 212,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    padding: EdgeInsets.symmetric(
-                        horizontal: Adaptive.pagePadding(context)),
-                    itemCount: songs.length,
-                    itemBuilder: (context, index) {
-                      final song = songs[index];
-                      final size = isTablet ? 158.0 : 138.0;
-                      return Padding(
-                        padding: const EdgeInsetsDirectional.only(end: 14),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(20),
-                          onTap: () => playerCubit.playSong(song, queue: songs),
-                          child: SizedBox(
-                            width: size,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Stack(
-                                  children: [
-                                    CachedArtwork(
-                                      id: song.id,
-                                      remoteUrl: song.remoteArtworkUrl,
-                                      type: ArtworkType.AUDIO,
-                                      size: size,
-                                      borderRadius: 18,
-                                    ),
-                                    PositionedDirectional(
-                                      end: 8,
-                                      bottom: 8,
-                                      child: Container(
-                                        width: 34,
-                                        height: 34,
-                                        decoration: BoxDecoration(
-                                          color: p.accent,
-                                          shape: BoxShape.circle,
-                                          boxShadow: [
-                                            BoxShadow(
-                                                color: p.glow,
-                                                blurRadius: 14,
-                                                spreadRadius: 1),
-                                          ],
-                                        ),
-                                        child: Icon(Icons.play_arrow_rounded,
-                                            color: p.onAccent, size: 22),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                SizedBox(
-                                  height: 34,
-                                  child: Text(
-                                    song.title,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: p.textPrimary,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 12.5,
-                                      height: 1.25,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  song.artist,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                      color: p.textSecondary, fontSize: 11.5),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            );
-          },
+        // ---------- Recently played (50 by 50 smooth lazy load) ----------
+        _RecentlyPlayedSection(
+          getSongsUseCase: getSongsUseCase,
+          isTablet: isTablet,
         ),
 
         const SizedBox(height: 12),
@@ -1266,6 +1166,223 @@ class _QuickCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _RecentlyPlayedSection extends StatefulWidget {
+  final GetSongsUseCase getSongsUseCase;
+  final bool isTablet;
+
+  const _RecentlyPlayedSection({
+    required this.getSongsUseCase,
+    required this.isTablet,
+  });
+
+  @override
+  State<_RecentlyPlayedSection> createState() => _RecentlyPlayedSectionState();
+}
+
+class _RecentlyPlayedSectionState extends State<_RecentlyPlayedSection> {
+  static const int _pageSize = 50;
+  int _currentLimit = _pageSize;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients || _isLoadingMore || !_hasMore) return;
+
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+
+    // Trigger next batch when scrolling within 250px of the horizontal end
+    if (maxScroll - currentScroll <= 250) {
+      _loadMore();
+    }
+  }
+
+  void _loadMore() {
+    if (_isLoadingMore || !_hasMore) return;
+    setState(() {
+      _isLoadingMore = true;
+      _currentLimit += _pageSize;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final playerCubit = context.read<PlayerCubit>();
+
+    return StreamBuilder<Result<List<SongsTableData>>>(
+      stream: widget.getSongsUseCase.watchRecentlyPlayed(limit: _currentLimit),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _SectionError(onRetry: () => setState(() {}));
+        }
+        final songs =
+            snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
+
+        // Determine if more songs are available
+        if (snapshot.hasData && snapshot.data != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            if (songs.length < _currentLimit) {
+              if (_hasMore || _isLoadingMore) {
+                setState(() {
+                  _hasMore = false;
+                  _isLoadingMore = false;
+                });
+              }
+            } else {
+              if (_isLoadingMore) {
+                setState(() {
+                  _isLoadingMore = false;
+                });
+              }
+            }
+          });
+        }
+
+        if (songs.isEmpty) return const SizedBox.shrink();
+
+        final size = widget.isTablet ? 158.0 : 138.0;
+        final totalItemCount = songs.length + (_hasMore ? 1 : 0);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SectionHeader(
+              title: context.l10n.recentlyPlayed,
+              actionLabel: 'See All',
+              onAction: () => context.push('/recents'),
+            ),
+            SizedBox(
+              height: widget.isTablet ? 232 : 212,
+              child: ListView.builder(
+                controller: _scrollController,
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                padding: EdgeInsets.symmetric(
+                    horizontal: Adaptive.pagePadding(context)),
+                itemCount: totalItemCount,
+                itemBuilder: (context, index) {
+                  if (index >= songs.length) {
+                    return Padding(
+                      padding: const EdgeInsetsDirectional.only(end: 14),
+                      child: Container(
+                        width: size,
+                        height: size,
+                        decoration: BoxDecoration(
+                          color: p.surfaceCard.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: p.hairline),
+                        ),
+                        child: Center(
+                          child: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(p.accent),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+
+                  final song = songs[index];
+                  return Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 14),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: () => playerCubit.playSong(song, queue: songs),
+                      child: SizedBox(
+                        width: size,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Stack(
+                              children: [
+                                CachedArtwork(
+                                  id: song.id,
+                                  remoteUrl: song.remoteArtworkUrl,
+                                  type: ArtworkType.AUDIO,
+                                  size: size,
+                                  borderRadius: 18,
+                                ),
+                                PositionedDirectional(
+                                  end: 8,
+                                  bottom: 8,
+                                  child: Container(
+                                    width: 34,
+                                    height: 34,
+                                    decoration: BoxDecoration(
+                                      color: p.accent,
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                            color: p.glow,
+                                            blurRadius: 14,
+                                            spreadRadius: 1),
+                                      ],
+                                    ),
+                                    child: Icon(Icons.play_arrow_rounded,
+                                        color: p.onAccent, size: 22),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              height: 34,
+                              child: Text(
+                                song.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: p.textPrimary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12.5,
+                                  height: 1.25,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              song.artist,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  color: p.textSecondary, fontSize: 11.5),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

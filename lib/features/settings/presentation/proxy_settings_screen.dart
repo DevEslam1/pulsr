@@ -8,6 +8,8 @@ import '../../../core/network/proxy_config.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
+import '../../../core/widgets/pulsr_back_button.dart';
+import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../cubit/settings_cubit.dart';
 import '../cubit/settings_state.dart';
 
@@ -436,16 +438,14 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
         final proxyList = state.proxyList;
         final isTestingAll = state.isTestingAllProxies;
 
-        return Scaffold(
-          backgroundColor: p.bg,
-          appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            leading: IconButton(
-              icon: Icon(Icons.arrow_back_rounded, color: p.textPrimary),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            title: Text(
+        return PulsrPagePopScope(
+          child: Scaffold(
+            backgroundColor: p.bg,
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              leading: const PulsrBackButton(),
+              title: Text(
               context.l10n.proxySettings,
               style: TextStyle(
                 color: p.textPrimary,
@@ -550,8 +550,9 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
               ),
             ),
           ),
-        );
-      },
+        ),
+      );
+    },
     );
   }
 

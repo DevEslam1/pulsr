@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/widgets/pulsr_back_button.dart';
+import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/repositories/music_repository_interface.dart';
 
@@ -98,12 +100,14 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
             .first
         : 'Never';
 
-    return Scaffold(
-      backgroundColor: p.surface,
-      appBar: AppBar(
+    return PulsrPagePopScope(
+      child: Scaffold(
         backgroundColor: p.surface,
-        elevation: 0,
-        title: Text(
+        appBar: AppBar(
+          backgroundColor: p.surface,
+          elevation: 0,
+          leading: const PulsrBackButton(),
+          title: Text(
           'Scrobbling Analytics',
           style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.bold),
         ),
@@ -290,6 +294,7 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
                 ],
               ],
             ),
+      ),
     );
   }
 }

@@ -6,6 +6,8 @@ import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/widgets/cached_artwork.dart';
+import '../../../core/widgets/pulsr_back_button.dart';
+import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../cubit/library_cubit.dart';
 import '../cubit/library_state.dart';
 
@@ -50,12 +52,14 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
     final maxCols = context.isTablet ? 8.0 : 5.0;
     const minCols = 2.0;
 
-    return Scaffold(
-      backgroundColor: p.surface,
-      appBar: AppBar(
+    return PulsrPagePopScope(
+      child: Scaffold(
         backgroundColor: p.surface,
-        elevation: 0,
-        title: Text(
+        appBar: AppBar(
+          backgroundColor: p.surface,
+          elevation: 0,
+          leading: const PulsrBackButton(),
+          title: Text(
           'Album Artwork Wall',
           style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.bold),
         ),
@@ -188,6 +192,7 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
             ),
           );
         },
+      ),
       ),
     );
   }

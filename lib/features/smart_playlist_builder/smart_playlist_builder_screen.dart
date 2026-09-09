@@ -9,6 +9,8 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/cached_artwork.dart';
+import '../../../core/widgets/pulsr_back_button.dart';
+import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/models/smart_playlist_criteria.dart';
 import 'smart_playlist_builder_cubit.dart';
@@ -79,9 +81,11 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
       builder: (context, state) {
         final cubit = context.read<SmartPlaylistBuilderCubit>();
 
-        return Scaffold(
-          appBar: AppBar(
-            title: Row(
+        return PulsrPagePopScope(
+          child: Scaffold(
+            appBar: AppBar(
+              leading: const PulsrBackButton(),
+              title: Row(
               children: [
                 Icon(Icons.auto_awesome_rounded, color: p.accent, size: 22),
                 const SizedBox(width: 8),
@@ -460,8 +464,9 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
               ),
             ),
           ),
-        );
-      },
+        ),
+      );
+    },
     );
   }
 }

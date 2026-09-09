@@ -5,6 +5,8 @@ import '../../../../core/di/injection.dart';
 import '../../../../core/services/ytm_browse_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
+import '../../../../core/widgets/pulsr_back_button.dart';
+import '../../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../player/cubit/player_cubit.dart';
 
 class YtmBrowseScreen extends StatefulWidget {
@@ -43,12 +45,14 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
   Widget build(BuildContext context) {
     final p = context.palette;
 
-    return Scaffold(
-      backgroundColor: p.surface,
-      appBar: AppBar(
+    return PulsrPagePopScope(
+      child: Scaffold(
         backgroundColor: p.surface,
-        elevation: 0,
-        title: Text(
+        appBar: AppBar(
+          backgroundColor: p.surface,
+          elevation: 0,
+          leading: const PulsrBackButton(),
+          title: Text(
           'YouTube Music Explore',
           style: TextStyle(
             color: p.textPrimary,
@@ -130,6 +134,7 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                 ),
               ),
             ),
+      ),
     );
   }
 

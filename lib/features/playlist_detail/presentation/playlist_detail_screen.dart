@@ -9,6 +9,8 @@ import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/pulsr_back_button.dart';
+import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/models/smart_playlist_criteria.dart';
@@ -135,9 +137,10 @@ class PlaylistDetailScreen extends StatelessWidget {
       builder: (context, snapshot) {
         final songs = snapshot.data ?? [];
 
-        return Scaffold(
+        final scaffold = Scaffold(
           appBar: AppBar(
-            automaticallyImplyLeading: !isEmbedded,
+            automaticallyImplyLeading: false,
+            leading: isEmbedded ? null : const PulsrBackButton(),
             title: Row(
               children: [
                 if (playlist.isSmart) ...[
@@ -367,6 +370,7 @@ class PlaylistDetailScreen extends StatelessWidget {
             ),
           ),
         );
+        return isEmbedded ? scaffold : PulsrPagePopScope(child: scaffold);
       },
     );
   }

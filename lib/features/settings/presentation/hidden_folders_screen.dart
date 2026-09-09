@@ -4,6 +4,8 @@ import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
+import '../../../core/widgets/pulsr_back_button.dart';
+import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../domain/usecases/folder_usecases.dart';
 import '../../library/cubit/library_cubit.dart';
 import '../cubit/settings_cubit.dart';
@@ -161,9 +163,11 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
       builder: (context, state) {
         final cubit = context.read<SettingsCubit>();
 
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(context.l10n.hiddenFolders),
+        return PulsrPagePopScope(
+          child: Scaffold(
+            appBar: AppBar(
+              leading: const PulsrBackButton(),
+              title: Text(context.l10n.hiddenFolders),
             actions: [
               IconButton(
                 icon: const Icon(Icons.create_new_folder_outlined),
@@ -665,8 +669,9 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
               ),
             ),
           ),
-        );
-      },
+        ),
+      );
+    },
     );
   }
 }

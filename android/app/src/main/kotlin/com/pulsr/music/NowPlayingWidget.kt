@@ -58,6 +58,9 @@ class NowPlayingWidget : AppWidgetProvider() {
         }
 
         super.onReceive(context, intent)
+        if (action != null && action == AppWidgetManager.ACTION_APPWIDGET_UPDATE) {
+            return
+        }
         try {
             val appWidgetManager = AppWidgetManager.getInstance(context)
             val componentName = ComponentName(context, NowPlayingWidget::class.java)
@@ -190,7 +193,7 @@ class NowPlayingWidget : AppWidgetProvider() {
         }
         cachedArtworkBitmap = null
         cachedArtworkPath = null
-        cachedArtworkTargetPx = 0
+        cachedArtworkMtime = 0L
     }
 
     companion object {
@@ -207,11 +210,12 @@ class NowPlayingWidget : AppWidgetProvider() {
         private const val EXTRA_WIDGET_TOKEN = "com.pulsr.music.widget.extra.TOKEN"
         private val WIDGET_INTERNAL_TOKEN = java.util.UUID.randomUUID().toString()
 
+        private const val UNIFIED_ART_TARGET_PX = 192
+
         private var cachedMediaBrowser: MediaBrowserCompat? = null
         private var cachedMediaController: MediaControllerCompat? = null
         private var cachedArtworkPath: String? = null
         private var cachedArtworkMtime: Long = 0L
-        private var cachedArtworkTargetPx: Int = 0
         private var cachedArtworkBitmap: Bitmap? = null
 
         private fun sendExplicitMediaButton(context: Context, keyCode: Int) {
@@ -237,7 +241,6 @@ class NowPlayingWidget : AppWidgetProvider() {
 
         private val updateHandler = Handler(Looper.getMainLooper())
         private var pendingUpdateRunnable: Runnable? = null
-        private val bitmapExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
 
         fun scheduleDebouncedWidgetUpdate(context: Context, delayMs: Long = 150L, isProgressOnly: Boolean = false) {
             val appContext = context.applicationContext ?: context
@@ -431,7 +434,7 @@ class NowPlayingWidget : AppWidgetProvider() {
                 try {
                     cachedArtworkBitmap = null
                     cachedArtworkPath = null
-                    cachedArtworkTargetPx = 0
+                    cachedArtworkMtime = 0L
 
                     val fallbackViews = RemoteViews(context.packageName, R.layout.widget_now_playing).apply {
                         val data = HomeWidgetPlugin.getData(context)
@@ -477,8 +480,12 @@ class NowPlayingWidget : AppWidgetProvider() {
                 if (isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play
             )
 
-            // If progress-only tick, skip bitmap decoding and text metadata churn
+            // If progress-only tick, populate cached artwork to preserve display and skip heavy churn
             if (isProgressOnly) {
+                val cachedBmp = cachedArtworkBitmap
+                if (cachedBmp != null && !cachedBmp.isRecycled) {
+                    views.setImageViewBitmap(R.id.widget_artwork, cachedBmp)
+                }
                 return views
             }
 
@@ -569,113 +576,12 @@ class NowPlayingWidget : AppWidgetProvider() {
                 )
             }
 
-            // ---- Artwork (async decode on cache miss to avoid ANR) ----
+            // ---- Artwork ----
             val artworkPath = getSafeString(data, "artwork")
-            var bitmapSet = false
-            if (!artworkPath.isNullOrEmpty()) {
-                try {
-                    val file = File(artworkPath)
-                    if (file.exists() && file.length() > 0 && file.length() < 15 * 1024 * 1024) {
-                        val mtime = file.lastModified()
-                        val density = context.resources.displayMetrics.density
-                        val targetPx = (targetArtDp * density).toInt().coerceAtLeast(112)
-                        val cachedBmp = cachedArtworkBitmap
-
-                        if (cachedArtworkPath == artworkPath && cachedArtworkMtime == mtime && cachedBmp != null && !cachedBmp.isRecycled && cachedArtworkTargetPx == targetPx) {
-                            val safeCopy = try { cachedBmp.copy(cachedBmp.config ?: Bitmap.Config.ARGB_8888, false) } catch (_: Throwable) { null }
-                            if (safeCopy != null && !safeCopy.isRecycled) {
-                                views.setImageViewBitmap(R.id.widget_artwork, safeCopy)
-                                bitmapSet = true
-                            }
-                        } else if (file.length() > 2 * 1024 * 1024) {
-                            // Large file not cached -> show placeholder synchronously, decode async and refresh widget
-                            views.setImageViewResource(R.id.widget_artwork, R.mipmap.launcher_icon)
-                            bitmapSet = true
-                            val appCtx = context.applicationContext ?: context
-                            bitmapExecutor.execute {
-                                try {
-                                    val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                                    BitmapFactory.decodeFile(artworkPath, boundsOptions)
-                                    var sampleSize = 1
-                                    while ((boundsOptions.outWidth / sampleSize) > targetPx * 2 || (boundsOptions.outHeight / sampleSize) > targetPx * 2) sampleSize *= 2
-                                    val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize; inPreferredConfig = Bitmap.Config.ARGB_8888 }
-                                    val rawBitmap = BitmapFactory.decodeFile(artworkPath, decodeOptions) ?: return@execute
-                                    if (rawBitmap.isRecycled) return@execute
-                                    val scaledBitmap = if (rawBitmap.width > targetPx || rawBitmap.height > targetPx) {
-                                        val sb = Bitmap.createScaledBitmap(rawBitmap, targetPx, targetPx, true)
-                                        if (sb !== rawBitmap) rawBitmap.recycle()
-                                        sb
-                                    } else rawBitmap
-                                    val cornerRadiusPx = (if (targetArtDp >= 90) 18f else 14f) * density
-                                    val roundedBitmap = getRoundedCornerBitmap(scaledBitmap, cornerRadiusPx)
-                                    if (roundedBitmap !== scaledBitmap) scaledBitmap.recycle()
-                                    if (roundedBitmap.isRecycled) return@execute
-                                    cachedArtworkBitmap = roundedBitmap
-                                    cachedArtworkPath = artworkPath
-                                    cachedArtworkMtime = mtime
-                                    cachedArtworkTargetPx = targetPx
-                                    Handler(Looper.getMainLooper()).post {
-                                        try {
-                                            val mgr = AppWidgetManager.getInstance(appCtx)
-                                            val cn = ComponentName(appCtx, NowPlayingWidget::class.java)
-                                            val ids = mgr.getAppWidgetIds(cn)
-                                            for (id in ids) {
-                                                try { updateAppWidget(appCtx, mgr, id, false) } catch (_: Throwable) {}
-                                            }
-                                        } catch (_: Throwable) {}
-                                    }
-                                } catch (_: Throwable) {}
-                            }
-                        } else {
-                            val boundsOptions = BitmapFactory.Options().apply {
-                                inJustDecodeBounds = true
-                            }
-                            BitmapFactory.decodeFile(artworkPath, boundsOptions)
-
-                            var sampleSize = 1
-                            while ((boundsOptions.outWidth / sampleSize) > targetPx * 2 ||
-                                   (boundsOptions.outHeight / sampleSize) > targetPx * 2) {
-                                sampleSize *= 2
-                            }
-
-                            val decodeOptions = BitmapFactory.Options().apply {
-                                inSampleSize = sampleSize
-                                inPreferredConfig = Bitmap.Config.ARGB_8888
-                            }
-
-                            val rawBitmap = BitmapFactory.decodeFile(artworkPath, decodeOptions)
-                            if (rawBitmap != null && !rawBitmap.isRecycled) {
-                                val scaledBitmap = if (rawBitmap.width > targetPx || rawBitmap.height > targetPx) {
-                                    val sb = Bitmap.createScaledBitmap(rawBitmap, targetPx, targetPx, true)
-                                    if (sb !== rawBitmap) rawBitmap.recycle()
-                                    sb
-                                } else {
-                                    rawBitmap
-                                }
-                                val cornerRadiusPx = (if (targetArtDp >= 90) 18f else 14f) * density
-                                val roundedBitmap = getRoundedCornerBitmap(scaledBitmap, cornerRadiusPx)
-                                if (roundedBitmap !== scaledBitmap) scaledBitmap.recycle()
-
-                                if (!roundedBitmap.isRecycled) {
-                                    cachedArtworkBitmap = roundedBitmap
-                                    cachedArtworkPath = artworkPath
-                                    cachedArtworkMtime = mtime
-                                    cachedArtworkTargetPx = targetPx
-
-                                    val safeCopy = try { roundedBitmap.copy(roundedBitmap.config ?: Bitmap.Config.ARGB_8888, false) } catch (_: Throwable) { null }
-                                    if (safeCopy != null && !safeCopy.isRecycled) {
-                                        views.setImageViewBitmap(R.id.widget_artwork, safeCopy)
-                                        bitmapSet = true
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } catch (e: Throwable) {
-                    bitmapSet = false
-                }
-            }
-            if (!bitmapSet) {
+            val bmp = if (!artworkPath.isNullOrEmpty()) getOrDecodeArtworkBitmap(context, artworkPath) else null
+            if (bmp != null && !bmp.isRecycled) {
+                views.setImageViewBitmap(R.id.widget_artwork, bmp)
+            } else {
                 views.setImageViewResource(R.id.widget_artwork, R.mipmap.launcher_icon)
             }
 
@@ -768,6 +674,58 @@ class NowPlayingWidget : AppWidgetProvider() {
                 PendingIntent.FLAG_UPDATE_CURRENT
             }
             return PendingIntent.getBroadcast(context, requestCode, intent, flags)
+        }
+
+        @Synchronized
+        private fun getOrDecodeArtworkBitmap(context: Context, artworkPath: String): Bitmap? {
+            try {
+                val file = File(artworkPath)
+                if (!file.exists() || file.length() <= 0L || file.length() > 15 * 1024 * 1024) {
+                    return null
+                }
+                val mtime = file.lastModified()
+                val cached = cachedArtworkBitmap
+                if (cachedArtworkPath == artworkPath && cachedArtworkMtime == mtime && cached != null && !cached.isRecycled) {
+                    return cached
+                }
+
+                val targetPx = UNIFIED_ART_TARGET_PX
+                val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(artworkPath, boundsOptions)
+                if (boundsOptions.outWidth <= 0 || boundsOptions.outHeight <= 0) return null
+
+                var sampleSize = 1
+                while ((boundsOptions.outWidth / sampleSize) > targetPx * 2 ||
+                       (boundsOptions.outHeight / sampleSize) > targetPx * 2) {
+                    sampleSize *= 2
+                }
+
+                val decodeOptions = BitmapFactory.Options().apply {
+                    inSampleSize = sampleSize
+                    inPreferredConfig = Bitmap.Config.ARGB_8888
+                }
+                val rawBitmap = BitmapFactory.decodeFile(artworkPath, decodeOptions) ?: return null
+                val scaled = if (rawBitmap.width != targetPx || rawBitmap.height != targetPx) {
+                    val sb = Bitmap.createScaledBitmap(rawBitmap, targetPx, targetPx, true)
+                    if (sb !== rawBitmap) rawBitmap.recycle()
+                    sb
+                } else {
+                    rawBitmap
+                }
+
+                val density = context.resources.displayMetrics.density
+                val cornerRadiusPx = 16f * density
+                val rounded = getRoundedCornerBitmap(scaled, cornerRadiusPx)
+                if (rounded !== scaled) scaled.recycle()
+
+                cachedArtworkBitmap = rounded
+                cachedArtworkPath = artworkPath
+                cachedArtworkMtime = mtime
+                return rounded
+            } catch (e: Throwable) {
+                android.util.Log.e("NowPlayingWidget", "Error decoding artwork bitmap", e)
+                return null
+            }
         }
 
         private fun getRoundedCornerBitmap(bitmap: Bitmap, cornerRadiusPx: Float): Bitmap {

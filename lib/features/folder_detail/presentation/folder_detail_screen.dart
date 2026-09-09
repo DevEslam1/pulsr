@@ -8,6 +8,8 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/pulsr_back_button.dart';
+import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/usecases/folder_usecases.dart';
@@ -45,9 +47,11 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     final p = context.palette;
     final folder = widget.folder;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(folder.name),
+    return PulsrPagePopScope(
+      child: Scaffold(
+        appBar: AppBar(
+          leading: const PulsrBackButton(),
+          title: Text(folder.name),
         actions: [
           IconButton(
             icon: Icon(
@@ -269,6 +273,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
           );
         },
       ),
-    );
-  }
+    ),
+  );
+}
 }

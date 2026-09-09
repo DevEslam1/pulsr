@@ -61,8 +61,9 @@ void main() {
       final forbiddenErr = Exception('HTTP Status Error: 403');
       final info = YtmErrorClassifier.classify(forbiddenErr);
 
-      expect(info.signal, equals(YtmBlockSignal.ipBlocked));
-      expect(info.recoveryAction, equals(YtmRecoveryAction.rotatePath));
+      expect(info.signal, equals(YtmBlockSignal.botChallenge));
+      expect(info.recoveryAction,
+          equals(YtmRecoveryAction.invalidatePoTokenAndRetry));
     });
 
     test('classifies 407 Proxy Authentication errors correctly', () {

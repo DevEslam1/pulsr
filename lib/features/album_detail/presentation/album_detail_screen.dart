@@ -7,6 +7,8 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/cached_artwork.dart';
+import '../../../core/widgets/pulsr_back_button.dart';
+import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/usecases/get_albums_usecase.dart';
@@ -44,24 +46,26 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     final expandedHeight = isTablet ? 340.0 : (isLandscape ? 230.0 : 300.0);
     final artworkSize = isTablet ? 220.0 : (isLandscape ? 120.0 : 180.0);
 
-    return Scaffold(
-      body: StreamBuilder<Result<List<SongsTableData>>>(
-        stream: _useCase.watchAlbumSongs(album.id),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return _AlbumErrorView(onRetry: () => setState(() {}));
-          }
-          final songs =
-              snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
+    return PulsrPagePopScope(
+      child: Scaffold(
+        body: StreamBuilder<Result<List<SongsTableData>>>(
+          stream: _useCase.watchAlbumSongs(album.id),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return _AlbumErrorView(onRetry: () => setState(() {}));
+            }
+            final songs =
+                snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
 
-          return Center(
-            child: ConstrainedBox(
-              constraints: Adaptive.contentConstraints(context),
-              child: CustomScrollView(
-                slivers: [
-                  SliverAppBar(
-                    expandedHeight: expandedHeight,
-                    pinned: true,
+            return Center(
+              child: ConstrainedBox(
+                constraints: Adaptive.contentConstraints(context),
+                child: CustomScrollView(
+                  slivers: [
+                    SliverAppBar(
+                      leading: const PulsrBackButton(),
+                      expandedHeight: expandedHeight,
+                      pinned: true,
                     backgroundColor: p.bg,
                     flexibleSpace: FlexibleSpaceBar(
                       background: Container(
@@ -169,6 +173,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           );
         },
       ),
+      ),
     );
   }
 }
@@ -181,8 +186,9 @@ class _AlbumErrorView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return Scaffold(
-      appBar: AppBar(),
+    return PulsrPagePopScope(
+      child: Scaffold(
+        appBar: AppBar(leading: const PulsrBackButton()),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -214,6 +220,7 @@ class _AlbumErrorView extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

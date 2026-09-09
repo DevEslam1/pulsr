@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../../domain/models/lyrics_line.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../cubit/player_cubit.dart';
@@ -52,8 +53,9 @@ class KaraokeModeScreen extends StatelessWidget {
                     ? effectiveLyrics[0]
                     : null);
 
-        return Scaffold(
-          backgroundColor: const Color(0xFF08090E),
+        return PulsrPagePopScope(
+          child: Scaffold(
+            backgroundColor: const Color(0xFF08090E),
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
@@ -192,6 +194,7 @@ class KaraokeModeScreen extends StatelessWidget {
               const SizedBox(height: 32),
             ],
           ),
+        ),
         );
       },
     );

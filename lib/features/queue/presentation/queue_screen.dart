@@ -8,6 +8,8 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/pulsr_back_button.dart';
+import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/di/injection.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
 import '../../../core/utils/formatters.dart';
@@ -20,9 +22,11 @@ class QueueScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(context.l10n.queue),
+    return PulsrPagePopScope(
+      child: Scaffold(
+        appBar: AppBar(
+          leading: const PulsrBackButton(),
+          title: Text(context.l10n.queue),
         actions: [
           BlocBuilder<PlayerCubit, PlayerState>(builder: (context, state) {
             if (state.queue.isEmpty) return const SizedBox.shrink();
@@ -226,6 +230,7 @@ class QueueScreen extends StatelessWidget {
           );
         },
       ),
-    );
-  }
+    ),
+  );
+}
 }

@@ -806,6 +806,23 @@ class YtmService {
       }
     }
 
+    // 3. Pure-Dart InnerTube Stream Resolver (Desktop / Non-Android / Native Plugin Fallback)
+    try {
+      debugPrint('[YTM_SERVICE] Attempting Dart InnerTube stream resolution for $videoId');
+      final dartStream = await _resolveStreamDart(videoId, quality: quality);
+      if (dartStream != null) {
+        try {
+          _tracker?.markStage(PlaybackStage.urlObtained);
+        } catch (_) {}
+        urlCache?.putStream(dartStream, quality: quality);
+        _noteResolveSuccess();
+        return dartStream;
+      }
+    } catch (e) {
+      debugPrint('[YTM_SERVICE] Dart InnerTube stream resolution failed: $e');
+      firstError ??= e;
+    }
+
     // All engines failed: surface the first classified engine error so the
     // UI/recovery layer sees the real cause (bot/rate/auth) with its mapped
     // recovery action, not a generic dead-end.
@@ -813,6 +830,174 @@ class YtmService {
     if (err is YtmException) throw err;
     if (err != null) throw err;
     throw const YtmException('YTM_FAILED', 'No stream returned from any engine');
+  }
+
+  /// Pure-Dart fallback that directly queries InnerTube player API using
+  /// lightweight clients (e.g. ANDROID_VR, TVHTML5) that provide direct audio
+  /// stream URLs without requiring native deciphers or MethodChannels.
+  Future<YtmStream?> _resolveStreamDart(String videoId,
+      {String quality = 'high'}) async {
+    String apiKey = const String.fromEnvironment(
+      'YTM_API_KEY',
+      defaultValue: 'AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30',
+    );
+    if (getIt.isRegistered<YtmClientVersionResolver>()) {
+      apiKey = getIt<YtmClientVersionResolver>().apiKey;
+    }
+
+    final clients = [
+      (
+        name: 'ANDROID_VR',
+        version: '1.63.27',
+        clientNameId: '28',
+        ua: 'com.google.android.apps.youtube.vr/1.63.27 (Linux; U; Android 14; en_US) gzip',
+        host: 'https://www.youtube.com',
+      ),
+      (
+        name: 'TVHTML5_SIMPLY_EMBEDDED_PLAYER',
+        version: '2.0',
+        clientNameId: '85',
+        ua: 'Mozilla/5.0 (PlayStation 4 5.55) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/11.0 Safari/605.1.15',
+        host: 'https://www.youtube.com',
+      ),
+      (
+        name: 'ANDROID',
+        version: '19.44.38',
+        clientNameId: '3',
+        ua: 'com.google.android.youtube/19.44.38 (Linux; U; Android 14; en_US) gzip',
+        host: 'https://www.youtube.com',
+      ),
+    ];
+
+    for (final client in clients) {
+      try {
+        final body = jsonEncode({
+          'context': {
+            'client': {
+              'clientName': client.name,
+              'clientVersion': client.version,
+              'hl': 'en',
+              'gl': 'US',
+            },
+          },
+          'videoId': videoId,
+          'playbackContext': {
+            'contentPlaybackContext': {
+              'html5Preference': 'HTML5_PREF_WANTS',
+            },
+          },
+        });
+
+        final headers = <String, String>{
+          'Content-Type': 'application/json',
+          'User-Agent': client.ua,
+          'X-Goog-Api-Key': apiKey,
+          'x-youtube-client-name': client.clientNameId,
+          'x-youtube-client-version': client.version,
+        };
+
+        final response = await _httpClient
+            .post(
+              Uri.parse(
+                  '${client.host}/youtubei/v1/player?prettyPrint=false&key=$apiKey'),
+              headers: headers,
+              body: body,
+            )
+            .timeout(const Duration(seconds: 10));
+
+        if (response.statusCode != 200) continue;
+
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final playability = data['playabilityStatus'] as Map<String, dynamic>?;
+        final status = playability?['status'] as String? ?? '';
+        if (status == 'LOGIN_REQUIRED' ||
+            status == 'UNPLAYABLE' ||
+            status.contains('BOT')) {
+          continue;
+        }
+
+        final streamingData = data['streamingData'] as Map<String, dynamic>?;
+        if (streamingData == null) continue;
+
+        final adaptive = (streamingData['adaptiveFormats'] as List<dynamic>? ??
+                [])
+            .whereType<Map<String, dynamic>>()
+            .toList();
+
+        final audioFormats = <({Map<String, dynamic> format, String url})>[];
+        for (final f in adaptive) {
+          final mime = f['mimeType'] as String? ?? '';
+          final streamUrl = f['url'] as String?;
+          if (mime.startsWith('audio/') &&
+              streamUrl != null &&
+              streamUrl.isNotEmpty) {
+            audioFormats.add((format: f, url: streamUrl));
+          }
+        }
+
+        if (audioFormats.isEmpty) {
+          final formats = (streamingData['formats'] as List<dynamic>? ?? [])
+              .whereType<Map<String, dynamic>>()
+              .toList();
+          for (final f in formats) {
+            final streamUrl = f['url'] as String?;
+            if (streamUrl != null && streamUrl.isNotEmpty) {
+              audioFormats.add((format: f, url: streamUrl));
+            }
+          }
+        }
+
+        if (audioFormats.isEmpty) continue;
+
+        final m4a = audioFormats
+            .where((f) =>
+                ((f.format['mimeType'] as String?) ?? '').contains('mp4'))
+            .toList();
+        final pool = m4a.isNotEmpty ? m4a : audioFormats;
+
+        final selected = switch (quality.toLowerCase()) {
+          'low' => pool.reduce((a, b) =>
+              ((a.format['bitrate'] as num?) ?? 0) <
+                      ((b.format['bitrate'] as num?) ?? 0)
+                  ? a
+                  : b),
+          'medium' => pool.reduce((a, b) =>
+              (((a.format['bitrate'] as num?) ?? 128000) - 128000).abs() <
+                      (((b.format['bitrate'] as num?) ?? 128000) - 128000).abs()
+                  ? a
+                  : b),
+          _ => pool.reduce((a, b) =>
+              ((a.format['bitrate'] as num?) ?? 0) >
+                      ((b.format['bitrate'] as num?) ?? 0)
+                  ? a
+                  : b),
+        };
+
+        final mime = selected.format['mimeType'] as String? ?? 'audio/mp4';
+        final bitrate = (selected.format['bitrate'] as num?)?.toInt() ?? 128000;
+        final durationMs = int.tryParse(
+                selected.format['approxDurationMs']?.toString() ?? '0') ??
+            0;
+        final details = data['videoDetails'] as Map<String, dynamic>?;
+
+        return YtmStream(
+          videoId: videoId,
+          url: selected.url,
+          mimeType: mime.split(';').first.trim(),
+          container: mime.contains('mp4') ? 'm4a' : 'webm',
+          bitrateKbps: (bitrate / 1000).round(),
+          duration: Duration(milliseconds: durationMs),
+          title: details?['title'] as String? ?? '',
+          artist: details?['author'] as String? ?? '',
+          artworkUrl: null,
+          userAgent: client.ua,
+        ).withResolvedExpiry();
+      } catch (e) {
+        debugPrint('[YTM_SERVICE] Dart client ${client.name} resolve error: $e');
+      }
+    }
+
+    return null;
   }
 
   Future<T?> _guard<T>(

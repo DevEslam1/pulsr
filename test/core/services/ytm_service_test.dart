@@ -250,18 +250,21 @@ void main() {
     test(
         'resolveStream skips the native tier while bot-cooling down (no chain pileup)',
         () async {
-      var calls = 0;
-      _mockChannel((_) async {
-        calls++;
-        throw PlatformException(
-            code: 'BOT_CHALLENGE', message: 'All clients LOGIN_REQUIRED');
+      var resolveCalls = 0;
+      _mockChannel((call) async {
+        if (call.method == 'resolveStream') {
+          resolveCalls++;
+          throw PlatformException(
+              code: 'BOT_CHALLENGE', message: 'All clients LOGIN_REQUIRED');
+        }
+        return false;
       });
       final service = YtmService();
       await expectLater(
           service.resolveStream('dQw4w9WgXcQ'), throwsA(isA<YtmException>()));
       await expectLater(
           service.resolveStream('dQw4w9WgXcQ'), throwsA(isA<YtmException>()));
-      expect(calls, equals(1),
+      expect(resolveCalls, equals(1),
           reason: 'second resolve must short-circuit to backend, not burn another full chain');
     });
 

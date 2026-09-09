@@ -32,13 +32,13 @@ class WidgetService {
   void _drainPendingArtwork() {
     if (_artworkResolveInFlight) return;
     final next = _pendingArtworkSong;
-    if (next == null || next.id == _lastSavedArtworkSongId) {
+    if (next == null) return;
+    if (next.id == _lastSavedArtworkSongId && _artworkCache.containsKey(next.id)) {
       _pendingArtworkSong = null;
       return;
     }
     _pendingArtworkSong = null;
     _artworkResolveInFlight = true;
-    _lastSavedArtworkSongId = next.id;
     unawaited(_resolveArtworkAsync(next).whenComplete(() {
       _artworkResolveInFlight = false;
       _drainPendingArtwork();
@@ -91,7 +91,13 @@ class WidgetService {
               : '';
           await HomeWidget.saveWidgetData<String>('nextTrack$i', title);
         }
-        if (_lastSavedArtworkSongId != song.id) {
+
+        // If artwork is already cached for this song, set it immediately
+        final cachedArt = _artworkCache[song.id];
+        if (cachedArt != null && File(cachedArt).existsSync()) {
+          _lastSavedArtworkSongId = song.id;
+          await HomeWidget.saveWidgetData<String>('artwork', cachedArt);
+        } else if (_lastSavedArtworkSongId != song.id) {
           _pendingArtworkSong = song;
           _drainPendingArtwork();
         }
@@ -118,8 +124,7 @@ class WidgetService {
   }
 
   /// Non-blocking artwork resolve: fires in background, updates widget
-  /// once complete. Runs image decode + corner rounding on a compute
-  /// isolate to avoid blocking the main thread.
+  /// once complete.
   Future<void> _resolveArtworkAsync(SongsTableData song) async {
     try {
       final artPath = await _resolveArtworkPath(song).timeout(
@@ -130,13 +135,15 @@ class WidgetService {
           return null;
         },
       );
-      if (_lastSavedArtworkSongId != song.id) return;
-      await HomeWidget.saveWidgetData<String>('artwork', artPath ?? '');
-      await HomeWidget.updateWidget(
-        name: androidWidgetName,
-        androidName: androidWidgetName,
-        qualifiedAndroidName: qualifiedAndroidName,
-      );
+      if (artPath != null && artPath.isNotEmpty) {
+        _lastSavedArtworkSongId = song.id;
+        await HomeWidget.saveWidgetData<String>('artwork', artPath);
+        await HomeWidget.updateWidget(
+          name: androidWidgetName,
+          androidName: androidWidgetName,
+          qualifiedAndroidName: qualifiedAndroidName,
+        );
+      }
     } catch (e, st) {
       ErrorLogger.log('Widget artwork async resolve failed',
           error: e, stackTrace: st, category: 'WidgetService');
@@ -167,12 +174,13 @@ class WidgetService {
     }
   }
 
-  /// Exports a corner-rounded artwork PNG for the widget, cached per song.
+  /// Exports an artwork image for the widget, cached per song.
   Future<String?> _resolveArtworkPath(SongsTableData song) async {
     final songId = song.id;
     final cachedPath = _artworkCache[songId];
     if (cachedPath != null) {
-      if (await File(cachedPath).exists()) return cachedPath;
+      final f = File(cachedPath);
+      if (await f.exists() && await f.length() > 0) return cachedPath;
       _artworkCache.remove(songId);
       _roundedArtworkCache.remove(songId);
     }
@@ -181,31 +189,35 @@ class WidgetService {
       final dir = await getTemporaryDirectory();
       final cleanId = songId < 0 ? 'neg_${songId.abs()}' : '$songId';
       final cachedFile = File('${dir.path}/pulsr_widget_art_$cleanId.png');
-      if (await cachedFile.exists()) {
+      if (await cachedFile.exists() && await cachedFile.length() > 0) {
         _artworkCache[songId] = cachedFile.path;
         return cachedFile.path;
       }
 
       Uint8List? rawBytes = _roundedArtworkCache[songId];
       if (rawBytes == null) {
-        // 1. Check if song has remote/online artwork URL (e.g. YouTube Music / stream)
         final remoteUrl = song.remoteArtworkUrl ??
             (song.artworkUri?.startsWith('http') == true
                 ? song.artworkUri
                 : null);
-        if (remoteUrl != null && remoteUrl.isNotEmpty) {
-          final targetUrl = CachedArtwork.upgradeToHighResArtwork(remoteUrl);
-          // Check ArtworkCacheManager cache (fast, in-memory)
-          var cachedBytes = await ArtworkCacheManager().get(targetUrl);
-          if (cachedBytes == null || cachedBytes.isEmpty) {
-            cachedBytes = await ArtworkCacheManager().get(remoteUrl);
-          }
 
-          if (cachedBytes != null && cachedBytes.isNotEmpty) {
-            rawBytes = cachedBytes;
-          } else {
-            // Fetch remote artwork via HTTP with generous timeouts.
-            // Increased from 5s to 8s to accommodate slow networks.
+        // 1. Fast path: Check in-memory ArtworkLruCache
+        if (remoteUrl != null && remoteUrl.isNotEmpty) {
+          rawBytes = ArtworkLruCache().get('${remoteUrl}_hq') ??
+              ArtworkLruCache().get(remoteUrl);
+        } else {
+          rawBytes = ArtworkLruCache().get('AUDIO_${songId}_hq') ??
+              ArtworkLruCache().get('AUDIO_$songId');
+        }
+
+        // 2. Check persistent ArtworkCacheManager disk cache
+        if (rawBytes == null && remoteUrl != null && remoteUrl.isNotEmpty) {
+          final targetUrl = CachedArtwork.upgradeToHighResArtwork(remoteUrl);
+          rawBytes = await ArtworkCacheManager().get(targetUrl) ??
+              await ArtworkCacheManager().get(remoteUrl);
+
+          if (rawBytes == null || rawBytes.isEmpty) {
+            // Fetch remote artwork via HTTP
             HttpClient? client;
             try {
               final uri = Uri.tryParse(targetUrl) ?? Uri.tryParse(remoteUrl);
@@ -239,20 +251,20 @@ class WidgetService {
           }
         }
 
-        // 2. Check local file URI (e.g. file:///...)
+        // 3. Check local file URI (e.g. file:///...)
         if ((rawBytes == null || rawBytes.isEmpty) &&
             song.artworkUri != null &&
             song.artworkUri!.isNotEmpty) {
           final parsed = Uri.tryParse(song.artworkUri!);
           if (parsed != null && parsed.scheme == 'file') {
             final f = File(parsed.toFilePath());
-            if (await f.exists()) {
+            if (await f.exists() && await f.length() > 0) {
               rawBytes = await f.readAsBytes();
             }
           }
         }
 
-        // 3. Fallback to OnAudioQuery for local MediaStore tracks
+        // 4. Fallback to OnAudioQuery for local MediaStore tracks (Audio ID, then Album ID)
         if ((rawBytes == null || rawBytes.isEmpty) && songId > 0) {
           rawBytes = await _audioQuery.queryArtwork(
             songId,
@@ -261,26 +273,26 @@ class WidgetService {
             size: 256,
             quality: 90,
           );
+
+          if ((rawBytes == null || rawBytes.isEmpty) && song.albumId != null) {
+            rawBytes = await _audioQuery.queryArtwork(
+              song.albumId!,
+              ArtworkType.ALBUM,
+              format: ArtworkFormat.JPEG,
+              size: 256,
+              quality: 90,
+            );
+          }
         }
 
         if (rawBytes == null || rawBytes.isEmpty) return null;
 
-        // Round corners on the main thread but within a tight timeout.
-        // Image decode + canvas clip is fast for 256×256 (~2-5ms).
-        final rounded = await _roundCorners(rawBytes, size: 256, radius: 56)
-            .timeout(const Duration(seconds: 3), onTimeout: () {
-          ErrorLogger.log('Corner rounding timed out',
-              category: 'WidgetService');
-          return null;
-        });
-        if (rounded == null) return null;
-        _roundedArtworkCache[songId] = rounded;
-        rawBytes = rounded;
+        _roundedArtworkCache[songId] = rawBytes;
       }
 
       await cachedFile.writeAsBytes(rawBytes, flush: true);
       _artworkCache[songId] = cachedFile.path;
-      // Already cached rounded bytes above; just enforce LRU bounds
+      // Enforce LRU bounds
       if (_artworkCache.length > _maxCacheSize) {
         final oldestKey = _artworkCache.keys.first;
         _artworkCache.remove(oldestKey);

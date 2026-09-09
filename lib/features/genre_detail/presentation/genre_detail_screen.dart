@@ -7,6 +7,8 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/pulsr_back_button.dart';
+import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/models/genre_item.dart';
@@ -40,10 +42,12 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
     final p = context.palette;
     final genreItem = widget.genreItem;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(genreItem.name),
-      ),
+    return PulsrPagePopScope(
+      child: Scaffold(
+        appBar: AppBar(
+          leading: const PulsrBackButton(),
+          title: Text(genreItem.name),
+        ),
       body: StreamBuilder<Result<List<SongsTableData>>>(
         stream: _useCase.watchGenreSongs(genreItem.name),
         builder: (context, snapshot) {
@@ -204,6 +208,7 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
           );
         },
       ),
-    );
-  }
+    ),
+  );
+}
 }

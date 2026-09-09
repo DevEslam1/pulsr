@@ -8,6 +8,8 @@ import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/cached_artwork.dart';
+import '../../../core/widgets/pulsr_back_button.dart';
+import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
@@ -43,222 +45,222 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
     final isTablet = Adaptive.isTablet(context);
     final artist = widget.artist;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(artist.name),
-      ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: Adaptive.contentConstraints(context),
-          child: ListView(
-            padding: const EdgeInsets.only(bottom: 160),
-            children: [
-              const SizedBox(height: 16),
-              Center(
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                        color: p.accent.withValues(alpha: 0.3), width: 2),
-                    boxShadow: [
-                      BoxShadow(
-                          color: p.glow,
-                          blurRadius: 28,
-                          spreadRadius: -4,
-                          offset: const Offset(0, 8)),
-                    ],
+    return PulsrPagePopScope(
+      child: Scaffold(
+        appBar: AppBar(
+          leading: const PulsrBackButton(),
+          title: Text(artist.name),
+        ),
+        body: Center(
+          child: ConstrainedBox(
+            constraints: Adaptive.contentConstraints(context),
+            child: ListView(
+              padding: const EdgeInsets.only(bottom: 160),
+              children: [
+                const SizedBox(height: 16),
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                          color: p.accent.withValues(alpha: 0.3), width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                            color: p.glow,
+                            blurRadius: 28,
+                            spreadRadius: -4,
+                            offset: const Offset(0, 8)),
+                      ],
+                    ),
+                    child: CachedArtwork(
+                      id: artist.id,
+                      type: ArtworkType.ARTIST,
+                      size: isTablet ? 160 : 130,
+                      borderRadius: 999,
+                      fallbackIcon: Icons.person_rounded,
+                    ),
                   ),
-                  child: CachedArtwork(
-                    id: artist.id,
-                    type: ArtworkType.ARTIST,
-                    size: isTablet ? 160 : 130,
-                    borderRadius: 999,
-                    fallbackIcon: Icons.person_rounded,
+                ),
+                const SizedBox(height: 14),
+                Center(
+                  child: Text(
+                    artist.name,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.headlineSmall,
                   ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              Center(
-                child: Text(
-                  artist.name,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineSmall,
+                const SizedBox(height: 4),
+                Center(
+                  child: Text(
+                    Formatters.formatTrackCount(artist.songCount),
+                    style: TextStyle(color: p.textSecondary, fontSize: 13),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Center(
-                child: Text(
-                  Formatters.formatTrackCount(artist.songCount),
-                  style: TextStyle(color: p.textSecondary, fontSize: 13),
-                ),
-              ),
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-              // Artist Biography & HD Info
-              FutureBuilder(
-                future: ArtistBioService().getArtistInfo(artist.name),
-                builder: (context, snapshot) {
-                  if (snapshot.hasData && snapshot.data?.bio != null) {
-                    final bio = snapshot.data!.bio!;
-                    return Container(
-                      margin: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 8),
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: p.surfaceContainer.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: p.hairline),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.info_outline_rounded,
-                                  size: 16, color: p.accent),
-                              const SizedBox(width: 6),
-                              Text(
-                                'About Artist',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: p.accent,
+                // Artist Biography & HD Info
+                FutureBuilder(
+                  future: ArtistBioService().getArtistInfo(artist.name),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData && snapshot.data?.bio != null) {
+                      final bio = snapshot.data!.bio!;
+                      return Container(
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 8),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: p.surfaceContainer.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: p.hairline),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.info_outline_rounded,
+                                    size: 16, color: p.accent),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'About Artist',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: p.accent,
+                                  ),
                                 ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              bio,
+                              maxLines: 4,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: p.textSecondary,
+                                height: 1.4,
                               ),
-                            ],
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Discography (Albums)
+                StreamBuilder<Result<List<AlbumsTableData>>>(
+                  stream: _useCase.watchArtistAlbums(artist.id),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return _ErrorSection(
+                        title: 'Albums',
+                        onRetry: () => setState(() {}),
+                      );
+                    }
+                    final albums = snapshot.data
+                            ?.fold((l) => <AlbumsTableData>[], (r) => r) ??
+                        [];
+                    if (albums.isEmpty) return const SizedBox.shrink();
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SectionHeader(title: 'Albums'),
+                        SizedBox(
+                          height: 175,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            padding: EdgeInsets.symmetric(
+                                horizontal: Adaptive.pagePadding(context)),
+                            itemCount: albums.length,
+                            itemBuilder: (context, index) {
+                              final album = albums[index];
+                              return Container(
+                                width: 120,
+                                margin: const EdgeInsets.only(right: 14),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(16),
+                                  onTap: () =>
+                                      context.push('/album', extra: album),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      CachedArtwork(
+                                          id: album.id,
+                                          type: ArtworkType.ALBUM,
+                                          size: 120,
+                                          borderRadius: 16),
+                                      const SizedBox(height: 8),
+                                      Text(album.title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                              color: p.textPrimary,
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 13)),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                          Formatters.formatTrackCount(
+                                              album.songCount),
+                                          style: TextStyle(
+                                              color: p.textSecondary,
+                                              fontSize: 11)),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            bio,
-                            maxLines: 4,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: p.textSecondary,
-                              height: 1.4,
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                    );
+                  },
+                ),
+
+                // Top Tracks
+                StreamBuilder<Result<List<SongsTableData>>>(
+                  stream: _useCase.watchArtistSongs(artist.id),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return _ErrorSection(
+                        title: 'Top Tracks',
+                        onRetry: () => setState(() {}),
+                      );
+                    }
+                    final songs = snapshot.data
+                            ?.fold((l) => <SongsTableData>[], (r) => r) ??
+                        [];
+                    if (songs.isEmpty) return const SizedBox.shrink();
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SectionHeader(title: 'Top Tracks'),
+                        for (int i = 0; i < songs.length; i++)
+                          SongTile(
+                            song: songs[i],
+                            index: i,
+                            subtitleOverride: songs[i].album,
+                            onTap: () => context
+                                .read<PlayerCubit>()
+                                .playSong(songs[i], queue: songs),
+                            onMorePressed: () => showModalBottomSheet(
+                              context: context,
+                              builder: (_) => SongInfoSheet(song: songs[i]),
                             ),
                           ),
-                        ],
-                      ),
+                      ],
                     );
-                  }
-                  return const SizedBox.shrink();
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Discography (Albums)
-              StreamBuilder<Result<List<AlbumsTableData>>>(
-                stream: _useCase.watchArtistAlbums(artist.id),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return _ErrorSection(
-                      title: 'Albums',
-                      onRetry: () => setState(() {}),
-                    );
-                  }
-                  final albums = snapshot.data
-                          ?.fold((l) => <AlbumsTableData>[], (r) => r) ??
-                      [];
-                  if (albums.isEmpty) return const SizedBox.shrink();
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SectionHeader(title: 'Albums'),
-                      SizedBox(
-                        height: 175,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          padding: EdgeInsets.symmetric(
-                              horizontal: Adaptive.pagePadding(context)),
-                          itemCount: albums.length,
-                          itemBuilder: (context, index) {
-                            final album = albums[index];
-                            return Container(
-                              width: 120,
-                              margin: const EdgeInsets.only(right: 14),
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(16),
-                                onTap: () =>
-                                    context.push('/album', extra: album),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    CachedArtwork(
-                                        id: album.id,
-                                        type: ArtworkType.ALBUM,
-                                        size: 120,
-                                        borderRadius: 16),
-                                    const SizedBox(height: 8),
-                                    Text(album.title,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                            color: p.textPrimary,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 13)),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                        Formatters.formatTrackCount(
-                                            album.songCount),
-                                        style: TextStyle(
-                                            color: p.textSecondary,
-                                            fontSize: 11)),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                  );
-                },
-              ),
-
-              // Top Tracks
-              StreamBuilder<Result<List<SongsTableData>>>(
-                stream: _useCase.watchArtistSongs(artist.id),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return _ErrorSection(
-                      title: 'Top Tracks',
-                      onRetry: () => setState(() {}),
-                    );
-                  }
-                  final songs = snapshot.data
-                          ?.fold((l) => <SongsTableData>[], (r) => r) ??
-                      [];
-                  if (songs.isEmpty) return const SizedBox.shrink();
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SectionHeader(title: 'Top Tracks'),
-                      for (int i = 0; i < songs.length; i++)
-                        SongTile(
-                          song: songs[i],
-                          index: i,
-                          subtitleOverride: songs[i].album,
-                          onTap: () => context
-                              .read<PlayerCubit>()
-                              .playSong(songs[i], queue: songs),
-                          onMorePressed: () => showModalBottomSheet(
-                            context: context,
-                            useRootNavigator: true,
-                            isScrollControlled: true,
-                            backgroundColor: Colors.transparent,
-                            builder: (_) => SongInfoSheet(song: songs[i]),
-                          ),
-                        ),
-                    ],
-                  );
-                },
-              ),
-            ],
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),

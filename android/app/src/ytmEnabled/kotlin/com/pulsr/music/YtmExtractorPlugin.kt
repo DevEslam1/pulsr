@@ -970,10 +970,10 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         }
 
         val playable = info.audioStreams.filter {
-            it.isUrl && it.deliveryMethod == DeliveryMethod.PROGRESSIVE_HTTP && !it.content.isNullOrEmpty()
+            it.isUrl && !it.content.isNullOrEmpty()
         }
         if (playable.isEmpty()) {
-            throw ExtractionException("No progressive audio stream available in NewPipe extractor")
+            throw ExtractionException("No playable audio stream available in NewPipe extractor")
         }
 
         val m4aStreams = playable.filter { it.format == MediaFormat.M4A }
@@ -996,7 +996,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             "title" to info.name,
             "artist" to (info.uploaderName ?: ""),
             "artworkUrl" to bestArtwork(info.thumbnails),
-            "userAgent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0",
+            "userAgent" to PulsrDownloader.USER_AGENT,
             // Without this the Dart cache treats a googlevideo URL as never expiring
             // and keeps re-serving it long after the `expire` stamp has passed.
             "expiresAt" to urlExpiryEpochSeconds(url),

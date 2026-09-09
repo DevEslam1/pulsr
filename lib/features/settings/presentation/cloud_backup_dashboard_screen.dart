@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/cloud_sync_service.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/widgets/pulsr_back_button.dart';
+import '../../../core/widgets/pulsr_page_pop_scope.dart';
 
 class CloudBackupDashboardScreen extends StatefulWidget {
   final CloudSyncService? syncService;
@@ -52,12 +54,14 @@ class _CloudBackupDashboardScreenState
     final lastSyncStr =
         lastSync != null ? '${lastSync.toLocal()}'.split('.').first : 'Never';
 
-    return Scaffold(
-      backgroundColor: p.surface,
-      appBar: AppBar(
+    return PulsrPagePopScope(
+      child: Scaffold(
         backgroundColor: p.surface,
-        elevation: 0,
-        title: Text(
+        appBar: AppBar(
+          backgroundColor: p.surface,
+          elevation: 0,
+          leading: const PulsrBackButton(),
+          title: Text(
           'Cloud Backup & Sync',
           style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.bold),
         ),
@@ -194,6 +198,7 @@ class _CloudBackupDashboardScreenState
             ),
           ),
         ],
+      ),
       ),
     );
   }
