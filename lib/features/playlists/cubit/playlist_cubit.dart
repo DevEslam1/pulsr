@@ -389,6 +389,16 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     );
   }
 
+  Future<void> reorderPlaylistSongs(
+      int playlistId, List<int> orderedSongIds) async {
+    final result = await _playlistUseCases.reorderPlaylistSongs(
+        playlistId, orderedSongIds);
+    result.fold(
+      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
+      (_) => safeEmit(state.copyWith(errorMessage: null)),
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // Online (YTM) playlist fetching
   // ---------------------------------------------------------------------------

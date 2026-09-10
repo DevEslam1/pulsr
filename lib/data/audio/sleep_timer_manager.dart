@@ -243,6 +243,38 @@ class SleepTimerManager {
     }).catchError((_) {});
   }
 
+  /// Restores a persisted duration timer after process death / background kill.
+  /// Returns true when a timer was re-armed. Track-based modes cannot be
+  /// restored (queue position is unknown) and are cleared.
+  Future<bool> restorePersistedState({
+    required Future<void> Function() onTimerExpired,
+    required AudioPlayer Function() getActivePlayer,
+    bool fadeOut = true,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final targetMs = prefs.getInt(PrefsKeys.sleepTimerTarget);
+      if (targetMs == null) return false;
+      final remainingMs =
+          targetMs - DateTime.now().millisecondsSinceEpoch;
+      if (remainingMs <= 0) {
+        await prefs.remove(PrefsKeys.sleepTimerTarget);
+        return false;
+      }
+      // Cap at 24h to guard against clock-skew garbage.
+      final remaining = Duration(milliseconds: remainingMs.clamp(0, 86400000));
+      startSleepTimer(
+        remaining,
+        fadeOut: fadeOut,
+        onTimerExpired: onTimerExpired,
+        getActivePlayer: getActivePlayer,
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   void _clearPersistedState() {
     SharedPreferences.getInstance().then((prefs) {
       prefs.remove(PrefsKeys.sleepTimerTarget);

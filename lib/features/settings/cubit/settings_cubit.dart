@@ -274,10 +274,18 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
         (e) => e.name == replayGainModeStr,
         orElse: () => ReplayGainMode.track,
       );
-      final replayGainPreampWithRg =
+      final replayGainPreampWithRgRaw =
           prefs.getDouble(_keyReplayGainPreampWithRg) ?? 0.0;
-      final replayGainPreampWithoutRg =
+      final replayGainPreampWithoutRgRaw =
           prefs.getDouble(_keyReplayGainPreampWithoutRg) ?? -3.0;
+      // Clamp corrupted prefs into the valid preamp range.
+      final replayGainPreampWithRg = replayGainPreampWithRgRaw.isFinite
+          ? replayGainPreampWithRgRaw.clamp(-12.0, 12.0)
+          : 0.0;
+      final replayGainPreampWithoutRg =
+          replayGainPreampWithoutRgRaw.isFinite
+              ? replayGainPreampWithoutRgRaw.clamp(-12.0, 12.0)
+              : -3.0;
 
       final streamingQualityStr =
           prefs.getString(_keyStreamingQuality) ?? YtmAudioQuality.high.name;
@@ -301,7 +309,8 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
         orElse: () => AppProxyType.http,
       );
       final proxyHost = prefs.getString(_keyProxyHost) ?? '';
-      final proxyPort = prefs.getInt(_keyProxyPort) ?? 8080;
+      final proxyPortRaw = prefs.getInt(_keyProxyPort) ?? 8080;
+      final proxyPort = proxyPortRaw.clamp(1, 65535);
       final proxyUsername = prefs.getString(_keyProxyUsername) ?? '';
 
       // Legacy proxy password migration already handled above (lines 164-186)
@@ -621,6 +630,24 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     safeEmit(state.copyWith(themeMode: mode));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyThemeMode, mode.name);
+    _syncSystemUiOverlay(mode);
+  }
+
+  /// Keeps the Android status/nav bars in sync with the app theme so a
+  /// light theme never leaves light-on-light system chrome.
+  void _syncSystemUiOverlay(AppThemeMode mode) {
+    try {
+      final isLight = mode == AppThemeMode.light;
+      SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness:
+            isLight ? Brightness.dark : Brightness.light,
+        statusBarBrightness: isLight ? Brightness.light : Brightness.dark,
+        systemNavigationBarColor: isLight ? Colors.white : Colors.black,
+        systemNavigationBarIconBrightness:
+            isLight ? Brightness.dark : Brightness.light,
+      ));
+    } catch (_) {}
   }
 
   Future<void> setLanguage(String languageCode) async {

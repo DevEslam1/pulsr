@@ -28,16 +28,30 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
     _loadFeed();
   }
 
+  String? _error;
   Future<void> _loadFeed() async {
     if (_sections.isEmpty) {
-      setState(() => _isLoading = true);
-    }
-    final sections = await _browseService.getHomeFeed();
-    if (mounted) {
       setState(() {
-        _sections = sections;
-        _isLoading = false;
+        _isLoading = true;
+        _error = null;
       });
+    }
+    try {
+      final sections = await _browseService.getHomeFeed();
+      if (mounted) {
+        setState(() {
+          _sections = sections;
+          _isLoading = false;
+          _error = sections.isEmpty ? 'No recommendations right now.' : null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = 'Failed to load feed. Check connection and retry.';
+        });
+      }
     }
   }
 
@@ -69,7 +83,28 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
       ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: p.primary))
-          : RefreshIndicator(
+          : _error != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.cloud_off_rounded,
+                            color: p.textSecondary, size: 40),
+                        const SizedBox(height: 12),
+                        Text(_error!,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: p.textSecondary)),
+                        const SizedBox(height: 12),
+                        FilledButton(
+                            onPressed: _loadFeed,
+                            child: const Text('Retry')),
+                      ],
+                    ),
+                  ),
+                )
+              : RefreshIndicator(
               onRefresh: _loadFeed,
               color: p.primary,
               child: Align(

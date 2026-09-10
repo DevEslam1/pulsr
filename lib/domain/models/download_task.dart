@@ -62,6 +62,7 @@ class DownloadTask {
     String? error,
     DateTime? createdAt,
     String? artworkUrl,
+    bool clearError = false, // FIX-A09: support clearing error via copyWith
   }) {
     return DownloadTask(
       id: id ?? this.id,
@@ -75,7 +76,7 @@ class DownloadTask {
       filePath: filePath ?? this.filePath,
       format: format ?? this.format,
       bitrate: bitrate ?? this.bitrate,
-      error: error ?? this.error,
+      error: clearError ? null : (error ?? this.error), // FIX-A09: clear error if requested
       createdAt: createdAt ?? this.createdAt,
       artworkUrl: artworkUrl ?? this.artworkUrl,
     );

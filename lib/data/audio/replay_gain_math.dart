@@ -46,19 +46,26 @@ class ReplayGainMath {
     }
 
     double preampDb;
-    if (gainDb != null && gainDb != 0.0) {
+    // Guard against NaN/Infinity from corrupt tags — fall back to no gain.
+    if (gainDb != null &&
+        gainDb.isFinite &&
+        gainDb != 0.0 &&
+        preampWithRg.isFinite &&
+        preampWithoutRg.isFinite &&
+        volume.isFinite) {
       preampDb = preampWithRg;
     } else {
-      preampDb = preampWithoutRg;
-      gainDb = 0.0;
+      if (gainDb == null || !gainDb.isFinite) gainDb = 0.0;
+      preampDb = preampWithoutRg.isFinite ? preampWithoutRg : 0.0;
     }
+    if (!volume.isFinite) return 0.0;
 
     final totalGainDb = (gainDb) + preampDb;
     var multiplier = math.pow(10.0, totalGainDb / 20.0).toDouble();
 
     // Clipping prevention: limit gain so output <= 1.0 with 0.5 dB
     // inter-sample peak headroom.
-    final effectivePeak = (peak != null && peak > 0.0) ? peak : 1.0;
+    final effectivePeak = (peak != null && peak.isFinite && peak > 0.0) ? peak : 1.0;
     final interSampleHeadroom =
         math.pow(10.0, -0.5 / 20.0).toDouble(); // ~0.944 (-0.5 dB)
     final maxGain = interSampleHeadroom / effectivePeak;

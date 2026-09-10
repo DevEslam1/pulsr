@@ -62,6 +62,18 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
     });
   }
 
+  void _deleteLine(int index) {
+    setState(() {
+      if (_lines.length > 1) _lines.removeAt(index);
+    });
+  }
+
+  void _sortLines() {
+    setState(() {
+      _lines.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
@@ -113,6 +125,11 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
               Row(
                 children: [
                   IconButton(
+                    icon: Icon(Icons.sort_rounded, color: p.primary),
+                    onPressed: _sortLines,
+                    tooltip: 'Sort by time',
+                  ),
+                  IconButton(
                     icon: Icon(Icons.add_rounded, color: p.primary),
                     onPressed: _addNewLine,
                     tooltip: 'Add Line',
@@ -124,7 +141,9 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                           borderRadius: BorderRadius.circular(12)),
                     ),
                     onPressed: () {
-                      widget.onSave(_lines);
+                      final sorted = List<LyricsLine>.from(_lines)
+                        ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+                      widget.onSave(sorted);
                       Navigator.pop(context);
                     },
                     child: const Text('Save',
@@ -176,6 +195,8 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                       // Text input field
                       Expanded(
                         child: TextFormField(
+                          key: ValueKey(
+                              'lyric_${index}_${line.timestamp.inMilliseconds}'),
                           initialValue: line.text,
                           style: TextStyle(color: p.textPrimary, fontSize: 13),
                           decoration: const InputDecoration(
@@ -199,6 +220,12 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                         icon: const Icon(Icons.add_rounded, size: 16),
                         color: p.textSecondary,
                         onPressed: () => _adjustOffset(index, 250),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline_rounded, size: 16),
+                        color: p.textSecondary,
+                        onPressed: () => _deleteLine(index),
+                        tooltip: 'Delete line',
                       ),
                     ],
                   ),

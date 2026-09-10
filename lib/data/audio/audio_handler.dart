@@ -248,6 +248,12 @@ class PulsrAudioHandler extends BaseAudioHandler
       if (!_effectsReadyCompleter.isCompleted) {
         _effectsReadyCompleter.complete();
       }
+      // Restore a persisted sleep timer (process death / background kill).
+      // Fire-and-forget: re-arms only duration timers still in the future.
+      unawaited(_sleepTimerManager.restorePersistedState(
+        onTimerExpired: () async => pause(),
+        getActivePlayer: () => _activePlayer,
+      ));
     });
   }
 
@@ -465,7 +471,10 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
   }
 
+  int _engineSwitchGeneration = 0;
+
   Future<void> _switchPlaybackEngine({required bool toGapless}) async {
+    final generation = ++_engineSwitchGeneration;
     final resumePos = _activePlayer.position;
     final wasPlaying = _activePlayer.playing;
     try {
@@ -474,6 +483,7 @@ class PulsrAudioHandler extends BaseAudioHandler
             initialPosition: resumePos, preload: wasPlaying);
       } else {
         _gaplessLoaded = false;
+        if (generation != _engineSwitchGeneration) return;
         if (wasPlaying) {
           await playSongAt(_currentIndex, initialPosition: resumePos);
         } else {
@@ -495,6 +505,7 @@ class PulsrAudioHandler extends BaseAudioHandler
           }
         }
       }
+      if (generation != _engineSwitchGeneration) return;
     } catch (e, st) {
       _pendingLazyPosition = null;
       ErrorLogger.log('Error switching playback engine on crossfade toggle',

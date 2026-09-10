@@ -460,12 +460,14 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
       continue;
     }
 
-    // Skip if within a user-excluded folder
+    // Skip if within a user-excluded folder (case-insensitive, normalized)
     if (input.excludedFolders.any((folder) {
-      final prefix = folder.endsWith(input.pathSeparator)
-          ? folder
-          : '$folder${input.pathSeparator}';
-      return path.startsWith(prefix) || path == folder;
+      final sep = input.pathSeparator;
+      final normPath = path.toLowerCase();
+      final normFolder = folder.toLowerCase();
+      final prefix =
+          normFolder.endsWith(sep) ? normFolder : '$normFolder$sep';
+      return normPath.startsWith(prefix) || normPath == normFolder;
     })) {
       continue;
     }

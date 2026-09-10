@@ -134,6 +134,8 @@ class YtmUrlCache {
     String? cookies,
     YtmStream? stream,
   }) {
+    if (videoId.trim().isEmpty || url.trim().isEmpty) return;
+    if (Uri.tryParse(url.trim()) == null) return;
     final key = _buildKey(videoId, quality);
     final now = _clock.now();
 

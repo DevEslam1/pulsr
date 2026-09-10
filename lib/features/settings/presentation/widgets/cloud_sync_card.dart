@@ -135,7 +135,25 @@ class CloudSyncCard extends StatelessWidget {
                       tooltip: context.l10n.signOut,
                       icon: Icon(Icons.logout_rounded,
                           color: p.textTertiary, size: 20),
-                      onPressed: () => authCubit.signOut(),
+                      onPressed: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: Text(context.l10n.signOut),
+                            content: const Text(
+                                'Sign out of cloud sync? Local music stays on device.'),
+                            actions: [
+                              TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: Text(context.l10n.cancel)),
+                              FilledButton(
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  child: Text(context.l10n.signOut)),
+                            ],
+                          ),
+                        );
+                        if (confirm == true) await authCubit.signOut();
+                      },
                     ),
                   ],
                 ],

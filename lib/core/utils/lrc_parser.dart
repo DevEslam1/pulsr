@@ -286,7 +286,11 @@ class LrcParser {
             .toList(),
       };
       await file.writeAsString(jsonEncode(payload), flush: true);
-    } catch (_) {}
+    } catch (e) {
+      // Disk-full / quota / permission — log once, never crash playback.
+      ErrorLogger.log('Lyrics disk cache write failed',
+          error: e, category: 'Lyrics');
+    }
   }
 
   static Future<LyricsResult?> _readFromDiskCache(String cacheKey) async {
@@ -384,6 +388,7 @@ class LrcParser {
   /// 6. null
   static final Map<String, DateTime> _negativeCacheTimes = {};
   static const Duration _negativeCacheTtl = Duration(minutes: 10);
+  static final Map<String, Future<LyricsResult?>> _inFlightResolves = {};
 
   static Future<LyricsResult?> resolveLyrics(
     String audioFilePath, {
@@ -398,6 +403,35 @@ class LrcParser {
     if (hasCachedLyrics(songId: songId, path: audioFilePath)) {
       return getCachedLyrics(songId: songId, path: audioFilePath);
     }
+    // Dedup concurrent requests for the same song.
+    final inFlight = _inFlightResolves[cacheKey];
+    if (inFlight != null) return inFlight;
+    final future = _resolveLyricsInner(
+      audioFilePath,
+      cacheKey: cacheKey,
+      trackTitle: trackTitle,
+      artist: artist,
+      album: album,
+      durationSec: durationSec,
+      lrclibService: lrclibService,
+    );
+    _inFlightResolves[cacheKey] = future;
+    try {
+      return await future;
+    } finally {
+      _inFlightResolves.remove(cacheKey);
+    }
+  }
+
+  static Future<LyricsResult?> _resolveLyricsInner(
+    String audioFilePath, {
+    required String cacheKey,
+    String? trackTitle,
+    String? artist,
+    String? album,
+    int? durationSec,
+    Object? lrclibService,
+  }) async {
 
     // Check persistent disk cache before external searching or network lookups
     final diskCached = await _readFromDiskCache(cacheKey);
@@ -475,6 +509,13 @@ class LrcParser {
     // Cache the result (including null to avoid repeated failing lookups, with TTL)
     // Only cache negative null if online resolution was attempted (trackTitle != null)
     if (resolved != null || (trackTitle != null && trackTitle.isNotEmpty)) {
+      // Proactively sweep expired negative entries so the map can't grow
+      // across a long session of misses.
+      if (_negativeCacheTimes.length > _maxCacheSize) {
+        final now = DateTime.now();
+        _negativeCacheTimes.removeWhere(
+            (_, t) => now.difference(t) > _negativeCacheTtl);
+      }
       if (_lyricsCache.length >= _maxCacheSize) {
         final evictedKey = _lyricsCache.keys.first;
         _lyricsCache.remove(evictedKey);

@@ -16,8 +16,17 @@ class DopEncoder {
     required Uint8List dsdLeft,
     required Uint8List dsdRight,
   }) {
-    final int byteCount =
-        dsdLeft.length < dsdRight.length ? dsdLeft.length : dsdRight.length;
+    if (dsdLeft.length != dsdRight.length) {
+      throw ArgumentError(
+        'DSD channels must have equal length '
+        '(left=${dsdLeft.length}, right=${dsdRight.length}). '
+        'Refusing to silently truncate.',
+      );
+    }
+    if (dsdLeft.length.isOdd) {
+      throw ArgumentError('DSD byte length must be even (16-bit pairs).');
+    }
+    final int byteCount = dsdLeft.length;
     // Each 2 bytes of DSD yields 1 24-bit PCM sample (3 bytes) per channel (6 bytes per stereo frame).
     final int numSamplesPerChannel = byteCount ~/ 2;
     final Uint8List dopBuffer = Uint8List(numSamplesPerChannel * 6);
@@ -46,8 +55,16 @@ class DopEncoder {
     required Uint8List dsdLeft,
     required Uint8List dsdRight,
   }) {
-    final int byteCount =
-        dsdLeft.length < dsdRight.length ? dsdLeft.length : dsdRight.length;
+    if (dsdLeft.length != dsdRight.length) {
+      throw ArgumentError(
+        'DSD channels must have equal length '
+        '(left=${dsdLeft.length}, right=${dsdRight.length}).',
+      );
+    }
+    if (dsdLeft.length.isOdd) {
+      throw ArgumentError('DSD byte length must be even (16-bit pairs).');
+    }
+    final int byteCount = dsdLeft.length;
     final int numSamplesPerChannel = byteCount ~/ 2;
     final Uint8List dopBuffer = Uint8List(numSamplesPerChannel * 8);
 

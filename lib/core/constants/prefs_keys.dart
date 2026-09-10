@@ -14,6 +14,8 @@ class PrefsKeys {
   static const String eqSpatializerEnabled = 'eq_spatializer_enabled';
   static const String eqHeadphoneProfileId = 'eq_headphone_profile_id';
   static const String eqCustomFrequencies = 'eq_custom_frequencies';
+  static const String eq32BandMode = 'eq_32_band_mode';
+  static const String eqCustom32Frequencies = 'eq_custom_32_frequencies';
   static const String customEqProfiles = 'custom_eq_profiles';
   static const String resumeAfterInterruption =
       'setting_resume_after_interruption';

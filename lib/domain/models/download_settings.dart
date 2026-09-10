@@ -1,5 +1,6 @@
 // lib/domain/models/download_settings.dart
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/utils/error_logger.dart'; // FIX-A10: Import ErrorLogger for error reporting
 
 class DownloadSettings {
   final bool wifiOnly;
@@ -20,13 +21,18 @@ class DownloadSettings {
   static const _kLocation = 'setting_download_location';
 
   static Future<DownloadSettings> load() async {
-    final prefs = await SharedPreferences.getInstance();
-    return DownloadSettings(
-      wifiOnly: prefs.getBool(_kWifi) ?? false,
-      quality: prefs.getString(_kQuality) ?? 'high',
-      maxConcurrent: prefs.getInt(_kConcurrency) ?? 3,
-      downloadLocation: prefs.getString(_kLocation),
-    );
+    try { // FIX-A10: Wrap load body in try/catch
+      final prefs = await SharedPreferences.getInstance();
+      return DownloadSettings(
+        wifiOnly: prefs.getBool(_kWifi) ?? false,
+        quality: prefs.getString(_kQuality) ?? 'high',
+        maxConcurrent: prefs.getInt(_kConcurrency) ?? 3,
+        downloadLocation: prefs.getString(_kLocation),
+      );
+    } catch (e, st) { // FIX-A10: Log via ErrorLogger and return default settings
+      ErrorLogger.log('DownloadSettings.load failed', error: e, stackTrace: st, category: 'DownloadSettings');
+      return const DownloadSettings();
+    }
   }
 
   Future<void> save() async {

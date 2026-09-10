@@ -195,6 +195,18 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       );
       if (isClosed) return;
       if (image != null) {
+        // Reject very large images before they can cause OOM downstream.
+        try {
+          final sizeBytes = await image.length();
+          if (sizeBytes > 15 * 1024 * 1024) {
+            if (!isClosed) {
+              emit(state.copyWith(
+                  errorMessage:
+                      'Image is too large (${(sizeBytes / 1048576).toStringAsFixed(1)} MB). Max 15 MB.'));
+            }
+            return;
+          }
+        } catch (_) {}
         _userEditedFields.add('artwork');
         emit(state.copyWith(
           newArtworkPath: image.path,
@@ -312,6 +324,30 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       ));
       return;
     }
+    // Validate year/track-number before hitting the native channel so
+    // non-numeric input surfaces a form error instead of a native crash.
+    final yearTrimmed = state.year.trim();
+    if (yearTrimmed.isNotEmpty) {
+      final yearNum = int.tryParse(yearTrimmed);
+      if (yearNum == null || yearNum < 1000 || yearNum > 2100) {
+        emit(state.copyWith(
+          status: TagEditorStatus.failure,
+          errorMessage: 'Year must be a number between 1000 and 2100.',
+        ));
+        return;
+      }
+    }
+    final trackTrimmed = state.trackNumber.trim();
+    if (trackTrimmed.isNotEmpty) {
+      final trackNum = int.tryParse(trackTrimmed.split('/').first.trim());
+      if (trackNum == null || trackNum < 0 || trackNum > 9999) {
+        emit(state.copyWith(
+          status: TagEditorStatus.failure,
+          errorMessage: 'Track number must be a non-negative number.',
+        ));
+        return;
+      }
+    }
 
     emit(state.copyWith(
         status: TagEditorStatus.saving,
@@ -399,8 +435,10 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       }
 
       String lyrics = state.lyrics;
+      bool lyricsTruncated = false;
       if (lyrics.length > 8192) {
         lyrics = lyrics.substring(0, 8192);
+        lyricsTruncated = true;
       }
 
       await _channel.invokeMethod('writeTags', {
@@ -424,6 +462,13 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       if (isClosed) return;
 
       emit(state.copyWith(status: TagEditorStatus.success));
+      if (lyricsTruncated && !isClosed) {
+        emit(state.copyWith(
+          status: TagEditorStatus.success,
+          errorMessage:
+              'Note: lyrics truncated to 8192 chars (device tag limit).',
+        ));
+      }
     } on PlatformException catch (e) {
       if (isClosed) return;
       emit(state.copyWith(

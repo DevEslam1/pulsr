@@ -25,7 +25,14 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
         Expression<bool>? combined;
         for (final rule in criteria.rules) {
           final expr = _buildRuleExpression(t, rule);
-          if (expr == null) continue;
+          if (expr == null) {
+            ErrorLogger.log(
+              'Smart playlist: ignoring unsupported rule '
+              '${rule.field.name} ${rule.operator.name} "${rule.value}"',
+              category: 'SmartPlaylist',
+            );
+            continue;
+          }
           if (combined == null) {
             combined = expr;
           } else {

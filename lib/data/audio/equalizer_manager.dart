@@ -33,6 +33,8 @@ class EqualizerManager {
   final AndroidLoudnessEnhancer? loudnessEnhancerB;
   final AudioEffectsChannel _effectsChannel = AudioEffectsChannel();
   Timer? _saveDebounce;
+  Timer? _bandGainDebounce;
+  final Map<int, double> _pendingBandGains = {};
   final _effectsLock =
       _AsyncLock(); // Serializes concurrent effect state changes
 
@@ -124,7 +126,7 @@ class EqualizerManager {
 
   Future<void> init() async {
     await _effectsChannel.init();
-    await _restorePreferences();
+    await _effectsLock.lock(() => _restorePreferences());
   }
 
   List<double> get activeFrequencies =>
@@ -134,7 +136,8 @@ class EqualizerManager {
     try {
       final prefs = await SharedPreferences.getInstance();
       isEnabled = prefs.getBool(PrefsKeys.eqEnabled) ?? false;
-      is32BandMode = prefs.getBool('eq_32_band_mode') ?? false;
+      is32BandMode = prefs.getBool(PrefsKeys.eq32BandMode) ??
+          (prefs.getBool('eq_32_band_mode') ?? false);
       final presetName = prefs.getString(PrefsKeys.eqPresetName) ?? 'Flat';
       final gainsJson = prefs.getString(PrefsKeys.eqGains);
       final bass = prefs.getDouble(PrefsKeys.eqBassBoost) ?? 0.0;
@@ -147,12 +150,32 @@ class EqualizerManager {
               (json.decode(customFreqsJson) as List<dynamic>)
                   .map((e) => (e as num).toDouble())
                   .toList();
-          if (decodedFreqs.length == 10) {
+          if (decodedFreqs.length == 10 &&
+              decodedFreqs.every((f) => f.isFinite && f > 0)) {
             customFrequencies = decodedFreqs;
           }
         } catch (e, st) {
           ErrorLogger.log(
             'Failed to decode custom EQ frequencies',
+            error: e,
+            stackTrace: st,
+            category: 'EqualizerManager',
+          );
+        }
+      }
+      final custom32Json = prefs.getString(PrefsKeys.eqCustom32Frequencies);
+      if (custom32Json != null) {
+        try {
+          final decoded32 = (json.decode(custom32Json) as List<dynamic>)
+              .map((e) => (e as num).toDouble())
+              .toList();
+          if (decoded32.length == 32 &&
+              decoded32.every((f) => f.isFinite && f > 0)) {
+            custom32Frequencies = decoded32;
+          }
+        } catch (e, st) {
+          ErrorLogger.log(
+            'Failed to decode custom 32-band EQ frequencies',
             error: e,
             stackTrace: st,
             category: 'EqualizerManager',
@@ -448,10 +471,11 @@ class EqualizerManager {
       // This prevents partial updates if app crashes mid-write.
       final batch = <String, dynamic>{
         PrefsKeys.eqEnabled: isEnabled,
-        'eq_32_band_mode': is32BandMode,
+        PrefsKeys.eq32BandMode: is32BandMode,
         PrefsKeys.eqPresetName: currentPreset.name,
         PrefsKeys.eqGains: json.encode(currentPreset.gains),
-        'eq_custom_frequencies': json.encode(customFrequencies),
+        PrefsKeys.eqCustomFrequencies: json.encode(customFrequencies),
+        PrefsKeys.eqCustom32Frequencies: json.encode(custom32Frequencies),
         PrefsKeys.eqBassBoost: currentPreset.bassBoost,
         PrefsKeys.eqVolumeBoost: volumeBoost,
         PrefsKeys.eqVirtualizerEnabled: isVirtualizerEnabled,
@@ -503,89 +527,7 @@ class EqualizerManager {
           await prefs.setString(entry.key, entry.value as String);
         }
       }
-      await prefs.setBool(PrefsKeys.eqEnabled, isEnabled);
-      await prefs.setBool('eq_32_band_mode', is32BandMode);
-      await prefs.setString(PrefsKeys.eqPresetName, currentPreset.name);
-      await prefs.setString(
-        PrefsKeys.eqGains,
-        json.encode(currentPreset.gains),
-      );
-      await prefs.setString(
-        'eq_custom_frequencies',
-        json.encode(customFrequencies),
-      );
-      await prefs.setDouble(PrefsKeys.eqBassBoost, currentPreset.bassBoost);
-      await prefs.setDouble(PrefsKeys.eqVolumeBoost, volumeBoost);
-      await prefs.setBool(PrefsKeys.eqVirtualizerEnabled, isVirtualizerEnabled);
-      await prefs.setDouble(
-        PrefsKeys.eqVirtualizerStrength,
-        virtualizerStrength,
-      );
-      await prefs.setString(PrefsKeys.eqDynamicsPreset, dynamicsPreset.name);
-      await prefs.setBool(PrefsKeys.eqDynamicsEnabled, isDynamicsEnabled);
-      await prefs.setBool(PrefsKeys.eqDynamicsBypassed, _isDynamicsBypassed);
-      await prefs.setBool(PrefsKeys.eqSpatializerEnabled, isSpatializerEnabled);
-
-      await prefs.setBool(PrefsKeys.crossfeedEnabled, isCrossfeedEnabled);
-      await prefs.setDouble(PrefsKeys.crossfeedDelayUs, crossfeedDelayUs);
-      await prefs.setDouble(PrefsKeys.crossfeedFeedDb, crossfeedFeedDb);
-
-      await prefs.setBool(PrefsKeys.lookaheadLimiterEnabled, isLimiterEnabled);
-      await prefs.setDouble(
-        PrefsKeys.lookaheadLimiterThresholdDb,
-        limiterThresholdDb,
-      );
-      await prefs.setDouble(
-        PrefsKeys.lookaheadLimiterReleaseMs,
-        limiterReleaseMs,
-      );
-      await prefs.setDouble(
-        PrefsKeys.lookaheadLimiterLookaheadMs,
-        limiterLookaheadMs,
-      );
-
-      await prefs.setBool(PrefsKeys.convolutionReverbEnabled, isReverbEnabled);
-      await prefs.setInt(PrefsKeys.convolutionReverbPreset, reverbPreset);
-      await prefs.setDouble(PrefsKeys.convolutionReverbWetDry, reverbWetDry);
-
-      await prefs.setDouble(PrefsKeys.stereoBalance, stereoBalance);
-      await prefs.setBool(PrefsKeys.monoMix, monoMix);
-      await prefs.setBool(
-        PrefsKeys.sincResamplerEnabled,
-        isSincResamplerEnabled,
-      );
-
-      // Phase 1 DSP expansion stages
-      await prefs.setBool(PrefsKeys.saturationEnabled, isSaturationEnabled);
-      await prefs.setDouble(PrefsKeys.saturationDrive, saturationDrive);
-      await prefs.setDouble(PrefsKeys.saturationMix, saturationMix);
-      await prefs.setDouble(PrefsKeys.saturationTilt, saturationTilt);
-      await prefs.setBool(PrefsKeys.stereoWidthEnabled, isStereoWidthEnabled);
-      await prefs.setDouble(PrefsKeys.stereoWidth, stereoWidth);
-      await prefs.setBool(
-        PrefsKeys.loudnessContourEnabled,
-        isLoudnessContourEnabled,
-      );
-      await prefs.setDouble(
-        PrefsKeys.loudnessContourIntensity,
-        loudnessContourIntensity,
-      );
-      await prefs.setBool(PrefsKeys.subCrossoverEnabled, isSubCrossoverEnabled);
-      await prefs.setDouble(
-        PrefsKeys.subCrossoverCornerHz,
-        subCrossoverCornerHz,
-      );
-      await prefs.setDouble(
-        PrefsKeys.subCrossoverSlopeDbPerOct,
-        subCrossoverSlopeDbPerOct,
-      );
-      await prefs.setDouble(PrefsKeys.subCrossoverGain, subCrossoverGain);
-      await prefs.setBool(PrefsKeys.dynamicEqEnabled, isDynamicEqEnabled);
-      await prefs.setString(
-        PrefsKeys.dynamicEqBands,
-        json.encode(dynamicEqBands.map((b) => b.toJson()).toList()),
-      );
-
+      // Single atomic pass — batch loop above already persisted everything.
       if (selectedHeadphoneProfile != null) {
         await prefs.setString(
           PrefsKeys.eqHeadphoneProfileId,
@@ -696,38 +638,70 @@ class EqualizerManager {
 
   Future<void> setBandGain(int index, double gain) async {
     if (index < 0 || index >= currentPreset.gains.length) return;
+    if (!gain.isFinite) return;
     selectedHeadphoneProfile = null;
-    final targetFreqs = is32BandMode ? custom32Frequencies : customFrequencies;
 
     final newGains = List<double>.from(currentPreset.gains);
     newGains[index] = gain.clamp(-15.0, 15.0);
     currentPreset = currentPreset.copyWith(name: 'Custom', gains: newGains);
     comparisonSlots[activeComparisonSlot] = currentPreset;
 
-    if (PlatformCapabilities.isAndroid && isEnabled) {
-      if (is32BandMode) {
-        await _effectsChannel.setNativeEqBand(
-          index,
-          targetFreqs[index],
-          newGains[index],
-          1.414,
-        );
-        final tenBandGains = EqPreset.interpolateGains(
-          newGains,
-          targetFrequencies: customFrequencies,
-        );
-        await _effectsChannel.setEqBandGains(tenBandGains);
-      } else {
-        await _effectsChannel.setEqBandGain(index, newGains[index]);
-        await _effectsChannel.setNativeEqBand(
-          index,
-          targetFreqs[index],
-          newGains[index],
-          1.414,
-        );
-      }
-    }
+    // Coalesce rapid slider drags: apply state immediately, push to native
+    // at most once per 60ms.
+    _pendingBandGains[index] = newGains[index];
+    _bandGainDebounce?.cancel();
+    _bandGainDebounce = Timer(const Duration(milliseconds: 60), () {
+      final pending = Map<int, double>.from(_pendingBandGains);
+      _pendingBandGains.clear();
+      unawaited(_flushBandGains(pending));
+    });
     _debouncedSavePreferences();
+  }
+
+  Future<void> _flushBandGains(Map<int, double> pending) async {
+    if (pending.isEmpty) return;
+    final targetFreqs = is32BandMode ? custom32Frequencies : customFrequencies;
+    // Guard against mode-switch race: drop stale indices instead of RangeError.
+    final valid = Map<int, double>.fromEntries(
+      pending.entries.where((e) => e.key >= 0 && e.key < targetFreqs.length),
+    );
+    if (valid.isEmpty) return;
+    try {
+      if (PlatformCapabilities.isAndroid && isEnabled) {
+        if (is32BandMode) {
+          for (final entry in valid.entries) {
+            await _effectsChannel.setNativeEqBand(
+              entry.key,
+              targetFreqs[entry.key],
+              entry.value,
+              1.414,
+            );
+          }
+          final tenBandGains = EqPreset.interpolateGains(
+            currentPreset.gains,
+            targetFrequencies: customFrequencies,
+          );
+          await _effectsChannel.setEqBandGains(tenBandGains);
+        } else {
+          for (final entry in valid.entries) {
+            await _effectsChannel.setEqBandGain(entry.key, entry.value);
+            await _effectsChannel.setNativeEqBand(
+              entry.key,
+              targetFreqs[entry.key],
+              entry.value,
+              1.414,
+            );
+          }
+        }
+      }
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to flush band gains',
+        error: e,
+        stackTrace: st,
+        category: 'EqualizerManager',
+      );
+    }
   }
 
   Future<void> setPreamp(double preampDb) async {
@@ -931,7 +905,28 @@ class EqualizerManager {
   }
 
   Future<void> setCustomFrequencies(List<double> frequencies) async {
+    if (frequencies.length != 10 ||
+        frequencies.any((f) => !f.isFinite || f <= 0)) {
+      ErrorLogger.log(
+        'Rejected invalid custom frequencies (need 10 finite >0)',
+        category: 'EqualizerManager',
+      );
+      return;
+    }
     customFrequencies = List.from(frequencies);
+    await _savePreferences();
+  }
+
+  Future<void> setCustom32Frequencies(List<double> frequencies) async {
+    if (frequencies.length != 32 ||
+        frequencies.any((f) => !f.isFinite || f <= 0)) {
+      ErrorLogger.log(
+        'Rejected invalid custom 32-band frequencies (need 32 finite >0)',
+        category: 'EqualizerManager',
+      );
+      return;
+    }
+    custom32Frequencies = List.from(frequencies);
     await _savePreferences();
   }
 
@@ -959,6 +954,20 @@ class EqualizerManager {
     final prevProfile = selectedHeadphoneProfile;
     try {
       if (profile != null) {
+        if (profile.gains.isEmpty) {
+          ErrorLogger.log(
+            'Headphone profile has empty gains — ignoring',
+            category: 'EqualizerManager',
+          );
+          return;
+        }
+        if (profile.gains.any((g) => !g.isFinite)) {
+          ErrorLogger.log(
+            'Headphone profile contains non-finite gains — ignoring',
+            category: 'EqualizerManager',
+          );
+          return;
+        }
         final targetFreqs =
             is32BandMode ? custom32Frequencies : customFrequencies;
         final gains = EqPreset.interpolateGains(
@@ -1641,7 +1650,21 @@ class EqualizerManager {
       futures.add(_effectsChannel.setDynamicEqEnabled(true));
     }
 
-    if (futures.isNotEmpty) await Future.wait(futures);
+    // Partial-failure tolerance: one failing effect must not abort the rest.
+    if (futures.isNotEmpty) {
+      await Future.wait(
+        futures.map(
+          (f) => f.then<void>((_) {}).catchError((Object e) {
+            ErrorLogger.log(
+              'Effect push failed (continuing with remaining effects)',
+              error: e,
+              category: 'EqualizerManager',
+            );
+          }),
+        ),
+        eagerError: false,
+      );
+    }
 
     // Dynamics last — triggers recalculateActiveStages which may disable OEM
     // engine; apply last to prevent intermediate dropout. No delay needed here
@@ -1655,5 +1678,8 @@ class EqualizerManager {
   void dispose() {
     _saveDebounce?.cancel();
     _saveDebounce = null;
+    _bandGainDebounce?.cancel();
+    _bandGainDebounce = null;
+    _pendingBandGains.clear();
   }
 }

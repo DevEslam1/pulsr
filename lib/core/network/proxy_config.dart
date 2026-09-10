@@ -73,7 +73,11 @@ class ProxyConfig {
       return 'DIRECT';
     }
     final cleanHost = host.trim();
-    final formattedHost = cleanHost.contains(':') ? '[$cleanHost]' : cleanHost;
+    // Don't double-wrap already-bracketed IPv6 like [::1].
+    final formattedHost =
+        (cleanHost.contains(':') && !(cleanHost.startsWith('[') && cleanHost.endsWith(']')))
+            ? '[$cleanHost]'
+            : cleanHost;
     switch (type) {
       case AppProxyType.http:
         return 'PROXY $formattedHost:$port; DIRECT';
@@ -229,7 +233,7 @@ class ProxyEntry {
       line = line.replaceFirst(RegExp(r'^[a-zA-Z0-9]+:\/\/'), '');
     }
 
-    // Handle user:pass@host:port format
+    // Handle user:pass@host:port format (host may be bracketed IPv6 [::1]).
     if (line.contains('@')) {
       final lastAtIndex = line.lastIndexOf('@');
       final authPart = line.substring(0, lastAtIndex);
@@ -239,11 +243,20 @@ class ProxyEntry {
       final user = authTokens[0].trim();
       final pass = authTokens.length > 1 ? authTokens.sublist(1).join(':') : '';
 
-      final serverTokens = serverPart.split(':');
-      final host = serverTokens[0].trim();
-      final port = serverTokens.length > 1
-          ? int.tryParse(serverTokens[1].trim()) ?? 8080
-          : 8080;
+      String host;
+      int port = 8080;
+      final bracketed = RegExp(r'^\[(.+)\](?::(\d+))?$').firstMatch(serverPart.trim());
+      if (bracketed != null) {
+        host = bracketed.group(1)!.trim();
+        final portStr = bracketed.group(2);
+        if (portStr != null) port = int.tryParse(portStr) ?? 8080;
+      } else {
+        final serverTokens = serverPart.split(':');
+        host = serverTokens[0].trim();
+        port = serverTokens.length > 1
+            ? int.tryParse(serverTokens[1].trim()) ?? 8080
+            : 8080;
+      }
 
       if (host.isNotEmpty) {
         return ProxyEntry(
@@ -257,10 +270,26 @@ class ProxyEntry {
       }
     }
 
-    // Handle delimiters: colon, comma, tab, whitespace
+    // Handle delimiters: bracketed IPv6 [::1]:port, then colon, comma, tab, whitespace
     List<String> parts;
-    if (line.contains(':')) {
+    final bracketedIpv6 =
+        RegExp(r'^\[(.+)\](?::(\d+))?(?::([^:]*)(?::(.*))?)?$')
+            .firstMatch(line);
+    if (bracketedIpv6 != null) {
+      parts = [
+        bracketedIpv6.group(1) ?? '',
+        if (bracketedIpv6.group(2) != null) bracketedIpv6.group(2)!,
+        if (bracketedIpv6.group(3) != null) bracketedIpv6.group(3)!,
+        if (bracketedIpv6.group(4) != null) bracketedIpv6.group(4)!,
+      ];
+    } else if (line.startsWith('[')) {
+      // Malformed bracketed entry — reject instead of shredding on ':'.
+      return null;
+    } else if (line.contains(':') && !RegExp(r'^\d{0,4}(:[\da-fA-F]{0,4}){2,}').hasMatch(line)) {
       parts = line.split(':');
+    } else if (RegExp(r'^\d{0,4}(:[\da-fA-F]{0,4}){2,}').hasMatch(line)) {
+      // Bare IPv6 without port/brackets — treat whole line as host, default port.
+      parts = [line];
     } else if (line.contains(',')) {
       parts = line.split(',');
     } else if (line.contains('\t')) {
@@ -290,12 +319,20 @@ class ProxyEntry {
   }
 
   /// Parses multiple lines of text into a list of [ProxyEntry].
+  /// Guards against pathological inputs: caps text at 10MB and entries at
+  /// 5000 so a huge paste cannot OOM the settings screen.
   static List<ProxyEntry> parseList(String multiLineText) {
-    final lines = multiLineText.split(RegExp(r'[\r\n]+'));
+    var text = multiLineText;
+    if (text.length > 10 * 1024 * 1024) {
+      text = text.substring(0, 10 * 1024 * 1024);
+    }
+    final lines = text.split(RegExp(r'[\r\n]+'));
     final results = <ProxyEntry>[];
     final seen = <String>{};
 
-    for (int i = 0; i < lines.length; i++) {
+    for (int i = 0;
+        i < lines.length && results.length < 5000;
+        i++) {
       final entry = parse(lines[i]);
       if (entry != null && entry.isValid) {
         final key = '${entry.host}:${entry.port}:${entry.username}';

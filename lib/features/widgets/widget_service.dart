@@ -136,6 +136,10 @@ class WidgetService {
         },
       );
       if (artPath != null && artPath.isNotEmpty) {
+        // Generation check: skip if another song took over while resolving.
+        if (_pendingArtworkSong != null && _pendingArtworkSong!.id != song.id) {
+          return;
+        }
         _lastSavedArtworkSongId = song.id;
         await HomeWidget.saveWidgetData<String>('artwork', artPath);
         await HomeWidget.updateWidget(

@@ -1934,7 +1934,10 @@ class YtmAccountService {
     return false;
   }
 
-  String? _extractContinuationToken(dynamic node) {
+  String? _extractContinuationToken(dynamic node, [int depth = 0]) {
+    // Iterative guard via depth cap: InnerTube payloads are shallow (<30);
+    // anything deeper is malformed — bail instead of stack-overflowing.
+    if (depth > 40) return null;
     if (node is Map<String, dynamic>) {
       // Canonical format: nextContinuationData.continuation
       if (node.containsKey('nextContinuationData')) {
@@ -1956,12 +1959,14 @@ class YtmAccountService {
         return node['nextRadioContinuationData']?['continuation'] as String?;
       }
       for (final val in node.values) {
-        final token = _extractContinuationToken(val);
+        final token = _extractContinuationToken(val, depth + 1);
         if (token != null) return token;
       }
     } else if (node is List) {
-      for (final item in node) {
-        final token = _extractContinuationToken(item);
+      // Cap fan-out to avoid pathological payloads pinning the UI thread.
+      final limit = node.length > 500 ? 500 : node.length;
+      for (var i = 0; i < limit; i++) {
+        final token = _extractContinuationToken(node[i], depth + 1);
         if (token != null) return token;
       }
     }

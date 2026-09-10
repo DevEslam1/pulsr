@@ -160,6 +160,19 @@ class CloudSyncService {
         await batch.commit();
         return;
       } catch (e, st) {
+        // Quota / permission errors are permanent — retrying burns quota
+        // and delays the user-facing error. Fail fast with a clear log.
+        if (e is FirebaseException) {
+          final code = e.code.toLowerCase();
+          if (code.contains('quota') ||
+              code.contains('resource-exhausted') ||
+              code.contains('permission-denied') ||
+              code.contains('unauthenticated')) {
+            ErrorLogger.log('Batch commit failed permanently (${e.code})',
+                error: e, stackTrace: st, category: 'CloudSync');
+            return;
+          }
+        }
         if (attempts >= 3) {
           ErrorLogger.log('Batch commit failed after 3 attempts',
               error: e, stackTrace: st, category: 'CloudSync');

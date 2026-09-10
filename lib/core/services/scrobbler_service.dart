@@ -86,10 +86,14 @@ class ScrobblerService {
   final Map<String, DateTime> _lastScrobblePerService = {};
   bool _isFlushing = false;
 
+  /// Minimum gap between submissions to the same service. Configurable for
+  /// tests / power users; defaults to the Last.fm-friendly 30s.
+  Duration scrobbleThrottle = const Duration(seconds: 30);
+
   bool _canScrobbleService(String service) {
     final last = _lastScrobblePerService[service];
     if (last == null) return true;
-    return DateTime.now().difference(last) >= const Duration(seconds: 30);
+    return DateTime.now().difference(last) >= scrobbleThrottle;
   }
 
   /// Checks for pending scrobble from previous session when app was terminated

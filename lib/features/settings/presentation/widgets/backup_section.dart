@@ -68,8 +68,7 @@ class _BackupSectionState extends State<BackupSection> {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                  'Backup exported successfully to $fileName'),
+              content: Text('Backup exported successfully to $outputUri'),
               backgroundColor: context.palette.accent,
             ),
           );
@@ -95,12 +94,29 @@ class _BackupSectionState extends State<BackupSection> {
       allowedExtensions: ['json'],
     );
 
-    if (result == null || result.path == null) {
-      return;
-    }
+    if (result == null) return;
+    const maxBackupBytes = 10 * 1024 * 1024;
 
-    final filePath = result.path!;
-    final file = File(filePath);
+    String? jsonContent;
+    final webBytes = (result as dynamic).bytes as Uint8List?;
+    if (webBytes != null && webBytes.isNotEmpty) {
+      // Web / in-memory pick path.
+      if (webBytes.length > maxBackupBytes) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Backup file too large (max 10 MB)'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+        return;
+      }
+      jsonContent = utf8.decode(webBytes);
+    } else {
+      if (result.path == null) return;
+      final filePath = result.path!;
+      final file = File(filePath);
 
     if (!await file.exists()) {
       if (context.mounted) {
@@ -114,10 +130,23 @@ class _BackupSectionState extends State<BackupSection> {
       return;
     }
 
-    final jsonContent = await file.readAsString();
+    jsonContent ??= await file.readAsString();
+    } // end file-path branch
+    final resolvedContent = jsonContent;
+    if (resolvedContent == null || resolvedContent.length > maxBackupBytes) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Backup file too large (max 10 MB)'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+      return;
+    }
     Map<String, dynamic> data;
     try {
-      data = jsonDecode(jsonContent) as Map<String, dynamic>;
+      data = jsonDecode(resolvedContent) as Map<String, dynamic>;
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -193,7 +222,7 @@ class _BackupSectionState extends State<BackupSection> {
     setState(() => _isImporting = true);
     try {
       final importUseCase = getIt<ImportBackupUseCase>();
-      final importResult = await importUseCase.execute(jsonContent);
+      final importResult = await importUseCase.execute(resolvedContent);
 
       if (context.mounted) {
         // Reload SettingsCubit so theme and player settings update immediately

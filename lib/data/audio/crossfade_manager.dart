@@ -66,7 +66,14 @@ class CrossfadeManager {
   /// Calculates beat-aligned duration if BPM is provided.
   static Duration calculateBpmAlignedDuration(
       Duration baseDuration, double? bpm) {
-    if (bpm == null || bpm <= 40.0 || bpm >= 240.0) return baseDuration;
+    if (bpm == null || !bpm.isFinite) return baseDuration;
+    if (bpm <= 40.0 || bpm >= 240.0) {
+      ErrorLogger.log(
+        'BPM $bpm out of range (40-240) — using base duration',
+        category: 'CrossfadeManager',
+      );
+      return baseDuration;
+    }
     final secondsPerBeat = 60.0 / bpm;
     // Align to nearest 2, 4, 8, or 16 beats
     final baseSec = baseDuration.inMilliseconds / 1000.0;

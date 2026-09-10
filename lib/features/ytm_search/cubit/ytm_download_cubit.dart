@@ -24,13 +24,16 @@ class YtDownloadItem {
     this.error,
   });
 
-  Map<String, dynamic> toJson() => {'status': status.name, 'error': error};
+  Map<String, dynamic> toJson() => {'status': status.name, 'error': error, 'progress': progress, 'speedKbps': speedKbps, 'etaSeconds': etaSeconds};
   factory YtDownloadItem.fromJson(Map<String, dynamic> json) {
     final statusName = json['status'] as String? ?? 'idle';
     return YtDownloadItem(
       status: YtDownloadStatus.values.firstWhere((e) => e.name == statusName,
           orElse: () => YtDownloadStatus.idle),
       error: json['error'] as String?,
+      progress: (json['progress'] as num?)?.toDouble(),
+      speedKbps: (json['speedKbps'] as num?)?.toDouble(),
+      etaSeconds: (json['etaSeconds'] as num?)?.toInt(),
     );
   }
 }
@@ -98,7 +101,6 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
     if ([
       YtDownloadStatus.running,
       YtDownloadStatus.queued,
-      YtDownloadStatus.done
     ].contains(current.status)) {
       return;
     }
@@ -145,12 +147,13 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
   /// Queues multiple songs for download in batch.
   /// Downloads are processed concurrently according to the service limit (3 active).
   /// Returns the number of songs newly queued.
-  int downloadAll(Iterable<SongsTableData> songs) {
+  int downloadAll(Iterable<SongsTableData> songs, {int maxBatch = 50}) {
     int queuedCount = 0;
     for (final song in songs) {
       final videoId = song.remoteId;
       if (videoId == null || videoId.isEmpty) continue;
 
+      if (queuedCount >= maxBatch) break;
       // Skip tracks that are already local on disk
       if (song.source == SongSource.local) continue;
 
@@ -158,7 +161,6 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
       if ([
         YtDownloadStatus.running,
         YtDownloadStatus.queued,
-        YtDownloadStatus.done
       ].contains(current.status)) {
         continue;
       }
@@ -211,11 +213,18 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
     }
   }
 
+  Future<void> retryDownload(SongsTableData song) async {
+    final videoId = song.remoteId;
+    if (videoId == null || videoId.isEmpty) return;
+    _set(videoId, const YtDownloadItem(status: YtDownloadStatus.idle));
+    await download(song);
+  }
+
   @override
-  Future<void> close() {
+  Future<void> close() async {
     _saveDebounce?.cancel();
     _saveDebounce = null;
-    _savePersistedState();
+    await _savePersistedState();
     _lastEmitTimeByVideoId.clear();
     return super.close();
   }

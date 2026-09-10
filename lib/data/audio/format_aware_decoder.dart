@@ -22,7 +22,10 @@ class FormatAwareDecoder {
       return resolveYtmStream(song, tag);
     }
 
-    final ext = song.path.split('.').last.toLowerCase();
+    final cleanPath = song.path.split('?').first;
+    final dot = cleanPath.lastIndexOf('.');
+    final ext =
+        dot >= 0 ? cleanPath.substring(dot + 1).toLowerCase() : '';
 
     switch (ext) {
       // 1. High-Res Lossless: Direct file access, native decoder
@@ -38,7 +41,10 @@ class FormatAwareDecoder {
         if (decodeDsdToPcm != null) {
           return decodeDsdToPcm!(song, tag);
         }
-        return AudioSource.uri(Uri.file(song.path), tag: tag);
+        throw UnsupportedError(
+          'DSD format (.$ext) needs a DSD-to-PCM decoder. '
+          'File: ${song.path}. Provide decodeDsdToPcm or convert to FLAC.',
+        );
 
       // 3. Compressed Standard Formats
       case 'mp3':

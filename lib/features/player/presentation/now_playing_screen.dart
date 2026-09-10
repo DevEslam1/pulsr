@@ -148,6 +148,8 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
   late final CurvedAnimation _curvedAnimation;
   late Animation<double> _anim;
   double _dragOffset = 0.0;
+  int _activePointers = 0;
+  bool get _singleTouch => _activePointers <= 1;
 
   @override
   void initState() {
@@ -176,10 +178,12 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
   }
 
   void _onVerticalDragStart(DragStartDetails details) {
+    if (!_singleTouch) return;
     _animController.stop();
   }
 
   void _onVerticalDragUpdate(DragUpdateDetails details) {
+    if (!_singleTouch) return;
     if (details.primaryDelta != null) {
       final newOffset = _dragOffset + details.primaryDelta!;
       if (newOffset >= 0) {
@@ -191,6 +195,15 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
   }
 
   void _onVerticalDragEnd(DragEndDetails details) {
+    if (!_singleTouch) {
+      // Second finger joined mid-gesture — snap back instead of dismissing.
+      if (_dragOffset > 0) {
+        _anim = Tween<double>(begin: _dragOffset, end: 0.0)
+            .animate(_curvedAnimation);
+        _animController.forward(from: 0.0);
+      }
+      return;
+    }
     final velocity = details.primaryVelocity ?? 0;
     if (_dragOffset > 100 || velocity > 450) {
       widget.onDismiss();
@@ -206,16 +219,22 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
     final screenHeight = MediaQuery.sizeOf(context).height;
     final progress = (_dragOffset / screenHeight).clamp(0.0, 1.0);
 
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onVerticalDragStart: _onVerticalDragStart,
-      onVerticalDragUpdate: _onVerticalDragUpdate,
-      onVerticalDragEnd: _onVerticalDragEnd,
-      child: Transform.translate(
-        offset: Offset(0, _dragOffset),
-        child: Opacity(
-          opacity: (1.0 - progress * 0.4).clamp(0.0, 1.0),
-          child: widget.child,
+    return Listener(
+      onPointerDown: (_) => _activePointers++,
+      onPointerUp: (_) => _activePointers = (_activePointers - 1).clamp(0, 10),
+      onPointerCancel: (_) =>
+          _activePointers = (_activePointers - 1).clamp(0, 10),
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onVerticalDragStart: _onVerticalDragStart,
+        onVerticalDragUpdate: _onVerticalDragUpdate,
+        onVerticalDragEnd: _onVerticalDragEnd,
+        child: Transform.translate(
+          offset: Offset(0, _dragOffset),
+          child: Opacity(
+            opacity: (1.0 - progress * 0.4).clamp(0.0, 1.0),
+            child: widget.child,
+          ),
         ),
       ),
     );

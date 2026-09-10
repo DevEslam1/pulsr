@@ -36,6 +36,18 @@ class MusicRepository implements IMusicRepository {
             t.path.like('ytmusic://%').not());
 
       if (searchQuery != null && searchQuery.trim().isNotEmpty) {
+        final ftsQuery = _toFtsQuery(searchQuery);
+        if (ftsQuery != null) {
+          // 10/10 path: FTS5 index instead of full-table LIKE scan.
+          return _watchSongsFts(
+            ftsQuery: ftsQuery,
+            sortBy: sortBy,
+            ascending: ascending,
+            limit: limit ?? 200,
+            offset: offset,
+            excludedFolders: excludedFolders,
+          );
+        }
         final pattern = '%${searchQuery.trim().toLowerCase()}%';
         query.where((t) =>
             t.title.lower().like(pattern) |
@@ -99,6 +111,71 @@ class MusicRepository implements IMusicRepository {
             (e) => Left<AppFailure, List<SongsTableData>>(
                 DatabaseFailure('Failed to watch songs', e)),
           );
+    } catch (e) {
+      return Stream.value(Left(DatabaseFailure('Failed to watch songs', e)));
+    }
+  }
+
+  /// Sanitizes user input into a safe FTS5 prefix query. Returns null when
+  /// the input has no usable token (caller falls back to LIKE).
+  String? _toFtsQuery(String input) {
+    final tokens = input
+        .toLowerCase()
+        .split(RegExp(r'[^a-z0-9\u00C0-\u024F\u0370-\u03FF\u0600-\u06FF]+'))
+        .where((t) => t.isNotEmpty)
+        .take(8)
+        .map((t) => '"${t.replaceAll('"', '""')}"*')
+        .toList();
+    if (tokens.isEmpty) return null;
+    return tokens.join(' ');
+  }
+
+  Stream<Result<List<SongsTableData>>> _watchSongsFts({
+    required String ftsQuery,
+    required String sortBy,
+    required bool ascending,
+    required int limit,
+    int? offset,
+    List<String> excludedFolders = const [],
+  }) {
+    try {
+      final orderCol = switch (sortBy) {
+        'artist' => 's.artist',
+        'dateAdded' => 's.date_added',
+        'duration' => 's.duration_ms',
+        'album' => 's.album',
+        _ => 's.title',
+      };
+      final dir = ascending ? 'ASC' : 'DESC';
+      final buffer = StringBuffer(
+        'SELECT s.* FROM songs s '
+        'JOIN songs_fts f ON s.id = f.rowid '
+        'WHERE songs_fts MATCH ? AND s.is_missing = 0 ',
+      );
+      final vars = <Variable>[Variable.withString(ftsQuery)];
+      for (final folder in excludedFolders.where((f) => f.trim().isNotEmpty)) {
+        buffer.write('AND s.path NOT LIKE ? ');
+        final prefix = folder.endsWith(Platform.pathSeparator)
+            ? folder
+            : '$folder${Platform.pathSeparator}';
+        vars.add(Variable.withString('$prefix%'));
+      }
+      buffer.write('ORDER BY $orderCol $dir LIMIT ? ');
+      vars.add(Variable.withInt(limit));
+      if (offset != null) {
+        buffer.write('OFFSET ?');
+        vars.add(Variable.withInt(offset));
+      }
+      return _db
+          .customSelect(buffer.toString(),
+              variables: vars, readsFrom: {_db.songsTable}).watch().asyncMap((rows) async {
+        final songs = await Future.wait(
+            rows.map((r) => _db.songsTable.mapFromRow(r)));
+        return Right<AppFailure, List<SongsTableData>>(songs);
+      }).handleError(
+        (e) => Left<AppFailure, List<SongsTableData>>(
+            DatabaseFailure('Failed to watch songs (FTS)', e)),
+      );
     } catch (e) {
       return Stream.value(Left(DatabaseFailure('Failed to watch songs', e)));
     }

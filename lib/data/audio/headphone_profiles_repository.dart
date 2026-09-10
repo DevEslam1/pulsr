@@ -61,6 +61,12 @@ class HeadphoneProfilesRepository {
   }
 
   Future<void> addCustomProfile(HeadphoneProfile profile) async {
+    if (profile.gains.isEmpty ||
+        profile.gains.any((g) => !g.isFinite || g.abs() > 15)) {
+      ErrorLogger.log('Rejected custom profile with invalid gains: ${profile.id}',
+          category: 'HeadphoneProfilesRepository');
+      return;
+    }
     // Replace if existing ID matches, else prepend
     final existingIndex = _profiles.indexWhere((p) => p.id == profile.id);
     if (existingIndex >= 0) {
@@ -72,6 +78,12 @@ class HeadphoneProfilesRepository {
   }
 
   Future<void> removeProfile(String id) async {
+    // Bundled profiles are read-only — only custom_* can be removed.
+    if (!id.startsWith('custom_')) {
+      ErrorLogger.log('Refused to remove bundled profile: $id',
+          category: 'HeadphoneProfilesRepository');
+      return;
+    }
     _profiles = _profiles.where((p) => p.id != id).toList();
     await _saveCustomProfiles();
   }

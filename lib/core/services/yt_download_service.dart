@@ -1385,24 +1385,34 @@ class YtDownloadService {
 
   Future<void> _tag(String path, SongsTableData song,
       {String? artworkPath}) async {
-    try {
-      await _tagChannel.invokeMethod('writeTags', {
-        'path': path,
-        'title': song.title,
-        'artist': song.artist,
-        'album': song.album,
-        'genre': song.genre,
-        'year': song.year,
-        'trackNumber': song.trackNumber,
-        'comment': null,
-        'lyrics': null,
-        'artworkPath': artworkPath,
-        'removeArtwork': false,
-      });
-    } on PlatformException catch (e) {
-      ErrorLogger.log('Tagging downloaded track failed: ${e.code}',
-          category: 'YTM');
+    // Retry once on transient failures — a flaky tag write must not fail
+    // the whole download.
+    Object? lastError;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        await _tagChannel.invokeMethod('writeTags', {
+          'path': path,
+          'title': song.title,
+          'artist': song.artist,
+          'album': song.album,
+          'genre': song.genre,
+          'year': song.year,
+          'trackNumber': song.trackNumber,
+          'comment': null,
+          'lyrics': null,
+          'artworkPath': artworkPath,
+          'removeArtwork': false,
+        });
+        return;
+      } on PlatformException catch (e) {
+        lastError = e;
+        if (attempt == 0) {
+          await Future<void>.delayed(const Duration(milliseconds: 500));
+        }
+      }
     }
+    ErrorLogger.log('Tagging downloaded track failed after retry: $lastError',
+        category: 'YTM');
   }
 
   static String sanitizeFilename(String artist, String title, String ext) {

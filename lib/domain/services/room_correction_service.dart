@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 import 'package:injectable/injectable.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../domain/models/eq_preset.dart';
 import '../../core/constants/channels.dart';
@@ -150,15 +151,39 @@ class RoomCorrectionService {
     double maxGainDb = 15.0,
     double maxAdjacentDeltaDb = 8.0,
   }) {
+    if (responseDb.isEmpty || tones.isEmpty || centers.isEmpty) return [];
+    if (!maxGainDb.isFinite || maxGainDb <= 0) return List.filled(centers.length, 0.0);
+    if (!maxAdjacentDeltaDb.isFinite || maxAdjacentDeltaDb < 0) {
+      maxAdjacentDeltaDb = 8.0;
+    }
+    // Sanitize inputs: non-finite tones/measurements carry no information.
+    final cleanTones = tones.where((t) => t.isFinite && t > 0).toList();
+    final cleanResponse = <double>[];
+    for (var i = 0; i < responseDb.length && i < tones.length; i++) {
+      if (tones[i].isFinite && tones[i] > 0 && responseDb[i].isFinite) {
+        cleanResponse.add(responseDb[i]);
+      }
+    }
+    // Align lengths after sanitizing.
+    final n = cleanTones.length < cleanResponse.length
+        ? cleanTones.length
+        : cleanResponse.length;
+    if (n == 0) return List.filled(centers.length, 0.0);
+    final tonesA = cleanTones.sublist(0, n);
+    final respA = cleanResponse.sublist(0, n);
     final gains = <double>[];
     for (final center in centers) {
+      if (!center.isFinite || center <= 0) {
+        gains.add(0.0);
+        continue;
+      }
       final logC = math.log(center);
       var bestIdx = 0;
       var bestDist = double.infinity;
       var windowSum = 0.0;
       var windowCount = 0;
-      for (var i = 0; i < tones.length && i < responseDb.length; i++) {
-        final logT = math.log(tones[i]);
+      for (var i = 0; i < tonesA.length; i++) {
+        final logT = math.log(tonesA[i]);
         final dist = (logT - logC).abs();
         if (dist < bestDist) {
           bestDist = dist;
@@ -166,11 +191,11 @@ class RoomCorrectionService {
         }
         // One-octave window around the center frequency.
         if ((logT - logC).abs() <= math.ln2 / 2) {
-          windowSum += responseDb[i];
+          windowSum += respA[i];
           windowCount++;
         }
       }
-      final dev = windowCount > 0 ? windowSum / windowCount : responseDb[bestIdx];
+      final dev = windowCount > 0 ? windowSum / windowCount : respA[bestIdx];
       final correction = -dev;
       final clamped = correction.clamp(-maxGainDb, maxGainDb).toDouble();
       gains.add(clamped);
@@ -203,8 +228,19 @@ class RoomCorrectionService {
   bool get isCapturing => _capturing;
 
   /// Starts mic capture; PCM blocks accumulate until [stopCapture].
+  /// Returns false with a log when microphone permission is denied.
   Future<bool> startCapture({int sampleRate = captureSampleRate}) async {
     try {
+      final micStatus = await Permission.microphone.status;
+      if (!micStatus.isGranted) {
+        final requested = await Permission.microphone.request();
+        if (!requested.isGranted) {
+          ErrorLogger.log(
+              'Room-correction capture blocked: microphone permission denied',
+              category: 'RoomCorrection');
+          return false;
+        }
+      }
       _pcmBuffer.clear();
       _captureSub = _events.receiveBroadcastStream().listen((data) {
         if (data is Map && data['pcm'] is Uint8List) {

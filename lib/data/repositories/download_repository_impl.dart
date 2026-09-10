@@ -382,11 +382,15 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     if (isTerminal) {
       _lastProgressEmitMs.remove(videoId);
     }
-    _schedulePersist();
+    _schedulePersist(immediateOnTerminal: isTerminal);
   }
 
   void dispose() {
     _saveDebounce?.cancel();
+    _saveDebounce = null;
+    // Flush pending state synchronously so terminal states are never lost
+    // on a fast close/kill after the debounce window opened.
+    unawaited(_persistNow());
     for (final timer in _throttleFlushTimers.values) {
       timer.cancel();
     }
@@ -395,15 +399,25 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     if (!_streamController.isClosed) _streamController.close();
   }
 
-  void _schedulePersist() {
+  void _schedulePersist({bool immediateOnTerminal = false}) {
+    if (immediateOnTerminal) {
+      _saveDebounce?.cancel();
+      _saveDebounce = null;
+      unawaited(_persistNow());
+      return;
+    }
     _saveDebounce?.cancel();
     _saveDebounce = Timer(const Duration(milliseconds: 800), () async {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        final rawList = _tasks.values.map((t) => t.toJson()).toList();
-        await prefs.setString(_prefKey, jsonEncode(rawList));
-      } catch (_) {}
+      await _persistNow();
     });
+  }
+
+  Future<void> _persistNow() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rawList = _tasks.values.map((t) => t.toJson()).toList();
+      await prefs.setString(_prefKey, jsonEncode(rawList));
+    } catch (_) {}
   }
 
   void _processQueue() {

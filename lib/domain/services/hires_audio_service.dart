@@ -183,10 +183,28 @@ class HiResAudioService {
           'setBitPerfectMode',
           {'enabled': enabled}).timeout(const Duration(seconds: 8));
       await getAudioOutputInfo();
+      if (success != true && enabled) {
+        // Unsupported hardware: fall back to DSP path and refresh state so
+        // the UI never shows bit-perfect as active when it isn't.
+        ErrorLogger.log(
+            'Bit-perfect rejected by device — falling back to DSP path',
+            category: 'HiResAudio');
+        try {
+          await _methodChannel.invokeMethod<bool>(
+              'setBitPerfectMode', {'enabled': false});
+        } catch (_) {}
+        await getAudioOutputInfo();
+        return false;
+      }
       return success ?? false;
     } catch (e, st) {
       ErrorLogger.log('Failed to setBitPerfectMode($enabled)',
           error: e, stackTrace: st, category: 'HiResAudio');
+      // Device may have disconnected mid-call — refresh so stale
+      // bit-perfect state is never displayed.
+      try {
+        await getAudioOutputInfo();
+      } catch (_) {}
       return false;
     }
   }
@@ -256,6 +274,21 @@ class HiResAudioService {
   Future<bool> setTargetOutputFormat(
       {int sampleRate = 0, int bitDepth = 0}) async {
     if (!PlatformCapabilities.isAndroid) return false;
+    // Validate before hitting native: 0 = auto, otherwise must be a sane
+    // rate; bit depth must be 0 (auto), 16, 24 or 32.
+    const validRates = <int>{
+      0, 44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 768000
+    };
+    if (!validRates.contains(sampleRate)) {
+      ErrorLogger.log(
+          'Rejected invalid sample rate $sampleRate', category: 'HiResAudio');
+      return false;
+    }
+    if (bitDepth != 0 && bitDepth != 16 && bitDepth != 24 && bitDepth != 32) {
+      ErrorLogger.log('Rejected invalid bit depth $bitDepth',
+          category: 'HiResAudio');
+      return false;
+    }
     try {
       final bool? success = await _methodChannel.invokeMethod<bool>(
           'setTargetOutputFormat', {
@@ -323,6 +356,12 @@ class HiResAudioService {
 
   Future<bool> setBluetoothSampleRate(int hz) async {
     if (!PlatformCapabilities.isAndroid) return false;
+    const validBtRates = <int>{44100, 48000, 88200, 96000, 176400, 192000};
+    if (!validBtRates.contains(hz)) {
+      ErrorLogger.log('Rejected invalid BT sample rate $hz',
+          category: 'HiResAudio');
+      return false;
+    }
     try {
       final bool? ok = await _methodChannel.invokeMethod<bool>(
           'setBluetoothSampleRate',

@@ -66,8 +66,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
       final existing = prefs.getStringList(_historyKey) ?? List.from(state.history);
       final updated = [q, ...existing.where((h) => h.toLowerCase() != q.toLowerCase())].take(_historyMax).toList();
       await prefs.setStringList(_historyKey, updated);
-      // Do not emit extra state here — history is merged into main search result emit to keep blocTest stable
-      // History will be loaded on next init or via explicit refresh
+      if (!isClosed) safeEmit(state.copyWith(history: updated));
     } catch (_) {}
   }
 
