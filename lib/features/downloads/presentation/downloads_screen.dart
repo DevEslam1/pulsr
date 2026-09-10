@@ -44,78 +44,99 @@ class DownloadsScreen extends StatelessWidget {
 
           final tasks = state.taskList;
 
+          // FIX-A11: Pull-to-refresh on downloads screen
+          Widget content;
           if (tasks.isEmpty) {
-            return Column(
-              children: [
-                if (state.storageStats.totalBytes > 0)
-                  StorageStatsHeader(stats: state.storageStats),
-                Expanded(
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(32.0),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.download_done_rounded,
-                            size: 64,
-                            color: p.textTertiary,
+            content = LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Column(
+                    children: [
+                      if (state.storageStats.totalBytes > 0)
+                        StorageStatsHeader(stats: state.storageStats),
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32.0),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.download_done_rounded,
+                                size: 64,
+                                color: p.textTertiary,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                l10n.noDownloadsTitle,
+                                style: TextStyle(
+                                  color: p.textPrimary,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                l10n.noDownloadsSubtitle,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: p.textSecondary,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 16),
-                          Text(
-                            l10n.noDownloadsTitle,
-                            style: TextStyle(
-                              color: p.textPrimary,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            l10n.noDownloadsSubtitle,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: p.textSecondary,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
-              ],
+              ),
+            );
+          } else {
+            content = ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.only(bottom: 24),
+              itemCount: tasks.length + 1,
+              findChildIndexCallback: (Key key) {
+                if (key is ValueKey<String>) {
+                  final id = key.value;
+                  if (id == 'storage_stats_header') return 0;
+                  final idx = tasks.indexWhere((t) => t.videoId == id);
+                  return idx >= 0 ? idx + 1 : null;
+                }
+                return null;
+              },
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  return StorageStatsHeader(
+                    key: const ValueKey('storage_stats_header'),
+                    stats: state.storageStats,
+                  );
+                }
+
+                final task = tasks[index - 1];
+                return Padding(
+                  key: ValueKey(task.videoId),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  child: DownloadTile(task: task),
+                );
+              },
             );
           }
 
-          return ListView.builder(
-            padding: const EdgeInsets.only(bottom: 24),
-            itemCount: tasks.length + 1,
-            findChildIndexCallback: (Key key) {
-              if (key is ValueKey<String>) {
-                final id = key.value;
-                if (id == 'storage_stats_header') return 0;
-                final idx = tasks.indexWhere((t) => t.videoId == id);
-                return idx >= 0 ? idx + 1 : null;
-              }
-              return null;
+          return RefreshIndicator(
+            color: p.accent,
+            onRefresh: () async {
+              final cubit = context.read<DownloadsCubit>();
+              await Future.wait([
+                cubit.loadInitialTasks(),
+                cubit.refreshStorageStats(),
+              ]);
             },
-            itemBuilder: (context, index) {
-              if (index == 0) {
-                return StorageStatsHeader(
-                  key: const ValueKey('storage_stats_header'),
-                  stats: state.storageStats,
-                );
-              }
-
-              final task = tasks[index - 1];
-              return Padding(
-                key: ValueKey(task.videoId),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                child: DownloadTile(task: task),
-              );
-            },
+            child: content,
           );
         },
       ),

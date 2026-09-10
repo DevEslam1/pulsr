@@ -866,7 +866,10 @@ class PulsrAudioHandler extends BaseAudioHandler
                 _lastPositionEmitMs = now;
                 _positionSubject.add(pos);
               }
-              if (pos.inSeconds >= 5 && _consecutiveFailures > 0) {
+              // FIX-B03: Guard failure reset on position ticks: only reset when ready and pos > 2s
+              if (player.processingState == ProcessingState.ready &&
+                  pos > const Duration(seconds: 2) &&
+                  _consecutiveFailures > 0) {
                 _consecutiveFailures = 0;
               }
               _saveCurrentPosition();
@@ -1883,6 +1886,18 @@ class PulsrAudioHandler extends BaseAudioHandler
             await _inactivePlayer.play();
           } catch (_) {}
         }
+
+        // FIX-B02: Abort if crossfade ID changed during play() await
+        if (_crossfadeManager.currentFadeId != currentFadeId) {
+          try {
+            await _inactivePlayer.stop();
+          } catch (_) {}
+          try {
+            await _activePlayer.setVolume(initialActiveVolume);
+          } catch (_) {}
+          return;
+        }
+
         // Poll until the decoder has produced its first audio frame
         // (processingState == ready/buffering with playing==true), or until
         // 1000ms have elapsed as a safety cap.
@@ -1895,6 +1910,17 @@ class PulsrAudioHandler extends BaseAudioHandler
           }
           await Future.delayed(const Duration(milliseconds: 20));
           settleWaited += 20;
+        }
+
+        // FIX-B02: Abort if crossfade ID changed during settle loop
+        if (_crossfadeManager.currentFadeId != currentFadeId) {
+          try {
+            await _inactivePlayer.stop();
+          } catch (_) {}
+          try {
+            await _activePlayer.setVolume(initialActiveVolume);
+          } catch (_) {}
+          return;
         }
 
         final ps = _inactivePlayer.processingState;

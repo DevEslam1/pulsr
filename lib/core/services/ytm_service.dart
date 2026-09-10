@@ -143,23 +143,57 @@ class YtmService {
   DateTime _botChallengeUntil = DateTime.fromMillisecondsSinceEpoch(0);
   YtmException? _lastBotChallenge;
 
+  // FIX-C01: Per-video failure tracking (trip only if 3 failures for that videoId within 60s)
+  final Map<String, List<DateTime>> _videoFailures = {};
+  final Map<String, DateTime> _videoCooldownUntil = {};
+
+  bool isVideoCoolingDown(String videoId) {
+    final until = _videoCooldownUntil[videoId];
+    if (until == null) return false;
+    if (DateTime.now().isBefore(until)) return true;
+    _videoCooldownUntil.remove(videoId);
+    return false;
+  }
+
+  // FIX-C01: Record a failure for a specific videoId
+  void recordFailure(String videoId, [YtmException? error]) {
+    _noteBotChallenge(error ?? const YtmException('BOT_CHALLENGE'), videoId: videoId);
+  }
+
   bool get isBotCoolingDown => DateTime.now().isBefore(_botChallengeUntil);
 
-  void _noteBotChallenge(YtmException e) {
+  void _noteBotChallenge(YtmException e, {String? videoId}) {
     _lastBotChallenge = e;
-    // Use extended cooldown for IP-level blocks: these don't resolve by
-    // just waiting a minute, and retrying only deepens the block. Keyed off
-    // the parsed signal, not off `isNetwork`, so an offline blip no longer
-    // buys a 3-minute cooldown that outlives the outage.
-    final cooldown = e.isIpBlocked ? _ipBlockCooldown : _botCooldown;
-    _botChallengeUntil = DateTime.now().add(cooldown);
+    final now = DateTime.now();
+
+    // FIX-C01: Key circuit breaker per videoId (3 failures within 60s)
+    if (videoId != null && videoId.isNotEmpty) {
+      final failures = _videoFailures.putIfAbsent(videoId, () => []);
+      failures.removeWhere((t) => now.difference(t).inSeconds > 60);
+      failures.add(now);
+
+      if (failures.length >= 3) {
+        final cooldown = e.isIpBlocked ? _ipBlockCooldown : _botCooldown;
+        _videoCooldownUntil[videoId] = now.add(cooldown);
+        if (e.isIpBlocked) {
+          _botChallengeUntil = now.add(_ipBlockCooldown);
+        }
+      }
+    } else {
+      final cooldown = e.isIpBlocked ? _ipBlockCooldown : _botCooldown;
+      _botChallengeUntil = now.add(cooldown);
+    }
   }
 
   /// Any successful resolve proves the IP is not blocked, so an active cooldown
   /// must end: a fixed window kept skipping the native tiers (the only ones
   /// that produce high-bitrate streams) for minutes after YouTube let us back
   /// in, and every retry inside the window rethrew the stale challenge.
-  void _noteResolveSuccess() {
+  void _noteResolveSuccess({String? videoId}) {
+    if (videoId != null) {
+      _videoFailures.remove(videoId);
+      _videoCooldownUntil.remove(videoId);
+    }
     if (_lastBotChallenge == null &&
         _botChallengeUntil.millisecondsSinceEpoch == 0) {
       return;
@@ -169,7 +203,14 @@ class YtmService {
   }
 
   /// Test-only: clears bot-cooldown state.
-  void debugClearBotCooldown() {
+  void debugClearBotCooldown([String? videoId]) {
+    if (videoId != null) {
+      _videoFailures.remove(videoId);
+      _videoCooldownUntil.remove(videoId);
+    } else {
+      _videoFailures.clear();
+      _videoCooldownUntil.clear();
+    }
     _botChallengeUntil = DateTime.fromMillisecondsSinceEpoch(0);
     _lastBotChallenge = null;
   }
@@ -678,8 +719,12 @@ class YtmService {
     // Remember the first classified failure so the caller gets an actionable
     // error (e.g. BOT_CHALLENGE → "verification" + poToken recovery) instead
     // of a generic YTM_FAILED that maps to recoveryAction.none (dead end).
+    // Remember the first classified failure so the caller gets an actionable
+    // error (e.g. BOT_CHALLENGE → "verification" + poToken recovery) instead
+    // of a generic YTM_FAILED that maps to recoveryAction.none (dead end).
     Object? firstError;
-    var inBotCooldown = isBotCoolingDown;
+    // FIX-C01: Check per-video cooldown as well as global IP cooldown
+    var inBotCooldown = isBotCoolingDown || isVideoCoolingDown(videoId);
     if (inBotCooldown) {
       // If native PoTokenManager has already refreshed the token in the background,
       // lift the cooldown immediately so resolution can succeed with the new token.
@@ -688,7 +733,7 @@ class YtmService {
         if (ready) {
           debugPrint(
               '[YTM_SERVICE] Native poToken is ready, lifting bot cooldown for $videoId');
-          _noteResolveSuccess();
+          _noteResolveSuccess(videoId: videoId);
           inBotCooldown = false;
         }
       } catch (_) {}
@@ -729,7 +774,7 @@ class YtmService {
               // bitrate. put() alone let a later cache hit rebuild the stream by
               // guessing them from the URL, which wrote Opus bytes into a .m4a.
               urlCache?.putStream(directStream, quality: quality);
-              _noteResolveSuccess();
+              _noteResolveSuccess(videoId: videoId);
               return directStream;
             }
           }
@@ -755,7 +800,7 @@ class YtmService {
       if (!inBotCooldown &&
           e is YtmException &&
           (e.isBotBlocked || e.isThrottled || e.isIpBlocked)) {
-        _noteBotChallenge(e);
+        _noteBotChallenge(e, videoId: videoId);
       }
     }
 
@@ -788,7 +833,7 @@ class YtmService {
           _tracker?.markStage(PlaybackStage.urlObtained);
         } catch (_) {}
         urlCache?.putStream(stream, quality: quality);
-        _noteResolveSuccess();
+        _noteResolveSuccess(videoId: videoId);
         return stream;
       }
     } catch (e) {
@@ -802,7 +847,7 @@ class YtmService {
       if (!inBotCooldown &&
           e is YtmException &&
           (e.isBotBlocked || e.isThrottled || e.isIpBlocked)) {
-        _noteBotChallenge(e);
+        _noteBotChallenge(e, videoId: videoId);
       }
     }
 
@@ -815,7 +860,7 @@ class YtmService {
           _tracker?.markStage(PlaybackStage.urlObtained);
         } catch (_) {}
         urlCache?.putStream(dartStream, quality: quality);
-        _noteResolveSuccess();
+        _noteResolveSuccess(videoId: videoId);
         return dartStream;
       }
     } catch (e) {
@@ -903,7 +948,8 @@ class YtmService {
               headers: headers,
               body: body,
             )
-            .timeout(const Duration(seconds: 10));
+            // FIX-C06: 12-second timeout per client in _resolveStreamDart
+            .timeout(const Duration(seconds: 12));
 
         if (response.statusCode != 200) continue;
 

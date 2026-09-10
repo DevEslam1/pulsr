@@ -1651,19 +1651,29 @@ class EqualizerManager {
     }
 
     // Partial-failure tolerance: one failing effect must not abort the rest.
+    // FIX-H02: Wrap Future.wait in try/catch without rethrowing so one failure does not abort other effects
     if (futures.isNotEmpty) {
-      await Future.wait(
-        futures.map(
-          (f) => f.then<void>((_) {}).catchError((Object e) {
-            ErrorLogger.log(
-              'Effect push failed (continuing with remaining effects)',
-              error: e,
-              category: 'EqualizerManager',
-            );
-          }),
-        ),
-        eagerError: false,
-      );
+      try {
+        await Future.wait(
+          futures.map(
+            (f) => f.then<void>((_) {}).catchError((Object e) {
+              ErrorLogger.log(
+                'Effect push failed (continuing with remaining effects)',
+                error: e,
+                category: 'EqualizerManager',
+              );
+            }),
+          ),
+          eagerError: false,
+        );
+      } catch (e, st) {
+        ErrorLogger.log(
+          'Future.wait failed while reapplying effects',
+          error: e,
+          stackTrace: st,
+          category: 'EqualizerManager',
+        );
+      }
     }
 
     // Dynamics last — triggers recalculateActiveStages which may disable OEM

@@ -228,7 +228,9 @@ class YtmUrlCache {
   /// A stamp in the past is returned as-is rather than as null: "no stamp" and
   /// "already dead" must not collapse into the same answer, or the caller
   /// cannot tell a fresh URL from an expired one.
-  DateTime? _parseUrlExpiryStamp(String url) {
+  // FIX-C02: Handle both epoch seconds (< 1e11) and milliseconds (>= 1e11)
+  @visibleForTesting
+  static DateTime? parseUrlExpiryStamp(String url) {
     try {
       final uri = Uri.parse(url);
       var expireParam = uri.queryParameters['expire'];
@@ -239,11 +241,14 @@ class YtmUrlCache {
           expireParam = segments[index + 1];
         }
       }
-      final epochSeconds = int.tryParse(expireParam ?? '');
-      if (epochSeconds != null && epochSeconds > 0) {
-        return DateTime.fromMillisecondsSinceEpoch(epochSeconds * 1000);
+      final rawEpoch = int.tryParse(expireParam ?? '');
+      if (rawEpoch != null && rawEpoch > 0) {
+        final ms = rawEpoch >= 100000000000 ? rawEpoch : rawEpoch * 1000;
+        return DateTime.fromMillisecondsSinceEpoch(ms);
       }
     } catch (_) {}
     return null;
   }
+
+  DateTime? _parseUrlExpiryStamp(String url) => parseUrlExpiryStamp(url);
 }

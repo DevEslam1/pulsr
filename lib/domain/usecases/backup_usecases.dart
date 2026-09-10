@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/prefs_keys.dart';
@@ -591,10 +592,17 @@ class ImportBackupUseCase {
     );
   }
 
-  void _validateSchema(Map<String, dynamic> data) {
+  void _validateSchema(Map<String, dynamic> data) => validateSchema(data);
+
+  // FIX-E02: Check unsupported future backup versions
+  @visibleForTesting
+  static void validateSchema(Map<String, dynamic> data) {
     final version = data['version'];
-    if (version == null || version is! int || version < 1 || version > 2) {
-      throw const FormatException('Invalid or unsupported backup version');
+    if (version == null || version is! int || version < 1) {
+      throw const FormatException('Invalid backup version: missing or malformed version field');
+    }
+    if (version > 2) {
+      throw FormatException('Unsupported backup version: $version. Please update Pulsr.');
     }
 
     if (data['favorites'] != null && data['favorites'] is! List) {

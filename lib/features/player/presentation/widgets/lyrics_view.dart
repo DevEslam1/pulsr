@@ -198,6 +198,8 @@ class _LyricsViewState extends State<LyricsView> {
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
       itemCount: widget.lyrics.length,
+      // FIX-F02: Use fixed itemExtent for lists > 100 lines to prevent layout thrash and scroll jank
+      itemExtent: widget.lyrics.length > 100 ? 36.0 : null,
       itemBuilder: (context, index) {
         final line = widget.lyrics[index];
         return Padding(

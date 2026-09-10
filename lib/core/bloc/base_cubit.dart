@@ -188,9 +188,12 @@ abstract class PulsrCubit<S> extends Cubit<S> {
             error: e, stackTrace: s, category: 'PulsrCubit');
       }));
     }
-    unawaited(super.close().catchError((e, s) {
+    // FIX-I01: await super.close() properly so callers awaiting close() have super.close completed
+    try {
+      await super.close();
+    } catch (e, s) {
       ErrorLogger.log('PulsrCubit super.close failed',
           error: e, stackTrace: s, category: 'PulsrCubit');
-    }));
+    }
   }
 }

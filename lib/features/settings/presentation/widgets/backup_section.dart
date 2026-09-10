@@ -133,7 +133,7 @@ class _BackupSectionState extends State<BackupSection> {
     jsonContent ??= await file.readAsString();
     } // end file-path branch
     final resolvedContent = jsonContent;
-    if (resolvedContent == null || resolvedContent.length > maxBackupBytes) {
+    if (resolvedContent.length > maxBackupBytes) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

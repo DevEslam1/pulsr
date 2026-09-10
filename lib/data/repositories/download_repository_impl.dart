@@ -43,7 +43,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   DownloadRepositoryImpl(
     this._ytDownloadService,
   ) {
-    reconcileOnBoot();
+    // FIX-I02: Move reconcileOnBoot() call OUT of the constructor to DownloadsCubit._init()
   }
 
   @override
@@ -57,7 +57,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   @override
   Future<Either<AppFailure, String>> queueDownload(DownloadTask task) async {
     final videoId = task.videoId;
-    if (videoId.isEmpty) {
+    // FIX-A15: Validate task.videoId with RegExp(r'^[A-Za-z0-9_-]{11}$') before proceeding
+    if (!RegExp(r'^[A-Za-z0-9_-]{11}$').hasMatch(videoId)) {
       return const Left(DownloadFailure('Invalid video ID'));
     }
 
@@ -132,6 +133,9 @@ class DownloadRepositoryImpl implements IDownloadRepository {
           await c.future.timeout(const Duration(seconds: 2));
         } catch (_) {}
       }
+      // FIX-A08: Force-remove videoId from _activeVideoIds and _activeCompleters to prevent leaks
+      _activeVideoIds.remove(videoId);
+      _activeCompleters.remove(videoId);
     }
 
     _updateTask(task.copyWith(status: DownloadStatus.paused));
@@ -258,22 +262,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         totalUsedBytes = sizes.fold(0, (a, b) => a + b);
         final existingCount = sizes.where((s) => s > 0).length;
         if (existingCount > 0) completedCount = existingCount;
-        // Self-heal: externally deleted files reconciled (mark failed) — also update tasks map
-        for (int i = 0; i < files.length; i++) {
-          if (sizes[i] == 0) {
-            final vid = _tasks.values
-                .where((t) => t.filePath == files[i])
-                .map((t) => t.videoId)
-                .firstOrNull;
-            if (vid != null) {
-              final old = _tasks[vid];
-              if (old != null && old.status == DownloadStatus.complete) {
-                _tasks[vid] = old.copyWith(status: DownloadStatus.failed, error: 'File deleted');
-                if (!_streamController.isClosed) _streamController.add(_tasks[vid]!);
-              }
-            }
-          }
-        }
+        // FIX-A06: Remove ALL mutations of _tasks from getStorageStats getter.
       } catch (_) {}
 
       final totalBytes = freeBytes + totalUsedBytes;
@@ -328,9 +317,29 @@ class DownloadRepositoryImpl implements IDownloadRepository {
           .toSet();
       await _ytDownloadService.cleanOrphanPartFiles(
           protectedVideoIds: protected.isNotEmpty ? protected : null);
-      // Enqueue paused tasks for resumption? Keep paused state; user taps resume re-resolves URL (expiry handled)
+      // FIX-A06: Call _reconcileCompletedFiles() from reconcileOnBoot
+      await _reconcileCompletedFiles();
     } catch (e) {
       ErrorLogger.log('DownloadRepository reconcileOnBoot failed', error: e);
+    }
+  }
+
+  /// FIX-A06: Reconciles completed tasks against disk, marking deleted files as failed.
+  Future<void> _reconcileCompletedFiles() async {
+    final completedTasks = _tasks.values
+        .where((t) => t.status == DownloadStatus.complete && t.filePath != null)
+        .toList();
+    for (final task in completedTasks) {
+      try {
+        final f = File(task.filePath!);
+        if (!await f.exists()) {
+          final updated = task.copyWith(
+            status: DownloadStatus.failed,
+            error: 'File deleted',
+          );
+          _updateTask(updated);
+        }
+      } catch (_) {}
     }
   }
 
@@ -391,11 +400,13 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     // Flush pending state synchronously so terminal states are never lost
     // on a fast close/kill after the debounce window opened.
     unawaited(_persistNow());
+    // FIX-A07: Cancel all _throttleFlushTimers entries BEFORE closing _streamController
     for (final timer in _throttleFlushTimers.values) {
       timer.cancel();
     }
     _throttleFlushTimers.clear();
     _pendingThrottledTasks.clear();
+    // FIX-A07: Guard _streamController.close() with if (!_streamController.isClosed)
     if (!_streamController.isClosed) _streamController.close();
   }
 
@@ -449,11 +460,20 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     _updateTask(task.copyWith(status: DownloadStatus.downloading));
 
     try {
+      // FIX-A05: Replace hardcoded Duration(minutes: 3) with actual duration from YtmStream.duration after resolution, falling back to Duration(minutes: 3) only when duration is zero.
+      Duration trackDuration = const Duration(minutes: 3);
+      try {
+        final stream = await _ytDownloadService.resolveDownloadStream(videoId);
+        if (stream.duration > Duration.zero) {
+          trackDuration = stream.duration;
+        }
+      } catch (_) {}
+
       final synthTrack = YtmTrack(
         videoId: videoId,
         title: task.title,
         artist: task.artist,
-        duration: const Duration(minutes: 3),
+        duration: trackDuration, // FIX-A05
         artworkUrl: task.artworkUrl,
       );
       final songRow = synthTrack.toSongData();
@@ -512,6 +532,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
             speedKbps: null,
             etaSeconds: null,
           ));
+          // FIX-A06: Reconcile completed files after each successful download
+          unawaited(_reconcileCompletedFiles());
         },
       );
     } catch (e) {
@@ -531,8 +553,4 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       _processQueue();
     }
   }
-}
-
-extension _FirstOrNull<E> on Iterable<E> {
-  E? get firstOrNull => isEmpty ? null : first;
 }

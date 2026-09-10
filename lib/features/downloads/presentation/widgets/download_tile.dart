@@ -114,6 +114,18 @@ class DownloadTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 4),
+                // FIX-A12: Direct cancel button during active download or queued state
+                if (task.status == DownloadStatus.downloading ||
+                    task.status == DownloadStatus.queued)
+                  IconButton(
+                    icon: Icon(Icons.close_rounded,
+                        color: p.textSecondary, size: 20),
+                    tooltip: 'Cancel',
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    onPressed: () => cubit.cancelDownload(task.videoId),
+                  ),
                 Semantics(
                   label: 'Download actions for ${task.title}',
                   button: true,

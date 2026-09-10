@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:home_widget/home_widget.dart';
@@ -147,10 +146,31 @@ class WidgetService {
           androidName: androidWidgetName,
           qualifiedAndroidName: qualifiedAndroidName,
         );
+      } else {
+        // FIX-G03: Push empty string on resolution failure so widget doesn't stay stuck on stale artwork
+        if (_pendingArtworkSong != null && _pendingArtworkSong!.id != song.id) {
+          return;
+        }
+        _lastSavedArtworkSongId = song.id;
+        await HomeWidget.saveWidgetData<String>('artwork', '');
+        await HomeWidget.updateWidget(
+          name: androidWidgetName,
+          androidName: androidWidgetName,
+          qualifiedAndroidName: qualifiedAndroidName,
+        );
       }
     } catch (e, st) {
       ErrorLogger.log('Widget artwork async resolve failed',
           error: e, stackTrace: st, category: 'WidgetService');
+      // FIX-G03: Reset artwork on error
+      try {
+        await HomeWidget.saveWidgetData<String>('artwork', '');
+        await HomeWidget.updateWidget(
+          name: androidWidgetName,
+          androidName: androidWidgetName,
+          qualifiedAndroidName: qualifiedAndroidName,
+        );
+      } catch (_) {}
     }
   }
 
@@ -315,56 +335,15 @@ class WidgetService {
     }
   }
 
-  Future<Uint8List?> _roundCorners(
-    Uint8List src, {
-    required int size,
-    required double radius,
-  }) async {
-    ui.Codec? codec;
-    ui.FrameInfo? frame;
-    ui.Picture? picture;
-    ui.Image? out;
-    try {
-      codec = await ui.instantiateImageCodec(
-        src,
-        targetWidth: size,
-        targetHeight: size,
-      );
-      frame = await codec.getNextFrame();
-
-      final recorder = ui.PictureRecorder();
-      final canvas = ui.Canvas(recorder);
-      final rect =
-          ui.Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble());
-      canvas.clipRRect(
-          ui.RRect.fromRectAndRadius(rect, ui.Radius.circular(radius)));
-      canvas.drawImageRect(
-        frame.image,
-        ui.Rect.fromLTWH(
-            0, 0, frame.image.width.toDouble(), frame.image.height.toDouble()),
-        rect,
-        ui.Paint()..filterQuality = ui.FilterQuality.medium,
-      );
-
-      picture = recorder.endRecording();
-      out = await picture.toImage(size, size);
-      final byteData = await out.toByteData(format: ui.ImageByteFormat.png);
-
-      return byteData?.buffer.asUint8List();
-    } catch (_) {
-      return null;
-    } finally {
-      picture?.dispose();
-      out?.dispose();
-      frame?.image.dispose();
-      codec?.dispose();
-    }
-  }
+  // FIX-G01: Deleted unused dead code _roundCorners (native rounding moved to RemoteViews)
 
   StreamSubscription<Uri?> listenToWidgetClicks(
       void Function(Uri? uri) onUriReceived) {
     return HomeWidget.widgetClicked.listen(onUriReceived);
   }
+
+  @visibleForTesting
+  Future<void> pruneOldWidgetArtwork(Directory dir) => _pruneOldWidgetArtwork(dir);
 
   Future<void> _pruneOldWidgetArtwork(Directory dir) async {
     try {
@@ -389,10 +368,15 @@ class WidgetService {
         }
       }
       if (files.length > _maxCacheSize) {
-        files.sort((a, b) => a.path.compareTo(b.path));
-        for (int i = 0; i < files.length - _maxCacheSize; i++) {
+        // FIX-G02: Sort by modified timestamp oldest first, not by path
+        final fileStats = await Future.wait(files.map((f) async {
+          final stat = await f.stat();
+          return (file: f, modified: stat.modified);
+        }));
+        fileStats.sort((a, b) => a.modified.compareTo(b.modified));
+        for (int i = 0; i < fileStats.length - _maxCacheSize; i++) {
           try {
-            await files[i].delete();
+            await fileStats[i].file.delete();
           } catch (e, st) {
             ErrorLogger.log('_pruneOldWidgetArtwork failed', error: e, stackTrace: st, category: 'WidgetService');
           }

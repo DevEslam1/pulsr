@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -140,6 +141,8 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     AppHttpOverrides.instance.update(config);
 
     // 2. Synchronize Android Native / NewPipe / JVM Proxy
+    // FIX-E03: Add platform check to prevent MissingPluginException on desktop
+    if (!Platform.isAndroid && !Platform.isIOS) return;
     try {
       await _proxyChannel.invokeMethod('setProxy', config.toMap());
     } catch (e) {
@@ -523,7 +526,12 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
         );
       }
       await refreshOutputDevice();
-      await _syncProxySettings(activeProxyConfig);
+      // FIX-E01: Wrap _syncProxySettings in try/catch so native proxy failure doesn't abort settings load
+      try {
+        await _syncProxySettings(activeProxyConfig);
+      } catch (e) {
+        debugPrint('[SettingsCubit] Failed to sync proxy settings during load: $e');
+      }
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to load settings preferences from SharedPreferences',

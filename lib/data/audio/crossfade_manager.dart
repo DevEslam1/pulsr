@@ -573,6 +573,7 @@ class CrossfadeManager {
     // Complete the completer exactly once
     final completer = _crossfadeCompleter;
     _crossfadeCompleter = null;
+    // FIX-B04: Guard against completing an already completed crossfade completer
     if (completer != null && !completer.isCompleted) {
       completer.complete();
     }
@@ -596,6 +597,10 @@ class CrossfadeManager {
 
   /// Marks the start of a crossfade operation targeting [targetIndex].
   void beginCrossfade(int targetIndex) {
+    // FIX-B04: Complete previous crossfade completer before starting new crossfade
+    if (_crossfadeCompleter != null && !_crossfadeCompleter!.isCompleted) {
+      _crossfadeCompleter!.complete();
+    }
     isCrossfading = true;
     pendingIndex = targetIndex;
     _crossfadeCompleter = Completer<void>();
@@ -605,6 +610,7 @@ class CrossfadeManager {
   void finishCrossfade() {
     isCrossfading = false;
     pendingIndex = null;
+    // FIX-B04: Guard against completing an already completed crossfade completer
     if (_crossfadeCompleter != null && !_crossfadeCompleter!.isCompleted) {
       _crossfadeCompleter!.complete();
     }
@@ -622,6 +628,7 @@ class CrossfadeManager {
     _fadeTimer = null;
     isCrossfading = false;
     pendingIndex = null;
+    // FIX-B04: Guard against completing an already completed crossfade completer
     if (_crossfadeCompleter != null && !_crossfadeCompleter!.isCompleted) {
       _crossfadeCompleter!.complete();
     }

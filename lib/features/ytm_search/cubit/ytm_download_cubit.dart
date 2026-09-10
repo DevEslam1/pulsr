@@ -1,9 +1,11 @@
 // lib/features/ytm_search/cubit/ytm_download_cubit.dart
 import 'dart:async';
 import 'dart:convert';
+import 'package:drift/drift.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/di/injection.dart';
 import '../../../core/services/yt_download_service.dart';
 import '../../../data/db/app_database.dart';
 import '../../player/cubit/player_cubit.dart';
@@ -140,6 +142,15 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
     }
 
     final newId = result.getOrElse((_) => song.id);
+    // FIX-C05: If song duration was zero/empty, update duration from resolved stream if available
+    try {
+      final resolved = _service.getResolvedStream(videoId);
+      if (resolved != null && resolved.duration > Duration.zero) {
+        final db = getIt<AppDatabase>();
+        await (db.update(db.songsTable)..where((t) => t.id.equals(newId)))
+            .write(SongsTableCompanion(durationMs: Value(resolved.duration.inMilliseconds)));
+      }
+    } catch (_) {}
     await _playerCubit.swapReconciledSong(song.id, newId);
     _set(videoId, const YtDownloadItem(status: YtDownloadStatus.done));
   }

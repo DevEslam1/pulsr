@@ -2,6 +2,7 @@
 import 'dart:io';
 import 'dart:math';
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 import '../../core/errors/failures.dart';
@@ -118,8 +119,11 @@ class MusicRepository implements IMusicRepository {
 
   /// Sanitizes user input into a safe FTS5 prefix query. Returns null when
   /// the input has no usable token (caller falls back to LIKE).
-  String? _toFtsQuery(String input) {
-    final tokens = input
+  // FIX-D01: Sanitize SQLite FTS5 special characters (*, ", ^, -) and escape double quotes
+  @visibleForTesting
+  static String? toFtsQuery(String input) {
+    final cleanInput = input.replaceAll(RegExp(r'["*^\-]'), ' ');
+    final tokens = cleanInput
         .toLowerCase()
         .split(RegExp(r'[^a-z0-9\u00C0-\u024F\u0370-\u03FF\u0600-\u06FF]+'))
         .where((t) => t.isNotEmpty)
@@ -129,6 +133,8 @@ class MusicRepository implements IMusicRepository {
     if (tokens.isEmpty) return null;
     return tokens.join(' ');
   }
+
+  String? _toFtsQuery(String input) => toFtsQuery(input);
 
   Stream<Result<List<SongsTableData>>> _watchSongsFts({
     required String ftsQuery,

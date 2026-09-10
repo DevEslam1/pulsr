@@ -106,6 +106,11 @@ class YtDownloadService {
   /// download begun from there was an ordinary background task Android was free
   /// to kill the moment the app left the foreground.
   bool _foregroundServiceRunning = false;
+  bool _processing = false; // FIX-A03: Guard against re-entrant calls in _processQueue
+  final Map<String, YtmStream> _resolvedStreams = {}; // FIX-A05/C05: Track resolved stream duration
+
+  /// Returns last resolved YtmStream for videoId if available
+  YtmStream? getResolvedStream(String videoId) => _resolvedStreams[videoId];
 
   YtDownloadService(
       this._http, this._ytmService, this._scanner, this._repository);
@@ -240,36 +245,42 @@ class YtDownloadService {
   }
 
   void _processQueue() {
-    while (_activeDownloads.length < _maxConcurrentDownloads &&
-        _queue.isNotEmpty) {
-      final task = _queue.removeFirst();
-      final videoId = task.song.remoteId!;
+    if (_processing) return; // FIX-A03: Guard against re-entrant calls with a _processing bool flag
+    _processing = true; // FIX-A03: Mark processing active
+    try {
+      while (_activeDownloads.length < _maxConcurrentDownloads &&
+          _queue.isNotEmpty) {
+        final task = _queue.removeFirst();
+        final videoId = task.song.remoteId!;
 
-      if (_canceledVideoIds.contains(videoId) || task.isCanceled) {
-        _canceledVideoIds.remove(videoId);
-        task.completer
-            .complete(const Left(DownloadFailure('Download canceled')));
-        continue;
+        if (_canceledVideoIds.contains(videoId) || task.isCanceled) {
+          _canceledVideoIds.remove(videoId);
+          task.completer
+              .complete(const Left(DownloadFailure('Download canceled')));
+          continue;
+        }
+
+        if (_activeDownloads.containsKey(videoId)) {
+          _activeDownloads[videoId]!.completer.future.then(
+              task.completer.complete,
+              onError: task.completer.completeError);
+          continue;
+        }
+
+        _activeDownloads[videoId] = task;
+        _executeDownload(task).then((result) {
+          task.completer.complete(result);
+        }).catchError((e) {
+          task.completer.complete(Left(DownloadFailure('Download error: $e')));
+        }).whenComplete(() {
+          _activeDownloads.remove(videoId);
+          Future.microtask(_processQueue);
+        });
       }
-
-      if (_activeDownloads.containsKey(videoId)) {
-        _activeDownloads[videoId]!.completer.future.then(
-            task.completer.complete,
-            onError: task.completer.completeError);
-        continue;
-      }
-
-      _activeDownloads[videoId] = task;
-      _executeDownload(task).then((result) {
-        task.completer.complete(result);
-      }).catchError((e) {
-        task.completer.complete(Left(DownloadFailure('Download error: $e')));
-      }).whenComplete(() {
-        _activeDownloads.remove(videoId);
-        Future.microtask(_processQueue);
-      });
+      _stopForegroundServiceIfIdle();
+    } finally {
+      _processing = false; // FIX-A03: Reset flag when queue processing turn completes
     }
-    _stopForegroundServiceIfIdle();
   }
 
   Future<Result<int>> _executeDownload(_QueuedDownload task) async {
@@ -315,14 +326,10 @@ class YtDownloadService {
         final freeBytes =
             await _downloadChannel.invokeMethod<int>('getFreeDiskSpace');
         if (freeBytes != null && freeBytes > 0) {
-          // Peak usage is about twice the track: the chunked path holds all
-          // four parts *and* the merged file before the rename, and the
-          // MediaStore copy at the end again holds the temp file and its copy
-          // at once. Budgeting one copy passed the preflight and then failed
-          // with ENOSPC halfway through the merge.
-          final estimatedBytes =
-              estimateBytes(stream) * 2 + (10 * 1024 * 1024);
-          if (freeBytes < estimatedBytes) {
+          // FIX-A04: For parallel downloads the multiplier must be _concurrentChunks + 1
+          final requiredSpace =
+              estimateBytes(stream) * (_concurrentChunks + 1) + (10 * 1024 * 1024);
+          if (freeBytes < requiredSpace) {
             return const Left(
                 DownloadFailure('Insufficient storage space for download'));
           }
@@ -552,8 +559,8 @@ class YtDownloadService {
     }
   }
 
-  Future<YtmStream> _resolveDownloadStream(String videoId, String quality,
-      {bool forceRefresh = false}) async {
+  Future<YtmStream> resolveDownloadStream(String videoId, [String quality = 'high',
+      bool forceRefresh = false]) async {
     if (forceRefresh && getIt.isRegistered<YtmUrlCache>()) {
       // Nothing used to evict the entry, so the "transparent re-resolution"
       // after a 403 read the same dead URL straight back out of the cache and
@@ -565,8 +572,14 @@ class YtDownloadService {
     // 1. Native resolution fallback
     final native = await _ytmService.resolveStream(videoId,
         quality: quality, forceRefresh: forceRefresh);
-    return native.withResolvedExpiry();
+    final resolved = native.withResolvedExpiry();
+    _resolvedStreams[videoId] = resolved; // FIX-A05/C05: Store resolved stream for duration lookup
+    return resolved;
   }
+
+  Future<YtmStream> _resolveDownloadStream(String videoId, String quality,
+      {bool forceRefresh = false}) =>
+      resolveDownloadStream(videoId, quality, forceRefresh);
 
   /// Downloads the audio into [dest], re-resolving when the URL is the problem.
   /// Returns the stream the bytes actually came from — its container decides the
@@ -816,11 +829,11 @@ class YtDownloadService {
     var lastEmitTime = 0;
     var mergeCompleted = false;
     var keepParts = false;
-    var rangeIgnored = false;
 
-    try {
+    try { // FIX-A02: Outer try to catch _RangeIgnored outside the inner try/finally
       try {
-        final freeBytes =
+        try {
+          final freeBytes =
             await _downloadChannel.invokeMethod<int>('getFreeDiskSpace') ?? 0;
         // Peak usage is twice the body: the four parts all exist while the
         // merged copy is being written. Checking against `total` alone let a
@@ -1031,9 +1044,8 @@ class YtDownloadService {
         await outPartFile.rename(dest.path);
       }
       mergeCompleted = true;
-    } on _RangeIgnored {
-      rangeIgnored = true;
     } catch (e) {
+      if (e is _RangeIgnored) rethrow; // FIX-A02: Bubble _RangeIgnored to outer catch
       keepParts = _partsWorthKeeping(e);
       rethrow;
     } finally {
@@ -1070,14 +1082,26 @@ class YtDownloadService {
         } catch (_) {}
       }
     }
-
-    if (rangeIgnored) {
-      debugPrint(
-          '[YtDownloadService] Server ignored Range mid-transfer; retrying as a single request');
-      await _downloadSequential(uri, dest, task, onProgress,
-          userAgent: userAgent, cookies: cookies, expectedBytes: total);
+  } on _RangeIgnored { // FIX-A02: Catch _RangeIgnored OUTSIDE the try/finally
+    // FIX-A02: Clean parts inside the catch, then call sequential
+    for (final part in tempParts) {
+      try {
+        if (await part.exists()) {
+          await part.delete();
+        }
+      } catch (_) {}
     }
+    try {
+      if (await stamp.exists()) {
+        await stamp.delete();
+      }
+    } catch (_) {}
+    debugPrint(
+        '[YtDownloadService] Server ignored Range mid-transfer; retrying as a single request');
+    await _downloadSequential(uri, dest, task, onProgress,
+        userAgent: userAgent, cookies: cookies, expectedBytes: total);
   }
+}
 
   /// Whether the `.partN` files already on disk are worth keeping after [e].
   ///
@@ -1106,6 +1130,7 @@ class YtDownloadService {
     String? cookies,
     int? expectedBytes,
     bool allowResume = true,
+    int retryCount = 0, // FIX-A01: Add retryCount parameter (max 1)
   }) async {
     final stopwatch = Stopwatch()..start();
     final partFile = File('${dest.path}.part');
@@ -1156,15 +1181,17 @@ class YtDownloadService {
         try {
           await partFile.delete();
         } catch (_) {}
-        // Retry from scratch. `allowResume: false` is what makes this terminate:
-        // recursing with resume still enabled would find the part it just
-        // deleted absent, ask without a Range, and be fine — but any leftover
-        // part written between the two calls would send it around again.
+        // FIX-A01: On second occurrence, throw DownloadFailure('Server does not support resume')
+        if (retryCount >= 1) {
+          throw const DownloadFailure('Server does not support resume');
+        }
+        // Retry from scratch with incremented retryCount
         return _downloadSequential(uri, dest, task, onProgress,
             userAgent: userAgent,
             cookies: cookies,
             expectedBytes: expectedBytes,
-            allowResume: false);
+            allowResume: false,
+            retryCount: retryCount + 1); // FIX-A01
       }
       if (response.statusCode != HttpStatus.partialContent) {
         await response.drain<void>();

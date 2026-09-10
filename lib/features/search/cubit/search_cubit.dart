@@ -148,9 +148,10 @@ class SearchCubit extends PulsrCubit<SearchState> {
     }
   }
 
+  // FIX-D02: Guard stale searches before addError to avoid firing BlocObserver on aborted queries
   void _failSearch(int generation, Object error, StackTrace stackTrace) {
-    addError(error, stackTrace);
     if (generation != _generation || isClosed) return;
+    addError(error, stackTrace);
     safeEmit(state.copyWith(isLoading: false, errorMessage: 'Search failed'));
   }
 

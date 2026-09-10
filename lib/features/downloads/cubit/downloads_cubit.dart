@@ -7,6 +7,7 @@ import '../../../core/bloc/base_cubit.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../domain/models/download_task.dart';
+import '../../../domain/repositories/download_repository_interface.dart'; // FIX-I02
 import '../../../domain/usecases/delete_download.dart';
 import '../../../domain/usecases/get_download_storage_stats.dart';
 import '../../../domain/usecases/observe_downloads.dart';
@@ -25,9 +26,11 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
   final DeleteDownloadUseCase _deleteDownloadUseCase;
   final ObserveDownloadsUseCase _observeDownloadsUseCase;
   final GetDownloadStorageStatsUseCase _getStorageStatsUseCase;
+  final IDownloadRepository? _downloadRepository; // FIX-I02
 
   StreamSubscription<DownloadTask>? _downloadSub;
   final Map<String, int> _lastEmitTimeByVideoId = {};
+  Timer? _storageStatsDebounceTimer; // FIX-A14: debounce storage stats refresh
 
   /// Tombstones for recently deleted tasks. A pre-delete emission can still be
   /// in flight on the broadcast stream when [deleteDownload] completes; without
@@ -56,14 +59,17 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     this._retryDownloadUseCase,
     this._deleteDownloadUseCase,
     this._observeDownloadsUseCase,
-    this._getStorageStatsUseCase,
-  ) : super(const DownloadsState()) {
+    this._getStorageStatsUseCase, [
+    this._downloadRepository, // FIX-I02
+  ]) : super(const DownloadsState()) {
     _init();
   }
 
   Future<void> _init() async {
     safeEmit(state.copyWith(isLoading: true));
     try {
+      // FIX-I02: Reconcile on boot from cubit init rather than repository constructor
+      await (_downloadRepository?.reconcileOnBoot() ?? _observeDownloadsUseCase.reconcileOnBoot());
       // Subscribe BEFORE hydrating: getAll() reads the repository's live task
       // map (which is updated before every stream event is emitted), so the
       // snapshot includes everything emitted up to call time, and events
@@ -198,8 +204,18 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     if (task.status == DownloadStatus.complete ||
         task.status == DownloadStatus.failed) {
       _lastEmitTimeByVideoId.remove(task.videoId);
-      refreshStorageStats();
+      _scheduleDebouncedStorageStats(); // FIX-A14: debounce rapid updates
     }
+  }
+
+  // FIX-A14: 300ms debounce on storage stats refresh to prevent disk thrashing
+  void _scheduleDebouncedStorageStats() {
+    _storageStatsDebounceTimer?.cancel();
+    _storageStatsDebounceTimer = autoTimer(Timer(const Duration(milliseconds: 300), () {
+      if (!isClosed) {
+        refreshStorageStats();
+      }
+    }));
   }
 
   Future<void> refreshStorageStats() async {
@@ -251,6 +267,12 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     _applyActionResult(result);
   }
 
+  // FIX-A13: Cancel download by pausing and removing task
+  Future<void> cancelDownload(String videoId) async {
+    await pauseDownload(videoId);
+    await deleteDownload(videoId);
+  }
+
   Future<void> deleteDownload(String videoId) async {
     final result = await _deleteDownloadUseCase(videoId);
     if (isClosed) return;
@@ -265,7 +287,7 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
           tasks: Map<String, DownloadTask>.unmodifiable(remaining),
           clearErrorMessage: true,
         ));
-        refreshStorageStats();
+        _scheduleDebouncedStorageStats(); // FIX-A14
       },
     );
   }
@@ -281,6 +303,7 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
 
   @override
   Future<void> close() {
+    _storageStatsDebounceTimer?.cancel(); // FIX-A14
     _resubscribeTimer?.cancel();
     _lastEmitTimeByVideoId.clear();
     _deletedAtMsByVideoId.clear();

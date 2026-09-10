@@ -283,6 +283,9 @@ class AudioPlayer {
         playbackEventStream.map((event) => event.bufferedPosition).distinct());
     _icyMetadataSubject.addStream(
         playbackEventStream.map((event) => event.icyMetadata).distinct());
+    // FIX-B01: Rx.pairwise() drops the very first event emitted by a stream.
+    // Replace pairwise() with an explicit previous-state tracker so first event isn't lost.
+    (PlaybackEvent, IndexedAudioSource?)? prevDiscontinuityState;
     _positionDiscontinuitySubscription = playbackEventStream
         .map((event) => (
               event,
@@ -292,10 +295,13 @@ class AudioPlayer {
                   ? sequence[event.currentIndex!]
                   : null
             ))
-        .pairwise()
-        .listen((rec) {
+        .listen((curr) {
+      final prev = prevDiscontinuityState;
+      prevDiscontinuityState = curr;
       if (_seeking) return;
-      final [(prevEvent, prevSource), (currEvent, currSource)] = rec.toList();
+      if (prev == null) return;
+      final (prevEvent, prevSource) = prev;
+      final (currEvent, currSource) = curr;
       if (prevSource == null || currSource == null) return;
       if (currSource._id != prevSource._id) {
         // If we've changed item without seeking, it must be an autoAdvance.

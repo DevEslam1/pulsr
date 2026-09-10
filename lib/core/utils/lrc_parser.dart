@@ -61,11 +61,14 @@ class LrcParser {
       final text = line.substring(lastMatch.end).replaceAll(wordTagExp, '').trim();
 
       for (final match in matches) {
-        final minutes = int.parse(match.group(1)!);
-        final seconds = int.parse(match.group(2)!);
+        // FIX-F01: Safely parse timestamp integers, skip malformed entries instead of throwing
+        final minutes = int.tryParse(match.group(1) ?? '');
+        final seconds = int.tryParse(match.group(2) ?? '');
+        if (minutes == null || seconds == null) continue;
+
         final fractionStr = match.group(3) ?? '0';
         final milliseconds =
-            int.parse(fractionStr.padRight(3, '0').substring(0, 3));
+            int.tryParse(fractionStr.padRight(3, '0').substring(0, 3)) ?? 0;
 
         var totalMs = minutes * 60000 + seconds * 1000 + milliseconds + offsetMs;
         if (totalMs < 0) totalMs = 0;

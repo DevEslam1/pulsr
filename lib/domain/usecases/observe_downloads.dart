@@ -12,4 +12,7 @@ class ObserveDownloadsUseCase {
   Stream<DownloadTask> call() => _repository.observeDownloads();
 
   Future<List<DownloadTask>> getAll() => _repository.getAllDownloads();
+
+  // FIX-I02: Reconcile persisted queue on startup
+  Future<void> reconcileOnBoot() => _repository.reconcileOnBoot();
 }

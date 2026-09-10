@@ -150,10 +150,13 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
         }
       }
 
+      // FIX-C04: Ensure generation guard precedes every emit in catch blocks
+      if (generation != _generation || isClosed) return;
       final errorInfo = YtmErrorClassifier.classify(e);
       emit(state.copyWith(
           isLoading: false, results: [], errorMessage: errorInfo.message));
     } catch (e) {
+      // FIX-C04: Ensure generation guard precedes emit
       if (generation != _generation || isClosed) return;
       final errorInfo = YtmErrorClassifier.classify(e);
       emit(state.copyWith(

@@ -1994,11 +1994,12 @@ class YtmAccountService {
       _dataSyncId = dsid;
       _sessionHarvestDebounce?.cancel();
       _sessionHarvestDebounce = null;
-      SharedPreferences.getInstance().then((p) {
+      // FIX-C03: unawaited SharedPreferences write with catchError to prevent unhandled async errors
+      unawaited(SharedPreferences.getInstance().then((p) {
         p.setString(_dataSyncIdPrefKey, dsid);
       }).catchError((e) {
         debugPrint('[YTM_ACCOUNT] Failed to persist dataSyncId: $e');
-      });
+      }));
       getIt<YtmService>().setDataSyncId(dsid);
     }
     final rc = json['responseContext'];
