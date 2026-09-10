@@ -380,8 +380,13 @@ class AudioSoundSection extends StatelessWidget {
         // contour adapts tone to the listening level. See conflict copy.
         Builder(builder: (cntx) {
           final l10n = context.l10n;
-          final playerCubit = context.watch<PlayerCubit>();
-          final playerState = playerCubit.state;
+          final playerCubit = context.read<PlayerCubit>();
+          final isLoudnessContourEnabled = context.select<PlayerCubit, bool>(
+            (c) => c.state.isLoudnessContourEnabled,
+          );
+          final loudnessContourIntensity = context.select<PlayerCubit, double>(
+            (c) => c.state.loudnessContourIntensity,
+          );
           final lcBlocked = AudioConflicts.dspBlockedByBitPerfect(
             bitPerfectOutput: state.bitPerfectOutput,
             bypassDspOnBitPerfect: state.bypassDspOnBitPerfect,
@@ -441,7 +446,7 @@ class AudioSoundSection extends StatelessWidget {
                       ),
                     ),
                     Switch.adaptive(
-                      value: playerState.isLoudnessContourEnabled,
+                      value: isLoudnessContourEnabled,
                       activeTrackColor: p.accent,
                       activeThumbColor: p.onAccent,
                       onChanged: lcBlocked != null || !AudioEffectsChannel().hasPcmDspPath
@@ -452,11 +457,11 @@ class AudioSoundSection extends StatelessWidget {
                 ),
                 if (lcBlocked == null &&
                     AudioEffectsChannel().hasPcmDspPath &&
-                    playerState.isLoudnessContourEnabled) ...[
+                    isLoudnessContourEnabled) ...[
                   const SizedBox(height: 4),
                   SettingSliderRow(
                     label: l10n.dspLoudnessIntensity,
-                    value: playerState.loudnessContourIntensity,
+                    value: loudnessContourIntensity,
                     min: 0.0,
                     max: 1.0,
                     divisions: 20,

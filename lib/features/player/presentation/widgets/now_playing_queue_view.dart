@@ -16,6 +16,12 @@ class NowPlayingQueueView extends StatelessWidget {
     final p = context.palette;
 
     return BlocBuilder<PlayerCubit, PlayerState>(
+      buildWhen: (prev, curr) =>
+          prev.queue != curr.queue ||
+          prev.currentIndex != curr.currentIndex ||
+          prev.activeQueueSlot != curr.activeQueueSlot ||
+          prev.currentSong?.id != curr.currentSong?.id ||
+          prev.isPlaying != curr.isPlaying,
       builder: (context, state) {
         final cubit = context.read<PlayerCubit>();
         final queue = state.queue;

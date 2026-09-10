@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/constants/app_radii.dart';
@@ -31,7 +32,7 @@ class MiniPlayer extends StatefulWidget {
 class _MiniPlayerState extends State<MiniPlayer> {
   PageController? _pageController;
   int _lastKnownIndex = -1;
-  bool _isSwipingPage = false;
+  bool _isUserDragging = false;
   double _verticalDragDy = 0.0;
 
   @override
@@ -46,7 +47,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
     if (_pageController == null) {
       _lastKnownIndex = safeIndex;
       _pageController = PageController(initialPage: safeIndex);
-    } else if (!_isSwipingPage && _lastKnownIndex != safeIndex) {
+    } else if (!_isUserDragging && _lastKnownIndex != safeIndex) {
       _lastKnownIndex = safeIndex;
       if (_pageController!.hasClients &&
           _pageController!.page?.round() != safeIndex) {
@@ -153,25 +154,27 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                 Expanded(
                                   child: SizedBox(
                                     height: 52,
-                                    child: PageView.builder(
-                                      controller: _pageController,
-                                      physics: const BouncingScrollPhysics(),
-                                      itemCount: queue.length,
-                                      onPageChanged: (page) {
-                                        if (page != currentIndex &&
-                                            !_isSwipingPage) {
-                                          _isSwipingPage = true;
-                                          _lastKnownIndex = page;
-                                          cubit.skipToQueueItem(page);
-                                          Future.delayed(
-                                              const Duration(milliseconds: 300),
-                                              () {
-                                            if (mounted) {
-                                              _isSwipingPage = false;
-                                            }
-                                          });
+                                    child: NotificationListener<ScrollNotification>(
+                                      onNotification: (notification) {
+                                        if (notification is UserScrollNotification) {
+                                          _isUserDragging = notification.direction !=
+                                              ScrollDirection.idle;
+                                        } else if (notification is ScrollEndNotification) {
+                                          _isUserDragging = false;
                                         }
+                                        return false;
                                       },
+                                      child: PageView.builder(
+                                        controller: _pageController,
+                                        physics: const BouncingScrollPhysics(),
+                                        itemCount: queue.length,
+                                        onPageChanged: (page) {
+                                          if (_isUserDragging &&
+                                              page != currentIndex) {
+                                            _lastKnownIndex = page;
+                                            cubit.skipToQueueItem(page);
+                                          }
+                                        },
                                       itemBuilder: (context, index) {
                                         final item = queue[index];
                                         final isCurrent = index == currentIndex;
@@ -218,40 +221,41 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                                   mainAxisAlignment:
                                                       MainAxisAlignment.center,
                                                   children: [
-                                                    Text(
-                                                      item.title,
-                                                      maxLines: 1,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                      style: TextStyle(
-                                                        color: isCurrent
-                                                            ? p.textPrimary
-                                                            : p.textSecondary,
-                                                        fontWeight:
-                                                            FontWeight.w700,
-                                                        fontSize: 14.5,
+                                                      Text(
+                                                        item.title,
+                                                        maxLines: 1,
+                                                        overflow:
+                                                            TextOverflow.ellipsis,
+                                                        style: TextStyle(
+                                                          color: isCurrent
+                                                              ? p.textPrimary
+                                                              : p.textSecondary,
+                                                          fontWeight:
+                                                              FontWeight.w700,
+                                                          fontSize: 14.5,
+                                                        ),
                                                       ),
-                                                    ),
-                                                    const SizedBox(height: 2),
-                                                    Text(
-                                                      item.artist,
-                                                      maxLines: 1,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                      style: TextStyle(
-                                                        color: p.textSecondary,
-                                                        fontSize: 12,
-                                                        fontWeight:
-                                                            FontWeight.w500,
+                                                      const SizedBox(height: 2),
+                                                      Text(
+                                                        item.artist,
+                                                        maxLines: 1,
+                                                        overflow:
+                                                            TextOverflow.ellipsis,
+                                                        style: TextStyle(
+                                                          color: p.textSecondary,
+                                                          fontSize: 12,
+                                                          fontWeight:
+                                                              FontWeight.w500,
+                                                        ),
                                                       ),
-                                                    ),
-                                                  ],
+                                                    ],
+                                                  ),
                                                 ),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                      },
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      ),
                                     ),
                                   ),
                                 ),

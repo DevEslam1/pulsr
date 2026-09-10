@@ -6,11 +6,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../data/audio/audio_effects_channel.dart';
+import '../../../../domain/models/audio_output_info.dart';
 import '../../../../domain/models/dsp_debug_report.dart';
 import '../../../settings/cubit/settings_cubit.dart';
-import '../../../settings/cubit/settings_state.dart';
 import '../../cubit/player_cubit.dart';
-import '../../cubit/player_state.dart';
 
 class DspInspectorSheet extends StatefulWidget {
   const DspInspectorSheet({super.key});
@@ -80,8 +79,14 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final playerState = context.watch<PlayerCubit>().state;
-    final settingsState = context.watch<SettingsCubit>().state;
+    final isEqEnabled =
+        context.select<PlayerCubit, bool>((c) => c.state.isEqEnabled);
+    final isDspActive =
+        context.select<PlayerCubit, bool>((c) => c.state.isDspActive);
+    final audioSessionId =
+        context.select<PlayerCubit, int?>((c) => c.state.audioSessionId);
+    final currentOutputDevice = context.select<SettingsCubit, AudioOutputInfo?>(
+        (c) => c.state.currentOutputDevice);
 
     return Align(
       alignment: Alignment.bottomCenter,
@@ -176,7 +181,13 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               // Master Engine Banner
-                              _buildMasterEngineCard(p, playerState, settingsState),
+                              _buildMasterEngineCard(
+                                p: p,
+                                isEqEnabled: isEqEnabled,
+                                isDspActive: isDspActive,
+                                audioSessionId: audioSessionId,
+                                currentOutputDevice: currentOutputDevice,
+                              ),
                               const SizedBox(height: 16),
 
                               // Active Effects Summary Header
@@ -249,8 +260,13 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
     );
   }
 
-  Widget _buildMasterEngineCard(
-      PulsrPalette p, PlayerState playerState, SettingsState settingsState) {
+  Widget _buildMasterEngineCard({
+    required PulsrPalette p,
+    required bool isEqEnabled,
+    required bool isDspActive,
+    required int? audioSessionId,
+    required AudioOutputInfo? currentOutputDevice,
+  }) {
     final rep = _report;
     final isBypassed = rep?.isBitPerfectBypassActive == true;
     final rawAttached = rep?.isSessionAttached == true;
@@ -414,7 +430,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
               child: OutlinedButton.icon(
                 onPressed: () async {
                   // Best-effort reattach using current PlayerState session.
-                  final sid = playerState.audioSessionId;
+                  final sid = audioSessionId;
                   if (sid != null && sid > 0) {
                     try { await AudioEffectsChannel().setAudioSessionId(sid); } catch (_) {}
                   }
@@ -444,14 +460,14 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
               _buildStatChip(
                 p,
                 'Master EQ',
-                playerState.isEqEnabled ? 'ON' : 'OFF',
-                isHighlight: playerState.isEqEnabled,
+                isEqEnabled ? 'ON' : 'OFF',
+                isHighlight: isEqEnabled,
               ),
               _buildStatChip(
                 p,
                 'Master DSP',
-                playerState.isDspActive ? 'ON' : 'OFF',
-                isHighlight: playerState.isDspActive,
+                isDspActive ? 'ON' : 'OFF',
+                isHighlight: isDspActive,
               ),
               if (rep?.hasOemAudio == true)
                 _buildStatChip(
@@ -463,7 +479,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
               _buildStatChip(
                 p,
                 'Output Target',
-                '${settingsState.currentOutputDevice?.sampleRate ?? 44100} Hz / ${settingsState.currentOutputDevice?.bitDepth ?? 16}-bit',
+                '${currentOutputDevice?.sampleRate ?? 44100} Hz / ${currentOutputDevice?.bitDepth ?? 16}-bit',
               ),
             ],
           ),

@@ -1,4 +1,4 @@
-﻿// lib/features/player/cubit/player_state.dart
+// lib/features/player/cubit/player_state.dart
 import 'package:flutter/material.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../../core/utils/list_content_diff.dart';
@@ -97,7 +97,11 @@ abstract class PlayerState with _$PlayerState {
         currentIndex != other.currentIndex ||
         isExpanded != other.isExpanded ||
         dominantColor != other.dominantColor ||
-        sleepTimerRemaining != other.sleepTimerRemaining ||
+        ((sleepTimerRemaining == null) != (other.sleepTimerRemaining == null) ||
+            (sleepTimerRemaining != null &&
+                other.sleepTimerRemaining != null &&
+                sleepTimerRemaining!.inMinutes !=
+                    other.sleepTimerRemaining!.inMinutes)) ||
         listContentDiffers(lyrics, other.lyrics) ||
         lyricsSource != other.lyricsSource ||
         isLoadingLyrics != other.isLoadingLyrics ||

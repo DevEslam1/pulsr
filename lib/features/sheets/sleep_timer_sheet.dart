@@ -38,6 +38,8 @@ class SleepTimerSheet extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsetsDirectional.fromSTEB(24, 16, 24, 32),
                   child: BlocBuilder<PlayerCubit, PlayerState>(
+                    buildWhen: (prev, curr) =>
+                        prev.sleepTimerRemaining != curr.sleepTimerRemaining,
                     builder: (context, state) {
                       final cubit = context.read<PlayerCubit>();
                       final isActive = state.sleepTimerRemaining != null;

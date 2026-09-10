@@ -28,7 +28,11 @@ class QueueScreen extends StatelessWidget {
           leading: const PulsrBackButton(),
           title: Text(context.l10n.queue),
         actions: [
-          BlocBuilder<PlayerCubit, PlayerState>(builder: (context, state) {
+          BlocBuilder<PlayerCubit, PlayerState>(
+            buildWhen: (prev, curr) =>
+                prev.queue.isEmpty != curr.queue.isEmpty ||
+                prev.queue != curr.queue,
+            builder: (context, state) {
             if (state.queue.isEmpty) return const SizedBox.shrink();
             return PopupMenuButton<String>(
               onSelected: (v) async {
@@ -122,6 +126,11 @@ class QueueScreen extends StatelessWidget {
         ],
       ),
       body: BlocBuilder<PlayerCubit, PlayerState>(
+        buildWhen: (prev, curr) =>
+            prev.queue != curr.queue ||
+            prev.currentIndex != curr.currentIndex ||
+            prev.currentSong?.id != curr.currentSong?.id ||
+            prev.isPlaying != curr.isPlaying,
         builder: (context, state) {
           final queue = state.queue;
           final currentSong = state.currentSong;

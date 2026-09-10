@@ -108,6 +108,8 @@ class PulsrAudioHandler extends BaseAudioHandler
   int _rapidGaplessChangeCount = 0;
   final List<int> _shuffleHistory = [];
   bool _wasPlayingBeforeInterruption = false;
+  DateTime? _lastPreviousTapTime;
+  bool _isManualSkip = false;
 
   // Bumped on every playSongAt/play entry so a slow async resolve from a
   // superseded call cannot load its source into the player.
@@ -316,16 +318,21 @@ class PulsrAudioHandler extends BaseAudioHandler
         ? artUri
         : null;
 
-    if (finalArtUri == null &&
-        song.artworkUri != null &&
-        song.artworkUri!.isNotEmpty) {
-      final parsed = Uri.tryParse(song.artworkUri!);
-      if (parsed != null &&
-          parsed.hasScheme &&
-          (parsed.host.isNotEmpty ||
-              parsed.scheme == 'file' ||
-              parsed.scheme == 'content')) {
-        finalArtUri = parsed;
+    if (finalArtUri == null) {
+      final artString = (song.artworkUri != null && song.artworkUri!.isNotEmpty)
+          ? song.artworkUri!
+          : (song.remoteArtworkUrl != null && song.remoteArtworkUrl!.isNotEmpty)
+              ? song.remoteArtworkUrl!
+              : null;
+      if (artString != null) {
+        final parsed = Uri.tryParse(artString);
+        if (parsed != null &&
+            parsed.hasScheme &&
+            (parsed.host.isNotEmpty ||
+                parsed.scheme == 'file' ||
+                parsed.scheme == 'content')) {
+          finalArtUri = parsed;
+        }
       }
     }
 
@@ -1661,12 +1668,23 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   Future<void> restoreLastPlaybackSession() async {
     try {
-      if (_userPlaybackInitiated || _songs.isNotEmpty) return;
+      if (_userPlaybackInitiated ||
+          _songs.isNotEmpty ||
+          _activePlayer.playing ||
+          _activePlayer.audioSources.isNotEmpty) {
+        return;
+      }
       final restoreGen = _playGeneration;
 
       // Restore shuffle and repeat preferences from storage (Issue #12)
       final prefs = await SharedPreferences.getInstance();
-      if (_userPlaybackInitiated || _songs.isNotEmpty || _playGeneration != restoreGen) return;
+      if (_userPlaybackInitiated ||
+          _songs.isNotEmpty ||
+          _playGeneration != restoreGen ||
+          _activePlayer.playing ||
+          _activePlayer.audioSources.isNotEmpty) {
+        return;
+      }
 
       final shufflePref = prefs.getBool(PrefsKeys.playbackShuffle) ?? false;
       final repeatModePref =
@@ -1679,13 +1697,31 @@ class PulsrAudioHandler extends BaseAudioHandler
       await setShuffleMode(shufflePref
           ? AudioServiceShuffleMode.all
           : AudioServiceShuffleMode.none);
-      if (_userPlaybackInitiated || _songs.isNotEmpty || _playGeneration != restoreGen) return;
+      if (_userPlaybackInitiated ||
+          _songs.isNotEmpty ||
+          _playGeneration != restoreGen ||
+          _activePlayer.playing ||
+          _activePlayer.audioSources.isNotEmpty) {
+        return;
+      }
 
       await setRepeatMode(repeatMode);
-      if (_userPlaybackInitiated || _songs.isNotEmpty || _playGeneration != restoreGen) return;
+      if (_userPlaybackInitiated ||
+          _songs.isNotEmpty ||
+          _playGeneration != restoreGen ||
+          _activePlayer.playing ||
+          _activePlayer.audioSources.isNotEmpty) {
+        return;
+      }
 
       final queueRes = await _repository.getSavedQueue();
-      if (_userPlaybackInitiated || _songs.isNotEmpty || _playGeneration != restoreGen) return;
+      if (_userPlaybackInitiated ||
+          _songs.isNotEmpty ||
+          _playGeneration != restoreGen ||
+          _activePlayer.playing ||
+          _activePlayer.audioSources.isNotEmpty) {
+        return;
+      }
 
       final queueItems =
           queueRes.fold((l) => <QueueItemsTableData>[], (r) => r);
@@ -1694,7 +1730,13 @@ class PulsrAudioHandler extends BaseAudioHandler
       // Batch query songs instead of N+1 synchronous disk checks (Issue #18)
       final songIds = queueItems.map((q) => q.songId).toList();
       final songsRes = await _repository.getSongsByIds(songIds);
-      if (_userPlaybackInitiated || _songs.isNotEmpty || _playGeneration != restoreGen) return;
+      if (_userPlaybackInitiated ||
+          _songs.isNotEmpty ||
+          _playGeneration != restoreGen ||
+          _activePlayer.playing ||
+          _activePlayer.audioSources.isNotEmpty) {
+        return;
+      }
 
       final songsMap = {
         for (final s in songsRes.fold((l) => <SongsTableData>[], (r) => r))
@@ -1718,7 +1760,13 @@ class PulsrAudioHandler extends BaseAudioHandler
       }
 
       if (songs.isNotEmpty) {
-        if (_userPlaybackInitiated || _songs.isNotEmpty || _playGeneration != restoreGen) return;
+        if (_userPlaybackInitiated ||
+            _songs.isNotEmpty ||
+            _playGeneration != restoreGen ||
+            _activePlayer.playing ||
+            _activePlayer.audioSources.isNotEmpty) {
+          return;
+        }
         _songs = songs;
         _currentIndex = targetIndex.clamp(0, songs.length - 1);
         final currentSong = _songs[_currentIndex];
@@ -1985,9 +2033,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     return null;
   }
 
-  int? _getPreviousIndex() {
+  int? _getPreviousIndex({bool forcePrevious = false}) {
     if (_songs.isEmpty) return null;
-    if (_activePlayer.position.inSeconds > 3) {
+    if (!forcePrevious && _activePlayer.position.inSeconds > 3) {
       return _currentIndex;
     }
     if (_activePlayer.shuffleModeEnabled && _shuffleHistory.isNotEmpty) {
@@ -2064,6 +2112,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   Future<void> loadQueue(List<SongsTableData> songs,
       {int initialIndex = 0, Duration? initialPosition}) async {
     _userPlaybackInitiated = true;
+    _isManualSkip = true;
     // Immediately warm the target song so network resolution overlaps
     // with crossfade cancellation, queue assembly, and player teardown.
     final targetIdx =
@@ -2140,8 +2189,10 @@ class PulsrAudioHandler extends BaseAudioHandler
 
       await _activePlayer.seek(initialPosition ?? Duration.zero,
           index: targetIndex);
-      _gaplessTargetReached = true;
-      _gaplessTargetIndex = null;
+      if (_activePlayer.currentIndex == targetIndex) {
+        _gaplessTargetReached = true;
+        _gaplessTargetIndex = null;
+      }
       final targetVolume = _calculateReplayGainVolume(song);
       try {
         await _activePlayer.dspClearGainCurve();
@@ -2420,7 +2471,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         final elapsed = _gaplessLoadTime != null
             ? DateTime.now().difference(_gaplessLoadTime!).inMilliseconds
             : 99999;
-        if (elapsed < 1500) {
+        if (elapsed < 3000) {
           debugPrint(
               '[AudioHandler] Ignoring spurious gapless index event: $index (target was $_gaplessTargetIndex)');
           return;
@@ -2435,28 +2486,34 @@ class PulsrAudioHandler extends BaseAudioHandler
       _consecutiveFailures = 0;
       return;
     }
-    final now = DateTime.now();
-    if (_lastGaplessChangeTime != null &&
-        now.difference(_lastGaplessChangeTime!).inMilliseconds < 1500) {
-      _rapidGaplessChangeCount++;
-      if (_rapidGaplessChangeCount >= 2) {
-        // Circuit breaker tripped: halt runaway skip loop (3rd song in your report)
-        _rapidGaplessChangeCount = 0;
-        _consecutiveFailures = 0;
-        ErrorLogger.log(
-          'Circuit breaker tripped: rapid gapless track changes detected. Halting playback.',
-          category: 'AudioHandler',
-        );
-        _errorSubject.add('Playback stopped: multiple tracks failed to load.');
-        await _activePlayer.pause();
-        _broadcastState(_activePlayer.playbackEvent);
-        return;
-      }
-    } else {
+    if (_isManualSkip) {
+      _isManualSkip = false;
       _rapidGaplessChangeCount = 0;
       _consecutiveFailures = 0;
+    } else {
+      final now = DateTime.now();
+      if (_lastGaplessChangeTime != null &&
+          now.difference(_lastGaplessChangeTime!).inMilliseconds < 1500) {
+        _rapidGaplessChangeCount++;
+        if (_rapidGaplessChangeCount >= 3) {
+          // Circuit breaker tripped: halt runaway skip loop
+          _rapidGaplessChangeCount = 0;
+          _consecutiveFailures = 0;
+          ErrorLogger.log(
+            'Circuit breaker tripped: rapid gapless track changes detected. Halting playback.',
+            category: 'AudioHandler',
+          );
+          _errorSubject.add('Playback stopped: multiple tracks failed to load.');
+          await _activePlayer.pause();
+          _broadcastState(_activePlayer.playbackEvent);
+          return;
+        }
+      } else {
+        _rapidGaplessChangeCount = 0;
+        _consecutiveFailures = 0;
+      }
+      _lastGaplessChangeTime = now;
     }
-    _lastGaplessChangeTime = now;
 
     _lastGaplessIndex = index;
     _currentIndex = index;
@@ -2756,6 +2813,11 @@ class PulsrAudioHandler extends BaseAudioHandler
   Future<void> skipToNext() async {
     _playGeneration++;
     ErrorLogger.addBreadcrumb('Playback skipToNext', category: 'player');
+    _isManualSkip = true;
+    _rapidGaplessChangeCount = 0;
+    _lastGaplessChangeTime = null;
+    final wasPlaying = _activePlayer.playing;
+
     if (_crossfadeManager.isCrossfading) {
       await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
           restoreVolume: _volume);
@@ -2763,6 +2825,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (_gaplessMode && _gaplessLoaded) {
       if (_activePlayer.hasNext) {
         await _activePlayer.seekToNext();
+        if (wasPlaying) {
+          await _activePlayer.play();
+        }
       } else if (_activePlayer.loopMode == LoopMode.all && _songs.isNotEmpty) {
         await _activePlayer.seek(Duration.zero, index: 0);
         await _activePlayer.play();
@@ -2788,37 +2853,62 @@ class PulsrAudioHandler extends BaseAudioHandler
   Future<void> skipToPrevious() async {
     _playGeneration++;
     ErrorLogger.addBreadcrumb('Playback skipToPrevious', category: 'player');
+    _isManualSkip = true;
+    _rapidGaplessChangeCount = 0;
+    _lastGaplessChangeTime = null;
+
+    final now = DateTime.now();
+    final isDoubleTap = _lastPreviousTapTime != null &&
+        now.difference(_lastPreviousTapTime!).inMilliseconds < 2500;
+    _lastPreviousTapTime = now;
+    final wasPlaying = _activePlayer.playing;
+
     if (_crossfadeManager.isCrossfading) {
       await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
           restoreVolume: _volume);
     }
     if (_gaplessMode && _gaplessLoaded) {
-      if (_activePlayer.position.inSeconds > 3) {
+      if (!isDoubleTap && _activePlayer.position.inSeconds > 3) {
         await _activePlayer.seek(Duration.zero);
+        if (wasPlaying) {
+          await _activePlayer.play();
+        }
         _saveCurrentPosition();
         return;
       }
       if (_activePlayer.hasPrevious) {
         await _activePlayer.seekToPrevious();
+        if (wasPlaying) {
+          await _activePlayer.play();
+        }
       } else if (_activePlayer.loopMode == LoopMode.all && _songs.isNotEmpty) {
         await _activePlayer.seek(Duration.zero, index: _songs.length - 1);
         await _activePlayer.play();
       } else {
         await _activePlayer.seek(Duration.zero);
+        if (wasPlaying) {
+          await _activePlayer.play();
+        }
         _saveCurrentPosition();
       }
       return;
     }
-    if (_activePlayer.position.inSeconds > 3) {
+    if (!isDoubleTap && _activePlayer.position.inSeconds > 3) {
       await _activePlayer.seek(Duration.zero);
+      if (wasPlaying) {
+        await _activePlayer.play();
+      }
       _saveCurrentPosition();
       return;
     }
-    final prevIdx = _getPreviousIndex();
+    final prevIdx = _getPreviousIndex(forcePrevious: isDoubleTap);
     if (prevIdx != null) {
       await playSongAt(prevIdx);
     } else {
       await _activePlayer.seek(Duration.zero);
+      if (wasPlaying) {
+        await _activePlayer.play();
+      }
       _saveCurrentPosition();
     }
   }

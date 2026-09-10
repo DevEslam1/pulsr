@@ -177,16 +177,6 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                   final pivotOffset = Offset(w * 0.81, h * 0.19);
                   final armLength = w * 0.46;
 
-                  // Progress tracking across the record grooves
-                  final progress = state.duration.inMilliseconds > 0
-                      ? (state.position.inMilliseconds /
-                              state.duration.inMilliseconds)
-                          .clamp(0.0, 1.0)
-                      : 0.0;
-
-                  // Rest angle: -0.06 rad (resting on arm rest cradle)
-                  // Playing angle: glides from 0.35 rad (outer track) to 0.49 rad (inner track)
-                  final playAngle = 0.35 + (progress * 0.14);
 
                   return GestureDetector(
                     onTap: () => cubit.togglePlayPause(),
@@ -350,20 +340,31 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                           // 4. Animated Tonearm Assembly Layer
                           Positioned.fill(
                             child: IgnorePointer(
-                              child: AnimatedBuilder(
-                                animation: _tonearmAnimation,
-                                builder: (context, child) {
-                                  final currentAngle = -0.06 +
-                                      ((playAngle - (-0.06)) *
-                                          _tonearmAnimation.value);
+                              child: BlocSelector<PlayerCubit, PlayerState, Duration>(
+                                selector: (s) => s.position,
+                                builder: (context, position) {
+                                  final progress = state.duration.inMilliseconds > 0
+                                      ? (position.inMilliseconds /
+                                              state.duration.inMilliseconds)
+                                          .clamp(0.0, 1.0)
+                                      : 0.0;
+                                  final playAngle = 0.35 + (progress * 0.14);
+                                  return AnimatedBuilder(
+                                    animation: _tonearmAnimation,
+                                    builder: (context, child) {
+                                      final currentAngle = -0.06 +
+                                          ((playAngle - (-0.06)) *
+                                              _tonearmAnimation.value);
 
-                                  return CustomPaint(
-                                    painter: _TonearmPainter(
-                                      pivot: pivotOffset,
-                                      angle: currentAngle,
-                                      activeColor: activeColor,
-                                      armLength: armLength,
-                                    ),
+                                      return CustomPaint(
+                                        painter: _TonearmPainter(
+                                          pivot: pivotOffset,
+                                          angle: currentAngle,
+                                          activeColor: activeColor,
+                                          armLength: armLength,
+                                        ),
+                                      );
+                                    },
                                   );
                                 },
                               ),

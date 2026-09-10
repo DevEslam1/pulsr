@@ -166,6 +166,12 @@ class _CachedArtworkState extends State<CachedArtwork> {
         oldWidget.remoteUrl != widget.remoteUrl ||
         oldWidget.highQuality != widget.highQuality) {
       _loadToken++;
+      final nextKey = _cacheKey;
+      if (_cache.containsKey(nextKey)) {
+        _cachedBytes = _cache.get(nextKey);
+      } else {
+        _cachedBytes = null;
+      }
       _loadArtwork();
     }
   }
@@ -305,13 +311,15 @@ class _CachedArtworkState extends State<CachedArtwork> {
         return null;
       });
     } else {
-      pending = _audioQuery.queryArtwork(
-        widget.id,
-        widget.type,
-        format: ArtworkFormat.JPEG,
-        size: isHq ? 1000 : (isThumbnail ? 180 : 350),
-        quality: isHq ? 100 : (isThumbnail ? 65 : 80),
-      );
+      pending = widget.id > 0
+          ? _audioQuery.queryArtwork(
+              widget.id,
+              widget.type,
+              format: ArtworkFormat.JPEG,
+              size: isHq ? 1000 : (isThumbnail ? 180 : 350),
+              quality: isHq ? 100 : (isThumbnail ? 65 : 80),
+            )
+          : Future<Uint8List?>.value(null);
     }
 
     pending.then((bytes) {
@@ -321,10 +329,14 @@ class _CachedArtworkState extends State<CachedArtwork> {
           setState(() {
             _cachedBytes = bytes;
           });
+        } else if (_cachedBytes != null) {
+          setState(() {
+            _cachedBytes = null;
+          });
         }
       }
     }).catchError((_) {
-      if (mounted && token == _loadToken && _cachedBytes == null) {
+      if (mounted && token == _loadToken && _cachedBytes != null) {
         setState(() {
           _cachedBytes = null;
         });

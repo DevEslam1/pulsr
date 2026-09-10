@@ -45,7 +45,6 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
           prev.currentSong?.title != curr.currentSong?.title ||
           prev.currentSong?.artist != curr.currentSong?.artist ||
           prev.isPlaying != curr.isPlaying ||
-          prev.position != curr.position ||
           prev.duration != curr.duration ||
           prev.isShuffle != curr.isShuffle ||
           prev.repeatMode != curr.repeatMode ||
@@ -265,81 +264,87 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                         ),
 
                         // Seekbar Row
-                        Row(
-                          children: [
-                            Text(
-                              Formatters.formatDuration(
-                                _dragSeekValue != null
-                                    ? Duration(
-                                        milliseconds: _dragSeekValue!.toInt())
-                                    : state.position,
-                              ),
-                              style: TextStyle(
-                                color: p.textSecondary,
-                                fontSize: 11,
-                                fontFeatures: const [
-                                  FontFeature.tabularFigures()
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: SliderTheme(
-                                data: SliderTheme.of(context).copyWith(
-                                  trackHeight: 3.5,
-                                  thumbShape: const RoundSliderThumbShape(
-                                      enabledThumbRadius: 5.5),
-                                  overlayShape: const RoundSliderOverlayShape(
-                                      overlayRadius: 11),
-                                  activeTrackColor: activeColor,
-                                  inactiveTrackColor:
-                                      p.textSecondary.withValues(alpha: 0.25),
-                                  thumbColor: activeColor,
-                                  overlayColor:
-                                      activeColor.withValues(alpha: 0.15),
-                                ),
-                                child: Slider(
-                                  min: 0.0,
-                                  max: state.duration.inMilliseconds
-                                              .toDouble() >
-                                          0
-                                      ? state.duration.inMilliseconds
-                                          .toDouble()
-                                      : 1.0,
-                                  value: (_dragSeekValue ??
-                                          state.position.inMilliseconds
-                                              .toDouble())
-                                      .clamp(
-                                    0.0,
-                                    state.duration.inMilliseconds.toDouble() >
-                                            0
-                                        ? state.duration.inMilliseconds
-                                            .toDouble()
-                                        : 1.0,
+                        BlocSelector<PlayerCubit, PlayerState, Duration>(
+                          selector: (s) => s.position,
+                          builder: (context, position) {
+                            return Row(
+                              children: [
+                                Text(
+                                  Formatters.formatDuration(
+                                    _dragSeekValue != null
+                                        ? Duration(
+                                            milliseconds:
+                                                _dragSeekValue!.toInt())
+                                        : position,
                                   ),
-                                  onChanged: (val) {
-                                    setState(() => _dragSeekValue = val);
-                                  },
-                                  onChangeEnd: (val) {
-                                    cubit.seek(
-                                        Duration(milliseconds: val.toInt()));
-                                    setState(() => _dragSeekValue = null);
-                                  },
+                                  style: TextStyle(
+                                    color: p.textSecondary,
+                                    fontSize: 11,
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures()
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              Formatters.formatDuration(state.duration),
-                              style: TextStyle(
-                                color: p.textSecondary,
-                                fontSize: 11,
-                                fontFeatures: const [
-                                  FontFeature.tabularFigures()
-                                ],
-                              ),
-                            ),
-                          ],
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: SliderTheme(
+                                    data: SliderTheme.of(context).copyWith(
+                                      trackHeight: 3.5,
+                                      thumbShape: const RoundSliderThumbShape(
+                                          enabledThumbRadius: 5.5),
+                                      overlayShape: const RoundSliderOverlayShape(
+                                          overlayRadius: 11),
+                                      activeTrackColor: activeColor,
+                                      inactiveTrackColor:
+                                          p.textSecondary.withValues(alpha: 0.25),
+                                      thumbColor: activeColor,
+                                      overlayColor:
+                                          activeColor.withValues(alpha: 0.15),
+                                    ),
+                                    child: Slider(
+                                      min: 0.0,
+                                      max: state.duration.inMilliseconds
+                                                  .toDouble() >
+                                              0
+                                          ? state.duration.inMilliseconds
+                                              .toDouble()
+                                          : 1.0,
+                                      value: (_dragSeekValue ??
+                                              position.inMilliseconds
+                                                  .toDouble())
+                                          .clamp(
+                                        0.0,
+                                        state.duration.inMilliseconds.toDouble() >
+                                                0
+                                            ? state.duration.inMilliseconds
+                                                .toDouble()
+                                            : 1.0,
+                                      ),
+                                      onChanged: (val) {
+                                        setState(() => _dragSeekValue = val);
+                                      },
+                                      onChangeEnd: (val) {
+                                        cubit.seek(
+                                            Duration(milliseconds: val.toInt()));
+                                        setState(() => _dragSeekValue = null);
+                                      },
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  Formatters.formatDuration(state.duration),
+                                  style: TextStyle(
+                                    color: p.textSecondary,
+                                    fontSize: 11,
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures()
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         ),
                       ],
                     ),

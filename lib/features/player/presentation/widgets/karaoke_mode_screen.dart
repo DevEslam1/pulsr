@@ -24,6 +24,12 @@ class KaraokeModeScreen extends StatelessWidget {
     );
 
     return BlocBuilder<PlayerCubit, PlayerState>(
+      buildWhen: (prev, curr) =>
+          prev.position != curr.position ||
+          prev.currentSong != curr.currentSong ||
+          prev.duration != curr.duration ||
+          prev.isPlaying != curr.isPlaying ||
+          prev.lyrics != curr.lyrics,
       builder: (context, state) {
         final pos = state.position - audibleOffset;
         final song = state.currentSong;
