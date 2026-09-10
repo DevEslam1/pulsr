@@ -5,6 +5,7 @@ import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/constants/app_radii.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/l10n_extensions.dart';
+import '../../../core/utils/list_content_diff.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/glass_container.dart';
 import '../../../core/widgets/spinning_vinyl_disc.dart';
@@ -70,7 +71,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
           a.isPlaying != b.isPlaying ||
           a.duration != b.duration ||
           a.currentIndex != b.currentIndex ||
-          a.queue.length != b.queue.length,
+          listContentDiffers(a.queue, b.queue),
       builder: (context, state) {
         final song = state.currentSong;
         if (song == null) return const SizedBox.shrink();
@@ -199,8 +200,8 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                               else
                                                 Hero(
                                                   tag: isCurrent
-                                                      ? 'now_playing_art_mini'
-                                                      : 'queue_art_$index',
+                                                      ? 'now_playing_art_mini_${item.id}'
+                                                      : 'queue_art_${item.id}_$index',
                                                   child: CachedArtwork(
                                                     id: item.id,
                                                     remoteUrl:
@@ -306,7 +307,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
   }
 }
 
-class _MiniPlayerProgressBar extends StatelessWidget {
+class _MiniPlayerProgressBar extends StatefulWidget {
   final Duration duration;
   final Color activeAccent;
   final Color hairlineColor;
@@ -320,6 +321,13 @@ class _MiniPlayerProgressBar extends StatelessWidget {
   });
 
   @override
+  State<_MiniPlayerProgressBar> createState() => _MiniPlayerProgressBarState();
+}
+
+class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar> {
+  double? _dragProgress;
+
+  @override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.ltr,
@@ -329,29 +337,50 @@ class _MiniPlayerProgressBar extends StatelessWidget {
           return BlocSelector<PlayerCubit, PlayerState, Duration>(
             selector: (s) => s.position,
             builder: (context, position) {
-              final progress = duration.inMilliseconds > 0
-                  ? (position.inMilliseconds / duration.inMilliseconds)
-                      .clamp(0.0, 1.0)
-                  : 0.0;
+              final progress = _dragProgress ??
+                  (widget.duration.inMilliseconds > 0
+                      ? (position.inMilliseconds / widget.duration.inMilliseconds)
+                          .clamp(0.0, 1.0)
+                      : 0.0);
 
               return GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTapDown: (details) {
-                  if (trackWidth > 0 && duration.inMilliseconds > 0) {
+                  if (trackWidth > 0 && widget.duration.inMilliseconds > 0) {
                     final ratio =
                         (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
-                    final seekMs = (duration.inMilliseconds * ratio).round();
-                    onSeek(Duration(milliseconds: seekMs));
+                    setState(() => _dragProgress = null);
+                    final seekMs =
+                        (widget.duration.inMilliseconds * ratio).round();
+                    widget.onSeek(Duration(milliseconds: seekMs));
                   }
                 },
-                onHorizontalDragStart: (_) {},
-                onHorizontalDragUpdate: (details) {
-                  if (trackWidth > 0 && duration.inMilliseconds > 0) {
+                onHorizontalDragStart: (details) {
+                  if (trackWidth > 0 && widget.duration.inMilliseconds > 0) {
                     final ratio =
                         (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
-                    final seekMs = (duration.inMilliseconds * ratio).round();
-                    onSeek(Duration(milliseconds: seekMs));
+                    setState(() => _dragProgress = ratio);
                   }
+                },
+                onHorizontalDragUpdate: (details) {
+                  if (trackWidth > 0 && widget.duration.inMilliseconds > 0) {
+                    final ratio =
+                        (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                    setState(() => _dragProgress = ratio);
+                  }
+                },
+                onHorizontalDragEnd: (_) {
+                  if (_dragProgress != null &&
+                      widget.duration.inMilliseconds > 0) {
+                    final seekMs =
+                        (widget.duration.inMilliseconds * _dragProgress!)
+                            .round();
+                    widget.onSeek(Duration(milliseconds: seekMs));
+                    setState(() => _dragProgress = null);
+                  }
+                },
+                onHorizontalDragCancel: () {
+                  setState(() => _dragProgress = null);
                 },
                 child: SizedBox(
                   height: 4.5,
@@ -361,7 +390,7 @@ class _MiniPlayerProgressBar extends StatelessWidget {
                     children: [
                       Positioned.fill(
                         child: ColoredBox(
-                            color: hairlineColor.withValues(alpha: 0.35)),
+                            color: widget.hairlineColor.withValues(alpha: 0.35)),
                       ),
                       Align(
                         alignment: Alignment.centerLeft,
@@ -373,13 +402,14 @@ class _MiniPlayerProgressBar extends StatelessWidget {
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: [
-                                  activeAccent.withValues(alpha: 0.7),
-                                  activeAccent,
+                                  widget.activeAccent.withValues(alpha: 0.7),
+                                  widget.activeAccent,
                                 ],
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: activeAccent.withValues(alpha: 0.45),
+                                  color: widget.activeAccent
+                                      .withValues(alpha: 0.45),
                                   blurRadius: 4,
                                 ),
                               ],

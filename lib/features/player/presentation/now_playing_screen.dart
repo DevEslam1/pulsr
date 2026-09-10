@@ -30,7 +30,11 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
   void initState() {
     super.initState();
     // Always default to Cover (Track) view when opening Now Playing screen
-    context.read<PlayerCubit>().resetOverlayViews();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<PlayerCubit>().resetOverlayViews();
+      }
+    });
   }
 
   @override
@@ -114,10 +118,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                         ? (context.isTablet ? 1160.0 : 960.0)
                         : (context.isTablet ? 780.0 : 560.0),
                   ),
-                  child: Directionality(
-                    textDirection: TextDirection.ltr,
-                    child: themeWidget,
-                  ),
+                  child: themeWidget,
                 ),
               ),
             ),
@@ -174,6 +175,10 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
     super.dispose();
   }
 
+  void _onVerticalDragStart(DragStartDetails details) {
+    _animController.stop();
+  }
+
   void _onVerticalDragUpdate(DragUpdateDetails details) {
     if (details.primaryDelta != null) {
       final newOffset = _dragOffset + details.primaryDelta!;
@@ -203,6 +208,7 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
 
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
+      onVerticalDragStart: _onVerticalDragStart,
       onVerticalDragUpdate: _onVerticalDragUpdate,
       onVerticalDragEnd: _onVerticalDragEnd,
       child: Transform.translate(

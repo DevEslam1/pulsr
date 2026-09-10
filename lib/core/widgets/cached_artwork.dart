@@ -1,6 +1,5 @@
-// lib/core/widgets/cached_artwork.dart
 import 'dart:io';
-import 'package:flutter/foundation.dart';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../di/injection.dart';
@@ -35,7 +34,7 @@ class ArtworkLruCache {
     return value;
   }
 
-  void put(String key, Uint8List? bytes) {
+  void put(String key, Uint8List? bytes, {bool persistToDisk = true}) {
     if (bytes == null || bytes.isEmpty) {
       remove(key);
       return;
@@ -59,7 +58,9 @@ class ArtworkLruCache {
 
     _cache[key] = bytes;
     _currentBytes += bytes.length;
-    ArtworkCacheManager().put(key, bytes);
+    if (persistToDisk) {
+      ArtworkCacheManager().put(key, bytes);
+    }
   }
 
   void remove(String key) {
@@ -164,7 +165,8 @@ class _CachedArtworkState extends State<CachedArtwork> {
     if (oldWidget.id != widget.id ||
         oldWidget.type != widget.type ||
         oldWidget.remoteUrl != widget.remoteUrl ||
-        oldWidget.highQuality != widget.highQuality) {
+        oldWidget.highQuality != widget.highQuality ||
+        oldWidget.size != widget.size) {
       _loadToken++;
       final nextKey = _cacheKey;
       if (_cache.containsKey(nextKey)) {
@@ -228,13 +230,25 @@ class _CachedArtworkState extends State<CachedArtwork> {
       }
 
       if (response.statusCode != 200 ||
-          response.contentLength > _maxRemoteBytes) {
+          (response.contentLength > 0 &&
+              response.contentLength > _maxRemoteBytes)) {
         await response.drain<void>();
         return null;
       }
-      final bytes = await consolidateHttpClientResponseBytes(response)
-          .timeout(const Duration(seconds: 8));
-      if (bytes.lengthInBytes > _maxRemoteBytes) return null;
+      final builder = BytesBuilder(copy: false);
+      var totalBytes = 0;
+      await for (final chunk in response.timeout(const Duration(seconds: 8))) {
+        totalBytes += chunk.length;
+        if (totalBytes > _maxRemoteBytes) {
+          try {
+            request?.abort();
+          } catch (_) {}
+          return null;
+        }
+        builder.add(chunk);
+      }
+      final bytes = builder.takeBytes();
+      if (bytes.lengthInBytes > _maxRemoteBytes || bytes.isEmpty) return null;
       return bytes;
     } catch (_) {
       try {
@@ -268,7 +282,7 @@ class _CachedArtworkState extends State<CachedArtwork> {
     final diskBytes = await ArtworkCacheManager().get(key);
     if (diskBytes != null && diskBytes.isNotEmpty) {
       if (mounted && token == _loadToken) {
-        _cache.put(key, diskBytes);
+        _cache.put(key, diskBytes, persistToDisk: false);
         setState(() {
           _cachedBytes = diskBytes;
         });
@@ -280,7 +294,7 @@ class _CachedArtworkState extends State<CachedArtwork> {
     if (isHq && _cachedBytes == null) {
       final baseDiskBytes = await ArtworkCacheManager().get(baseKey);
       if (baseDiskBytes != null && baseDiskBytes.isNotEmpty && mounted && token == _loadToken) {
-        _cache.put(baseKey, baseDiskBytes);
+        _cache.put(baseKey, baseDiskBytes, persistToDisk: false);
         setState(() {
           _cachedBytes = baseDiskBytes;
         });
@@ -329,19 +343,9 @@ class _CachedArtworkState extends State<CachedArtwork> {
           setState(() {
             _cachedBytes = bytes;
           });
-        } else if (_cachedBytes != null) {
-          setState(() {
-            _cachedBytes = null;
-          });
         }
       }
-    }).catchError((_) {
-      if (mounted && token == _loadToken && _cachedBytes != null) {
-        setState(() {
-          _cachedBytes = null;
-        });
-      }
-    });
+    }).catchError((_) {});
   }
 
   @override

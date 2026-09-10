@@ -396,6 +396,7 @@ class TestPulsrAudioHandler extends BaseAudioHandler
     List<SongsTableData> songs, {
     int initialIndex = 0,
     Duration? initialPosition,
+    bool autoPlay = true,
   }) async {}
 
   double? lastSetSpeed;
@@ -575,7 +576,7 @@ void main() {
       cubit.startAfterNTracksTimer(3);
       expect(testAudioHandler.sleepTimerTracks, 3);
       expect(cubit.sleepTimerRemainingTracks, 3);
-      expect(cubit.state.sleepTimerRemaining, const Duration(minutes: 9));
+      expect(cubit.state.sleepTimerRemaining, isNull);
 
       cubit.startEndOfTrackTimer();
       expect(testAudioHandler.sleepTimerTracks, 1);

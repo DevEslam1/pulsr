@@ -1,8 +1,10 @@
 // lib/features/library/cubit/library_cubit.dart
 import 'dart:async';
+import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/bloc/base_cubit.dart';
+import '../../../core/errors/failures.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/utils/error_logger.dart';
@@ -176,7 +178,42 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     _favoritesSub = autoSub(_getFavoritesUseCase.watchFavorites(), (result) {
       result.fold(
         (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
-        (favs) => safeEmit(state.copyWith(favorites: favs, errorMessage: null)),
+        (favs) {
+          if (_pendingFavoriteTargets.isEmpty) {
+            safeEmit(state.copyWith(favorites: favs, errorMessage: null));
+            return;
+          }
+          // A favorite toggle is in flight: the DB still holds the pre-toggle
+          // truth and this emission would flip the row back until the write
+          // settles. Hold the optimistic direction for the affected songs.
+          var merged = favs;
+          _pendingFavoriteTargets.forEach((songId, targetFav) {
+            final has = merged.any((s) => s.id == songId);
+            if (targetFav && !has) {
+              SongsTableData? optimistic;
+              for (final s in state.favorites) {
+                if (s.id == songId) {
+                  optimistic = s;
+                  break;
+                }
+              }
+              if (optimistic == null) {
+                for (final s in state.songs) {
+                  if (s.id == songId) {
+                    optimistic = s;
+                    break;
+                  }
+                }
+              }
+              if (optimistic != null) {
+                merged = [...merged, optimistic.copyWith(isFavorite: true)];
+              }
+            } else if (!targetFav && has) {
+              merged = merged.where((s) => s.id != songId).toList();
+            }
+          });
+          safeEmit(state.copyWith(favorites: merged, errorMessage: null));
+        },
       );
     });
   }
@@ -212,6 +249,13 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
   }
 
   final Map<int, int> _favoriteOpTokens = {};
+
+  /// Optimistic favorite direction per song while a toggle use case is in
+  /// flight (songId -> target isFavorite). Live favorites emissions are
+  /// reconciled against it so the row does not flip back to the pre-toggle DB
+  /// truth for the duration of the write.
+  final Map<int, bool> _pendingFavoriteTargets = {};
+
   Future<void> toggleFavorite(int songId) async {
     final opToken = (_favoriteOpTokens[songId] ?? 0) + 1;
     _favoriteOpTokens[songId] = opToken;
@@ -220,12 +264,24 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
         .map((s) => s.id == songId ? s.copyWith(isFavorite: isFavorite) : s)
         .toList();
 
-    final currentFavs = List<SongsTableData>.from(state.favorites);
-    final wasFav = currentFavs.any((s) => s.id == songId);
+    // Keep the actual pre-toggle row: rollback must restore it even when the
+    // song is not visible in the current (possibly filtered) songs list.
+    SongsTableData? preToggleFav;
+    for (final s in state.favorites) {
+      if (s.id == songId) {
+        preToggleFav = s;
+        break;
+      }
+    }
+    final wasFav = preToggleFav != null;
+
     if (wasFav) {
-      currentFavs.removeWhere((s) => s.id == songId);
-      safeEmit(state.copyWith(favorites: currentFavs, songs: songsWith(false)));
+      _pendingFavoriteTargets[songId] = false;
+      final favs = List<SongsTableData>.from(state.favorites)
+        ..removeWhere((s) => s.id == songId);
+      safeEmit(state.copyWith(favorites: favs, songs: songsWith(false)));
     } else {
+      _pendingFavoriteTargets[songId] = true;
       var matchingSong = state.songs.cast<SongsTableData?>().firstWhere(
             (s) => s?.id == songId,
             orElse: () => null,
@@ -234,29 +290,51 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
         try {
           final res = await _musicRepository!.getSongsByIds([songId]);
           matchingSong = res.fold((_) => null, (list) => list.firstOrNull);
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Favorite toggle: song lookup failed for $songId',
+              error: e, stackTrace: st, category: 'LibraryCubit');
+        }
+        // The repository lookup awaited: the favorites watch-stream may have
+        // emitted during the gap. Bail if closed or superseded instead of
+        // clobbering that update with the stale pre-await snapshot.
+        if (isClosed || _favoriteOpTokens[songId] != opToken) return;
       }
       if (matchingSong != null) {
-        currentFavs.add(matchingSong.copyWith(isFavorite: true));
-        safeEmit(state.copyWith(favorites: currentFavs, songs: songsWith(true)));
+        // Re-read favorites after any await so a watch emission that landed in
+        // the gap is not overwritten by our optimistic emit.
+        final favs = List<SongsTableData>.from(state.favorites);
+        if (!favs.any((s) => s.id == songId)) {
+          favs.add(matchingSong.copyWith(isFavorite: true));
+        }
+        safeEmit(state.copyWith(favorites: favs, songs: songsWith(true)));
       }
     }
 
-    final result = await _toggleFavoriteUseCase(songId);
+    Result<bool> result;
+    try {
+      result = await _toggleFavoriteUseCase(songId);
+    } catch (e, st) {
+      // The use case normally returns Left; a raw throw must not leak the
+      // in-flight bookkeeping or crash the awaiting UI.
+      ErrorLogger.log('Favorite toggle failed for song $songId',
+          error: e, stackTrace: st, category: 'LibraryCubit');
+      result = Left(DatabaseFailure('Could not update favorite'));
+    }
     if (isClosed || _favoriteOpTokens[songId] != opToken) return;
+    _favoriteOpTokens.remove(songId);
+    _pendingFavoriteTargets.remove(songId);
     final failureMessage = result.fold<String?>((l) => l.message, (_) => null);
     if (failureMessage == null) {
       safeEmit(state.copyWith(errorMessage: null));
       return;
     }
+    // Rollback restores from the pre-toggle snapshot regardless of whether the
+    // song exists in state.songs — the old code silently dropped favorites for
+    // songs outside the visible (filtered) list until the next emission.
     final reconciled = List<SongsTableData>.from(state.favorites);
     if (wasFav) {
-      final matchingSong = state.songs.cast<SongsTableData?>().firstWhere(
-            (s) => s?.id == songId,
-            orElse: () => null,
-          );
-      if (matchingSong != null && !reconciled.any((s) => s.id == songId)) {
-        reconciled.add(matchingSong.copyWith(isFavorite: true));
+      if (!reconciled.any((s) => s.id == songId)) {
+        reconciled.add(preToggleFav.copyWith(isFavorite: true));
       }
     } else {
       reconciled.removeWhere((s) => s.id == songId);

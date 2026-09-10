@@ -26,6 +26,11 @@ abstract class AudioPlayerBackend {
   int? get currentIndex;
   SequenceState? get sequenceState;
   AudioSource? get audioSource;
+  List<AudioSource> get audioSources;
+  bool get hasNext;
+  bool get hasPrevious;
+  LoopMode get loopMode;
+  bool get shuffleModeEnabled;
 
   Future<void> play();
   Future<void> pause();
@@ -33,6 +38,7 @@ abstract class AudioPlayerBackend {
   Future<void> seek(Duration position, {int? index});
   Future<void> setVolume(double volume);
   Future<void> setSpeed(double speed);
+  Future<void> shuffle();
   Future<Duration?> setAudioSource(
     AudioSource source, {
     bool preload = true,
@@ -104,6 +110,16 @@ class JustAudioPlayerBackend implements AudioPlayerBackend {
   SequenceState? get sequenceState => _player.sequenceState;
   @override
   AudioSource? get audioSource => _player.audioSource;
+  @override
+  List<AudioSource> get audioSources => _player.audioSources;
+  @override
+  bool get hasNext => _player.hasNext;
+  @override
+  bool get hasPrevious => _player.hasPrevious;
+  @override
+  LoopMode get loopMode => _player.loopMode;
+  @override
+  bool get shuffleModeEnabled => _player.shuffleModeEnabled;
 
   @override
   Future<void> play() => _player.play();
@@ -118,6 +134,8 @@ class JustAudioPlayerBackend implements AudioPlayerBackend {
   Future<void> setVolume(double volume) => _player.setVolume(volume);
   @override
   Future<void> setSpeed(double speed) => _player.setSpeed(speed);
+  @override
+  Future<void> shuffle() => _player.shuffle();
   @override
   Future<Duration?> setAudioSource(
     AudioSource source, {

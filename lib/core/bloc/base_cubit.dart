@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rxdart/rxdart.dart';
 
+import '../utils/error_logger.dart';
+
 /// Transient one-off UI event (toast, banner, haptic, navigation command).
 ///
 /// Effects are NEVER stored in persistent state: they are broadcast on a
@@ -171,8 +173,24 @@ abstract class PulsrCubit<S> extends Cubit<S> {
       timer.cancel();
     }
     _timers.clear();
-    unawaited(_effectController.close());
-    unawaited(_subs.dispose());
-    unawaited(super.close());
+    // The completion futures are still deliberately not awaited (see the note
+    // above: awaiting them deadlocks fake-async widget tests on the UI tree).
+    // Errors are captured, though: a failing controller close or composite
+    // dispose used to surface as an unhandled zone error instead.
+    unawaited(_effectController.close().catchError((e, s) {
+      ErrorLogger.log('PulsrCubit effect controller close failed',
+          error: e, stackTrace: s, category: 'PulsrCubit');
+    }));
+    final subsDisposeFuture = _subs.dispose();
+    if (subsDisposeFuture != null) {
+      unawaited(subsDisposeFuture.catchError((e, s) {
+        ErrorLogger.log('PulsrCubit composite dispose failed',
+            error: e, stackTrace: s, category: 'PulsrCubit');
+      }));
+    }
+    unawaited(super.close().catchError((e, s) {
+      ErrorLogger.log('PulsrCubit super.close failed',
+          error: e, stackTrace: s, category: 'PulsrCubit');
+    }));
   }
 }

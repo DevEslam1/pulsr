@@ -13,23 +13,15 @@ class ArtworkUriResolver {
   static final LinkedHashMap<int, Uri> _cachedArtworkUris = LinkedHashMap();
   static final LinkedHashMap<int, Uri> _cachedAlbumArtUris = LinkedHashMap();
   static final LinkedHashMap<int, Uri> _cachedArtistArtUris = LinkedHashMap();
+  static final Map<int, Future<Uri?>> _inFlightArtwork = {};
+  static final Map<int, Future<Uri?>> _inFlightAlbumArt = {};
+  static final Map<int, Future<Uri?>> _inFlightArtistArt = {};
 
   static void _putLru(LinkedHashMap<int, Uri> map, int key, Uri value) {
     if (map.containsKey(key)) {
       map.remove(key);
     } else if (map.length >= _maxCacheSize) {
-      final oldestKey = map.keys.first;
-      final oldestUri = map.remove(oldestKey);
-      if (oldestUri != null && oldestUri.scheme == 'file') {
-        File(oldestUri.toFilePath()).exists().then((exists) {
-          if (exists) {
-            File(oldestUri.toFilePath()).delete().ignore();
-          }
-        }).catchError((e, st) {
-          ErrorLogger.log('Failed to delete evicted artwork temp file',
-              error: e, stackTrace: st, category: 'ArtworkUriResolver');
-        });
-      }
+      map.remove(map.keys.first);
     }
     map[key] = value;
   }
@@ -74,32 +66,44 @@ class ArtworkUriResolver {
       _cachedArtworkUris[songId] = uri;
       return uri;
     }
-    try {
-      final tempDir = await getTemporaryDirectory();
-      final file = File('${tempDir.path}/pulsr_art_$songId.jpg');
-      if (await file.exists()) {
-        final uri = Uri.file(file.path);
-        _putLru(_cachedArtworkUris, songId, uri);
-        return uri;
-      }
-      final bytes = await _audioQuery.queryArtwork(
-        songId,
-        ArtworkType.AUDIO,
-        format: ArtworkFormat.JPEG,
-        size: 800,
-        quality: 95,
-      );
-      if (bytes != null && bytes.isNotEmpty) {
-        await file.writeAsBytes(bytes);
-        final uri = Uri.file(file.path);
-        _putLru(_cachedArtworkUris, songId, uri);
-        return uri;
-      }
-    } catch (e, st) {
-      ErrorLogger.log('Failed to resolve artwork URI for song ID: $songId',
-          error: e, stackTrace: st, category: 'ArtworkUriResolver');
+    if (_inFlightArtwork.containsKey(songId)) {
+      return await _inFlightArtwork[songId]!;
     }
-    return null;
+    final future = () async {
+      try {
+        final tempDir = await getTemporaryDirectory();
+        final file = File('${tempDir.path}/pulsr_art_$songId.jpg');
+        if (await file.exists() && (await file.length()) > 0) {
+          final uri = Uri.file(file.path);
+          _putLru(_cachedArtworkUris, songId, uri);
+          return uri;
+        }
+        final bytes = await _audioQuery.queryArtwork(
+          songId,
+          ArtworkType.AUDIO,
+          format: ArtworkFormat.JPEG,
+          size: 800,
+          quality: 95,
+        );
+        if (bytes != null && bytes.isNotEmpty) {
+          await file.writeAsBytes(bytes, flush: true);
+          final uri = Uri.file(file.path);
+          _putLru(_cachedArtworkUris, songId, uri);
+          return uri;
+        }
+      } catch (e, st) {
+        ErrorLogger.log('Failed to resolve artwork URI for song ID: $songId',
+            error: e, stackTrace: st, category: 'ArtworkUriResolver');
+      }
+      return null;
+    }();
+
+    _inFlightArtwork[songId] = future;
+    try {
+      return await future;
+    } finally {
+      _inFlightArtwork.remove(songId);
+    }
   }
 
   static Future<Uri?> getAlbumArtUri(int albumId) async {
@@ -108,35 +112,47 @@ class ArtworkUriResolver {
       _cachedAlbumArtUris[albumId] = uri;
       return uri;
     }
-    try {
-      final tempDir = await getTemporaryDirectory();
-      final file = File('${tempDir.path}/pulsr_album_art_$albumId.jpg');
-      if (await file.exists()) {
-        final uri = Uri.file(file.path);
-        _putLru(_cachedAlbumArtUris, albumId, uri);
-        return uri;
-      }
-      final bytes = await _audioQuery.queryArtwork(
-        albumId,
-        ArtworkType.ALBUM,
-        format: ArtworkFormat.JPEG,
-        size: 800,
-        quality: 95,
-      );
-      if (bytes != null && bytes.isNotEmpty) {
-        await file.writeAsBytes(bytes);
-        final uri = Uri.file(file.path);
-        _putLru(_cachedAlbumArtUris, albumId, uri);
-        return uri;
-      }
-    } catch (e, st) {
-      ErrorLogger.log(
-          'Failed to resolve album artwork URI for album ID: $albumId',
-          error: e,
-          stackTrace: st,
-          category: 'ArtworkUriResolver');
+    if (_inFlightAlbumArt.containsKey(albumId)) {
+      return await _inFlightAlbumArt[albumId]!;
     }
-    return null;
+    final future = () async {
+      try {
+        final tempDir = await getTemporaryDirectory();
+        final file = File('${tempDir.path}/pulsr_album_art_$albumId.jpg');
+        if (await file.exists() && (await file.length()) > 0) {
+          final uri = Uri.file(file.path);
+          _putLru(_cachedAlbumArtUris, albumId, uri);
+          return uri;
+        }
+        final bytes = await _audioQuery.queryArtwork(
+          albumId,
+          ArtworkType.ALBUM,
+          format: ArtworkFormat.JPEG,
+          size: 800,
+          quality: 95,
+        );
+        if (bytes != null && bytes.isNotEmpty) {
+          await file.writeAsBytes(bytes, flush: true);
+          final uri = Uri.file(file.path);
+          _putLru(_cachedAlbumArtUris, albumId, uri);
+          return uri;
+        }
+      } catch (e, st) {
+        ErrorLogger.log(
+            'Failed to resolve album artwork URI for album ID: $albumId',
+            error: e,
+            stackTrace: st,
+            category: 'ArtworkUriResolver');
+      }
+      return null;
+    }();
+
+    _inFlightAlbumArt[albumId] = future;
+    try {
+      return await future;
+    } finally {
+      _inFlightAlbumArt.remove(albumId);
+    }
   }
 
   static Future<Uri?> getArtistArtUri(int artistId) async {
@@ -145,35 +161,47 @@ class ArtworkUriResolver {
       _cachedArtistArtUris[artistId] = uri;
       return uri;
     }
-    try {
-      final tempDir = await getTemporaryDirectory();
-      final file = File('${tempDir.path}/pulsr_artist_art_$artistId.jpg');
-      if (await file.exists()) {
-        final uri = Uri.file(file.path);
-        _putLru(_cachedArtistArtUris, artistId, uri);
-        return uri;
-      }
-      final bytes = await _audioQuery.queryArtwork(
-        artistId,
-        ArtworkType.ARTIST,
-        format: ArtworkFormat.JPEG,
-        size: 800,
-        quality: 95,
-      );
-      if (bytes != null && bytes.isNotEmpty) {
-        await file.writeAsBytes(bytes);
-        final uri = Uri.file(file.path);
-        _putLru(_cachedArtistArtUris, artistId, uri);
-        return uri;
-      }
-    } catch (e, st) {
-      ErrorLogger.log(
-          'Failed to resolve artist artwork URI for artist ID: $artistId',
-          error: e,
-          stackTrace: st,
-          category: 'ArtworkUriResolver');
+    if (_inFlightArtistArt.containsKey(artistId)) {
+      return await _inFlightArtistArt[artistId]!;
     }
-    return null;
+    final future = () async {
+      try {
+        final tempDir = await getTemporaryDirectory();
+        final file = File('${tempDir.path}/pulsr_artist_art_$artistId.jpg');
+        if (await file.exists() && (await file.length()) > 0) {
+          final uri = Uri.file(file.path);
+          _putLru(_cachedArtistArtUris, artistId, uri);
+          return uri;
+        }
+        final bytes = await _audioQuery.queryArtwork(
+          artistId,
+          ArtworkType.ARTIST,
+          format: ArtworkFormat.JPEG,
+          size: 800,
+          quality: 95,
+        );
+        if (bytes != null && bytes.isNotEmpty) {
+          await file.writeAsBytes(bytes, flush: true);
+          final uri = Uri.file(file.path);
+          _putLru(_cachedArtistArtUris, artistId, uri);
+          return uri;
+        }
+      } catch (e, st) {
+        ErrorLogger.log(
+            'Failed to resolve artist artwork URI for artist ID: $artistId',
+            error: e,
+            stackTrace: st,
+            category: 'ArtworkUriResolver');
+      }
+      return null;
+    }();
+
+    _inFlightArtistArt[artistId] = future;
+    try {
+      return await future;
+    } finally {
+      _inFlightArtistArt.remove(artistId);
+    }
   }
 
   static Future<Uri?> resolveArtworkUri(SongsTableData song) async {

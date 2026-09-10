@@ -48,11 +48,36 @@ class DynamicThemeState {
   }
 }
 
+/// Palette-only snapshot cached per song/artwork. Deliberately excludes
+/// [DynamicThemeState.isDark]: replaying a whole cached state used to revert a
+/// light/dark toggle made after the palette was cached.
+class _CachedPalette {
+  final Color primaryColor;
+  final Color secondaryColor;
+  final Color backgroundColor;
+  final Color surfaceColor;
+
+  const _CachedPalette({
+    required this.primaryColor,
+    required this.secondaryColor,
+    required this.backgroundColor,
+    required this.surfaceColor,
+  });
+
+  DynamicThemeState applyTo(DynamicThemeState current) => current.copyWith(
+        primaryColor: primaryColor,
+        secondaryColor: secondaryColor,
+        backgroundColor: backgroundColor,
+        surfaceColor: surfaceColor,
+        hasCustomArtworkColor: true,
+      );
+}
+
 @singleton
 class DynamicThemeCubit extends Cubit<DynamicThemeState> {
   final OnAudioQuery _audioQuery = OnAudioQuery();
   static const int _maxCacheSize = 50;
-  final LinkedHashMap<String, DynamicThemeState> _cachedPalettes =
+  final LinkedHashMap<String, _CachedPalette> _cachedPalettes =
       LinkedHashMap();
   Timer? _debounceTimer;
   int _currentRequestToken = 0;
@@ -88,7 +113,11 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
       _debounceTimer?.cancel();
       final cached = _cachedPalettes.remove(cacheKey)!;
       _cachedPalettes[cacheKey] = cached; // Refresh LRU position
-      emit(cached);
+      // Guarded like every other emit: this path fires during teardown when
+      // the player screen disposes while artwork updates are still landing.
+      if (!isClosed) {
+        emit(cached.applyTo(state));
+      }
       return;
     }
 
@@ -185,21 +214,20 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
                 Colors.black.withValues(alpha: 0.75), darkVibrant)
             : const Color(0xFF14172B);
 
-        final newState = state.copyWith(
+        final newPalette = _CachedPalette(
           primaryColor: primary,
           secondaryColor: palette.mutedColor?.color ?? AppColors.secondary,
           backgroundColor: bg,
           surfaceColor: Color.alphaBlend(
               primary.withValues(alpha: 0.08), AppColors.surface),
-          hasCustomArtworkColor: true,
         );
 
         if (_cachedPalettes.length >= _maxCacheSize) {
           _cachedPalettes.remove(_cachedPalettes.keys.first);
         }
-        _cachedPalettes[cacheKey] = newState;
+        _cachedPalettes[cacheKey] = newPalette;
         if (!isClosed && token == _currentRequestToken) {
-          emit(newState);
+          emit(newPalette.applyTo(state));
         }
         return;
       }
@@ -216,14 +244,17 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
     }
 
     if (token == _currentRequestToken && !isClosed) {
-      emit(const DynamicThemeState());
+      emit(DynamicThemeState(isDark: state.isDark));
     }
   }
 
   void resetToDefault() {
+    if (isClosed) return;
     _debounceTimer?.cancel();
     _currentRequestToken++;
-    emit(const DynamicThemeState());
+    // Preserve the current light/dark selection; a bare DynamicThemeState()
+    // hard-codes isDark: true and silently reverted the user's mode.
+    emit(DynamicThemeState(isDark: state.isDark));
   }
 
   @override

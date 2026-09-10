@@ -100,8 +100,8 @@ abstract class PlayerState with _$PlayerState {
         ((sleepTimerRemaining == null) != (other.sleepTimerRemaining == null) ||
             (sleepTimerRemaining != null &&
                 other.sleepTimerRemaining != null &&
-                sleepTimerRemaining!.inMinutes !=
-                    other.sleepTimerRemaining!.inMinutes)) ||
+                sleepTimerRemaining!.inSeconds !=
+                    other.sleepTimerRemaining!.inSeconds)) ||
         listContentDiffers(lyrics, other.lyrics) ||
         lyricsSource != other.lyricsSource ||
         isLoadingLyrics != other.isLoadingLyrics ||

@@ -26,18 +26,19 @@ class FakeAudioPlayerBackend implements AudioPlayerBackend {
       StreamController<SequenceState?>.broadcast();
 
   Duration _position = Duration.zero;
-  Duration? _duration = const Duration(minutes: 3, seconds: 30);
+  Duration? _duration;
   final Duration _bufferedPosition = Duration.zero;
   ProcessingState _processingState = ProcessingState.idle;
   bool _playing = false;
   double _volume = 1.0;
   double _speed = 1.0;
-  int? _currentIndex = 0;
+  int? _currentIndex;
   SequenceState? _sequenceState;
   AudioSource? _audioSource;
   bool _shuffleEnabled = false;
   LoopMode _loopMode = LoopMode.off;
   List<AudioSource> _sources = [];
+  bool _disposed = false;
 
   FakeAudioPlayerBackend() {
     _emitState();
@@ -87,11 +88,27 @@ class FakeAudioPlayerBackend implements AudioPlayerBackend {
   SequenceState? get sequenceState => _sequenceState;
   @override
   AudioSource? get audioSource => _audioSource;
+  @override
+  List<AudioSource> get audioSources => List.unmodifiable(_sources);
+  List<AudioSource> get sources => audioSources;
+  @override
+  bool get shuffleModeEnabled => _shuffleEnabled;
   bool get shuffleEnabled => _shuffleEnabled;
+  @override
+  bool get hasNext =>
+      _currentIndex != null &&
+      _sources.isNotEmpty &&
+      (_currentIndex! < _sources.length - 1 || _loopMode == LoopMode.all);
+  @override
+  bool get hasPrevious =>
+      _currentIndex != null &&
+      _sources.isNotEmpty &&
+      (_currentIndex! > 0 || _loopMode == LoopMode.all);
+  @override
   LoopMode get loopMode => _loopMode;
-  List<AudioSource> get sources => List.unmodifiable(_sources);
 
   void _emitState() {
+    if (_disposed) return;
     _positionController.add(_position);
     _durationController.add(_duration);
     _bufferedPositionController.add(_bufferedPosition);
@@ -105,13 +122,21 @@ class FakeAudioPlayerBackend implements AudioPlayerBackend {
 
   /// Advances the simulated playback clock by [delta], advancing position and emitting updates.
   void tickClock(Duration delta) {
-    if (!_playing || _processingState != ProcessingState.ready) return;
+    if (!_playing || _processingState != ProcessingState.ready || _disposed) return;
     _position += delta;
     if (_duration != null && _position >= _duration!) {
-      _position = _duration!;
-      _processingState = ProcessingState.completed;
-      _playing = false;
+      if (_loopMode == LoopMode.one) {
+        _position = Duration.zero;
+      } else if (hasNext) {
+        seekToNext();
+        return;
+      } else {
+        _position = _duration!;
+        _processingState = ProcessingState.completed;
+        _playing = false;
+      }
     }
+    if (_disposed) return;
     _positionController.add(_position);
     _playerStateController.add(PlayerState(_playing, _processingState));
     _processingStateController.add(_processingState);
@@ -200,6 +225,12 @@ class FakeAudioPlayerBackend implements AudioPlayerBackend {
   }
 
   @override
+  Future<void> shuffle() async {
+    _sources.shuffle();
+    _emitState();
+  }
+
+  @override
   Future<void> setShuffleModeEnabled(bool enabled) async {
     _shuffleEnabled = enabled;
   }
@@ -211,10 +242,13 @@ class FakeAudioPlayerBackend implements AudioPlayerBackend {
 
   @override
   Future<void> seekToNext() async {
-    if (_sources.isNotEmpty &&
-        _currentIndex != null &&
-        _currentIndex! < _sources.length - 1) {
+    if (_sources.isEmpty || _currentIndex == null) return;
+    if (_currentIndex! < _sources.length - 1) {
       _currentIndex = _currentIndex! + 1;
+      _position = Duration.zero;
+      _emitState();
+    } else if (_loopMode == LoopMode.all) {
+      _currentIndex = 0;
       _position = Duration.zero;
       _emitState();
     }
@@ -222,8 +256,13 @@ class FakeAudioPlayerBackend implements AudioPlayerBackend {
 
   @override
   Future<void> seekToPrevious() async {
-    if (_sources.isNotEmpty && _currentIndex != null && _currentIndex! > 0) {
+    if (_sources.isEmpty || _currentIndex == null) return;
+    if (_currentIndex! > 0) {
       _currentIndex = _currentIndex! - 1;
+      _position = Duration.zero;
+      _emitState();
+    } else if (_loopMode == LoopMode.all) {
+      _currentIndex = _sources.length - 1;
       _position = Duration.zero;
       _emitState();
     }
@@ -231,6 +270,7 @@ class FakeAudioPlayerBackend implements AudioPlayerBackend {
 
   @override
   Future<void> dispose() async {
+    _disposed = true;
     _positionController.close();
     _durationController.close();
     _bufferedPositionController.close();

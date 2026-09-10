@@ -234,7 +234,7 @@ class TestPulsrAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> loadQueue(List<SongsTableData> songs,
-      {int initialIndex = 0, Duration? initialPosition}) async {}
+      {int initialIndex = 0, Duration? initialPosition, bool autoPlay = true}) async {}
 
   @override
   Stream<Duration?> get sleepTimerRemainingStream => const Stream.empty();

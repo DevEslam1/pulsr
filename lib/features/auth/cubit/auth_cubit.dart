@@ -12,6 +12,8 @@ class AuthCubit extends Cubit<AuthState> {
   final CloudSyncService _cloudSyncService;
   StreamSubscription? _authSubscription;
   bool _syncing = false;
+  DateTime? _lastSyncAttemptAt;
+  static const Duration _syncDedupeWindow = Duration(seconds: 2);
 
   AuthCubit(this._authService, this._cloudSyncService)
       : super(AuthState(lastSyncedAt: _cloudSyncService.lastSyncTime)) {
@@ -44,6 +46,7 @@ class AuthCubit extends Cubit<AuthState> {
     emit(state.copyWith(status: AuthStatus.authenticating, errorMessage: null));
     try {
       final user = await _authService.signInWithGoogle();
+      if (isClosed) return;
       if (user != null) {
         emit(state.copyWith(
           status: AuthStatus.authenticated,
@@ -55,6 +58,7 @@ class AuthCubit extends Cubit<AuthState> {
         emit(state.copyWith(status: AuthStatus.unauthenticated));
       }
     } catch (e) {
+      if (isClosed) return;
       final msg = _mapAuthError(e);
       emit(state.copyWith(
         status: AuthStatus.error,
@@ -67,6 +71,7 @@ class AuthCubit extends Cubit<AuthState> {
     emit(state.copyWith(status: AuthStatus.authenticating, errorMessage: null));
     try {
       final user = await _authService.signInWithEmail(email, password);
+      if (isClosed) return;
       if (user != null) {
         emit(state.copyWith(
           status: AuthStatus.authenticated,
@@ -81,6 +86,7 @@ class AuthCubit extends Cubit<AuthState> {
         ));
       }
     } catch (e) {
+      if (isClosed) return;
       final msg = _mapAuthError(e);
       emit(state.copyWith(
         status: AuthStatus.error,
@@ -93,6 +99,7 @@ class AuthCubit extends Cubit<AuthState> {
     emit(state.copyWith(status: AuthStatus.authenticating, errorMessage: null));
     try {
       final user = await _authService.signUpWithEmail(email, password);
+      if (isClosed) return;
       if (user != null) {
         emit(state.copyWith(
           status: AuthStatus.authenticated,
@@ -107,6 +114,7 @@ class AuthCubit extends Cubit<AuthState> {
         ));
       }
     } catch (e) {
+      if (isClosed) return;
       final msg = _mapAuthError(e);
       emit(state.copyWith(
         status: AuthStatus.error,
@@ -119,6 +127,7 @@ class AuthCubit extends Cubit<AuthState> {
     try {
       await _authService.sendPasswordResetEmail(email);
     } catch (e) {
+      if (isClosed) return;
       final msg = _mapAuthError(e);
       emit(state.copyWith(
         errorMessage: msg,
@@ -157,6 +166,16 @@ class AuthCubit extends Cubit<AuthState> {
 
   Future<void> syncNow() async {
     if (state.user == null || _syncing) return;
+    // The authStateChanges listener and every sign-in path both trigger a sync
+    // for the same login; without this window they run back-to-back and
+    // duplicate the whole sync for no benefit.
+    final now = DateTime.now();
+    final lastAttempt = _lastSyncAttemptAt;
+    if (lastAttempt != null &&
+        now.difference(lastAttempt) < _syncDedupeWindow) {
+      return;
+    }
+    _lastSyncAttemptAt = now;
     _syncing = true;
     emit(state.copyWith(syncStatus: SyncStatus.syncing, syncError: null));
     try {

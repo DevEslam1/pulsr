@@ -50,10 +50,16 @@ class DownloadsState {
           mapEquals(tasks, other.tasks);
 
   @override
-  int get hashCode => Object.hash(
-        Object.hashAll(tasks.entries.map((e) => Object.hash(e.key, e.value))),
-        storageStats,
-        isLoading,
-        errorMessage,
-      );
+  int get hashCode {
+    // Order-insensitive on purpose: == uses mapEquals, which ignores insertion
+    // order, so two maps holding the same entries must produce the same hash
+    // regardless of iteration order. (Object.hashAllUnordered would do this
+    // directly, but it needs Dart 3.2+ and pubspec declares >=3.0.0; a
+    // commutative sum of per-entry hashes achieves the same.)
+    var tasksHash = 0;
+    for (final entry in tasks.entries) {
+      tasksHash += Object.hash(entry.key, entry.value);
+    }
+    return Object.hash(tasksHash, storageStats, isLoading, errorMessage);
+  }
 }

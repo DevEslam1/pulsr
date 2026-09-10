@@ -67,5 +67,14 @@ void main() {
       final cache = ArtworkLruCache();
       expect(cache.maxCapacity, equals(200));
     });
+
+    test('put with persistToDisk false stores item in memory without error', () {
+      final cache = ArtworkLruCache.withCapacity(5);
+      final bytes = Uint8List.fromList([10, 20, 30]);
+      cache.put('memory_only_key', bytes, persistToDisk: false);
+
+      expect(cache.containsKey('memory_only_key'), isTrue);
+      expect(cache.get('memory_only_key'), equals(bytes));
+    });
   });
 }

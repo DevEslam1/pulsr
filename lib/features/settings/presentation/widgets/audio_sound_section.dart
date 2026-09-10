@@ -9,6 +9,7 @@ import '../../../../data/db/app_database.dart';
 import '../../../../core/utils/platform_capabilities.dart';
 import '../../../../data/audio/audio_effects_channel.dart';
 import '../../../player/cubit/player_cubit.dart';
+import '../../../player/cubit/player_state.dart';
 import '../../../player/presentation/widgets/audio_quality_sheet.dart';
 import '../../../player/presentation/widgets/equalizer_sheet.dart';
 import '../../../player/presentation/widgets/dsp_inspector_sheet.dart';
@@ -378,15 +379,15 @@ class AudioSoundSection extends StatelessWidget {
         // Loudness Contour (Fletcher–Munson) — volume-linked tone compensation.
         // Complementary to ReplayGain (gain-domain): RG levels tracks, the
         // contour adapts tone to the listening level. See conflict copy.
-        Builder(builder: (cntx) {
-          final l10n = context.l10n;
-          final playerCubit = context.read<PlayerCubit>();
-          final isLoudnessContourEnabled = context.select<PlayerCubit, bool>(
-            (c) => c.state.isLoudnessContourEnabled,
-          );
-          final loudnessContourIntensity = context.select<PlayerCubit, double>(
-            (c) => c.state.loudnessContourIntensity,
-          );
+        BlocBuilder<PlayerCubit, PlayerState>(
+          buildWhen: (prev, curr) =>
+              prev.isLoudnessContourEnabled != curr.isLoudnessContourEnabled ||
+              prev.loudnessContourIntensity != curr.loudnessContourIntensity,
+          builder: (context, playerState) {
+            final l10n = context.l10n;
+            final playerCubit = context.read<PlayerCubit>();
+            final isLoudnessContourEnabled = playerState.isLoudnessContourEnabled;
+            final loudnessContourIntensity = playerState.loudnessContourIntensity;
           final lcBlocked = AudioConflicts.dspBlockedByBitPerfect(
             bitPerfectOutput: state.bitPerfectOutput,
             bypassDspOnBitPerfect: state.bypassDspOnBitPerfect,
