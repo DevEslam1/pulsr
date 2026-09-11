@@ -1114,7 +1114,8 @@ class YtmAccountService {
 
             // Fetch continuation pages until maxTracks is satisfied.
             var pageCount = 0;
-            const maxPages = 20;
+            const maxPages = 100;
+            var consecutiveEmptyPages = 0;
             while (allTracks.length < maxTracks && pageCount < maxPages) {
               pageCount++;
               try {
@@ -1136,7 +1137,12 @@ class YtmAccountService {
                   currentJson =
                       jsonDecode(contResponse.body) as Map<String, dynamic>;
                   final contTracks = _parseInnertubePlaylistTracks(currentJson);
-                  if (contTracks.isEmpty) break;
+                  if (contTracks.isEmpty) {
+                    consecutiveEmptyPages++;
+                    if (consecutiveEmptyPages >= 3) break;
+                    continue;
+                  }
+                  consecutiveEmptyPages = 0;
                   allTracks.addAll(contTracks);
                 } else {
                   break;

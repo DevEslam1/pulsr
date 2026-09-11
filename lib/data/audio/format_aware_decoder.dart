@@ -2,6 +2,8 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 import '../db/app_database.dart';
+import 'dsd_decoder_helper.dart';
+import 'mqa_decoder_helper.dart';
 
 /// Routes audio playback to the optimal decode path per format.
 class FormatAwareDecoder {
@@ -28,9 +30,14 @@ class FormatAwareDecoder {
         dot >= 0 ? cleanPath.substring(dot + 1).toLowerCase() : '';
 
     switch (ext) {
-      // 1. High-Res Lossless: Direct file access, native decoder
+      // 1. High-Res Lossless & MQA
       case 'flac':
       case 'wav':
+        final isMqa = await MqaDecoderHelper.isMqaFile(song.path);
+        if (isMqa && (MqaDecoderHelper.isMqaEnabled?.call() ?? true)) {
+          return MqaDecoderHelper.decodeMqaFile(song, tag);
+        }
+        return AudioSource.uri(Uri.file(song.path), tag: tag);
       case 'alac':
       case 'aiff':
         return AudioSource.uri(Uri.file(song.path), tag: tag);
@@ -38,13 +45,8 @@ class FormatAwareDecoder {
       // 2. DSD Formats (Direct Stream Digital)
       case 'dsf':
       case 'dff':
-        if (decodeDsdToPcm != null) {
-          return decodeDsdToPcm!(song, tag);
-        }
-        throw UnsupportedError(
-          'DSD format (.$ext) needs a DSD-to-PCM decoder. '
-          'File: ${song.path}. Provide decodeDsdToPcm or convert to FLAC.',
-        );
+        final decoder = decodeDsdToPcm ?? DsdDecoderHelper.decodeDsdFile;
+        return decoder(song, tag);
 
       // 3. Compressed Standard Formats
       case 'mp3':

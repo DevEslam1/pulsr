@@ -1455,4 +1455,29 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(PrefsKeys.bluetoothLatencyOffsetMs, clamped);
   }
+
+  /// Applies the "Maximum Quality" audiophile preset:
+  /// Bit-perfect mode enabled, all DSP/EQ/ReplayGain/crossfade bypassed, gapless active.
+  Future<void> applyMaximumQualityPreset() async {
+    await setBitPerfectOutput(true);
+    await setBypassDspOnBitPerfect(true);
+    await setReplayGainMode(ReplayGainMode.off);
+    await setGapless(true);
+  }
+
+  /// Applies the "Smooth Playback" preset:
+  /// Standard crossfade, auto ReplayGain, adaptive buffering.
+  Future<void> applySmoothPlaybackPreset() async {
+    await setBitPerfectOutput(false);
+    await setReplayGainMode(ReplayGainMode.auto);
+    await setCrossfade(4.0);
+  }
+
+  /// Applies the "Poor Network" preset:
+  /// Conservative data usage, zero crossfade, lower bitrate.
+  Future<void> applyPoorNetworkPreset() async {
+    await setCrossfade(0.0);
+    await setGapless(false);
+    await setStreamingQuality(YtmAudioQuality.low);
+  }
 }

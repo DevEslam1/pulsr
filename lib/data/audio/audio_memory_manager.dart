@@ -1,5 +1,5 @@
-// lib/data/audio/audio_memory_manager.dart
 import 'dart:collection';
+import 'dart:io';
 import 'package:just_audio/just_audio.dart';
 
 /// Item stored in preloaded stream head cache.
@@ -16,11 +16,27 @@ class PreloadedHead {
 }
 
 /// Aggressive memory and audio buffer management with strict LRU cleanup
-/// and hard 32MB budget capping for preloaded stream heads.
+/// and adaptive budget capping for preloaded stream heads.
 class AudioMemoryManager {
   static const int maxStreamCacheEntries = 64;
-  static const int maxPreloadBudgetBytes = 32 * 1024 * 1024; // 32MB hard cap
+  static int maxPreloadBudgetBytes = 32 * 1024 * 1024;
   static const int defaultHeadSizeBytes = 2 * 1024 * 1024; // 2MB default head
+
+  /// Adapts preload budget based on available system memory heuristic (clamped 16–64MB).
+  static void adaptBudgetToSystemRam() {
+    maxPreloadBudgetBytes = computeAdaptiveBudget();
+  }
+
+  static int computeAdaptiveBudget() {
+    try {
+      final totalRam = Platform.numberOfProcessors * 512 * 1024 * 1024;
+      return (totalRam * 0.01)
+          .clamp(16 * 1024 * 1024, 64 * 1024 * 1024)
+          .toInt();
+    } catch (_) {
+      return 32 * 1024 * 1024;
+    }
+  }
 
   final LinkedHashMap<String, PreloadedHead> _headCache = LinkedHashMap();
   int _currentPreloadBytes = 0;
@@ -100,7 +116,7 @@ class AudioMemoryManager {
   }
 
   /// Called when a track finishes playback to release completed audio buffers.
-  void onTrackCompleted(int trackId) {
+  void onTrackCompleted(Object trackId) {
     onEvictOldestCacheRequested?.call();
   }
 

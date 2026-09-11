@@ -175,16 +175,58 @@ class XdmBackendService {
 
   /// Checks server health, returning a typed BackendHealthInfo.
   Future<BackendHealthInfo> checkHealth({bool force = false}) async {
-    // DISABLED: no network I/O.
-    return const BackendHealthInfo(
-      ok: false,
-      backendVersion: 'disabled',
-      ytdlpVersion: 'disabled',
-      proxyPoolSize: 0,
-      latencyMs: 0,
-      circuitState: BackendCircuitState.open,
-      message: 'Remote yt-dlp backend is disabled (on-device only).',
-    );
+    if (!await isEnabled()) {
+      return const BackendHealthInfo(
+        ok: false,
+        backendVersion: 'disabled',
+        ytdlpVersion: 'disabled',
+        proxyPoolSize: 0,
+        latencyMs: 0,
+        circuitState: BackendCircuitState.open,
+        message: 'Remote yt-dlp backend is disabled (on-device only).',
+      );
+    }
+
+    try {
+      final baseUrl = await _getBaseUrl();
+      final uri = Uri.parse('$baseUrl/health');
+      final sw = Stopwatch()..start();
+      final res = await _client.get(uri).timeout(const Duration(seconds: 4));
+      sw.stop();
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        return BackendHealthInfo(
+          ok: data['ok'] == true || data['status'] == 'healthy' || data['status'] == 'ok',
+          backendVersion: data['version']?.toString() ?? '1.0.0',
+          ytdlpVersion: data['ytdlp_version']?.toString() ?? 'unknown',
+          proxyPoolSize: data['proxies_count'] as int? ?? 0,
+          latencyMs: sw.elapsedMilliseconds,
+          circuitState: BackendCircuitState.closed,
+          message: data['message']?.toString() ?? 'Backend online',
+        );
+      } else {
+        return BackendHealthInfo(
+          ok: false,
+          backendVersion: 'error',
+          ytdlpVersion: 'error',
+          proxyPoolSize: 0,
+          latencyMs: sw.elapsedMilliseconds,
+          circuitState: BackendCircuitState.open,
+          message: 'HTTP ${res.statusCode}',
+        );
+      }
+    } catch (e) {
+      return BackendHealthInfo(
+        ok: false,
+        backendVersion: 'unreachable',
+        ytdlpVersion: 'unreachable',
+        proxyPoolSize: 0,
+        latencyMs: 0,
+        circuitState: BackendCircuitState.open,
+        message: 'Connection failed: $e',
+      );
+    }
   }
 
   /// Resolves an audio stream for [videoId] via the Contract v2 /resolve/audio endpoint.

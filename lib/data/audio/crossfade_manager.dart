@@ -203,6 +203,7 @@ class CrossfadeManager {
     required Duration remainingTrackDuration,
     required bool isSameDecoderConfig,
     required bool isRepeatOne,
+    double? nextTrackBufferedFraction,
   }) {
     if (configuredCrossfade == Duration.zero ||
         configuredCrossfade.inMilliseconds < 100) {
@@ -210,6 +211,15 @@ class CrossfadeManager {
         type: TransitionType.gapless,
         effectiveDuration: Duration.zero,
         reason: 'Crossfade disabled (0s)',
+      );
+    }
+
+    if (nextTrackBufferedFraction != null && nextTrackBufferedFraction < 0.5) {
+      return const TransitionDecision(
+        type: TransitionType.gapless,
+        effectiveDuration: Duration.zero,
+        reason:
+            'Next track insufficiently buffered (<50%); skipping crossfade for safety',
       );
     }
 
@@ -227,8 +237,8 @@ class CrossfadeManager {
     final clampedDuration = configuredCrossfade > maxAllowedFade
         ? maxAllowedFade
         : configuredCrossfade;
-    final effectiveFade = clampedDuration < const Duration(milliseconds: 500)
-        ? const Duration(milliseconds: 500)
+    final effectiveFade = clampedDuration < const Duration(milliseconds: 100)
+        ? const Duration(milliseconds: 100)
         : clampedDuration;
 
     return TransitionDecision(
@@ -330,6 +340,25 @@ class CrossfadeManager {
           nativeArmed = false;
         }
       }
+    }
+    if (nativeArmed) {
+      Timer? singleTimer;
+      singleTimer = Timer(Duration(milliseconds: totalMs.round()), () {
+        _activeTimers.remove(singleTimer);
+        if (_fadeId != fadeId) {
+          if (!completer.isCompleted) completer.complete();
+          return;
+        }
+        try {
+          player.setVolume(to.clamp(0.0, 1.0));
+        } catch (_) {}
+        if (to > 0.0) {
+          _clearNativeCurve(player);
+        }
+        if (!completer.isCompleted) completer.complete();
+      });
+      _activeTimers.add(singleTimer);
+      return completer.future;
     }
 
     late final Timer timer;
@@ -463,27 +492,20 @@ class CrossfadeManager {
       _clearNativeCurve(inactive);
     }
     if (nativeReady) {
-      late final Timer timer;
-      timer = Timer.periodic(const Duration(milliseconds: 10), (t) {
+      Timer? singleTimer;
+      singleTimer = Timer(Duration(milliseconds: totalMs.round()), () {
+        _activeTimers.remove(singleTimer);
         if (_fadeId != fadeId) {
-          t.cancel();
-          _activeTimers.remove(t);
           if (!completer.isCompleted) completer.complete();
           return;
         }
-        if (stopwatch.elapsedMilliseconds >= totalMs) {
-          // Exact endpoints — the curves hold their last values, mirror them
-          // onto the platform volumes so state stays consistent afterwards.
-          try {
-            active.setVolume(0.0);
-            inactive.setVolume(toInactiveVol.clamp(0.0, 1.0));
-          } catch (_) {}
-          t.cancel();
-          _activeTimers.remove(t);
-          if (!completer.isCompleted) completer.complete();
-        }
+        try {
+          active.setVolume(0.0);
+          inactive.setVolume(toInactiveVol.clamp(0.0, 1.0));
+        } catch (_) {}
+        if (!completer.isCompleted) completer.complete();
       });
-      _activeTimers.add(timer);
+      _activeTimers.add(singleTimer);
       return completer.future;
     }
 

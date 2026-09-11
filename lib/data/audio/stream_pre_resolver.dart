@@ -21,6 +21,7 @@ class StreamPreResolver {
   final YtmUrlCache urlCache;
   final String Function() qualityProvider;
   final Duration debounceDuration;
+  final bool Function(String videoId)? isAlreadyPrefetching;
 
   Timer? _debounceTimer;
   Completer<void>? _activeResolution;
@@ -31,7 +32,8 @@ class StreamPreResolver {
     required this.resolveUrl,
     required this.urlCache,
     this.qualityProvider = _defaultQuality,
-    this.debounceDuration = const Duration(milliseconds: 300),
+    this.debounceDuration = const Duration(milliseconds: 100),
+    this.isAlreadyPrefetching,
   });
 
   static String _defaultQuality() => 'high';
@@ -45,6 +47,8 @@ class StreamPreResolver {
     required int currentIndex,
     required bool isShuffle,
     List<int>? shuffleIndices,
+    Duration? position,
+    Duration? duration,
   }) {
     if (_disposed) return;
     _debounceTimer?.cancel();
@@ -62,18 +66,50 @@ class StreamPreResolver {
     required int currentIndex,
     required bool isShuffle,
     List<int>? shuffleIndices,
+    Duration? position,
+    Duration? duration,
   }) {
     if (_disposed) return;
+    final timeRemaining = (duration != null && position != null && duration > position)
+        ? duration - position
+        : null;
+    final urgent = timeRemaining != null && timeRemaining < const Duration(seconds: 15);
     _debounceTimer?.cancel();
-    _debounceTimer = Timer(debounceDuration, () {
-      if (_disposed) return;
+    if (urgent) {
       _planPreResolution(
         queue: queue,
         currentIndex: currentIndex,
         isShuffle: isShuffle,
         shuffleIndices: shuffleIndices,
       );
-    });
+    } else {
+      _debounceTimer = Timer(debounceDuration, () {
+        if (_disposed) return;
+        _planPreResolution(
+          queue: queue,
+          currentIndex: currentIndex,
+          isShuffle: isShuffle,
+          shuffleIndices: shuffleIndices,
+        );
+      });
+    }
+  }
+
+  /// Fire the moment a track is tapped or enqueued — not only on track start.
+  void onTrackEnqueuedOrTapped(SongsTableData song) {
+    if (_disposed) return;
+    if (song.source != SongSource.youtube) return;
+    final videoId = song.remoteId;
+    if (videoId == null || videoId.isEmpty) return;
+
+    final quality = qualityProvider();
+    if (urlCache.contains(videoId, quality: quality)) return;
+    if (_inFlightVideoId == videoId ||
+        isAlreadyPrefetching?.call(videoId) == true) {
+      return;
+    }
+
+    _resolveNow(song, quality);
   }
 
   void _planPreResolution({
@@ -109,9 +145,17 @@ class StreamPreResolver {
     }
 
     // Skip if already in flight for the same video
-    if (_inFlightVideoId == videoId) {
+    if (_inFlightVideoId == videoId ||
+        isAlreadyPrefetching?.call(videoId) == true) {
       return;
     }
+
+    _resolveNow(nextSong, quality);
+  }
+
+  void _resolveNow(SongsTableData song, String quality) {
+    final videoId = song.remoteId;
+    if (videoId == null || videoId.isEmpty) return;
 
     _cancelInFlight();
     _inFlightVideoId = videoId;
@@ -123,7 +167,7 @@ class StreamPreResolver {
       if (_disposed || !identical(_activeResolution, completer)) return;
       urlCache.putStream(stream, quality: quality);
       debugPrint(
-          '[StreamPreResolver] Successfully pre-resolved next track ($videoId)');
+          '[StreamPreResolver] Successfully pre-resolved track ($videoId)');
     }).catchError((e) {
       if (_disposed || !identical(_activeResolution, completer)) return;
       debugPrint(

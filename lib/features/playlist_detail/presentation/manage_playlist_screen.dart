@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/constants/app_radii.dart';
 import '../../../core/di/injection.dart';
+import '../../../core/errors/failures.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/glass_container.dart';
@@ -27,22 +29,26 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
   final Set<int> _initialSongIds = {};
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  Timer? _searchDebounce;
   bool _isLoading = true;
   bool _isSaving = false;
 
   late final PlaylistUseCases _playlistUseCases;
   late final GetSongsUseCase _getSongsUseCase;
+  late final Stream<Result<List<SongsTableData>>> _songsStream;
 
   @override
   void initState() {
     super.initState();
     _playlistUseCases = getIt<PlaylistUseCases>();
     _getSongsUseCase = getIt<GetSongsUseCase>();
+    _songsStream = _getSongsUseCase.watchSongs().asBroadcastStream();
     _loadInitialPlaylistSongs();
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -82,123 +88,113 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
   Widget build(BuildContext context) {
     final p = context.palette;
 
-    return PulsrPagePopScope(
-      child: Scaffold(
-        backgroundColor: p.bg,
-        appBar: AppBar(
-          backgroundColor: p.surface,
-          elevation: 0,
-          leading: const PulsrBackButton(),
-          title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Manage Playlist',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-            ),
-            Text(
-              widget.playlist.name,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: p.accent,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-        actions: [
-          StreamBuilder(
-            stream: _getSongsUseCase.watchSongs(),
-            builder: (context, snapshot) {
-              final allSongs = snapshot.data
-                      ?.fold((l) => <SongsTableData>[], (r) => r) ??
-                  [];
-              final visibleSongs = _filterSongs(allSongs);
-              final isAllSelected = visibleSongs.isNotEmpty &&
-                  visibleSongs.every((s) => _selectedSongIds.contains(s.id));
+    return StreamBuilder<Result<List<SongsTableData>>>(
+      stream: _songsStream,
+      builder: (context, snapshot) {
+        final allSongs = snapshot.data
+                ?.fold((l) => <SongsTableData>[], (r) => r) ??
+            [];
+        final visibleSongs = _filterSongs(allSongs);
+        final isAllSelected = visibleSongs.isNotEmpty &&
+            visibleSongs.every((s) => _selectedSongIds.contains(s.id));
 
-              return TextButton.icon(
-                onPressed: visibleSongs.isEmpty
-                    ? null
-                    : () {
-                        setState(() {
-                          if (isAllSelected) {
-                            for (final s in visibleSongs) {
-                              _selectedSongIds.remove(s.id);
+        return PulsrPagePopScope(
+          child: Scaffold(
+            backgroundColor: p.bg,
+            appBar: AppBar(
+              backgroundColor: p.surface,
+              elevation: 0,
+              leading: const PulsrBackButton(),
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Manage Playlist',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
+                  Text(
+                    widget.playlist.name,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: p.accent,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton.icon(
+                  onPressed: visibleSongs.isEmpty
+                      ? null
+                      : () {
+                          setState(() {
+                            if (isAllSelected) {
+                              for (final s in visibleSongs) {
+                                _selectedSongIds.remove(s.id);
+                              }
+                            } else {
+                              for (final s in visibleSongs) {
+                                _selectedSongIds.add(s.id);
+                              }
                             }
-                          } else {
-                            for (final s in visibleSongs) {
-                              _selectedSongIds.add(s.id);
-                            }
-                          }
-                        });
-                      },
-                icon: Icon(
-                  isAllSelected ? Icons.deselect_rounded : Icons.select_all_rounded,
-                  color: p.accent,
-                  size: 18,
-                ),
-                label: Text(
-                  isAllSelected ? 'Deselect' : 'Select All',
-                  style: TextStyle(
+                          });
+                        },
+                  icon: Icon(
+                    isAllSelected
+                        ? Icons.deselect_rounded
+                        : Icons.select_all_rounded,
                     color: p.accent,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
+                    size: 18,
+                  ),
+                  label: Text(
+                    isAllSelected ? 'Deselect' : 'Select All',
+                    style: TextStyle(
+                      color: p.accent,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
-              );
-            },
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(p.accent),
-              ),
-            )
-          : Column(
-              children: [
-                _buildSearchBar(p),
-                _buildCountBanner(p),
-                Expanded(
-                  child: StreamBuilder(
-                    stream: _getSongsUseCase.watchSongs(),
-                    builder: (context, snapshot) {
-                      final allSongs = snapshot.data
-                              ?.fold((l) => <SongsTableData>[], (r) => r) ??
-                          [];
-                      final filteredSongs = _filterSongs(allSongs);
-
-                      if (filteredSongs.isEmpty) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.search_off_rounded,
-                                  size: 48, color: p.textTertiary),
-                              const SizedBox(height: 12),
-                              Text(
-                                _searchQuery.isEmpty
-                                    ? 'No songs in library'
-                                    : 'No songs matching "$_searchQuery"',
-                                style: TextStyle(
-                                  color: p.textSecondary,
-                                  fontSize: 14,
+              ],
+            ),
+            body: _isLoading
+                ? Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(p.accent),
+                    ),
+                  )
+                : Column(
+                    children: [
+                      _buildSearchBar(p),
+                      _buildCountBanner(p),
+                      Expanded(
+                        child: visibleSongs.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.search_off_rounded,
+                                        size: 48, color: p.textTertiary),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      _searchQuery.isEmpty
+                                          ? 'No songs in library'
+                                          : 'No songs matching "$_searchQuery"',
+                                      style: TextStyle(
+                                        color: p.textSecondary,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-
-                      return ListView.builder(
-                        padding: const EdgeInsets.only(
-                            top: 8, bottom: 100, left: 12, right: 12),
-                        itemCount: filteredSongs.length,
-                        itemBuilder: (context, index) {
-                          final song = filteredSongs[index];
+                              )
+                            : ListView.builder(
+                                padding: const EdgeInsets.only(
+                                    top: 8, bottom: 100, left: 12, right: 12),
+                                itemCount: visibleSongs.length,
+                                itemBuilder: (context, index) {
+                                  final song = visibleSongs[index];
                           final isSelected =
                               _selectedSongIds.contains(song.id);
 
@@ -303,16 +299,16 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
                             ),
                           );
                         },
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-      bottomNavigationBar: _buildBottomActionBar(p),
-      ),
-    );
-  }
+                      ),
+              ),
+            ],
+          ),
+          bottomNavigationBar: _buildBottomActionBar(p),
+        ),
+      );
+    },
+  );
+}
 
   Widget _buildSearchBar(PulsrPalette p) {
     return Padding(
@@ -331,7 +327,12 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
             Expanded(
               child: TextField(
                 controller: _searchController,
-                onChanged: (val) => setState(() => _searchQuery = val),
+                onChanged: (val) {
+                  _searchDebounce?.cancel();
+                  _searchDebounce = Timer(const Duration(milliseconds: 250), () {
+                    if (mounted) setState(() => _searchQuery = val);
+                  });
+                },
                 style: TextStyle(color: p.textPrimary, fontSize: 14),
                 decoration: InputDecoration(
                   hintText: 'Search songs by title or artist...',
@@ -346,6 +347,7 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
               IconButton(
                 icon: Icon(Icons.close_rounded, color: p.textSecondary, size: 18),
                 onPressed: () {
+                  _searchDebounce?.cancel();
                   _searchController.clear();
                   setState(() => _searchQuery = '');
                 },

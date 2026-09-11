@@ -114,10 +114,23 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
   static const String googleSignInUrl = YtmWebLoginSheet.googleSignInUrl;
 
-  static bool _isCookieMismatchUrl(String u) => RegExp(
-        r'CookieMismatch|/sorry|speedbump',
-        caseSensitive: false,
-      ).hasMatch(u);
+  static bool _isCookieMismatchUrl(String u) {
+    if (RegExp(
+      r'CookieMismatch|/sorry|speedbump',
+      caseSensitive: false,
+    ).hasMatch(u)) {
+      return true;
+    }
+    final uri = Uri.tryParse(u);
+    if (uri == null) return false;
+    final hasCookieError = uri.queryParameters.containsKey('cookie_mismatch') ||
+        uri.queryParameters['error'] == 'cookie_mismatch' ||
+        (uri.queryParameters['flowName'] == 'GlifWebSignIn' &&
+            uri.queryParameters.containsKey('cookie_mismatch'));
+    return hasCookieError ||
+        uri.path.contains('cookiemismatch') ||
+        uri.path.contains('cookie_mismatch');
+  }
 
   static bool _isAuthInProgressUrl(String u) => RegExp(
         r'accounts\.google\.com/(v3/)?signin|accounts\.google\.com/ServiceLogin|/checkpoint/|/challenge/|challenge|consent\.google',
@@ -371,8 +384,17 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     return uri.replace(queryParameters: newParams).toString();
   }
 
+  static bool _shouldScanGeoBlockUrl(String url) {
+    if (url.isEmpty) return false;
+    final lower = url.toLowerCase();
+    return lower.contains('music.youtube.com') || lower.contains('youtube.com');
+  }
+
   Future<bool> _scanPageForGeoBlock(InAppWebViewController controller) async {
     try {
+      final url = (await controller.getUrl())?.toString() ?? '';
+      if (!_shouldScanGeoBlockUrl(url)) return false;
+
       final raw = await controller.evaluateJavascript(source: '''
 (() => {
   try {
@@ -669,15 +691,25 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     return true;
   }
 
+  static bool _shouldScanForBlockText(String currentUrl) {
+    if (currentUrl.isEmpty) return false;
+    if (currentUrl.contains('/challenge/') ||
+        currentUrl.contains('signin/challenge') ||
+        currentUrl.contains('/checkpoint/')) {
+      return false;
+    }
+    return currentUrl.contains('accounts.google.com') ||
+        currentUrl.contains('music.youtube.com') ||
+        currentUrl.contains('youtube.com');
+  }
+
   /// Lightweight throttled JS evaluation: looks for Google's block-page
   /// phrases in the document title/body text (first 4 KB, lowercased).
   Future<bool> _scanPageForBlockText(InAppWebViewController controller) async {
     try {
       final currentUrl =
           (await controller.getUrl())?.toString().toLowerCase() ?? '';
-      if (currentUrl.contains('/challenge/') ||
-          currentUrl.contains('signin/challenge') ||
-          currentUrl.contains('/checkpoint/')) {
+      if (!_shouldScanForBlockText(currentUrl)) {
         return false;
       }
 

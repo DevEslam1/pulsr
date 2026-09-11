@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:audio_service/audio_service.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../data/audio/ir_file_parser.dart';
 import '../../../core/bloc/base_cubit.dart';
 import '../../../core/constants/prefs_keys.dart';
 import '../../../core/di/injection.dart';
@@ -271,7 +273,8 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
           'speed': entry.value.speed,
         };
       }
-      await prefs.setString(PrefsKeys.queueSlots, jsonEncode(data));
+      final encoded = await compute(jsonEncode, data);
+      await prefs.setString(PrefsKeys.queueSlots, encoded);
     } catch (e, st) {
       ErrorLogger.log('Failed to persist queue slots',
           error: e, stackTrace: st, category: 'PlayerCubit');
@@ -288,7 +291,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       if (_queueRestorationDone) return;
       final raw = prefs.getString(PrefsKeys.queueSlots);
       if (raw == null) return;
-      final decoded = jsonDecode(raw);
+      final decoded = await compute(jsonDecode, raw);
       if (decoded is! Map<String, dynamic>) return;
       final data = decoded;
       // Validate: reject oversized slots (DoS)
@@ -1142,6 +1145,10 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     try {
       _latencyTracker?.start(videoId: videoIdForLatency);
       _latencyTracker?.markStage(PlaybackStage.tap);
+    } catch (_) {}
+    // P0-2: Speculative resolution on tap: begin resolving URL in background immediately
+    try {
+      _audioHandler.streamPreResolver.onTrackEnqueuedOrTapped(song);
     } catch (_) {}
     ++_mediaItemResolutionGen;
     final capturedGen = _mediaItemResolutionGen;
@@ -2268,6 +2275,27 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       _syncAudioEffects();
       safeEmit(
           state.copyWith(errorMessage: 'Failed to load impulse response: $e'));
+    }
+  }
+
+  Future<void> pickAndLoadCustomIrFile() async {
+    if (!_guardDsp('Reverb IR')) return;
+    try {
+      final result = await FilePicker.pickFile(
+        type: FileType.custom,
+        allowedExtensions: ['wav'],
+      );
+      if (result != null && result.path != null) {
+        final path = result.path!;
+        final samples = await IrFileParser.parseWavFile(File(path));
+        await loadCustomImpulseResponse(samples);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(PrefsKeys.customReverbIrPath, path);
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to pick/load custom IR file',
+          error: e, stackTrace: st, category: 'Reverb');
+      safeEmit(state.copyWith(errorMessage: 'Failed to load IR WAV file: $e'));
     }
   }
 

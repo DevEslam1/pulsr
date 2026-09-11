@@ -27,14 +27,16 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     _scan();
   }
 
-  void _scan() {
+  Future<void> _scan() async {
     setState(() => _isScanning = true);
     final songs = context.read<LibraryCubit>().state.songs;
-    final duplicates = _finder.findDuplicates(songs);
-    setState(() {
-      _duplicateGroups = duplicates;
-      _isScanning = false;
-    });
+    final duplicates = await _finder.findDuplicates(songs);
+    if (mounted) {
+      setState(() {
+        _duplicateGroups = duplicates;
+        _isScanning = false;
+      });
+    }
   }
 
   @override

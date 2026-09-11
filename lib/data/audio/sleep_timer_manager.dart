@@ -97,7 +97,7 @@ class SleepTimerManager {
         // Trigger smooth fade-out during the final 15 seconds (or remaining duration if smaller)
         if (_isFadeOutEnabled &&
             _remainingDuration <= const Duration(seconds: 15)) {
-          _applyFadeOutStep(player, _remainingDuration.inSeconds / 15.0);
+          _applyFadeOut(player, _remainingDuration.inSeconds);
         }
       } else {
         _remainingDuration = Duration.zero;
@@ -169,6 +169,34 @@ class SleepTimerManager {
     }
   }
 
+  bool _nativeCurveArmed = false;
+
+  void _applyFadeOut(AudioPlayer? player, int remainingSeconds) {
+    if (player == null || !player.playing) return;
+    _preFadeVolume ??= player.volume;
+
+    if (!_nativeCurveArmed && remainingSeconds <= 15 && remainingSeconds > 0) {
+      final totalMs = remainingSeconds * 1000;
+      final points = (totalMs / 20).ceil().clamp(2, 201);
+      final segmentMs = (totalMs / (points - 1)).ceil().clamp(1, 1000);
+      final gains = List<double>.generate(
+        points,
+        (i) => 1.0 - (i / (points - 1)),
+      );
+      try {
+        player.dspSetGainCurve(gains, segmentMs: segmentMs).then((ok) {
+          if (ok == true) {
+            _nativeCurveArmed = true;
+          }
+        }).catchError((_) {});
+      } catch (_) {}
+    }
+
+    if (!_nativeCurveArmed) {
+      _applyFadeOutStep(player, remainingSeconds / 15.0);
+    }
+  }
+
   void _applyFadeOutStep(AudioPlayer? player, double fraction) {
     if (player == null || !player.playing) return;
     _preFadeVolume ??= player.volume;
@@ -185,6 +213,12 @@ class SleepTimerManager {
     _sleepCountdownTickerCancel();
 
     final player = _lastPlayerGetter?.call();
+    if (_nativeCurveArmed && player != null) {
+      try {
+        player.dspClearGainCurve().catchError((_) => false);
+      } catch (_) {}
+      _nativeCurveArmed = false;
+    }
     try {
       if (_onTimerExpiredCallback != null) {
         await _onTimerExpiredCallback!();
@@ -226,11 +260,20 @@ class SleepTimerManager {
     _remainingTracks = 0;
     _onTimerExpiredCallback = null;
 
-    if (_preFadeVolume != null && _lastPlayerGetter != null) {
-      try {
-        _lastPlayerGetter!().setVolume(_preFadeVolume!);
-      } catch (_) {}
-      _preFadeVolume = null;
+    if (_lastPlayerGetter != null) {
+      final player = _lastPlayerGetter!();
+      if (_nativeCurveArmed) {
+        try {
+          player.dspClearGainCurve().catchError((_) => false);
+        } catch (_) {}
+        _nativeCurveArmed = false;
+      }
+      if (_preFadeVolume != null) {
+        try {
+          player.setVolume(_preFadeVolume!);
+        } catch (_) {}
+        _preFadeVolume = null;
+      }
     }
     _clearPersistedState();
   }

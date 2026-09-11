@@ -10,14 +10,21 @@ import 'clock.dart';
 /// Stages in tap-to-audible pipeline. Ordered by expected occurrence.
 enum PlaybackStage {
   tap,
+  requestStarted,
+  cacheChecked,
   resolutionRequested,
+  streamResolved,
   pluginEntered,
   clientRequestSent,
   poTokenNeeded,
   poTokenRegenerated,
   urlObtained,
+  audioSourceCreated,
+  playerSetSourceStarted,
+  playerSetSourceCompleted,
   sourceSet,
   firstBytesReady,
+  decoderReady,
   playing,
 }
 

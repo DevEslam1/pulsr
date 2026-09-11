@@ -123,7 +123,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
 
               if (filtered.isEmpty && boundedQuery.length >= 2) {
                 // If strict SQL yielded 0 results (e.g. typos, Arabic normalized variants, or accents),
-                // fallback to evaluating across all songs so fuzzy/Levenshtein can match.
+                // fallback to evaluating across a bounded subset so fuzzy/Levenshtein can match safely.
                 try {
                   final allSongsRes = await _searchUseCase
                       .searchSongs('', excludedFolders: excluded)
@@ -131,7 +131,9 @@ class SearchCubit extends PulsrCubit<SearchState> {
                   if (generation != _generation || isClosed) return;
                   final allSongs =
                       allSongsRes.fold((l) => <SongsTableData>[], (r) => r);
-                  filtered = _filterWithFuzzy(allSongs, q, filter);
+                  final candidateSubset =
+                      allSongs.length > 300 ? allSongs.sublist(0, 300) : allSongs;
+                  filtered = _filterWithFuzzy(candidateSubset, q, filter);
                 } catch (_) {}
               }
 

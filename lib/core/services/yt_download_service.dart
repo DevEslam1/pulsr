@@ -13,6 +13,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../data/audio/adaptive_buffer_engine.dart';
 import '../../data/db/app_database.dart';
 import '../../data/scanner/media_scanner_service.dart';
 import '../../domain/repositories/music_repository_interface.dart';
@@ -319,32 +320,9 @@ class YtDownloadService {
       await _ytmService.ensurePoTokenReady();
 
       final quality = prefs.getString('setting_download_quality') ?? 'high';
-      var stream = await _resolveDownloadStream(videoId, quality);
-
-      // Pre-download storage check (BUG-06)
-      try {
-        final freeBytes =
-            await _downloadChannel.invokeMethod<int>('getFreeDiskSpace');
-        if (freeBytes != null && freeBytes > 0) {
-          // FIX-A04: For parallel downloads the multiplier must be _concurrentChunks + 1
-          final requiredSpace =
-              estimateBytes(stream) * (_concurrentChunks + 1) + (10 * 1024 * 1024);
-          if (freeBytes < requiredSpace) {
-            return const Left(
-                DownloadFailure('Insufficient storage space for download'));
-          }
-        }
-      } catch (_) {}
-
-      var ext = stream.container.isNotEmpty ? stream.container : 'm4a';
       final dir = await getTemporaryDirectory();
-      temp = File(p.join(dir.path, 'ytdl_$videoId.$ext'));
 
-      if (task.isCanceled || _canceledVideoIds.contains(videoId)) {
-        return const Left(DownloadFailure('Download canceled'));
-      }
-
-      // Download high-res master artwork in parallel with the audio stream (with 2-attempt retry)
+      // Download high-res master artwork in parallel with stream resolution
       final rawArtUrl = song.remoteArtworkUrl;
       if (rawArtUrl != null && rawArtUrl.isNotEmpty) {
         final artUrl = CachedArtwork.upgradeToHighResArtwork(rawArtUrl);
@@ -370,6 +348,30 @@ class YtDownloadService {
           }
           return null;
         });
+      }
+
+      var stream = await _resolveDownloadStream(videoId, quality);
+
+      // Pre-download storage check (BUG-06)
+      try {
+        final freeBytes =
+            await _downloadChannel.invokeMethod<int>('getFreeDiskSpace');
+        if (freeBytes != null && freeBytes > 0) {
+          // FIX-A04: For parallel downloads the multiplier must be _concurrentChunks + 1
+          final requiredSpace =
+              estimateBytes(stream) * (_concurrentChunks + 1) + (10 * 1024 * 1024);
+          if (freeBytes < requiredSpace) {
+            return const Left(
+                DownloadFailure('Insufficient storage space for download'));
+          }
+        }
+      } catch (_) {}
+
+      var ext = stream.container.isNotEmpty ? stream.container : 'm4a';
+      temp = File(p.join(dir.path, 'ytdl_$videoId.$ext'));
+
+      if (task.isCanceled || _canceledVideoIds.contains(videoId)) {
+        return const Left(DownloadFailure('Download canceled'));
       }
 
       onProgress
@@ -815,14 +817,16 @@ class YtDownloadService {
     // the first attempt got m4a) carries different bytes at the same offsets.
     // Without this stamp, resuming across that switch would merge two formats
     // into one file and the size check would happily pass.
+    final expectedStamp = '$total|${uri.toString().hashCode}';
     var resumable = false;
     try {
       if (await stamp.exists()) {
-        resumable = (await stamp.readAsString()).trim() == '$total';
+        final existing = (await stamp.readAsString()).trim();
+        resumable = existing == expectedStamp || existing == '$total';
       }
     } catch (_) {}
     try {
-      await stamp.writeAsString('$total', flush: true);
+      await stamp.writeAsString(expectedStamp, flush: true);
     } catch (_) {}
 
     final chunkReceived = List<int>.filled(_concurrentChunks, 0);
@@ -964,6 +968,8 @@ class YtDownloadService {
               }
             }
             await sink.flush();
+            final totalBytes = chunkReceived.reduce((a, b) => a + b);
+            _sampleThroughput(totalBytes, stopwatch.elapsed);
           } on FileSystemException catch (e) {
             final m = e.message.toLowerCase();
             if (m.contains('no space') || m.contains('enospc') || e.osError?.errorCode == 28) {
@@ -1263,6 +1269,7 @@ class YtDownloadService {
         }
       }
       await sink.flush();
+      _sampleThroughput(received - baseReceived, stopwatch.elapsed);
     } on FileSystemException catch (e) {
       final msg = e.message.toLowerCase();
       if (msg.contains('no space') || msg.contains('enospc') || e.osError?.errorCode == 28) {
@@ -1545,12 +1552,20 @@ class YtDownloadService {
     try {
       final raf = await file.open();
       try {
-        return sniffContainerBytes(await raf.read(16));
+        return sniffContainerBytes(await raf.read(32));
       } finally {
         await raf.close();
       }
     } catch (_) {
       return null;
     }
+  }
+
+  void _sampleThroughput(int bytes, Duration elapsed) {
+    try {
+      if (getIt.isRegistered<AdaptiveBufferEngine>()) {
+        getIt<AdaptiveBufferEngine>().sampleThroughput(bytes, elapsed);
+      }
+    } catch (_) {}
   }
 }

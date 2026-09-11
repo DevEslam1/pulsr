@@ -124,6 +124,12 @@ class PrefsKeys {
   static const String scrobblerLastScrobbledKey = scrobbleLastKey;
   static const String scrobblerLastScrobbledTime = scrobbleLastTime;
   static const String scrobblerLastScrobbledId = scrobbleLastId;
-  static const String scrobblerLastScrobbledTimestamp = scrobbleLastTimestamp;
   static const String scrobblerOfflineQueue = scrobbleOfflineQueue;
+
+  // Advanced playback engine features
+  static const String dsdOutputMode = 'setting_dsd_output_mode'; // 'pcm' | 'dop'
+  static const String mqaDecodingEnabled = 'setting_mqa_decoding_enabled';
+  static const String customReverbIrPath = 'setting_custom_reverb_ir_path';
+  static const String spatializerEngine = 'setting_spatializer_engine'; // 'off' | 'systemHardware' | 'binauralAmbisonic'
+  static const String exclusiveOffloadEnabled = 'setting_exclusive_offload_enabled';
 }

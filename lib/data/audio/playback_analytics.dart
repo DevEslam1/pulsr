@@ -29,9 +29,16 @@ class PlaybackAnalytics {
     this.onCorruptedFileDetected,
   });
 
+  void _addEvent(PlaybackHealthEvent event) {
+    _recentEvents.add(event);
+    if (_recentEvents.length > 500) {
+      _recentEvents.removeRange(0, _recentEvents.length - 500);
+    }
+  }
+
   /// Tracks a buffer underrun event and triggers adaptive scaling if threshold is reached.
   void recordBufferUnderrun() {
-    _recentEvents.add(PlaybackHealthEvent.bufferUnderrun);
+    _addEvent(PlaybackHealthEvent.bufferUnderrun);
     _bufferUnderrunCount++;
 
     if (_bufferUnderrunCount >= 3) {
@@ -43,7 +50,7 @@ class PlaybackAnalytics {
 
   /// Tracks a stream resolution / playback failure and triggers self-healing recovery chain.
   void recordStreamFailure(String videoId, Object error) {
-    _recentEvents.add(PlaybackHealthEvent.streamFailure);
+    _addEvent(PlaybackHealthEvent.streamFailure);
     ErrorLogger.log('Stream failure recorded for $videoId: $error',
         category: 'PlaybackAnalytics');
     onStreamRecoveryRequested?.call(videoId, error);
@@ -51,7 +58,7 @@ class PlaybackAnalytics {
 
   /// Tracks a file decoding error.
   void recordDecodeError(String path, Object error) {
-    _recentEvents.add(PlaybackHealthEvent.decodeError);
+    _addEvent(PlaybackHealthEvent.decodeError);
     ErrorLogger.log('Decode error recorded for $path: $error',
         category: 'PlaybackAnalytics');
     onCorruptedFileDetected?.call(path, error);
@@ -60,8 +67,8 @@ class PlaybackAnalytics {
   /// Resets error counters on successful track progress.
   void resetErrorCounters() {
     _bufferUnderrunCount = 0;
-    if (_recentEvents.length > 1000) {
-      _recentEvents.removeRange(0, _recentEvents.length - 1000);
+    if (_recentEvents.length > 500) {
+      _recentEvents.removeRange(0, _recentEvents.length - 500);
     }
   }
 }

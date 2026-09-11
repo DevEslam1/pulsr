@@ -49,11 +49,16 @@ class MusicRepository implements IMusicRepository {
             excludedFolders: excludedFolders,
           );
         }
-        final pattern = '%${searchQuery.trim().toLowerCase()}%';
+        // Fallback when FTS tokenization yields no tokens: use indexed prefix search when possible
+        final trimmed = searchQuery.trim();
+        final prefixPattern = '$trimmed%';
+        final containsPattern = '%$trimmed%';
         query.where((t) =>
-            t.title.lower().like(pattern) |
-            t.artist.lower().like(pattern) |
-            t.album.lower().like(pattern));
+            t.title.like(prefixPattern) |
+            t.artist.like(prefixPattern) |
+            t.title.like(containsPattern) |
+            t.artist.like(containsPattern) |
+            t.album.like(containsPattern));
       }
 
       if (excludedFolders.isNotEmpty) {
@@ -120,12 +125,13 @@ class MusicRepository implements IMusicRepository {
   /// Sanitizes user input into a safe FTS5 prefix query. Returns null when
   /// the input has no usable token (caller falls back to LIKE).
   // FIX-D01: Sanitize SQLite FTS5 special characters (*, ", ^, -) and escape double quotes
+  // P1-1: Unicode-aware tokenization supporting CJK, Cyrillic, Hebrew, Arabic, Latin, etc.
   @visibleForTesting
   static String? toFtsQuery(String input) {
     final cleanInput = input.replaceAll(RegExp(r'["*^\-]'), ' ');
     final tokens = cleanInput
         .toLowerCase()
-        .split(RegExp(r'[^a-z0-9\u00C0-\u024F\u0370-\u03FF\u0600-\u06FF]+'))
+        .split(RegExp(r'[^\p{L}\p{N}]+', unicode: true))
         .where((t) => t.isNotEmpty)
         .take(8)
         .map((t) => '"${t.replaceAll('"', '""')}"*')
@@ -1134,10 +1140,10 @@ class MusicRepository implements IMusicRepository {
           .where((s) => !scannedSongIds.contains(s.id))
           .toList();
 
-      // 2. Perform bounded async disk checks (max 16 concurrent) without blocking database locks
+      // 2. Perform bounded async disk checks (max 32 concurrent) without blocking database locks
       final trulyMissingIds = <int>[];
       final reappearedIds = <int>[];
-      const chunkSize = 16;
+      const chunkSize = 32;
 
       for (var i = 0; i < unscannedSongs.length; i += chunkSize) {
         final end = (i + chunkSize < unscannedSongs.length)
@@ -1160,22 +1166,20 @@ class MusicRepository implements IMusicRepository {
         }));
       }
 
-      int markedMissingCount = 0;
-      await _db.transaction(() async {
-        // Chunked updates to avoid SQLite parameter overflow (max 400 IDs per chunk)
-        const updateChunkSize = 400;
+      // P0-6: Use Drift batch for atomic single-transaction execution
+      const updateChunkSize = 400;
+      await _db.batch((batch) {
         if (trulyMissingIds.isNotEmpty) {
           for (var i = 0; i < trulyMissingIds.length; i += updateChunkSize) {
             final end = (i + updateChunkSize < trulyMissingIds.length)
                 ? i + updateChunkSize
                 : trulyMissingIds.length;
             final chunk = trulyMissingIds.sublist(i, end);
-            final count = await (_db.update(_db.songsTable)
-                  ..where((t) => t.id.isIn(chunk)))
-                .write(
+            batch.update(
+              _db.songsTable,
               const SongsTableCompanion(isMissing: Value(true)),
+              where: (t) => t.id.isIn(chunk),
             );
-            markedMissingCount += count;
           }
         }
 
@@ -1187,22 +1191,26 @@ class MusicRepository implements IMusicRepository {
                 ? i + updateChunkSize
                 : activeIds.length;
             final chunk = activeIds.sublist(i, end);
-            await (_db.update(_db.songsTable)..where((t) => t.id.isIn(chunk)))
-                .write(
+            batch.update(
+              _db.songsTable,
               const SongsTableCompanion(isMissing: Value(false)),
+              where: (t) => t.id.isIn(chunk),
             );
           }
         }
+      });
 
-        // Recalculate song counts using active (non-missing) local songs
-        final albumCounts = await (_db.selectOnly(_db.songsTable)
-              ..addColumns([_db.songsTable.albumId, _db.songsTable.id.count()])
-              ..where(_db.songsTable.albumId.isNotNull() &
-                  _db.songsTable.isMissing.equals(false) &
-                  _db.songsTable.source.equals(SongSource.local) &
-                  _db.songsTable.path.like('ytmusic://%').not())
-              ..groupBy([_db.songsTable.albumId]))
-            .get();
+      final markedMissingCount = trulyMissingIds.length;
+
+      // Recalculate song counts using active (non-missing) local songs
+      final albumCounts = await (_db.selectOnly(_db.songsTable)
+            ..addColumns([_db.songsTable.albumId, _db.songsTable.id.count()])
+            ..where(_db.songsTable.albumId.isNotNull() &
+                _db.songsTable.isMissing.equals(false) &
+                _db.songsTable.source.equals(SongSource.local) &
+                _db.songsTable.path.like('ytmusic://%').not())
+            ..groupBy([_db.songsTable.albumId]))
+          .get();
 
         final artistCounts = await (_db.selectOnly(_db.songsTable)
               ..addColumns([_db.songsTable.artistId, _db.songsTable.id.count()])
@@ -1237,7 +1245,6 @@ class MusicRepository implements IMusicRepository {
             }
           }
         });
-      });
 
       return Right(markedMissingCount);
     } catch (e) {
@@ -1585,7 +1592,6 @@ class MusicRepository implements IMusicRepository {
         ..where(_db.songsTable.genre.isNotNull() &
             _db.songsTable.genre.equals('').not() &
             _db.songsTable.isMissing.equals(false) &
-            _db.songsTable.source.equals(SongSource.local) &
             _db.songsTable.path.like('ytmusic://%').not())
         ..groupBy([_db.songsTable.genre])
         ..orderBy([OrderingTerm(expression: _db.songsTable.genre)]);
@@ -1616,7 +1622,6 @@ class MusicRepository implements IMusicRepository {
         ..where(_db.songsTable.genre.isNotNull() &
             _db.songsTable.genre.equals('').not() &
             _db.songsTable.isMissing.equals(false) &
-            _db.songsTable.source.equals(SongSource.local) &
             _db.songsTable.path.like('ytmusic://%').not())
         ..groupBy([_db.songsTable.genre])
         ..orderBy([OrderingTerm(expression: _db.songsTable.genre)]);
@@ -1643,7 +1648,6 @@ class MusicRepository implements IMusicRepository {
             ..where((t) =>
                 t.genre.equals(genre) &
                 t.isMissing.equals(false) &
-                t.source.equals(SongSource.local) &
                 t.path.like('ytmusic://%').not())
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
@@ -1663,7 +1667,6 @@ class MusicRepository implements IMusicRepository {
             ..where((t) =>
                 t.genre.equals(genre) &
                 t.isMissing.equals(false) &
-                t.source.equals(SongSource.local) &
                 t.path.like('ytmusic://%').not())
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .get();
@@ -1683,11 +1686,10 @@ class MusicRepository implements IMusicRepository {
         ..where(_db.songsTable.year.isNotNull() &
             _db.songsTable.year.isBiggerThanValue(0) &
             _db.songsTable.isMissing.equals(false) &
-            _db.songsTable.source.equals(SongSource.local) &
             _db.songsTable.path.like('ytmusic://%').not())
         ..groupBy([_db.songsTable.year])
         ..orderBy([
-          OrderingTerm(expression: _db.songsTable.year, mode: OrderingMode.desc)
+            OrderingTerm(expression: _db.songsTable.year, mode: OrderingMode.desc)
         ]);
 
       return query.watch().map((rows) {
@@ -1714,7 +1716,6 @@ class MusicRepository implements IMusicRepository {
             ..where((t) =>
                 t.year.equals(year) &
                 t.isMissing.equals(false) &
-                t.source.equals(SongSource.local) &
                 t.path.like('ytmusic://%').not())
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
@@ -26,6 +27,8 @@ class RecentsScreen extends StatefulWidget {
 class _RecentsScreenState extends State<RecentsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  Timer? _searchDebounce;
+  int _historyLimit = 100;
   late final GetSongsUseCase _getSongsUseCase;
 
   @override
@@ -36,6 +39,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -116,7 +120,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
         ],
       ),
       body: StreamBuilder(
-        stream: _getSongsUseCase.watchRecentlyPlayed(limit: 100),
+        stream: _getSongsUseCase.watchRecentlyPlayed(limit: _historyLimit),
         builder: (context, snapshot) {
           final allRecents =
               snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
@@ -174,8 +178,12 @@ class _RecentsScreenState extends State<RecentsScreen> {
                             Expanded(
                               child: TextField(
                                 controller: _searchController,
-                                onChanged: (val) =>
-                                    setState(() => _searchQuery = val),
+                                onChanged: (val) {
+                                  _searchDebounce?.cancel();
+                                  _searchDebounce = Timer(const Duration(milliseconds: 250), () {
+                                    if (mounted) setState(() => _searchQuery = val);
+                                  });
+                                },
                                 style: TextStyle(
                                     color: p.textPrimary, fontSize: 14),
                                 decoration: InputDecoration(
@@ -195,6 +203,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                                 icon: Icon(Icons.close_rounded,
                                     color: p.textSecondary, size: 18),
                                 onPressed: () {
+                                  _searchDebounce?.cancel();
                                   _searchController.clear();
                                   setState(() => _searchQuery = '');
                                 },
@@ -367,6 +376,23 @@ class _RecentsScreenState extends State<RecentsScreen> {
                         );
                       },
                       childCount: filtered.length,
+                    ),
+                  ),
+                ),
+              if (allRecents.length >= _historyLimit && _searchQuery.isEmpty)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Center(
+                      child: TextButton.icon(
+                        icon: const Icon(Icons.expand_more_rounded),
+                        label: const Text('Load More History'),
+                        onPressed: () {
+                          setState(() {
+                            _historyLimit += 100;
+                          });
+                        },
+                      ),
                     ),
                   ),
                 ),

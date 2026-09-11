@@ -1205,88 +1205,134 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               borderRadius: AppRadii.cardRadius,
               border: Border.all(color: p.hairline),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: p.accent.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(Icons.speaker_group_rounded,
-                      color: p.accent, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Bass Enhancer',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13,
-                                  color: p.textPrimary),
-                            ),
-                          ),
-                          IconButton(icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary), visualDensity: VisualDensity.compact, tooltip: 'About Bass Boost', onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.bassBoost, conflictReason: dspBlocked)),
-                        ],
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      Row(
+                      child: Icon(Icons.speaker_group_rounded,
+                          color: p.accent, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Bass Enhancer',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                      color: p.textPrimary),
+                                ),
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.info_outline_rounded,
+                                    size: 16, color: p.textTertiary),
+                                visualDensity: VisualDensity.compact,
+                                tooltip: 'About Bass Boost',
+                                onPressed: () => _showFeatureInfo(
+                                    context, AudioFeatureRegistry.bassBoost,
+                                    conflictReason: dspBlocked),
+                              ),
+                            ],
+                          ),
                           Text(
-                            '${(preset.bassBoost * 100).round()}% punch',
-                            style: TextStyle(fontSize: 11, color: p.textTertiary),
-                          ),
-                          const SizedBox(width: 4),
-                          IconButton(
-                            icon: Icon(Icons.settings_backup_restore,
-                                size: 14,
-                                color: preset.bassBoost <= 0.001 || dspBlocked != null
-                                    ? p.textTertiary.withValues(alpha: 0.35)
-                                    : p.accent),
-                            tooltip: 'Reset Bass Enhancer (0%)',
-                            visualDensity: VisualDensity.compact,
-                            padding: EdgeInsets.zero,
-                            constraints:
-                                const BoxConstraints(minWidth: 18, minHeight: 18),
-                            onPressed: preset.bassBoost <= 0.001 || dspBlocked != null
-                                ? null
-                                : () => cubit.setBassBoost(0.0),
+                            preset.bassBoost > 0
+                                ? '${(preset.bassBoost * 100).round()}% punch'
+                                : 'Bass boost bypassed',
+                            style:
+                                TextStyle(fontSize: 11, color: p.textTertiary),
                           ),
                         ],
-                      ),
-                    ],
-                  ),
-                ),
-                Flexible(
-                  flex: 2,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 140),
-                    child: SliderTheme(
-                      data: SliderTheme.of(context).copyWith(
-                        trackHeight: 4,
-                        thumbShape:
-                            const RoundSliderThumbShape(enabledThumbRadius: 6),
-                        activeTrackColor: p.accent,
-                        inactiveTrackColor: p.surface,
-                        thumbColor: p.accent,
-                      ),
-                      child: Slider(
-                        value: preset.bassBoost.clamp(0.0, 1.0),
-                        min: 0.0,
-                        max: 1.0,
-                        onChanged: dspBlocked != null ? null : (val) {
-                          if (!state.isEqEnabled) {
-                            cubit.setEqualizerEnabled(true);
-                          }
-                          cubit.setBassBoost(val);
-                        },
                       ),
                     ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: (preset.bassBoost > 0
+                                    ? p.accent
+                                    : p.surface)
+                                .withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: preset.bassBoost > 0
+                                  ? p.accent.withValues(alpha: 0.3)
+                                  : p.hairline,
+                            ),
+                          ),
+                          child: Text(
+                            preset.bassBoost > 0
+                                ? '${(preset.bassBoost * 100).round()}%'
+                                : 'Off',
+                            style: TextStyle(
+                              color: preset.bassBoost > 0
+                                  ? p.accent
+                                  : p.textSecondary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        IconButton(
+                          icon: Icon(Icons.settings_backup_restore,
+                              size: 16,
+                              color: preset.bassBoost <= 0.001 ||
+                                      dspBlocked != null
+                                  ? p.textTertiary.withValues(alpha: 0.35)
+                                  : p.accent),
+                          tooltip: 'Reset Bass Enhancer (Off)',
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints:
+                              const BoxConstraints(minWidth: 24, minHeight: 24),
+                          onPressed: preset.bassBoost <= 0.001 ||
+                                  dspBlocked != null
+                              ? null
+                              : () => cubit.setBassBoost(0.0),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: 4,
+                    thumbShape:
+                        const RoundSliderThumbShape(enabledThumbRadius: 6),
+                    overlayShape:
+                        const RoundSliderOverlayShape(overlayRadius: 14),
+                    activeTrackColor: p.accent,
+                    inactiveTrackColor: p.surface,
+                    thumbColor: p.accent,
+                  ),
+                  child: Slider(
+                    value: preset.bassBoost.clamp(0.0, 1.0),
+                    min: 0.0,
+                    max: 1.0,
+                    onChanged: dspBlocked != null
+                        ? null
+                        : (val) {
+                            if (!state.isEqEnabled) {
+                              cubit.setEqualizerEnabled(true);
+                            }
+                            cubit.setBassBoost(val);
+                          },
                   ),
                 ),
               ],
@@ -1336,7 +1382,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                       color: p.textPrimary),
                                 ),
                               ),
-                              IconButton(icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary), visualDensity: VisualDensity.compact, tooltip: 'About Volume Boost', onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.volumeBoost, conflictReason: dspBlocked)),
+                              IconButton(
+                                  icon: Icon(Icons.info_outline_rounded,
+                                      size: 16, color: p.textTertiary),
+                                  visualDensity: VisualDensity.compact,
+                                  tooltip: 'About Volume Boost',
+                                  onPressed: () => _showFeatureInfo(context,
+                                      AudioFeatureRegistry.volumeBoost,
+                                      conflictReason: dspBlocked)),
                             ],
                           ),
                           Text(
@@ -1390,7 +1443,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         IconButton(
                           icon: Icon(Icons.settings_backup_restore,
                               size: 16,
-                              color: state.volumeBoost <= 0.001 || dspBlocked != null
+                              color: state.volumeBoost <= 0.001 ||
+                                      dspBlocked != null
                                   ? p.textTertiary.withValues(alpha: 0.35)
                                   : p.accent),
                           tooltip: 'Reset Volume Boost (Off)',
@@ -1398,7 +1452,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           padding: EdgeInsets.zero,
                           constraints:
                               const BoxConstraints(minWidth: 24, minHeight: 24),
-                          onPressed: state.volumeBoost <= 0.001 || dspBlocked != null
+                          onPressed: state.volumeBoost <= 0.001 ||
+                                  dspBlocked != null
                               ? null
                               : () => cubit.setVolumeBoost(0.0),
                         ),
@@ -1406,12 +1461,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 6),
                 SliderTheme(
                   data: SliderTheme.of(context).copyWith(
                     trackHeight: 4,
                     thumbShape:
                         const RoundSliderThumbShape(enabledThumbRadius: 6),
+                    overlayShape:
+                        const RoundSliderOverlayShape(overlayRadius: 14),
                     activeTrackColor: isOverSafe ? p.error : p.accent,
                     inactiveTrackColor: p.surface,
                     thumbColor: isOverSafe ? p.error : p.accent,
@@ -1420,10 +1477,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     value: state.volumeBoost.clamp(0.0, 1.0),
                     min: 0.0,
                     max: 1.0,
-                    onChanged: dspBlocked != null ? null : (val) {
-                      if (!state.isEqEnabled) cubit.setEqualizerEnabled(true);
-                      cubit.setVolumeBoost(val);
-                    },
+                    onChanged: dspBlocked != null
+                        ? null
+                        : (val) {
+                            if (!state.isEqEnabled) {
+                              cubit.setEqualizerEnabled(true);
+                            }
+                            cubit.setVolumeBoost(val);
+                          },
                   ),
                 ),
                 if (isOverSafe)
@@ -3049,9 +3110,22 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   Widget _buildReverbChip(ReverbPreset preset, int currentPreset,
       PlayerCubit cubit, PulsrPalette p) {
     final isSelected = preset.wireValue == currentPreset;
-    // Custom IR is only meaningful once one is loaded; selecting it would
-    // otherwise leave the reverb with whatever IR happened to be prepared.
-    final isSelectable = preset != ReverbPreset.custom || isSelected;
+    if (preset == ReverbPreset.custom) {
+      return ActionChip(
+        avatar: Icon(Icons.file_upload_outlined,
+            size: 14, color: isSelected ? p.accent : p.textSecondary),
+        label: Text(isSelected ? 'Custom (Loaded)' : 'Load WAV IR...'),
+        backgroundColor:
+            isSelected ? p.accent.withValues(alpha: 0.22) : p.surface,
+        side: BorderSide(color: isSelected ? p.accent : p.hairline),
+        labelStyle: TextStyle(
+          color: isSelected ? p.accent : p.textSecondary,
+          fontWeight: FontWeight.w700,
+          fontSize: 11,
+        ),
+        onPressed: () => cubit.pickAndLoadCustomIrFile(),
+      );
+    }
     return ChoiceChip(
       label: Text(preset.label),
       selected: isSelected,
@@ -3061,15 +3135,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
         color: isSelected ? p.accent : p.hairline,
       ),
       labelStyle: TextStyle(
-        color: isSelected
-            ? p.accent
-            : (isSelectable ? p.textSecondary : p.textSecondary.withValues(alpha: 0.4)),
+        color: isSelected ? p.accent : p.textSecondary,
         fontWeight: FontWeight.w700,
         fontSize: 11,
       ),
-      onSelected: isSelectable
-          ? (_) => cubit.setReverb(true, preset: preset.wireValue)
-          : null,
+      onSelected: (_) => cubit.setReverb(true, preset: preset.wireValue),
     );
   }
 

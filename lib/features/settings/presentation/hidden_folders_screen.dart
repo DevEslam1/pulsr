@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/di/injection.dart';
@@ -26,6 +27,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
   List<FolderItem> _folders = [];
   bool _isLoading = true;
   String _searchQuery = '';
+  Timer? _searchDebounce;
   int _minFileSizeKb = 0;
 
   @override
@@ -42,6 +44,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     _customPathController.dispose();
     super.dispose();
@@ -517,7 +520,13 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                     ),
                     child: TextField(
                       controller: _searchController,
-                      onChanged: (val) => setState(() => _searchQuery = val),
+                      onChanged: (val) {
+                        _searchDebounce?.cancel();
+                        _searchDebounce =
+                            Timer(const Duration(milliseconds: 250), () {
+                          if (mounted) setState(() => _searchQuery = val);
+                        });
+                      },
                       style: TextStyle(fontSize: 13, color: p.textPrimary),
                       decoration: InputDecoration(
                         hintText: 'Search directories by name or path...',
@@ -530,6 +539,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                 icon: Icon(Icons.clear_rounded,
                                     color: p.textTertiary, size: 16),
                                 onPressed: () {
+                                  _searchDebounce?.cancel();
                                   _searchController.clear();
                                   setState(() => _searchQuery = '');
                                 },

@@ -16,66 +16,92 @@ class PlaylistSuggestion {
 
 @singleton
 class PlaylistSuggestionsService {
+  List<PlaylistSuggestion>? _cachedSuggestions;
+  DateTime? _lastGeneratedTime;
+  int? _lastSongCount;
+  static const Duration _cacheTtl = Duration(minutes: 30);
+
+  /// Invalidates the suggestion cache (e.g. after library scan or playlist changes).
+  void invalidateCache() {
+    _cachedSuggestions = null;
+    _lastGeneratedTime = null;
+    _lastSongCount = null;
+  }
+
   /// Generates smart suggested mixes based on library tracks and playback history.
-  List<PlaylistSuggestion> generateSuggestions(List<SongsTableData> allSongs) {
+  /// Uses a single-pass traversal over [allSongs] and caches results for 30 minutes.
+  List<PlaylistSuggestion> generateSuggestions(List<SongsTableData> allSongs, {bool forceRefresh = false}) {
     if (allSongs.isEmpty) return [];
 
-    final suggestions = <PlaylistSuggestion>[];
-
-    // 1. Heavy Rotation (Top played)
-    final topPlayed = List<SongsTableData>.from(allSongs)
-      ..sort((a, b) => b.playCount.compareTo(a.playCount));
-    final heavyRotation =
-        topPlayed.where((s) => s.playCount > 0).take(25).toList();
-    if (heavyRotation.isNotEmpty) {
-      suggestions.add(PlaylistSuggestion(
-        title: 'Heavy Rotation Mix',
-        description: 'Your most played tracks on repeat',
-        songs: heavyRotation,
-      ));
+    final now = DateTime.now();
+    if (!forceRefresh &&
+        _cachedSuggestions != null &&
+        _lastGeneratedTime != null &&
+        _lastSongCount == allSongs.length &&
+        now.difference(_lastGeneratedTime!) < _cacheTtl) {
+      return _cachedSuggestions!;
     }
 
-    // 2. Rediscover & Forgotten Favorites
-    final forgotten = allSongs
-        .where((s) => s.isFavorite && (s.playCount < 3))
-        .take(20)
-        .toList();
-    if (forgotten.isNotEmpty) {
-      suggestions.add(PlaylistSuggestion(
-        title: 'Forgotten Favorites',
-        description: 'Starred gems you haven\'t heard in a while',
-        songs: forgotten,
-      ));
+    final heavyRotationCandidates = <SongsTableData>[];
+    final forgotten = <SongsTableData>[];
+    final audiophile = <SongsTableData>[];
+    final upbeat = <SongsTableData>[];
+
+    // P0-3: Single pass through allSongs, avoiding multiple 50k object allocations
+    for (final song in allSongs) {
+      if (song.playCount > 0) {
+        heavyRotationCandidates.add(song);
+      }
+      if (forgotten.length < 20 && song.isFavorite && song.playCount < 3) {
+        forgotten.add(song);
+      }
+      if (audiophile.length < 30 &&
+          (song.codec == 'FLAC' ||
+           song.codec == 'ALAC' ||
+           (song.bitDepth != null && song.bitDepth! >= 24))) {
+        audiophile.add(song);
+      }
+      if (upbeat.length < 25 &&
+          song.durationMs > 120000 &&
+          song.durationMs < 240000) {
+        upbeat.add(song);
+      }
     }
 
-    // 3. Audiophile Master Lossless Mix
-    final audiophile = allSongs
-        .where((s) =>
-            s.codec == 'FLAC' ||
-            s.codec == 'ALAC' ||
-            (s.bitDepth != null && s.bitDepth! >= 24))
-        .take(30)
-        .toList();
-    if (audiophile.isNotEmpty) {
-      suggestions.add(PlaylistSuggestion(
-        title: 'Hi-Res Audiophile Showcase',
-        description: 'Studio master 24-bit lossless fidelity',
-        songs: audiophile,
-      ));
-    }
+    // Sort only the heavy rotation subset by playCount
+    heavyRotationCandidates.sort((a, b) => b.playCount.compareTo(a.playCount));
+    final heavyRotation = heavyRotationCandidates.take(25).toList();
 
-    // 4. Quick Energy Boost (Short upbeat tracks)
-    final upbeat = allSongs
-        .where((s) => s.durationMs > 120000 && s.durationMs < 240000)
-        .take(25)
-        .toList();
-    if (upbeat.isNotEmpty) {
-      suggestions.add(PlaylistSuggestion(
-        title: 'Quick Energy Boost',
-        description: 'High-energy fast tracks to power your day',
-        songs: upbeat,
-      ));
-    }
+    final suggestions = <PlaylistSuggestion>[
+      if (heavyRotation.isNotEmpty)
+        PlaylistSuggestion(
+          title: 'Heavy Rotation Mix',
+          description: 'Your most played tracks on repeat',
+          songs: heavyRotation,
+        ),
+      if (forgotten.isNotEmpty)
+        PlaylistSuggestion(
+          title: 'Forgotten Favorites',
+          description: 'Starred gems you haven\'t heard in a while',
+          songs: forgotten,
+        ),
+      if (audiophile.isNotEmpty)
+        PlaylistSuggestion(
+          title: 'Hi-Res Audiophile Showcase',
+          description: 'Studio master 24-bit lossless fidelity',
+          songs: audiophile,
+        ),
+      if (upbeat.isNotEmpty)
+        PlaylistSuggestion(
+          title: 'Quick Energy Boost',
+          description: 'High-energy fast tracks to power your day',
+          songs: upbeat,
+        ),
+    ];
+
+    _cachedSuggestions = suggestions;
+    _lastGeneratedTime = now;
+    _lastSongCount = allSongs.length;
 
     return suggestions;
   }

@@ -1,6 +1,7 @@
-// lib/data/audio/smart_preload_scheduler.dart
+import 'dart:async';
 import 'dart:math' as math;
 import '../db/app_database.dart';
+import 'artwork_uri_resolver.dart';
 
 /// Intelligent queue analysis and preload scheduler.
 class SmartPreloadScheduler {
@@ -18,6 +19,7 @@ class SmartPreloadScheduler {
     required bool isShuffle,
     required Duration position,
     required Duration duration,
+    int preloadCount = 3,
   }) {
     if (queue.isEmpty || currentIndex < 0 || currentIndex >= queue.length) {
       return;
@@ -25,15 +27,19 @@ class SmartPreloadScheduler {
 
     if (duration > Duration.zero) {
       final timeRemaining = duration - position;
-      if (timeRemaining > const Duration(seconds: 30)) {
+      final isPastThreshold =
+          position.inMilliseconds >= (duration.inMilliseconds * 0.7);
+      final shouldPreload = timeRemaining < const Duration(seconds: 60) || isPastThreshold;
+      if (!shouldPreload) {
         return; // Too early to preload
       }
     }
 
+    final effectiveCount = preloadCount.clamp(1, 5);
     if (isShuffle) {
-      _preloadRandomTracks(queue, currentIndex, count: 3);
+      _preloadRandomTracks(queue, currentIndex, count: effectiveCount);
     } else {
-      for (int i = 1; i <= 3; i++) {
+      for (int i = 1; i <= effectiveCount; i++) {
         final idx = currentIndex + i;
         if (idx < queue.length) {
           _preloadTrack(queue[idx], priority: i);
@@ -68,6 +74,8 @@ class SmartPreloadScheduler {
     final key = '${song.id}_${song.remoteId}';
     if (_scheduledKeys.contains(key)) return;
     _scheduledKeys.add(key);
+
+    unawaited(ArtworkUriResolver.resolveArtworkUri(song));
 
     onPreloadRequested(song, priority: priority);
   }

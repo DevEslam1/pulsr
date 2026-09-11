@@ -14,6 +14,7 @@ import 'package:path/path.dart' as p;
 import '../../core/constants/embedded_browser_ua.dart';
 import '../../core/di/injection.dart';
 import '../../core/errors/ytm_error_classifier.dart';
+import 'adaptive_buffer_engine.dart';
 import '../../core/services/ytm_cache_manager.dart';
 import '../../core/services/ytm_url_cache.dart';
 import '../../core/telemetry/playback_latency_tracker.dart';
@@ -130,7 +131,7 @@ class YtmResolvingSource extends StreamAudioSource {
         try {
           _latency?.markStage(PlaybackStage.firstBytesReady);
         } catch (_) {}
-        return res;
+        return _wrapWithThroughputSampler(res);
       } catch (byteErr) {
         final burned = isUrlBurned(byteErr);
 
@@ -157,7 +158,7 @@ class YtmResolvingSource extends StreamAudioSource {
           try {
             _latency?.markStage(PlaybackStage.firstBytesReady);
           } catch (_) {}
-          return res;
+          return _wrapWithThroughputSampler(res);
         } catch (retryErr) {
           // Classify failure to ensure structured diagnostics
           final classified = YtmErrorClassifier.classify(retryErr);
@@ -201,6 +202,31 @@ class YtmResolvingSource extends StreamAudioSource {
   /// exactly the same one — `HTTP Status Error: 403` from the just_audio fork
   /// and `HTTP 403` from a chunk request mean the same thing, and a second copy
   /// of the rule would drift.
+  StreamAudioResponse _wrapWithThroughputSampler(StreamAudioResponse res) {
+    final stopwatch = Stopwatch()..start();
+    int bytesReceived = 0;
+    final sampleStream = res.stream.map((chunk) {
+      bytesReceived += chunk.length;
+      if (stopwatch.elapsedMilliseconds >= 500) {
+        if (getIt.isRegistered<AdaptiveBufferEngine>()) {
+          getIt<AdaptiveBufferEngine>()
+              .sampleThroughput(bytesReceived, stopwatch.elapsed);
+        }
+        bytesReceived = 0;
+        stopwatch.reset();
+      }
+      return chunk;
+    });
+    return StreamAudioResponse(
+      rangeRequestsSupported: res.rangeRequestsSupported,
+      sourceLength: res.sourceLength,
+      contentLength: res.contentLength,
+      offset: res.offset,
+      stream: sampleStream,
+      contentType: res.contentType,
+    );
+  }
+
   @visibleForTesting
   static bool isUrlBurned(Object byteErr) =>
       YtmErrorClassifier.isUrlBurned(byteErr);
@@ -209,8 +235,10 @@ class YtmResolvingSource extends StreamAudioSource {
   /// it. [invalidateUrl] additionally evicts the URL from [YtmUrlCache] and
   /// forces the next creation to re-resolve, for when the URL is the problem.
   void _discardInner({bool invalidateUrl = false}) {
+    final old = _inner;
     _inner = null;
     _pending = null;
+    old?.dispose();
     if (invalidateUrl) {
       _forceNextRefresh = true;
       _effectiveUrlCache?.invalidate(videoId);
@@ -331,21 +359,29 @@ class YtmResolvingSource extends StreamAudioSource {
     // Serialize creation per cache path so two sources for the same videoId
     // never start writing the same file at exactly the same time.
     final pathKey = cacheFile.path;
-    final completer = Completer<void>();
-    if (_pathCreationLocks.length >= _maxPathCreationLocks &&
-        !_pathCreationLocks.containsKey(pathKey)) {
-      _pathCreationLocks.remove(_pathCreationLocks.keys.first);
-    }
-    final previous =
-        _pathCreationLocks.putIfAbsent(pathKey, () => completer.future);
+    // Loop until we own the creation lock for this path.
+    late final Completer<void> ownedCompleter;
+    while (true) {
+      final completer = Completer<void>();
+      if (_pathCreationLocks.length >= _maxPathCreationLocks &&
+          !_pathCreationLocks.containsKey(pathKey)) {
+        _pathCreationLocks.remove(_pathCreationLocks.keys.first);
+      }
+      final previous =
+          _pathCreationLocks.putIfAbsent(pathKey, () => completer.future);
 
-    if (!identical(previous, completer.future)) {
-      // Another creation is in progress; wait for it
+      if (identical(previous, completer.future)) {
+        // We own the lock.
+        ownedCompleter = completer;
+        break;
+      }
+      // Another creation is in progress; wait for it then re-check.
       try {
         await previous;
       } catch (_) {}
       final existing = _inner;
       if (existing != null) return existing;
+      // _inner still null — loop and re-compete for the lock.
     }
 
     try {
@@ -368,8 +404,8 @@ class YtmResolvingSource extends StreamAudioSource {
       _pending = null;
       rethrow;
     } finally {
-      if (!completer.isCompleted) {
-        completer.complete();
+      if (!ownedCompleter.isCompleted) {
+        ownedCompleter.complete();
       }
       _pathCreationLocks.remove(pathKey);
     }

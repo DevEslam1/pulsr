@@ -84,7 +84,23 @@ class ScrobblerService {
   int? _nowPlayingTrackId;
   DateTime? _trackStartTime;
   final Map<String, DateTime> _lastScrobblePerService = {};
+  static const int _maxScrobbleEntries = 10;
   bool _isFlushing = false;
+
+  SharedPreferences? _cachedPrefs;
+  Future<SharedPreferences> _getPrefs() async {
+    _cachedPrefs ??= await SharedPreferences.getInstance();
+    return _cachedPrefs!;
+  }
+
+  void _recordServiceScrobble(String service) {
+    _lastScrobblePerService[service] = DateTime.now();
+    if (_lastScrobblePerService.length > _maxScrobbleEntries) {
+      final oldest = _lastScrobblePerService.entries
+          .reduce((a, b) => a.value.isBefore(b.value) ? a : b);
+      _lastScrobblePerService.remove(oldest.key);
+    }
+  }
 
   /// Minimum gap between submissions to the same service. Configurable for
   /// tests / power users; defaults to the Last.fm-friendly 30s.
@@ -99,7 +115,7 @@ class ScrobblerService {
   /// Checks for pending scrobble from previous session when app was terminated
   Future<void> checkPendingScrobble() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       final lastId = prefs.getInt(_keyLastScrobbleSong);
       final lastTime = prefs.getInt(_keyLastScrobbleTime);
       final lastPos = prefs.getInt(_keyLastScrobblePos) ?? 0;
@@ -468,7 +484,7 @@ class ScrobblerService {
             body: params,
           );
           if (ok) {
-            _lastScrobblePerService['lastfm'] = DateTime.now();
+            _recordServiceScrobble('lastfm');
           } else {
             anyFailure = true;
           }
@@ -504,7 +520,7 @@ class ScrobblerService {
             body: params,
           );
           if (ok) {
-            _lastScrobblePerService['librefm'] = DateTime.now();
+            _recordServiceScrobble('librefm');
           } else {
             anyFailure = true;
           }
@@ -538,7 +554,7 @@ class ScrobblerService {
             }),
           );
           if (ok) {
-            _lastScrobblePerService['webhook'] = DateTime.now();
+            _recordServiceScrobble('webhook');
           } else {
             anyFailure = true;
           }
@@ -587,7 +603,7 @@ class ScrobblerService {
             body: jsonEncode(payload),
           );
           if (ok) {
-            _lastScrobblePerService['listenbrainz'] = DateTime.now();
+            _recordServiceScrobble('listenbrainz');
           } else {
             anyFailure = true;
           }

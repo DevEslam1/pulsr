@@ -472,6 +472,8 @@ class _LibraryScreenState extends State<LibraryScreen>
               ? GridView.builder(
                   physics: const AlwaysScrollableScrollPhysics(),
                   controller: _songsScrollController,
+                  addAutomaticKeepAlives: false,
+                  addRepaintBoundaries: true,
                   padding: const EdgeInsets.only(
                       bottom: 160, top: 8, left: 6, right: 6),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -488,6 +490,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                   physics: const AlwaysScrollableScrollPhysics(),
                   controller: _songsScrollController,
                   itemExtent: songs.length > 500 ? 58.0 : null,
+                  addAutomaticKeepAlives: false,
+                  addRepaintBoundaries: true,
                   padding: const EdgeInsets.only(
                       bottom: 160, top: 8, left: 4, right: 4),
                   itemCount: songs.length,

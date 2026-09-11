@@ -13,19 +13,35 @@ import '../../core/utils/error_logger.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../db/app_database.dart';
 
+class ScanError {
+  final String path;
+  final String message;
+  final Object? error;
+
+  const ScanError({
+    required this.path,
+    required this.message,
+    this.error,
+  });
+}
+
 @singleton
 class MediaScannerService {
   final OnAudioQuery _audioQuery = OnAudioQuery();
   final IMusicRepository _repository;
   final StreamController<double> _progressController =
       StreamController<double>.broadcast();
+  final StreamController<ScanError> _errorController =
+      StreamController<ScanError>.broadcast();
 
   Stream<double> get scanProgress => _progressController.stream;
+  Stream<ScanError> get scanErrors => _errorController.stream;
 
   MediaScannerService(this._repository);
 
   void dispose() {
     if (!_progressController.isClosed) _progressController.close();
+    if (!_errorController.isClosed) _errorController.close();
   }
 
   Future<bool> checkPermission() async {
@@ -243,6 +259,11 @@ class MediaScannerService {
         );
       }
     } catch (e, stack) {
+      _errorController.add(ScanError(
+        path: path,
+        message: 'Failed to rescan single file metadata',
+        error: e,
+      ));
       ErrorLogger.log(
         'Failed to rescan single file metadata: $path',
         error: e,
@@ -291,6 +312,11 @@ class MediaScannerService {
         loudnessRange: lraVal,
       );
     } catch (e, stack) {
+      _errorController.add(ScanError(
+        path: path,
+        message: 'Failed to enrich audio quality',
+        error: e,
+      ));
       ErrorLogger.log(
         'Failed to enrich audio quality: $path',
         error: e,

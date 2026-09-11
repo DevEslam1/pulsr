@@ -65,7 +65,7 @@ class AudioPlayer {
   /// Whether to use the proxy server to send request headers.
   final bool _useProxyForRequestHeaders;
 
-  final AudioLoadConfiguration? _audioLoadConfiguration;
+  AudioLoadConfiguration? _audioLoadConfiguration;
 
   final bool _androidOffloadSchedulingEnabled;
 
@@ -517,6 +517,20 @@ class AudioPlayer {
 
   /// The current skipSilenceEnabled factor of the player.
   bool get skipSilenceEnabled => _skipSilenceEnabledSubject.nvalue!;
+
+  /// The current audio load configuration of the player.
+  AudioLoadConfiguration? get audioLoadConfiguration =>
+      _audioLoadConfiguration;
+
+  /// Reconfigures the player's audio load configuration.
+  Future<void> setAudioLoadConfiguration(
+      AudioLoadConfiguration configuration) async {
+    _audioLoadConfiguration = configuration;
+    if (configuration.darwinLoadControl != null) {
+      _automaticallyWaitsToMinimizeStalling = configuration
+          .darwinLoadControl!.automaticallyWaitsToMinimizeStalling;
+    }
+  }
 
   /// A stream of current skipSilenceEnabled factor values.
   Stream<bool> get skipSilenceEnabledStream =>
@@ -3430,6 +3444,10 @@ class LockCachingAudioSource extends StreamAudioSource {
   final _requests = <_StreamingByteRangeRequest>[];
   final _downloadProgressSubject = BehaviorSubject<double>();
   bool _downloading = false;
+  StreamSubscription<List<int>>? _subscription;
+  HttpClient? _httpClient;
+  IOSink? _sink;
+  bool _disposed = false;
 
   /// Creates a [LockCachingAudioSource] to that provides [uri] to the player
   /// while simultaneously caching it to [cacheFile]. If no cache file is
@@ -3449,8 +3467,13 @@ class LockCachingAudioSource extends StreamAudioSource {
   }
 
   Future<void> _init() async {
-    final cacheFile = await this.cacheFile;
-    _downloadProgressSubject.add((await cacheFile.exists()) ? 1.0 : 0.0);
+    try {
+      final cacheFile = await this.cacheFile;
+      final exists = await cacheFile.exists();
+      if (!_disposed && !_downloadProgressSubject.isClosed) {
+        _downloadProgressSubject.add(exists ? 1.0 : 0.0);
+      }
+    } catch (_) {}
   }
 
   /// Returns a [UriAudioSource] resolving directly to the cache file if it
@@ -3528,16 +3551,22 @@ class LockCachingAudioSource extends StreamAudioSource {
     File getEffectiveCacheFile() =>
         partialCacheFile.existsSync() ? partialCacheFile : cacheFile;
 
-    final httpClient = _createHttpClient(userAgent: _player?._userAgent);
+    if (_disposed) throw Exception('LockCachingAudioSource disposed');
+    final httpClient = _httpClient = _createHttpClient(userAgent: _player?._userAgent);
     final httpRequest = await _getUrl(httpClient, uri, headers: headers);
     final response = await httpRequest.close();
+    if (_disposed) {
+      httpClient.close(force: true);
+      throw Exception('LockCachingAudioSource disposed');
+    }
     if (response.statusCode != 200) {
       httpClient.close();
+      _httpClient = null;
       throw Exception('HTTP Status Error: ${response.statusCode}');
     }
     (await _partialCacheFile).createSync(recursive: true);
     // ignore: close_sinks
-    final sink = (await _partialCacheFile).openWrite();
+    final sink = _sink = (await _partialCacheFile).openWrite();
     final sourceLength =
         response.contentLength == -1 ? null : response.contentLength;
     final mimeType = response.headers.contentType.toString();
@@ -3557,7 +3586,7 @@ class LockCachingAudioSource extends StreamAudioSource {
     }
 
     _progress = 0;
-    subscription = response.listen((data) async {
+    subscription = _subscription = response.listen((data) async {
       _progress += data.length;
       final newPercentProgress = (sourceLength == null)
           ? 0
@@ -3679,11 +3708,18 @@ class LockCachingAudioSource extends StreamAudioSource {
       }
       (await _partialCacheFile).renameSync(cacheFile.path);
       await subscription.cancel();
+      _subscription = null;
       httpClient.close();
+      _httpClient = null;
+      _sink = null;
       _downloading = false;
     }, onError: (Object e, StackTrace stackTrace) async {
       (await _partialCacheFile).deleteSync();
+      await subscription.cancel();
+      _subscription = null;
       httpClient.close();
+      _httpClient = null;
+      _sink = null;
       // Fail all pending requests
       for (final req in _requests) {
         req.fail(e, stackTrace);
@@ -3736,6 +3772,32 @@ class LockCachingAudioSource extends StreamAudioSource {
       });
       return response;
     });
+  }
+
+  /// Disposes active download and releases file/network handles.
+  Future<void> dispose() async {
+    _disposed = true;
+    _downloading = false;
+    _response = null;
+    try {
+      await _subscription?.cancel();
+    } catch (_) {}
+    _subscription = null;
+    try {
+      await _sink?.close();
+    } catch (_) {}
+    _sink = null;
+    try {
+      _httpClient?.close(force: true);
+    } catch (_) {}
+    _httpClient = null;
+    for (final req in _requests) {
+      req.fail(Exception('LockCachingAudioSource disposed'), StackTrace.current);
+    }
+    _requests.clear();
+    if (!_downloadProgressSubject.isClosed) {
+      _downloadProgressSubject.close();
+    }
   }
 }
 

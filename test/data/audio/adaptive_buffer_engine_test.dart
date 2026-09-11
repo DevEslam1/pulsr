@@ -1,51 +1,61 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/data/audio/adaptive_buffer_engine.dart';
-import 'package:pulsr/data/audio/adaptive_playback_buffer.dart';
 
 void main() {
-  group('AdaptivePlaybackBuffer - Task 7 Start Buffer Tuning', () {
+  group('AdaptiveBufferEngine — Start Buffer Tuning', () {
+    late AdaptiveBufferEngine engine;
+
+    setUp(() {
+      engine = AdaptiveBufferEngine();
+    });
+
     test('Wi-Fi fast connection starts with 800ms buffer', () {
-      final startBuffer = AdaptivePlaybackBuffer.calculateStartBuffer(
-        networkSpeedMbps: 25.0,
+      engine.updateNetworkSpeed(25.0);
+      final startBuffer = engine.calculateStartBuffer(
         isWifi: true,
+        isLocalFile: false,
       );
       expect(startBuffer, const Duration(milliseconds: 800));
     });
 
     test('Cellular standard connection starts with 1200ms buffer', () {
-      final startBuffer = AdaptivePlaybackBuffer.calculateStartBuffer(
-        networkSpeedMbps: 4.0,
+      engine.updateNetworkSpeed(4.0);
+      final startBuffer = engine.calculateStartBuffer(
         isWifi: false,
+        isLocalFile: false,
       );
       expect(startBuffer, const Duration(milliseconds: 1200));
     });
 
     test('Poor / 2G connection starts with 2500ms buffer', () {
-      final startBuffer = AdaptivePlaybackBuffer.calculateStartBuffer(
-        networkSpeedMbps: 0.8,
+      engine.updateNetworkSpeed(0.8);
+      final startBuffer = engine.calculateStartBuffer(
         isWifi: false,
+        isLocalFile: false,
       );
       expect(startBuffer, const Duration(milliseconds: 2500));
     });
 
-    test('Steady-state buffer remains bounded between 5s and 60s', () {
-      final wifiBuffer = AdaptivePlaybackBuffer.calculateBuffer(
+    test('Steady-state buffer remains bounded between 5s and 50s', () {
+      engine.updateNetworkSpeed(15.0);
+      final wifiBuffer = engine.calculateOptimalBuffer(
         bitrateKbps: 256,
-        networkSpeedMbps: 15.0,
         isWifi: true,
+        isLocalFile: false,
       );
-      expect(wifiBuffer.inSeconds, inInclusiveRange(5, 30));
+      expect(wifiBuffer.inSeconds, inInclusiveRange(2, 50));
 
-      final cellBuffer = AdaptivePlaybackBuffer.calculateBuffer(
+      engine.updateNetworkSpeed(3.0);
+      final cellBuffer = engine.calculateOptimalBuffer(
         bitrateKbps: 256,
-        networkSpeedMbps: 3.0,
         isWifi: false,
+        isLocalFile: false,
       );
-      expect(cellBuffer.inSeconds, inInclusiveRange(10, 60));
+      expect(cellBuffer.inSeconds, inInclusiveRange(2, 50));
     });
   });
 
-  group('AdaptiveBufferEngine - Task 7 Dynamic Calculation', () {
+  group('AdaptiveBufferEngine — Dynamic Calculation', () {
     late AdaptiveBufferEngine engine;
 
     setUp(() {

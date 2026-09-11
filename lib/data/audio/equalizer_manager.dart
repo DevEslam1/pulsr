@@ -12,6 +12,7 @@ import '../../domain/models/headphone_profile.dart';
 import '../../domain/models/reverb_preset.dart';
 import 'audio_effects_channel.dart';
 import 'headphone_profiles_repository.dart';
+import 'optimized_dsp_pipeline.dart';
 
 enum ComparisonSlot { slotA, slotB, slotC, slotD }
 
@@ -53,6 +54,7 @@ class EqualizerManager {
   bool get isDynamicsBypassed => _isDynamicsBypassed;
 
   bool isSpatializerEnabled = false;
+  String spatializerMode = 'systemHardware';
 
   // Tier 1 & Tier 2 & Tier 3 Native DSP features
   bool isCrossfeedEnabled = false;
@@ -244,6 +246,8 @@ class EqualizerManager {
 
       isSpatializerEnabled =
           prefs.getBool(PrefsKeys.eqSpatializerEnabled) ?? false;
+      spatializerMode =
+          prefs.getString(PrefsKeys.spatializerEngine) ?? 'systemHardware';
 
       isCrossfeedEnabled = prefs.getBool(PrefsKeys.crossfeedEnabled) ?? false;
       crossfeedDelayUs = prefs.getDouble(PrefsKeys.crossfeedDelayUs) ?? 350.0;
@@ -1083,6 +1087,17 @@ class EqualizerManager {
     }
   }
 
+  Future<void> setSpatializerMode(String mode) async {
+    spatializerMode = mode;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(PrefsKeys.spatializerEngine, mode);
+    if (mode == 'off') {
+      await setSpatializerEnabled(false);
+    } else {
+      await setSpatializerEnabled(true);
+    }
+  }
+
   bool get hasOemAudio => _effectsChannel.hasOemAudio;
   List<String> get detectedOemEngines => _effectsChannel.detectedOemEngines;
 
@@ -1201,6 +1216,66 @@ class EqualizerManager {
       await _effectsChannel.setSincResamplerEnabled(enabled);
     }
     _debouncedSavePreferences();
+  }
+
+  bool _isDegradedForPower = false;
+  bool _savedReverbEnabled = false;
+  bool _savedCrossfeedEnabled = false;
+  bool _savedSaturationEnabled = false;
+  bool _savedStereoWidthEnabled = false;
+  bool _savedLoudnessContourEnabled = false;
+  bool _savedSubCrossoverEnabled = false;
+  bool _savedDynamicEqEnabled = false;
+  bool _savedDynamicsEnabled = false;
+  bool _savedLimiterEnabled = false;
+
+  bool get isDegradedForPower => _isDegradedForPower;
+
+  /// Temporarily disables heavy DSP stages (reverb, crossfeed, saturation,
+  /// stereo width, loudness contour, sub crossover, dynamic eq, dynamics, limiter)
+  /// to conserve battery while preserving the core equalizer.
+  Future<void> degradeToEssentials() async {
+    if (_isDegradedForPower) return;
+    _isDegradedForPower = true;
+    _savedReverbEnabled = isReverbEnabled;
+    _savedCrossfeedEnabled = isCrossfeedEnabled;
+    _savedSaturationEnabled = isSaturationEnabled;
+    _savedStereoWidthEnabled = isStereoWidthEnabled;
+    _savedLoudnessContourEnabled = isLoudnessContourEnabled;
+    _savedSubCrossoverEnabled = isSubCrossoverEnabled;
+    _savedDynamicEqEnabled = isDynamicEqEnabled;
+    _savedDynamicsEnabled = isDynamicsEnabled;
+    _savedLimiterEnabled = isLimiterEnabled;
+
+    if (_savedReverbEnabled) await setReverb(false);
+    if (_savedCrossfeedEnabled) await setCrossfeed(false);
+    if (_savedSaturationEnabled) await setSaturation(false);
+    if (_savedStereoWidthEnabled) await setStereoWidth(false);
+    if (_savedLoudnessContourEnabled) await setLoudnessContour(false);
+    if (_savedSubCrossoverEnabled) await setSubCrossover(false);
+    if (_savedDynamicEqEnabled) await setDynamicEq(false);
+    if (_savedDynamicsEnabled) {
+      await setDynamicsPreset(dynamicsPreset, enabled: false);
+    }
+    if (_savedLimiterEnabled) await setLookaheadLimiter(false);
+  }
+
+  /// Restores DSP stages that were disabled during low power mode.
+  Future<void> restoreFromDegrade() async {
+    if (!_isDegradedForPower) return;
+    _isDegradedForPower = false;
+
+    if (_savedReverbEnabled) await setReverb(true);
+    if (_savedCrossfeedEnabled) await setCrossfeed(true);
+    if (_savedSaturationEnabled) await setSaturation(true);
+    if (_savedStereoWidthEnabled) await setStereoWidth(true);
+    if (_savedLoudnessContourEnabled) await setLoudnessContour(true);
+    if (_savedSubCrossoverEnabled) await setSubCrossover(true);
+    if (_savedDynamicEqEnabled) await setDynamicEq(true);
+    if (_savedDynamicsEnabled) {
+      await setDynamicsPreset(dynamicsPreset, enabled: true);
+    }
+    if (_savedLimiterEnabled) await setLookaheadLimiter(true);
   }
 
   // --- PHASE 1 DSP EXPANSION STAGES ---
@@ -1345,7 +1420,15 @@ class EqualizerManager {
     }
   }
 
-  Future<int> syncNativeLatency(double sampleRate) async {
+  OptimizedDspPipeline? _dspPipeline;
+
+  /// Attaches the DSP pipeline so native latency syncs automatically update the pipeline.
+  void attachDspPipeline(OptimizedDspPipeline pipeline) {
+    _dspPipeline = pipeline;
+  }
+
+  Future<int> syncNativeLatency(double sampleRate,
+      {OptimizedDspPipeline? dspPipeline}) async {
     if (!PlatformCapabilities.isAndroid) return 0;
     try {
       final frames = await _effectsChannel.getPipelineLatencyFrames();
@@ -1353,6 +1436,8 @@ class EqualizerManager {
       if (isSincResamplerEnabled) {
         await _effectsChannel.setSincResamplerRates(sampleRate, sampleRate);
       }
+      (dspPipeline ?? _dspPipeline)
+          ?.updateNativeLatency(frames: frames, sampleRate: sampleRate);
       return frames;
     } catch (_) {
       return 0;

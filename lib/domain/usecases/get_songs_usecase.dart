@@ -18,18 +18,25 @@ class GetSongsUseCase {
     String? searchQuery,
     List<String> excludedFolders = const [],
   }) {
+    final validatedLimit = limit?.clamp(0, 1000);
+    final validatedOffset = offset != null ? (offset < 0 ? 0 : offset) : null;
+    final validatedQuery = (searchQuery != null && searchQuery.length > 200)
+        ? searchQuery.substring(0, 200)
+        : searchQuery;
+
     return _repository.watchAllSongs(
       sortBy: sortBy,
       ascending: ascending,
-      limit: limit,
-      offset: offset,
-      searchQuery: searchQuery,
+      limit: validatedLimit,
+      offset: validatedOffset,
+      searchQuery: validatedQuery,
       excludedFolders: excludedFolders,
     );
   }
 
   Stream<Result<List<SongsTableData>>> watchRecentlyPlayed({int limit = 20}) {
-    return _repository.watchRecentlyPlayed(limit: limit);
+    final validatedLimit = limit.clamp(1, 500);
+    return _repository.watchRecentlyPlayed(limit: validatedLimit);
   }
 
   Future<Result<void>> clearRecentlyPlayed() {
@@ -37,11 +44,13 @@ class GetSongsUseCase {
   }
 
   Stream<Result<List<SongsTableData>>> watchRecentlyAdded({int limit = 20}) {
-    return _repository.watchRecentlyAdded(limit: limit);
+    final validatedLimit = limit.clamp(1, 500);
+    return _repository.watchRecentlyAdded(limit: validatedLimit);
   }
 
   Stream<Result<List<SongsTableData>>> watchTopPlayed({int limit = 30}) {
-    return _repository.watchTopPlayed(limit: limit);
+    final validatedLimit = limit.clamp(1, 500);
+    return _repository.watchTopPlayed(limit: validatedLimit);
   }
 
   Future<Result<List<SongsTableData>>> getAllSongs({
@@ -50,11 +59,14 @@ class GetSongsUseCase {
     int? limit,
     int? offset,
   }) {
+    final validatedLimit = limit?.clamp(0, 1000);
+    final validatedOffset = offset != null ? (offset < 0 ? 0 : offset) : null;
+
     return _repository.getAllSongs(
       sortBy: sortBy,
       ascending: ascending,
-      limit: limit,
-      offset: offset,
+      limit: validatedLimit,
+      offset: validatedOffset,
     );
   }
 }
