@@ -529,6 +529,38 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetDynamicEqBand(
     });
 }
 
+// ---- ReplayGain 2.0 / EBU R128 pre-gain (bit-transparent, in-DSP) ----
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReplayGainEnabled(
+        JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        snap.replayGain.enabled = enabled;
+        if (!enabled) snap.replayGain.mode = ReplayGainMode::Off;
+        else if (snap.replayGain.mode == ReplayGainMode::Off) snap.replayGain.mode = ReplayGainMode::Track;
+    });
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReplayGainParams(
+        JNIEnv* /* env */, jobject /* thiz */,
+        jint mode, jdouble trackGainDb, jdouble albumGainDb,
+        jdouble trackPeak, jdouble albumPeak,
+        jdouble preAmpDb, jboolean preventClipping, jboolean enabled) {
+    if (mode < 0 || mode > 2) return;
+    auto m = static_cast<ReplayGainMode>(mode);
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        snap.replayGain.mode = enabled ? m : ReplayGainMode::Off;
+        snap.replayGain.trackGainDb = trackGainDb;
+        snap.replayGain.albumGainDb = albumGainDb;
+        snap.replayGain.trackPeak = (trackPeak > 0.0) ? trackPeak : 1.0;
+        snap.replayGain.albumPeak = (albumPeak > 0.0) ? albumPeak : 1.0;
+        snap.replayGain.preAmpDb = preAmpDb;
+        snap.replayGain.preventClipping = preventClipping;
+        snap.replayGain.enabled = enabled;
+    });
+}
+
 // ---- ExoPlayer Media3 NativeDspAudioProcessor In-Stream Direct Buffer Bridge ----
 
 JNIEXPORT jlong JNICALL

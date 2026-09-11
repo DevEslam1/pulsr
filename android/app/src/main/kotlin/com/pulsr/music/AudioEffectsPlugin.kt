@@ -266,6 +266,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         index: Int, freq: Double, q: Double, thresholdDb: Double, ratio: Double,
         attackMs: Double, releaseMs: Double, maxCutDb: Double, enabled: Boolean
     )
+    private external fun nativeSetReplayGainEnabled(enabled: Boolean)
+    private external fun nativeSetReplayGainParams(
+        mode: Int, trackGainDb: Double, albumGainDb: Double,
+        trackPeak: Double, albumPeak: Double,
+        preAmpDb: Double, preventClipping: Boolean, enabled: Boolean
+    )
     private external fun nativeDecodeDsd(dsdL: ByteArray, dsdR: ByteArray, byteCount: Int, dsdRate: Int, targetPcmSampleRate: Int, bitOrder: Int): FloatArray?
     private external fun nativeSetActiveStages(bitmask: Int)
     private external fun nativeSetCacheBudgetBytes(budgetBytes: Long)
@@ -2060,6 +2066,27 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     )
                     Log.d(TAG, "[DSP_DEBUG] Live DSP snapshot requested: ${activeNames.size} active effects, session=$currentAudioSessionId, attached=${report["isSessionAttached"]}, bypass=$isBitPerfectBypassActive")
                     result.success(report)
+                }
+
+                "setReplayGainEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    try { nativeSetReplayGainEnabled(enabled) } catch (e: Exception) { Log.w(TAG, "nativeSetReplayGainEnabled failed: ${e.message}") }
+                    result.success(true)
+                }
+
+                "setReplayGainParams" -> {
+                    val mode = call.argument<Int>("mode") ?: 0
+                    val trackGainDb = call.argument<Double>("trackGainDb") ?: 0.0
+                    val albumGainDb = call.argument<Double>("albumGainDb") ?: 0.0
+                    val trackPeak = call.argument<Double>("trackPeak") ?: 1.0
+                    val albumPeak = call.argument<Double>("albumPeak") ?: 1.0
+                    val preAmpDb = call.argument<Double>("preAmpDb") ?: 0.0
+                    val preventClipping = call.argument<Boolean>("preventClipping") ?: true
+                    val enabled = call.argument<Boolean>("enabled") ?: (mode != 0)
+                    try {
+                        nativeSetReplayGainParams(mode, trackGainDb, albumGainDb, trackPeak, albumPeak, preAmpDb, preventClipping, enabled)
+                    } catch (e: Exception) { Log.w(TAG, "nativeSetReplayGainParams failed: ${e.message}") }
+                    result.success(true)
                 }
 
                 "setBypassDspForBitPerfect" -> {

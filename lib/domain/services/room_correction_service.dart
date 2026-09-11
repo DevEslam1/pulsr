@@ -219,6 +219,109 @@ class RoomCorrectionService {
     );
   }
 
+  /// Merges a room-correction curve with a headphone AutoEQ curve band-wise.
+  /// Both [roomGains] and [headphoneGains] must share [centers] length;
+  /// shorter inputs are zero-padded, result clamped to +/- [maxGainDb].
+  /// This is the "Studio in Your Pocket" stack: headphone compensation +
+  /// room compensation in one preset instead of two conflicting EQs.
+  static List<double> mergeWithHeadphoneCurve(
+    List<double> roomGains,
+    List<double> headphoneGains, {
+    double maxGainDb = 15.0,
+  }) {
+    final n = math.max(roomGains.length, headphoneGains.length);
+    if (n == 0) return [];
+    return List<double>.generate(n, (i) {
+      final r = i < roomGains.length ? roomGains[i] : 0.0;
+      final h = i < headphoneGains.length ? headphoneGains[i] : 0.0;
+      final rC = r.isFinite ? r : 0.0;
+      final hC = h.isFinite ? h : 0.0;
+      return (rC + hC).clamp(-maxGainDb, maxGainDb).toDouble();
+    });
+  }
+
+  /// Exports a correction curve as a linear-phase FIR impulse response for
+  /// the native convolution stage (`nativeLoadImpulseResponse`) or WAV export.
+  ///
+  /// Frequency-sampling design: desired magnitude per FFT bin comes from
+  /// log-interpolated [gains] at [centers]; linear phase; Hamming-windowed
+  /// inverse DFT. Returns mono taps of length [taps] (odd, default 127).
+  /// Magnitude-only correction — phase of the room is left untouched.
+  static Float32List exportCorrectionImpulseResponse(
+    List<double> gains, {
+    List<double> centers = EqPreset.centerFrequencies,
+    int sampleRate = captureSampleRate,
+    int taps = 127,
+  }) {
+    final n = taps.isOdd ? taps : taps + 1;
+    if (gains.isEmpty || centers.isEmpty || gains.length != centers.length) {
+      final ir = Float32List(n);
+      ir[n ~/ 2] = 1.0;
+      return ir;
+    }
+    double magAt(double freq) {
+      final f = freq.clamp(centers.first, centers.last).toDouble();
+      final logF = math.log(f);
+      for (var i = 0; i < centers.length - 1; i++) {
+        final l0 = math.log(centers[i]);
+        final l1 = math.log(centers[i + 1]);
+        if (logF >= l0 && logF <= l1) {
+          final t = (l1 - l0) < 1e-9 ? 0.0 : (logF - l0) / (l1 - l0);
+          final gDb = gains[i] * (1 - t) + gains[i + 1] * t;
+          return math.pow(10.0, gDb / 20.0).toDouble();
+        }
+      }
+      return math.pow(10.0, gains.last / 20.0).toDouble();
+    }
+
+    // Even-length FFT for symmetric bins; design half spectrum then mirror.
+    final fftSize = 512;
+    final half = fftSize ~/ 2;
+    final real = List<double>.filled(fftSize, 0.0);
+    final imag = List<double>.filled(fftSize, 0.0);
+    for (var k = 0; k <= half; k++) {
+      final freq = k * sampleRate / fftSize;
+      final mag = k == 0 ? 1.0 : magAt(freq.clamp(20.0, sampleRate / 2 - 1));
+      // Linear phase: delay = (n-1)/2 samples.
+      final delay = (n - 1) / 2;
+      final phase = -2 * math.pi * k * delay / fftSize;
+      real[k] = mag * math.cos(phase);
+      imag[k] = mag * math.sin(phase);
+      if (k > 0 && k < half) {
+        real[fftSize - k] = real[k];
+        imag[fftSize - k] = -imag[k];
+      }
+    }
+    // Naive inverse DFT (512 pts — trivial cost, runs once per wizard finish).
+    final time = List<double>.filled(fftSize, 0.0);
+    for (var m = 0; m < fftSize; m++) {
+      var sum = 0.0;
+      for (var k = 0; k < fftSize; k++) {
+        final ang = 2 * math.pi * k * m / fftSize;
+        sum += real[k] * math.cos(ang) - imag[k] * math.sin(ang);
+      }
+      time[m] = sum / fftSize;
+    }
+    // Crop center (n-1)/2 delay to n taps + Hamming window.
+    final start = fftSize ~/ 2 - n ~/ 2;
+    final ir = Float32List(n);
+    for (var i = 0; i < n; i++) {
+      final w = 0.54 - 0.46 * math.cos(2 * math.pi * i / (n - 1));
+      ir[i] = (time[start + i] * w).toDouble();
+    }
+    // Unity-DC normalize so bypass transparency holds when curve is flat.
+    var dcSum = 0.0;
+    for (final v in ir) {
+      dcSum += v;
+    }
+    if (dcSum.abs() > 1e-9) {
+      for (var i = 0; i < ir.length; i++) {
+        ir[i] = ir[i] / dcSum;
+      }
+    }
+    return ir;
+  }
+
   // --- capture plumbing ---
 
   StreamSubscription<dynamic>? _captureSub;

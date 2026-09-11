@@ -21,6 +21,7 @@ import '../utils/error_logger.dart';
 import '../utils/ytm_rate_limiter.dart';
 
 import '../errors/ytm_error_classifier.dart';
+import 'ytm_circuit_breaker.dart';
 
 /// A failed YTM call with structured block signal and trace ID.
 class YtmException implements Exception {
@@ -147,6 +148,13 @@ class YtmService {
   final Map<String, List<DateTime>> _videoFailures = {};
   final Map<String, DateTime> _videoCooldownUntil = {};
 
+  /// Per-signal breaker + metrics. Existing bot/video cooldowns stay as the
+  /// fast path; the breaker adds bounded per-signal windows and observability.
+  final YtmCircuitBreaker breaker = YtmCircuitBreaker();
+
+  /// Diagnostics snapshot for logs/settings UI.
+  Map<String, dynamic> breakerMetrics() => breaker.metrics();
+
   bool isVideoCoolingDown(String videoId) {
     final until = _videoCooldownUntil[videoId];
     if (until == null) return false;
@@ -164,6 +172,8 @@ class YtmService {
 
   void _noteBotChallenge(YtmException e, {String? videoId}) {
     _lastBotChallenge = e;
+    final signal = e.signal;
+    if (signal != null) breaker.recordFailure(signal);
     final now = DateTime.now();
 
     // FIX-C01: Key circuit breaker per videoId (3 failures within 60s)
@@ -190,6 +200,7 @@ class YtmService {
   /// that produce high-bitrate streams) for minutes after YouTube let us back
   /// in, and every retry inside the window rethrew the stale challenge.
   void _noteResolveSuccess({String? videoId}) {
+    breaker.recordSuccess();
     if (videoId != null) {
       _videoFailures.remove(videoId);
       _videoCooldownUntil.remove(videoId);
@@ -805,6 +816,7 @@ class YtmService {
     }
 
     // 2. Native Multi-Client Extractor (NewPipe -> WEB_REMIX -> ANDROID -> IOS -> TV)
+    Object? nativeError;
     try {
       // Fail fast with a FRESH per-video exception: rethrowing _lastBotChallenge
       // pastes another video's id + trace id into this video's logs and makes a
@@ -842,12 +854,49 @@ class YtmService {
       // caused by stale synced cookies) must still try the remote backend
       // before surfacing auth to the UI.
       firstError ??= e;
+      nativeError = e;
       // The cooldown short-circuit itself must not extend the window, or a
       // retry loop would hold it open forever (fixed window from first hit).
       if (!inBotCooldown &&
           e is YtmException &&
           (e.isBotBlocked || e.isThrottled || e.isIpBlocked)) {
         _noteBotChallenge(e, videoId: videoId);
+      }
+    }
+
+    // 2.5 PoToken refresh-and-retry (on-device only, no XDM backend).
+    // A stale/mismatched BotGuard token fails every client identically; one
+    // invalidate + mint + single native retry recovers without burning the
+    // full Dart chain or imposing a bot cooldown on a non-bot failure.
+    if (nativeError is YtmException &&
+        (nativeError.signal == YtmBlockSignal.poTokenInvalid ||
+            nativeError.signal == YtmBlockSignal.botChallenge) &&
+        breaker.shouldAllow(YtmBlockSignal.poTokenInvalid)) {
+      try {
+        debugPrint('[YTM_SERVICE] Tier-2.5 poToken refresh-and-retry for $videoId');
+        await invalidatePoToken().timeout(const Duration(seconds: 3));
+        final ready = await ensurePoTokenReady().timeout(const Duration(seconds: 6));
+        if (ready) {
+          final raw = await _guard(
+            () => _channel.invokeMethod<Map<Object?, Object?>>('resolveStream', {
+              'videoId': videoId,
+              'quality': quality,
+            }),
+            timeout: _defaultResolveTimeout,
+          );
+          final stream = raw == null ? null : YtmStream.fromChannel(raw);
+          if (stream != null) {
+            try {
+              _tracker?.markStage(PlaybackStage.urlObtained);
+            } catch (_) {}
+            urlCache?.putStream(stream, quality: quality);
+            _noteResolveSuccess(videoId: videoId);
+            return stream;
+          }
+        }
+      } catch (e) {
+        debugPrint('[YTM_SERVICE] Tier-2.5 retry failed: $e');
+        if (e is YtmException) breaker.classifyAndRecord(e);
       }
     }
 

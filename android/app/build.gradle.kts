@@ -417,6 +417,19 @@ tasks.register("validateProdIsolation") {
         }
 
         println("[validateProdIsolation] PASSED: Prod isolation verified successfully across manifests, kotlin, res, assets, proguard, cpp, and jniLibs.")
+        // 8. Pulsr Pure: prod overlay must strip INTERNET + YTM download worker.
+        val prodManifest = file("src/prod/AndroidManifest.xml")
+        if (!prodManifest.exists()) {
+            throw GradleException("Pulsr Pure prod overlay src/prod/AndroidManifest.xml is missing!")
+        } else {
+            val prodText = prodManifest.readText()
+            if (!prodText.contains("android.permission.INTERNET") || !prodText.contains("tools:node=\"remove\"")) {
+                throw GradleException("Pulsr Pure prod overlay must remove INTERNET permission!")
+            }
+            if (!prodText.contains(".DownloadService") || !prodText.contains("tools:node=\"remove\"")) {
+                throw GradleException("Pulsr Pure prod overlay must remove DownloadService!")
+            }
+        }
     }
 }
 

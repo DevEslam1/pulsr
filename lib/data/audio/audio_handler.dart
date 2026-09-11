@@ -465,6 +465,9 @@ class PulsrAudioHandler extends BaseAudioHandler
   bool get isDopLocked => _isDopLocked;
 
   double _calculateReplayGainVolume(SongsTableData? song) {
+    // Keep native DSP pre-gain in sync (fire-and-forget): mixer stays at
+    // user volume on Android, gain applied bit-transparently in-DSP.
+    unawaited(_pushNativeReplayGain(song));
     if (_isDopLocked) return 1.0;
     if (song == null) return _volume;
 
@@ -488,6 +491,51 @@ class PulsrAudioHandler extends BaseAudioHandler
       preampWithoutRg:
           prefs.getDouble(PrefsKeys.replayGainPreampWithoutRg) ?? -3.0,
     );
+  }
+
+  /// Pushes ReplayGain tags to the native DSP pre-gain stage.
+  /// Non-Android / DoP-locked / bit-perfect: disables native stage so the
+  /// existing volume-path semantics (unity) are preserved.
+  Future<void> _pushNativeReplayGain(SongsTableData? song) async {
+    try {
+      final prefs = _cachedPrefs;
+      if (prefs == null || _isDopLocked) {
+        await AudioEffectsChannel().setReplayGainEnabled(false);
+        return;
+      }
+      final bitPerfect = (prefs.getBool(PrefsKeys.bitPerfectOutput) ?? false) &&
+          (prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true);
+      if (bitPerfect) {
+        await AudioEffectsChannel().setReplayGainEnabled(false);
+        return;
+      }
+      final modeStr = prefs.getString(PrefsKeys.replayGainMode) ?? 'track';
+      final albumCtx = _isConsecutiveAlbumPlayback();
+      final mode = ReplayGainMath.nativeModeFor(modeStr, albumContext: albumCtx);
+      if (mode == 0) {
+        await AudioEffectsChannel().setReplayGainEnabled(false);
+        return;
+      }
+      final preAmp = ReplayGainMath.nativePreAmpFor(
+        mode: modeStr,
+        trackGainDb: song?.replayGainTrack,
+        albumGainDb: song?.replayGainAlbum,
+        albumContext: albumCtx,
+        preampWithRg: prefs.getDouble(PrefsKeys.replayGainPreampWithRg) ?? 0.0,
+        preampWithoutRg:
+            prefs.getDouble(PrefsKeys.replayGainPreampWithoutRg) ?? -3.0,
+      );
+      await AudioEffectsChannel().setReplayGainParams(
+        mode: mode,
+        trackGainDb: song?.replayGainTrack ?? 0.0,
+        albumGainDb: song?.replayGainAlbum ?? 0.0,
+        trackPeak: song?.replayGainTrackPeak ?? 1.0,
+        albumPeak: song?.replayGainAlbumPeak ?? 1.0,
+        preAmpDb: preAmp,
+        preventClipping: true,
+        enabled: true,
+      );
+    } catch (_) {}
   }
 
   Future<void> setVolume(double volume) async {

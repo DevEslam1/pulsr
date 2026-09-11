@@ -602,6 +602,61 @@ class AudioEffectsChannel {
     }
   }
 
+  // --- NATIVE REPLAYGAIN 2.0 (bit-transparent pre-gain in DSP) ---
+
+  /// Pushes ReplayGain tags into the native DSP pre-gain stage.
+  /// [mode]: 0=off, 1=track, 2=album. Keeps the Android mixer at unity so
+  /// DoP markers and bit-perfect PCM survive; volume slider stays separate.
+  Future<void> setReplayGainParams({
+    required int mode,
+    required double trackGainDb,
+    required double albumGainDb,
+    required double trackPeak,
+    required double albumPeak,
+    required double preAmpDb,
+    bool preventClipping = true,
+    required bool enabled,
+  }) async {
+    if (!_isAndroid) return;
+    try {
+      await _channel
+          .invokeMethod('setReplayGainParams', {
+            'mode': mode,
+            'trackGainDb': trackGainDb,
+            'albumGainDb': albumGainDb,
+            'trackPeak': trackPeak,
+            'albumPeak': albumPeak,
+            'preAmpDb': preAmpDb,
+            'preventClipping': preventClipping,
+            'enabled': enabled,
+          })
+          .timeout(const Duration(seconds: 2));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set native ReplayGain params (mode=$mode)',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+    }
+  }
+
+  Future<void> setReplayGainEnabled(bool enabled) async {
+    if (!_isAndroid) return;
+    try {
+      await _channel
+          .invokeMethod('setReplayGainEnabled', {'enabled': enabled})
+          .timeout(const Duration(seconds: 2));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set native ReplayGain enabled ($enabled)',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+    }
+  }
+
   // --- HEADPHONE CROSSFEED ---
 
   Future<void> setCrossfeedEnabled(bool enabled) async {

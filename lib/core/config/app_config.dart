@@ -41,6 +41,19 @@ class AppConfig {
   static bool get isProd => environment == AppEnvironment.prod;
   static bool get isDev => environment == AppEnvironment.dev;
 
+  /// Pulsr Pure: Play Store offline-only build. No INTERNET permission
+  /// (see android/app/src/prod/AndroidManifest.xml), no YTM, no Firebase,
+  /// no Sentry, no cloud sync — competes with Musicolet on manifest privacy.
+  static bool get isPure => isProd && !ytmEnabled;
+
+  /// Telemetry (Sentry/Firebase) is only allowed outside Pure builds and
+  /// only when a DSN is actually configured (main.dart already gates on this).
+  static bool get isTelemetryAllowed => !isPure && sentryDsn.isNotEmpty;
+
+  /// Cloud sync / remote metadata fetch must be hard-off in Pure builds even
+  /// if stale prefs say otherwise.
+  static bool get isCloudSyncAllowed => !isPure;
+
   static String get appTitle {
     final lowerFlavor = flavor.toLowerCase();
     if (lowerFlavor == 'ytm' || ytmEnabled) {

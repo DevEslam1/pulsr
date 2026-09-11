@@ -75,4 +75,50 @@ class ReplayGainMath {
 
     return (volume * multiplier).clamp(0.0, 1.0).toDouble();
   }
+
+  /// Maps a UI mode string to the native DSP mode int (0=off, 1=track, 2=album).
+  /// 'auto' resolves via [albumContext], mirroring [apply].
+  static int nativeModeFor(String mode, {bool albumContext = false}) {
+    switch (mode) {
+      case 'track':
+        return 1;
+      case 'album':
+        return 2;
+      case 'auto':
+        return albumContext ? 2 : 1;
+      case 'off':
+      default:
+        return 0;
+    }
+  }
+
+  /// Selects the effective preamp: [preampWithRg] when a finite non-zero tag
+  /// exists, else [preampWithoutRg]. Mirrors [apply] without volume scaling —
+  /// the native stage applies gain itself, so the mixer stays at unity.
+  static double nativePreAmpFor({
+    required String mode,
+    double? trackGainDb,
+    double? albumGainDb,
+    bool albumContext = false,
+    double preampWithRg = 0.0,
+    double preampWithoutRg = -3.0,
+  }) {
+    double? gainDb;
+    switch (mode) {
+      case 'track':
+        gainDb = trackGainDb;
+        break;
+      case 'album':
+        gainDb = albumGainDb ?? trackGainDb;
+        break;
+      case 'auto':
+        gainDb = (albumContext && albumGainDb != null) ? albumGainDb : trackGainDb;
+        break;
+      default:
+        return 0.0;
+    }
+    final hasTag = gainDb != null && gainDb.isFinite && gainDb != 0.0;
+    if (hasTag) return preampWithRg.isFinite ? preampWithRg : 0.0;
+    return preampWithoutRg.isFinite ? preampWithoutRg : 0.0;
+  }
 }

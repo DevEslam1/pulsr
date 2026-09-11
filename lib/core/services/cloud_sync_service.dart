@@ -10,6 +10,7 @@ import '../../data/db/app_database.dart';
 import '../../domain/models/ytm_track.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../utils/error_logger.dart';
+import '../config/app_config.dart';
 import 'auth_service.dart';
 
 class SyncRecord {
@@ -124,6 +125,9 @@ class CloudSyncService {
 
   Future<bool> syncAll(
       {bool syncFavorites = true, bool syncPlaylists = true}) async {
+    // Pulsr Pure (prod offline): cloud sync is hard-off — no Firebase traffic
+    // even if prefs/account state linger from another flavor.
+    if (!AppConfig.isCloudSyncAllowed) return false;
     final user = _authService.currentUser;
     if (user == null) return false;
 
