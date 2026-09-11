@@ -88,6 +88,9 @@ mixin _$SettingsState {
   String get multiOutputMode;
   bool get dspSnapshotEnabled;
   int get silenceSkipSensitivity;
+  bool get sessionLogEnabled;
+  bool get outputFormatNegotiationEnabled;
+  bool get floatOutputEnabled;
 
   /// Create a copy of SettingsState
   /// with the given fields replaced by the non-null parameter values.
@@ -202,7 +205,10 @@ mixin _$SettingsState {
             (identical(other.duckingLevel, _this.duckingLevel) || other.duckingLevel == _this.duckingLevel) &&
             (identical(other.multiOutputMode, _this.multiOutputMode) || other.multiOutputMode == _this.multiOutputMode) &&
             (identical(other.dspSnapshotEnabled, _this.dspSnapshotEnabled) || other.dspSnapshotEnabled == _this.dspSnapshotEnabled) &&
-            (identical(other.silenceSkipSensitivity, _this.silenceSkipSensitivity) || other.silenceSkipSensitivity == _this.silenceSkipSensitivity));
+            (identical(other.silenceSkipSensitivity, _this.silenceSkipSensitivity) || other.silenceSkipSensitivity == _this.silenceSkipSensitivity) &&
+            (identical(other.sessionLogEnabled, _this.sessionLogEnabled) || other.sessionLogEnabled == _this.sessionLogEnabled) &&
+            (identical(other.outputFormatNegotiationEnabled, _this.outputFormatNegotiationEnabled) || other.outputFormatNegotiationEnabled == _this.outputFormatNegotiationEnabled) &&
+            (identical(other.floatOutputEnabled, _this.floatOutputEnabled) || other.floatOutputEnabled == _this.floatOutputEnabled));
   }
 
   @override
@@ -282,14 +288,17 @@ mixin _$SettingsState {
       _this.duckingLevel,
       _this.multiOutputMode,
       _this.dspSnapshotEnabled,
-      _this.silenceSkipSensitivity
+      _this.silenceSkipSensitivity,
+      _this.sessionLogEnabled,
+      _this.outputFormatNegotiationEnabled,
+      _this.floatOutputEnabled
     ]);
   }
 
   @override
   String toString() {
     final _this = this as SettingsState;
-    return 'SettingsState(gaplessPlayback: ${_this.gaplessPlayback}, crossfadeSeconds: ${_this.crossfadeSeconds}, minDurationSec: ${_this.minDurationSec}, autoHideSystemMedia: ${_this.autoHideSystemMedia}, themeColorSource: ${_this.themeColorSource}, resumeAfterInterruption: ${_this.resumeAfterInterruption}, waveformSeekBarEnabled: ${_this.waveformSeekBarEnabled}, themeMode: ${_this.themeMode}, languageCode: ${_this.languageCode}, customAccentColorValue: ${_this.customAccentColorValue}, playerThemeMode: ${_this.playerThemeMode}, visualizerStyle: ${_this.visualizerStyle}, miniPlayerSwipeLeft: ${_this.miniPlayerSwipeLeft}, miniPlayerSwipeRight: ${_this.miniPlayerSwipeRight}, nowPlayingDoubleTap: ${_this.nowPlayingDoubleTap}, nowPlayingArtworkSwipe: ${_this.nowPlayingArtworkSwipe}, replayGainMode: ${_this.replayGainMode}, replayGainPreampWithRg: ${_this.replayGainPreampWithRg}, replayGainPreampWithoutRg: ${_this.replayGainPreampWithoutRg}, streamingQuality: ${_this.streamingQuality}, downloadQuality: ${_this.downloadQuality}, wifiOnlyMode: ${_this.wifiOnlyMode}, offlineOnlyMode: ${_this.offlineOnlyMode}, isScanning: ${_this.isScanning}, proxyEnabled: ${_this.proxyEnabled}, proxyType: ${_this.proxyType}, proxyHost: ${_this.proxyHost}, proxyPort: ${_this.proxyPort}, proxyUsername: ${_this.proxyUsername}, hasProxyPassword: ${_this.hasProxyPassword}, proxyBypassHosts: ${_this.proxyBypassHosts}, proxyList: ${_this.proxyList}, isTestingAllProxies: ${_this.isTestingAllProxies}, extractorEngine: ${_this.extractorEngine}, ytdlpBackendEnabled: ${_this.ytdlpBackendEnabled}, ytdlpBackendUrl: ${_this.ytdlpBackendUrl}, ytdlpBackendToken: ${_this.ytdlpBackendToken}, syncCookiesToBackend: ${_this.syncCookiesToBackend}, isTestingYtdlpBackend: ${_this.isTestingYtdlpBackend}, ytdlpBackendStatusMessage: ${_this.ytdlpBackendStatusMessage}, ytdlpBackendVersion: ${_this.ytdlpBackendVersion}, ytdlpBackendProxyCount: ${_this.ytdlpBackendProxyCount}, ytdlpBackendCircuitState: ${_this.ytdlpBackendCircuitState}, bitPerfectOutput: ${_this.bitPerfectOutput}, bypassDspOnBitPerfect: ${_this.bypassDspOnBitPerfect}, currentOutputDevice: ${_this.currentOutputDevice}, scanResultCount: ${_this.scanResultCount}, errorMessage: ${_this.errorMessage}, crossfeedEnabled: ${_this.crossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, limiterEnabled: ${_this.limiterEnabled}, limiterLookaheadMs: ${_this.limiterLookaheadMs}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, reverbEnabled: ${_this.reverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, sincResamplerEnabled: ${_this.sincResamplerEnabled}, dspPreference: ${_this.dspPreference}, systemEffectsPolicy: ${_this.systemEffectsPolicy}, systemEffectsStatus: ${_this.systemEffectsStatus}, systemEffectsBundles: ${_this.systemEffectsBundles}, bluetoothLatencyOffsetMs: ${_this.bluetoothLatencyOffsetMs}, hedgedResolutionEnabled: ${_this.hedgedResolutionEnabled}, adaptiveQualityEnabled: ${_this.adaptiveQualityEnabled}, duckingMode: ${_this.duckingMode}, duckingLevel: ${_this.duckingLevel}, multiOutputMode: ${_this.multiOutputMode}, dspSnapshotEnabled: ${_this.dspSnapshotEnabled}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity})';
+    return 'SettingsState(gaplessPlayback: ${_this.gaplessPlayback}, crossfadeSeconds: ${_this.crossfadeSeconds}, minDurationSec: ${_this.minDurationSec}, autoHideSystemMedia: ${_this.autoHideSystemMedia}, themeColorSource: ${_this.themeColorSource}, resumeAfterInterruption: ${_this.resumeAfterInterruption}, waveformSeekBarEnabled: ${_this.waveformSeekBarEnabled}, themeMode: ${_this.themeMode}, languageCode: ${_this.languageCode}, customAccentColorValue: ${_this.customAccentColorValue}, playerThemeMode: ${_this.playerThemeMode}, visualizerStyle: ${_this.visualizerStyle}, miniPlayerSwipeLeft: ${_this.miniPlayerSwipeLeft}, miniPlayerSwipeRight: ${_this.miniPlayerSwipeRight}, nowPlayingDoubleTap: ${_this.nowPlayingDoubleTap}, nowPlayingArtworkSwipe: ${_this.nowPlayingArtworkSwipe}, replayGainMode: ${_this.replayGainMode}, replayGainPreampWithRg: ${_this.replayGainPreampWithRg}, replayGainPreampWithoutRg: ${_this.replayGainPreampWithoutRg}, streamingQuality: ${_this.streamingQuality}, downloadQuality: ${_this.downloadQuality}, wifiOnlyMode: ${_this.wifiOnlyMode}, offlineOnlyMode: ${_this.offlineOnlyMode}, isScanning: ${_this.isScanning}, proxyEnabled: ${_this.proxyEnabled}, proxyType: ${_this.proxyType}, proxyHost: ${_this.proxyHost}, proxyPort: ${_this.proxyPort}, proxyUsername: ${_this.proxyUsername}, hasProxyPassword: ${_this.hasProxyPassword}, proxyBypassHosts: ${_this.proxyBypassHosts}, proxyList: ${_this.proxyList}, isTestingAllProxies: ${_this.isTestingAllProxies}, extractorEngine: ${_this.extractorEngine}, ytdlpBackendEnabled: ${_this.ytdlpBackendEnabled}, ytdlpBackendUrl: ${_this.ytdlpBackendUrl}, ytdlpBackendToken: ${_this.ytdlpBackendToken}, syncCookiesToBackend: ${_this.syncCookiesToBackend}, isTestingYtdlpBackend: ${_this.isTestingYtdlpBackend}, ytdlpBackendStatusMessage: ${_this.ytdlpBackendStatusMessage}, ytdlpBackendVersion: ${_this.ytdlpBackendVersion}, ytdlpBackendProxyCount: ${_this.ytdlpBackendProxyCount}, ytdlpBackendCircuitState: ${_this.ytdlpBackendCircuitState}, bitPerfectOutput: ${_this.bitPerfectOutput}, bypassDspOnBitPerfect: ${_this.bypassDspOnBitPerfect}, currentOutputDevice: ${_this.currentOutputDevice}, scanResultCount: ${_this.scanResultCount}, errorMessage: ${_this.errorMessage}, crossfeedEnabled: ${_this.crossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, limiterEnabled: ${_this.limiterEnabled}, limiterLookaheadMs: ${_this.limiterLookaheadMs}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, reverbEnabled: ${_this.reverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, sincResamplerEnabled: ${_this.sincResamplerEnabled}, dspPreference: ${_this.dspPreference}, systemEffectsPolicy: ${_this.systemEffectsPolicy}, systemEffectsStatus: ${_this.systemEffectsStatus}, systemEffectsBundles: ${_this.systemEffectsBundles}, bluetoothLatencyOffsetMs: ${_this.bluetoothLatencyOffsetMs}, hedgedResolutionEnabled: ${_this.hedgedResolutionEnabled}, adaptiveQualityEnabled: ${_this.adaptiveQualityEnabled}, duckingMode: ${_this.duckingMode}, duckingLevel: ${_this.duckingLevel}, multiOutputMode: ${_this.multiOutputMode}, dspSnapshotEnabled: ${_this.dspSnapshotEnabled}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, sessionLogEnabled: ${_this.sessionLogEnabled}, outputFormatNegotiationEnabled: ${_this.outputFormatNegotiationEnabled}, floatOutputEnabled: ${_this.floatOutputEnabled})';
   }
 }
 
@@ -372,7 +381,10 @@ abstract mixin class $SettingsStateCopyWith<$Res> {
       double duckingLevel,
       String multiOutputMode,
       bool dspSnapshotEnabled,
-      int silenceSkipSensitivity});
+      int silenceSkipSensitivity,
+      bool sessionLogEnabled,
+      bool outputFormatNegotiationEnabled,
+      bool floatOutputEnabled});
 }
 
 /// @nodoc
@@ -461,6 +473,9 @@ class _$SettingsStateCopyWithImpl<$Res>
     Object? multiOutputMode = null,
     Object? dspSnapshotEnabled = null,
     Object? silenceSkipSensitivity = null,
+    Object? sessionLogEnabled = null,
+    Object? outputFormatNegotiationEnabled = null,
+    Object? floatOutputEnabled = null,
   }) {
     return _then(SettingsState(
       gaplessPlayback: null == gaplessPlayback
@@ -755,6 +770,18 @@ class _$SettingsStateCopyWithImpl<$Res>
           ? _self.silenceSkipSensitivity
           : silenceSkipSensitivity // ignore: cast_nullable_to_non_nullable
               as int,
+      sessionLogEnabled: null == sessionLogEnabled
+          ? _self.sessionLogEnabled
+          : sessionLogEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      outputFormatNegotiationEnabled: null == outputFormatNegotiationEnabled
+          ? _self.outputFormatNegotiationEnabled
+          : outputFormatNegotiationEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      floatOutputEnabled: null == floatOutputEnabled
+          ? _self.floatOutputEnabled
+          : floatOutputEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
     ));
   }
 }
@@ -925,7 +952,10 @@ extension SettingsStatePatterns on SettingsState {
             double duckingLevel,
             String multiOutputMode,
             bool dspSnapshotEnabled,
-            int silenceSkipSensitivity)?
+            int silenceSkipSensitivity,
+            bool sessionLogEnabled,
+            bool outputFormatNegotiationEnabled,
+            bool floatOutputEnabled)?
         $default, {
     required TResult orElse(),
   }) {
@@ -1005,7 +1035,10 @@ extension SettingsStatePatterns on SettingsState {
             _that.duckingLevel,
             _that.multiOutputMode,
             _that.dspSnapshotEnabled,
-            _that.silenceSkipSensitivity);
+            _that.silenceSkipSensitivity,
+            _that.sessionLogEnabled,
+            _that.outputFormatNegotiationEnabled,
+            _that.floatOutputEnabled);
       case _:
         return orElse();
     }
@@ -1099,7 +1132,10 @@ extension SettingsStatePatterns on SettingsState {
             double duckingLevel,
             String multiOutputMode,
             bool dspSnapshotEnabled,
-            int silenceSkipSensitivity)
+            int silenceSkipSensitivity,
+            bool sessionLogEnabled,
+            bool outputFormatNegotiationEnabled,
+            bool floatOutputEnabled)
         $default,
   ) {
     final _that = this;
@@ -1178,7 +1214,10 @@ extension SettingsStatePatterns on SettingsState {
             _that.duckingLevel,
             _that.multiOutputMode,
             _that.dspSnapshotEnabled,
-            _that.silenceSkipSensitivity);
+            _that.silenceSkipSensitivity,
+            _that.sessionLogEnabled,
+            _that.outputFormatNegotiationEnabled,
+            _that.floatOutputEnabled);
       case _:
         throw StateError('Unexpected subclass');
     }
@@ -1271,7 +1310,10 @@ extension SettingsStatePatterns on SettingsState {
             double duckingLevel,
             String multiOutputMode,
             bool dspSnapshotEnabled,
-            int silenceSkipSensitivity)?
+            int silenceSkipSensitivity,
+            bool sessionLogEnabled,
+            bool outputFormatNegotiationEnabled,
+            bool floatOutputEnabled)?
         $default,
   ) {
     final _that = this;
@@ -1350,7 +1392,10 @@ extension SettingsStatePatterns on SettingsState {
             _that.duckingLevel,
             _that.multiOutputMode,
             _that.dspSnapshotEnabled,
-            _that.silenceSkipSensitivity);
+            _that.silenceSkipSensitivity,
+            _that.sessionLogEnabled,
+            _that.outputFormatNegotiationEnabled,
+            _that.floatOutputEnabled);
       case _:
         return null;
     }
@@ -1419,7 +1464,7 @@ class _SettingsState extends SettingsState {
       this.limiterReleaseMs = 50.0,
       this.reverbEnabled = false,
       this.reverbPreset = 0,
-      this.reverbWetDry = 0.2,
+      this.reverbWetDry = 0.20,
       this.stereoBalance = 0.0,
       this.monoMix = false,
       this.sincResamplerEnabled = true,
@@ -1434,7 +1479,10 @@ class _SettingsState extends SettingsState {
       this.duckingLevel = 0.3,
       this.multiOutputMode = 'systemDefault',
       this.dspSnapshotEnabled = true,
-      this.silenceSkipSensitivity = 0})
+      this.silenceSkipSensitivity = 0,
+      this.sessionLogEnabled = true,
+      this.outputFormatNegotiationEnabled = false,
+      this.floatOutputEnabled = false})
       : _proxyList = proxyList,
         _systemEffectsBundles = systemEffectsBundles,
         super._();
@@ -1664,6 +1712,15 @@ class _SettingsState extends SettingsState {
   @override
   @JsonKey()
   final int silenceSkipSensitivity;
+  @override
+  @JsonKey()
+  final bool sessionLogEnabled;
+  @override
+  @JsonKey()
+  final bool outputFormatNegotiationEnabled;
+  @override
+  @JsonKey()
+  final bool floatOutputEnabled;
 
   /// Create a copy of SettingsState
   /// with the given fields replaced by the non-null parameter values.
@@ -1782,7 +1839,10 @@ class _SettingsState extends SettingsState {
             (identical(other.duckingLevel, duckingLevel) || other.duckingLevel == duckingLevel) &&
             (identical(other.multiOutputMode, multiOutputMode) || other.multiOutputMode == multiOutputMode) &&
             (identical(other.dspSnapshotEnabled, dspSnapshotEnabled) || other.dspSnapshotEnabled == dspSnapshotEnabled) &&
-            (identical(other.silenceSkipSensitivity, silenceSkipSensitivity) || other.silenceSkipSensitivity == silenceSkipSensitivity));
+            (identical(other.silenceSkipSensitivity, silenceSkipSensitivity) || other.silenceSkipSensitivity == silenceSkipSensitivity) &&
+            (identical(other.sessionLogEnabled, sessionLogEnabled) || other.sessionLogEnabled == sessionLogEnabled) &&
+            (identical(other.outputFormatNegotiationEnabled, outputFormatNegotiationEnabled) || other.outputFormatNegotiationEnabled == outputFormatNegotiationEnabled) &&
+            (identical(other.floatOutputEnabled, floatOutputEnabled) || other.floatOutputEnabled == floatOutputEnabled));
   }
 
   @override
@@ -1861,13 +1921,16 @@ class _SettingsState extends SettingsState {
       duckingLevel,
       multiOutputMode,
       dspSnapshotEnabled,
-      silenceSkipSensitivity
+      silenceSkipSensitivity,
+      sessionLogEnabled,
+      outputFormatNegotiationEnabled,
+      floatOutputEnabled
     ]);
   }
 
   @override
   String toString() {
-    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, hasProxyPassword: $hasProxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, syncCookiesToBackend: $syncCookiesToBackend, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, ytdlpBackendVersion: $ytdlpBackendVersion, ytdlpBackendProxyCount: $ytdlpBackendProxyCount, ytdlpBackendCircuitState: $ytdlpBackendCircuitState, bitPerfectOutput: $bitPerfectOutput, bypassDspOnBitPerfect: $bypassDspOnBitPerfect, currentOutputDevice: $currentOutputDevice, scanResultCount: $scanResultCount, errorMessage: $errorMessage, crossfeedEnabled: $crossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, limiterEnabled: $limiterEnabled, limiterLookaheadMs: $limiterLookaheadMs, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, reverbEnabled: $reverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, sincResamplerEnabled: $sincResamplerEnabled, dspPreference: $dspPreference, systemEffectsPolicy: $systemEffectsPolicy, systemEffectsStatus: $systemEffectsStatus, systemEffectsBundles: $systemEffectsBundles, bluetoothLatencyOffsetMs: $bluetoothLatencyOffsetMs, hedgedResolutionEnabled: $hedgedResolutionEnabled, adaptiveQualityEnabled: $adaptiveQualityEnabled, duckingMode: $duckingMode, duckingLevel: $duckingLevel, multiOutputMode: $multiOutputMode, dspSnapshotEnabled: $dspSnapshotEnabled, silenceSkipSensitivity: $silenceSkipSensitivity)';
+    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, hasProxyPassword: $hasProxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, syncCookiesToBackend: $syncCookiesToBackend, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, ytdlpBackendVersion: $ytdlpBackendVersion, ytdlpBackendProxyCount: $ytdlpBackendProxyCount, ytdlpBackendCircuitState: $ytdlpBackendCircuitState, bitPerfectOutput: $bitPerfectOutput, bypassDspOnBitPerfect: $bypassDspOnBitPerfect, currentOutputDevice: $currentOutputDevice, scanResultCount: $scanResultCount, errorMessage: $errorMessage, crossfeedEnabled: $crossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, limiterEnabled: $limiterEnabled, limiterLookaheadMs: $limiterLookaheadMs, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, reverbEnabled: $reverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, sincResamplerEnabled: $sincResamplerEnabled, dspPreference: $dspPreference, systemEffectsPolicy: $systemEffectsPolicy, systemEffectsStatus: $systemEffectsStatus, systemEffectsBundles: $systemEffectsBundles, bluetoothLatencyOffsetMs: $bluetoothLatencyOffsetMs, hedgedResolutionEnabled: $hedgedResolutionEnabled, adaptiveQualityEnabled: $adaptiveQualityEnabled, duckingMode: $duckingMode, duckingLevel: $duckingLevel, multiOutputMode: $multiOutputMode, dspSnapshotEnabled: $dspSnapshotEnabled, silenceSkipSensitivity: $silenceSkipSensitivity, sessionLogEnabled: $sessionLogEnabled, outputFormatNegotiationEnabled: $outputFormatNegotiationEnabled, floatOutputEnabled: $floatOutputEnabled)';
   }
 }
 
@@ -1952,7 +2015,10 @@ abstract mixin class _$SettingsStateCopyWith<$Res>
       double duckingLevel,
       String multiOutputMode,
       bool dspSnapshotEnabled,
-      int silenceSkipSensitivity});
+      int silenceSkipSensitivity,
+      bool sessionLogEnabled,
+      bool outputFormatNegotiationEnabled,
+      bool floatOutputEnabled});
 }
 
 /// @nodoc
@@ -2041,6 +2107,9 @@ class __$SettingsStateCopyWithImpl<$Res>
     Object? multiOutputMode = null,
     Object? dspSnapshotEnabled = null,
     Object? silenceSkipSensitivity = null,
+    Object? sessionLogEnabled = null,
+    Object? outputFormatNegotiationEnabled = null,
+    Object? floatOutputEnabled = null,
   }) {
     return _then(_SettingsState(
       gaplessPlayback: null == gaplessPlayback
@@ -2335,6 +2404,18 @@ class __$SettingsStateCopyWithImpl<$Res>
           ? _self.silenceSkipSensitivity
           : silenceSkipSensitivity // ignore: cast_nullable_to_non_nullable
               as int,
+      sessionLogEnabled: null == sessionLogEnabled
+          ? _self.sessionLogEnabled
+          : sessionLogEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      outputFormatNegotiationEnabled: null == outputFormatNegotiationEnabled
+          ? _self.outputFormatNegotiationEnabled
+          : outputFormatNegotiationEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      floatOutputEnabled: null == floatOutputEnabled
+          ? _self.floatOutputEnabled
+          : floatOutputEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
     ));
   }
 }

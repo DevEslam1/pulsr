@@ -113,6 +113,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     // Pulsr fork: per-player DSP processor handle for the sample-accurate
     // gain-ramp API (dspSetGainCurve / dspClearGainCurve).
     private NativeDspAudioProcessor dspAudioProcessor;
+    // Pulsr fork: opt-in 24/32-bit float output path. Off by default so the
+    // audio sink is built exactly as before (16-bit) unless Dart enables it.
+    private boolean floatOutputEnabled = false;
     private Integer errorCode;
     private String errorMessage;
     private Integer currentIndex;
@@ -444,6 +447,17 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
 
     @Override
     public void onMethodCall(final MethodCall call, final Result result) {
+        // Pulsr fork: the float-output preference must reach the player BEFORE
+        // the sink is built, so handle it without forcing initialization. Once
+        // the player exists this only updates the stored flag; an already
+        // configured sink keeps its encodings until it is rebuilt.
+        if ("dspSetFloatOutput".equals(call.method)) {
+            Boolean requested = call.argument("enabled");
+            boolean enabled = requested != null && requested;
+            result.success(applyFloatOutput(enabled));
+            return;
+        }
+
         ensurePlayerInitialized();
 
         try {
@@ -824,12 +838,30 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         player.prepare();
     }
 
+    /**
+     * Pulsr fork: stores the 24/32-bit float-output preference and applies it
+     * to the DSP processor when one already exists. Returns true when the
+     * request was honoured exactly, false when the platform forced a safe
+     * degradation to the existing 16-bit path.
+     */
+    private boolean applyFloatOutput(boolean enabled) {
+        boolean supported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP;
+        boolean effective = enabled && supported;
+        floatOutputEnabled = effective;
+        if (dspAudioProcessor != null) {
+            dspAudioProcessor.setFloatOutput(effective);
+        }
+        return effective == enabled;
+    }
+
     private void ensurePlayerInitialized() {
         if (player == null) {
             // Pulsr fork: the audio sink carries NativeDspAudioProcessor so the
             // native DSP chain sees the decoded PCM stream. The instance is
             // kept around so the gain-ramp method-channel API can reach it.
             NativeDspAudioProcessor dspProcessor = new NativeDspAudioProcessor();
+            // Apply the opt-in float preference before the sink is configured.
+            dspProcessor.setFloatOutput(floatOutputEnabled);
             dspAudioProcessor = dspProcessor;
             DefaultRenderersFactory renderersFactoryImpl = new DefaultRenderersFactory(context) {
                 @Override
@@ -842,6 +874,11 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                         .build();
                 }
             };
+            // DefaultRenderersFactory forwards this into buildAudioSink(). Enabling
+            // it is what lets the sink negotiate/emit float PCM; leaving it false
+            // keeps the historical 16-bit-only sink.
+            renderersFactoryImpl.setEnableAudioFloatOutput(
+                floatOutputEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP);
             RenderersFactory renderersFactory = (eventHandler, videoListener, audioListener, textOutput, metadataOutput) -> {
                 Renderer[] defaultRenderers = renderersFactoryImpl
                     .createRenderers(eventHandler, videoListener, audioListener, textOutput, metadataOutput);

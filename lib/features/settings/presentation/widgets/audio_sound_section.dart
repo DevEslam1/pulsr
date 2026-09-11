@@ -1,8 +1,10 @@
 // lib/features/settings/presentation/widgets/audio_sound_section.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/constants/app_radii.dart';
+import '../../../../core/telemetry/audio_session_log.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/db/app_database.dart';
@@ -46,6 +48,11 @@ class AudioSoundSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final cubit = context.read<SettingsCubit>();
+    // Native DSP / HAL / Hi-Res output are Android-only. On other platforms the
+    // channel truthfully reports "not applied"; disable the controls here instead
+    // of letting them silently no-op and leave the UI looking enabled.
+    final isAndroid = PlatformCapabilities.isAndroid;
+    const unsupported = 'Not available on this platform';
     return SettingsSection(
       icon: Icons.graphic_eq_rounded,
       title: context.l10n.audioAndSound,
@@ -69,13 +76,18 @@ class AudioSoundSection extends StatelessWidget {
         SettingsNavTile(
           Icons.settings_input_composite_rounded,
           context.l10n.dspEnginePreference,
-          switch (state.dspPreference) {
-            'oem' => context.l10n.dspEngineOem,
-            'auto' => context.l10n.dspEngineAuto,
-            _ => context.l10n.dspEngineNative,
-          },
-          onTap: () => _showDspPreferencePickerSheet(
-              context, cubit, state.dspPreference),
+          isAndroid
+              ? switch (state.dspPreference) {
+                  'oem' => context.l10n.dspEngineOem,
+                  'auto' => context.l10n.dspEngineAuto,
+                  _ => context.l10n.dspEngineNative,
+                }
+              : unsupported,
+          disabledReason: isAndroid ? null : unsupported,
+          onTap: isAndroid
+              ? () => _showDspPreferencePickerSheet(
+                  context, cubit, state.dspPreference)
+              : null,
         ),
         settingsCardDivider(p),
         // Audiophile & Hi-Res Output Card & Controls
@@ -187,21 +199,25 @@ class AudioSoundSection extends StatelessWidget {
           ),
         ),
         Builder(builder: (ctx) {
-          final bpBlock =
-              AudioConflicts.bitPerfectBlockedReason(state.currentOutputDevice);
+          final bpBlock = !isAndroid
+              ? unsupported
+              : AudioConflicts.bitPerfectBlockedReason(
+                  state.currentOutputDevice);
           return Column(
             children: [
               // Hardware/OS-level blockers (Bluetooth, Android version) cannot
               // be resolved in-app → explanatory card without a resolve action.
-              if (bpBlock != null)
+              if (bpBlock != null && isAndroid)
                 SettingsConflictCard(reason: bpBlock),
               SettingsSwitchTile(
                 Icons.album_rounded,
                 'Bit-Perfect USB Pass-Through',
-                state.currentOutputDevice?.isBluetooth == true
-                    ? 'Unavailable: Bluetooth transcodes — use USB / wired DAC'
-                    : 'Direct hardware streaming to USB / wired DACs (bypasses Android resampler)',
-                value: state.bitPerfectOutput,
+                !isAndroid
+                    ? unsupported
+                    : state.currentOutputDevice?.isBluetooth == true
+                        ? 'Unavailable: Bluetooth transcodes — use USB / wired DAC'
+                        : 'Direct hardware streaming to USB / wired DACs (bypasses Android resampler)',
+                value: isAndroid && state.bitPerfectOutput,
                 featureInfo: AudioFeatureRegistry.bitPerfect,
                 disabledReason: bpBlock,
                 onChanged:
@@ -215,12 +231,15 @@ class AudioSoundSection extends StatelessWidget {
           Icons.tune_rounded,
           'Bypass DSP in Bit-Perfect Mode',
           'Bypasses Equalizer and virtualizer for an uncolored, pure audio bitstream to the DAC',
-          value: state.bitPerfectOutput && state.bypassDspOnBitPerfect,
+          value:
+              isAndroid && state.bitPerfectOutput && state.bypassDspOnBitPerfect,
           featureInfo: AudioFeatureRegistry.bypassDsp,
-          disabledReason: !state.bitPerfectOutput
-              ? 'Enable Bit-Perfect USB Pass-Through first'
-              : null,
-          onChanged: !state.bitPerfectOutput
+          disabledReason: !isAndroid
+              ? unsupported
+              : !state.bitPerfectOutput
+                  ? 'Enable Bit-Perfect USB Pass-Through first'
+                  : null,
+          onChanged: !isAndroid || !state.bitPerfectOutput
               ? (v) {}
               : cubit.setBypassDspOnBitPerfect,
         ),
@@ -274,7 +293,7 @@ class AudioSoundSection extends StatelessWidget {
                           ),
                           Text(
                             rgBlocked ??
-                                'EBU R128 automatic volume leveling across diverse track masters',
+                                'Track / album gain from tags, applied during playback',
                             style: TextStyle(
                               color: rgBlocked != null ? p.error : p.textSecondary,
                               fontSize: 12,
@@ -485,31 +504,39 @@ class AudioSoundSection extends StatelessWidget {
           padding: const EdgeInsets.only(top: 4),
           child: ListTile(
             contentPadding: EdgeInsets.zero,
+            enabled: isAndroid,
             leading: const Icon(Icons.graphic_eq_rounded),
             title: Text(context.l10n.rcTitle,
                 style: Theme.of(context).textTheme.bodyLarge),
-            subtitle: Text(context.l10n.rcSubtitle,
+            subtitle: Text(
+                isAndroid ? context.l10n.rcSubtitle : unsupported,
                 style: Theme.of(context).textTheme.bodySmall),
-            onTap: () => showModalBottomSheet<void>(
-              context: context,
-              useRootNavigator: true,
-              isScrollControlled: true,
-              backgroundColor: Colors.transparent,
-              builder: (_) => const RoomCorrectionSheet(),
-            ),
+            onTap: isAndroid
+                ? () => showModalBottomSheet<void>(
+                      context: context,
+                      useRootNavigator: true,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => const RoomCorrectionSheet(),
+                    )
+                : null,
           ),
         ),
         Padding(
           padding: const EdgeInsets.only(top: 4),
           child: ListTile(
             contentPadding: EdgeInsets.zero,
+            enabled: isAndroid,
             leading: const Icon(Icons.sensors_rounded),
             title: const Text('DSP Signal Inspector & Debug',
                 style: TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: Text('Inspect live active DSP stages, HAL effects & engine state',
+            subtitle: Text(
+                isAndroid
+                    ? 'Inspect live active DSP stages, HAL effects & engine state'
+                    : unsupported,
                 style: TextStyle(color: p.textSecondary, fontSize: 12)),
             trailing: Icon(Icons.chevron_right_rounded, color: p.textSecondary),
-            onTap: () => DspInspectorSheet.show(context),
+            onTap: isAndroid ? () => DspInspectorSheet.show(context) : null,
           ),
         ),
         settingsCardDivider(p),
@@ -537,12 +564,16 @@ class AudioSoundSection extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                switch (state.systemEffectsStatus) {
-                  'bypassed' => context.l10n.systemEffectsSubtitleBypassed,
-                  'active' => context.l10n.systemEffectsSubtitleActive,
-                  'unsupportedDevice' => context.l10n.systemEffectsSubtitleUnsupported,
-                  _ => 'Status: ${state.systemEffectsStatus}',
-                },
+                !isAndroid
+                    ? unsupported
+                    : switch (state.systemEffectsStatus) {
+                        'bypassed' =>
+                          context.l10n.systemEffectsSubtitleBypassed,
+                        'active' => context.l10n.systemEffectsSubtitleActive,
+                        'unsupportedDevice' =>
+                          context.l10n.systemEffectsSubtitleUnsupported,
+                        _ => 'Status: ${state.systemEffectsStatus}',
+                      },
                 style: TextStyle(
                   color: state.systemEffectsStatus == 'bypassed'
                       ? Colors.greenAccent
@@ -576,11 +607,13 @@ class AudioSoundSection extends StatelessWidget {
                     ),
                   ],
                   selected: {state.systemEffectsPolicy},
-                  onSelectionChanged: (selected) {
-                    if (selected.isNotEmpty) {
-                      cubit.setSystemEffectsPolicy(selected.first);
-                    }
-                  },
+                  onSelectionChanged: isAndroid
+                      ? (selected) {
+                          if (selected.isNotEmpty) {
+                            cubit.setSystemEffectsPolicy(selected.first);
+                          }
+                        }
+                      : null,
                 ),
               ),
             ],
@@ -611,13 +644,17 @@ class AudioSoundSection extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                context.l10n.bluetoothLatencySubtitle(state.bluetoothLatencyOffsetMs),
+                isAndroid
+                    ? context.l10n
+                        .bluetoothLatencySubtitle(state.bluetoothLatencyOffsetMs)
+                    : unsupported,
                 style: TextStyle(color: p.textSecondary, fontSize: 12),
               ),
               const SizedBox(height: 6),
               SettingSliderRow(
                 label: 'Sync Offset',
                 value: state.bluetoothLatencyOffsetMs.toDouble(),
+                enabled: isAndroid,
                 min: 0.0,
                 max: 400.0,
                 divisions: 20,
@@ -628,9 +665,79 @@ class AudioSoundSection extends StatelessWidget {
             ],
           ),
         ),
+        settingsCardDivider(p),
+        // Opt-in per-track output-format negotiation. Off by default: the output
+        // format stays the manual, device-global setting. When on, each track
+        // requests its native rate/depth, capped by the active route's device.
+        SettingsSwitchTile(
+          Icons.sync_alt_rounded,
+          'Per-Track Output Format Negotiation',
+          'Requests each track\'s native sample rate / bit depth from the '
+              'output device (device-capped). Bit-Perfect keeps its exclusive '
+              'format. Off: the manual output format is used as-is',
+          value: isAndroid && state.outputFormatNegotiationEnabled,
+          disabledReason: isAndroid ? null : unsupported,
+          onChanged: !isAndroid
+              ? (v) {}
+              : cubit.setOutputFormatNegotiationEnabled,
+        ),
+        settingsCardDivider(p),
+        // Opt-in 24/32-bit float DSP path. Off by default: the native DSP chain
+        // stays on the historical 16-bit sink path, byte-identical to today.
+        SettingsSwitchTile(
+          Icons.graphic_eq_rounded,
+          '24/32-bit Float DSP Path',
+          'Feeds the native DSP chain float32 samples and keeps the higher bit '
+              'depth on output (24/32-bit float DSP path; off = 16-bit). '
+              'Unsupported devices safely fall back to 16-bit',
+          value: isAndroid && state.floatOutputEnabled,
+          disabledReason: isAndroid ? null : unsupported,
+          onChanged:
+              !isAndroid ? (v) {} : cubit.setFloatOutputEnabled,
+        ),
+        settingsCardDivider(p),
+        // Per-session audio diagnostics (pure Dart; works on every platform).
+        SettingsSwitchTile(
+          Icons.monitor_heart_rounded,
+          'Session Audio Diagnostics',
+          'Records one log per track: route type, Bluetooth codec, negotiated '
+              'sample rate / bit depth, interruptions and dropout counts',
+          value: state.sessionLogEnabled,
+          onChanged: cubit.setSessionLogEnabled,
+        ),
+        SettingsNavTile(
+          Icons.ios_share_rounded,
+          'Export audio session logs',
+          'Share the on-device JSONL log of your recent playback sessions',
+          trailing: Icon(Icons.chevron_right_rounded, color: p.textSecondary),
+          onTap: () => _exportSessionLogs(context),
+        ),
         const BatteryOptimizationCard(),
       ],
     );
+  }
+
+  /// Exports the per-session audio telemetry JSONL and hands it to the OS share
+  /// sheet. Best-effort: a missing/failed export surfaces a message, never a throw.
+  Future<void> _exportSessionLogs(BuildContext context) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    try {
+      final file = await AudioSessionLog.instance.exportToFile();
+      if (file == null || await file.length() == 0) {
+        messenger?.showSnackBar(const SnackBar(
+          content: Text('No audio session logs recorded yet'),
+        ));
+        return;
+      }
+      await SharePlus.instance.share(ShareParams(
+        files: [XFile(file.path, mimeType: 'application/x-ndjson')],
+        text: 'Pulsr audio session logs',
+      ));
+    } catch (e) {
+      messenger?.showSnackBar(
+        SnackBar(content: Text('Export failed: ${e.toString()}')),
+      );
+    }
   }
 
   void _showDspPreferencePickerSheet(

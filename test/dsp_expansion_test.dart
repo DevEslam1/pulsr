@@ -217,6 +217,44 @@ void main() {
       restored.dispose();
     });
 
+    test('compressor ratio/attack/make-up persist and restore', () async {
+      final manager = EqualizerManager();
+      await manager.setCompressorParams(
+        thresholdDb: -3.0,
+        ratio: 8.0,
+        attackMs: 25.0,
+        releaseMs: 120.0,
+        makeupGainDb: 4.0,
+      );
+      await manager.onAppPaused();
+      manager.dispose();
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getDouble('setting_compressor_ratio'), 8.0);
+      expect(prefs.getDouble('setting_compressor_attack_ms'), 25.0);
+      expect(prefs.getDouble('setting_compressor_makeup_gain_db'), 4.0);
+
+      final restored = EqualizerManager();
+      await restored.init();
+      expect(restored.compressorRatio, 8.0);
+      expect(restored.compressorAttackMs, 25.0);
+      expect(restored.compressorMakeupGainDb, 4.0);
+      restored.dispose();
+    });
+
+    test('compressor keys stay unwritten until the user edits them', () async {
+      // A fresh install must not persist compressor defaults, otherwise the
+      // HAL limiter would silently switch from brickwall to 3:1 compression.
+      final manager = EqualizerManager();
+      await manager.onAppPaused();
+      manager.dispose();
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.containsKey('setting_compressor_ratio'), isFalse);
+      expect(prefs.containsKey('setting_compressor_attack_ms'), isFalse);
+      expect(prefs.containsKey('setting_compressor_makeup_gain_db'), isFalse);
+    });
+
     test('missing keys fall back to neutral defaults for all 5 stages',
         () async {
       SharedPreferences.setMockInitialValues({});

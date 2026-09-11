@@ -1,5 +1,6 @@
 package com.ryanheise.just_audio;
 
+import android.os.Build;
 import android.util.Log;
 import androidx.media3.common.C;
 import androidx.media3.common.audio.AudioProcessor;
@@ -11,9 +12,18 @@ import java.nio.FloatBuffer;
 /**
  * Feeds ExoPlayer's PCM stream through Pulsr's native DSP chain (libpulsr_dsp).
  *
- * The library only ever sees 16-bit PCM here: DefaultAudioSink inserts
- * ToInt16PcmAudioProcessor ahead of the chain whenever float output is off,
- * which is always the case for this player.
+ * <p>Default (16-bit) mode: DefaultAudioSink inserts ToInt16PcmAudioProcessor
+ * ahead of the chain, so this processor reads {@code ENCODING_PCM_16BIT},
+ * expands it to float for the native engine and re-quantises the result back to
+ * 16-bit — exactly the historical behaviour.
+ *
+ * <p>Float mode (opt-in, off by default): when {@link #setFloatOutput(boolean)}
+ * is enabled and the sink offers {@code ENCODING_PCM_FLOAT}, the decoded float
+ * samples go straight to the native engine (it already processes arbitrary
+ * float blocks) and are emitted as float again, avoiding the per-sample 16-bit
+ * re-quantisation at the end of the chain. If the sink still delivers 16-bit,
+ * the processor transparently keeps the 16-bit behaviour so playback is never
+ * interrupted.
  */
 public class NativeDspAudioProcessor extends BaseAudioProcessor {
     private static final String TAG = "NativeDspAudioProcessor";
@@ -38,6 +48,27 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
             long engineHandle, double sampleRate, int channels);
 
     private long nativeEngineHandle = 0;
+
+    // Pulsr fork: opt-in 24/32-bit float path. Off by default so the sink
+    // pipeline (and therefore the audible result) is byte-identical to the
+    // historical 16-bit-only behaviour unless the user enables it.
+    private volatile boolean floatOutputEnabled = false;
+
+    /**
+     * Enables/disables the float32 DSP path. Safe to call before or after the
+     * sink is configured; a change after configuration only takes effect when
+     * the sink is rebuilt (the media3 pipeline fixes its encodings at
+     * configure time).
+     */
+    public void setFloatOutput(boolean enabled) {
+        // Float AudioTrack output exists from API 21; minSdk is well above it,
+        // but degrading to 16-bit is cheaper than risking a silent sink.
+        this.floatOutputEnabled = enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP;
+    }
+
+    public boolean isFloatOutputEnabled() {
+        return floatOutputEnabled;
+    }
 
     public NativeDspAudioProcessor() {
         if (NATIVE_AVAILABLE) {
@@ -135,10 +166,20 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
 
     @Override
     protected AudioFormat onConfigure(AudioFormat inputAudioFormat) {
-        if (!NATIVE_AVAILABLE || inputAudioFormat.encoding != C.ENCODING_PCM_16BIT) {
+        if (!NATIVE_AVAILABLE) {
             return AudioFormat.NOT_SET;
         }
-        return inputAudioFormat;
+        // 16-bit is the historical path and stays accepted unconditionally.
+        if (inputAudioFormat.encoding == C.ENCODING_PCM_16BIT) {
+            return inputAudioFormat;
+        }
+        // Float is only accepted when the opt-in float path is enabled; when it
+        // is off this returns NOT_SET exactly as before, so ExoPlayer inserts
+        // ToInt16PcmAudioProcessor ahead of the chain.
+        if (floatOutputEnabled && inputAudioFormat.encoding == C.ENCODING_PCM_FLOAT) {
+            return inputAudioFormat;
+        }
+        return AudioFormat.NOT_SET;
     }
 
     @Override
@@ -151,11 +192,18 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
             return;
         }
 
-        int channelCount = inputAudioFormat.channelCount;
+        final int channelCount = inputAudioFormat.channelCount;
+        final boolean inputIsFloat = inputAudioFormat.encoding == C.ENCODING_PCM_FLOAT;
         FloatBuffer floats = ensureScratch(frameCount * channelCount);
 
-        for (int i = 0; i < frameCount * channelCount; i++) {
-            floats.put(i, inputBuffer.getShort(position + i * 2) / 32768f);
+        if (inputIsFloat) {
+            for (int i = 0; i < frameCount * channelCount; i++) {
+                floats.put(i, inputBuffer.getFloat(position + i * 4));
+            }
+        } else {
+            for (int i = 0; i < frameCount * channelCount; i++) {
+                floats.put(i, inputBuffer.getShort(position + i * 2) / 32768f);
+            }
         }
 
         int processed = frameCount;
@@ -197,6 +245,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         }
 
         final int lastIdx = curve == null ? 0 : curve.length - 1;
+        final boolean outputIsFloat = outputAudioFormat.encoding == C.ENCODING_PCM_FLOAT;
         ByteBuffer output = replaceOutputBuffer(processed * outputAudioFormat.bytesPerFrame);
         for (int i = 0; i < processed * channelCount; i++) {
             float gain = idleGain;
@@ -213,9 +262,14 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
                 }
             }
             float value = floats.get(i) * gain;
-            float scaled = value * (value < 0.0f ? 32768f : 32767f);
-            int sample = Math.round(scaled);
-            output.putShort((short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, sample)));
+            if (outputIsFloat) {
+                // Emit straight float32: no 16-bit re-quantisation after DSP.
+                output.putFloat(value);
+            } else {
+                float scaled = value * (value < 0.0f ? 32768f : 32767f);
+                int sample = Math.round(scaled);
+                output.putShort((short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, sample)));
+            }
         }
         inputBuffer.position(limit);
         output.flip();

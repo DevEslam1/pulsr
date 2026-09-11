@@ -54,6 +54,9 @@ jobs:
           cd android && ./gradlew :app:processProdReleaseMainManifest && cd ..
           python3 scripts/check_prod_flavor.py
 
+      - name: Run Audio DSP & Bluetooth Suites
+        run: bash scripts/run_audio_suites.sh
+
       - name: Run Tests with Coverage
         run: flutter test --coverage
 

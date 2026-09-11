@@ -1,6 +1,8 @@
 // lib/data/audio/equalizer_manager.dart
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/prefs_keys.dart';
@@ -12,6 +14,7 @@ import '../../domain/models/headphone_profile.dart';
 import '../../domain/models/reverb_preset.dart';
 import 'audio_effects_channel.dart';
 import 'headphone_profiles_repository.dart';
+import 'ir_file_parser.dart';
 import 'optimized_dsp_pipeline.dart';
 
 enum ComparisonSlot { slotA, slotB, slotC, slotD }
@@ -39,6 +42,37 @@ class EqualizerManager {
   final _effectsLock =
       _AsyncLock(); // Serializes concurrent effect state changes
 
+  /// Per-effect truthful status: a key is present only while the most recent
+  /// native apply attempt was rejected (unsupported capability, build failure,
+  /// or no attached session). The UI reads this so an ON control cannot
+  /// silently mean "no audible effect". Updated without persisting or logging
+  /// on every failure — only on a status transition.
+  final ValueNotifier<Map<String, String>> effectStatusNotifier =
+      ValueNotifier<Map<String, String>>(const {});
+
+  /// True when the last apply attempt for [effectKey] was rejected by native.
+  bool effectUnavailable(String effectKey) =>
+      effectStatusNotifier.value.containsKey(effectKey);
+
+  void _recordEffectOutcome(String effectKey, bool applied) {
+    final current = effectStatusNotifier.value;
+    if (applied) {
+      if (current.containsKey(effectKey)) {
+        final next = Map<String, String>.from(current)..remove(effectKey);
+        effectStatusNotifier.value = Map.unmodifiable(next);
+      }
+      return;
+    }
+    if (current.containsKey(effectKey)) return; // already known; no log spam
+    final next = Map<String, String>.from(current)..[effectKey] = 'notApplied';
+    effectStatusNotifier.value = Map.unmodifiable(next);
+    ErrorLogger.log(
+      'Effect "$effectKey" reported it could not be applied by the audio engine '
+      '(unsupported, build failure, or unavailable session)',
+      category: 'EqualizerManager',
+    );
+  }
+
   EqPreset currentPreset = EqPreset.defaultPresets.first;
   bool isEnabled = false;
   bool is32BandMode = false;
@@ -52,6 +86,12 @@ class EqualizerManager {
   DynamicsPreset dynamicsPreset = DynamicsPreset.off;
   bool _isDynamicsBypassed = false;
   bool get isDynamicsBypassed => _isDynamicsBypassed;
+
+  /// Effective dynamics state the UI must mirror: the stage is only audible
+  /// when it is both enabled and not bypassed. Exposing the conjunction keeps
+  /// the toggle from showing ON while the native stage is muted.
+  bool get isDynamicsEffectivelyEnabled =>
+      isDynamicsEnabled && !_isDynamicsBypassed;
 
   bool isSpatializerEnabled = false;
   String spatializerMode = 'systemHardware';
@@ -70,6 +110,16 @@ class EqualizerManager {
   double compressorRatio = 3.0;
   double compressorAttackMs = 15.0;
   double compressorMakeupGainDb = 0.0;
+
+  /// True once the user has saved compressor knobs (or changed them this
+  /// session). Until then the HAL is left on its brickwall defaults.
+  bool _hasStoredCompressorParams = false;
+
+  /// Ratio / attack / make-up are honored by the Android HAL
+  /// DynamicsProcessing limiter; the native C++ stage is a brickwall limiter
+  /// with no ratio/attack/make-up concept, so the sliders are gated when the
+  /// HAL engine is unavailable.
+  bool get isCompressorAdvancedParamsSupported => isDynamicsSupported;
 
   bool isReverbEnabled = false;
 
@@ -102,6 +152,28 @@ class EqualizerManager {
 
   bool isDynamicEqEnabled = false;
   List<DynamicEqBandConfig> dynamicEqBands = const [DynamicEqBandConfig()];
+
+  /// DSP engine routing: 'native' | 'oem' | 'auto'. Single source of truth —
+  /// SettingsCubit persists to the same PrefsKeys.dspPreference key.
+  String dspPreference = 'native';
+
+  /// Bit-perfect bypass mirror. Owned here so reattach/route resync restores
+  /// it (previously only pushed once from SettingsCubit and lost on resync).
+  bool isBitPerfectBypass = false;
+
+  /// TPDF dither mirror (native stage; skipped on BT routes automatically).
+  bool isDitherEnabled = false;
+  int ditherTargetBitDepth = 16;
+
+  /// Whether the current output route is Bluetooth. Updated from the existing
+  /// route-change hook so dither pushes stop claiming a wired route while a BT
+  /// device is active (the native side uses this to skip dithering).
+  bool isBluetoothRoute = false;
+
+  bool get isVirtualizerSupported => _effectsChannel.isVirtualizerSupported;
+  bool get isDynamicsSupported => _effectsChannel.isDynamicsSupported;
+  bool get isBassBoostSupported => _effectsChannel.isBassBoostSupported;
+  bool get isVolumeBoostSupported => _effectsChannel.isVolumeBoostSupported;
 
   HeadphoneProfile? selectedHeadphoneProfile;
 
@@ -261,18 +333,53 @@ class EqualizerManager {
           prefs.getDouble(PrefsKeys.lookaheadLimiterReleaseMs) ?? 50.0;
       limiterLookaheadMs =
           prefs.getDouble(PrefsKeys.lookaheadLimiterLookaheadMs) ?? 3.0;
+      compressorRatio = prefs.getDouble(PrefsKeys.compressorRatio) ?? 3.0;
+      compressorAttackMs =
+          prefs.getDouble(PrefsKeys.compressorAttackMs) ?? 15.0;
+      compressorMakeupGainDb =
+          prefs.getDouble(PrefsKeys.compressorMakeupGainDb) ?? 0.0;
+      // Only forward compressor knobs to the HAL when the user actually saved
+      // them: the native brickwall limiter defaults must not silently turn into
+      // a 3:1 / 15 ms compressor for users who never opened the sheet.
+      _hasStoredCompressorParams = prefs.containsKey(PrefsKeys.compressorRatio) ||
+          prefs.containsKey(PrefsKeys.compressorAttackMs) ||
+          prefs.containsKey(PrefsKeys.compressorMakeupGainDb);
 
       isReverbEnabled =
           prefs.getBool(PrefsKeys.convolutionReverbEnabled) ?? false;
-      // The impulse response itself is not persisted, so a stored `custom`
-      // would restore reverb with no IR at all. Fall back to the default room.
+      // A stored `custom` reverb is only valid if its impulse response can be
+      // reloaded from the persisted WAV path. Re-apply it here; if reloading
+      // fails (file gone/corrupt), fall back honestly to the default room
+      // instead of leaving the UI claiming "Custom (Loaded)" with no IR.
       final storedReverb = ReverbPreset.fromWireValue(
           prefs.getInt(PrefsKeys.convolutionReverbPreset) ??
               ReverbPreset.studio.wireValue);
-      reverbPreset = (storedReverb == ReverbPreset.custom
-              ? ReverbPreset.studio
-              : storedReverb)
-          .wireValue;
+      if (storedReverb == ReverbPreset.custom) {
+        final irPath = prefs.getString(PrefsKeys.customReverbIrPath);
+        var customIrRestored = false;
+        if (irPath != null && irPath.isNotEmpty) {
+          try {
+            final samples = await IrFileParser.parseWavFile(File(irPath));
+            if (samples.isNotEmpty &&
+                await _effectsChannel.loadImpulseResponse(samples)) {
+              reverbPreset = ReverbPreset.custom.wireValue;
+              customIrRestored = true;
+            }
+          } catch (e, st) {
+            ErrorLogger.log(
+              'Failed to restore custom reverb IR from $irPath',
+              error: e,
+              stackTrace: st,
+              category: 'EqualizerManager',
+            );
+          }
+        }
+        if (!customIrRestored) {
+          reverbPreset = ReverbPreset.studio.wireValue;
+        }
+      } else {
+        reverbPreset = storedReverb.wireValue;
+      }
       reverbWetDry = prefs.getDouble(PrefsKeys.convolutionReverbWetDry) ?? 0.20;
 
       stereoBalance = prefs.getDouble(PrefsKeys.stereoBalance) ?? 0.0;
@@ -304,6 +411,42 @@ class EqualizerManager {
       subCrossoverGain = prefs.getDouble(PrefsKeys.subCrossoverGain) ?? 0.8;
 
       isDynamicEqEnabled = prefs.getBool(PrefsKeys.dynamicEqEnabled) ?? false;
+      dspPreference = prefs.getString(PrefsKeys.dspPreference) ?? 'native';
+      if (dspPreference != 'native' &&
+          dspPreference != 'oem' &&
+          dspPreference != 'auto') {
+        dspPreference = 'native';
+      }
+      final bitPerfect =
+          prefs.getBool(PrefsKeys.bitPerfectOutput) ?? false;
+      final bypassDsp =
+          prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true;
+      isBitPerfectBypass = bitPerfect && bypassDsp;
+      isDitherEnabled = prefs.getBool(PrefsKeys.ditherEnabled) ?? false;
+      ditherTargetBitDepth =
+          prefs.getInt(PrefsKeys.ditherTargetBitDepth) ?? 16;
+      if (ditherTargetBitDepth != 16 &&
+          ditherTargetBitDepth != 24 &&
+          ditherTargetBitDepth != 32) {
+        ditherTargetBitDepth = 16;
+      }
+      if (PlatformCapabilities.isAndroid) {
+        await _effectsChannel.setDspPreference(dspPreference);
+        await _effectsChannel.setBypassDspForBitPerfect(isBitPerfectBypass);
+        // Restore dither too: it was previously loaded into in-memory state
+        // but never pushed, so a saved-ON dither did nothing until toggled.
+        if (isDitherEnabled) {
+          await _effectsChannel.setDitherParams(
+            enabled: true,
+            targetBitDepth: ditherTargetBitDepth,
+            isBluetooth: isBluetoothRoute,
+          );
+        }
+      }
+      if (isBitPerfectBypass) {
+        _syncPipeline();
+        return;
+      }
       final dynEqJson = prefs.getString(PrefsKeys.dynamicEqBands);
       if (dynEqJson != null) {
         try {
@@ -354,7 +497,7 @@ class EqualizerManager {
         );
       }
       if (isSpatializerEnabled) {
-        pendingFutures.add(_effectsChannel.setSpatializerEnabled(true));
+        pendingFutures.add(_applySpatializerWithFallback(true));
       }
       if (isCrossfeedEnabled) {
         pendingFutures.add(
@@ -368,6 +511,10 @@ class EqualizerManager {
             limiterLookaheadMs,
             limiterThresholdDb,
             limiterReleaseMs,
+            ratio: _hasStoredCompressorParams ? compressorRatio : null,
+            attackMs: _hasStoredCompressorParams ? compressorAttackMs : null,
+            makeupGainDb:
+                _hasStoredCompressorParams ? compressorMakeupGainDb : null,
           ),
         );
         pendingFutures.add(_effectsChannel.setLimiterEnabled(true));
@@ -452,6 +599,7 @@ class EqualizerManager {
         await Future<void>.delayed(const Duration(milliseconds: 120));
         await _effectsChannel.setDynamicsPreset(dynamicsPreset, true);
       }
+      _syncPipeline();
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to restore equalizer preferences',
@@ -495,6 +643,13 @@ class EqualizerManager {
         PrefsKeys.lookaheadLimiterThresholdDb: limiterThresholdDb,
         PrefsKeys.lookaheadLimiterReleaseMs: limiterReleaseMs,
         PrefsKeys.lookaheadLimiterLookaheadMs: limiterLookaheadMs,
+        // Only written once the user edits the compressor, so a fresh install
+        // never has these keys and keeps the native brickwall defaults.
+        if (_hasStoredCompressorParams) ...{
+          PrefsKeys.compressorRatio: compressorRatio,
+          PrefsKeys.compressorAttackMs: compressorAttackMs,
+          PrefsKeys.compressorMakeupGainDb: compressorMakeupGainDb,
+        },
         PrefsKeys.convolutionReverbEnabled: isReverbEnabled,
         PrefsKeys.convolutionReverbPreset: reverbPreset,
         PrefsKeys.convolutionReverbWetDry: reverbWetDry,
@@ -517,6 +672,9 @@ class EqualizerManager {
         PrefsKeys.dynamicEqBands: json.encode(
           dynamicEqBands.map((b) => b.toJson()).toList(),
         ),
+        PrefsKeys.dspPreference: dspPreference,
+        PrefsKeys.ditherEnabled: isDitherEnabled,
+        PrefsKeys.ditherTargetBitDepth: ditherTargetBitDepth,
       };
 
       // Atomic commit: all-or-nothing write pattern
@@ -610,8 +768,10 @@ class EqualizerManager {
         await applyCurrentPreset();
       }
       await _savePreferences();
+      _syncPipeline();
     } catch (e, st) {
       isEnabled = previous;
+      _syncPipeline();
       ErrorLogger.log(
         'Failed to toggle equalizer state ($enabled)',
         error: e,
@@ -825,7 +985,10 @@ class EqualizerManager {
     currentPreset = currentPreset.copyWith(bassBoost: clamped);
     final milliBels = (clamped * 1000).round();
     if (PlatformCapabilities.isAndroid) {
-      await _effectsChannel.setBassBoost(milliBels);
+      final applied = await _effectsChannel.setBassBoost(milliBels);
+      // A failed "off" request still leaves the desired state; only an
+      // enabled-but-rejected boost is a real "not applied".
+      _recordEffectOutcome('bassBoost', applied || clamped <= 0.0);
     }
     _debouncedSavePreferences();
   }
@@ -948,7 +1111,8 @@ class EqualizerManager {
     volumeBoost = safeValue;
     final milliBels = (volumeBoost * 1000).round();
     if (PlatformCapabilities.isAndroid) {
-      await _effectsChannel.setVolumeBoost(milliBels);
+      final applied = await _effectsChannel.setVolumeBoost(milliBels);
+      _recordEffectOutcome('volumeBoost', applied || volumeBoost <= 0.0);
     }
     _debouncedSavePreferences();
   }
@@ -1009,10 +1173,18 @@ class EqualizerManager {
     final previous = isVirtualizerEnabled;
     isVirtualizerEnabled = enabled;
     try {
-      await _effectsChannel.setVirtualizerEnabled(enabled);
+      final applied = await _effectsChannel.setVirtualizerEnabled(enabled);
+      if (enabled) {
+        _recordEffectOutcome('virtualizer', applied);
+        // Never leave the toggle ON when the engine rejected the request.
+        if (!applied) isVirtualizerEnabled = previous;
+      } else {
+        _recordEffectOutcome('virtualizer', true);
+      }
       await _savePreferences();
     } catch (e, st) {
       isVirtualizerEnabled = previous;
+      _recordEffectOutcome('virtualizer', false);
       ErrorLogger.log(
         'Failed to set virtualizer enabled',
         error: e,
@@ -1024,7 +1196,10 @@ class EqualizerManager {
 
   Future<void> setVirtualizerStrength(double strength) async {
     virtualizerStrength = strength.clamp(0.0, 1.0);
-    await _effectsChannel.setVirtualizerStrength(virtualizerStrength);
+    final applied = await _effectsChannel.setVirtualizerStrength(
+      virtualizerStrength,
+    );
+    _recordEffectOutcome('virtualizer', applied || virtualizerStrength <= 0.0);
     await _savePreferences();
   }
 
@@ -1038,10 +1213,14 @@ class EqualizerManager {
       isDynamicsEnabled = true;
     }
     if (!_isDynamicsBypassed) {
-      await _effectsChannel.setDynamicsPreset(
+      final applied = await _effectsChannel.setDynamicsPreset(
         dynamicsPreset,
         isDynamicsEnabled,
       );
+      final wantsDynamics = isDynamicsEnabled && preset != DynamicsPreset.off;
+      // A rejected "off" still reaches the desired disabled state; only an
+      // enabled-but-rejected preset is a genuine "not applied".
+      _recordEffectOutcome('dynamics', applied || !wantsDynamics);
     }
     await _savePreferences();
   }
@@ -1062,22 +1241,47 @@ class EqualizerManager {
   bool get isSpatializerSupported => _effectsChannel.isSpatializerSupported;
   bool get isHeadTrackerAvailable => _effectsChannel.isHeadTrackerAvailable;
 
+  /// Applies the spatializer enable flag, then falls back to the hardware
+  /// virtualizer when the device has no Spatializer API. Uses the channel
+  /// directly (never [_savePreferences]) so it is safe to call from within
+  /// [_restorePreferences] while [_effectsLock] is held, and from the public
+  /// setter, restore and reattach paths alike.
+  Future<bool> _applySpatializerWithFallback(bool enabled) async {
+    final applied = await _effectsChannel.setSpatializerEnabled(enabled);
+    if (enabled && !_effectsChannel.isSpatializerSupported) {
+      if (!isVirtualizerEnabled) {
+        isVirtualizerEnabled = true;
+        _recordEffectOutcome(
+          'virtualizer',
+          await _effectsChannel.setVirtualizerEnabled(true),
+        );
+        if (virtualizerStrength < 0.3) {
+          virtualizerStrength = 0.7;
+          _recordEffectOutcome(
+            'virtualizer',
+            await _effectsChannel.setVirtualizerStrength(virtualizerStrength),
+          );
+        }
+      }
+    }
+    return applied;
+  }
+
   Future<void> setSpatializerEnabled(bool enabled) async {
     final previous = isSpatializerEnabled;
     isSpatializerEnabled = enabled;
     try {
-      await _effectsChannel.setSpatializerEnabled(enabled);
-      if (enabled && !_effectsChannel.isSpatializerSupported) {
-        if (!isVirtualizerEnabled) {
-          await setVirtualizerEnabled(true);
-          if (virtualizerStrength < 0.3) {
-            await setVirtualizerStrength(0.7);
-          }
-        }
+      final applied = await _applySpatializerWithFallback(enabled);
+      if (enabled) {
+        _recordEffectOutcome('spatializer', applied);
+        if (!applied) isSpatializerEnabled = previous;
+      } else {
+        _recordEffectOutcome('spatializer', true);
       }
       await _savePreferences();
     } catch (e, st) {
       isSpatializerEnabled = previous;
+      _recordEffectOutcome('spatializer', false);
       ErrorLogger.log(
         'Failed to set spatializer enabled',
         error: e,
@@ -1117,6 +1321,7 @@ class EqualizerManager {
       await _effectsChannel.setCrossfeedEnabled(enabled);
     }
     _debouncedSavePreferences();
+    _syncPipeline();
   }
 
   Future<void> setLookaheadLimiter(
@@ -1138,6 +1343,7 @@ class EqualizerManager {
       await _effectsChannel.setLimiterEnabled(enabled);
     }
     _debouncedSavePreferences();
+    _syncPipeline();
   }
 
   Future<void> setCompressorParams({
@@ -1153,14 +1359,21 @@ class EqualizerManager {
     if (releaseMs != null) limiterReleaseMs = releaseMs;
     if (makeupGainDb != null) compressorMakeupGainDb = makeupGainDb;
 
+    // Any explicit edit marks the compressor knobs as user-owned so restore
+    // and reattach keep forwarding them to the HAL.
+    _hasStoredCompressorParams = true;
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setLimiterParams(
         limiterLookaheadMs,
         limiterThresholdDb,
         limiterReleaseMs,
+        ratio: compressorRatio,
+        attackMs: compressorAttackMs,
+        makeupGainDb: compressorMakeupGainDb,
       );
     }
     _debouncedSavePreferences();
+    _syncPipeline();
   }
 
   Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) async {
@@ -1173,18 +1386,36 @@ class EqualizerManager {
       await _effectsChannel.setReverbEnabled(enabled);
     }
     _debouncedSavePreferences();
+    _syncPipeline();
   }
 
-  Future<void> loadCustomImpulseResponse(List<double> irSamples) async {
-    if (PlatformCapabilities.isAndroid) {
-      await _effectsChannel.loadImpulseResponse(irSamples);
+  /// Loads a user-supplied impulse response. Returns true only when the native
+  /// side accepted it, so callers never flip the UI to "Custom (Loaded)" on a
+  /// failed load.
+  Future<bool> loadCustomImpulseResponse(List<double> irSamples) async {
+    if (!PlatformCapabilities.isAndroid) {
       isReverbEnabled = true;
-      // Must be `custom`: any synthesizable ordinal makes the native side
-      // build its own IR on the next re-apply and discard the loaded one.
       reverbPreset = ReverbPreset.custom.wireValue;
-      await _effectsChannel.setReverbEnabled(true);
+      _debouncedSavePreferences();
+      _syncPipeline();
+      return true;
     }
+    final loaded = await _effectsChannel.loadImpulseResponse(irSamples);
+    if (!loaded) {
+      ErrorLogger.log(
+        'Custom impulse response rejected by native DSP',
+        category: 'EqualizerManager',
+      );
+      return false;
+    }
+    isReverbEnabled = true;
+    // Must be `custom`: any synthesizable ordinal makes the native side
+    // build its own IR on the next re-apply and discard the loaded one.
+    reverbPreset = ReverbPreset.custom.wireValue;
+    await _effectsChannel.setReverbEnabled(true);
     _debouncedSavePreferences();
+    _syncPipeline();
+    return true;
   }
 
   Future<int> getPipelineLatencyFrames() =>
@@ -1200,6 +1431,7 @@ class EqualizerManager {
       await _effectsChannel.setStereoBalance(stereoBalance);
     }
     _debouncedSavePreferences();
+    _syncPipeline();
   }
 
   Future<void> setMonoMix(bool mono) async {
@@ -1208,6 +1440,7 @@ class EqualizerManager {
       await _effectsChannel.setMonoMix(mono);
     }
     _debouncedSavePreferences();
+    _syncPipeline();
   }
 
   Future<void> setSincResampler(bool enabled) async {
@@ -1258,6 +1491,7 @@ class EqualizerManager {
       await setDynamicsPreset(dynamicsPreset, enabled: false);
     }
     if (_savedLimiterEnabled) await setLookaheadLimiter(false);
+    _syncPipeline();
   }
 
   /// Restores DSP stages that were disabled during low power mode.
@@ -1276,6 +1510,7 @@ class EqualizerManager {
       await setDynamicsPreset(dynamicsPreset, enabled: true);
     }
     if (_savedLimiterEnabled) await setLookaheadLimiter(true);
+    _syncPipeline();
   }
 
   // --- PHASE 1 DSP EXPANSION STAGES ---
@@ -1299,6 +1534,7 @@ class EqualizerManager {
       await _effectsChannel.setSaturationEnabled(enabled);
     }
     _debouncedSavePreferences();
+    _syncPipeline();
   }
 
   Future<void> setStereoWidth(bool enabled, {double? width}) async {
@@ -1309,6 +1545,7 @@ class EqualizerManager {
       await _effectsChannel.setStereoWidthEnabled(enabled);
     }
     _debouncedSavePreferences();
+    _syncPipeline();
   }
 
   /// Sets the loudness contour. The contour lift is computed against
@@ -1325,6 +1562,7 @@ class EqualizerManager {
       await _effectsChannel.setLoudnessContourEnabled(enabled);
     }
     _debouncedSavePreferences();
+    _syncPipeline();
   }
 
   /// Pushes the current volume-stage value to the engine so the loudness
@@ -1361,6 +1599,7 @@ class EqualizerManager {
       await _effectsChannel.setSubCrossoverEnabled(enabled);
     }
     _debouncedSavePreferences();
+    _syncPipeline();
   }
 
   Future<void> setDynamicEq(bool enabled) async {
@@ -1370,6 +1609,7 @@ class EqualizerManager {
       await _effectsChannel.setDynamicEqEnabled(enabled);
     }
     _debouncedSavePreferences();
+    _syncPipeline();
   }
 
   Future<void> setDynamicEqBand(int index, DynamicEqBandConfig band) async {
@@ -1414,10 +1654,64 @@ class EqualizerManager {
     }
   }
 
-  Future<void> setBypassDspForBitPerfect(bool bypass) async {
+  /// Owned bypass: stores state, pushes to native (with DoP mirror), and
+  /// syncs the pipeline mirror so reattach/route resync restores it.
+  Future<void> setBypassDspForBitPerfect(bool bypass, {bool? isDop}) async {
+    isBitPerfectBypass = bypass;
     if (PlatformCapabilities.isAndroid) {
-      await _effectsChannel.setBypassDspForBitPerfect(bypass);
+      await _effectsChannel.setBypassDspForBitPerfect(bypass, isDop: isDop);
     }
+    _syncPipeline();
+  }
+
+  /// Owned DSP-preference routing. Persisted to the same key SettingsCubit
+  /// uses, so both writers converge instead of diverging.
+  Future<void> setDspPreference(String preference) async {
+    final p = preference.toLowerCase();
+    dspPreference = (p == 'oem' || p == 'auto') ? p : 'native';
+    if (PlatformCapabilities.isAndroid) {
+      await _effectsChannel.setDspPreference(dspPreference);
+    }
+    _debouncedSavePreferences();
+    _syncPipeline();
+  }
+
+  /// TPDF dither toggle (native stage; auto-skipped on BT routes).
+  Future<void> setDither(bool enabled, {int? targetBitDepth}) async {
+    isDitherEnabled = enabled;
+    if (targetBitDepth != null &&
+        (targetBitDepth == 16 ||
+            targetBitDepth == 24 ||
+            targetBitDepth == 32)) {
+      ditherTargetBitDepth = targetBitDepth;
+    }
+    if (PlatformCapabilities.isAndroid) {
+      await _effectsChannel.setDitherParams(
+        enabled: isDitherEnabled,
+        targetBitDepth: ditherTargetBitDepth,
+        isBluetooth: isBluetoothRoute,
+      );
+    }
+    _debouncedSavePreferences();
+    _syncPipeline();
+  }
+
+  /// Mirrors all locally-owned flags into the attached pipeline inspector.
+  void _syncPipeline() {
+    _dspPipeline?.updateState(
+      isEqEnabled: isEnabled,
+      isDynamicEqEnabled: isDynamicEqEnabled,
+      isCrossfeedEnabled: isCrossfeedEnabled,
+      isReverbEnabled: isReverbEnabled,
+      stereoBalance: stereoBalance,
+      isMonoMix: monoMix,
+      isSaturationEnabled: isSaturationEnabled,
+      isStereoWidthEnabled: isStereoWidthEnabled,
+      isSubCrossoverEnabled: isSubCrossoverEnabled,
+      isLoudnessContourEnabled: isLoudnessContourEnabled,
+      isLimiterEnabled: isLimiterEnabled,
+      bitPerfectBypass: isBitPerfectBypass,
+    );
   }
 
   OptimizedDspPipeline? _dspPipeline;
@@ -1425,6 +1719,7 @@ class EqualizerManager {
   /// Attaches the DSP pipeline so native latency syncs automatically update the pipeline.
   void attachDspPipeline(OptimizedDspPipeline pipeline) {
     _dspPipeline = pipeline;
+    _syncPipeline();
   }
 
   Future<int> syncNativeLatency(double sampleRate,
@@ -1629,6 +1924,32 @@ class EqualizerManager {
     // The EQ will be enabled/disabled based on actual state.
     final futures = <Future<void>>[];
 
+    // Routing truth first: preference + bypass + dither must precede stage
+    // pushes, otherwise a reattach re-enables stages that bypass should mute.
+    try {
+      await _effectsChannel.setDspPreference(dspPreference);
+      await _effectsChannel.setBypassDspForBitPerfect(isBitPerfectBypass);
+      await _effectsChannel.setDitherParams(
+        enabled: isDitherEnabled,
+        targetBitDepth: ditherTargetBitDepth,
+        isBluetooth: isBluetoothRoute,
+      );
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to push routing truth (preference/bypass/dither)',
+        error: e,
+        stackTrace: st,
+        category: 'EqualizerManager',
+      );
+    }
+
+    if (isBitPerfectBypass) {
+      // In Bit-Perfect bypass mode, all DSP stages must remain completely disabled.
+      // Skipping the remaining stage pushes avoids wasting JNI roundtrips and prevents
+      // transient leakage before the native bypass gate takes full effect.
+      return;
+    }
+
     // Initialize EQ chain with current band configuration and enable state
     try {
       final freqs = is32BandMode ? custom32Frequencies : customFrequencies;
@@ -1670,7 +1991,9 @@ class EqualizerManager {
       futures.add(_effectsChannel.setVirtualizerStrength(virtualizerStrength));
     }
     if (isSpatializerEnabled) {
-      futures.add(_effectsChannel.setSpatializerEnabled(true));
+      // Guarded fallback: on devices without a Spatializer API this also
+      // re-asserts the virtualizer, so reattach matches the public setter.
+      futures.add(_applySpatializerWithFallback(true));
     }
     if (isCrossfeedEnabled) {
       futures.add(
@@ -1684,6 +2007,10 @@ class EqualizerManager {
           limiterLookaheadMs,
           limiterThresholdDb,
           limiterReleaseMs,
+          ratio: _hasStoredCompressorParams ? compressorRatio : null,
+          attackMs: _hasStoredCompressorParams ? compressorAttackMs : null,
+          makeupGainDb:
+              _hasStoredCompressorParams ? compressorMakeupGainDb : null,
         ),
       );
       futures.add(_effectsChannel.setLimiterEnabled(true));
@@ -1697,6 +2024,11 @@ class EqualizerManager {
       futures.add(_effectsChannel.setStereoBalance(stereoBalance));
     }
     if (monoMix) futures.add(_effectsChannel.setMonoMix(true));
+    // Re-assert the resampler so a user-disabled resampler stays disabled
+    // after a reattach/route change instead of silently reverting to ON.
+    futures.add(
+      _effectsChannel.setSincResamplerEnabled(isSincResamplerEnabled),
+    );
     if (isSaturationEnabled) {
       futures.add(
         _effectsChannel.setSaturationParams(

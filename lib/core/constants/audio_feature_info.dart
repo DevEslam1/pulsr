@@ -141,10 +141,10 @@ class AudioFeatureRegistry {
 
   static const dsdNative = AudioFeatureInfo(
     id: 'dsdNative',
-    title: 'DSD (Native / DoP)',
-    subtitle: 'Detection-only in this build',
+    title: 'DSD (Native PCM Decode)',
+    subtitle: 'PCM decode only — DoP output unavailable',
     description:
-        'DSD files (DSF/DFF) decode to PCM through the native DSD decoder and then follow the normal DSP pipeline. DoP framing exists as a future transport; raw native-DSD USB streaming is not implemented, so this feature reports DAC class diagnostics (UAC1/UAC2/UAC3) without claiming native-DSD capability.',
+        'DSD files (DSF/DFF) decode to PCM through the native DSD decoder and then follow the normal DSP pipeline. There is no user-selectable DoP (DSD over PCM) output mode: native-DSD / DoP USB streaming is not implemented in this build, so DoP framing is not exposed in the UI and this feature only reports DAC class diagnostics (UAC1/UAC2/UAC3) without claiming native-DSD capability.',
   );
 
   static const gapless = AudioFeatureInfo(
@@ -168,7 +168,7 @@ class AudioFeatureRegistry {
   static const replayGain = AudioFeatureInfo(
     id: 'replayGain',
     title: 'ReplayGain Normalization',
-    subtitle: 'EBU R128 track/album/auto',
+    subtitle: 'Track / album gain tags applied at playback',
     description:
         'Software volume leveling based on Track/Album Gain tags. Applies multiplier with 0.5 dB inter-sample headroom. Conflicts with Bit-Perfect bypass (software gain would alter bits). Set to Off for true exclusive.',
     conflictsWith: 'Bit-Perfect bypass',

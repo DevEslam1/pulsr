@@ -8,8 +8,24 @@ import 'dart:typed_data';
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 import '../db/app_database.dart';
+import '../../core/utils/platform_capabilities.dart';
 import 'audio_effects_channel.dart';
 import 'dop_encoder.dart';
+
+/// Thrown when a DSD (DSF/DFF) file is played on a platform/build with no
+/// native DSD decoder — most notably iOS, where the `decodeDsd` channel method
+/// returns null. Callers must catch this and fail the track gracefully instead
+/// of letting a raw [UnsupportedError] escape.
+class DsdUnsupportedException implements Exception {
+  final String message;
+
+  const DsdUnsupportedException([
+    this.message = 'DSD playback is not supported on this platform',
+  ]);
+
+  @override
+  String toString() => 'DsdUnsupportedException: $message';
+}
 
 typedef DsdDecodeFunction = Future<List<double>?> Function(
   List<int> dsdL,
@@ -46,11 +62,12 @@ class DsdDecoderHelper {
   /// Injected decoder for tests when running outside of the Android runtime.
   static DsdDecodeFunction? testDecoder;
 
-  /// Global or injected predicate whether DoP native framing is active / preferred.
-  static bool Function()? isDopPreferred;
-
   /// Parses DSF or DFF file, decodes DSD frames via the native C++ decoder or wraps
   /// into DoP (DSD over PCM) frames, and packages the resulting audio into an [AudioSource].
+  ///
+  /// [forceDop] is only meaningful for programmatic/explicit requests; there is
+  /// no user-facing DoP output mode — raw native-DSD / DoP USB transport is not
+  /// implemented, so normal playback always uses the PCM decode path.
   static Future<AudioSource> decodeDsdFile(
     SongsTableData song,
     MediaItem tag, {
@@ -82,7 +99,7 @@ class DsdDecoderHelper {
       bitOrder = 1; // LSB first (DFF)
     }
 
-    final bool useDop = forceDop || (isDopPreferred?.call() ?? false);
+    final bool useDop = forceDop;
     if (useDop) {
       // DoP framing (DSD over PCM v1.1): pack 16-bit DSD chunks with alternating 0x05/0xFA markers
       var left = dsdL;
@@ -130,8 +147,13 @@ class DsdDecoderHelper {
     );
 
     if (pcmFloats == null || pcmFloats.isEmpty) {
-      throw UnsupportedError(
-        'Native DSD decoder is unavailable on this build/platform or returned empty PCM stream.',
+      // Non-Android has no native decoder at all (the channel returns null);
+      // Android can still fail when libpulsr_dsp is absent. Both are handled,
+      // user-visible failures — never a raw UnsupportedError.
+      throw DsdUnsupportedException(
+        PlatformCapabilities.isAndroid
+            ? 'The native DSD decoder is unavailable or returned an empty PCM stream.'
+            : 'DSD playback is not supported on this platform.',
       );
     }
 

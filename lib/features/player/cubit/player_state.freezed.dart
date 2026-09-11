@@ -35,12 +35,16 @@ mixin _$PlayerState {
   bool get isEqEnabled;
   bool get isVirtualizerEnabled;
   double get virtualizerStrength;
+  bool get isVirtualizerSupported;
   bool get isDynamicsEnabled;
+  bool get isDynamicsSupported;
   DynamicsPreset get dynamicsPreset;
   HeadphoneProfile? get selectedHeadphoneProfile;
   bool get isSpatializerSupported;
   bool get isSpatializerEnabled;
   double get volumeBoost;
+  bool get isVolumeBoostSupported;
+  bool get isBassBoostSupported;
   bool get isCrossfeedEnabled;
   double get crossfeedDelayUs;
   double get crossfeedFeedDb;
@@ -53,6 +57,8 @@ mixin _$PlayerState {
   double get stereoBalance;
   bool get monoMix;
   bool get isSincResamplerEnabled;
+  bool get isDitherEnabled;
+  int get ditherTargetBitDepth;
   bool get isSaturationEnabled;
   double get saturationDrive;
   double get saturationMix;
@@ -131,8 +137,12 @@ mixin _$PlayerState {
                 other.isVirtualizerEnabled == _this.isVirtualizerEnabled) &&
             (identical(other.virtualizerStrength, _this.virtualizerStrength) ||
                 other.virtualizerStrength == _this.virtualizerStrength) &&
+            (identical(other.isVirtualizerSupported, _this.isVirtualizerSupported) ||
+                other.isVirtualizerSupported == _this.isVirtualizerSupported) &&
             (identical(other.isDynamicsEnabled, _this.isDynamicsEnabled) ||
                 other.isDynamicsEnabled == _this.isDynamicsEnabled) &&
+            (identical(other.isDynamicsSupported, _this.isDynamicsSupported) ||
+                other.isDynamicsSupported == _this.isDynamicsSupported) &&
             (identical(other.dynamicsPreset, _this.dynamicsPreset) ||
                 other.dynamicsPreset == _this.dynamicsPreset) &&
             (identical(other.selectedHeadphoneProfile, _this.selectedHeadphoneProfile) ||
@@ -144,6 +154,10 @@ mixin _$PlayerState {
                 other.isSpatializerEnabled == _this.isSpatializerEnabled) &&
             (identical(other.volumeBoost, _this.volumeBoost) ||
                 other.volumeBoost == _this.volumeBoost) &&
+            (identical(other.isVolumeBoostSupported, _this.isVolumeBoostSupported) ||
+                other.isVolumeBoostSupported == _this.isVolumeBoostSupported) &&
+            (identical(other.isBassBoostSupported, _this.isBassBoostSupported) ||
+                other.isBassBoostSupported == _this.isBassBoostSupported) &&
             (identical(other.isCrossfeedEnabled, _this.isCrossfeedEnabled) ||
                 other.isCrossfeedEnabled == _this.isCrossfeedEnabled) &&
             (identical(other.crossfeedDelayUs, _this.crossfeedDelayUs) ||
@@ -154,18 +168,15 @@ mixin _$PlayerState {
                 other.isLimiterEnabled == _this.isLimiterEnabled) &&
             (identical(other.limiterThresholdDb, _this.limiterThresholdDb) ||
                 other.limiterThresholdDb == _this.limiterThresholdDb) &&
-            (identical(other.limiterReleaseMs, _this.limiterReleaseMs) ||
-                other.limiterReleaseMs == _this.limiterReleaseMs) &&
-            (identical(other.isReverbEnabled, _this.isReverbEnabled) ||
-                other.isReverbEnabled == _this.isReverbEnabled) &&
-            (identical(other.reverbPreset, _this.reverbPreset) ||
-                other.reverbPreset == _this.reverbPreset) &&
-            (identical(other.reverbWetDry, _this.reverbWetDry) ||
-                other.reverbWetDry == _this.reverbWetDry) &&
-            (identical(other.stereoBalance, _this.stereoBalance) ||
-                other.stereoBalance == _this.stereoBalance) &&
+            (identical(other.limiterReleaseMs, _this.limiterReleaseMs) || other.limiterReleaseMs == _this.limiterReleaseMs) &&
+            (identical(other.isReverbEnabled, _this.isReverbEnabled) || other.isReverbEnabled == _this.isReverbEnabled) &&
+            (identical(other.reverbPreset, _this.reverbPreset) || other.reverbPreset == _this.reverbPreset) &&
+            (identical(other.reverbWetDry, _this.reverbWetDry) || other.reverbWetDry == _this.reverbWetDry) &&
+            (identical(other.stereoBalance, _this.stereoBalance) || other.stereoBalance == _this.stereoBalance) &&
             (identical(other.monoMix, _this.monoMix) || other.monoMix == _this.monoMix) &&
             (identical(other.isSincResamplerEnabled, _this.isSincResamplerEnabled) || other.isSincResamplerEnabled == _this.isSincResamplerEnabled) &&
+            (identical(other.isDitherEnabled, _this.isDitherEnabled) || other.isDitherEnabled == _this.isDitherEnabled) &&
+            (identical(other.ditherTargetBitDepth, _this.ditherTargetBitDepth) || other.ditherTargetBitDepth == _this.ditherTargetBitDepth) &&
             (identical(other.isSaturationEnabled, _this.isSaturationEnabled) || other.isSaturationEnabled == _this.isSaturationEnabled) &&
             (identical(other.saturationDrive, _this.saturationDrive) || other.saturationDrive == _this.saturationDrive) &&
             (identical(other.saturationMix, _this.saturationMix) || other.saturationMix == _this.saturationMix) &&
@@ -219,12 +230,16 @@ mixin _$PlayerState {
       _this.isEqEnabled,
       _this.isVirtualizerEnabled,
       _this.virtualizerStrength,
+      _this.isVirtualizerSupported,
       _this.isDynamicsEnabled,
+      _this.isDynamicsSupported,
       _this.dynamicsPreset,
       _this.selectedHeadphoneProfile,
       _this.isSpatializerSupported,
       _this.isSpatializerEnabled,
       _this.volumeBoost,
+      _this.isVolumeBoostSupported,
+      _this.isBassBoostSupported,
       _this.isCrossfeedEnabled,
       _this.crossfeedDelayUs,
       _this.crossfeedFeedDb,
@@ -237,6 +252,8 @@ mixin _$PlayerState {
       _this.stereoBalance,
       _this.monoMix,
       _this.isSincResamplerEnabled,
+      _this.isDitherEnabled,
+      _this.ditherTargetBitDepth,
       _this.isSaturationEnabled,
       _this.saturationDrive,
       _this.saturationMix,
@@ -269,7 +286,7 @@ mixin _$PlayerState {
   @override
   String toString() {
     final _this = this as PlayerState;
-    return 'PlayerState(currentSong: ${_this.currentSong}, isPlaying: ${_this.isPlaying}, position: ${_this.position}, duration: ${_this.duration}, isShuffle: ${_this.isShuffle}, repeatMode: ${_this.repeatMode}, queue: ${_this.queue}, currentIndex: ${_this.currentIndex}, isExpanded: ${_this.isExpanded}, dominantColor: ${_this.dominantColor}, sleepTimerRemaining: ${_this.sleepTimerRemaining}, lyrics: ${_this.lyrics}, lyricsSource: ${_this.lyricsSource}, isLoadingLyrics: ${_this.isLoadingLyrics}, isLyricsVisible: ${_this.isLyricsVisible}, isQueueVisible: ${_this.isQueueVisible}, eqPreset: ${_this.eqPreset}, isEqEnabled: ${_this.isEqEnabled}, isVirtualizerEnabled: ${_this.isVirtualizerEnabled}, virtualizerStrength: ${_this.virtualizerStrength}, isDynamicsEnabled: ${_this.isDynamicsEnabled}, dynamicsPreset: ${_this.dynamicsPreset}, selectedHeadphoneProfile: ${_this.selectedHeadphoneProfile}, isSpatializerSupported: ${_this.isSpatializerSupported}, isSpatializerEnabled: ${_this.isSpatializerEnabled}, volumeBoost: ${_this.volumeBoost}, isCrossfeedEnabled: ${_this.isCrossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, isLimiterEnabled: ${_this.isLimiterEnabled}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, isReverbEnabled: ${_this.isReverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, isSincResamplerEnabled: ${_this.isSincResamplerEnabled}, isSaturationEnabled: ${_this.isSaturationEnabled}, saturationDrive: ${_this.saturationDrive}, saturationMix: ${_this.saturationMix}, saturationTilt: ${_this.saturationTilt}, isStereoWidthEnabled: ${_this.isStereoWidthEnabled}, stereoWidth: ${_this.stereoWidth}, isLoudnessContourEnabled: ${_this.isLoudnessContourEnabled}, loudnessContourIntensity: ${_this.loudnessContourIntensity}, isSubCrossoverEnabled: ${_this.isSubCrossoverEnabled}, subCrossoverCornerHz: ${_this.subCrossoverCornerHz}, subCrossoverSlopeDbPerOct: ${_this.subCrossoverSlopeDbPerOct}, subCrossoverGain: ${_this.subCrossoverGain}, isDynamicEqEnabled: ${_this.isDynamicEqEnabled}, dynamicEqBands: ${_this.dynamicEqBands}, hasOemAudio: ${_this.hasOemAudio}, detectedOemEngines: ${_this.detectedOemEngines}, activeQueueSlot: ${_this.activeQueueSlot}, playbackSpeed: ${_this.playbackSpeed}, audioSessionId: ${_this.audioSessionId}, errorMessage: ${_this.errorMessage}, abLoopEnabled: ${_this.abLoopEnabled}, abPointA: ${_this.abPointA}, abPointB: ${_this.abPointB}, trackDelayMs: ${_this.trackDelayMs}, bookmarkPosition: ${_this.bookmarkPosition}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity})';
+    return 'PlayerState(currentSong: ${_this.currentSong}, isPlaying: ${_this.isPlaying}, position: ${_this.position}, duration: ${_this.duration}, isShuffle: ${_this.isShuffle}, repeatMode: ${_this.repeatMode}, queue: ${_this.queue}, currentIndex: ${_this.currentIndex}, isExpanded: ${_this.isExpanded}, dominantColor: ${_this.dominantColor}, sleepTimerRemaining: ${_this.sleepTimerRemaining}, lyrics: ${_this.lyrics}, lyricsSource: ${_this.lyricsSource}, isLoadingLyrics: ${_this.isLoadingLyrics}, isLyricsVisible: ${_this.isLyricsVisible}, isQueueVisible: ${_this.isQueueVisible}, eqPreset: ${_this.eqPreset}, isEqEnabled: ${_this.isEqEnabled}, isVirtualizerEnabled: ${_this.isVirtualizerEnabled}, virtualizerStrength: ${_this.virtualizerStrength}, isVirtualizerSupported: ${_this.isVirtualizerSupported}, isDynamicsEnabled: ${_this.isDynamicsEnabled}, isDynamicsSupported: ${_this.isDynamicsSupported}, dynamicsPreset: ${_this.dynamicsPreset}, selectedHeadphoneProfile: ${_this.selectedHeadphoneProfile}, isSpatializerSupported: ${_this.isSpatializerSupported}, isSpatializerEnabled: ${_this.isSpatializerEnabled}, volumeBoost: ${_this.volumeBoost}, isVolumeBoostSupported: ${_this.isVolumeBoostSupported}, isBassBoostSupported: ${_this.isBassBoostSupported}, isCrossfeedEnabled: ${_this.isCrossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, isLimiterEnabled: ${_this.isLimiterEnabled}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, isReverbEnabled: ${_this.isReverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, isSincResamplerEnabled: ${_this.isSincResamplerEnabled}, isDitherEnabled: ${_this.isDitherEnabled}, ditherTargetBitDepth: ${_this.ditherTargetBitDepth}, isSaturationEnabled: ${_this.isSaturationEnabled}, saturationDrive: ${_this.saturationDrive}, saturationMix: ${_this.saturationMix}, saturationTilt: ${_this.saturationTilt}, isStereoWidthEnabled: ${_this.isStereoWidthEnabled}, stereoWidth: ${_this.stereoWidth}, isLoudnessContourEnabled: ${_this.isLoudnessContourEnabled}, loudnessContourIntensity: ${_this.loudnessContourIntensity}, isSubCrossoverEnabled: ${_this.isSubCrossoverEnabled}, subCrossoverCornerHz: ${_this.subCrossoverCornerHz}, subCrossoverSlopeDbPerOct: ${_this.subCrossoverSlopeDbPerOct}, subCrossoverGain: ${_this.subCrossoverGain}, isDynamicEqEnabled: ${_this.isDynamicEqEnabled}, dynamicEqBands: ${_this.dynamicEqBands}, hasOemAudio: ${_this.hasOemAudio}, detectedOemEngines: ${_this.detectedOemEngines}, activeQueueSlot: ${_this.activeQueueSlot}, playbackSpeed: ${_this.playbackSpeed}, audioSessionId: ${_this.audioSessionId}, errorMessage: ${_this.errorMessage}, abLoopEnabled: ${_this.abLoopEnabled}, abPointA: ${_this.abPointA}, abPointB: ${_this.abPointB}, trackDelayMs: ${_this.trackDelayMs}, bookmarkPosition: ${_this.bookmarkPosition}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity})';
   }
 }
 
@@ -300,12 +317,16 @@ abstract mixin class $PlayerStateCopyWith<$Res> {
       bool isEqEnabled,
       bool isVirtualizerEnabled,
       double virtualizerStrength,
+      bool isVirtualizerSupported,
       bool isDynamicsEnabled,
+      bool isDynamicsSupported,
       DynamicsPreset dynamicsPreset,
       HeadphoneProfile? selectedHeadphoneProfile,
       bool isSpatializerSupported,
       bool isSpatializerEnabled,
       double volumeBoost,
+      bool isVolumeBoostSupported,
+      bool isBassBoostSupported,
       bool isCrossfeedEnabled,
       double crossfeedDelayUs,
       double crossfeedFeedDb,
@@ -318,6 +339,8 @@ abstract mixin class $PlayerStateCopyWith<$Res> {
       double stereoBalance,
       bool monoMix,
       bool isSincResamplerEnabled,
+      bool isDitherEnabled,
+      int ditherTargetBitDepth,
       bool isSaturationEnabled,
       double saturationDrive,
       double saturationMix,
@@ -378,12 +401,16 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
     Object? isEqEnabled = null,
     Object? isVirtualizerEnabled = null,
     Object? virtualizerStrength = null,
+    Object? isVirtualizerSupported = null,
     Object? isDynamicsEnabled = null,
+    Object? isDynamicsSupported = null,
     Object? dynamicsPreset = null,
     Object? selectedHeadphoneProfile = freezed,
     Object? isSpatializerSupported = null,
     Object? isSpatializerEnabled = null,
     Object? volumeBoost = null,
+    Object? isVolumeBoostSupported = null,
+    Object? isBassBoostSupported = null,
     Object? isCrossfeedEnabled = null,
     Object? crossfeedDelayUs = null,
     Object? crossfeedFeedDb = null,
@@ -396,6 +423,8 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
     Object? stereoBalance = null,
     Object? monoMix = null,
     Object? isSincResamplerEnabled = null,
+    Object? isDitherEnabled = null,
+    Object? ditherTargetBitDepth = null,
     Object? isSaturationEnabled = null,
     Object? saturationDrive = null,
     Object? saturationMix = null,
@@ -504,9 +533,17 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
           ? _self.virtualizerStrength
           : virtualizerStrength // ignore: cast_nullable_to_non_nullable
               as double,
+      isVirtualizerSupported: null == isVirtualizerSupported
+          ? _self.isVirtualizerSupported
+          : isVirtualizerSupported // ignore: cast_nullable_to_non_nullable
+              as bool,
       isDynamicsEnabled: null == isDynamicsEnabled
           ? _self.isDynamicsEnabled
           : isDynamicsEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      isDynamicsSupported: null == isDynamicsSupported
+          ? _self.isDynamicsSupported
+          : isDynamicsSupported // ignore: cast_nullable_to_non_nullable
               as bool,
       dynamicsPreset: null == dynamicsPreset
           ? _self.dynamicsPreset
@@ -528,6 +565,14 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
           ? _self.volumeBoost
           : volumeBoost // ignore: cast_nullable_to_non_nullable
               as double,
+      isVolumeBoostSupported: null == isVolumeBoostSupported
+          ? _self.isVolumeBoostSupported
+          : isVolumeBoostSupported // ignore: cast_nullable_to_non_nullable
+              as bool,
+      isBassBoostSupported: null == isBassBoostSupported
+          ? _self.isBassBoostSupported
+          : isBassBoostSupported // ignore: cast_nullable_to_non_nullable
+              as bool,
       isCrossfeedEnabled: null == isCrossfeedEnabled
           ? _self.isCrossfeedEnabled
           : isCrossfeedEnabled // ignore: cast_nullable_to_non_nullable
@@ -576,6 +621,14 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
           ? _self.isSincResamplerEnabled
           : isSincResamplerEnabled // ignore: cast_nullable_to_non_nullable
               as bool,
+      isDitherEnabled: null == isDitherEnabled
+          ? _self.isDitherEnabled
+          : isDitherEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      ditherTargetBitDepth: null == ditherTargetBitDepth
+          ? _self.ditherTargetBitDepth
+          : ditherTargetBitDepth // ignore: cast_nullable_to_non_nullable
+              as int,
       isSaturationEnabled: null == isSaturationEnabled
           ? _self.isSaturationEnabled
           : isSaturationEnabled // ignore: cast_nullable_to_non_nullable
@@ -798,12 +851,16 @@ extension PlayerStatePatterns on PlayerState {
             bool isEqEnabled,
             bool isVirtualizerEnabled,
             double virtualizerStrength,
+            bool isVirtualizerSupported,
             bool isDynamicsEnabled,
+            bool isDynamicsSupported,
             DynamicsPreset dynamicsPreset,
             HeadphoneProfile? selectedHeadphoneProfile,
             bool isSpatializerSupported,
             bool isSpatializerEnabled,
             double volumeBoost,
+            bool isVolumeBoostSupported,
+            bool isBassBoostSupported,
             bool isCrossfeedEnabled,
             double crossfeedDelayUs,
             double crossfeedFeedDb,
@@ -816,6 +873,8 @@ extension PlayerStatePatterns on PlayerState {
             double stereoBalance,
             bool monoMix,
             bool isSincResamplerEnabled,
+            bool isDitherEnabled,
+            int ditherTargetBitDepth,
             bool isSaturationEnabled,
             double saturationDrive,
             double saturationMix,
@@ -869,12 +928,16 @@ extension PlayerStatePatterns on PlayerState {
             _that.isEqEnabled,
             _that.isVirtualizerEnabled,
             _that.virtualizerStrength,
+            _that.isVirtualizerSupported,
             _that.isDynamicsEnabled,
+            _that.isDynamicsSupported,
             _that.dynamicsPreset,
             _that.selectedHeadphoneProfile,
             _that.isSpatializerSupported,
             _that.isSpatializerEnabled,
             _that.volumeBoost,
+            _that.isVolumeBoostSupported,
+            _that.isBassBoostSupported,
             _that.isCrossfeedEnabled,
             _that.crossfeedDelayUs,
             _that.crossfeedFeedDb,
@@ -887,6 +950,8 @@ extension PlayerStatePatterns on PlayerState {
             _that.stereoBalance,
             _that.monoMix,
             _that.isSincResamplerEnabled,
+            _that.isDitherEnabled,
+            _that.ditherTargetBitDepth,
             _that.isSaturationEnabled,
             _that.saturationDrive,
             _that.saturationMix,
@@ -954,12 +1019,16 @@ extension PlayerStatePatterns on PlayerState {
             bool isEqEnabled,
             bool isVirtualizerEnabled,
             double virtualizerStrength,
+            bool isVirtualizerSupported,
             bool isDynamicsEnabled,
+            bool isDynamicsSupported,
             DynamicsPreset dynamicsPreset,
             HeadphoneProfile? selectedHeadphoneProfile,
             bool isSpatializerSupported,
             bool isSpatializerEnabled,
             double volumeBoost,
+            bool isVolumeBoostSupported,
+            bool isBassBoostSupported,
             bool isCrossfeedEnabled,
             double crossfeedDelayUs,
             double crossfeedFeedDb,
@@ -972,6 +1041,8 @@ extension PlayerStatePatterns on PlayerState {
             double stereoBalance,
             bool monoMix,
             bool isSincResamplerEnabled,
+            bool isDitherEnabled,
+            int ditherTargetBitDepth,
             bool isSaturationEnabled,
             double saturationDrive,
             double saturationMix,
@@ -1024,12 +1095,16 @@ extension PlayerStatePatterns on PlayerState {
             _that.isEqEnabled,
             _that.isVirtualizerEnabled,
             _that.virtualizerStrength,
+            _that.isVirtualizerSupported,
             _that.isDynamicsEnabled,
+            _that.isDynamicsSupported,
             _that.dynamicsPreset,
             _that.selectedHeadphoneProfile,
             _that.isSpatializerSupported,
             _that.isSpatializerEnabled,
             _that.volumeBoost,
+            _that.isVolumeBoostSupported,
+            _that.isBassBoostSupported,
             _that.isCrossfeedEnabled,
             _that.crossfeedDelayUs,
             _that.crossfeedFeedDb,
@@ -1042,6 +1117,8 @@ extension PlayerStatePatterns on PlayerState {
             _that.stereoBalance,
             _that.monoMix,
             _that.isSincResamplerEnabled,
+            _that.isDitherEnabled,
+            _that.ditherTargetBitDepth,
             _that.isSaturationEnabled,
             _that.saturationDrive,
             _that.saturationMix,
@@ -1108,12 +1185,16 @@ extension PlayerStatePatterns on PlayerState {
             bool isEqEnabled,
             bool isVirtualizerEnabled,
             double virtualizerStrength,
+            bool isVirtualizerSupported,
             bool isDynamicsEnabled,
+            bool isDynamicsSupported,
             DynamicsPreset dynamicsPreset,
             HeadphoneProfile? selectedHeadphoneProfile,
             bool isSpatializerSupported,
             bool isSpatializerEnabled,
             double volumeBoost,
+            bool isVolumeBoostSupported,
+            bool isBassBoostSupported,
             bool isCrossfeedEnabled,
             double crossfeedDelayUs,
             double crossfeedFeedDb,
@@ -1126,6 +1207,8 @@ extension PlayerStatePatterns on PlayerState {
             double stereoBalance,
             bool monoMix,
             bool isSincResamplerEnabled,
+            bool isDitherEnabled,
+            int ditherTargetBitDepth,
             bool isSaturationEnabled,
             double saturationDrive,
             double saturationMix,
@@ -1178,12 +1261,16 @@ extension PlayerStatePatterns on PlayerState {
             _that.isEqEnabled,
             _that.isVirtualizerEnabled,
             _that.virtualizerStrength,
+            _that.isVirtualizerSupported,
             _that.isDynamicsEnabled,
+            _that.isDynamicsSupported,
             _that.dynamicsPreset,
             _that.selectedHeadphoneProfile,
             _that.isSpatializerSupported,
             _that.isSpatializerEnabled,
             _that.volumeBoost,
+            _that.isVolumeBoostSupported,
+            _that.isBassBoostSupported,
             _that.isCrossfeedEnabled,
             _that.crossfeedDelayUs,
             _that.crossfeedFeedDb,
@@ -1196,6 +1283,8 @@ extension PlayerStatePatterns on PlayerState {
             _that.stereoBalance,
             _that.monoMix,
             _that.isSincResamplerEnabled,
+            _that.isDitherEnabled,
+            _that.ditherTargetBitDepth,
             _that.isSaturationEnabled,
             _that.saturationDrive,
             _that.saturationMix,
@@ -1253,12 +1342,16 @@ class _PlayerState extends PlayerState {
       this.isEqEnabled = false,
       this.isVirtualizerEnabled = false,
       this.virtualizerStrength = 0.0,
+      this.isVirtualizerSupported = false,
       this.isDynamicsEnabled = false,
+      this.isDynamicsSupported = false,
       this.dynamicsPreset = DynamicsPreset.off,
       this.selectedHeadphoneProfile,
       this.isSpatializerSupported = false,
       this.isSpatializerEnabled = false,
       this.volumeBoost = 0.0,
+      this.isVolumeBoostSupported = false,
+      this.isBassBoostSupported = false,
       this.isCrossfeedEnabled = false,
       this.crossfeedDelayUs = 350.0,
       this.crossfeedFeedDb = -9.0,
@@ -1271,6 +1364,8 @@ class _PlayerState extends PlayerState {
       this.stereoBalance = 0.0,
       this.monoMix = false,
       this.isSincResamplerEnabled = true,
+      this.isDitherEnabled = false,
+      this.ditherTargetBitDepth = 16,
       this.isSaturationEnabled = false,
       this.saturationDrive = 0.3,
       this.saturationMix = 0.5,
@@ -1374,7 +1469,13 @@ class _PlayerState extends PlayerState {
   final double virtualizerStrength;
   @override
   @JsonKey()
+  final bool isVirtualizerSupported;
+  @override
+  @JsonKey()
   final bool isDynamicsEnabled;
+  @override
+  @JsonKey()
+  final bool isDynamicsSupported;
   @override
   @JsonKey()
   final DynamicsPreset dynamicsPreset;
@@ -1389,6 +1490,12 @@ class _PlayerState extends PlayerState {
   @override
   @JsonKey()
   final double volumeBoost;
+  @override
+  @JsonKey()
+  final bool isVolumeBoostSupported;
+  @override
+  @JsonKey()
+  final bool isBassBoostSupported;
   @override
   @JsonKey()
   final bool isCrossfeedEnabled;
@@ -1425,6 +1532,12 @@ class _PlayerState extends PlayerState {
   @override
   @JsonKey()
   final bool isSincResamplerEnabled;
+  @override
+  @JsonKey()
+  final bool isDitherEnabled;
+  @override
+  @JsonKey()
+  final int ditherTargetBitDepth;
   @override
   @JsonKey()
   final bool isSaturationEnabled;
@@ -1563,8 +1676,12 @@ class _PlayerState extends PlayerState {
                 other.isVirtualizerEnabled == isVirtualizerEnabled) &&
             (identical(other.virtualizerStrength, virtualizerStrength) ||
                 other.virtualizerStrength == virtualizerStrength) &&
+            (identical(other.isVirtualizerSupported, isVirtualizerSupported) ||
+                other.isVirtualizerSupported == isVirtualizerSupported) &&
             (identical(other.isDynamicsEnabled, isDynamicsEnabled) ||
                 other.isDynamicsEnabled == isDynamicsEnabled) &&
+            (identical(other.isDynamicsSupported, isDynamicsSupported) ||
+                other.isDynamicsSupported == isDynamicsSupported) &&
             (identical(other.dynamicsPreset, dynamicsPreset) ||
                 other.dynamicsPreset == dynamicsPreset) &&
             (identical(other.selectedHeadphoneProfile, selectedHeadphoneProfile) ||
@@ -1575,6 +1692,10 @@ class _PlayerState extends PlayerState {
                 other.isSpatializerEnabled == isSpatializerEnabled) &&
             (identical(other.volumeBoost, volumeBoost) ||
                 other.volumeBoost == volumeBoost) &&
+            (identical(other.isVolumeBoostSupported, isVolumeBoostSupported) ||
+                other.isVolumeBoostSupported == isVolumeBoostSupported) &&
+            (identical(other.isBassBoostSupported, isBassBoostSupported) ||
+                other.isBassBoostSupported == isBassBoostSupported) &&
             (identical(other.isCrossfeedEnabled, isCrossfeedEnabled) ||
                 other.isCrossfeedEnabled == isCrossfeedEnabled) &&
             (identical(other.crossfeedDelayUs, crossfeedDelayUs) ||
@@ -1598,14 +1719,13 @@ class _PlayerState extends PlayerState {
             (identical(other.monoMix, monoMix) || other.monoMix == monoMix) &&
             (identical(other.isSincResamplerEnabled, isSincResamplerEnabled) ||
                 other.isSincResamplerEnabled == isSincResamplerEnabled) &&
-            (identical(other.isSaturationEnabled, isSaturationEnabled) ||
-                other.isSaturationEnabled == isSaturationEnabled) &&
-            (identical(other.saturationDrive, saturationDrive) ||
-                other.saturationDrive == saturationDrive) &&
-            (identical(other.saturationMix, saturationMix) ||
-                other.saturationMix == saturationMix) &&
-            (identical(other.saturationTilt, saturationTilt) ||
-                other.saturationTilt == saturationTilt) &&
+            (identical(other.isDitherEnabled, isDitherEnabled) ||
+                other.isDitherEnabled == isDitherEnabled) &&
+            (identical(other.ditherTargetBitDepth, ditherTargetBitDepth) || other.ditherTargetBitDepth == ditherTargetBitDepth) &&
+            (identical(other.isSaturationEnabled, isSaturationEnabled) || other.isSaturationEnabled == isSaturationEnabled) &&
+            (identical(other.saturationDrive, saturationDrive) || other.saturationDrive == saturationDrive) &&
+            (identical(other.saturationMix, saturationMix) || other.saturationMix == saturationMix) &&
+            (identical(other.saturationTilt, saturationTilt) || other.saturationTilt == saturationTilt) &&
             (identical(other.isStereoWidthEnabled, isStereoWidthEnabled) || other.isStereoWidthEnabled == isStereoWidthEnabled) &&
             (identical(other.stereoWidth, stereoWidth) || other.stereoWidth == stereoWidth) &&
             (identical(other.isLoudnessContourEnabled, isLoudnessContourEnabled) || other.isLoudnessContourEnabled == isLoudnessContourEnabled) &&
@@ -1654,12 +1774,16 @@ class _PlayerState extends PlayerState {
       isEqEnabled,
       isVirtualizerEnabled,
       virtualizerStrength,
+      isVirtualizerSupported,
       isDynamicsEnabled,
+      isDynamicsSupported,
       dynamicsPreset,
       selectedHeadphoneProfile,
       isSpatializerSupported,
       isSpatializerEnabled,
       volumeBoost,
+      isVolumeBoostSupported,
+      isBassBoostSupported,
       isCrossfeedEnabled,
       crossfeedDelayUs,
       crossfeedFeedDb,
@@ -1672,6 +1796,8 @@ class _PlayerState extends PlayerState {
       stereoBalance,
       monoMix,
       isSincResamplerEnabled,
+      isDitherEnabled,
+      ditherTargetBitDepth,
       isSaturationEnabled,
       saturationDrive,
       saturationMix,
@@ -1703,7 +1829,7 @@ class _PlayerState extends PlayerState {
 
   @override
   String toString() {
-    return 'PlayerState(currentSong: $currentSong, isPlaying: $isPlaying, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, queue: $queue, currentIndex: $currentIndex, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, lyrics: $lyrics, lyricsSource: $lyricsSource, isLoadingLyrics: $isLoadingLyrics, isLyricsVisible: $isLyricsVisible, isQueueVisible: $isQueueVisible, eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isDynamicsEnabled: $isDynamicsEnabled, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, isCrossfeedEnabled: $isCrossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, isLimiterEnabled: $isLimiterEnabled, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, isReverbEnabled: $isReverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, isSincResamplerEnabled: $isSincResamplerEnabled, isSaturationEnabled: $isSaturationEnabled, saturationDrive: $saturationDrive, saturationMix: $saturationMix, saturationTilt: $saturationTilt, isStereoWidthEnabled: $isStereoWidthEnabled, stereoWidth: $stereoWidth, isLoudnessContourEnabled: $isLoudnessContourEnabled, loudnessContourIntensity: $loudnessContourIntensity, isSubCrossoverEnabled: $isSubCrossoverEnabled, subCrossoverCornerHz: $subCrossoverCornerHz, subCrossoverSlopeDbPerOct: $subCrossoverSlopeDbPerOct, subCrossoverGain: $subCrossoverGain, isDynamicEqEnabled: $isDynamicEqEnabled, dynamicEqBands: $dynamicEqBands, hasOemAudio: $hasOemAudio, detectedOemEngines: $detectedOemEngines, activeQueueSlot: $activeQueueSlot, playbackSpeed: $playbackSpeed, audioSessionId: $audioSessionId, errorMessage: $errorMessage, abLoopEnabled: $abLoopEnabled, abPointA: $abPointA, abPointB: $abPointB, trackDelayMs: $trackDelayMs, bookmarkPosition: $bookmarkPosition, silenceSkipSensitivity: $silenceSkipSensitivity)';
+    return 'PlayerState(currentSong: $currentSong, isPlaying: $isPlaying, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, queue: $queue, currentIndex: $currentIndex, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, lyrics: $lyrics, lyricsSource: $lyricsSource, isLoadingLyrics: $isLoadingLyrics, isLyricsVisible: $isLyricsVisible, isQueueVisible: $isQueueVisible, eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isVirtualizerSupported: $isVirtualizerSupported, isDynamicsEnabled: $isDynamicsEnabled, isDynamicsSupported: $isDynamicsSupported, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, isVolumeBoostSupported: $isVolumeBoostSupported, isBassBoostSupported: $isBassBoostSupported, isCrossfeedEnabled: $isCrossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, isLimiterEnabled: $isLimiterEnabled, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, isReverbEnabled: $isReverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, isSincResamplerEnabled: $isSincResamplerEnabled, isDitherEnabled: $isDitherEnabled, ditherTargetBitDepth: $ditherTargetBitDepth, isSaturationEnabled: $isSaturationEnabled, saturationDrive: $saturationDrive, saturationMix: $saturationMix, saturationTilt: $saturationTilt, isStereoWidthEnabled: $isStereoWidthEnabled, stereoWidth: $stereoWidth, isLoudnessContourEnabled: $isLoudnessContourEnabled, loudnessContourIntensity: $loudnessContourIntensity, isSubCrossoverEnabled: $isSubCrossoverEnabled, subCrossoverCornerHz: $subCrossoverCornerHz, subCrossoverSlopeDbPerOct: $subCrossoverSlopeDbPerOct, subCrossoverGain: $subCrossoverGain, isDynamicEqEnabled: $isDynamicEqEnabled, dynamicEqBands: $dynamicEqBands, hasOemAudio: $hasOemAudio, detectedOemEngines: $detectedOemEngines, activeQueueSlot: $activeQueueSlot, playbackSpeed: $playbackSpeed, audioSessionId: $audioSessionId, errorMessage: $errorMessage, abLoopEnabled: $abLoopEnabled, abPointA: $abPointA, abPointB: $abPointB, trackDelayMs: $trackDelayMs, bookmarkPosition: $bookmarkPosition, silenceSkipSensitivity: $silenceSkipSensitivity)';
   }
 }
 
@@ -1736,12 +1862,16 @@ abstract mixin class _$PlayerStateCopyWith<$Res>
       bool isEqEnabled,
       bool isVirtualizerEnabled,
       double virtualizerStrength,
+      bool isVirtualizerSupported,
       bool isDynamicsEnabled,
+      bool isDynamicsSupported,
       DynamicsPreset dynamicsPreset,
       HeadphoneProfile? selectedHeadphoneProfile,
       bool isSpatializerSupported,
       bool isSpatializerEnabled,
       double volumeBoost,
+      bool isVolumeBoostSupported,
+      bool isBassBoostSupported,
       bool isCrossfeedEnabled,
       double crossfeedDelayUs,
       double crossfeedFeedDb,
@@ -1754,6 +1884,8 @@ abstract mixin class _$PlayerStateCopyWith<$Res>
       double stereoBalance,
       bool monoMix,
       bool isSincResamplerEnabled,
+      bool isDitherEnabled,
+      int ditherTargetBitDepth,
       bool isSaturationEnabled,
       double saturationDrive,
       double saturationMix,
@@ -1814,12 +1946,16 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
     Object? isEqEnabled = null,
     Object? isVirtualizerEnabled = null,
     Object? virtualizerStrength = null,
+    Object? isVirtualizerSupported = null,
     Object? isDynamicsEnabled = null,
+    Object? isDynamicsSupported = null,
     Object? dynamicsPreset = null,
     Object? selectedHeadphoneProfile = freezed,
     Object? isSpatializerSupported = null,
     Object? isSpatializerEnabled = null,
     Object? volumeBoost = null,
+    Object? isVolumeBoostSupported = null,
+    Object? isBassBoostSupported = null,
     Object? isCrossfeedEnabled = null,
     Object? crossfeedDelayUs = null,
     Object? crossfeedFeedDb = null,
@@ -1832,6 +1968,8 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
     Object? stereoBalance = null,
     Object? monoMix = null,
     Object? isSincResamplerEnabled = null,
+    Object? isDitherEnabled = null,
+    Object? ditherTargetBitDepth = null,
     Object? isSaturationEnabled = null,
     Object? saturationDrive = null,
     Object? saturationMix = null,
@@ -1940,9 +2078,17 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
           ? _self.virtualizerStrength
           : virtualizerStrength // ignore: cast_nullable_to_non_nullable
               as double,
+      isVirtualizerSupported: null == isVirtualizerSupported
+          ? _self.isVirtualizerSupported
+          : isVirtualizerSupported // ignore: cast_nullable_to_non_nullable
+              as bool,
       isDynamicsEnabled: null == isDynamicsEnabled
           ? _self.isDynamicsEnabled
           : isDynamicsEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      isDynamicsSupported: null == isDynamicsSupported
+          ? _self.isDynamicsSupported
+          : isDynamicsSupported // ignore: cast_nullable_to_non_nullable
               as bool,
       dynamicsPreset: null == dynamicsPreset
           ? _self.dynamicsPreset
@@ -1964,6 +2110,14 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
           ? _self.volumeBoost
           : volumeBoost // ignore: cast_nullable_to_non_nullable
               as double,
+      isVolumeBoostSupported: null == isVolumeBoostSupported
+          ? _self.isVolumeBoostSupported
+          : isVolumeBoostSupported // ignore: cast_nullable_to_non_nullable
+              as bool,
+      isBassBoostSupported: null == isBassBoostSupported
+          ? _self.isBassBoostSupported
+          : isBassBoostSupported // ignore: cast_nullable_to_non_nullable
+              as bool,
       isCrossfeedEnabled: null == isCrossfeedEnabled
           ? _self.isCrossfeedEnabled
           : isCrossfeedEnabled // ignore: cast_nullable_to_non_nullable
@@ -2012,6 +2166,14 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
           ? _self.isSincResamplerEnabled
           : isSincResamplerEnabled // ignore: cast_nullable_to_non_nullable
               as bool,
+      isDitherEnabled: null == isDitherEnabled
+          ? _self.isDitherEnabled
+          : isDitherEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      ditherTargetBitDepth: null == ditherTargetBitDepth
+          ? _self.ditherTargetBitDepth
+          : ditherTargetBitDepth // ignore: cast_nullable_to_non_nullable
+              as int,
       isSaturationEnabled: null == isSaturationEnabled
           ? _self.isSaturationEnabled
           : isSaturationEnabled // ignore: cast_nullable_to_non_nullable

@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/constants/audio_feature_info.dart';
 import 'package:pulsr/core/constants/channels.dart';
+import 'package:pulsr/core/constants/prefs_keys.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/data/scanner/media_scanner_service.dart';
 import 'package:pulsr/domain/models/audio_output_info.dart';
@@ -14,6 +15,7 @@ import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/settings/presentation/widgets/audio_sound_section.dart';
 import 'package:pulsr/features/settings/presentation/widgets/playback_section.dart';
+import 'package:pulsr/features/settings/presentation/widgets/room_correction_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MockMediaScannerService extends Mock implements MediaScannerService {}
@@ -41,6 +43,21 @@ void main() {
         .setMockMethodCallHandler(
       const MethodChannel(PulsrChannels.hiresDac),
       (call) async => null,
+    );
+    // The system-effects policy write is a real channel round-trip with a 2s
+    // timeout; answer it so the OEM selector test leaves no pending timer.
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel(PulsrChannels.audioEffects),
+      (call) async {
+        if (call.method == 'setSystemEffectsPolicy') {
+          return <String, dynamic>{
+            'status': 'unsupportedDevice',
+            'detectedBundles': <String>[],
+          };
+        }
+        return null;
+      },
     );
     mockScanner = MockMediaScannerService();
   });
@@ -247,5 +264,136 @@ void main() {
         isNull,
       );
     });
+  });
+
+  // The live settings screen now renders AudioSoundSection directly (it was
+  // orphaned before), so these entries are reachable from Settings.
+  group('Live audio section reachability (AudioSoundSection)', () {
+    late MockPlayerCubit playerCubit;
+
+    setUp(() {
+      playerCubit = MockPlayerCubit();
+      when(() => playerCubit.state).thenReturn(const PlayerState());
+      when(() => playerCubit.stream).thenAnswer((_) => const Stream.empty());
+    });
+
+    testWidgets('Room Correction entry is reachable and opens the wizard',
+        (tester) async {
+      final cubit = SettingsCubit(scannerService: mockScanner);
+      addTearDown(cubit.close);
+
+      // Providers sit above MaterialApp: the wizard is a root-navigator modal,
+      // so it must still find PlayerCubit from the app root (as in main.dart).
+      await tester.pumpWidget(
+        BlocProvider<SettingsCubit>.value(
+          value: cubit,
+          child: BlocProvider<PlayerCubit>.value(
+            value: playerCubit,
+            child: MaterialApp(
+              theme: AuraTheme.darkTheme,
+              home: Scaffold(
+                body: ListView(
+                  children: const [
+                    AudioSoundSection(state: SettingsState()),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final rcTile = find.text('Room Correction');
+      expect(rcTile, findsOneWidget);
+
+      await tester.ensureVisible(rcTile);
+      await tester.pump();
+      await tester.tap(rcTile);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.byType(RoomCorrectionSheet), findsOneWidget);
+    }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+
+    testWidgets('OEM system-effects policy selector is reachable and persists',
+        (tester) async {
+      final cubit = SettingsCubit(scannerService: mockScanner);
+      addTearDown(cubit.close);
+
+      await tester.pumpWidget(host(
+        BlocProvider<SettingsCubit>.value(
+          value: cubit,
+          child: BlocProvider<PlayerCubit>.value(
+            value: playerCubit,
+            child: const AudioSoundSection(state: SettingsState()),
+          ),
+        ),
+      ));
+
+      expect(find.text('System Audio Effects (Dolby Atmos / DAP)'),
+          findsOneWidget);
+      final tryDisable = find.text('Try to disable');
+      expect(tryDisable, findsOneWidget);
+
+      await tester.ensureVisible(tryDisable);
+      await tester.pump();
+      await tester.tap(tryDisable);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(cubit.state.systemEffectsPolicy, 'tryDisable');
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(PrefsKeys.systemEffectsPolicy), 'tryDisable');
+    }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+  });
+
+  group('Non-Android (iOS) degradation gating (AudioSoundSection)', () {
+    late MockPlayerCubit playerCubit;
+
+    setUp(() {
+      playerCubit = MockPlayerCubit();
+      when(() => playerCubit.state).thenReturn(const PlayerState());
+      when(() => playerCubit.stream).thenAnswer((_) => const Stream.empty());
+    });
+
+    testWidgets(
+        'Android-only controls are disabled with a clear reason and do nothing',
+        (tester) async {
+      final cubit = SettingsCubit(scannerService: mockScanner);
+      addTearDown(cubit.close);
+
+      await tester.pumpWidget(host(
+        BlocProvider<SettingsCubit>.value(
+          value: cubit,
+          child: BlocProvider<PlayerCubit>.value(
+            value: playerCubit,
+            child: const AudioSoundSection(state: SettingsState()),
+          ),
+        ),
+      ));
+
+      // Clear, repeated reason instead of silently failing.
+      expect(find.text('Not available on this platform'), findsWidgets);
+
+      // Room Correction is disabled: tapping it must not open the wizard.
+      final rcTile = find.text('Room Correction');
+      expect(rcTile, findsOneWidget);
+      await tester.ensureVisible(rcTile);
+      await tester.pump();
+      await tester.tap(rcTile, warnIfMissed: false);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byType(RoomCorrectionSheet), findsNothing);
+
+      // OEM system-effects selector is disabled.
+      final tryDisable = find.text('Try to disable');
+      expect(tryDisable, findsOneWidget);
+      await tester.ensureVisible(tryDisable);
+      await tester.pump();
+      await tester.tap(tryDisable, warnIfMissed: false);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(cubit.state.systemEffectsPolicy, 'auto');
+    }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
   });
 }

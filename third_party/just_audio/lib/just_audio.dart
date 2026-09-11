@@ -76,6 +76,12 @@ class AudioPlayer {
   /// resources are not needed (i.e. after initial instantiation and after [stop]).
   bool _active = false;
 
+  /// Pulsr fork: the remembered 24/32-bit float-output preference for this
+  /// player. It is kept even while the platform player is idle and pushed to
+  /// the native player when it is (re)created, so the sink is built with the
+  /// right encodings. Default `false` = historical 16-bit path.
+  bool _floatOutputEnabled = false;
+
   /// This is set to [_nativePlatform] when [_active] is `true` and
   /// [_idlePlatform] otherwise.
   late Future<AudioPlayerPlatform> _platform;
@@ -1247,6 +1253,35 @@ class AudioPlayer {
     }
   }
 
+  /// Pulsr fork: requests the opt-in 24/32-bit float DSP path on this player's
+  /// audio sink. When enabled, the vendored Android fork configures ExoPlayer's
+  /// audio sink for float output and [NativeDspAudioProcessor] forwards float
+  /// samples to the native engine instead of quantising to 16-bit. Default is
+  /// `false`, which keeps the historical 16-bit sink path.
+  ///
+  /// The preference is remembered even when the platform player is idle and is
+  /// applied when the native player is (re)created, so it survives just_audio's
+  /// lazy platform initialisation. Returns `false` only when the request could
+  /// not be stored at all (player disposed); platforms that cannot honour float
+  /// output keep the 16-bit path rather than failing.
+  Future<bool> dspSetFloatOutput(bool enabled) async {
+    if (_disposed) return false;
+    _floatOutputEnabled = enabled;
+    try {
+      if (!_active) return true; // remembered; flushed on platform activation
+      final platform = _platformValue;
+      if (platform == null) return true;
+      final channel =
+          MethodChannel('com.ryanheise.just_audio.methods.${platform.id}');
+      return await channel
+              .invokeMethod<bool>('dspSetFloatOutput', {'enabled': enabled}) ??
+          false;
+    } catch (_) {
+      // Not the Pulsr Android fork (web/iOS/macOS/windows).
+      return false;
+    }
+  }
+
   /// Sets whether silence should be skipped in audio playback. (Currently
   /// Android only).
   Future<void> setSkipSilenceEnabled(bool enabled) async {
@@ -1729,6 +1764,22 @@ class AudioPlayer {
         return platform;
       });
       if (checkInterruption() || _disposed) return inactiveResult(platform);
+
+      // Pulsr fork: push the remembered float-output preference before any
+      // other call configures the native audio sink. The native handler stores
+      // the flag without initialising the player, so the sink built by the
+      // following setAudioAttributes/load calls uses the requested 16-bit
+      // (default) or 24/32-bit float DSP path.
+      if (active && !_isUnitTest()) {
+        try {
+          final dspChannel = MethodChannel(
+              'com.ryanheise.just_audio.methods.${platform.id}');
+          await dspChannel.invokeMethod<bool>(
+              'dspSetFloatOutput', {'enabled': _floatOutputEnabled});
+        } catch (_) {
+          // Not the Pulsr Android fork — keep the default 16-bit path.
+        }
+      }
 
       if (active) {
         if (playlist.children.isNotEmpty) {

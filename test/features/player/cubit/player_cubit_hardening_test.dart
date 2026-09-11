@@ -188,7 +188,7 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   @override
   Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) async {}
   @override
-  Future<void> loadCustomImpulseResponse(List<double> irSamples) async {}
+  Future<bool> loadCustomImpulseResponse(List<double> irSamples) async => true;
   @override
   Future<void> setStereoBalance(double balance) async {}
   @override
@@ -278,6 +278,23 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   bool get isDynamicEqEnabled => false;
   @override
   List<DynamicEqBandConfig> get dynamicEqBands => const [DynamicEqBandConfig()];
+
+  @override
+  bool get isDynamicsEffectivelyEnabled => false;
+  @override
+  bool get isDynamicsSupported => true;
+  @override
+  bool get isVirtualizerSupported => true;
+  @override
+  bool get isBassBoostSupported => true;
+  @override
+  bool get isVolumeBoostSupported => true;
+  @override
+  bool get isDitherEnabled => false;
+  @override
+  int get ditherTargetBitDepth => 16;
+  @override
+  Future<void> setDither(bool enabled, {int? targetBitDepth}) async {}
 
   @override
   void dispose() {

@@ -208,6 +208,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         panner_.applyParams(snapshot->panner);
         crossfeed_.applyParams(snapshot->crossfeed);
         limiter_.applyParams(snapshot->limiter);
+        resampler_.applyParams(snapshot->resampler);
         saturation_.applyParams(snapshot->saturation);
         stereoWidth_.applyParams(snapshot->stereoWidth);
         loudnessContour_.applyParams(snapshot->loudness);
@@ -279,6 +280,14 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
             }
         }
 
+        // 0. Sinc Resampler Stage — rate-matches the track to the engine rate
+        //    first so all downstream coefficients (EQ, reverb, crossover) run
+        //    at the true rate. In-place polyphase FIR keeps the N-in/N-out
+        //    block contract; bypassed when rates match (zero cost).
+        if ((stages & STAGE_RESAMPLER) && snapshot->resampler.enabled && !resampler_.isBypassed()) {
+            resampler_.processInterleaved(buffer, frames, channels);
+        }
+
         // 1. Parametric EQ Stage
         if (stages & STAGE_EQ) {
             eq_.processInterleaved(buffer, frames, channels);
@@ -332,20 +341,28 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         if ((stages & STAGE_LIMITER) && (hasNetPositiveGain || snapshot->limiter.enabled)) {
             limiter_.processInterleaved(buffer, frames, channels);
         }
+    }
 
-        // TPDF Dither: Applied ONLY at final 16-bit truncation, ONLY when chain gain != unity,
-        // and SKIPPED on Bluetooth (lossy codecs SBC/AAC/LDAC perform lossy quantization downstream)
-        if (snapshot->dither.enabled && snapshot->dither.targetBitDepth == 16 && !snapshot->dither.isBluetooth) {
-            const int totalSamples = frames * channels;
-            constexpr float kScale = 32768.0f;
-            constexpr float kInvScale = 1.0f / 32768.0f;
-            for (int i = 0; i < totalSamples; ++i) {
-                float x = buffer[i];
-                if (!std::isfinite(x)) continue;
-                float dither = generateTpdf(); // Triangular PDF (-1.0 to +1.0 LSB)
-                float quant = std::round(x * kScale + dither) * kInvScale;
-                buffer[i] = std::clamp(quant, -1.0f, 1.0f);
-            }
+    // TPDF Dither — its own stage bit, so a lone dither toggle acts standalone
+    // (previously it was nested inside the non-unity-gain block and dead when no
+    // other effect was active). Applied at the final requantization to the
+    // configured output depth (16/24/32-bit) with a correctly scaled LSB.
+    // SKIPPED on Bluetooth: SBC/AAC/LDAC re-quantize downstream, so dithering
+    // here is wasted noise. When disabled — or the stage bit is clear — this is
+    // bit-transparent: no write touches the buffer.
+    const bool ditherStageActive = (stages & STAGE_DITHER) != 0 &&
+                                   snapshot->dither.enabled &&
+                                   !snapshot->dither.isBluetooth;
+    if (ditherStageActive) {
+        const float scale = ditherScaleForBits(snapshot->dither.targetBitDepth);
+        const float invScale = 1.0f / scale;
+        const int totalSamples = frames * channels;
+        for (int i = 0; i < totalSamples; ++i) {
+            float x = buffer[i];
+            if (!std::isfinite(x)) continue;
+            float dither = generateTpdf(); // Triangular PDF (-1.0 .. +1.0 LSB)
+            float quant = std::round(x * scale + dither) * invScale;
+            buffer[i] = std::clamp(quant, -1.0f, 1.0f);
         }
     }
 

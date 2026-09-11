@@ -99,6 +99,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var limiterLookaheadMs = 3.0
     private var limiterThresholdDb = -0.2
     private var limiterReleaseMs = 50.0
+    // Studio compressor knobs. Only the HAL DynamicsProcessing limiter can
+    // honor these; defaults keep the brickwall behavior (ratio 20, attack from
+    // lookahead, no make-up) until the user edits the compressor sheet.
+    private var limiterRatio = 20.0
+    private var limiterAttackMs = 0.0 // <= 0 → derive attack from lookahead
+    private var limiterMakeupGainDb = 0.0
 
     private var isReverbEnabled = false
     private var reverbPreset = 0
@@ -135,6 +141,14 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var _oemWarningLogged = false
     private var isBitPerfectBypassActive = false
     private var bypassSavedStages: Int? = null
+    // Dither / bit-perfect snapshot state (mirrors DspParams.h defaults).
+    // Default depth is 16: the native PCM sink is 16-bit, so that is the only
+    // depth the always-on path can actually honour. Must match DspParams.h and
+    // the Dart state default (PlayerState.ditherTargetBitDepth / EqualizerManager).
+    private var isDitherEnabled = false
+    private var ditherTargetBitDepth = 16
+    private var isBluetoothRoute = false
+    private var isDopActive = false
 
     private val disposed = java.util.concurrent.atomic.AtomicBoolean(false)
     @Volatile private var reverbExecutor = java.util.concurrent.Executors.newSingleThreadExecutor(
@@ -178,6 +192,22 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun isValidSampleRate(rate: Double): Boolean {
         return rate.isFinite() && rate >= 8000.0 && rate <= 768000.0
+    }
+
+    // M12: single truthful-status helper for effect setters that can silently
+    // no-op (unsupported capability, construction/build failure, or missing
+    // native engine/session). Returns false so the channel reports the failure
+    // instead of an unconditional success(true). The reason is logged once per
+    // call, and consecutive identical reasons are only logged on transition so
+    // a failing slider drag cannot spam the log.
+    @Volatile private var lastNotAppliedReason: String? = null
+
+    private fun notApplied(reason: String): Boolean {
+        if (reason != lastNotAppliedReason) {
+            Log.w(TAG, "Effect not applied: $reason")
+            lastNotAppliedReason = reason
+        }
+        return false
     }
 
     // Deduplication caches for native effect parameter pushes (W7)
@@ -272,6 +302,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         trackPeak: Double, albumPeak: Double,
         preAmpDb: Double, preventClipping: Boolean, enabled: Boolean
     )
+    private external fun nativeSetDitherParams(enabled: Boolean, targetBitDepth: Int, isBluetooth: Boolean)
+    private external fun nativeSetDitherBluetooth(isBluetooth: Boolean)
+    private external fun nativeSetBitPerfectParams(enabled: Boolean, isDop: Boolean)
     private external fun nativeDecodeDsd(dsdL: ByteArray, dsdR: ByteArray, byteCount: Int, dsdRate: Int, targetPcmSampleRate: Int, bitOrder: Int): FloatArray?
     private external fun nativeSetActiveStages(bitmask: Int)
     private external fun nativeSetCacheBudgetBytes(budgetBytes: Long)
@@ -308,6 +341,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             if (isNativeDspLoaded) {
                 try { nativeSetActiveStages(0) } catch (_: Exception) {}
                 try { nativeSetSincResamplerEnabled(false) } catch (_: Exception) {}
+                try { nativeSetBitPerfectParams(true, isDopActive) } catch (_: Exception) {}
             }
             return
         }
@@ -336,6 +370,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         if (isLoudnessContourEnabled && loudnessIntensity > 0.001) mask = mask or STAGE_LOUDNESS
         if (isSubCrossoverEnabled) mask = mask or STAGE_CROSSOVER
         if (isDynamicEqEnabled && dynamicEqBandCount > 0) mask = mask or STAGE_DYNEQ
+        // Dither is a standalone stage: it must run even with every other
+        // effect off, so it is gated by its own bit rather than by chain gain.
+        if (isDitherEnabled) mask = mask or STAGE_DITHER
         activeDspStages = mask
 
         if (isNativeDspLoaded) {
@@ -372,6 +409,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         const val STAGE_LOUDNESS = 1 shl 8
         const val STAGE_CROSSOVER = 1 shl 9
         const val STAGE_DYNEQ = 1 shl 10
+        // Standalone dither stage (must mirror DspStageMask in AudioDspEngine.h)
+        const val STAGE_DITHER = 1 shl 11
 
         /**
          * Ordinal of `ReverbPreset::Custom` in ConvolutionReverb.h — the one
@@ -618,6 +657,14 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         val deviceTypes = devices?.map { it.type } ?: emptyList()
         Log.i(TAG, "Audio device route changed (${if (isAdded) "added" else "removed"}): types=$deviceTypes")
         val isBluetooth = deviceTypes.any { HiResDacPlugin.isBluetoothOutputType(it) }
+        // Keep the native dither stage truthful: dither is skipped on BT
+        // (lossy transcode downstream) and applied on wired/USB when enabled.
+        if (isBluetooth != isBluetoothRoute) {
+            isBluetoothRoute = isBluetooth
+            if (isNativeDspLoaded) {
+                try { nativeSetDitherBluetooth(isBluetooth) } catch (_: Exception) {}
+            }
+        }
         // BT (A2DP codec handshake or LE Audio CIS setup) needs 500-600ms to
         // negotiate the sink; wired/USB is fast (150ms). Rebinding an
         // AudioEffect before the sink settles silently drops the effect.
@@ -771,6 +818,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         try { nativeSetLoudnessContourEnabled(isLoudnessContourEnabled) } catch (_: Exception) {}
         try { nativeSetSubCrossoverEnabled(isSubCrossoverEnabled) } catch (_: Exception) {}
         try { nativeSetDynamicEqEnabled(isDynamicEqEnabled) } catch (_: Exception) {}
+        // Re-assert bit-perfect/dither snapshot truth after bypass so the
+        // C++ early-return and BT dither-skip match the restored route.
+        try { nativeSetBitPerfectParams(false, isDopActive) } catch (_: Exception) {}
+        try { nativeSetDitherParams(isDitherEnabled, ditherTargetBitDepth, isBluetoothRoute) } catch (_: Exception) {}
         recalculateActiveStages()
     }
 
@@ -797,20 +848,17 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
                 "setVirtualizerEnabled" -> {
                     val enabled = call.argument<Boolean>("enabled") ?: false
-                    setVirtualizerState(enabled)
-                    result.success(true)
+                    result.success(setVirtualizerState(enabled))
                 }
 
                 "setVirtualizerStrength" -> {
                     val strength = call.argument<Int>("strength") ?: 0
-                    setVirtualizerStrengthValue(strength)
-                    result.success(true)
+                    result.success(setVirtualizerStrengthValue(strength))
                 }
 
                 "setVolumeBoost" -> {
                     val milliBels = (call.argument<Int>("milliBels") ?: 0).coerceIn(0, 1000)
-                    setVolumeBoost(milliBels)
-                    result.success(true)
+                    result.success(setVolumeBoost(milliBels))
                 }
 
                 "isVolumeBoostSupported" -> {
@@ -820,8 +868,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
                 "setBassBoost" -> {
                     val strength = call.argument<Int>("strength") ?: 0
-                    setBassBoostStrengthValue(strength)
-                    result.success(true)
+                    result.success(setBassBoostStrengthValue(strength))
                 }
 
                 "isBassBoostSupported" -> {
@@ -856,8 +903,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         return
                     }
                     val enabled = if (preset == "off") false else (call.argument<Boolean>("enabled") ?: true)
-                    setDynamicsPresetState(preset, enabled)
-                    result.success(true)
+                    result.success(setDynamicsPresetState(preset, enabled))
                 }
 
                 "setEqEnabled" -> {
@@ -1122,6 +1168,16 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     limiterLookaheadMs = lookaheadMs
                     limiterThresholdDb = thresholdDb
                     limiterReleaseMs = releaseMs
+                    // Optional compressor knobs (only sent once the user owns them).
+                    (call.argument<Number>("ratio"))?.toDouble()?.let {
+                        limiterRatio = clamp(it, 1.0, 20.0)
+                    }
+                    (call.argument<Number>("attackMs"))?.toDouble()?.let {
+                        limiterAttackMs = clamp(it, 0.1, 100.0)
+                    }
+                    (call.argument<Number>("makeupGainDb"))?.toDouble()?.let {
+                        limiterMakeupGainDb = clamp(it, 0.0, 12.0)
+                    }
                     if (isNativeDspLoaded) {
                         val key = String.format(java.util.Locale.US, "%.2f:%.2f:%.1f:%b", lookaheadMs, thresholdDb, releaseMs, truePeak)
                         if (lastNativeLimiterParams != key) {
@@ -1239,6 +1295,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         result.error("NATIVE_DSP_UNAVAILABLE", "Native DSP is not loaded", null)
                         return
                     }
+                    if (disposed.get()) {
+                        result.success(notApplied("Plugin disposed before IR load"))
+                        return
+                    }
 
                     val copy = irList.toList()
                     safeReverbExecute {
@@ -1252,11 +1312,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             } else {
                                 Log.w(TAG, "IR too large or exceeds budget")
                             }
+                            // Report the real native result instead of assuming success.
+                            result.success(loaded)
                         } catch (e: Exception) {
                             Log.w(TAG, "nativeLoadImpulseResponse async failed: ${e.message}")
+                            result.success(notApplied("IR load failed: ${e.message}"))
                         }
                     }
-                    result.success(true)
                 }
 
                 "setCacheBudgetBytes" -> {
@@ -1654,8 +1716,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
                 "setSpatializerEnabled" -> {
                     val enabled = call.argument<Boolean>("enabled") ?: false
-                    setSpatializerState(enabled)
-                    result.success(true)
+                    result.success(setSpatializerState(enabled))
                 }
 
                 "hasActiveEffects" -> {
@@ -2070,8 +2131,17 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
                 "setReplayGainEnabled" -> {
                     val enabled = call.argument<Boolean>("enabled") ?: false
-                    try { nativeSetReplayGainEnabled(enabled) } catch (e: Exception) { Log.w(TAG, "nativeSetReplayGainEnabled failed: ${e.message}") }
-                    result.success(true)
+                    if (!isNativeDspLoaded) {
+                        result.success(notApplied("ReplayGain requires the native DSP engine (not loaded)"))
+                        return
+                    }
+                    try {
+                        nativeSetReplayGainEnabled(enabled)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "nativeSetReplayGainEnabled failed: ${e.message}")
+                        result.success(notApplied("ReplayGain enable failed: ${e.message}"))
+                    }
                 }
 
                 "setReplayGainParams" -> {
@@ -2083,18 +2153,30 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     val preAmpDb = call.argument<Double>("preAmpDb") ?: 0.0
                     val preventClipping = call.argument<Boolean>("preventClipping") ?: true
                     val enabled = call.argument<Boolean>("enabled") ?: (mode != 0)
+                    if (!isNativeDspLoaded) {
+                        result.success(notApplied("ReplayGain requires the native DSP engine (not loaded)"))
+                        return
+                    }
                     try {
                         nativeSetReplayGainParams(mode, trackGainDb, albumGainDb, trackPeak, albumPeak, preAmpDb, preventClipping, enabled)
-                    } catch (e: Exception) { Log.w(TAG, "nativeSetReplayGainParams failed: ${e.message}") }
-                    result.success(true)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "nativeSetReplayGainParams failed: ${e.message}")
+                        result.success(notApplied("ReplayGain params failed: ${e.message}"))
+                    }
                 }
 
                 "setBypassDspForBitPerfect" -> {
                     val bypass = call.argument<Boolean>("bypass") ?: false
+                    val isDop = (call.argument<Boolean>("isDop") ?: isDopActive)
                     synchronized(this) {
-                        if (bypass != isBitPerfectBypassActive) {
+                        if (bypass != isBitPerfectBypassActive || (bypass && isDop != isDopActive)) {
                             if (bypass) bypassSavedStages = activeDspStages
                             isBitPerfectBypassActive = bypass
+                            isDopActive = isDop
+                            // Mirror into the native snapshot so the C++ early-return
+                            // fires even if a stages mask is stale after reattach.
+                            try { nativeSetBitPerfectParams(bypass, isDop) } catch (_: Exception) {}
                             if (bypass) {
                                 // Immediately disable virtualizer/loudness/bass + native stages
                                 try { virtualizer?.enabled = false } catch (_: Exception) {}
@@ -2112,6 +2194,36 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             }
                         }
                     }
+                    result.success(true)
+                }
+
+                "setDitherParams" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    val targetBitDepth = (call.argument<Int>("targetBitDepth") ?: 16).coerceIn(16, 32)
+                    val isBt = call.argument<Boolean>("isBluetooth") ?: isBluetoothRoute
+                    isDitherEnabled = enabled
+                    ditherTargetBitDepth = if (targetBitDepth == 24 || targetBitDepth == 32) targetBitDepth else 16
+                    // Dither owns STAGE_DITHER in the mask; refresh it so a lone
+                    // dither toggle actually reaches the native stage.
+                    recalculateActiveStages()
+                    if (!isNativeDspLoaded) {
+                        result.success(notApplied("Dither requires the native DSP engine (not loaded)"))
+                        return
+                    }
+                    try {
+                        nativeSetDitherParams(enabled, ditherTargetBitDepth, isBt)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "nativeSetDitherParams failed: ${e.message}")
+                        result.success(notApplied("Dither apply failed: ${e.message}"))
+                    }
+                }
+
+                "setBitPerfectParams" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    val isDop = call.argument<Boolean>("isDop") ?: false
+                    isDopActive = isDop
+                    try { nativeSetBitPerfectParams(enabled, isDop) } catch (e: Exception) { Log.w(TAG, "nativeSetBitPerfectParams failed: ${e.message}") }
                     result.success(true)
                 }
 
@@ -2162,26 +2274,40 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun setVirtualizerState(enabled: Boolean) {
+    private fun setVirtualizerState(enabled: Boolean): Boolean {
         isVirtualizerEnabled = enabled
+        if (!isEffectTypeSupported(AudioEffect.EFFECT_TYPE_VIRTUALIZER)) {
+            return notApplied("Virtualizer unsupported on this device")
+        }
         ensureVirtualizer()
-        try {
-            virtualizer?.enabled = enabled
+        val v = virtualizer
+            ?: return notApplied("Virtualizer not attached (no audio session or ctor failure)")
+        return try {
+            v.enabled = enabled
+            true
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to set virtualizer enabled: ${e.message}")
+            notApplied("Virtualizer enable failed: ${e.message}")
         }
     }
 
-    private fun setVirtualizerStrengthValue(strength: Int) {
+    private fun setVirtualizerStrengthValue(strength: Int): Boolean {
         val clamped = strength.coerceIn(0, 1000).toShort()
         virtualizerStrength = clamped
+        if (!isEffectTypeSupported(AudioEffect.EFFECT_TYPE_VIRTUALIZER)) {
+            return notApplied("Virtualizer unsupported on this device")
+        }
         ensureVirtualizer()
-        try {
-            if (virtualizer?.strengthSupported == true) {
-                virtualizer?.setStrength(clamped)
+        val v = virtualizer
+            ?: return notApplied("Virtualizer not attached (no audio session or ctor failure)")
+        return try {
+            if (clamped > 0 && v.strengthSupported != true) {
+                notApplied("Virtualizer strength control unsupported on this device")
+            } else {
+                if (v.strengthSupported == true) v.setStrength(clamped)
+                true
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to set virtualizer strength: ${e.message}")
+            notApplied("Virtualizer strength apply failed: ${e.message}")
         }
     }
 
@@ -2217,14 +2343,20 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun setVolumeBoost(milliBels: Int) {
+    private fun setVolumeBoost(milliBels: Int): Boolean {
         volumeBoostMilliBels = milliBels.coerceIn(0, 1000)
+        if (!isEffectTypeSupported(AudioEffect.EFFECT_TYPE_LOUDNESS_ENHANCER)) {
+            return notApplied("Volume boost (LoudnessEnhancer) unsupported on this device")
+        }
         ensureVolumeBoost()
-        try {
-            loudnessEnhancer?.setTargetGain(volumeBoostMilliBels)
-            loudnessEnhancer?.enabled = volumeBoostMilliBels > 0
+        val le = loudnessEnhancer
+            ?: return notApplied("Volume boost not attached (no audio session or ctor failure)")
+        return try {
+            le.setTargetGain(volumeBoostMilliBels)
+            le.enabled = volumeBoostMilliBels > 0
+            true
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to set volume boost: ${e.message}")
+            notApplied("Volume boost apply failed: ${e.message}")
         }
     }
 
@@ -2242,17 +2374,25 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun setBassBoostStrengthValue(strength: Int) {
+    private fun setBassBoostStrengthValue(strength: Int): Boolean {
         val clamped = strength.coerceIn(0, 1000).toShort()
         bassBoostStrength = clamped
+        if (!isEffectTypeSupported(AudioEffect.EFFECT_TYPE_BASS_BOOST)) {
+            return notApplied("Bass boost unsupported on this device")
+        }
         ensureBassBoost()
-        try {
-            if (bassBoost?.strengthSupported == true) {
-                bassBoost?.setStrength(clamped)
+        val bb = bassBoost
+            ?: return notApplied("Bass boost not attached (no audio session or ctor failure)")
+        return try {
+            if (clamped > 0 && bb.strengthSupported != true) {
+                notApplied("Bass boost strength control unsupported on this device")
+            } else {
+                if (bb.strengthSupported == true) bb.setStrength(clamped)
+                bb.enabled = clamped > 0
+                true
             }
-            bassBoost?.enabled = clamped > 0
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to set bass boost: ${e.message}")
+            notApplied("Bass boost apply failed: ${e.message}")
         }
     }
 
@@ -2306,18 +2446,27 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun setDynamicsPresetState(preset: String, enabled: Boolean) {
+    private fun setDynamicsPresetState(preset: String, enabled: Boolean): Boolean {
         currentDynamicsPreset = preset
         isDynamicsEnabled = enabled
+        val wantsDynamics = enabled && preset != "off"
+        if (wantsDynamics && !isEffectTypeSupported(AudioEffect.EFFECT_TYPE_DYNAMICS_PROCESSING)) {
+            dynamicsProcessing?.let { neutralizeDynamics(it) }
+            return notApplied("DynamicsProcessing unsupported on this device")
+        }
         val dp = dynamicsProcessing
         if (dp != null) {
             configureDynamicsInPlace(dp, preset, enabled)
             // A preset switch can turn dynamics on while DP was disabled
             // (e.g. EQ-only while HAL EQ suppressed): re-evaluate the flag.
             updateDpEnabled()
-        } else {
-            buildDynamicsProcessing()
+            return true
         }
+        buildDynamicsProcessing()
+        if (wantsDynamics && dynamicsProcessing == null) {
+            return notApplied("DynamicsProcessing build failed or unavailable (no audio session)")
+        }
+        return true
     }
 
     private fun configureDynamicsInPlace(
@@ -2655,8 +2804,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         return result
     }
 
-    private fun setSpatializerState(enabled: Boolean) {
-        var hardwareApplied = false
+    private fun setSpatializerState(enabled: Boolean): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S_V2) {
             try {
                 val audioManager = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
@@ -2665,24 +2813,26 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     try {
                         val setEnabledMethod = spatializer.javaClass.getMethod("setEnabled", Boolean::class.javaPrimitiveType)
                         setEnabledMethod.invoke(spatializer, enabled)
-                        hardwareApplied = true
+                        Log.i(TAG, "Hardware Spatializer ${if (enabled) "enabled" else "disabled"}")
+                        return true
                     } catch (e: Exception) {
                         Log.w(TAG, "Spatializer reflection failed: ${e.message}")
-                    }
-                    if (hardwareApplied) {
-                        Log.i(TAG, "Hardware Spatializer ${if (enabled) "enabled" else "disabled"}")
-                        return  // Don't fall through to virtualizer
                     }
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Spatializer hardware check failed, falling back: ${e.message}")
             }
         }
-        // Fallback: virtualizer-only stereo field widening
-        setVirtualizerState(enabled)
+        // Fallback: virtualizer-only stereo field widening. If the device has
+        // neither a Spatializer API nor a Virtualizer there is no audible path.
+        if (!isEffectTypeSupported(AudioEffect.EFFECT_TYPE_VIRTUALIZER)) {
+            return notApplied("Spatializer unavailable and device has no Virtualizer")
+        }
+        if (!setVirtualizerState(enabled)) return false
         if (enabled && virtualizerStrength <= 0) {
             setVirtualizerStrengthValue(800)
         }
+        return true
     }
 
     private fun recreateEffects() {
@@ -2790,23 +2940,28 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             for (ch in 0 until CHANNEL_COUNT) {
                 val limiter = dp.getLimiterByChannelIndex(ch)
                 if (isLimiterEnabled) {
-                    // Map lookahead (ms) → attack time (ms): DynamicsProcessing
-                    // has no lookahead, only Limiter.attackTime.
-                    limiter.attackTime = limiterLookaheadMs.toFloat().coerceIn(0.1f, 50f)
+                    // Compressor knobs when the user set them; otherwise keep the
+                    // brickwall defaults (attack follows lookahead, ratio 20).
+                    val attackMs = if (limiterAttackMs > 0.0) {
+                        limiterAttackMs.toFloat().coerceIn(0.1f, 50f)
+                    } else {
+                        limiterLookaheadMs.toFloat().coerceIn(0.1f, 50f)
+                    }
+                    limiter.attackTime = attackMs
                     limiter.releaseTime = limiterReleaseMs.toFloat().coerceIn(10f, 2000f)
-                    limiter.ratio = 20f           // Effectively brickwall
+                    limiter.ratio = limiterRatio.toFloat().coerceIn(1f, 20f)
                     limiter.threshold = limiterThresholdDb.toFloat().coerceIn(-60f, 0f)
-                    limiter.postGain = baseGain + preampDb
+                    limiter.postGain = baseGain + preampDb + limiterMakeupGainDb.toFloat()
                     limiter.isEnabled = true
                 } else {
                     limiter.isEnabled = false
-                    limiter.postGain = baseGain + preampDb
+                    limiter.postGain = baseGain + preampDb + limiterMakeupGainDb.toFloat()
                 }
             }
             // Enabling the limiter must wake a DP instance that was disabled
             // because no stage needed it (e.g. EQ-only while HAL EQ suppressed).
             updateDpEnabled()
-            Log.d(TAG, "HAL limiter applied: enabled=$isLimiterEnabled threshold=${limiterThresholdDb}dB attack=${limiterLookaheadMs}ms")
+            Log.d(TAG, "HAL limiter applied: enabled=$isLimiterEnabled threshold=${limiterThresholdDb}dB attack=${limiterAttackMs}ms ratio=${limiterRatio} makeup=${limiterMakeupGainDb}dB")
         } catch (e: Exception) {
             Log.w(TAG, "applyHalLimiter failed: ${e.message}")
         }

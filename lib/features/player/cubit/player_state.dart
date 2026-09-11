@@ -38,12 +38,16 @@ abstract class PlayerState with _$PlayerState {
     @Default(false) bool isEqEnabled,
     @Default(false) bool isVirtualizerEnabled,
     @Default(0.0) double virtualizerStrength,
+    @Default(false) bool isVirtualizerSupported,
     @Default(false) bool isDynamicsEnabled,
+    @Default(false) bool isDynamicsSupported,
     @Default(DynamicsPreset.off) DynamicsPreset dynamicsPreset,
     HeadphoneProfile? selectedHeadphoneProfile,
     @Default(false) bool isSpatializerSupported,
     @Default(false) bool isSpatializerEnabled,
     @Default(0.0) double volumeBoost,
+    @Default(false) bool isVolumeBoostSupported,
+    @Default(false) bool isBassBoostSupported,
     @Default(false) bool isCrossfeedEnabled,
     @Default(350.0) double crossfeedDelayUs,
     @Default(-9.0) double crossfeedFeedDb,
@@ -56,6 +60,8 @@ abstract class PlayerState with _$PlayerState {
     @Default(0.0) double stereoBalance,
     @Default(false) bool monoMix,
     @Default(true) bool isSincResamplerEnabled,
+    @Default(false) bool isDitherEnabled,
+    @Default(16) int ditherTargetBitDepth,
     @Default(false) bool isSaturationEnabled,
     @Default(0.3) double saturationDrive,
     @Default(0.5) double saturationMix,
@@ -121,12 +127,16 @@ abstract class PlayerState with _$PlayerState {
         isEqEnabled != other.isEqEnabled ||
         isVirtualizerEnabled != other.isVirtualizerEnabled ||
         virtualizerStrength != other.virtualizerStrength ||
+        isVirtualizerSupported != other.isVirtualizerSupported ||
         isDynamicsEnabled != other.isDynamicsEnabled ||
+        isDynamicsSupported != other.isDynamicsSupported ||
         dynamicsPreset != other.dynamicsPreset ||
         selectedHeadphoneProfile != other.selectedHeadphoneProfile ||
         isSpatializerSupported != other.isSpatializerSupported ||
         isSpatializerEnabled != other.isSpatializerEnabled ||
         volumeBoost != other.volumeBoost ||
+        isVolumeBoostSupported != other.isVolumeBoostSupported ||
+        isBassBoostSupported != other.isBassBoostSupported ||
         isCrossfeedEnabled != other.isCrossfeedEnabled ||
         crossfeedDelayUs != other.crossfeedDelayUs ||
         crossfeedFeedDb != other.crossfeedFeedDb ||
@@ -139,6 +149,8 @@ abstract class PlayerState with _$PlayerState {
         stereoBalance != other.stereoBalance ||
         monoMix != other.monoMix ||
         isSincResamplerEnabled != other.isSincResamplerEnabled ||
+        isDitherEnabled != other.isDitherEnabled ||
+        ditherTargetBitDepth != other.ditherTargetBitDepth ||
         isSaturationEnabled != other.isSaturationEnabled ||
         saturationDrive != other.saturationDrive ||
         saturationMix != other.saturationMix ||

@@ -363,7 +363,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         else -> "Unknown ($codecType)"
     }
 
-    /** Maps codec name string to BluetoothCodecConfig codec type int. */
+    /** Maps codec name string to BluetoothCodecConfig codec type int, or -1 when unknown. */
     private fun codecNameToType(name: String): Int = when (name.uppercase()) {
         "SBC"      -> BluetoothCodecConfig.SOURCE_CODEC_TYPE_SBC
         "AAC"      -> BluetoothCodecConfig.SOURCE_CODEC_TYPE_AAC
@@ -371,10 +371,12 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         "APTX HD"  -> BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_HD
         "LDAC"     -> BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC
         "LC3"      -> 5
-        else       -> BluetoothCodecConfig.SOURCE_CODEC_TYPE_SBC
+        // Unknown names must NOT silently fall back to SBC (that would switch
+        // the user's codec without consent); callers reject -1 explicitly.
+        else       -> -1
     }
 
-    /** Maps BluetoothCodecConfig sample rate flag to Hz. */
+    /** Maps BluetoothCodecConfig sample rate flag to Hz, or 0 when unknown. */
     private fun codecSampleRateToHz(flag: Int): Int = when (flag) {
         BluetoothCodecConfig.SAMPLE_RATE_44100 -> 44100
         BluetoothCodecConfig.SAMPLE_RATE_48000 -> 48000
@@ -382,7 +384,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         BluetoothCodecConfig.SAMPLE_RATE_96000 -> 96000
         BluetoothCodecConfig.SAMPLE_RATE_176400 -> 176400
         BluetoothCodecConfig.SAMPLE_RATE_192000 -> 192000
-        else -> 44100
+        else -> 0
     }
 
     /** Maps Hz to BluetoothCodecConfig sample rate flag. */
@@ -471,7 +473,14 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         val a2dpPresent = hasConnectedA2dpDevice()
 
         if (device == null) {
-            // Check if it's a permission problem or truly no device
+            // Check if it's a permission problem or truly no device.
+            // SCO (voice-call) routes are BT but expose no A2DP codec at all —
+            // report that explicitly instead of a misleading no_device_connected.
+            val scoRouted = try {
+                audioManager
+                    ?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+                    ?.any { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO } == true
+            } catch (_: Exception) { false }
             val hasBtPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 context.checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) ==
                     android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -481,6 +490,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 "connected" to false,
                 "a2dpPresent" to a2dpPresent,
                 "reason" to when {
+                    scoRouted -> "sco_voice_no_codec"
                     !hasBtPermission -> "permission_required"
                     a2dp == null -> "proxy_initializing"
                     else -> "no_device_connected"
@@ -590,8 +600,14 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             val current = status.javaClass.getMethod("getCodecConfig").invoke(status)
                 as? BluetoothCodecConfig ?: return false
 
-            val targetCodecType = if (codec != null) codecNameToType(codec)
-                else current.codecType
+            val targetCodecType = if (codec != null) {
+                val mapped = codecNameToType(codec)
+                if (mapped == -1) {
+                    Log.w(TAG, "Unknown codec name '$codec' — refusing to change codec (no silent SBC fallback)")
+                    return false
+                }
+                mapped
+            } else current.codecType
             val targetSampleRate = if (sampleRateHz != null && sampleRateHz > 0)
                 hzToCodecSampleRate(sampleRateHz)
                 else current.sampleRate
@@ -648,7 +664,9 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 .setCodecPriority(BluetoothCodecConfig.CODEC_PRIORITY_HIGHEST)
                 .setSampleRate(targetSampleRate)
                 .setBitsPerSample(targetBits)
-                .setChannelMode(BluetoothCodecConfig.CHANNEL_MODE_STEREO)
+                // Preserve the sink's channel mode (mono headsets, joint-stereo
+                // buds); forcing STEREO broke mono accessibility routing.
+                .setChannelMode(current.channelMode)
                 .setCodecSpecific1(ldacSpecific1)
                 .setCodecSpecific2(0)
                 .setCodecSpecific3(0)

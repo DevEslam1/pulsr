@@ -561,6 +561,40 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReplayGainParams(
     });
 }
 
+// ---- Dither (TPDF at 16/24/32-bit target) + Bluetooth route flag ----
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetDitherParams(
+        JNIEnv* /* env */, jobject /* thiz */,
+        jboolean enabled, jint targetBitDepth, jboolean isBluetooth) {
+    int depth = static_cast<int>(targetBitDepth);
+    if (depth != 16 && depth != 24 && depth != 32) return;
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        snap.dither.enabled = enabled;
+        snap.dither.targetBitDepth = depth;
+        snap.dither.isBluetooth = isBluetooth;
+    });
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetDitherBluetooth(
+        JNIEnv* /* env */, jobject /* thiz */, jboolean isBluetooth) {
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        snap.dither.isBluetooth = isBluetooth;
+    });
+}
+
+// ---- Bit-Perfect / DoP bypass (source of truth alongside activeStages=0) ----
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetBitPerfectParams(
+        JNIEnv* /* env */, jobject /* thiz */, jboolean enabled, jboolean isDop) {
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        snap.bitPerfect.enabled = enabled;
+        snap.bitPerfect.isDop = isDop;
+    });
+}
+
 // ---- ExoPlayer Media3 NativeDspAudioProcessor In-Stream Direct Buffer Bridge ----
 
 JNIEXPORT jlong JNICALL

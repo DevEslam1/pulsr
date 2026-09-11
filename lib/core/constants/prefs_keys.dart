@@ -23,8 +23,6 @@ class PrefsKeys {
   static const String customAccentColor = 'setting_custom_accent_color';
   static const String dynamicThemingEnabled = 'setting_dynamic_theming_enabled';
   static const String playerThemeMode = 'setting_player_theme_mode';
-  static const String crossfadeEnabled = 'setting_crossfade_enabled';
-  static const String crossfadeDurationSec = 'setting_crossfade_duration_sec';
   static const String playbackSpeed = 'setting_playback_speed';
   static const String advancedPlaybackSpeed = 'setting_advanced_playback_speed';
   static const String playbackShuffle = 'setting_playback_shuffle';
@@ -56,6 +54,11 @@ class PrefsKeys {
       'setting_lookahead_limiter_release_ms';
   static const String lookaheadLimiterLookaheadMs =
       'setting_lookahead_limiter_lookahead_ms';
+  // Studio compressor knobs on the limiter/HAL DynamicsProcessing stage.
+  static const String compressorRatio = 'setting_compressor_ratio';
+  static const String compressorAttackMs = 'setting_compressor_attack_ms';
+  static const String compressorMakeupGainDb =
+      'setting_compressor_makeup_gain_db';
   static const String convolutionReverbEnabled =
       'setting_convolution_reverb_enabled';
   static const String convolutionReverbPreset =
@@ -140,9 +143,24 @@ class PrefsKeys {
   static const String trackDelayMap = 'per_track_audio_delay_v1';
   static const String bookmarksMap = 'playback_bookmarks_v1';
 
-  static const String dsdOutputMode = 'setting_dsd_output_mode'; // 'pcm' | 'dop'
+  static const String dspPreference = 'setting_dsp_preference'; // 'native' | 'oem' | 'auto'
+  static const String ditherEnabled = 'setting_dither_enabled';
+  static const String ditherTargetBitDepth = 'setting_dither_target_bit_depth';
   static const String mqaDecodingEnabled = 'setting_mqa_decoding_enabled';
   static const String customReverbIrPath = 'setting_custom_reverb_ir_path';
   static const String spatializerEngine = 'setting_spatializer_engine'; // 'off' | 'systemHardware' | 'binauralAmbisonic'
   static const String exclusiveOffloadEnabled = 'setting_exclusive_offload_enabled';
+
+  // Per-session audio telemetry (route/codec/negotiated format/interruptions).
+  static const String audioSessionLogEnabled =
+      'setting_audio_session_log_enabled';
+
+  // Opt-in per-track output-format negotiation (default OFF: keeps the manual,
+  // device-global output format unless the user enables it).
+  static const String outputFormatNegotiationEnabled =
+      'setting_output_format_negotiation_enabled';
+
+  // Opt-in 24/32-bit float DSP path (default OFF: the native DSP chain stays
+  // on the historical 16-bit sink path, byte-identical to today).
+  static const String floatOutputEnabled = 'setting_float_output_enabled';
 }

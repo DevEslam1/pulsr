@@ -130,6 +130,14 @@ abstract class SettingsState with _$SettingsState {
     @Default('systemDefault') String multiOutputMode,
     @Default(true) bool dspSnapshotEnabled,
     @Default(0) int silenceSkipSensitivity,
+    // Per-session audio telemetry (route/codec/negotiated format/dropouts).
+    @Default(true) bool sessionLogEnabled,
+    // Opt-in per-track output-format negotiation (default OFF: the output
+    // format stays the manual, device-global setting unless enabled).
+    @Default(false) bool outputFormatNegotiationEnabled,
+    // Opt-in 24/32-bit float DSP path (default OFF: the native DSP chain keeps
+    // today's 16-bit sink path byte-identical).
+    @Default(false) bool floatOutputEnabled,
   }) = _SettingsState;
 
   Color get customAccentColor => Color(customAccentColorValue);

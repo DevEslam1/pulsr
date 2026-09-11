@@ -16,6 +16,8 @@ import '../../../core/network/proxy_config.dart';
 import '../../../core/services/hires_audio_service.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../data/audio/audio_effects_channel.dart';
+import '../../../data/audio/audio_handler.dart';
+import '../../../data/audio/equalizer_manager.dart';
 import '../../../data/scanner/media_scanner_service.dart';
 import '../../../core/constants/audio_feature_info.dart';
 import '../../player/presentation/widgets/audio_visualizer.dart';
@@ -389,8 +391,20 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
         themeColorSource = ThemeColorSource.artwork;
       }
 
+      // Effect keys are owned by EqualizerManager. Prefer its live values so
+      // the settings screen can never diverge from the DSP engine; fall back
+      // to the on-disk snapshot when the manager has not been created yet.
+      final effectManager = getIt.isRegistered<EqualizerManager>()
+          ? getIt<EqualizerManager>()
+          : null;
+
       final newState = state.copyWith(
-        gaplessPlayback: prefs.getBool(_keyGapless) ?? state.gaplessPlayback,
+        // Crossfade > 0 forces gapless OFF (they are mutually exclusive), even
+        // if legacy prefs stored both on.
+        gaplessPlayback:
+            ((prefs.getDouble(_keyCrossfade) ?? state.crossfadeSeconds) > 0.01)
+                ? false
+                : (prefs.getBool(_keyGapless) ?? state.gaplessPlayback),
         crossfadeSeconds:
             prefs.getDouble(_keyCrossfade) ?? state.crossfadeSeconds,
         minDurationSec: prefs.getInt(_keyMinDuration) ?? state.minDurationSec,
@@ -438,34 +452,43 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
             state.bypassDspOnBitPerfect,
         currentOutputDevice:
             _hiResAudioService.currentOutputInfo ?? state.currentOutputDevice,
-        crossfeedEnabled:
-            prefs.getBool(PrefsKeys.crossfeedEnabled) ?? state.crossfeedEnabled,
-        crossfeedDelayUs: prefs.getDouble(PrefsKeys.crossfeedDelayUs) ??
-            state.crossfeedDelayUs,
-        crossfeedFeedDb:
-            prefs.getDouble(PrefsKeys.crossfeedFeedDb) ?? state.crossfeedFeedDb,
-        limiterEnabled: prefs.getBool(PrefsKeys.lookaheadLimiterEnabled) ??
-            state.limiterEnabled,
-        limiterLookaheadMs:
-            prefs.getDouble('setting_lookahead_limiter_lookahead_ms') ??
-                state.limiterLookaheadMs,
-        limiterThresholdDb:
-            prefs.getDouble(PrefsKeys.lookaheadLimiterThresholdDb) ??
-                state.limiterThresholdDb,
-        limiterReleaseMs:
-            prefs.getDouble(PrefsKeys.lookaheadLimiterReleaseMs) ??
-                state.limiterReleaseMs,
-        reverbEnabled: prefs.getBool(PrefsKeys.convolutionReverbEnabled) ??
-            state.reverbEnabled,
-        reverbPreset: prefs.getInt(PrefsKeys.convolutionReverbPreset) ??
-            state.reverbPreset,
-        reverbWetDry: prefs.getDouble(PrefsKeys.convolutionReverbWetDry) ??
-            state.reverbWetDry,
-        stereoBalance:
-            prefs.getDouble(PrefsKeys.stereoBalance) ?? state.stereoBalance,
-        monoMix: prefs.getBool(PrefsKeys.monoMix) ?? state.monoMix,
-        sincResamplerEnabled: prefs.getBool(PrefsKeys.sincResamplerEnabled) ??
-            state.sincResamplerEnabled,
+        crossfeedEnabled: effectManager?.isCrossfeedEnabled ??
+            (prefs.getBool(PrefsKeys.crossfeedEnabled) ??
+                state.crossfeedEnabled),
+        crossfeedDelayUs: effectManager?.crossfeedDelayUs ??
+            (prefs.getDouble(PrefsKeys.crossfeedDelayUs) ??
+                state.crossfeedDelayUs),
+        crossfeedFeedDb: effectManager?.crossfeedFeedDb ??
+            (prefs.getDouble(PrefsKeys.crossfeedFeedDb) ??
+                state.crossfeedFeedDb),
+        limiterEnabled: effectManager?.isLimiterEnabled ??
+            (prefs.getBool(PrefsKeys.lookaheadLimiterEnabled) ??
+                state.limiterEnabled),
+        limiterLookaheadMs: effectManager?.limiterLookaheadMs ??
+            (prefs.getDouble('setting_lookahead_limiter_lookahead_ms') ??
+                state.limiterLookaheadMs),
+        limiterThresholdDb: effectManager?.limiterThresholdDb ??
+            (prefs.getDouble(PrefsKeys.lookaheadLimiterThresholdDb) ??
+                state.limiterThresholdDb),
+        limiterReleaseMs: effectManager?.limiterReleaseMs ??
+            (prefs.getDouble(PrefsKeys.lookaheadLimiterReleaseMs) ??
+                state.limiterReleaseMs),
+        reverbEnabled: effectManager?.isReverbEnabled ??
+            (prefs.getBool(PrefsKeys.convolutionReverbEnabled) ??
+                state.reverbEnabled),
+        reverbPreset: effectManager?.reverbPreset ??
+            (prefs.getInt(PrefsKeys.convolutionReverbPreset) ??
+                state.reverbPreset),
+        reverbWetDry: effectManager?.reverbWetDry ??
+            (prefs.getDouble(PrefsKeys.convolutionReverbWetDry) ??
+                state.reverbWetDry),
+        stereoBalance: effectManager?.stereoBalance ??
+            (prefs.getDouble(PrefsKeys.stereoBalance) ?? state.stereoBalance),
+        monoMix: effectManager?.monoMix ??
+            (prefs.getBool(PrefsKeys.monoMix) ?? state.monoMix),
+        sincResamplerEnabled: effectManager?.isSincResamplerEnabled ??
+            (prefs.getBool(PrefsKeys.sincResamplerEnabled) ??
+                state.sincResamplerEnabled),
         dspPreference:
             prefs.getString(_keyDspPreference) ?? state.dspPreference,
         systemEffectsPolicy: prefs.getString(PrefsKeys.systemEffectsPolicy) ??
@@ -487,6 +510,13 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
             prefs.getBool(PrefsKeys.dspSnapshotEnabled) ?? true,
         silenceSkipSensitivity:
             prefs.getInt(PrefsKeys.silenceSkipSensitivity) ?? 0,
+        sessionLogEnabled:
+            prefs.getBool(PrefsKeys.audioSessionLogEnabled) ?? true,
+        outputFormatNegotiationEnabled: prefs
+                .getBool(PrefsKeys.outputFormatNegotiationEnabled) ??
+            false,
+        floatOutputEnabled:
+            prefs.getBool(PrefsKeys.floatOutputEnabled) ?? false,
       );
 
       // A proxy edit made while this load was in flight must win over the
@@ -514,7 +544,11 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       // theme and locale for as long as the native calls take.
       safeEmit(loadedState);
 
-      await AudioEffectsChannel().setDspPreference(loadedState.dspPreference);
+      if (getIt.isRegistered<EqualizerManager>()) {
+        await getIt<EqualizerManager>().setDspPreference(loadedState.dspPreference);
+      } else {
+        await AudioEffectsChannel().setDspPreference(loadedState.dspPreference);
+      }
       try {
         final status = await AudioEffectsChannel().setSystemEffectsPolicy(
           loadedState.systemEffectsPolicy,
@@ -529,7 +563,11 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
         // Re-assert the DSP-bypass policy at boot: without this the Kotlin
         // effects plugin keeps its default (bypass off) after a restart and
         // the saved bit-perfect conflict rule is not enforced this session.
-        await AudioEffectsChannel().setBypassDspForBitPerfect(true);
+        if (getIt.isRegistered<EqualizerManager>()) {
+          await getIt<EqualizerManager>().setBypassDspForBitPerfect(true);
+        } else {
+          await AudioEffectsChannel().setBypassDspForBitPerfect(true);
+        }
       }
       final savedSampleRate = prefs.getInt('target_output_sample_rate') ?? 0;
       final savedBitDepth = prefs.getInt('target_output_bit_depth') ?? 0;
@@ -1207,7 +1245,11 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     // Wire bypass: when bit-perfect enabled and user wants bypass, force DSP off via native
     if (enabled && state.bypassDspOnBitPerfect) {
       try {
-        await AudioEffectsChannel().setBypassDspForBitPerfect(true);
+        if (getIt.isRegistered<EqualizerManager>()) {
+          await getIt<EqualizerManager>().setBypassDspForBitPerfect(true);
+        } else {
+          await AudioEffectsChannel().setBypassDspForBitPerfect(true);
+        }
       } catch (_) {}
       // Also force ReplayGain off — software gain breaks bit-perfect
       if (state.replayGainMode != ReplayGainMode.off) {
@@ -1222,7 +1264,11 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       }
     } else if (!enabled) {
       try {
-        await AudioEffectsChannel().setBypassDspForBitPerfect(false);
+        if (getIt.isRegistered<EqualizerManager>()) {
+          await getIt<EqualizerManager>().setBypassDspForBitPerfect(false);
+        } else {
+          await AudioEffectsChannel().setBypassDspForBitPerfect(false);
+        }
       } catch (_) {}
     }
     await refreshOutputDevice();
@@ -1235,7 +1281,11 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     // Apply immediately if bit-perfect is currently active
     if (state.bitPerfectOutput) {
       try {
-        await AudioEffectsChannel().setBypassDspForBitPerfect(enabled);
+        if (getIt.isRegistered<EqualizerManager>()) {
+          await getIt<EqualizerManager>().setBypassDspForBitPerfect(enabled);
+        } else {
+          await AudioEffectsChannel().setBypassDspForBitPerfect(enabled);
+        }
       } catch (_) {}
       await refreshOutputDevice();
     }
@@ -1400,6 +1450,12 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
 
   Future<void> setDspPreference(String preference) async {
     safeEmit(state.copyWith(dspPreference: preference));
+    // EqualizerManager is the single writer for effect keys (including
+    // dspPreference). Only persist directly when it is unavailable.
+    if (getIt.isRegistered<EqualizerManager>()) {
+      await getIt<EqualizerManager>().setDspPreference(preference);
+      return;
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyDspPreference, preference);
     await AudioEffectsChannel().setDspPreference(preference);
@@ -1423,6 +1479,17 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
         limiterLookaheadMs: newLookahead,
       ),
     );
+    // EqualizerManager owns the limiter keys + persistence; delegating keeps
+    // a single writer so this screen cannot diverge from the effect engine.
+    if (getIt.isRegistered<EqualizerManager>()) {
+      await getIt<EqualizerManager>().setLookaheadLimiter(
+        newEnabled,
+        thresholdDb: newThreshold,
+        releaseMs: newRelease,
+        lookaheadMs: newLookahead,
+      );
+      return;
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.lookaheadLimiterEnabled, newEnabled);
     await prefs.setDouble(PrefsKeys.lookaheadLimiterThresholdDb, newThreshold);
@@ -1431,6 +1498,12 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       'setting_lookahead_limiter_lookahead_ms',
       newLookahead,
     );
+    await AudioEffectsChannel().setLimiterParams(
+      newLookahead,
+      newThreshold,
+      newRelease,
+    );
+    await AudioEffectsChannel().setLimiterEnabled(newEnabled);
   }
 
   Future<void> setSystemEffectsPolicy(String policy) async {
@@ -1468,6 +1541,40 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     safeEmit(state.copyWith(bluetoothLatencyOffsetMs: clamped));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(PrefsKeys.bluetoothLatencyOffsetMs, clamped);
+  }
+
+  /// Toggles per-session audio telemetry. The logger reads this flag on every
+  /// call, so disabling takes effect immediately with no re-wiring.
+  Future<void> setSessionLogEnabled(bool enabled) async {
+    safeEmit(state.copyWith(sessionLogEnabled: enabled));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(PrefsKeys.audioSessionLogEnabled, enabled);
+  }
+
+  /// Opt-in per-track output-format negotiation. Off by default so the manual
+  /// device-global output format is untouched unless the user asks for it.
+  Future<void> setOutputFormatNegotiationEnabled(bool enabled) async {
+    safeEmit(state.copyWith(outputFormatNegotiationEnabled: enabled));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(PrefsKeys.outputFormatNegotiationEnabled, enabled);
+  }
+
+  /// Opt-in 24/32-bit float DSP path. Off by default: with the flag off the
+  /// vendored Android fork builds the same 16-bit sink as before. When on, the
+  /// preference is persisted here and pushed to every player by the player
+  /// layer's settings observer (and restored on boot by the audio handler).
+  Future<void> setFloatOutputEnabled(bool enabled) async {
+    safeEmit(state.copyWith(floatOutputEnabled: enabled));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(PrefsKeys.floatOutputEnabled, enabled);
+    // Best-effort immediate push; the player layer also observes the state.
+    try {
+      if (getIt.isRegistered<PulsrAudioHandler>()) {
+        await getIt<PulsrAudioHandler>().setFloatOutputEnabled(enabled);
+      }
+    } catch (_) {
+      // Player not available yet; boot/observer push covers it.
+    }
   }
 
   // ── F3/F4/F7/F8/F9/F10 ──────────────────────────────────────────────

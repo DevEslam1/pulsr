@@ -479,6 +479,166 @@ void runDspStressTest() {
 #include "test_snapshot_race.cpp"
 #include "test_custom_ir_budget.cpp"
 
+// Phase 2C: dither correctness. Verifies (a) a lone dither toggle acts through
+// its own STAGE_DITHER bit, (b) dither-off is bit-transparent, and (c) the
+// TPDF LSB scaling is correct for 16/24/32-bit targets.
+namespace {
+constexpr float kLsb16 = 1.0f / 32768.0f;
+constexpr float kLsb24 = 1.0f / 8388608.0f;
+constexpr float kLsb32 = 1.0f / 2147483648.0f;
+
+bool isOnGrid(float value, float scale) {
+    const float q = value * scale;
+    return std::abs(q - std::round(q)) < 1e-2f;
+}
+} // namespace
+
+void runDitherStandaloneTest() {
+    std::cout << "\n=== [DITHER 1/3] Standalone dither acts without any other stage ===" << std::endl;
+    auto& engine = AudioDspEngine::instance();
+    engine.setSampleRate(48000.0);
+    engine.setAutoDegradeMonitorEnabled(false);
+    engine.clearAutoDegradedStages();
+
+    const int frames = 4096;
+    const int channels = 2;
+    const int total = frames * channels;
+    // A fractional 16-bit grid position (0.37 LSB off) so every sample is
+    // affected by the +/-1 LSB dither, not just the ~50% that straddle a
+    // rounding boundary for a grid-exact DC value.
+    std::vector<float> base(total);
+    for (int i = 0; i < total; ++i) {
+        base[i] = 0.25f + 0.37f / 32768.0f;
+    }
+
+    auto publish = [&](uint32_t stages, bool ditherOn, int depth) {
+        auto snap = std::make_shared<DspParamSnapshot>();
+        snap->activeStages = stages;
+        snap->dither.enabled = ditherOn;
+        snap->dither.targetBitDepth = depth;
+        snap->dither.isBluetooth = false;
+        engine.publishParams(snap);
+    };
+
+    // Dither off, no stages: untouched buffer (bit-transparent).
+    publish(0, false, 16);
+    std::vector<float> off = base;
+    engine.processInterleaved(off.data(), frames, channels);
+    for (int i = 0; i < total; ++i) assert(off[i] == base[i]);
+
+    // Dither bit set but dither disabled: still bit-transparent.
+    publish(STAGE_DITHER, false, 16);
+    std::vector<float> offWithBit = base;
+    engine.processInterleaved(offWithBit.data(), frames, channels);
+    for (int i = 0; i < total; ++i) assert(offWithBit[i] == base[i]);
+
+    // Dither disabled but stage bit set is inert; enabled alone must act.
+    publish(STAGE_DITHER, true, 16);
+    std::vector<float> on = base;
+    engine.processInterleaved(on.data(), frames, channels);
+    int changed = 0;
+    float maxDev = 0.0f;
+    for (int i = 0; i < total; ++i) {
+        if (on[i] != base[i]) changed++;
+        maxDev = std::max(maxDev, std::abs(on[i] - base[i]));
+    }
+    assert(changed > total / 2);
+    assert(maxDev > 0.0f);
+    assert(maxDev <= kLsb16 * 1.51f);
+    for (int i = 0; i < total; ++i) assert(isOnGrid(on[i], 32768.0f));
+    std::cout << "  ✓ Standalone dither changed " << changed << "/" << total
+              << " samples (max deviation " << maxDev << " <= 1.5 LSB16)." << std::endl;
+
+    engine.setAutoDegradeMonitorEnabled(true);
+    engine.setActiveStages(0xFFFFFFFF);
+}
+
+void runDitherBitDepthTest() {
+    std::cout << "\n=== [DITHER 2/3] TPDF LSB scaling across 16/24/32-bit targets ===" << std::endl;
+    auto& engine = AudioDspEngine::instance();
+    engine.setSampleRate(48000.0);
+    engine.setAutoDegradeMonitorEnabled(false);
+    engine.clearAutoDegradedStages();
+
+    const int frames = 8192;
+    const int channels = 2;
+    const int total = frames * channels;
+    std::vector<float> base(total, 0.25f);
+
+    auto measure = [&](int depth) {
+        auto snap = std::make_shared<DspParamSnapshot>();
+        snap->activeStages = STAGE_DITHER;
+        snap->dither.enabled = true;
+        snap->dither.targetBitDepth = depth;
+        snap->dither.isBluetooth = false;
+        engine.publishParams(snap);
+        std::vector<float> buf = base;
+        engine.processInterleaved(buf.data(), frames, channels);
+        float maxDev = 0.0f;
+        for (int i = 0; i < total; ++i) {
+            maxDev = std::max(maxDev, std::abs(buf[i] - base[i]));
+        }
+        return std::make_pair(buf, maxDev);
+    };
+
+    auto r16 = measure(16);
+    auto r24 = measure(24);
+    auto r32 = measure(32);
+
+    // Each target stays within 1 LSB of its own depth.
+    assert(r16.second <= kLsb16 * 1.01f);
+    assert(r24.second <= kLsb24 * 1.01f);
+    assert(r32.second <= kLsb32 * 1.01f);
+
+    // 16-bit dither noise must be ~256x the 24-bit noise: LSB scaling is real.
+    const float ratio = r16.second / (r24.second + 1e-30f);
+    assert(ratio > 200.0f && ratio < 320.0f);
+
+    // 32-bit target on a float buffer is a no-op by construction (float holds
+    // ~24-bit mantissa), so the deviation is far below 1 LSB24.
+    assert(r32.second <= kLsb24);
+
+    for (int i = 0; i < total; ++i) {
+        assert(isOnGrid(r16.first[i], 32768.0f));
+        assert(isOnGrid(r24.first[i], 8388608.0f));
+    }
+    std::cout << "  ✓ max deviation: 16-bit=" << r16.second
+              << ", 24-bit=" << r24.second
+              << ", 32-bit=" << r32.second
+              << " (16/24 ratio " << ratio << ", expected ~256)." << std::endl;
+
+    engine.setAutoDegradeMonitorEnabled(true);
+    engine.setActiveStages(0xFFFFFFFF);
+}
+
+void runDitherBluetoothSkipTest() {
+    std::cout << "\n=== [DITHER 3/3] Bluetooth route skips dither (bit-transparent) ===" << std::endl;
+    auto& engine = AudioDspEngine::instance();
+    engine.setSampleRate(48000.0);
+    engine.setAutoDegradeMonitorEnabled(false);
+    engine.clearAutoDegradedStages();
+
+    const int frames = 4096;
+    const int channels = 2;
+    const int total = frames * channels;
+    std::vector<float> base(total, 0.25f);
+
+    auto snap = std::make_shared<DspParamSnapshot>();
+    snap->activeStages = STAGE_DITHER;
+    snap->dither.enabled = true;
+    snap->dither.targetBitDepth = 16;
+    snap->dither.isBluetooth = true;
+    engine.publishParams(snap);
+
+    std::vector<float> buf = base;
+    engine.processInterleaved(buf.data(), frames, channels);
+    for (int i = 0; i < total; ++i) assert(buf[i] == base[i]);
+    std::cout << "  ✓ BT route left all " << total << " samples untouched." << std::endl;
+
+    engine.setAutoDegradeMonitorEnabled(true);
+    engine.setActiveStages(0xFFFFFFFF);
+}
+
 void runSyntheticIrCacheBudgetTest() {
     std::cout << "\n=== [TEST 12/13] Synthetic IR Cache 64MB LRU Budget & Damping Sweep Test ===" << std::endl;
     PreparedIr::clearSyntheticCache();
@@ -550,6 +710,9 @@ int main() {
     runSnapshotRaceTest();
     runSyntheticIrCacheBudgetTest();
     runCustomIrBudgetTest();
+    runDitherStandaloneTest();
+    runDitherBitDepthTest();
+    runDitherBluetoothSkipTest();
 
     std::cout << "\n====================================================" << std::endl;
     std::cout << "  [PASS] ALL NATIVE DSP SUITE TESTS PASSED 100%!" << std::endl;

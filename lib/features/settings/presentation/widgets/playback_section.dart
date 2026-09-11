@@ -61,7 +61,9 @@ class PlaybackSection extends StatelessWidget {
           context.l10n.gaplessSubtitle,
           value: state.gaplessPlayback,
           featureInfo: AudioFeatureRegistry.gapless,
-          disabledReason: null,
+          disabledReason: state.crossfadeSeconds > 0.01
+              ? AudioConflicts.gaplessBlockedByCrossfade(state.crossfadeSeconds)
+              : null,
           onChanged: cubit.setGapless,
         ),
         settingsCardDivider(p),

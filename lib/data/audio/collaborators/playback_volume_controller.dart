@@ -16,7 +16,7 @@ class PlaybackVolumeController {
   double _preampWithRg = 0.0;
   double _preampWithoutRg = -3.0;
   bool _isDucked = false;
-  double _duckFactor = 0.3;
+  double _duckFactor = 0.2;
   bool _isDopActive = false;
 
   double get userVolume => _userVolume;

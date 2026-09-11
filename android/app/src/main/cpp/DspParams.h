@@ -171,7 +171,10 @@ struct ReplayGainParamSet {
 
 struct DitherParamSet {
     bool enabled = false;
-    int targetBitDepth = 32;  // 16, 24, 32
+    // Target output depth. Defaults to 16 because the Android native DSP sink
+    // (NativeDspAudioProcessor) is 16-bit PCM by construction; 24/32 are only
+    // meaningful on a path that actually requantizes to those depths.
+    int targetBitDepth = 16;  // 16, 24, 32
     // Dither is SKIPPED on Bluetooth (lossy encode happens downstream — dithering before SBC/AAC/LDAC is wasted noise)
     bool isBluetooth = false;
 };

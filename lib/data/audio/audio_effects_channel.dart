@@ -38,6 +38,9 @@ class AudioEffectsChannel {
     }
   }
 
+  /// Whether the platform can apply native audio effects at all. Every
+  /// bool-returning setter must report `false` here instead of pretending the
+  /// effect was applied, so callers can gate the UI truthfully.
   bool get _isAndroid => PlatformCapabilities.isAndroid;
 
   /// Dispose stream controller (call on hot restart / test teardown).
@@ -307,12 +310,18 @@ class AudioEffectsChannel {
     }
   }
 
-  Future<void> setVolumeBoost(int milliBels) async {
-    if (!_isAndroid) return;
+  /// Returns true when the native layer confirmed the boost was applied.
+  /// An explicit `false` means the device has no LoudnessEnhancer, the effect
+  /// failed to build, no audio session is attached, or the platform is not
+  /// Android (unsupported). A missing return (older bridges) is treated as
+  /// success so nothing regresses.
+  Future<bool> setVolumeBoost(int milliBels) async {
+    if (!_isAndroid) return false;
     try {
-      await _channel
-          .invokeMethod('setVolumeBoost', {'milliBels': milliBels})
+      final bool? applied = await _channel
+          .invokeMethod<bool>('setVolumeBoost', {'milliBels': milliBels})
           .timeout(const Duration(seconds: 3));
+      return applied ?? true;
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set volume boost ($milliBels mB)',
@@ -320,15 +329,18 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      return false;
     }
   }
 
-  Future<void> setBassBoost(int strength) async {
-    if (!_isAndroid) return;
+  /// Returns true when the native BassBoost was actually applied.
+  Future<bool> setBassBoost(int strength) async {
+    if (!_isAndroid) return false;
     try {
-      await _channel
-          .invokeMethod('setBassBoost', {'strength': strength})
+      final bool? applied = await _channel
+          .invokeMethod<bool>('setBassBoost', {'strength': strength})
           .timeout(const Duration(seconds: 3));
+      return applied ?? true;
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set bass boost strength ($strength)',
@@ -336,15 +348,18 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      return false;
     }
   }
 
-  Future<void> setVirtualizerEnabled(bool enabled) async {
-    if (!_isAndroid) return;
+  /// Returns true when the native Virtualizer was actually enabled/disabled.
+  Future<bool> setVirtualizerEnabled(bool enabled) async {
+    if (!_isAndroid) return false;
     try {
-      await _channel.invokeMethod('setVirtualizerEnabled', {
-        'enabled': enabled,
-      });
+      final bool? applied = await _channel
+          .invokeMethod<bool>('setVirtualizerEnabled', {'enabled': enabled})
+          .timeout(const Duration(seconds: 3));
+      return applied ?? true;
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set virtualizer enabled ($enabled)',
@@ -352,16 +367,20 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      return false;
     }
   }
 
-  Future<void> setVirtualizerStrength(double strength0to1) async {
-    if (!_isAndroid) return;
+  /// Returns true when the native Virtualizer strength was actually applied.
+  Future<bool> setVirtualizerStrength(double strength0to1) async {
+    if (!_isAndroid) return false;
     try {
       final intStrength = (strength0to1.clamp(0.0, 1.0) * 1000).round();
-      await _channel.invokeMethod('setVirtualizerStrength', {
+      final bool? applied = await _channel
+          .invokeMethod<bool>('setVirtualizerStrength', {
         'strength': intStrength,
-      });
+      }).timeout(const Duration(seconds: 3));
+      return applied ?? true;
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set virtualizer strength ($strength0to1)',
@@ -369,18 +388,21 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      return false;
     }
   }
 
-  Future<void> setDynamicsPreset(DynamicsPreset preset, bool enabled) async {
-    if (!_isAndroid) return;
+  /// Returns true when DynamicsProcessing accepted the preset.
+  Future<bool> setDynamicsPreset(DynamicsPreset preset, bool enabled) async {
+    if (!_isAndroid) return false;
     try {
-      await _channel
-          .invokeMethod('setDynamicsPreset', {
+      final bool? applied = await _channel
+          .invokeMethod<bool>('setDynamicsPreset', {
             'preset': preset.name,
             'enabled': enabled && preset != DynamicsPreset.off,
           })
           .timeout(const Duration(seconds: 3));
+      return applied ?? true;
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set dynamics preset (${preset.name})',
@@ -388,15 +410,18 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      return false;
     }
   }
 
-  Future<void> setSpatializerEnabled(bool enabled) async {
-    if (!_isAndroid) return;
+  /// Returns true when the Spatializer (or its Virtualizer fallback) applied.
+  Future<bool> setSpatializerEnabled(bool enabled) async {
+    if (!_isAndroid) return false;
     try {
-      await _channel.invokeMethod('setSpatializerEnabled', {
-        'enabled': enabled,
-      });
+      final bool? applied = await _channel
+          .invokeMethod<bool>('setSpatializerEnabled', {'enabled': enabled})
+          .timeout(const Duration(seconds: 3));
+      return applied ?? true;
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set spatializer enabled ($enabled)',
@@ -404,6 +429,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      return false;
     }
   }
 
@@ -585,12 +611,16 @@ class AudioEffectsChannel {
   }
 
   /// Unified bypass for all DSP stages when bit-perfect is active.
-  Future<void> setBypassDspForBitPerfect(bool bypass) async {
+  /// [isDop] mirrors the DoP lock into the native snapshot when known.
+  Future<void> setBypassDspForBitPerfect(bool bypass, {bool? isDop}) async {
     if (!_isAndroid) return;
     lastPushedBypassDspForBitPerfect = bypass;
     try {
       await _channel
-          .invokeMethod('setBypassDspForBitPerfect', {'bypass': bypass})
+          .invokeMethod('setBypassDspForBitPerfect', {
+            'bypass': bypass,
+            if (isDop != null) 'isDop': isDop,
+          })
           .timeout(const Duration(seconds: 2));
     } catch (e, st) {
       ErrorLogger.log(
@@ -602,12 +632,18 @@ class AudioEffectsChannel {
     }
   }
 
-  // --- NATIVE REPLAYGAIN 2.0 (bit-transparent pre-gain in DSP) ---
+  // --- NATIVE REPLAYGAIN (tag-supplied pre-gain in DSP) ---
 
-  /// Pushes ReplayGain tags into the native DSP pre-gain stage.
+  /// Pushes ReplayGain tags into the native DSP pre-gain stage. The gain comes
+  /// from the track's existing ReplayGain tags; there is no EBU R128 / RG 2.0
+  /// measurement in the native path (the Dart side computes the multiplier).
   /// [mode]: 0=off, 1=track, 2=album. Keeps the Android mixer at unity so
   /// DoP markers and bit-perfect PCM survive; volume slider stays separate.
-  Future<void> setReplayGainParams({
+  ///
+  /// Returns true when the native engine applied the params. An explicit
+  /// `false` means the native DSP engine is not loaded. A missing return
+  /// (older bridges) is treated as success.
+  Future<bool> setReplayGainParams({
     required int mode,
     required double trackGainDb,
     required double albumGainDb,
@@ -617,10 +653,10 @@ class AudioEffectsChannel {
     bool preventClipping = true,
     required bool enabled,
   }) async {
-    if (!_isAndroid) return;
+    if (!_isAndroid) return false;
     try {
-      await _channel
-          .invokeMethod('setReplayGainParams', {
+      final bool? applied = await _channel
+          .invokeMethod<bool>('setReplayGainParams', {
             'mode': mode,
             'trackGainDb': trackGainDb,
             'albumGainDb': albumGainDb,
@@ -631,6 +667,7 @@ class AudioEffectsChannel {
             'enabled': enabled,
           })
           .timeout(const Duration(seconds: 2));
+      return applied ?? true;
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set native ReplayGain params (mode=$mode)',
@@ -638,15 +675,18 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      return false;
     }
   }
 
-  Future<void> setReplayGainEnabled(bool enabled) async {
-    if (!_isAndroid) return;
+  /// Returns true when the native ReplayGain enable flag was applied.
+  Future<bool> setReplayGainEnabled(bool enabled) async {
+    if (!_isAndroid) return false;
     try {
-      await _channel
-          .invokeMethod('setReplayGainEnabled', {'enabled': enabled})
+      final bool? applied = await _channel
+          .invokeMethod<bool>('setReplayGainEnabled', {'enabled': enabled})
           .timeout(const Duration(seconds: 2));
+      return applied ?? true;
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set native ReplayGain enabled ($enabled)',
@@ -654,6 +694,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      return false;
     }
   }
 
@@ -715,8 +756,11 @@ class AudioEffectsChannel {
   Future<void> setLimiterParams(
     double lookaheadMs,
     double thresholdDb,
-    double releaseMs,
-  ) async {
+    double releaseMs, {
+    double? ratio,
+    double? attackMs,
+    double? makeupGainDb,
+  }) async {
     if (!_isAndroid) return;
     try {
       await _channel
@@ -724,6 +768,11 @@ class AudioEffectsChannel {
             'lookaheadMs': lookaheadMs,
             'thresholdDb': thresholdDb,
             'releaseMs': releaseMs,
+            // Compressor knobs (HAL DynamicsProcessing limiter). Omitted unless
+            // the user owns them so the native brickwall defaults are preserved.
+            if (ratio != null) 'ratio': ratio,
+            if (attackMs != null) 'attackMs': attackMs,
+            if (makeupGainDb != null) 'makeupGainDb': makeupGainDb,
           })
           .timeout(const Duration(seconds: 3));
     } catch (e, st) {
@@ -786,12 +835,27 @@ class AudioEffectsChannel {
     }
   }
 
-  Future<void> loadImpulseResponse(List<double> irSamples) async {
-    if (!_isAndroid) return;
+  /// Loads a custom impulse response into the native convolution reverb.
+  /// Returns false when the request was rejected (invalid/empty samples,
+  /// native DSP unavailable, channel error, or an explicit native failure)
+  /// so callers do not report a successful custom-IR load untruthfully.
+  Future<bool> loadImpulseResponse(List<double> irSamples) async {
+    if (!_isAndroid) return false;
+    if (irSamples.isEmpty) {
+      ErrorLogger.log(
+        'Cannot load an empty impulse response',
+        category: 'AudioEffectsChannel',
+      );
+      return false;
+    }
     try {
-      await _channel.invokeMethod('loadImpulseResponse', {
-        'irSamples': irSamples,
-      });
+      final bool? result = await _channel.invokeMethod<bool>(
+        'loadImpulseResponse',
+        {'irSamples': irSamples},
+      );
+      // Older bridges return nothing on success; only an explicit false is a
+      // failure signal.
+      return result ?? true;
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to load impulse response',
@@ -799,6 +863,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      return false;
     }
   }
 
@@ -1215,6 +1280,64 @@ class AudioEffectsChannel {
     } catch (e, st) {
       ErrorLogger.log(
         'setDspPreference failed',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+    }
+  }
+
+  // --- DITHER (TPDF) + BIT-PERFECT SNAPSHOT ---
+
+  /// Returns true when the native dither stage accepted the params. Dither is
+  /// intentionally skipped on BT routes by the native side (still "applied").
+  /// Returns false off Android, where there is no native DSP stage.
+  ///
+  /// This is the single reachable dither entry point: it carries the enable
+  /// flag, target depth and route together. The old enable-only
+  /// `setDitherEnabled` wrapper was unreachable and has been removed.
+  Future<bool> setDitherParams({
+    required bool enabled,
+    required int targetBitDepth,
+    required bool isBluetooth,
+  }) async {
+    if (!_isAndroid) return false;
+    try {
+      final bool? applied = await _channel
+          .invokeMethod<bool>('setDitherParams', {
+            'enabled': enabled,
+            'targetBitDepth': targetBitDepth,
+            'isBluetooth': isBluetooth,
+          })
+          .timeout(const Duration(seconds: 2));
+      return applied ?? true;
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set dither params',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return false;
+    }
+  }
+
+  /// Mirrors bypass into the native snapshot (plus optional DoP flag).
+  Future<void> setBitPerfectParams({
+    required bool enabled,
+    required bool isDop,
+  }) async {
+    if (!_isAndroid) return;
+    try {
+      await _channel
+          .invokeMethod('setBitPerfectParams', {
+            'enabled': enabled,
+            'isDop': isDop,
+          })
+          .timeout(const Duration(seconds: 2));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set bit-perfect params',
         error: e,
         stackTrace: st,
         category: 'AudioEffectsChannel',

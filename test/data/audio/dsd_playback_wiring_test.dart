@@ -138,7 +138,7 @@ void main() {
       await tempDir.delete(recursive: true);
     });
 
-    test('DsdDecoderHelper throws UnsupportedError if native decoder returns null', () async {
+    test('DsdDecoderHelper throws DsdUnsupportedException if native decoder returns null', () async {
       final tempDir = await Directory.systemTemp.createTemp('dsd_null_test');
       final tempFile = File('${tempDir.path}/test_null.dsf');
       final builder = BytesBuilder();
@@ -185,7 +185,7 @@ void main() {
 
       await expectLater(
         DsdDecoderHelper.decodeDsdFile(song, MediaItem(id: '303', title: 'Null DSD')),
-        throwsA(isA<UnsupportedError>()),
+        throwsA(isA<DsdUnsupportedException>()),
       );
 
       DsdDecoderHelper.testDecoder = null;

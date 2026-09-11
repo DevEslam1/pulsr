@@ -15,10 +15,13 @@ import '../../core/constants/prefs_keys.dart';
 import '../../core/di/injection.dart';
 import '../../core/errors/ytm_error_classifier.dart';
 import '../../core/services/battery_optimization_service.dart';
+import '../../core/services/hires_audio_service.dart';
 import '../../core/services/ytm_service.dart';
 import '../../core/telemetry/playback_latency_tracker.dart';
+import '../../core/telemetry/audio_session_log.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/models/audio_effects_config.dart';
+import '../../domain/models/audio_output_info.dart';
 import '../../domain/models/eq_preset.dart';
 import '../../domain/models/genre_item.dart';
 import '../../domain/models/headphone_profile.dart';
@@ -39,6 +42,7 @@ import 'battery_aware_playback.dart';
 import 'format_aware_decoder.dart';
 import 'latency_optimizer.dart';
 import 'optimized_dsp_pipeline.dart';
+import 'output_format_negotiation.dart';
 import 'playback_analytics.dart';
 import 'replay_gain_math.dart';
 import 'seamless_queue_transition.dart';
@@ -47,6 +51,7 @@ import 'stream_pre_resolver.dart';
 import 'triple_buffer_pipeline.dart';
 import 'dsd_decoder_helper.dart';
 import '../../core/services/ytm_url_cache.dart';
+import 'collaborators/float_output_controller.dart';
 import 'collaborators/playback_queue_manager.dart';
 import 'collaborators/playback_state_coordinator.dart';
 import 'collaborators/playback_volume_controller.dart';
@@ -213,10 +218,17 @@ class PulsrAudioHandler extends BaseAudioHandler
   DateTime? _gaplessLoadTime;
   bool _gaplessTargetReached = false;
 
+  /// User-facing gapless toggle (persisted as `setting_gapless`). Gapless is
+  /// the default engine but is mutually exclusive with crossfade.
+  bool _gaplessEnabled = true;
+  bool get isGaplessEnabled => _gaplessEnabled;
+
   /// Gapless is the default engine. Enabling crossfade (duration > 0) switches
   /// to the overlapping dual-player engine, which cannot also produce a seamless
-  /// join, so the two are mutually exclusive by construction.
-  bool get _gaplessMode => _crossfadeManager.duration <= Duration.zero;
+  /// join, so the two are mutually exclusive by construction. An explicit
+  /// gapless OFF also falls back to per-track playback when crossfade is 0.
+  bool get _gaplessMode =>
+      _gaplessEnabled && _crossfadeManager.duration <= Duration.zero;
 
   final StreamController<SongsTableData> _onTrackChangedSubject =
       StreamController<SongsTableData>.broadcast();
@@ -301,8 +313,11 @@ class PulsrAudioHandler extends BaseAudioHandler
         _audioSessionIdSubject.add(sessionId);
       },
       onRouteChanged: () {
+        _syncBluetoothRouteFromCache();
         _equalizerManager.resyncActiveEffects();
         _equalizerManager.syncNativeLatency(assumedOutputSampleRate);
+        unawaited(_refreshBluetoothRoute());
+        unawaited(_recordSessionRouteChange());
       },
     );
     if (getIt.isRegistered<EqualizerManager>()) {
@@ -345,6 +360,72 @@ class PulsrAudioHandler extends BaseAudioHandler
   PlaybackStateCoordinator get playbackStateCoordinator => _playbackStateCoordinator;
   PlaybackPreloadOrchestrator get preloadOrchestrator => _preloadOrchestrator;
   StreamResolutionPipeline get streamResolutionPipeline => _streamResolutionPipeline;
+
+  /// Mirrors the cached output route's Bluetooth flag into the effects layer.
+  /// Synchronous (uses the HiResAudioService cache) so a route-change resync
+  /// sees the new route immediately instead of hardcoding a wired route.
+  void _syncBluetoothRouteFromCache() {
+    try {
+      if (!getIt.isRegistered<HiResAudioService>()) return;
+      final info = getIt<HiResAudioService>().currentOutputInfo;
+      if (info != null) _equalizerManager.isBluetoothRoute = info.isBluetooth;
+    } catch (_) {}
+  }
+
+  /// Refreshes the cached output info from native, then mirrors the route.
+  Future<void> _refreshBluetoothRoute() async {
+    try {
+      if (!getIt.isRegistered<HiResAudioService>()) return;
+      final info = await getIt<HiResAudioService>().getAudioOutputInfo();
+      _equalizerManager.isBluetoothRoute = info.isBluetooth;
+    } catch (_) {}
+  }
+
+  // ── Per-session audio telemetry (pure Dart, best-effort) ───────────────
+  // One record per playback session: route/codec/negotiated format plus any
+  // route change, interruption and underrun/dropout count. Every call is
+  // fire-and-forget; the service never throws and is a no-op when disabled.
+
+  Future<AudioOutputInfo?> _currentOutputInfo() async {
+    try {
+      if (!getIt.isRegistered<HiResAudioService>()) return null;
+      return await getIt<HiResAudioService>().getAudioOutputInfo();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _beginAudioSession(SongsTableData song) async {
+    try {
+      final log = AudioSessionLog.instance;
+      // Restore/preload paths can re-notify the same track; keep one session.
+      if (log.activeTrackId == song.id.toString()) return;
+      final info = await _currentOutputInfo();
+      await log.startSession(
+        trackId: song.id.toString(),
+        trackTitle: song.title,
+        routeType: AudioSessionLog.routeTypeForInfo(info),
+        bluetoothCodec: info?.btCodecName,
+        sampleRate: info?.sampleRate ?? song.sampleRate,
+        bitDepth: info?.bitDepth ?? song.bitDepth,
+        bitrateKbps: song.bitrateKbps,
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _recordSessionRouteChange() async {
+    try {
+      if (!AudioSessionLog.instance.hasActiveSession) return;
+      final info = await _currentOutputInfo();
+      if (info == null) return;
+      await AudioSessionLog.instance.updateOutputInfo(
+        routeType: AudioSessionLog.routeTypeForInfo(info),
+        bluetoothCodec: info.btCodecName,
+        sampleRate: info.sampleRate,
+        bitDepth: info.bitDepth,
+      );
+    } catch (_) {}
+  }
 
   int getOptimalBufferFrames({
     required bool isLocalFile,
@@ -458,17 +539,10 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// in [_notifyTrackChanged] corrects it once real header rates arrive.
   static const double assumedOutputSampleRate = 48000.0;
 
-  /// True while the current track is a DSD-over-PCM stream whose marker bits
-  /// must survive bit-exact: volume/ReplayGain scaling would corrupt 0x05/0xFA
-  /// framing into white noise, so all software gain stages lock to unity.
-  bool _isDopLocked = false;
-  bool get isDopLocked => _isDopLocked;
-
   double _calculateReplayGainVolume(SongsTableData? song) {
     // Keep native DSP pre-gain in sync (fire-and-forget): mixer stays at
     // user volume on Android, gain applied bit-transparently in-DSP.
     unawaited(_pushNativeReplayGain(song));
-    if (_isDopLocked) return 1.0;
     if (song == null) return _volume;
 
     final prefs = _cachedPrefs;
@@ -494,12 +568,12 @@ class PulsrAudioHandler extends BaseAudioHandler
   }
 
   /// Pushes ReplayGain tags to the native DSP pre-gain stage.
-  /// Non-Android / DoP-locked / bit-perfect: disables native stage so the
-  /// existing volume-path semantics (unity) are preserved.
+  /// Non-Android / bit-perfect: disables native stage so the existing
+  /// volume-path semantics (unity) are preserved.
   Future<void> _pushNativeReplayGain(SongsTableData? song) async {
     try {
       final prefs = _cachedPrefs;
-      if (prefs == null || _isDopLocked) {
+      if (prefs == null) {
         await AudioEffectsChannel().setReplayGainEnabled(false);
         return;
       }
@@ -541,9 +615,9 @@ class PulsrAudioHandler extends BaseAudioHandler
   Future<void> setVolume(double volume) async {
     _volume = volume.clamp(0.0, 1.0);
     final song = currentSong;
-    // DoP lock forces unity regardless of user slider/ReplayGain.
-    final target = _isDopLocked ? 1.0 : _calculateReplayGainVolume(song);
+    final target = _calculateReplayGainVolume(song);
     _volumeController.updateSettings(userVolume: _volume);
+    unawaited(_equalizerManager.updateLoudnessVolume(_volume));
     await _activePlayer.setVolume(target);
   }
 
@@ -552,6 +626,9 @@ class PulsrAudioHandler extends BaseAudioHandler
   bool get isVirtualizerEnabled => _equalizerManager.isVirtualizerEnabled;
   double get virtualizerStrength => _equalizerManager.virtualizerStrength;
   bool get isDynamicsEnabled => _equalizerManager.isDynamicsEnabled;
+  bool get isDynamicsEffectivelyEnabled =>
+      _equalizerManager.isDynamicsEffectivelyEnabled;
+  bool get isDynamicsBypassed => _equalizerManager.isDynamicsBypassed;
   DynamicsPreset get dynamicsPreset => _equalizerManager.dynamicsPreset;
   HeadphoneProfile? get selectedHeadphoneProfile =>
       _equalizerManager.selectedHeadphoneProfile;
@@ -561,18 +638,35 @@ class PulsrAudioHandler extends BaseAudioHandler
     final wasGapless = _gaplessMode;
     _crossfadeManager.duration = duration;
     final isGapless = _gaplessMode;
-    if (wasGapless != isGapless &&
-        _songs.isNotEmpty &&
-        _currentIndex >= 0 &&
-        _currentIndex < _songs.length) {
-      // Debounce slider drags: rapid toggles previously spawned
-      // concurrent _switchPlaybackEngine calls that interleaved.
-      _crossfadeSwitchDebounce?.cancel();
-      _crossfadeSwitchDebounce =
-          Timer(const Duration(milliseconds: 300), () {
-        unawaited(_switchPlaybackEngine(toGapless: isGapless));
-      });
+    if (wasGapless != isGapless) {
+      _scheduleEngineSwitch(toGapless: isGapless);
     }
+  }
+
+  /// Applies the persisted gapless toggle. Switching it (queue non-empty)
+  /// re-selects the gapless playlist engine or the per-track player.
+  void setGaplessEnabled(bool enabled) {
+    if (_gaplessEnabled == enabled) return;
+    final wasGapless = _gaplessMode;
+    _gaplessEnabled = enabled;
+    final isGapless = _gaplessMode;
+    if (wasGapless != isGapless) {
+      _scheduleEngineSwitch(toGapless: isGapless);
+    }
+  }
+
+  void _scheduleEngineSwitch({required bool toGapless}) {
+    if (_songs.isEmpty ||
+        _currentIndex < 0 ||
+        _currentIndex >= _songs.length) {
+      return;
+    }
+    // Debounce slider drags: rapid toggles previously spawned concurrent
+    // _switchPlaybackEngine calls that interleaved.
+    _crossfadeSwitchDebounce?.cancel();
+    _crossfadeSwitchDebounce = Timer(const Duration(milliseconds: 300), () {
+      unawaited(_switchPlaybackEngine(toGapless: toGapless));
+    });
   }
 
   int _engineSwitchGeneration = 0;
@@ -639,9 +733,12 @@ class PulsrAudioHandler extends BaseAudioHandler
       _equalizerManager.setDynamicsPreset(preset, enabled: enabled);
   Future<void> toggleDynamicsBypass() =>
       _equalizerManager.toggleDynamicsBypass();
-  bool get isDynamicsBypassed => _equalizerManager.isDynamicsBypassed;
   bool get isSpatializerEnabled => _equalizerManager.isSpatializerEnabled;
   bool get isSpatializerSupported => _equalizerManager.isSpatializerSupported;
+  bool get isVirtualizerSupported => _equalizerManager.isVirtualizerSupported;
+  bool get isDynamicsSupported => _equalizerManager.isDynamicsSupported;
+  bool get isBassBoostSupported => _equalizerManager.isBassBoostSupported;
+  bool get isVolumeBoostSupported => _equalizerManager.isVolumeBoostSupported;
   bool get isHeadTrackerAvailable => _equalizerManager.isHeadTrackerAvailable;
   String get spatializerMode => _equalizerManager.spatializerMode;
   Future<void> setSpatializerMode(String mode) =>
@@ -686,7 +783,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   double get reverbWetDry => _equalizerManager.reverbWetDry;
   Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) =>
       _equalizerManager.setReverb(enabled, preset: preset, wetDry: wetDry);
-  Future<void> loadCustomImpulseResponse(List<double> irSamples) =>
+  Future<bool> loadCustomImpulseResponse(List<double> irSamples) =>
       _equalizerManager.loadCustomImpulseResponse(irSamples);
 
   double get stereoBalance => _equalizerManager.stereoBalance;
@@ -698,6 +795,11 @@ class PulsrAudioHandler extends BaseAudioHandler
   bool get isSincResamplerEnabled => _equalizerManager.isSincResamplerEnabled;
   Future<void> setSincResampler(bool enabled) =>
       _equalizerManager.setSincResampler(enabled);
+
+  bool get isDitherEnabled => _equalizerManager.isDitherEnabled;
+  int get ditherTargetBitDepth => _equalizerManager.ditherTargetBitDepth;
+  Future<void> setDither(bool enabled, {int? targetBitDepth}) =>
+      _equalizerManager.setDither(enabled, targetBitDepth: targetBitDepth);
 
   Future<int> getPipelineLatencyFrames() =>
       _equalizerManager.getPipelineLatencyFrames();
@@ -797,6 +899,11 @@ class PulsrAudioHandler extends BaseAudioHandler
     _initSaveTimer();
     AudioMemoryManager.adaptBudgetToSystemRam();
     await _initPrefs();
+    // Restore the opt-in float DSP path before any other player call so the
+    // native sink is built with the persisted preference. Off by default.
+    await setFloatOutputEnabled(
+      _cachedPrefs?.getBool(PrefsKeys.floatOutputEnabled) ?? false,
+    );
 
     _playbackAnalytics = PlaybackAnalytics(
       onIncreaseBufferSizeRequested: () {
@@ -813,6 +920,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       onStreamRecoveryRequested: (videoId, error) async {
         debugPrint(
             '[AudioHandler] Attempting self-healing recovery for $videoId: $error');
+        unawaited(AudioSessionLog.instance.recordDropout());
         try {
           await _ytmService.invalidatePoToken();
           await _ytmService.ensurePoTokenReady();
@@ -820,6 +928,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       },
       onCorruptedFileDetected: (path, error) {
         debugPrint('[AudioHandler] Corrupted file flagged at $path: $error');
+        unawaited(AudioSessionLog.instance.recordDropout());
       },
     );
 
@@ -967,6 +1076,7 @@ class PulsrAudioHandler extends BaseAudioHandler
               if (event.processingState == ProcessingState.buffering &&
                   _activePlayer.playing) {
                 _playbackAnalytics.recordBufferUnderrun();
+                unawaited(AudioSessionLog.instance.recordUnderrun());
               }
               _broadcastState(event);
             }
@@ -1174,6 +1284,8 @@ class PulsrAudioHandler extends BaseAudioHandler
           if (event.begin) {
             switch (event.type) {
               case AudioInterruptionType.duck:
+                unawaited(AudioSessionLog.instance
+                    .recordInterruption(AudioInterruptionKind.duck));
                 // F7: ducking behavior is user-controllable (duck/pause/ignore).
                 if (duckingController.shouldIgnore) break;
                 if (duckingController.shouldPause) {
@@ -1201,6 +1313,8 @@ class PulsrAudioHandler extends BaseAudioHandler
                 }
                 break;
               case AudioInterruptionType.pause:
+                unawaited(AudioSessionLog.instance
+                    .recordInterruption(AudioInterruptionKind.pause));
                 // Stack-safe: keep the original pre-interruption state so an
                 // overlapping duck + call doesn't lose the resume decision.
                 if (!_pauseInterruptionActive) {
@@ -1217,6 +1331,8 @@ class PulsrAudioHandler extends BaseAudioHandler
                 }
                 break;
               case AudioInterruptionType.unknown:
+                unawaited(AudioSessionLog.instance
+                    .recordInterruption(AudioInterruptionKind.unknown));
                 // Permanent/unknown loss: pause, never auto-resume, free DSP.
                 if (!_pauseInterruptionActive) {
                   _wasPlayingBeforeInterruption = _activePlayer.playing;
@@ -1301,6 +1417,8 @@ class PulsrAudioHandler extends BaseAudioHandler
             return;
           }
           _lastNoisyTime = now;
+          unawaited(AudioSessionLog.instance
+              .recordInterruption(AudioInterruptionKind.becomingNoisy));
           if (!_activePlayer.playing && !_crossfadeManager.isCrossfading) {
             return;
           }
@@ -1314,7 +1432,10 @@ class PulsrAudioHandler extends BaseAudioHandler
 
       _subscriptions.add(
         session.devicesStream.listen((devices) {
+          _syncBluetoothRouteFromCache();
           _audioSessionIdRouter.handleRouteChanged();
+          unawaited(_refreshBluetoothRoute());
+          unawaited(_recordSessionRouteChange());
         }),
       );
     } catch (e, st) {
@@ -1325,12 +1446,18 @@ class PulsrAudioHandler extends BaseAudioHandler
     _subscriptions.add(
       AudioEffectsChannel().onRouteChanged.listen((_) {
         _audioSessionIdRouter.handleRouteChanged();
+        unawaited(_recordSessionRouteChange());
       }),
     );
 
     // Initialize audio effects & equalizer preferences
     try {
+      // Seed the BT mirror before effects init so the cold-start dither push
+      // sees the real route when the output info is already cached.
+      _syncBluetoothRouteFromCache();
       await _equalizerManager.init();
+      unawaited(_refreshBluetoothRoute());
+      unawaited(_equalizerManager.updateLoudnessVolume(_volume));
       await _restoreSkipSilence();
       // F2/F7/F9–F11: restore persisted feature state (best-effort).
       try {
@@ -1411,12 +1538,6 @@ class PulsrAudioHandler extends BaseAudioHandler
   void _notifyTrackChanged(SongsTableData song) {
     // F1: AB loop is per-track; a new song invalidates it.
     abLoopManager.onSongChanged(song.id);
-    // DoP lock: DSD-over-PCM framing dies if any software gain touches it.
-    final ext = song.path.split('.').last.toLowerCase();
-    final isDsd = ext == 'dsf' || ext == 'dff';
-    final dopPreferred = DsdDecoderHelper.isDopPreferred?.call() ?? false;
-    _isDopLocked = isDsd && dopPreferred;
-    _volumeController.setDopActive(_isDopLocked);
     // Correct DSP coefficients for the real header rate (replaces the 48kHz
     // cold-start assumption once known).
     final rate = song.sampleRate;
@@ -1437,6 +1558,54 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
     _lastPlayedSong = song;
     _onTrackChangedSubject.add(song);
+    unawaited(_beginAudioSession(song));
+    unawaited(_maybeNegotiateOutputFormat(song));
+  }
+
+  /// Opt-in per-track output-format negotiation. When enabled (and not in the
+  /// bit-perfect exclusive path, which negotiates its own mixer attributes), the
+  /// pure [negotiateOutputFormat] decision picks the format and pushes it
+  /// through the existing target-format channel. No-op when disabled, so the
+  /// default manual, device-global output format is untouched.
+  Future<void> _maybeNegotiateOutputFormat(SongsTableData song) async {
+    try {
+      final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
+      if (!(prefs.getBool(PrefsKeys.outputFormatNegotiationEnabled) ?? false)) {
+        return;
+      }
+      if (!getIt.isRegistered<HiResAudioService>()) return;
+      final service = getIt<HiResAudioService>();
+      final info =
+          service.currentOutputInfo ?? await service.getAudioOutputInfo();
+      final bitPerfect = (prefs.getBool(PrefsKeys.bitPerfectOutput) ?? false) &&
+          (prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true);
+      final decision = negotiateOutputFormat(
+        request: OutputFormatRequest(
+          trackSampleRate: song.sampleRate ?? 0,
+          trackBitDepth: song.bitDepth ?? 0,
+        ),
+        deviceSampleRates: info.supportedSampleRates,
+        deviceMaxBitDepth: info.bitDepth,
+        route: OutputRoute.fromOutputInfo(info),
+        bitPerfectActive: bitPerfect,
+      );
+      if (!decision.applied) return; // Exclusive path owns the mixer format.
+      // setTargetOutputFormat only accepts the platform's known ladder; fall
+      // back to "auto" for that dimension when the device reports a rate it
+      // does not accept, rather than silently requesting nothing.
+      const validRates = <int>{
+        44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 768000
+      };
+      final rate =
+          validRates.contains(decision.sampleRate) ? decision.sampleRate : 0;
+      await service.setTargetOutputFormat(
+        sampleRate: rate,
+        bitDepth: decision.bitDepth,
+      );
+    } catch (e, st) {
+      ErrorLogger.log('Output format negotiation failed',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
   }
 
   static AudioLoadConfiguration _loadConfigForBucket(BufferBucket bucket) {
@@ -1957,6 +2126,16 @@ class PulsrAudioHandler extends BaseAudioHandler
     } catch (e, st) {
       ErrorLogger.log('Failed to set skipSilence', error: e, stackTrace: st, category: 'AudioHandler');
     }
+  }
+
+  /// Pushes the opt-in 24/32-bit float DSP-path preference to every player
+  /// (active, inactive and prefetch). Off by default; with `false` the native
+  /// sink is built exactly as before. Never throws.
+  Future<void> setFloatOutputEnabled(bool enabled) async {
+    await pushFloatOutputToPlayers(
+      enabled,
+      [_playerA, _playerB, _prefetchPlayer],
+    );
   }
 
   Future<void> _restoreSkipSilence() async {
@@ -3371,6 +3550,14 @@ class PulsrAudioHandler extends BaseAudioHandler
       // A dead network, bot challenge, or extractor-less build fails every remaining YouTube
       // row, so skipping through them is pointless — halt immediately.
       await _failCurrentPlayback(fatal: e.isFatal);
+    } on DsdUnsupportedException catch (e, st) {
+      if (generation != _playGeneration) return;
+      // DSD (DSF/DFF) on a platform with no native decoder (e.g. iOS) must
+      // fail visibly and skip, never crash or loop on the same row.
+      _errorSubject.add(e.message);
+      ErrorLogger.log('DSD playback unsupported for ${song.title}',
+          error: e, stackTrace: st, category: 'AudioHandler');
+      await _failCurrentPlayback(fatal: false);
     } catch (e, st) {
       if (generation != _playGeneration) return;
       if (e is PlatformException &&
@@ -4710,6 +4897,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   Future<void> stop() async {
     _sleepTimerManager.cancelSleepTimer();
+    unawaited(AudioSessionLog.instance.endSession());
     await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
         restoreVolume: _volume);
     _saveCurrentPosition();

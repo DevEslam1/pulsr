@@ -91,6 +91,20 @@ class StubPulsrAudioHandler extends BaseAudioHandler
   @override
   bool get isSincResamplerEnabled => true;
   @override
+  bool get isDitherEnabled => false;
+  @override
+  int get ditherTargetBitDepth => 16;
+  @override
+  bool get isDynamicsEffectivelyEnabled => false;
+  @override
+  bool get isDynamicsSupported => true;
+  @override
+  bool get isVirtualizerSupported => true;
+  @override
+  bool get isBassBoostSupported => true;
+  @override
+  bool get isVolumeBoostSupported => true;
+  @override
   bool get hasOemAudio => false;
   @override
   List<String> get detectedOemEngines => const [];
@@ -175,7 +189,9 @@ class StubPulsrAudioHandler extends BaseAudioHandler
   @override
   Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) async {}
   @override
-  Future<void> loadCustomImpulseResponse(List<double> irSamples) async {}
+  Future<bool> loadCustomImpulseResponse(List<double> irSamples) async => true;
+  @override
+  Future<void> setDither(bool enabled, {int? targetBitDepth}) async {}
   @override
   Future<void> setStereoBalance(double balance) async {}
   @override

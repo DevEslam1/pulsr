@@ -180,11 +180,17 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       eqPreset: _audioHandler.currentPreset,
       isVirtualizerEnabled: _audioHandler.isVirtualizerEnabled,
       virtualizerStrength: _audioHandler.virtualizerStrength,
-      isDynamicsEnabled: _audioHandler.isDynamicsEnabled,
+      isVirtualizerSupported: _audioHandler.isVirtualizerSupported,
+      // Effective dynamics: enabled AND not bypassed, so the toggle can never
+      // show ON while the native stage is muted by the bypass.
+      isDynamicsEnabled: _audioHandler.isDynamicsEffectivelyEnabled,
+      isDynamicsSupported: _audioHandler.isDynamicsSupported,
       dynamicsPreset: _audioHandler.dynamicsPreset,
       selectedHeadphoneProfile: _audioHandler.selectedHeadphoneProfile,
       isSpatializerEnabled: _audioHandler.isSpatializerEnabled,
       isSpatializerSupported: _audioHandler.isSpatializerSupported,
+      isBassBoostSupported: _audioHandler.isBassBoostSupported,
+      isVolumeBoostSupported: _audioHandler.isVolumeBoostSupported,
       volumeBoost: _audioHandler.volumeBoost,
       isCrossfeedEnabled: _audioHandler.isCrossfeedEnabled,
       crossfeedDelayUs: _audioHandler.crossfeedDelayUs,
@@ -198,6 +204,8 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       stereoBalance: _audioHandler.stereoBalance,
       monoMix: _audioHandler.monoMix,
       isSincResamplerEnabled: _audioHandler.isSincResamplerEnabled,
+      isDitherEnabled: _audioHandler.isDitherEnabled,
+      ditherTargetBitDepth: _audioHandler.ditherTargetBitDepth,
       isSaturationEnabled: _audioHandler.isSaturationEnabled,
       saturationDrive: _audioHandler.saturationDrive,
       saturationMix: _audioHandler.saturationMix,
@@ -229,11 +237,14 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
             milliseconds:
                 (settingsCubit.state.crossfadeSeconds * 1000).round()),
       );
+      _audioHandler.setGaplessEnabled(settingsCubit.state.gaplessPlayback);
       autoSub(settingsCubit.stream, (settingsState) {
         _audioHandler.setCrossfadeDuration(
           Duration(
               milliseconds: (settingsState.crossfadeSeconds * 1000).round()),
         );
+        // Persisted gapless toggle actually selects the gapless engine.
+        _audioHandler.setGaplessEnabled(settingsState.gaplessPlayback);
         // Re-apply gain when ReplayGain settings change
         _audioHandler.setVolume(_audioHandler.volume);
       });
@@ -2194,20 +2205,10 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
             await _audioHandler.setVolumeBoost(snap.volumeBoost);
           }
         } else {
-          safeEmit(state.copyWith(
-            isLimiterEnabled: true,
-            isDynamicsEnabled: true,
-            dynamicsPreset: state.dynamicsPreset == DynamicsPreset.off
-                ? DynamicsPreset.studioPunch
-                : state.dynamicsPreset,
-          ));
-          await _audioHandler.setLookaheadLimiter(true);
-          await _audioHandler.setDynamicsPreset(
-            state.dynamicsPreset == DynamicsPreset.off
-                ? DynamicsPreset.studioPunch
-                : state.dynamicsPreset,
-            enabled: true,
-          );
+          // No snapshot to restore: do not fabricate limiter/dynamics as ON.
+          // Re-sync the UI from the handler (the source of truth) and leave
+          // every stage exactly as the current/stored preference has it.
+          _syncAudioEffects();
         }
       }
     } catch (e) {
@@ -2301,18 +2302,31 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     }
   }
 
-  Future<void> loadCustomImpulseResponse(List<double> irSamples) async {
-    if (!_guardDsp('Reverb IR')) return;
-    safeEmit(state.copyWith(
-      isReverbEnabled: true,
-      reverbPreset: ReverbPreset.custom.wireValue,
-    ));
+  /// Loads a custom reverb impulse response. Returns true only when the native
+  /// side accepted it; on failure the UI is NOT flipped to "Custom (Loaded)".
+  Future<bool> loadCustomImpulseResponse(List<double> irSamples) async {
+    if (!_guardDsp('Reverb IR')) return false;
     try {
-      await _audioHandler.loadCustomImpulseResponse(irSamples);
+      final loaded = await _audioHandler.loadCustomImpulseResponse(irSamples);
+      if (!loaded) {
+        _syncAudioEffects();
+        safeEmit(state.copyWith(
+            errorMessage: 'Impulse response rejected by the audio engine'));
+        return false;
+      }
+      if (!isClosed) {
+        safeEmit(state.copyWith(
+          isReverbEnabled: true,
+          reverbPreset: ReverbPreset.custom.wireValue,
+          errorMessage: null,
+        ));
+      }
+      return true;
     } catch (e) {
       _syncAudioEffects();
       safeEmit(
           state.copyWith(errorMessage: 'Failed to load impulse response: $e'));
+      return false;
     }
   }
 
@@ -2326,9 +2340,12 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       if (result != null && result.path != null) {
         final path = result.path!;
         final samples = await IrFileParser.parseWavFile(File(path));
-        await loadCustomImpulseResponse(samples);
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(PrefsKeys.customReverbIrPath, path);
+        // Persist the path only after the engine actually accepted the IR,
+        // otherwise a failed load would be restored as "custom" with no IR.
+        if (await loadCustomImpulseResponse(samples)) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(PrefsKeys.customReverbIrPath, path);
+        }
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to pick/load custom IR file',
@@ -2372,6 +2389,27 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     } catch (e) {
       _syncAudioEffects();
       safeEmit(state.copyWith(errorMessage: 'Failed to set resampler: $e'));
+    }
+  }
+
+  Future<void> setDither(bool enabled, {int? targetBitDepth}) async {
+    if (enabled && !_guardDsp('Dither', showError: false)) return;
+    if (targetBitDepth != null &&
+        targetBitDepth != 16 &&
+        targetBitDepth != 24 &&
+        targetBitDepth != 32) {
+      return;
+    }
+    safeEmit(state.copyWith(
+      isDitherEnabled: enabled,
+      ditherTargetBitDepth: targetBitDepth ?? state.ditherTargetBitDepth,
+      errorMessage: null,
+    ));
+    try {
+      await _audioHandler.setDither(enabled, targetBitDepth: targetBitDepth);
+    } catch (e) {
+      _syncAudioEffects();
+      safeEmit(state.copyWith(errorMessage: 'Failed to set dither: $e'));
     }
   }
 

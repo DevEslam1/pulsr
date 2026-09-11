@@ -34,6 +34,9 @@ enum DspStageMask {
     STAGE_LOUDNESS = 1 << 8,
     STAGE_CROSSOVER = 1 << 9,
     STAGE_DYNEQ = 1 << 10,
+    // Dither has its own stage bit so it can act standalone: toggling dither
+    // alone (no EQ/gain stage active) must still requantize at the target depth.
+    STAGE_DITHER = 1 << 11,
 };
 
 template<typename T>
@@ -192,6 +195,18 @@ private:
         const float r1 = static_cast<float>(ditherPrngState1_) * (1.0f / 4294967296.0f);
         const float r2 = static_cast<float>(ditherPrngState2_) * (1.0f / 4294967296.0f);
         return r1 - r2;
+    }
+
+    // Quantization full-scale for a TPDF dither target depth. 1 LSB at b bits is
+    // 1 / 2^(b-1), so the round-trip is round(x * scale + tpdf) / scale.
+    static float ditherScaleForBits(int bits) {
+        switch (bits) {
+            case 24: return 8388608.0f;    // 2^23
+            case 32: return 2147483648.0f; // 2^31 (float holds ~24-bit mantissa,
+                                           // so 32-bit dither is a no-op by
+                                           // construction — still correct math)
+            default: return 32768.0f;      // 2^15 (16-bit)
+        }
     }
 
     // Phase 1 DSP-expansion stages (all zero-latency IIR/pointwise, so they

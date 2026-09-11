@@ -20,6 +20,10 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
   late double _releaseMs;
   late double _makeupGainDb;
 
+  /// Ratio / attack / make-up are honored only by the Android HAL
+  /// DynamicsProcessing limiter; the native C++ stage is a brickwall limiter.
+  late final bool _advancedSupported;
+
   @override
   void initState() {
     super.initState();
@@ -29,6 +33,8 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
     _attackMs = widget.equalizerManager.compressorAttackMs;
     _releaseMs = widget.equalizerManager.limiterReleaseMs;
     _makeupGainDb = widget.equalizerManager.compressorMakeupGainDb;
+    _advancedSupported =
+        widget.equalizerManager.isCompressorAdvancedParamsSupported;
   }
 
   void _applyParams() {
@@ -99,6 +105,34 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
               'Studio-grade lookahead dynamics processing and peak brickwall limiting.',
               style: TextStyle(color: p.textSecondary, fontSize: 13),
             ),
+            if (!_advancedSupported) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: p.surfaceCard,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: p.hairline),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline_rounded,
+                        size: 16, color: p.textTertiary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Ratio, Attack and Make-up Gain need the Android DynamicsProcessing engine, which this device does not expose. Only Threshold and Release are applied to the native brickwall limiter.',
+                        style: TextStyle(
+                            color: p.textTertiary,
+                            fontSize: 11,
+                            height: 1.35),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 24),
 
             // Threshold Slider
@@ -109,13 +143,14 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
               min: -30.0,
               max: 0.0,
               defaultValue: -0.2,
+              enabled: _limiterEnabled,
               onChanged: (val) {
                 setState(() => _thresholdDb = val);
                 _applyParams();
               },
             ),
 
-            // Ratio Slider
+            // Ratio Slider (HAL DynamicsProcessing only)
             _buildParamRow(
               title: 'Ratio',
               valueDisplay: '${_ratio.toStringAsFixed(1)}:1',
@@ -123,13 +158,14 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
               min: 1.0,
               max: 20.0,
               defaultValue: 3.0,
+              enabled: _limiterEnabled && _advancedSupported,
               onChanged: (val) {
                 setState(() => _ratio = val);
                 _applyParams();
               },
             ),
 
-            // Attack Slider
+            // Attack Slider (HAL DynamicsProcessing only)
             _buildParamRow(
               title: 'Attack Time',
               valueDisplay: '${_attackMs.toStringAsFixed(0)} ms',
@@ -137,6 +173,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
               min: 1.0,
               max: 100.0,
               defaultValue: 15.0,
+              enabled: _limiterEnabled && _advancedSupported,
               onChanged: (val) {
                 setState(() => _attackMs = val);
                 _applyParams();
@@ -151,13 +188,14 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
               min: 10.0,
               max: 500.0,
               defaultValue: 50.0,
+              enabled: _limiterEnabled,
               onChanged: (val) {
                 setState(() => _releaseMs = val);
                 _applyParams();
               },
             ),
 
-            // Makeup Gain Slider
+            // Makeup Gain Slider (HAL DynamicsProcessing only)
             _buildParamRow(
               title: 'Makeup Gain',
               valueDisplay: '+${_makeupGainDb.toStringAsFixed(1)} dB',
@@ -165,6 +203,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
               min: 0.0,
               max: 12.0,
               defaultValue: 0.0,
+              enabled: _limiterEnabled && _advancedSupported,
               onChanged: (val) {
                 setState(() => _makeupGainDb = val);
                 _applyParams();
@@ -208,6 +247,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
     required double min,
     required double max,
     double? defaultValue,
+    bool enabled = true,
     required ValueChanged<double> onChanged,
   }) {
     final p = context.palette;
@@ -223,7 +263,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
               Text(
                 title,
                 style: TextStyle(
-                  color: p.textPrimary,
+                  color: enabled ? p.textPrimary : p.textTertiary,
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
@@ -234,7 +274,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                   Text(
                     valueDisplay,
                     style: TextStyle(
-                      color: p.primary,
+                      color: enabled ? p.primary : p.textTertiary,
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
@@ -244,7 +284,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                     IconButton(
                       icon: Icon(Icons.settings_backup_restore,
                           size: 16,
-                          color: isDefault || !_limiterEnabled
+                          color: isDefault || !enabled
                               ? p.textSecondary.withValues(alpha: 0.35)
                               : p.primary),
                       tooltip: 'Reset to default',
@@ -252,9 +292,8 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                       padding: EdgeInsets.zero,
                       constraints:
                           const BoxConstraints(minWidth: 24, minHeight: 24),
-                      onPressed: isDefault || !_limiterEnabled
-                          ? null
-                          : () => onChanged(defaultValue),
+                      onPressed:
+                          isDefault || !enabled ? null : () => onChanged(defaultValue),
                     ),
                   ],
                 ],
@@ -272,7 +311,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
               value: value.clamp(min, max),
               min: min,
               max: max,
-              onChanged: _limiterEnabled ? onChanged : null,
+              onChanged: enabled ? onChanged : null,
             ),
           ),
         ],

@@ -49,6 +49,26 @@ void main() {
       cubit.close();
     });
 
+    test('float output setting defaults OFF and persists/restores', () async {
+      // Default is OFF: the 16-bit sink path must stay the default behaviour.
+      expect(const SettingsState().floatOutputEnabled, false);
+
+      final cubit = SettingsCubit(scannerService: mockScannerService);
+      expect(cubit.state.floatOutputEnabled, false);
+
+      await cubit.setFloatOutputEnabled(true);
+      expect(cubit.state.floatOutputEnabled, true);
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('setting_float_output_enabled'), true);
+      cubit.close();
+
+      final restored = SettingsCubit(scannerService: mockScannerService);
+      await restored.reloadSettings();
+      expect(restored.state.floatOutputEnabled, true);
+      restored.close();
+    });
+
     test(
         'setGapless, setCrossfade, setMinDuration, setDynamicTheming update state',
         () async {

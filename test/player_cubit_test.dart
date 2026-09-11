@@ -136,6 +136,13 @@ class TestPulsrAudioHandler extends BaseAudioHandler
     currentCrossfadeDuration = d;
   }
 
+  bool? gaplessEnabled;
+
+  @override
+  void setGaplessEnabled(bool enabled) {
+    gaplessEnabled = enabled;
+  }
+
   @override
   Future<void> restoreLastPlaybackSession() async {}
 
@@ -166,6 +173,12 @@ class TestPulsrAudioHandler extends BaseAudioHandler
 
   @override
   bool get isDynamicsEnabled => false;
+
+  @override
+  bool get isDynamicsEffectivelyEnabled => false;
+
+  @override
+  bool get isDynamicsSupported => true;
 
   @override
   DynamicsPreset get dynamicsPreset => DynamicsPreset.off;
@@ -241,7 +254,17 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   @override
   bool get monoMix => false;
   @override
+  bool get isVirtualizerSupported => true;
+  @override
+  bool get isBassBoostSupported => true;
+  @override
+  bool get isVolumeBoostSupported => true;
+  @override
   bool get isSincResamplerEnabled => true;
+  @override
+  bool get isDitherEnabled => false;
+  @override
+  int get ditherTargetBitDepth => 16;
   @override
   bool get hasOemAudio => false;
   @override
@@ -321,13 +344,15 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   @override
   Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) async {}
   @override
-  Future<void> loadCustomImpulseResponse(List<double> irSamples) async {}
+  Future<bool> loadCustomImpulseResponse(List<double> irSamples) async => true;
   @override
   Future<void> setStereoBalance(double balance) async {}
   @override
   Future<void> setMonoMix(bool mono) async {}
   @override
   Future<void> setSincResampler(bool enabled) async {}
+  @override
+  Future<void> setDither(bool enabled, {int? targetBitDepth}) async {}
 
   @override
   Future<void> toggleDynamicsBypass() async {}
@@ -628,6 +653,30 @@ void main() {
         testAudioHandler.currentCrossfadeDuration,
         const Duration(seconds: 6),
       );
+
+      await cubit.close();
+      await settingsCubit.close();
+    });
+
+    test('gapless toggle is forwarded to the audio handler', () async {
+      final mockScannerService = MockMediaScannerService();
+      SharedPreferences.setMockInitialValues({'setting_gapless': true});
+      final settingsCubit = SettingsCubit(scannerService: mockScannerService);
+
+      final cubit = PlayerCubit(
+        audioHandler: testAudioHandler,
+        repository: mockRepository,
+        toggleFavoriteUseCase: mockToggleFavorite,
+        settingsCubit: settingsCubit,
+      );
+
+      // Persisted toggle is pushed on construction…
+      expect(testAudioHandler.gaplessEnabled, isTrue);
+
+      // …and re-pushed when the user flips it in Settings.
+      await settingsCubit.setGapless(false);
+      await pumpEventQueue();
+      expect(testAudioHandler.gaplessEnabled, isFalse);
 
       await cubit.close();
       await settingsCubit.close();

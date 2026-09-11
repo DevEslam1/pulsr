@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/constants/audio_feature_info.dart';
 import 'package:pulsr/data/audio/adaptive_buffer_engine.dart';
 import 'package:pulsr/data/audio/collaborators/playback_volume_controller.dart';
 import 'package:pulsr/data/audio/dop_encoder.dart';
@@ -15,6 +16,12 @@ class MockAudioPlayer extends Mock implements AudioPlayer {}
 
 void main() {
   group('DoP DSD Framing & Unity Gain Tests', () {
+    test('dsdNative registry states DoP output is unavailable', () {
+      final info = AudioFeatureRegistry.dsdNative;
+      expect(info.subtitle.toLowerCase(), contains('dop'));
+      expect(info.description.toLowerCase(), contains('not implemented'));
+    });
+
     test('DopEncoder.encodeToDopPcm24 produces valid DoP 0x05 / 0xFA marker bytes', () {
       final dsdLeft = Uint8List.fromList(List.generate(8, (i) => 0xAA));
       final dsdRight = Uint8List.fromList(List.generate(8, (i) => 0x55));

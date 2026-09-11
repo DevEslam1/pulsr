@@ -36,12 +36,16 @@ bool dspSheetRebuildGate(PlayerState a, PlayerState b) {
       a.eqPreset.bassBoost != b.eqPreset.bassBoost ||
       a.isVirtualizerEnabled != b.isVirtualizerEnabled ||
       a.virtualizerStrength != b.virtualizerStrength ||
+      a.isVirtualizerSupported != b.isVirtualizerSupported ||
       a.isDynamicsEnabled != b.isDynamicsEnabled ||
+      a.isDynamicsSupported != b.isDynamicsSupported ||
       a.dynamicsPreset != b.dynamicsPreset ||
       a.selectedHeadphoneProfile != b.selectedHeadphoneProfile ||
       a.isSpatializerEnabled != b.isSpatializerEnabled ||
       a.isSpatializerSupported != b.isSpatializerSupported ||
       a.volumeBoost != b.volumeBoost ||
+      a.isVolumeBoostSupported != b.isVolumeBoostSupported ||
+      a.isBassBoostSupported != b.isBassBoostSupported ||
       a.stereoBalance != b.stereoBalance ||
       a.monoMix != b.monoMix ||
       a.isCrossfeedEnabled != b.isCrossfeedEnabled ||
@@ -54,6 +58,8 @@ bool dspSheetRebuildGate(PlayerState a, PlayerState b) {
       a.reverbPreset != b.reverbPreset ||
       a.reverbWetDry != b.reverbWetDry ||
       a.isSincResamplerEnabled != b.isSincResamplerEnabled ||
+      a.isDitherEnabled != b.isDitherEnabled ||
+      a.ditherTargetBitDepth != b.ditherTargetBitDepth ||
       a.hasOemAudio != b.hasOemAudio ||
       listContentDiffers(a.detectedOemEngines, b.detectedOemEngines) ||
       a.isSaturationEnabled != b.isSaturationEnabled ||
@@ -167,6 +173,58 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   /// HAL-backed stages (limiter, EQ, bass, virtualizer, volume boost) ignore
   /// this and stay available.
   bool get _nativePcmEffectsAvailable => AudioEffectsChannel().hasPcmDspPath;
+
+  /// The spatializer toggle falls back to the hardware virtualizer on devices
+  /// without a Spatializer API, so it is only reachable when at least one of
+  /// the two exists. Shared by both tabs so their gating stays identical.
+  bool _spatializerToggleAvailable(PlayerState state) =>
+      state.isSpatializerSupported || state.isVirtualizerSupported;
+
+  /// The EqualizerManager singleton, when DI has registered it. Widget tests
+  /// that do not register it must not crash the sheet, so this is defensive.
+  EqualizerManager? _equalizerManagerOrNull() {
+    try {
+      return getIt.isRegistered<EqualizerManager>()
+          ? getIt<EqualizerManager>()
+          : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Truthful native status: shown under an effect control when the engine
+  /// reported it could not be applied (unsupported / build failure / no
+  /// session), so an "on" control cannot silently mean "no audible effect".
+  Widget _effectNotAppliedNotice(String effectKey, PulsrPalette p) {
+    final manager = _equalizerManagerOrNull();
+    if (manager == null) return const SizedBox.shrink();
+    return ValueListenableBuilder<Map<String, String>>(
+      valueListenable: manager.effectStatusNotifier,
+      builder: (context, status, _) {
+        if (!status.containsKey(effectKey)) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.error_outline_rounded, size: 13, color: p.error),
+              const SizedBox(width: 5),
+              Expanded(
+                child: Text(
+                  'Not applied by the audio engine on this device/session — this control may have no audible effect.',
+                  style: TextStyle(
+                    color: p.error,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   void _showFeatureInfo(BuildContext context, AudioFeatureInfo info, {String? conflictReason}) {
     final p = context.palette;
@@ -792,6 +850,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     final isEnabled = state.isEqEnabled;
     final dspBlocked = _dspBlockedReason(context);
     final effectiveEnabled = isEnabled && dspBlocked == null;
+    final spatializerAvailable = _spatializerToggleAvailable(state);
 
     // Gain staging calculations for Volume Boost
     final preampDb = state.selectedHeadphoneProfile?.preampGain ?? 0.0;
@@ -1301,7 +1360,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           constraints:
                               const BoxConstraints(minWidth: 24, minHeight: 24),
                           onPressed: preset.bassBoost <= 0.001 ||
-                                  dspBlocked != null
+                                  dspBlocked != null ||
+                                  !state.isBassBoostSupported
                               ? null
                               : () => cubit.setBassBoost(0.0),
                         ),
@@ -1325,7 +1385,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     value: preset.bassBoost.clamp(0.0, 1.0),
                     min: 0.0,
                     max: 1.0,
-                    onChanged: dspBlocked != null
+                    onChanged: dspBlocked != null || !state.isBassBoostSupported
                         ? null
                         : (val) {
                             if (!state.isEqEnabled) {
@@ -1335,6 +1395,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           },
                   ),
                 ),
+                _effectNotAppliedNotice('bassBoost', p),
               ],
             ),
           ),
@@ -1453,7 +1514,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           constraints:
                               const BoxConstraints(minWidth: 24, minHeight: 24),
                           onPressed: state.volumeBoost <= 0.001 ||
-                                  dspBlocked != null
+                                  dspBlocked != null ||
+                                  !state.isVolumeBoostSupported
                               ? null
                               : () => cubit.setVolumeBoost(0.0),
                         ),
@@ -1477,14 +1539,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     value: state.volumeBoost.clamp(0.0, 1.0),
                     min: 0.0,
                     max: 1.0,
-                    onChanged: dspBlocked != null
-                        ? null
-                        : (val) {
-                            if (!state.isEqEnabled) {
-                              cubit.setEqualizerEnabled(true);
-                            }
-                            cubit.setVolumeBoost(val);
-                          },
+                    onChanged:
+                        dspBlocked != null || !state.isVolumeBoostSupported
+                            ? null
+                            : (val) {
+                                if (!state.isEqEnabled) {
+                                  cubit.setEqualizerEnabled(true);
+                                }
+                                cubit.setVolumeBoost(val);
+                              },
                   ),
                 ),
                 if (isOverSafe)
@@ -1527,6 +1590,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       ],
                     ),
                   ),
+                _effectNotAppliedNotice('volumeBoost', p),
               ],
             ),
           ),
@@ -1612,13 +1676,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   value: dspBlocked == null && state.isSpatializerEnabled,
                   activeTrackColor: p.accent,
                   activeThumbColor: p.onAccent,
-                  onChanged: dspBlocked != null
+                  onChanged: dspBlocked != null || !spatializerAvailable
                       ? null
                       : (val) => cubit.setSpatializerEnabled(val),
                 ),
               ],
             ),
           ),
+          _effectNotAppliedNotice('spatializer', p),
         ],
       ),
     );
@@ -1967,6 +2032,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     PulsrPalette p,
   ) {
     final dspBlocked = _dspBlockedReason(context);
+    final spatializerAvailable = _spatializerToggleAvailable(state);
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
       child: Column(
@@ -2105,7 +2171,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     value: dspBlocked == null && state.isSpatializerEnabled,
                     activeTrackColor: p.accent,
                     activeThumbColor: p.onAccent,
-                    onChanged: dspBlocked != null ? null : (val) => cubit.setSpatializerEnabled(val),
+                    onChanged: dspBlocked != null || !spatializerAvailable ? null : (val) => cubit.setSpatializerEnabled(val),
                   ),
                 ],
               ),
@@ -2174,7 +2240,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       value: dspBlocked == null && state.isVirtualizerEnabled,
                       activeTrackColor: p.accent,
                       activeThumbColor: p.onAccent,
-                      onChanged: dspBlocked != null ? null : (val) => cubit.setVirtualizerEnabled(val),
+                      onChanged: dspBlocked != null || !state.isVirtualizerSupported ? null : (val) => cubit.setVirtualizerEnabled(val),
                     ),
                   ],
                 ),
@@ -2217,7 +2283,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(
                                     minWidth: 20, minHeight: 20),
-                                onPressed: !state.isVirtualizerEnabled ||
+                                onPressed: !state.isVirtualizerSupported ||
+                                        !state.isVirtualizerEnabled ||
                                         state.virtualizerStrength <= 0.001
                                     ? null
                                     : () => cubit.setVirtualizerStrength(0.0),
@@ -2239,14 +2306,16 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           value: state.virtualizerStrength.clamp(0.0, 1.0),
                           min: 0.0,
                           max: 1.0,
-                          onChanged: state.isVirtualizerEnabled
-                              ? (val) => cubit.setVirtualizerStrength(val)
-                              : null,
+                          onChanged:
+                              state.isVirtualizerEnabled && state.isVirtualizerSupported
+                                  ? (val) => cubit.setVirtualizerStrength(val)
+                                  : null,
                         ),
                       ),
                     ],
                   ),
                 ),
+                _effectNotAppliedNotice('virtualizer', p),
               ],
             ),
           ),
@@ -2311,7 +2380,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       value: dspBlocked == null && state.isDynamicsEnabled,
                       activeTrackColor: p.accent,
                       activeThumbColor: p.onAccent,
-                      onChanged: dspBlocked != null ? null : (val) {
+                      onChanged: dspBlocked != null || !state.isDynamicsSupported ? null : (val) {
                         cubit.setDynamicsPreset(
                           val
                               ? (state.dynamicsPreset == DynamicsPreset.off
@@ -2325,6 +2394,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   ],
                 ),
                 if (dspBlocked != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Blocked by Bit-Perfect', style: TextStyle(color: p.error, fontSize: 10, fontWeight: FontWeight.w600))),
+                _effectNotAppliedNotice('dynamics', p),
                 const SizedBox(height: 14),
 
                 // Dynamics Preset Cards Grid
@@ -2339,10 +2409,12 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: InkWell(
-                          onTap: dspBlocked != null ? null : (state.isDynamicsEnabled
-                              ? () =>
-                                  cubit.setDynamicsPreset(preset, enabled: true)
-                              : null),
+                          onTap: dspBlocked != null || !state.isDynamicsSupported
+                              ? null
+                              : (state.isDynamicsEnabled
+                                  ? () =>
+                                      cubit.setDynamicsPreset(preset, enabled: true)
+                                  : null),
                           borderRadius: BorderRadius.circular(10),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
@@ -3102,6 +3174,19 @@ class _EqualizerSheetState extends State<EqualizerSheet>
 
           // 6. Dynamic EQ (Phase 1 DSP expansion)
           _buildDynamicEqCard(context, state, cubit, dspBlocked, p),
+          const SizedBox(height: 16),
+
+          // 7. Loudness Contour (Fletcher-Munson) — previously persisted with
+          // no reachable control.
+          _buildLoudnessContourCard(context, state, cubit, dspBlocked, p),
+          const SizedBox(height: 16),
+
+          // 8. TPDF Dither — previously persisted with no reachable control.
+          _buildDitherCard(context, state, cubit, dspBlocked, p),
+          const SizedBox(height: 16),
+
+          // 9. Sinc Resampler — previously persisted with no reachable control.
+          _buildSincResamplerCard(context, state, cubit, dspBlocked, p),
         ],
       ),
     );
@@ -3726,6 +3811,309 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   cubit.setDynamicEqBand(0, band.copyWith(maxCutDb: val)),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  /// Loudness Contour (Fletcher-Munson). Previously persisted state with no
+  /// reachable control; the dead AudioSoundSection was its only renderer.
+  Widget _buildLoudnessContourCard(BuildContext context, PlayerState state,
+      PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
+    final available = dspBlocked == null && _nativePcmEffectsAvailable;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer,
+        borderRadius: AppRadii.cardRadius,
+        border: Border.all(color: p.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.volume_up_rounded,
+                          color: p.accent, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Loudness Contour',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: p.textPrimary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                          Text('Equal-loudness bass/treble lift at low volume',
+                              style: TextStyle(
+                                  fontSize: 11, color: p.textTertiary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4),
+              Switch.adaptive(
+                value: available && state.isLoudnessContourEnabled,
+                activeTrackColor: p.accent,
+                activeThumbColor: p.onAccent,
+                onChanged: !available
+                    ? null
+                    : (val) => cubit.setLoudnessContour(val),
+              ),
+            ],
+          ),
+          if (dspBlocked != null)
+            Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text('Blocked by Bit-Perfect',
+                    style: TextStyle(
+                        color: p.error,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600)))
+          else if (!_nativePcmEffectsAvailable)
+            Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text('Native DSP unavailable on this device',
+                    style: TextStyle(
+                        color: p.textTertiary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600))),
+          if (available && state.isLoudnessContourEnabled) ...[
+            const SizedBox(height: 14),
+            _buildDspSliderRow(
+              context: context,
+              p: p,
+              label: 'Intensity',
+              valueText: '${(state.loudnessContourIntensity * 100).round()}%',
+              value: state.loudnessContourIntensity,
+              min: 0.0,
+              max: 1.0,
+              defaultValue: 0.0,
+              divisions: 20,
+              onChanged: (val) =>
+                  cubit.setLoudnessContour(true, intensity: val),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// TPDF Dither with a 16/24/32-bit target. Previously persisted with no
+  /// reachable control.
+  Widget _buildDitherCard(BuildContext context, PlayerState state,
+      PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
+    final available = dspBlocked == null && _nativePcmEffectsAvailable;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer,
+        borderRadius: AppRadii.cardRadius,
+        border: Border.all(color: p.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.grain_rounded,
+                          color: p.accent, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('TPDF Dither',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: p.textPrimary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                          Text('Bit-depth dithering (auto-skipped on Bluetooth)',
+                              style: TextStyle(
+                                  fontSize: 11, color: p.textTertiary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4),
+              Switch.adaptive(
+                value: available && state.isDitherEnabled,
+                activeTrackColor: p.accent,
+                activeThumbColor: p.onAccent,
+                onChanged: !available ? null : (val) => cubit.setDither(val),
+              ),
+            ],
+          ),
+          if (dspBlocked != null)
+            Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text('Blocked by Bit-Perfect',
+                    style: TextStyle(
+                        color: p.error,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600)))
+          else if (!_nativePcmEffectsAvailable)
+            Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text('Native DSP unavailable on this device',
+                    style: TextStyle(
+                        color: p.textTertiary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600))),
+          if (available && state.isDitherEnabled) ...[
+            const SizedBox(height: 14),
+            Text('Target Bit Depth',
+                style: TextStyle(
+                    fontSize: 12,
+                    color: p.textSecondary,
+                    fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                for (final bits in const [16, 24, 32])
+                  ChoiceChip(
+                    label: Text('$bits-bit'),
+                    selected: state.ditherTargetBitDepth == bits,
+                    selectedColor: p.accent.withValues(alpha: 0.22),
+                    backgroundColor: p.surface,
+                    side: BorderSide(
+                      color: state.ditherTargetBitDepth == bits
+                          ? p.accent
+                          : p.hairline,
+                    ),
+                    labelStyle: TextStyle(
+                      color: state.ditherTargetBitDepth == bits
+                          ? p.accent
+                          : p.textSecondary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11,
+                    ),
+                    onSelected: (_) =>
+                        cubit.setDither(true, targetBitDepth: bits),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Sinc Resampler toggle (auto-bypasses when track and device rates match).
+  Widget _buildSincResamplerCard(BuildContext context, PlayerState state,
+      PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
+    final available = dspBlocked == null && _nativePcmEffectsAvailable;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer,
+        borderRadius: AppRadii.cardRadius,
+        border: Border.all(color: p.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.sync_alt_rounded,
+                          color: p.accent, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Sinc Resampler',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: p.textPrimary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                          Text('High-quality resampling when rates differ',
+                              style: TextStyle(
+                                  fontSize: 11, color: p.textTertiary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4),
+              Switch.adaptive(
+                value: available && state.isSincResamplerEnabled,
+                activeTrackColor: p.accent,
+                activeThumbColor: p.onAccent,
+                onChanged:
+                    !available ? null : (val) => cubit.setSincResampler(val),
+              ),
+            ],
+          ),
+          if (dspBlocked != null)
+            Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text('Blocked by Bit-Perfect',
+                    style: TextStyle(
+                        color: p.error,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600)))
+          else if (!_nativePcmEffectsAvailable)
+            Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text('Native DSP unavailable on this device',
+                    style: TextStyle(
+                        color: p.textTertiary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600))),
         ],
       ),
     );
