@@ -473,6 +473,20 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
         bluetoothLatencyOffsetMs:
             prefs.getInt(PrefsKeys.bluetoothLatencyOffsetMs) ??
                 state.bluetoothLatencyOffsetMs,
+        hedgedResolutionEnabled:
+            prefs.getBool(PrefsKeys.hedgedResolutionEnabled) ?? true,
+        adaptiveQualityEnabled:
+            prefs.getBool(PrefsKeys.adaptiveQualityEnabled) ?? true,
+        duckingMode:
+            prefs.getString(PrefsKeys.duckingMode) ?? 'duck',
+        duckingLevel:
+            prefs.getDouble(PrefsKeys.duckingLevel) ?? 0.3,
+        multiOutputMode:
+            prefs.getString(PrefsKeys.multiOutputMode) ?? 'systemDefault',
+        dspSnapshotEnabled:
+            prefs.getBool(PrefsKeys.dspSnapshotEnabled) ?? true,
+        silenceSkipSensitivity:
+            prefs.getInt(PrefsKeys.silenceSkipSensitivity) ?? 0,
       );
 
       // A proxy edit made while this load was in flight must win over the
@@ -1454,6 +1468,93 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     safeEmit(state.copyWith(bluetoothLatencyOffsetMs: clamped));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(PrefsKeys.bluetoothLatencyOffsetMs, clamped);
+  }
+
+  // ── F3/F4/F7/F8/F9/F10 ──────────────────────────────────────────────
+  Future<void> setHedgedResolutionEnabled(bool v) async {
+    safeEmit(state.copyWith(hedgedResolutionEnabled: v));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(PrefsKeys.hedgedResolutionEnabled, v);
+  }
+
+  Future<void> setAdaptiveQualityEnabled(bool v) async {
+    safeEmit(state.copyWith(adaptiveQualityEnabled: v));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(PrefsKeys.adaptiveQualityEnabled, v);
+  }
+
+  Future<void> setDuckingMode(String mode) async {
+    safeEmit(state.copyWith(duckingMode: mode));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(PrefsKeys.duckingMode, mode);
+  }
+
+  Future<void> setDuckingLevel(double level) async {
+    final clamped = level.clamp(0.05, 1.0);
+    safeEmit(state.copyWith(duckingLevel: clamped));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(PrefsKeys.duckingLevel, clamped);
+  }
+
+  Future<void> setMultiOutputMode(String mode) async {
+    safeEmit(state.copyWith(multiOutputMode: mode));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(PrefsKeys.multiOutputMode, mode);
+  }
+
+  Future<void> setDspSnapshotEnabled(bool v) async {
+    safeEmit(state.copyWith(dspSnapshotEnabled: v));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(PrefsKeys.dspSnapshotEnabled, v);
+  }
+
+  Future<void> setSilenceSkipSensitivity(int v) async {
+    final clamped = v.clamp(0, 100);
+    safeEmit(state.copyWith(silenceSkipSensitivity: clamped));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(PrefsKeys.silenceSkipSensitivity, clamped);
+  }
+
+  /// F5: Bluetooth latency auto-calibration. Uses the codec latency table
+  /// plus optional probe samples, then persists the winning offset.
+  Future<int> autoCalibrateBluetoothLatency({Future<int> Function()? probe}) async {
+    final codec = state.currentOutputDevice?.btCodecName;
+    int codecEst = 180;
+    try {
+      const table = {
+        'sbc': 220, 'aac': 200, 'aptx': 150, 'ldac': 250,
+        'lc3': 60, 'opus': 100, 'lhdc': 180,
+      };
+      if (codec != null && codec.isNotEmpty) {
+        final key = codec.toLowerCase();
+        for (final e in table.entries) {
+          if (key.contains(e.key)) {
+            codecEst = e.value;
+            break;
+          }
+        }
+      }
+    } catch (_) {}
+    var combined = codecEst;
+    if (probe != null) {
+      final vals = <int>[];
+      for (var i = 0; i < 5; i++) {
+        try {
+          final v = await probe();
+          if (v >= 0 && v <= 1000) vals.add(v);
+        } catch (_) {}
+      }
+      if (vals.isNotEmpty) {
+        vals.sort();
+        final trimmed =
+            vals.length >= 4 ? vals.sublist(1, vals.length - 1) : vals;
+        final avg = (trimmed.reduce((a, b) => a + b) / trimmed.length).round();
+        combined = (codecEst * 0.6 + avg * 0.4).round();
+      }
+    }
+    final clamped = combined.clamp(0, 500);
+    await setBluetoothLatencyOffsetMs(clamped);
+    return clamped;
   }
 
   /// Applies the "Maximum Quality" audiophile preset:

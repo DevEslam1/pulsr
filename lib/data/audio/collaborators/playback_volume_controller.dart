@@ -16,6 +16,7 @@ class PlaybackVolumeController {
   double _preampWithRg = 0.0;
   double _preampWithoutRg = -3.0;
   bool _isDucked = false;
+  double _duckFactor = 0.3;
   bool _isDopActive = false;
 
   double get userVolume => _userVolume;
@@ -37,11 +38,13 @@ class PlaybackVolumeController {
     String? replayGainMode,
     double? preampWithRg,
     double? preampWithoutRg,
+    double? duckFactor,
   }) {
     if (userVolume != null) _userVolume = userVolume.clamp(0.0, 1.0);
     if (replayGainMode != null) _replayGainMode = replayGainMode;
     if (preampWithRg != null) _preampWithRg = preampWithRg;
     if (preampWithoutRg != null) _preampWithoutRg = preampWithoutRg;
+    if (duckFactor != null) _duckFactor = duckFactor.clamp(0.05, 1.0);
   }
 
   /// Calculates target volume for [song] with current ReplayGain and ducking state.
@@ -50,9 +53,11 @@ class PlaybackVolumeController {
     // to avoid corrupting 0x05 / 0xFA marker bits into white noise.
     if (_isDopActive) return 1.0;
 
-    if (song == null) return _isDucked ? (_userVolume * 0.2) : _userVolume;
+    if (song == null) {
+      return _isDucked ? (_userVolume * _duckFactor) : _userVolume;
+    }
 
-    final baseVolume = _isDucked ? (_userVolume * 0.2) : _userVolume;
+    final baseVolume = _isDucked ? (_userVolume * _duckFactor) : _userVolume;
     return ReplayGainMath.apply(
       mode: _replayGainMode,
       volume: baseVolume,

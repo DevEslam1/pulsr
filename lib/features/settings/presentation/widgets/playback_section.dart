@@ -109,6 +109,96 @@ class PlaybackSection extends StatelessWidget {
             onResolve: () =>
                 _resolveCrossfadeConflict(context, cubit, state.crossfadeSeconds),
           ),
+        settingsCardDivider(p),
+        // F3: hedged stream resolution (race 2 clients, take first).
+        _switchTile(
+          context,
+          Icons.bolt_outlined,
+          'Hedged streaming',
+          'Race two resolvers, take the fastest URL',
+          value: state.hedgedResolutionEnabled,
+          onChanged: cubit.setHedgedResolutionEnabled,
+        ),
+        settingsCardDivider(p),
+        // F4: adaptive quality mid-track.
+        _switchTile(
+          context,
+          Icons.auto_graph_outlined,
+          'Adaptive quality',
+          'Step bitrate down/up mid-track on stalls',
+          value: state.adaptiveQualityEnabled,
+          onChanged: cubit.setAdaptiveQualityEnabled,
+        ),
+        settingsCardDivider(p),
+        // F10: silence-skip sensitivity slider (0 = off).
+        SettingSliderRow(
+          label: 'Silence-skip sensitivity',
+          value: state.silenceSkipSensitivity.toDouble(),
+          min: 0,
+          max: 100,
+          divisions: 20,
+          defaultValue: 0.0,
+          formatValue: (v) =>
+              v < 0.5 ? 'Off' : '${v.round()}%',
+          onChanged: (v) => cubit.setSilenceSkipSensitivity(v.round()),
+        ),
+        settingsCardDivider(p),
+        // F7: ducking control.
+        _switchTile(
+          context,
+          Icons.volume_down_outlined,
+          'Duck on navigation',
+          'Lower music instead of pausing for prompts',
+          value: state.duckingMode == 'duck',
+          onChanged: (v) => cubit.setDuckingMode(v ? 'duck' : 'pause'),
+        ),
+        SettingSliderRow(
+          label: 'Duck level',
+          value: state.duckingLevel,
+          min: 0.05,
+          max: 1.0,
+          divisions: 19,
+          defaultValue: 0.3,
+          formatValue: (v) => '${(v * 100).round()}%',
+          onChanged: cubit.setDuckingLevel,
+        ),
+        settingsCardDivider(p),
+        // F8: multi-output routing.
+        _switchTile(
+          context,
+          Icons.speaker_group_outlined,
+          'Speaker + Bluetooth',
+          'Best-effort simultaneous output (falls back gracefully)',
+          value: state.multiOutputMode == 'speakerAndBluetooth',
+          onChanged: (v) => cubit.setMultiOutputMode(
+              v ? 'speakerAndBluetooth' : 'systemDefault'),
+        ),
+        settingsCardDivider(p),
+        // F9: per-album DSP snapshots.
+        _switchTile(
+          context,
+          Icons.save_as_outlined,
+          'Per-album EQ memory',
+          'Restore EQ snapshot per album/artist',
+          value: state.dspSnapshotEnabled,
+          onChanged: cubit.setDspSnapshotEnabled,
+        ),
+        settingsCardDivider(p),
+        // F5: BT latency auto-calibration.
+        _navTile(
+          context,
+          Icons.bluetooth_searching_outlined,
+          'Calibrate Bluetooth latency',
+          'Auto-probe offset (currently ${state.bluetoothLatencyOffsetMs} ms)',
+          onTap: () async {
+            final ms = await cubit.autoCalibrateBluetoothLatency();
+            if (!context.mounted) return;
+            ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+              behavior: SnackBarBehavior.floating,
+              content: Text('Bluetooth latency calibrated: $ms ms'),
+            ));
+          },
+        ),
       ],
     );
   }

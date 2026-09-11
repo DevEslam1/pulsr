@@ -10,10 +10,13 @@ class SeamlessQueueTransition {
   final Future<void> Function(
           AudioPlayer activePlayer, AudioPlayer inactivePlayer)?
       crossfadeToInactive;
+  final Future<AudioSource> Function(SongsTableData song)?
+      buildSingleSource;
 
   SeamlessQueueTransition({
     required this.buildAudioSources,
     this.crossfadeToInactive,
+    this.buildSingleSource,
   });
 
   /// Transitions playback engine smoothly from dual-player crossfade to gapless
@@ -28,12 +31,13 @@ class SeamlessQueueTransition {
     required bool isPlaying,
   }) async {
     if (songs.isEmpty) return;
+    final safeIndex = currentIndex.clamp(0, songs.length - 1);
 
     if (toGapless) {
       final sources = buildAudioSources(songs);
       await inactivePlayer.setAudioSources(
         sources,
-        initialIndex: currentIndex.clamp(0, songs.length - 1),
+        initialIndex: safeIndex,
         initialPosition: currentPosition,
         preload: true,
       );
@@ -41,6 +45,28 @@ class SeamlessQueueTransition {
       if (isPlaying && crossfadeToInactive != null) {
         await crossfadeToInactive!(activePlayer, inactivePlayer);
       }
+      return;
+    }
+
+    // toGapless == false: dual-player engine = single source per track.
+    // Mirror of the gapless path: stage the current track on the inactive
+    // player, then fade the old engine out so the caller can swap.
+    final single = buildSingleSource != null
+        ? await buildSingleSource!(songs[safeIndex])
+        : buildAudioSources([songs[safeIndex]]).first;
+    await inactivePlayer.setAudioSource(
+      single,
+      initialPosition: currentPosition,
+      preload: true,
+    );
+    if (isPlaying) {
+      await inactivePlayer.play();
+      if (crossfadeToInactive != null) {
+        await crossfadeToInactive!(activePlayer, inactivePlayer);
+      }
+      try {
+        await activePlayer.stop();
+      } catch (_) {}
     }
   }
 }

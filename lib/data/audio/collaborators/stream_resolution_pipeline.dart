@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/core/telemetry/playback_latency_tracker.dart';
+import 'package:pulsr/data/audio/hedged_stream_resolver.dart';
 import 'package:pulsr/data/db/app_database.dart';
+import 'package:pulsr/domain/models/ytm_track.dart';
 
 class CachedStreamUrl {
   final String url;
@@ -18,6 +20,8 @@ class CachedStreamUrl {
 class StreamResolutionPipeline {
   final YtmService ytmService;
   final PlaybackLatencyTracker? Function()? getLatencyTracker;
+  /// F3: when true, race two resolve attempts and take the first success.
+  bool hedgedEnabled;
 
   final Map<String, CachedStreamUrl> _streamCache = {};
   final Map<String, Future<({String url, String? userAgent, String? cookies, String quality})>> _inFlightResolves = {};
@@ -25,6 +29,7 @@ class StreamResolutionPipeline {
   StreamResolutionPipeline({
     required this.ytmService,
     this.getLatencyTracker,
+    this.hedgedEnabled = true,
   });
 
   Map<String, CachedStreamUrl> get streamCache => _streamCache;
@@ -89,7 +94,13 @@ class StreamResolutionPipeline {
         getLatencyTracker?.call()?.markStage(PlaybackStage.clientRequestSent);
       } catch (_) {}
 
-      final stream = await ytmService.resolveStream(videoId, quality: quality, forceRefresh: forceRefresh);
+      Future<YtmStream> doResolve() =>
+          ytmService.resolveStream(videoId, quality: quality, forceRefresh: forceRefresh);
+      // F3: hedged resolution — staggered duplicate race.
+      final YtmStream stream = hedgedEnabled
+          ? await HedgedStreamResolver.raceDuplicate<YtmStream>(doResolve,
+              hedgeDelay: const Duration(milliseconds: 300))
+          : await doResolve();
       if (stream.url.trim().isEmpty) {
         throw const YtmException('YTM_UNAVAILABLE', 'Resolved stream URL is empty');
       }

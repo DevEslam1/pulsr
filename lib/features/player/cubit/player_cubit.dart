@@ -21,6 +21,7 @@ import '../../../core/utils/lrc_parser.dart';
 import '../../../core/constants/audio_feature_info.dart';
 import '../../../data/audio/audio_handler.dart';
 import '../../../data/audio/equalizer_manager.dart';
+import '../../../data/audio/playback_bookmark_store.dart';
 import '../../../data/audio/sleep_timer_manager.dart';
 import '../../../data/db/app_database.dart';
 import '../../../data/scanner/media_scanner_service.dart';
@@ -608,9 +609,31 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       if (!isSameSong) {
         unawaited(_loadLyricsForSong(song));
         unawaited(_enrichAudioQuality(song, gen));
+        // Gapless advances fire onTrackChanged without a fresh mediaItem;
+        // without this the previous track's SponsorBlock segments stay armed.
+        unawaited(_loadSponsorBlockSegments(song, gen));
       }
       _updateWidgetThrottled(force: true);
       _debouncedScrobble(song, state.position, state.isPlaying);
+      if (!isSameSong) {
+        // F1/F2/F11: reset per-track UI state on song change.
+        // Guarded: test doubles of the handler may not implement the
+        // newer F1–F11 members (noSuchMethod throws).
+        var delayMs = state.trackDelayMs;
+        try {
+          delayMs = _audioHandler.currentTrackDelayMs;
+        } catch (_) {}
+        safeEmit(state.copyWith(
+          abPointA: null,
+          abPointB: null,
+          abLoopEnabled: false,
+          trackDelayMs: delayMs,
+          bookmarkPosition: null,
+        ));
+        try {
+          checkBookmarkOffer();
+        } catch (_) {}
+      }
     });
 
     autoSub(_audioHandler.mediaItem, (item) async {
@@ -1724,7 +1747,14 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
             _lastSeekMs = DateTime.now().millisecondsSinceEpoch;
             _lastSkippedSegmentEnd = null;
             _lastSponsorSkipTime = null;
-            unawaited(_audioHandler.seek(pending));
+            _audioHandler.seek(pending).catchError((Object e, StackTrace st) {
+              ErrorLogger.log('Coalesced seek failed',
+                  error: e, stackTrace: st, category: 'PlayerCubit');
+              if (!isClosed) {
+                safeEmit(state.copyWith(
+                    errorMessage: 'Seek failed, position restored'));
+              }
+            });
           }
         },
       ));
@@ -1733,7 +1763,8 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     _lastSeekMs = nowMs;
     _lastSkippedSegmentEnd = null;
     _lastSponsorSkipTime = null;
-    return _audioHandler.seek(target);
+    // Discrete intent: bypass the handler's scrub debounce (single layer).
+    return _audioHandler.seekDirect(target);
   }
 
   Future<void> next() async {
@@ -2044,6 +2075,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
           _dspSnapshot = state;
         }
         safeEmit(state.copyWith(
+          isEqEnabled: false,
           isSpatializerEnabled: false,
           isVirtualizerEnabled: false,
           isDynamicsEnabled: false,
@@ -2057,6 +2089,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
           isDynamicEqEnabled: false,
           volumeBoost: 0.0,
         ));
+        await _audioHandler.setEqualizerEnabled(false);
         await _audioHandler.setSpatializerEnabled(false);
         await _audioHandler.setVirtualizerEnabled(false);
         await _audioHandler.setDynamicsPreset(DynamicsPreset.off,
@@ -2074,6 +2107,8 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
         final snap = _dspSnapshot;
         if (snap != null && snap.isDspActive) {
           safeEmit(state.copyWith(
+            isEqEnabled: snap.isEqEnabled,
+            eqPreset: snap.eqPreset,
             isSpatializerEnabled: snap.isSpatializerEnabled,
             isVirtualizerEnabled: snap.isVirtualizerEnabled,
             virtualizerStrength: snap.virtualizerStrength,
@@ -2104,6 +2139,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
             dynamicEqBands: snap.dynamicEqBands,
             volumeBoost: snap.volumeBoost,
           ));
+          if (snap.isEqEnabled) {
+            await _audioHandler.setEqualizerEnabled(true);
+          }
           if (snap.isSpatializerEnabled) {
             await _audioHandler.setSpatializerEnabled(true);
           }
@@ -2646,6 +2684,96 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       ));
     }
   }
+
+  // ── F1: AB loop ────────────────────────────────────────────────────
+  void setAbPointA() {
+    final pos = state.position;
+    _audioHandler.setAbPointA(pos);
+    safeEmit(state.copyWith(
+      abPointA: pos,
+      abLoopEnabled: _audioHandler.abLoopManager.isEnabled,
+      abPointB: _audioHandler.abLoopManager.pointB,
+    ));
+  }
+
+  void setAbPointB() {
+    final pos = state.position;
+    _audioHandler.setAbPointB(pos);
+    safeEmit(state.copyWith(
+      abPointB: pos,
+      abPointA: _audioHandler.abLoopManager.pointA,
+      abLoopEnabled: _audioHandler.abLoopManager.isEnabled,
+    ));
+  }
+
+  void toggleAbLoop() {
+    _audioHandler.toggleAbLoop();
+    safeEmit(state.copyWith(
+        abLoopEnabled: _audioHandler.abLoopManager.isEnabled));
+  }
+
+  void clearAbLoop() {
+    _audioHandler.clearAbLoop();
+    safeEmit(state.copyWith(
+        abLoopEnabled: false, abPointA: null, abPointB: null));
+  }
+
+  // ── F2: per-track delay ──────────────────────────────────────────────
+  Future<void> setTrackDelayMs(int ms) async {
+    await _audioHandler.setCurrentTrackDelay(ms);
+    safeEmit(state.copyWith(trackDelayMs: ms.clamp(-2000, 2000)));
+  }
+
+  void syncTrackDelay() {
+    safeEmit(
+        state.copyWith(trackDelayMs: _audioHandler.currentTrackDelayMs));
+  }
+
+  // ── F10: silence-skip sensitivity ────────────────────────────────────
+  Future<void> setSilenceSkipSensitivity(int v) async {
+    await _audioHandler.setSilenceSkipSensitivity(v);
+    safeEmit(state.copyWith(silenceSkipSensitivity: v.clamp(0, 100)));
+  }
+
+  // ── F11: bookmarks ───────────────────────────────────────────────────
+  void dismissBookmark() {
+    safeEmit(state.copyWith(bookmarkPosition: null));
+  }
+
+  Future<void> seekToBookmark() async {
+    final b = state.bookmarkPosition;
+    if (b != null) {
+      await _audioHandler.seek(b);
+      safeEmit(state.copyWith(bookmarkPosition: null, position: b));
+    }
+  }
+
+  Future<void> clearBookmark() async {
+    final song = state.currentSong;
+    if (song != null) await _audioHandler.clearBookmarkFor(song);
+    safeEmit(state.copyWith(bookmarkPosition: null));
+  }
+
+  void checkBookmarkOffer() {
+    final song = state.currentSong;
+    if (song == null) return;
+    PlaybackBookmark? b;
+    try {
+      b = _audioHandler.recallBookmarkFor(song);
+    } catch (_) {
+      return;
+    }
+    if (b != null && b.positionMs > 5000) {
+      // Only offer when starting near the head.
+      if (state.position.inMilliseconds < 8000) {
+        safeEmit(state.copyWith(
+            bookmarkPosition: Duration(milliseconds: b.positionMs)));
+      }
+    }
+  }
+
+  // ── F9: DSP snapshot ─────────────────────────────────────────────────
+  Future<void> saveDspSnapshot() => _audioHandler.saveDspSnapshotForCurrent();
 
   @override
   Future<void> close() {

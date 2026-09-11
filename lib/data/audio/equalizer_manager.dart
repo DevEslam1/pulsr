@@ -1771,10 +1771,17 @@ class EqualizerManager {
   }
 
   void dispose() {
+    // Flush pending work instead of dropping it: disposing mid-drag
+    // otherwise loses the last ~60ms of slider movement and ~350ms of prefs.
+    if (_pendingBandGains.isNotEmpty) {
+      final pending = Map<int, double>.from(_pendingBandGains);
+      _pendingBandGains.clear();
+      unawaited(_flushBandGains(pending));
+    }
     _saveDebounce?.cancel();
     _saveDebounce = null;
     _bandGainDebounce?.cancel();
     _bandGainDebounce = null;
-    _pendingBandGains.clear();
+    unawaited(_savePreferences());
   }
 }

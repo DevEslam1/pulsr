@@ -72,8 +72,7 @@ class AudioMemoryManager {
       {required bool isBatteryConstrained,
       int estimatedBytes = defaultHeadSizeBytes}) {
     if (isBatteryConstrained) return false;
-    return (_currentPreloadBytes + estimatedBytes) <= maxPreloadBudgetBytes ||
-        _headCache.isNotEmpty;
+    return (_currentPreloadBytes + estimatedBytes) <= maxPreloadBudgetBytes;
   }
 
   /// Registers a preloaded stream head and evicts oldest items if exceeding 32MB cap.

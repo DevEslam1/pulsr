@@ -26,6 +26,12 @@ class TripleBufferPipeline {
   /// swapped that same player, clobbering live playback.
   final bool Function()? isLoadStillValid;
 
+  /// Monotonic play epoch from the handler. Captured at preload schedule time
+  /// so a resolve that outlives its track is abandoned even when the
+  /// active/inactive player pair hasn't swapped (the old `identical` check was
+  /// always true for distinct objects, so generation is the real guard).
+  final int Function()? getGeneration;
+
   final Mutex _claimMutex = Mutex();
   PlayerClaim _inactiveClaim = PlayerClaim.none;
   PlayerClaim get inactiveClaim => _inactiveClaim;
@@ -51,6 +57,7 @@ class TripleBufferPipeline {
     required this.getInactivePlayer,
     this.prefetchPlayer,
     this.isLoadStillValid,
+    this.getGeneration,
     required this.resolveAudioSource,
     required this.songToMediaItem,
   });
@@ -59,10 +66,15 @@ class TripleBufferPipeline {
   Future<void> preloadNext(SongsTableData nextSong) async {
     try {
       if (!await claimInactive(PlayerClaim.prefetch)) return;
+      final scheduledGen = getGeneration?.call();
       final tag = songToMediaItem(nextSong);
       final source = await resolveAudioSource(nextSong, tag);
       // The await above can outlast the track that scheduled this preload;
       // never touch a player that is no longer the inactive one.
+      if (scheduledGen != null && scheduledGen != getGeneration?.call()) {
+        releaseInactive(PlayerClaim.prefetch);
+        return;
+      }
       if (isLoadStillValid != null && !isLoadStillValid!()) {
         releaseInactive(PlayerClaim.prefetch);
         return;
@@ -70,6 +82,10 @@ class TripleBufferPipeline {
       // Re-acquire the inactive player reference AFTER the async gap — the
       // active/inactive players may have swapped during URL resolution.
       final inactivePlayer = getInactivePlayer();
+      if (scheduledGen != null && scheduledGen != getGeneration?.call()) {
+        releaseInactive(PlayerClaim.prefetch);
+        return;
+      }
       await inactivePlayer.setAudioSource(source, preload: true);
     } catch (e) {
       ErrorLogger.log('Preload failed', error: e, category: 'TripleBuffer');
@@ -82,8 +98,15 @@ class TripleBufferPipeline {
   Future<void> prefetchAhead(SongsTableData aheadSong) async {
     if (prefetchPlayer == null) return;
     try {
+      final scheduledGen = getGeneration?.call();
       final tag = songToMediaItem(aheadSong);
       final source = await resolveAudioSource(aheadSong, tag);
+      if (scheduledGen != null && scheduledGen != getGeneration?.call()) {
+        return;
+      }
+      if (isLoadStillValid != null && !isLoadStillValid!()) {
+        return;
+      }
       await prefetchPlayer!.setAudioSource(source, preload: false);
     } catch (e) {
       ErrorLogger.log('Preload failed', error: e, category: 'TripleBuffer');

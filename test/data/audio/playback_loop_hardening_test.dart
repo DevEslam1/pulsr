@@ -27,6 +27,9 @@ class StubPulsrAudioHandler extends BaseAudioHandler
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 
+  @override
+  Future<void> seekDirect(Duration position) async {}
+
   double _vol = 1.0;
   @override
   double get volume => _vol;

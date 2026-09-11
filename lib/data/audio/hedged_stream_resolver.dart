@@ -1,0 +1,63 @@
+// F3: Hedged stream resolution (race clients, take first success).
+import 'dart:async';
+
+/// Races multiple resolution attempts and returns the first success.
+/// Failures are collected; if all fail, the first error is rethrown.
+class HedgedStreamResolver {
+  /// Race [attempts] with optional stagger between launches.
+  /// [hedgeDelay] staggers the 2nd+ attempt so the fast path usually wins
+  /// without paying double cost on every resolve.
+  static Future<T> race<T>(
+    List<Future<T> Function()> attempts, {
+    Duration hedgeDelay = const Duration(milliseconds: 250),
+    Duration? timeout,
+  }) async {
+    if (attempts.isEmpty) throw StateError('No attempts provided');
+    if (attempts.length == 1) {
+      final f = attempts.first();
+      return timeout == null ? f : f.timeout(timeout);
+    }
+    final completer = Completer<T>();
+    final errors = <Object>[];
+    var remaining = attempts.length;
+    var settled = false;
+
+    Future<void> run(int index) async {
+      if (index > 0 && hedgeDelay > Duration.zero) {
+        await Future.delayed(hedgeDelay);
+        if (settled) return;
+      }
+      try {
+        final value = await (timeout == null
+            ? attempts[index]()
+            : attempts[index]().timeout(timeout));
+        if (!settled) {
+          settled = true;
+          completer.complete(value);
+        }
+      } catch (e) {
+        errors.add(e);
+        remaining--;
+        if (remaining == 0 && !settled) {
+          settled = true;
+          completer.completeError(errors.first);
+        }
+      }
+    }
+
+    for (var i = 0; i < attempts.length; i++) {
+      unawaited(run(i));
+    }
+    return completer.future;
+  }
+
+  /// Convenience: race the same resolver twice (e.g. two Innertube clients
+  /// or primary + fallback) with dedup-friendly stagger.
+  static Future<T> raceDuplicate<T>(
+    Future<T> Function() resolver, {
+    Duration hedgeDelay = const Duration(milliseconds: 250),
+    Duration? timeout,
+  }) =>
+      race([resolver, resolver],
+          hedgeDelay: hedgeDelay, timeout: timeout);
+}

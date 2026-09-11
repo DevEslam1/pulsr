@@ -76,6 +76,16 @@ abstract class PlayerState with _$PlayerState {
     @Default(1.0) double playbackSpeed,
     int? audioSessionId,
     String? errorMessage,
+    // F1: AB loop
+    @Default(false) bool abLoopEnabled,
+    Duration? abPointA,
+    Duration? abPointB,
+    // F2: per-track delay (ms) for current track
+    @Default(0) int trackDelayMs,
+    // F11: bookmark resume offer for current track
+    Duration? bookmarkPosition,
+    // F10: silence-skip sensitivity mirror
+    @Default(0) int silenceSkipSensitivity,
   }) = _PlayerState;
 
   /// True when every field other than [position] is equal to [other]'s, i.e.
@@ -148,10 +158,18 @@ abstract class PlayerState with _$PlayerState {
         activeQueueSlot != other.activeQueueSlot ||
         playbackSpeed != other.playbackSpeed ||
         audioSessionId != other.audioSessionId ||
-        errorMessage != other.errorMessage;
+        errorMessage != other.errorMessage ||
+        abLoopEnabled != other.abLoopEnabled ||
+        abPointA != other.abPointA ||
+        abPointB != other.abPointB ||
+        trackDelayMs != other.trackDelayMs ||
+        bookmarkPosition != other.bookmarkPosition ||
+        silenceSkipSensitivity != other.silenceSkipSensitivity;
   }
 
   bool get isDspActive =>
+      isEqEnabled ||
+      selectedHeadphoneProfile != null ||
       isVirtualizerEnabled ||
       isDynamicsEnabled ||
       isSpatializerEnabled ||
@@ -167,6 +185,8 @@ abstract class PlayerState with _$PlayerState {
 
   int get activeDspStagesCount {
     int count = 0;
+    if (isEqEnabled) count++;
+    if (selectedHeadphoneProfile != null) count++;
     if (isVirtualizerEnabled) count++;
     if (isDynamicsEnabled) count++;
     if (isSpatializerEnabled) count++;

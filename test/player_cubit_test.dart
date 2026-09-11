@@ -435,6 +435,9 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   Future<void> seek(Duration position) async {}
 
   @override
+  Future<void> seekDirect(Duration position) async {}
+
+  @override
   Future<void> skipToNext() async {}
 
   @override

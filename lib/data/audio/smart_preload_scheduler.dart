@@ -7,10 +7,23 @@ import 'artwork_uri_resolver.dart';
 class SmartPreloadScheduler {
   final Future<void> Function(SongsTableData song, {required int priority})
       onPreloadRequested;
+  final String Function()? qualityProvider;
 
-  final Set<String> _scheduledKeys = {};
+  final Map<String, DateTime> _scheduledKeys = {};
+  static const _keyTtl = Duration(hours: 4);
 
-  SmartPreloadScheduler({required this.onPreloadRequested});
+  SmartPreloadScheduler({required this.onPreloadRequested, this.qualityProvider});
+
+  String _dedupKey(SongsTableData song) {
+    // Unified with AudioHandler's `videoId:quality` cache keys so a quality
+    // change re-resolves instead of hitting a stale scheduled-key block.
+    final videoId = song.remoteId;
+    if (videoId != null && videoId.isNotEmpty) {
+      final q = (qualityProvider?.call() ?? 'high').toLowerCase();
+      return '$videoId:$q';
+    }
+    return '${song.id}_${song.remoteId}';
+  }
 
   /// Evaluates the current playback progress and schedules ahead-of-time preloads.
   void schedulePreloads({
@@ -71,9 +84,18 @@ class SmartPreloadScheduler {
     // Local files are fast disk I/O, no network resolution required
     if (song.source == SongSource.local) return;
 
-    final key = '${song.id}_${song.remoteId}';
-    if (_scheduledKeys.contains(key)) return;
-    _scheduledKeys.add(key);
+    final key = _dedupKey(song);
+    final scheduledAt = _scheduledKeys[key];
+    if (scheduledAt != null &&
+        DateTime.now().difference(scheduledAt) < _keyTtl) {
+      return;
+    }
+    _scheduledKeys[key] = DateTime.now();
+    // Bound map growth (queues churn across sessions).
+    if (_scheduledKeys.length > 500) {
+      final oldest = _scheduledKeys.keys.first;
+      _scheduledKeys.remove(oldest);
+    }
 
     unawaited(ArtworkUriResolver.resolveArtworkUri(song));
 

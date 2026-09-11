@@ -26,6 +26,7 @@ class PrefsKeys {
   static const String crossfadeEnabled = 'setting_crossfade_enabled';
   static const String crossfadeDurationSec = 'setting_crossfade_duration_sec';
   static const String playbackSpeed = 'setting_playback_speed';
+  static const String advancedPlaybackSpeed = 'setting_advanced_playback_speed';
   static const String playbackShuffle = 'setting_playback_shuffle';
   static const String playbackRepeatMode = 'setting_playback_repeat_mode';
   static const String replayGainMode = 'setting_replay_gain_mode';
@@ -127,6 +128,18 @@ class PrefsKeys {
   static const String scrobblerOfflineQueue = scrobbleOfflineQueue;
 
   // Advanced playback engine features
+  // F1–F11 maximize-feature-set keys
+  static const String abLoopEnabled = 'ab_loop_enabled';
+  static const String hedgedResolutionEnabled = 'hedged_resolution_enabled';
+  static const String adaptiveQualityEnabled = 'adaptive_quality_enabled';
+  static const String duckingMode = 'audio_ducking_mode_v1';
+  static const String duckingLevel = 'audio_ducking_level_v1';
+  static const String multiOutputMode = 'multi_output_mode_v1';
+  static const String dspSnapshotEnabled = 'dsp_snapshot_enabled_v1';
+  static const String silenceSkipSensitivity = 'skip_silence_sensitivity_v1';
+  static const String trackDelayMap = 'per_track_audio_delay_v1';
+  static const String bookmarksMap = 'playback_bookmarks_v1';
+
   static const String dsdOutputMode = 'setting_dsd_output_mode'; // 'pcm' | 'dop'
   static const String mqaDecodingEnabled = 'setting_mqa_decoding_enabled';
   static const String customReverbIrPath = 'setting_custom_reverb_ir_path';

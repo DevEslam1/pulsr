@@ -122,6 +122,14 @@ abstract class SettingsState with _$SettingsState {
     @Default(<String>[]) List<String> systemEffectsBundles,
     // Bluetooth quality & sync
     @Default(150) int bluetoothLatencyOffsetMs,
+    // F3/F4/F7/F8/F9/F10
+    @Default(true) bool hedgedResolutionEnabled,
+    @Default(true) bool adaptiveQualityEnabled,
+    @Default('duck') String duckingMode,
+    @Default(0.3) double duckingLevel,
+    @Default('systemDefault') String multiOutputMode,
+    @Default(true) bool dspSnapshotEnabled,
+    @Default(0) int silenceSkipSensitivity,
   }) = _SettingsState;
 
   Color get customAccentColor => Color(customAccentColorValue);
