@@ -48,6 +48,7 @@ mixin _$PlayerState {
   bool get isCrossfeedEnabled;
   double get crossfeedDelayUs;
   double get crossfeedFeedDb;
+  int get crossfeedMode;
   bool get isLimiterEnabled;
   double get limiterThresholdDb;
   double get limiterReleaseMs;
@@ -63,6 +64,7 @@ mixin _$PlayerState {
   double get saturationDrive;
   double get saturationMix;
   double get saturationTilt;
+  bool get saturationMultiband;
   bool get isStereoWidthEnabled;
   double get stereoWidth;
   bool get isLoudnessContourEnabled;
@@ -73,6 +75,13 @@ mixin _$PlayerState {
   double get subCrossoverGain;
   bool get isDynamicEqEnabled;
   List<DynamicEqBandConfig> get dynamicEqBands;
+  bool get isViperDdcEnabled;
+  String get viperDdcProfileName;
+  bool get isArbitraryEqEnabled;
+  String get arbitraryEqString;
+  bool get isLiveProgEnabled;
+  String get liveProgCode;
+  String get liveProgStatus;
   bool get hasOemAudio;
   List<String> get detectedOemEngines;
   int get activeQueueSlot;
@@ -172,10 +181,11 @@ mixin _$PlayerState {
                 other.crossfeedDelayUs == _this.crossfeedDelayUs) &&
             (identical(other.crossfeedFeedDb, _this.crossfeedFeedDb) ||
                 other.crossfeedFeedDb == _this.crossfeedFeedDb) &&
+            (identical(other.crossfeedMode, _this.crossfeedMode) ||
+                other.crossfeedMode == _this.crossfeedMode) &&
             (identical(other.isLimiterEnabled, _this.isLimiterEnabled) ||
                 other.isLimiterEnabled == _this.isLimiterEnabled) &&
-            (identical(other.limiterThresholdDb, _this.limiterThresholdDb) ||
-                other.limiterThresholdDb == _this.limiterThresholdDb) &&
+            (identical(other.limiterThresholdDb, _this.limiterThresholdDb) || other.limiterThresholdDb == _this.limiterThresholdDb) &&
             (identical(other.limiterReleaseMs, _this.limiterReleaseMs) || other.limiterReleaseMs == _this.limiterReleaseMs) &&
             (identical(other.isReverbEnabled, _this.isReverbEnabled) || other.isReverbEnabled == _this.isReverbEnabled) &&
             (identical(other.reverbPreset, _this.reverbPreset) || other.reverbPreset == _this.reverbPreset) &&
@@ -189,6 +199,7 @@ mixin _$PlayerState {
             (identical(other.saturationDrive, _this.saturationDrive) || other.saturationDrive == _this.saturationDrive) &&
             (identical(other.saturationMix, _this.saturationMix) || other.saturationMix == _this.saturationMix) &&
             (identical(other.saturationTilt, _this.saturationTilt) || other.saturationTilt == _this.saturationTilt) &&
+            (identical(other.saturationMultiband, _this.saturationMultiband) || other.saturationMultiband == _this.saturationMultiband) &&
             (identical(other.isStereoWidthEnabled, _this.isStereoWidthEnabled) || other.isStereoWidthEnabled == _this.isStereoWidthEnabled) &&
             (identical(other.stereoWidth, _this.stereoWidth) || other.stereoWidth == _this.stereoWidth) &&
             (identical(other.isLoudnessContourEnabled, _this.isLoudnessContourEnabled) || other.isLoudnessContourEnabled == _this.isLoudnessContourEnabled) &&
@@ -199,6 +210,13 @@ mixin _$PlayerState {
             (identical(other.subCrossoverGain, _this.subCrossoverGain) || other.subCrossoverGain == _this.subCrossoverGain) &&
             (identical(other.isDynamicEqEnabled, _this.isDynamicEqEnabled) || other.isDynamicEqEnabled == _this.isDynamicEqEnabled) &&
             const DeepCollectionEquality().equals(other.dynamicEqBands, _this.dynamicEqBands) &&
+            (identical(other.isViperDdcEnabled, _this.isViperDdcEnabled) || other.isViperDdcEnabled == _this.isViperDdcEnabled) &&
+            (identical(other.viperDdcProfileName, _this.viperDdcProfileName) || other.viperDdcProfileName == _this.viperDdcProfileName) &&
+            (identical(other.isArbitraryEqEnabled, _this.isArbitraryEqEnabled) || other.isArbitraryEqEnabled == _this.isArbitraryEqEnabled) &&
+            (identical(other.arbitraryEqString, _this.arbitraryEqString) || other.arbitraryEqString == _this.arbitraryEqString) &&
+            (identical(other.isLiveProgEnabled, _this.isLiveProgEnabled) || other.isLiveProgEnabled == _this.isLiveProgEnabled) &&
+            (identical(other.liveProgCode, _this.liveProgCode) || other.liveProgCode == _this.liveProgCode) &&
+            (identical(other.liveProgStatus, _this.liveProgStatus) || other.liveProgStatus == _this.liveProgStatus) &&
             (identical(other.hasOemAudio, _this.hasOemAudio) || other.hasOemAudio == _this.hasOemAudio) &&
             const DeepCollectionEquality().equals(other.detectedOemEngines, _this.detectedOemEngines) &&
             (identical(other.activeQueueSlot, _this.activeQueueSlot) || other.activeQueueSlot == _this.activeQueueSlot) &&
@@ -259,6 +277,7 @@ mixin _$PlayerState {
       _this.isCrossfeedEnabled,
       _this.crossfeedDelayUs,
       _this.crossfeedFeedDb,
+      _this.crossfeedMode,
       _this.isLimiterEnabled,
       _this.limiterThresholdDb,
       _this.limiterReleaseMs,
@@ -274,6 +293,7 @@ mixin _$PlayerState {
       _this.saturationDrive,
       _this.saturationMix,
       _this.saturationTilt,
+      _this.saturationMultiband,
       _this.isStereoWidthEnabled,
       _this.stereoWidth,
       _this.isLoudnessContourEnabled,
@@ -284,6 +304,13 @@ mixin _$PlayerState {
       _this.subCrossoverGain,
       _this.isDynamicEqEnabled,
       const DeepCollectionEquality().hash(_this.dynamicEqBands),
+      _this.isViperDdcEnabled,
+      _this.viperDdcProfileName,
+      _this.isArbitraryEqEnabled,
+      _this.arbitraryEqString,
+      _this.isLiveProgEnabled,
+      _this.liveProgCode,
+      _this.liveProgStatus,
       _this.hasOemAudio,
       const DeepCollectionEquality().hash(_this.detectedOemEngines),
       _this.activeQueueSlot,
@@ -310,7 +337,7 @@ mixin _$PlayerState {
   @override
   String toString() {
     final _this = this as PlayerState;
-    return 'PlayerState(currentSong: ${_this.currentSong}, isPlaying: ${_this.isPlaying}, position: ${_this.position}, duration: ${_this.duration}, isShuffle: ${_this.isShuffle}, repeatMode: ${_this.repeatMode}, queue: ${_this.queue}, currentIndex: ${_this.currentIndex}, isExpanded: ${_this.isExpanded}, dominantColor: ${_this.dominantColor}, sleepTimerRemaining: ${_this.sleepTimerRemaining}, lyrics: ${_this.lyrics}, lyricsSource: ${_this.lyricsSource}, isLoadingLyrics: ${_this.isLoadingLyrics}, isLyricsVisible: ${_this.isLyricsVisible}, isQueueVisible: ${_this.isQueueVisible}, eqPreset: ${_this.eqPreset}, isEqEnabled: ${_this.isEqEnabled}, isVirtualizerEnabled: ${_this.isVirtualizerEnabled}, virtualizerStrength: ${_this.virtualizerStrength}, isVirtualizerSupported: ${_this.isVirtualizerSupported}, isDynamicsEnabled: ${_this.isDynamicsEnabled}, isDynamicsSupported: ${_this.isDynamicsSupported}, dynamicsPreset: ${_this.dynamicsPreset}, selectedHeadphoneProfile: ${_this.selectedHeadphoneProfile}, isSpatializerSupported: ${_this.isSpatializerSupported}, isSpatializerEnabled: ${_this.isSpatializerEnabled}, volumeBoost: ${_this.volumeBoost}, isVolumeBoostSupported: ${_this.isVolumeBoostSupported}, isBassBoostSupported: ${_this.isBassBoostSupported}, isCrossfeedEnabled: ${_this.isCrossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, isLimiterEnabled: ${_this.isLimiterEnabled}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, isReverbEnabled: ${_this.isReverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, isSincResamplerEnabled: ${_this.isSincResamplerEnabled}, isDitherEnabled: ${_this.isDitherEnabled}, ditherTargetBitDepth: ${_this.ditherTargetBitDepth}, isSaturationEnabled: ${_this.isSaturationEnabled}, saturationDrive: ${_this.saturationDrive}, saturationMix: ${_this.saturationMix}, saturationTilt: ${_this.saturationTilt}, isStereoWidthEnabled: ${_this.isStereoWidthEnabled}, stereoWidth: ${_this.stereoWidth}, isLoudnessContourEnabled: ${_this.isLoudnessContourEnabled}, loudnessContourIntensity: ${_this.loudnessContourIntensity}, isSubCrossoverEnabled: ${_this.isSubCrossoverEnabled}, subCrossoverCornerHz: ${_this.subCrossoverCornerHz}, subCrossoverSlopeDbPerOct: ${_this.subCrossoverSlopeDbPerOct}, subCrossoverGain: ${_this.subCrossoverGain}, isDynamicEqEnabled: ${_this.isDynamicEqEnabled}, dynamicEqBands: ${_this.dynamicEqBands}, hasOemAudio: ${_this.hasOemAudio}, detectedOemEngines: ${_this.detectedOemEngines}, activeQueueSlot: ${_this.activeQueueSlot}, playbackSpeed: ${_this.playbackSpeed}, playbackPitch: ${_this.playbackPitch}, audioSessionId: ${_this.audioSessionId}, errorMessage: ${_this.errorMessage}, abLoopEnabled: ${_this.abLoopEnabled}, abPointA: ${_this.abPointA}, abPointB: ${_this.abPointB}, trackDelayMs: ${_this.trackDelayMs}, bookmarkPosition: ${_this.bookmarkPosition}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, currentSongRating: ${_this.currentSongRating}, currentSongEqOverride: ${_this.currentSongEqOverride}, currentSongVolumeOverrideDb: ${_this.currentSongVolumeOverrideDb}, cueChapters: ${_this.cueChapters}, currentCueIndex: ${_this.currentCueIndex}, isQuranModeEnabled: ${_this.isQuranModeEnabled}, quranReciterStyle: ${_this.quranReciterStyle})';
+    return 'PlayerState(currentSong: ${_this.currentSong}, isPlaying: ${_this.isPlaying}, position: ${_this.position}, duration: ${_this.duration}, isShuffle: ${_this.isShuffle}, repeatMode: ${_this.repeatMode}, queue: ${_this.queue}, currentIndex: ${_this.currentIndex}, isExpanded: ${_this.isExpanded}, dominantColor: ${_this.dominantColor}, sleepTimerRemaining: ${_this.sleepTimerRemaining}, lyrics: ${_this.lyrics}, lyricsSource: ${_this.lyricsSource}, isLoadingLyrics: ${_this.isLoadingLyrics}, isLyricsVisible: ${_this.isLyricsVisible}, isQueueVisible: ${_this.isQueueVisible}, eqPreset: ${_this.eqPreset}, isEqEnabled: ${_this.isEqEnabled}, isVirtualizerEnabled: ${_this.isVirtualizerEnabled}, virtualizerStrength: ${_this.virtualizerStrength}, isVirtualizerSupported: ${_this.isVirtualizerSupported}, isDynamicsEnabled: ${_this.isDynamicsEnabled}, isDynamicsSupported: ${_this.isDynamicsSupported}, dynamicsPreset: ${_this.dynamicsPreset}, selectedHeadphoneProfile: ${_this.selectedHeadphoneProfile}, isSpatializerSupported: ${_this.isSpatializerSupported}, isSpatializerEnabled: ${_this.isSpatializerEnabled}, volumeBoost: ${_this.volumeBoost}, isVolumeBoostSupported: ${_this.isVolumeBoostSupported}, isBassBoostSupported: ${_this.isBassBoostSupported}, isCrossfeedEnabled: ${_this.isCrossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, crossfeedMode: ${_this.crossfeedMode}, isLimiterEnabled: ${_this.isLimiterEnabled}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, isReverbEnabled: ${_this.isReverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, isSincResamplerEnabled: ${_this.isSincResamplerEnabled}, isDitherEnabled: ${_this.isDitherEnabled}, ditherTargetBitDepth: ${_this.ditherTargetBitDepth}, isSaturationEnabled: ${_this.isSaturationEnabled}, saturationDrive: ${_this.saturationDrive}, saturationMix: ${_this.saturationMix}, saturationTilt: ${_this.saturationTilt}, saturationMultiband: ${_this.saturationMultiband}, isStereoWidthEnabled: ${_this.isStereoWidthEnabled}, stereoWidth: ${_this.stereoWidth}, isLoudnessContourEnabled: ${_this.isLoudnessContourEnabled}, loudnessContourIntensity: ${_this.loudnessContourIntensity}, isSubCrossoverEnabled: ${_this.isSubCrossoverEnabled}, subCrossoverCornerHz: ${_this.subCrossoverCornerHz}, subCrossoverSlopeDbPerOct: ${_this.subCrossoverSlopeDbPerOct}, subCrossoverGain: ${_this.subCrossoverGain}, isDynamicEqEnabled: ${_this.isDynamicEqEnabled}, dynamicEqBands: ${_this.dynamicEqBands}, isViperDdcEnabled: ${_this.isViperDdcEnabled}, viperDdcProfileName: ${_this.viperDdcProfileName}, isArbitraryEqEnabled: ${_this.isArbitraryEqEnabled}, arbitraryEqString: ${_this.arbitraryEqString}, isLiveProgEnabled: ${_this.isLiveProgEnabled}, liveProgCode: ${_this.liveProgCode}, liveProgStatus: ${_this.liveProgStatus}, hasOemAudio: ${_this.hasOemAudio}, detectedOemEngines: ${_this.detectedOemEngines}, activeQueueSlot: ${_this.activeQueueSlot}, playbackSpeed: ${_this.playbackSpeed}, playbackPitch: ${_this.playbackPitch}, audioSessionId: ${_this.audioSessionId}, errorMessage: ${_this.errorMessage}, abLoopEnabled: ${_this.abLoopEnabled}, abPointA: ${_this.abPointA}, abPointB: ${_this.abPointB}, trackDelayMs: ${_this.trackDelayMs}, bookmarkPosition: ${_this.bookmarkPosition}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, currentSongRating: ${_this.currentSongRating}, currentSongEqOverride: ${_this.currentSongEqOverride}, currentSongVolumeOverrideDb: ${_this.currentSongVolumeOverrideDb}, cueChapters: ${_this.cueChapters}, currentCueIndex: ${_this.currentCueIndex}, isQuranModeEnabled: ${_this.isQuranModeEnabled}, quranReciterStyle: ${_this.quranReciterStyle})';
   }
 }
 
@@ -354,6 +381,7 @@ abstract mixin class $PlayerStateCopyWith<$Res> {
       bool isCrossfeedEnabled,
       double crossfeedDelayUs,
       double crossfeedFeedDb,
+      int crossfeedMode,
       bool isLimiterEnabled,
       double limiterThresholdDb,
       double limiterReleaseMs,
@@ -369,6 +397,7 @@ abstract mixin class $PlayerStateCopyWith<$Res> {
       double saturationDrive,
       double saturationMix,
       double saturationTilt,
+      bool saturationMultiband,
       bool isStereoWidthEnabled,
       double stereoWidth,
       bool isLoudnessContourEnabled,
@@ -379,6 +408,13 @@ abstract mixin class $PlayerStateCopyWith<$Res> {
       double subCrossoverGain,
       bool isDynamicEqEnabled,
       List<DynamicEqBandConfig> dynamicEqBands,
+      bool isViperDdcEnabled,
+      String viperDdcProfileName,
+      bool isArbitraryEqEnabled,
+      String arbitraryEqString,
+      bool isLiveProgEnabled,
+      String liveProgCode,
+      String liveProgStatus,
       bool hasOemAudio,
       List<String> detectedOemEngines,
       int activeQueueSlot,
@@ -446,6 +482,7 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
     Object? isCrossfeedEnabled = null,
     Object? crossfeedDelayUs = null,
     Object? crossfeedFeedDb = null,
+    Object? crossfeedMode = null,
     Object? isLimiterEnabled = null,
     Object? limiterThresholdDb = null,
     Object? limiterReleaseMs = null,
@@ -461,6 +498,7 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
     Object? saturationDrive = null,
     Object? saturationMix = null,
     Object? saturationTilt = null,
+    Object? saturationMultiband = null,
     Object? isStereoWidthEnabled = null,
     Object? stereoWidth = null,
     Object? isLoudnessContourEnabled = null,
@@ -471,6 +509,13 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
     Object? subCrossoverGain = null,
     Object? isDynamicEqEnabled = null,
     Object? dynamicEqBands = null,
+    Object? isViperDdcEnabled = null,
+    Object? viperDdcProfileName = null,
+    Object? isArbitraryEqEnabled = null,
+    Object? arbitraryEqString = null,
+    Object? isLiveProgEnabled = null,
+    Object? liveProgCode = null,
+    Object? liveProgStatus = null,
     Object? hasOemAudio = null,
     Object? detectedOemEngines = null,
     Object? activeQueueSlot = null,
@@ -625,6 +670,10 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
           ? _self.crossfeedFeedDb
           : crossfeedFeedDb // ignore: cast_nullable_to_non_nullable
               as double,
+      crossfeedMode: null == crossfeedMode
+          ? _self.crossfeedMode
+          : crossfeedMode // ignore: cast_nullable_to_non_nullable
+              as int,
       isLimiterEnabled: null == isLimiterEnabled
           ? _self.isLimiterEnabled
           : isLimiterEnabled // ignore: cast_nullable_to_non_nullable
@@ -685,6 +734,10 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
           ? _self.saturationTilt
           : saturationTilt // ignore: cast_nullable_to_non_nullable
               as double,
+      saturationMultiband: null == saturationMultiband
+          ? _self.saturationMultiband
+          : saturationMultiband // ignore: cast_nullable_to_non_nullable
+              as bool,
       isStereoWidthEnabled: null == isStereoWidthEnabled
           ? _self.isStereoWidthEnabled
           : isStereoWidthEnabled // ignore: cast_nullable_to_non_nullable
@@ -725,6 +778,34 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
           ? _self.dynamicEqBands
           : dynamicEqBands // ignore: cast_nullable_to_non_nullable
               as List<DynamicEqBandConfig>,
+      isViperDdcEnabled: null == isViperDdcEnabled
+          ? _self.isViperDdcEnabled
+          : isViperDdcEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      viperDdcProfileName: null == viperDdcProfileName
+          ? _self.viperDdcProfileName
+          : viperDdcProfileName // ignore: cast_nullable_to_non_nullable
+              as String,
+      isArbitraryEqEnabled: null == isArbitraryEqEnabled
+          ? _self.isArbitraryEqEnabled
+          : isArbitraryEqEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      arbitraryEqString: null == arbitraryEqString
+          ? _self.arbitraryEqString
+          : arbitraryEqString // ignore: cast_nullable_to_non_nullable
+              as String,
+      isLiveProgEnabled: null == isLiveProgEnabled
+          ? _self.isLiveProgEnabled
+          : isLiveProgEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      liveProgCode: null == liveProgCode
+          ? _self.liveProgCode
+          : liveProgCode // ignore: cast_nullable_to_non_nullable
+              as String,
+      liveProgStatus: null == liveProgStatus
+          ? _self.liveProgStatus
+          : liveProgStatus // ignore: cast_nullable_to_non_nullable
+              as String,
       hasOemAudio: null == hasOemAudio
           ? _self.hasOemAudio
           : hasOemAudio // ignore: cast_nullable_to_non_nullable
@@ -936,6 +1017,7 @@ extension PlayerStatePatterns on PlayerState {
             bool isCrossfeedEnabled,
             double crossfeedDelayUs,
             double crossfeedFeedDb,
+            int crossfeedMode,
             bool isLimiterEnabled,
             double limiterThresholdDb,
             double limiterReleaseMs,
@@ -951,6 +1033,7 @@ extension PlayerStatePatterns on PlayerState {
             double saturationDrive,
             double saturationMix,
             double saturationTilt,
+            bool saturationMultiband,
             bool isStereoWidthEnabled,
             double stereoWidth,
             bool isLoudnessContourEnabled,
@@ -961,6 +1044,13 @@ extension PlayerStatePatterns on PlayerState {
             double subCrossoverGain,
             bool isDynamicEqEnabled,
             List<DynamicEqBandConfig> dynamicEqBands,
+            bool isViperDdcEnabled,
+            String viperDdcProfileName,
+            bool isArbitraryEqEnabled,
+            String arbitraryEqString,
+            bool isLiveProgEnabled,
+            String liveProgCode,
+            String liveProgStatus,
             bool hasOemAudio,
             List<String> detectedOemEngines,
             int activeQueueSlot,
@@ -1021,6 +1111,7 @@ extension PlayerStatePatterns on PlayerState {
             _that.isCrossfeedEnabled,
             _that.crossfeedDelayUs,
             _that.crossfeedFeedDb,
+            _that.crossfeedMode,
             _that.isLimiterEnabled,
             _that.limiterThresholdDb,
             _that.limiterReleaseMs,
@@ -1036,6 +1127,7 @@ extension PlayerStatePatterns on PlayerState {
             _that.saturationDrive,
             _that.saturationMix,
             _that.saturationTilt,
+            _that.saturationMultiband,
             _that.isStereoWidthEnabled,
             _that.stereoWidth,
             _that.isLoudnessContourEnabled,
@@ -1046,6 +1138,13 @@ extension PlayerStatePatterns on PlayerState {
             _that.subCrossoverGain,
             _that.isDynamicEqEnabled,
             _that.dynamicEqBands,
+            _that.isViperDdcEnabled,
+            _that.viperDdcProfileName,
+            _that.isArbitraryEqEnabled,
+            _that.arbitraryEqString,
+            _that.isLiveProgEnabled,
+            _that.liveProgCode,
+            _that.liveProgStatus,
             _that.hasOemAudio,
             _that.detectedOemEngines,
             _that.activeQueueSlot,
@@ -1120,6 +1219,7 @@ extension PlayerStatePatterns on PlayerState {
             bool isCrossfeedEnabled,
             double crossfeedDelayUs,
             double crossfeedFeedDb,
+            int crossfeedMode,
             bool isLimiterEnabled,
             double limiterThresholdDb,
             double limiterReleaseMs,
@@ -1135,6 +1235,7 @@ extension PlayerStatePatterns on PlayerState {
             double saturationDrive,
             double saturationMix,
             double saturationTilt,
+            bool saturationMultiband,
             bool isStereoWidthEnabled,
             double stereoWidth,
             bool isLoudnessContourEnabled,
@@ -1145,6 +1246,13 @@ extension PlayerStatePatterns on PlayerState {
             double subCrossoverGain,
             bool isDynamicEqEnabled,
             List<DynamicEqBandConfig> dynamicEqBands,
+            bool isViperDdcEnabled,
+            String viperDdcProfileName,
+            bool isArbitraryEqEnabled,
+            String arbitraryEqString,
+            bool isLiveProgEnabled,
+            String liveProgCode,
+            String liveProgStatus,
             bool hasOemAudio,
             List<String> detectedOemEngines,
             int activeQueueSlot,
@@ -1204,6 +1312,7 @@ extension PlayerStatePatterns on PlayerState {
             _that.isCrossfeedEnabled,
             _that.crossfeedDelayUs,
             _that.crossfeedFeedDb,
+            _that.crossfeedMode,
             _that.isLimiterEnabled,
             _that.limiterThresholdDb,
             _that.limiterReleaseMs,
@@ -1219,6 +1328,7 @@ extension PlayerStatePatterns on PlayerState {
             _that.saturationDrive,
             _that.saturationMix,
             _that.saturationTilt,
+            _that.saturationMultiband,
             _that.isStereoWidthEnabled,
             _that.stereoWidth,
             _that.isLoudnessContourEnabled,
@@ -1229,6 +1339,13 @@ extension PlayerStatePatterns on PlayerState {
             _that.subCrossoverGain,
             _that.isDynamicEqEnabled,
             _that.dynamicEqBands,
+            _that.isViperDdcEnabled,
+            _that.viperDdcProfileName,
+            _that.isArbitraryEqEnabled,
+            _that.arbitraryEqString,
+            _that.isLiveProgEnabled,
+            _that.liveProgCode,
+            _that.liveProgStatus,
             _that.hasOemAudio,
             _that.detectedOemEngines,
             _that.activeQueueSlot,
@@ -1302,6 +1419,7 @@ extension PlayerStatePatterns on PlayerState {
             bool isCrossfeedEnabled,
             double crossfeedDelayUs,
             double crossfeedFeedDb,
+            int crossfeedMode,
             bool isLimiterEnabled,
             double limiterThresholdDb,
             double limiterReleaseMs,
@@ -1317,6 +1435,7 @@ extension PlayerStatePatterns on PlayerState {
             double saturationDrive,
             double saturationMix,
             double saturationTilt,
+            bool saturationMultiband,
             bool isStereoWidthEnabled,
             double stereoWidth,
             bool isLoudnessContourEnabled,
@@ -1327,6 +1446,13 @@ extension PlayerStatePatterns on PlayerState {
             double subCrossoverGain,
             bool isDynamicEqEnabled,
             List<DynamicEqBandConfig> dynamicEqBands,
+            bool isViperDdcEnabled,
+            String viperDdcProfileName,
+            bool isArbitraryEqEnabled,
+            String arbitraryEqString,
+            bool isLiveProgEnabled,
+            String liveProgCode,
+            String liveProgStatus,
             bool hasOemAudio,
             List<String> detectedOemEngines,
             int activeQueueSlot,
@@ -1386,6 +1512,7 @@ extension PlayerStatePatterns on PlayerState {
             _that.isCrossfeedEnabled,
             _that.crossfeedDelayUs,
             _that.crossfeedFeedDb,
+            _that.crossfeedMode,
             _that.isLimiterEnabled,
             _that.limiterThresholdDb,
             _that.limiterReleaseMs,
@@ -1401,6 +1528,7 @@ extension PlayerStatePatterns on PlayerState {
             _that.saturationDrive,
             _that.saturationMix,
             _that.saturationTilt,
+            _that.saturationMultiband,
             _that.isStereoWidthEnabled,
             _that.stereoWidth,
             _that.isLoudnessContourEnabled,
@@ -1411,6 +1539,13 @@ extension PlayerStatePatterns on PlayerState {
             _that.subCrossoverGain,
             _that.isDynamicEqEnabled,
             _that.dynamicEqBands,
+            _that.isViperDdcEnabled,
+            _that.viperDdcProfileName,
+            _that.isArbitraryEqEnabled,
+            _that.arbitraryEqString,
+            _that.isLiveProgEnabled,
+            _that.liveProgCode,
+            _that.liveProgStatus,
             _that.hasOemAudio,
             _that.detectedOemEngines,
             _that.activeQueueSlot,
@@ -1475,6 +1610,7 @@ class _PlayerState extends PlayerState {
       this.isCrossfeedEnabled = false,
       this.crossfeedDelayUs = 350.0,
       this.crossfeedFeedDb = -9.0,
+      this.crossfeedMode = 0,
       this.isLimiterEnabled = false,
       this.limiterThresholdDb = -0.2,
       this.limiterReleaseMs = 50.0,
@@ -1490,6 +1626,7 @@ class _PlayerState extends PlayerState {
       this.saturationDrive = 0.3,
       this.saturationMix = 0.5,
       this.saturationTilt = 0.3,
+      this.saturationMultiband = false,
       this.isStereoWidthEnabled = false,
       this.stereoWidth = 1.0,
       this.isLoudnessContourEnabled = false,
@@ -1500,6 +1637,13 @@ class _PlayerState extends PlayerState {
       this.subCrossoverGain = 0.8,
       this.isDynamicEqEnabled = false,
       List<DynamicEqBandConfig> dynamicEqBands = const [],
+      this.isViperDdcEnabled = false,
+      this.viperDdcProfileName = '',
+      this.isArbitraryEqEnabled = false,
+      this.arbitraryEqString = '',
+      this.isLiveProgEnabled = false,
+      this.liveProgCode = '',
+      this.liveProgStatus = '',
       this.hasOemAudio = false,
       List<String> detectedOemEngines = const [],
       this.activeQueueSlot = 0,
@@ -1636,6 +1780,9 @@ class _PlayerState extends PlayerState {
   final double crossfeedFeedDb;
   @override
   @JsonKey()
+  final int crossfeedMode;
+  @override
+  @JsonKey()
   final bool isLimiterEnabled;
   @override
   @JsonKey()
@@ -1681,6 +1828,9 @@ class _PlayerState extends PlayerState {
   final double saturationTilt;
   @override
   @JsonKey()
+  final bool saturationMultiband;
+  @override
+  @JsonKey()
   final bool isStereoWidthEnabled;
   @override
   @JsonKey()
@@ -1715,6 +1865,27 @@ class _PlayerState extends PlayerState {
     return EqualUnmodifiableListView(_dynamicEqBands);
   }
 
+  @override
+  @JsonKey()
+  final bool isViperDdcEnabled;
+  @override
+  @JsonKey()
+  final String viperDdcProfileName;
+  @override
+  @JsonKey()
+  final bool isArbitraryEqEnabled;
+  @override
+  @JsonKey()
+  final String arbitraryEqString;
+  @override
+  @JsonKey()
+  final bool isLiveProgEnabled;
+  @override
+  @JsonKey()
+  final String liveProgCode;
+  @override
+  @JsonKey()
+  final String liveProgStatus;
   @override
   @JsonKey()
   final bool hasOemAudio;
@@ -1860,6 +2031,8 @@ class _PlayerState extends PlayerState {
                 other.crossfeedDelayUs == crossfeedDelayUs) &&
             (identical(other.crossfeedFeedDb, crossfeedFeedDb) ||
                 other.crossfeedFeedDb == crossfeedFeedDb) &&
+            (identical(other.crossfeedMode, crossfeedMode) ||
+                other.crossfeedMode == crossfeedMode) &&
             (identical(other.isLimiterEnabled, isLimiterEnabled) ||
                 other.isLimiterEnabled == isLimiterEnabled) &&
             (identical(other.limiterThresholdDb, limiterThresholdDb) ||
@@ -1877,13 +2050,13 @@ class _PlayerState extends PlayerState {
             (identical(other.monoMix, monoMix) || other.monoMix == monoMix) &&
             (identical(other.isSincResamplerEnabled, isSincResamplerEnabled) ||
                 other.isSincResamplerEnabled == isSincResamplerEnabled) &&
-            (identical(other.isDitherEnabled, isDitherEnabled) ||
-                other.isDitherEnabled == isDitherEnabled) &&
+            (identical(other.isDitherEnabled, isDitherEnabled) || other.isDitherEnabled == isDitherEnabled) &&
             (identical(other.ditherTargetBitDepth, ditherTargetBitDepth) || other.ditherTargetBitDepth == ditherTargetBitDepth) &&
             (identical(other.isSaturationEnabled, isSaturationEnabled) || other.isSaturationEnabled == isSaturationEnabled) &&
             (identical(other.saturationDrive, saturationDrive) || other.saturationDrive == saturationDrive) &&
             (identical(other.saturationMix, saturationMix) || other.saturationMix == saturationMix) &&
             (identical(other.saturationTilt, saturationTilt) || other.saturationTilt == saturationTilt) &&
+            (identical(other.saturationMultiband, saturationMultiband) || other.saturationMultiband == saturationMultiband) &&
             (identical(other.isStereoWidthEnabled, isStereoWidthEnabled) || other.isStereoWidthEnabled == isStereoWidthEnabled) &&
             (identical(other.stereoWidth, stereoWidth) || other.stereoWidth == stereoWidth) &&
             (identical(other.isLoudnessContourEnabled, isLoudnessContourEnabled) || other.isLoudnessContourEnabled == isLoudnessContourEnabled) &&
@@ -1894,6 +2067,13 @@ class _PlayerState extends PlayerState {
             (identical(other.subCrossoverGain, subCrossoverGain) || other.subCrossoverGain == subCrossoverGain) &&
             (identical(other.isDynamicEqEnabled, isDynamicEqEnabled) || other.isDynamicEqEnabled == isDynamicEqEnabled) &&
             const DeepCollectionEquality().equals(other.dynamicEqBands, _dynamicEqBands) &&
+            (identical(other.isViperDdcEnabled, isViperDdcEnabled) || other.isViperDdcEnabled == isViperDdcEnabled) &&
+            (identical(other.viperDdcProfileName, viperDdcProfileName) || other.viperDdcProfileName == viperDdcProfileName) &&
+            (identical(other.isArbitraryEqEnabled, isArbitraryEqEnabled) || other.isArbitraryEqEnabled == isArbitraryEqEnabled) &&
+            (identical(other.arbitraryEqString, arbitraryEqString) || other.arbitraryEqString == arbitraryEqString) &&
+            (identical(other.isLiveProgEnabled, isLiveProgEnabled) || other.isLiveProgEnabled == isLiveProgEnabled) &&
+            (identical(other.liveProgCode, liveProgCode) || other.liveProgCode == liveProgCode) &&
+            (identical(other.liveProgStatus, liveProgStatus) || other.liveProgStatus == liveProgStatus) &&
             (identical(other.hasOemAudio, hasOemAudio) || other.hasOemAudio == hasOemAudio) &&
             const DeepCollectionEquality().equals(other.detectedOemEngines, _detectedOemEngines) &&
             (identical(other.activeQueueSlot, activeQueueSlot) || other.activeQueueSlot == activeQueueSlot) &&
@@ -1953,6 +2133,7 @@ class _PlayerState extends PlayerState {
       isCrossfeedEnabled,
       crossfeedDelayUs,
       crossfeedFeedDb,
+      crossfeedMode,
       isLimiterEnabled,
       limiterThresholdDb,
       limiterReleaseMs,
@@ -1968,6 +2149,7 @@ class _PlayerState extends PlayerState {
       saturationDrive,
       saturationMix,
       saturationTilt,
+      saturationMultiband,
       isStereoWidthEnabled,
       stereoWidth,
       isLoudnessContourEnabled,
@@ -1978,6 +2160,13 @@ class _PlayerState extends PlayerState {
       subCrossoverGain,
       isDynamicEqEnabled,
       const DeepCollectionEquality().hash(_dynamicEqBands),
+      isViperDdcEnabled,
+      viperDdcProfileName,
+      isArbitraryEqEnabled,
+      arbitraryEqString,
+      isLiveProgEnabled,
+      liveProgCode,
+      liveProgStatus,
       hasOemAudio,
       const DeepCollectionEquality().hash(_detectedOemEngines),
       activeQueueSlot,
@@ -2003,7 +2192,7 @@ class _PlayerState extends PlayerState {
 
   @override
   String toString() {
-    return 'PlayerState(currentSong: $currentSong, isPlaying: $isPlaying, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, queue: $queue, currentIndex: $currentIndex, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, lyrics: $lyrics, lyricsSource: $lyricsSource, isLoadingLyrics: $isLoadingLyrics, isLyricsVisible: $isLyricsVisible, isQueueVisible: $isQueueVisible, eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isVirtualizerSupported: $isVirtualizerSupported, isDynamicsEnabled: $isDynamicsEnabled, isDynamicsSupported: $isDynamicsSupported, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, isVolumeBoostSupported: $isVolumeBoostSupported, isBassBoostSupported: $isBassBoostSupported, isCrossfeedEnabled: $isCrossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, isLimiterEnabled: $isLimiterEnabled, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, isReverbEnabled: $isReverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, isSincResamplerEnabled: $isSincResamplerEnabled, isDitherEnabled: $isDitherEnabled, ditherTargetBitDepth: $ditherTargetBitDepth, isSaturationEnabled: $isSaturationEnabled, saturationDrive: $saturationDrive, saturationMix: $saturationMix, saturationTilt: $saturationTilt, isStereoWidthEnabled: $isStereoWidthEnabled, stereoWidth: $stereoWidth, isLoudnessContourEnabled: $isLoudnessContourEnabled, loudnessContourIntensity: $loudnessContourIntensity, isSubCrossoverEnabled: $isSubCrossoverEnabled, subCrossoverCornerHz: $subCrossoverCornerHz, subCrossoverSlopeDbPerOct: $subCrossoverSlopeDbPerOct, subCrossoverGain: $subCrossoverGain, isDynamicEqEnabled: $isDynamicEqEnabled, dynamicEqBands: $dynamicEqBands, hasOemAudio: $hasOemAudio, detectedOemEngines: $detectedOemEngines, activeQueueSlot: $activeQueueSlot, playbackSpeed: $playbackSpeed, playbackPitch: $playbackPitch, audioSessionId: $audioSessionId, errorMessage: $errorMessage, abLoopEnabled: $abLoopEnabled, abPointA: $abPointA, abPointB: $abPointB, trackDelayMs: $trackDelayMs, bookmarkPosition: $bookmarkPosition, silenceSkipSensitivity: $silenceSkipSensitivity, currentSongRating: $currentSongRating, currentSongEqOverride: $currentSongEqOverride, currentSongVolumeOverrideDb: $currentSongVolumeOverrideDb, cueChapters: $cueChapters, currentCueIndex: $currentCueIndex, isQuranModeEnabled: $isQuranModeEnabled, quranReciterStyle: $quranReciterStyle)';
+    return 'PlayerState(currentSong: $currentSong, isPlaying: $isPlaying, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, queue: $queue, currentIndex: $currentIndex, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, lyrics: $lyrics, lyricsSource: $lyricsSource, isLoadingLyrics: $isLoadingLyrics, isLyricsVisible: $isLyricsVisible, isQueueVisible: $isQueueVisible, eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isVirtualizerSupported: $isVirtualizerSupported, isDynamicsEnabled: $isDynamicsEnabled, isDynamicsSupported: $isDynamicsSupported, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, isVolumeBoostSupported: $isVolumeBoostSupported, isBassBoostSupported: $isBassBoostSupported, isCrossfeedEnabled: $isCrossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, crossfeedMode: $crossfeedMode, isLimiterEnabled: $isLimiterEnabled, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, isReverbEnabled: $isReverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, isSincResamplerEnabled: $isSincResamplerEnabled, isDitherEnabled: $isDitherEnabled, ditherTargetBitDepth: $ditherTargetBitDepth, isSaturationEnabled: $isSaturationEnabled, saturationDrive: $saturationDrive, saturationMix: $saturationMix, saturationTilt: $saturationTilt, saturationMultiband: $saturationMultiband, isStereoWidthEnabled: $isStereoWidthEnabled, stereoWidth: $stereoWidth, isLoudnessContourEnabled: $isLoudnessContourEnabled, loudnessContourIntensity: $loudnessContourIntensity, isSubCrossoverEnabled: $isSubCrossoverEnabled, subCrossoverCornerHz: $subCrossoverCornerHz, subCrossoverSlopeDbPerOct: $subCrossoverSlopeDbPerOct, subCrossoverGain: $subCrossoverGain, isDynamicEqEnabled: $isDynamicEqEnabled, dynamicEqBands: $dynamicEqBands, isViperDdcEnabled: $isViperDdcEnabled, viperDdcProfileName: $viperDdcProfileName, isArbitraryEqEnabled: $isArbitraryEqEnabled, arbitraryEqString: $arbitraryEqString, isLiveProgEnabled: $isLiveProgEnabled, liveProgCode: $liveProgCode, liveProgStatus: $liveProgStatus, hasOemAudio: $hasOemAudio, detectedOemEngines: $detectedOemEngines, activeQueueSlot: $activeQueueSlot, playbackSpeed: $playbackSpeed, playbackPitch: $playbackPitch, audioSessionId: $audioSessionId, errorMessage: $errorMessage, abLoopEnabled: $abLoopEnabled, abPointA: $abPointA, abPointB: $abPointB, trackDelayMs: $trackDelayMs, bookmarkPosition: $bookmarkPosition, silenceSkipSensitivity: $silenceSkipSensitivity, currentSongRating: $currentSongRating, currentSongEqOverride: $currentSongEqOverride, currentSongVolumeOverrideDb: $currentSongVolumeOverrideDb, cueChapters: $cueChapters, currentCueIndex: $currentCueIndex, isQuranModeEnabled: $isQuranModeEnabled, quranReciterStyle: $quranReciterStyle)';
   }
 }
 
@@ -2049,6 +2238,7 @@ abstract mixin class _$PlayerStateCopyWith<$Res>
       bool isCrossfeedEnabled,
       double crossfeedDelayUs,
       double crossfeedFeedDb,
+      int crossfeedMode,
       bool isLimiterEnabled,
       double limiterThresholdDb,
       double limiterReleaseMs,
@@ -2064,6 +2254,7 @@ abstract mixin class _$PlayerStateCopyWith<$Res>
       double saturationDrive,
       double saturationMix,
       double saturationTilt,
+      bool saturationMultiband,
       bool isStereoWidthEnabled,
       double stereoWidth,
       bool isLoudnessContourEnabled,
@@ -2074,6 +2265,13 @@ abstract mixin class _$PlayerStateCopyWith<$Res>
       double subCrossoverGain,
       bool isDynamicEqEnabled,
       List<DynamicEqBandConfig> dynamicEqBands,
+      bool isViperDdcEnabled,
+      String viperDdcProfileName,
+      bool isArbitraryEqEnabled,
+      String arbitraryEqString,
+      bool isLiveProgEnabled,
+      String liveProgCode,
+      String liveProgStatus,
       bool hasOemAudio,
       List<String> detectedOemEngines,
       int activeQueueSlot,
@@ -2141,6 +2339,7 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
     Object? isCrossfeedEnabled = null,
     Object? crossfeedDelayUs = null,
     Object? crossfeedFeedDb = null,
+    Object? crossfeedMode = null,
     Object? isLimiterEnabled = null,
     Object? limiterThresholdDb = null,
     Object? limiterReleaseMs = null,
@@ -2156,6 +2355,7 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
     Object? saturationDrive = null,
     Object? saturationMix = null,
     Object? saturationTilt = null,
+    Object? saturationMultiband = null,
     Object? isStereoWidthEnabled = null,
     Object? stereoWidth = null,
     Object? isLoudnessContourEnabled = null,
@@ -2166,6 +2366,13 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
     Object? subCrossoverGain = null,
     Object? isDynamicEqEnabled = null,
     Object? dynamicEqBands = null,
+    Object? isViperDdcEnabled = null,
+    Object? viperDdcProfileName = null,
+    Object? isArbitraryEqEnabled = null,
+    Object? arbitraryEqString = null,
+    Object? isLiveProgEnabled = null,
+    Object? liveProgCode = null,
+    Object? liveProgStatus = null,
     Object? hasOemAudio = null,
     Object? detectedOemEngines = null,
     Object? activeQueueSlot = null,
@@ -2320,6 +2527,10 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
           ? _self.crossfeedFeedDb
           : crossfeedFeedDb // ignore: cast_nullable_to_non_nullable
               as double,
+      crossfeedMode: null == crossfeedMode
+          ? _self.crossfeedMode
+          : crossfeedMode // ignore: cast_nullable_to_non_nullable
+              as int,
       isLimiterEnabled: null == isLimiterEnabled
           ? _self.isLimiterEnabled
           : isLimiterEnabled // ignore: cast_nullable_to_non_nullable
@@ -2380,6 +2591,10 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
           ? _self.saturationTilt
           : saturationTilt // ignore: cast_nullable_to_non_nullable
               as double,
+      saturationMultiband: null == saturationMultiband
+          ? _self.saturationMultiband
+          : saturationMultiband // ignore: cast_nullable_to_non_nullable
+              as bool,
       isStereoWidthEnabled: null == isStereoWidthEnabled
           ? _self.isStereoWidthEnabled
           : isStereoWidthEnabled // ignore: cast_nullable_to_non_nullable
@@ -2420,6 +2635,34 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
           ? _self._dynamicEqBands
           : dynamicEqBands // ignore: cast_nullable_to_non_nullable
               as List<DynamicEqBandConfig>,
+      isViperDdcEnabled: null == isViperDdcEnabled
+          ? _self.isViperDdcEnabled
+          : isViperDdcEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      viperDdcProfileName: null == viperDdcProfileName
+          ? _self.viperDdcProfileName
+          : viperDdcProfileName // ignore: cast_nullable_to_non_nullable
+              as String,
+      isArbitraryEqEnabled: null == isArbitraryEqEnabled
+          ? _self.isArbitraryEqEnabled
+          : isArbitraryEqEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      arbitraryEqString: null == arbitraryEqString
+          ? _self.arbitraryEqString
+          : arbitraryEqString // ignore: cast_nullable_to_non_nullable
+              as String,
+      isLiveProgEnabled: null == isLiveProgEnabled
+          ? _self.isLiveProgEnabled
+          : isLiveProgEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      liveProgCode: null == liveProgCode
+          ? _self.liveProgCode
+          : liveProgCode // ignore: cast_nullable_to_non_nullable
+              as String,
+      liveProgStatus: null == liveProgStatus
+          ? _self.liveProgStatus
+          : liveProgStatus // ignore: cast_nullable_to_non_nullable
+              as String,
       hasOemAudio: null == hasOemAudio
           ? _self.hasOemAudio
           : hasOemAudio // ignore: cast_nullable_to_non_nullable

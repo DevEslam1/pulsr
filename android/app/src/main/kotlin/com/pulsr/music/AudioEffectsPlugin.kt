@@ -155,6 +155,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var dynamicBassSideGainHigh = 0.50
     private var dynamicBassDevicePreset = 0
 
+    // JamesDSP additions
+    private var isViperDdcEnabled = false
+    private var isArbitraryEqEnabled = false
+    private var isLiveProgEnabled = false
+
     private var isSincResamplerEnabled = true
     private var resamplerInRate = 48000.0
     private var resamplerOutRate = 48000.0
@@ -312,7 +317,16 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeSetSincResamplerRates(inRate: Double, outRate: Double)
     private external fun nativeSetSincResamplerQuality(quality: Int)
     private external fun nativeSetSaturationEnabled(enabled: Boolean)
-    private external fun nativeSetSaturationParams(drive: Double, mix: Double, tilt: Double, mode: Int)
+    private external fun nativeSetSaturationParams(drive: Double, mix: Double, tilt: Double, mode: Int, multiband: Boolean)
+    private external fun nativeSetSaturationMultiband(multiband: Boolean)
+    private external fun nativeSetCrossfeedMode(mode: Int)
+    private external fun nativeSetViperDdcEnabled(enabled: Boolean)
+    private external fun nativeLoadViperDdc(ddcContent: String, profileName: String): Boolean
+    private external fun nativeSetArbitraryEqEnabled(enabled: Boolean)
+    private external fun nativeLoadArbitraryEq(eqString: String, linearPhase: Boolean): Boolean
+    private external fun nativeSetLiveProgEnabled(enabled: Boolean)
+    private external fun nativeLoadLiveProgCode(code: String): String
+    private external fun nativeSetLiveProgSlider(index: Int, value: Double)
     private external fun nativeSetStereoWidthEnabled(enabled: Boolean)
     private external fun nativeSetStereoWidthParams(
         width: Double, multiband: Boolean, lowWidth: Double, midWidth: Double,
@@ -419,6 +433,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         if (isDynamicEqEnabled && dynamicEqBandCount > 0) mask = mask or STAGE_DYNEQ
         if (isMultibandCompressorEnabled) mask = mask or STAGE_MULTIBAND_COMPRESSOR
         if (isDynamicBassEnabled && dynamicBassStrength > 0.001) mask = mask or STAGE_DYNAMIC_BASS
+        if (isViperDdcEnabled) mask = mask or STAGE_VIPER_DDC
+        if (isArbitraryEqEnabled) mask = mask or STAGE_ARBITRARY_EQ
+        if (isLiveProgEnabled) mask = mask or STAGE_LIVE_PROG
         // Dither is a standalone stage: it must run even with every other
         // effect off, so it is gated by its own bit rather than by chain gain.
         if (isDitherEnabled) mask = mask or STAGE_DITHER
@@ -464,6 +481,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         const val STAGE_MULTIBAND_COMPRESSOR = 1 shl 12
         // Dynamic Bass (must mirror DspStageMask in AudioDspEngine.h)
         const val STAGE_DYNAMIC_BASS = 1 shl 13
+        // JamesDSP additions
+        const val STAGE_VIPER_DDC = 1 shl 14
+        const val STAGE_ARBITRARY_EQ = 1 shl 15
+        const val STAGE_LIVE_PROG = 1 shl 16
 
         /**
          * Ordinal of `ReverbPreset::Custom` in ConvolutionReverb.h — the one
@@ -1208,6 +1229,18 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     result.success(true)
                 }
 
+                "setCrossfeedMode" -> {
+                    val mode = call.argument<Int>("mode") ?: 0
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeSetCrossfeedMode(mode)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetCrossfeedMode failed: ${e.message}")
+                        }
+                    }
+                    result.success(true)
+                }
+
                 // Lookahead Brickwall Limiter
                 "setLimiterEnabled" -> {
                     val enabled = call.argument<Boolean>("enabled") ?: false
@@ -1555,21 +1588,34 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     val mix = clamp((call.argument<Number>("mix"))?.toDouble() ?: 0.5, 0.0, 1.0)
                     val tilt = clamp((call.argument<Number>("tilt"))?.toDouble() ?: 0.3, 0.0, 1.0)
                     val mode = call.argument<Int>("mode") ?: 0
+                    val multiband = call.argument<Boolean>("multiband") ?: false
                     saturationDrive = drive
                     saturationMix = mix
                     saturationTilt = tilt
                     saturationMode = mode
                     if (isNativeDspLoaded) {
-                        val key = String.format(java.util.Locale.US, "%.2f:%.2f:%.2f:%d", drive, mix, tilt, mode)
+                        val key = String.format(java.util.Locale.US, "%.2f:%.2f:%.2f:%d:%b", drive, mix, tilt, mode, multiband)
                         if (lastNativeSaturationParams != key) {
                             try {
-                                nativeSetSaturationParams(drive, mix, tilt, mode)
+                                nativeSetSaturationParams(drive, mix, tilt, mode, multiband)
                                 lastNativeSaturationParams = key
                             } catch (e: Exception) {
                                 Log.w(TAG, "nativeSetSaturationParams failed: ${e.message}")
                                 result.error("NATIVE_ERROR", e.message, null)
                                 return
                             }
+                        }
+                    }
+                    result.success(true)
+                }
+
+                "setSaturationMultiband" -> {
+                    val multiband = call.argument<Boolean>("multiband") ?: false
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeSetSaturationMultiband(multiband)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetSaturationMultiband failed: ${e.message}")
                         }
                     }
                     result.success(true)
@@ -1897,6 +1943,104 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         }
                     }
                     recalculateActiveStages()
+                    result.success(true)
+                }
+
+                // ---- ViPER-DDC (Digital Dynamic Correction) ----
+                "setViperDdcEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    isViperDdcEnabled = enabled
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeSetViperDdcEnabled(enabled)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetViperDdcEnabled failed: ${e.message}")
+                        }
+                    }
+                    recalculateActiveStages()
+                    result.success(true)
+                }
+
+                "loadViperDdc" -> {
+                    val ddcContent = call.argument<String>("ddcContent") ?: ""
+                    val profileName = call.argument<String>("profileName") ?: ""
+                    val ok = if (isNativeDspLoaded) {
+                        try {
+                            nativeLoadViperDdc(ddcContent, profileName)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeLoadViperDdc failed: ${e.message}")
+                            false
+                        }
+                    } else false
+                    result.success(ok)
+                }
+
+                // ---- Arbitrary Response Equalizer (EqualizerAPO GraphicEq) ----
+                "setArbitraryEqEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    isArbitraryEqEnabled = enabled
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeSetArbitraryEqEnabled(enabled)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetArbitraryEqEnabled failed: ${e.message}")
+                        }
+                    }
+                    recalculateActiveStages()
+                    result.success(true)
+                }
+
+                "loadArbitraryEq" -> {
+                    val eqString = call.argument<String>("eqString") ?: ""
+                    val linearPhase = call.argument<Boolean>("linearPhase") ?: false
+                    val ok = if (isNativeDspLoaded) {
+                        try {
+                            nativeLoadArbitraryEq(eqString, linearPhase)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeLoadArbitraryEq failed: ${e.message}")
+                            false
+                        }
+                    } else false
+                    result.success(ok)
+                }
+
+                // ---- Live Programmable DSP (EEL Scripting) ----
+                "setLiveProgEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    isLiveProgEnabled = enabled
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeSetLiveProgEnabled(enabled)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetLiveProgEnabled failed: ${e.message}")
+                        }
+                    }
+                    recalculateActiveStages()
+                    result.success(true)
+                }
+
+                "loadLiveProgCode" -> {
+                    val code = call.argument<String>("code") ?: ""
+                    val status = if (isNativeDspLoaded) {
+                        try {
+                            nativeLoadLiveProgCode(code)
+                        } catch (e: Exception) {
+                            e.message ?: "Unknown error"
+                        }
+                    } else "Native DSP not loaded"
+                    result.success(status)
+                }
+
+                "setLiveProgSlider" -> {
+                    val index = call.argument<Int>("index") ?: 1
+                    val value = (call.argument<Number>("value"))?.toDouble() ?: 0.0
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeSetLiveProgSlider(index, value)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetLiveProgSlider failed: ${e.message}")
+                        }
+                    }
                     result.success(true)
                 }
 

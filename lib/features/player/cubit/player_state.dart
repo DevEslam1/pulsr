@@ -53,6 +53,7 @@ abstract class PlayerState with _$PlayerState {
     @Default(false) bool isCrossfeedEnabled,
     @Default(350.0) double crossfeedDelayUs,
     @Default(-9.0) double crossfeedFeedDb,
+    @Default(0) int crossfeedMode,
     @Default(false) bool isLimiterEnabled,
     @Default(-0.2) double limiterThresholdDb,
     @Default(50.0) double limiterReleaseMs,
@@ -68,6 +69,7 @@ abstract class PlayerState with _$PlayerState {
     @Default(0.3) double saturationDrive,
     @Default(0.5) double saturationMix,
     @Default(0.3) double saturationTilt,
+    @Default(false) bool saturationMultiband,
     @Default(false) bool isStereoWidthEnabled,
     @Default(1.0) double stereoWidth,
     @Default(false) bool isLoudnessContourEnabled,
@@ -78,6 +80,13 @@ abstract class PlayerState with _$PlayerState {
     @Default(0.8) double subCrossoverGain,
     @Default(false) bool isDynamicEqEnabled,
     @Default([]) List<DynamicEqBandConfig> dynamicEqBands,
+    @Default(false) bool isViperDdcEnabled,
+    @Default('') String viperDdcProfileName,
+    @Default(false) bool isArbitraryEqEnabled,
+    @Default('') String arbitraryEqString,
+    @Default(false) bool isLiveProgEnabled,
+    @Default('') String liveProgCode,
+    @Default('') String liveProgStatus,
     @Default(false) bool hasOemAudio,
     @Default([]) List<String> detectedOemEngines,
     @Default(0) int activeQueueSlot,
@@ -153,6 +162,7 @@ abstract class PlayerState with _$PlayerState {
         isCrossfeedEnabled != other.isCrossfeedEnabled ||
         crossfeedDelayUs != other.crossfeedDelayUs ||
         crossfeedFeedDb != other.crossfeedFeedDb ||
+        crossfeedMode != other.crossfeedMode ||
         isLimiterEnabled != other.isLimiterEnabled ||
         limiterThresholdDb != other.limiterThresholdDb ||
         limiterReleaseMs != other.limiterReleaseMs ||
@@ -168,6 +178,7 @@ abstract class PlayerState with _$PlayerState {
         saturationDrive != other.saturationDrive ||
         saturationMix != other.saturationMix ||
         saturationTilt != other.saturationTilt ||
+        saturationMultiband != other.saturationMultiband ||
         isStereoWidthEnabled != other.isStereoWidthEnabled ||
         stereoWidth != other.stereoWidth ||
         isLoudnessContourEnabled != other.isLoudnessContourEnabled ||
@@ -178,6 +189,13 @@ abstract class PlayerState with _$PlayerState {
         subCrossoverGain != other.subCrossoverGain ||
         isDynamicEqEnabled != other.isDynamicEqEnabled ||
         listContentDiffers(dynamicEqBands, other.dynamicEqBands) ||
+        isViperDdcEnabled != other.isViperDdcEnabled ||
+        viperDdcProfileName != other.viperDdcProfileName ||
+        isArbitraryEqEnabled != other.isArbitraryEqEnabled ||
+        arbitraryEqString != other.arbitraryEqString ||
+        isLiveProgEnabled != other.isLiveProgEnabled ||
+        liveProgCode != other.liveProgCode ||
+        liveProgStatus != other.liveProgStatus ||
         hasOemAudio != other.hasOemAudio ||
         listContentDiffers(detectedOemEngines, other.detectedOemEngines) ||
         activeQueueSlot != other.activeQueueSlot ||
@@ -214,6 +232,9 @@ abstract class PlayerState with _$PlayerState {
       isLoudnessContourEnabled ||
       isSubCrossoverEnabled ||
       isDynamicEqEnabled ||
+      isViperDdcEnabled ||
+      isArbitraryEqEnabled ||
+      isLiveProgEnabled ||
       volumeBoost > 0.01;
 
   int get activeDspStagesCount {
@@ -231,6 +252,9 @@ abstract class PlayerState with _$PlayerState {
     if (isLoudnessContourEnabled) count++;
     if (isSubCrossoverEnabled) count++;
     if (isDynamicEqEnabled) count++;
+    if (isViperDdcEnabled) count++;
+    if (isArbitraryEqEnabled) count++;
+    if (isLiveProgEnabled) count++;
     if (volumeBoost > 0.01) count++;
     return count;
   }

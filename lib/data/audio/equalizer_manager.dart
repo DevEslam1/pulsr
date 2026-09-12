@@ -106,6 +106,7 @@ class EqualizerManager {
   bool isCrossfeedEnabled = false;
   double crossfeedDelayUs = 350.0; // 200 - 700 us
   double crossfeedFeedDb = -9.0; // -15 to -6 dB
+  int crossfeedMode = 0; // 0=Bs2bDefault, 1=Bs2bChuMoy, 2=Bs2bJanMeier, 3=Custom
 
   bool isLimiterEnabled = false;
   double limiterThresholdDb = -0.2;
@@ -144,6 +145,7 @@ class EqualizerManager {
   double saturationMix = 0.5; // 0.0 - 1.0 wet/dry
   double saturationTilt = 0.3; // 0.0 - 1.0 HF pre-emphasis
   int saturationMode = 0; // 0=Tape, 1=Tube, 2=Analog Class-A
+  bool saturationMultiband = false;
 
   bool isStereoWidthEnabled = false;
   double stereoWidth = 1.0; // 0.0 mono … 1.0 normal … 2.0 widened
@@ -190,6 +192,19 @@ class EqualizerManager {
   double dynamicBassSideGainLow = 0.10;
   double dynamicBassSideGainHigh = 0.50;
   int dynamicBassPreset = 0;
+
+  // ViPER-DDC
+  bool isViperDdcEnabled = false;
+  String viperDdcProfileName = '';
+
+  // Arbitrary Response EQ (EqualizerAPO GraphicEq)
+  bool isArbitraryEqEnabled = false;
+  String arbitraryEqString = '';
+
+  // Live Programmable DSP (EEL script)
+  bool isLiveProgEnabled = false;
+  String liveProgCode = '';
+  final Map<int, double> liveProgSliders = {};
 
   double reverbCrossChannel = 0.0;
 
@@ -399,6 +414,7 @@ class EqualizerManager {
       isCrossfeedEnabled = prefs.getBool(PrefsKeys.crossfeedEnabled) ?? false;
       crossfeedDelayUs = prefs.getDouble(PrefsKeys.crossfeedDelayUs) ?? 350.0;
       crossfeedFeedDb = prefs.getDouble(PrefsKeys.crossfeedFeedDb) ?? -9.0;
+      crossfeedMode = prefs.getInt(PrefsKeys.crossfeedMode) ?? 0;
 
       isLimiterEnabled =
           prefs.getBool(PrefsKeys.lookaheadLimiterEnabled) ?? false;
@@ -468,6 +484,8 @@ class EqualizerManager {
       saturationMix = prefs.getDouble(PrefsKeys.saturationMix) ?? 0.5;
       saturationTilt = prefs.getDouble(PrefsKeys.saturationTilt) ?? 0.3;
       saturationMode = prefs.getInt(PrefsKeys.saturationMode) ?? 0;
+      saturationMultiband =
+          prefs.getBool(PrefsKeys.saturationMultiband) ?? false;
 
       isStereoWidthEnabled =
           prefs.getBool(PrefsKeys.stereoWidthEnabled) ?? false;
@@ -538,6 +556,18 @@ class EqualizerManager {
           prefs.getDouble(PrefsKeys.dynamicBassSideGainHigh) ?? 0.50;
       dynamicBassPreset =
           prefs.getInt(PrefsKeys.dynamicBassPreset) ?? 0;
+      isViperDdcEnabled =
+          prefs.getBool(PrefsKeys.viperDdcEnabled) ?? false;
+      viperDdcProfileName =
+          prefs.getString(PrefsKeys.viperDdcProfileName) ?? '';
+      isArbitraryEqEnabled =
+          prefs.getBool(PrefsKeys.arbitraryEqEnabled) ?? false;
+      arbitraryEqString =
+          prefs.getString(PrefsKeys.arbitraryEqString) ?? '';
+      isLiveProgEnabled =
+          prefs.getBool(PrefsKeys.liveProgEnabled) ?? false;
+      liveProgCode =
+          prefs.getString(PrefsKeys.liveProgCode) ?? '';
       dspPreference = prefs.getString(PrefsKeys.dspPreference) ?? 'native';
       if (dspPreference != 'native' &&
           dspPreference != 'oem' &&
@@ -630,6 +660,7 @@ class EqualizerManager {
         pendingFutures.add(
           _effectsChannel.setCrossfeedParams(crossfeedDelayUs, crossfeedFeedDb),
         );
+        pendingFutures.add(_effectsChannel.setCrossfeedMode(crossfeedMode));
         pendingFutures.add(_effectsChannel.setCrossfeedEnabled(true));
       }
       if (isLimiterEnabled) {
@@ -673,6 +704,9 @@ class EqualizerManager {
             saturationTilt,
             mode: saturationMode,
           ),
+        );
+        pendingFutures.add(
+          _effectsChannel.setSaturationMultiband(saturationMultiband),
         );
         pendingFutures.add(_effectsChannel.setSaturationEnabled(true));
       }
@@ -735,6 +769,17 @@ class EqualizerManager {
             devicePreset: dynamicBassPreset,
           ),
         );
+      }
+      if (isViperDdcEnabled) {
+        pendingFutures.add(_effectsChannel.setViperDdcEnabled(true));
+      }
+      if (isArbitraryEqEnabled && arbitraryEqString.isNotEmpty) {
+        pendingFutures.add(_effectsChannel.loadArbitraryEq(eqString: arbitraryEqString));
+        pendingFutures.add(_effectsChannel.setArbitraryEqEnabled(true));
+      }
+      if (isLiveProgEnabled && liveProgCode.isNotEmpty) {
+        pendingFutures.add(_effectsChannel.loadLiveProgCode(liveProgCode));
+        pendingFutures.add(_effectsChannel.setLiveProgEnabled(true));
       }
       // Dynamics last — it triggers recalculateActiveStages which disables OEM engine; doing it last prevents intermediate dropout
       // Log individual failures so failed effect stages are diagnosable while allowing remaining stages to complete
@@ -808,6 +853,7 @@ class EqualizerManager {
         PrefsKeys.crossfeedEnabled: isCrossfeedEnabled,
         PrefsKeys.crossfeedDelayUs: crossfeedDelayUs,
         PrefsKeys.crossfeedFeedDb: crossfeedFeedDb,
+        PrefsKeys.crossfeedMode: crossfeedMode,
         PrefsKeys.lookaheadLimiterEnabled: isLimiterEnabled,
         PrefsKeys.lookaheadLimiterThresholdDb: limiterThresholdDb,
         PrefsKeys.lookaheadLimiterReleaseMs: limiterReleaseMs,
@@ -830,6 +876,7 @@ class EqualizerManager {
         PrefsKeys.saturationMix: saturationMix,
         PrefsKeys.saturationTilt: saturationTilt,
         PrefsKeys.saturationMode: saturationMode,
+        PrefsKeys.saturationMultiband: saturationMultiband,
         PrefsKeys.stereoWidthEnabled: isStereoWidthEnabled,
         PrefsKeys.stereoWidth: stereoWidth,
         PrefsKeys.stereoWidthMultiband: stereoWidthMultiband,
@@ -867,6 +914,12 @@ class EqualizerManager {
         PrefsKeys.dynamicBassSideGainLow: dynamicBassSideGainLow,
         PrefsKeys.dynamicBassSideGainHigh: dynamicBassSideGainHigh,
         PrefsKeys.dynamicBassPreset: dynamicBassPreset,
+        PrefsKeys.viperDdcEnabled: isViperDdcEnabled,
+        PrefsKeys.viperDdcProfileName: viperDdcProfileName,
+        PrefsKeys.arbitraryEqEnabled: isArbitraryEqEnabled,
+        PrefsKeys.arbitraryEqString: arbitraryEqString,
+        PrefsKeys.liveProgEnabled: isLiveProgEnabled,
+        PrefsKeys.liveProgCode: liveProgCode,
         PrefsKeys.dspPreference: dspPreference,
         PrefsKeys.ditherEnabled: isDitherEnabled,
         PrefsKeys.ditherTargetBitDepth: ditherTargetBitDepth,
@@ -1531,16 +1584,28 @@ class EqualizerManager {
     bool enabled, {
     double? delayUs,
     double? feedDb,
+    int? mode,
   }) async {
     isCrossfeedEnabled = enabled;
     if (delayUs != null) crossfeedDelayUs = delayUs;
     if (feedDb != null) crossfeedFeedDb = feedDb;
+    if (mode != null) crossfeedMode = mode.clamp(0, 3);
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setCrossfeedParams(
         crossfeedDelayUs,
         crossfeedFeedDb,
       );
+      await _effectsChannel.setCrossfeedMode(crossfeedMode);
       await _effectsChannel.setCrossfeedEnabled(enabled);
+    }
+    _debouncedSavePreferences();
+    _syncPipeline();
+  }
+
+  Future<void> setCrossfeedMode(int mode) async {
+    crossfeedMode = mode.clamp(0, 3);
+    if (PlatformCapabilities.isAndroid) {
+      await _effectsChannel.setCrossfeedMode(crossfeedMode);
     }
     _debouncedSavePreferences();
     _syncPipeline();
@@ -1683,12 +1748,15 @@ class EqualizerManager {
   bool _savedDynamicEqEnabled = false;
   bool _savedDynamicsEnabled = false;
   bool _savedLimiterEnabled = false;
+  bool _savedViperDdcEnabled = false;
+  bool _savedArbitraryEqEnabled = false;
+  bool _savedLiveProgEnabled = false;
 
   bool get isDegradedForPower => _isDegradedForPower;
 
   /// Temporarily disables heavy DSP stages (reverb, crossfeed, saturation,
-  /// stereo width, loudness contour, sub crossover, dynamic eq, dynamics, limiter)
-  /// to conserve battery while preserving the core equalizer.
+  /// stereo width, loudness contour, sub crossover, dynamic eq, dynamics, limiter,
+  /// viper ddc, arbitrary eq, live prog) to conserve battery while preserving the core equalizer.
   Future<void> degradeToEssentials() async {
     if (_isDegradedForPower) return;
     _isDegradedForPower = true;
@@ -1701,6 +1769,9 @@ class EqualizerManager {
     _savedDynamicEqEnabled = isDynamicEqEnabled;
     _savedDynamicsEnabled = isDynamicsEnabled;
     _savedLimiterEnabled = isLimiterEnabled;
+    _savedViperDdcEnabled = isViperDdcEnabled;
+    _savedArbitraryEqEnabled = isArbitraryEqEnabled;
+    _savedLiveProgEnabled = isLiveProgEnabled;
 
     if (_savedReverbEnabled) await setReverb(false);
     if (_savedCrossfeedEnabled) await setCrossfeed(false);
@@ -1713,6 +1784,9 @@ class EqualizerManager {
       await setDynamicsPreset(dynamicsPreset, enabled: false);
     }
     if (_savedLimiterEnabled) await setLookaheadLimiter(false);
+    if (_savedViperDdcEnabled) await setViperDdc(false);
+    if (_savedArbitraryEqEnabled) await setArbitraryEq(false);
+    if (_savedLiveProgEnabled) await setLiveProg(false);
     _syncPipeline();
   }
 
@@ -1732,6 +1806,9 @@ class EqualizerManager {
       await setDynamicsPreset(dynamicsPreset, enabled: true);
     }
     if (_savedLimiterEnabled) await setLookaheadLimiter(true);
+    if (_savedViperDdcEnabled) await setViperDdc(true);
+    if (_savedArbitraryEqEnabled) await setArbitraryEq(true);
+    if (_savedLiveProgEnabled) await setLiveProg(true);
     _syncPipeline();
   }
 
@@ -1743,12 +1820,14 @@ class EqualizerManager {
     double? mix,
     double? tilt,
     int? mode,
+    bool? multiband,
   }) async {
     isSaturationEnabled = enabled;
     if (drive != null) saturationDrive = drive.clamp(0.0, 1.0);
     if (mix != null) saturationMix = mix.clamp(0.0, 1.0);
     if (tilt != null) saturationTilt = tilt.clamp(0.0, 1.0);
     if (mode != null) saturationMode = mode.clamp(0, 2);
+    if (multiband != null) saturationMultiband = multiband;
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setSaturationParams(
         saturationDrive,
@@ -1756,10 +1835,81 @@ class EqualizerManager {
         saturationTilt,
         mode: saturationMode,
       );
+      await _effectsChannel.setSaturationMultiband(saturationMultiband);
       await _effectsChannel.setSaturationEnabled(enabled);
     }
     _debouncedSavePreferences();
     _syncPipeline();
+  }
+
+  Future<void> setSaturationMultiband(bool multiband) async {
+    saturationMultiband = multiband;
+    if (PlatformCapabilities.isAndroid) {
+      await _effectsChannel.setSaturationMultiband(multiband);
+    }
+    _debouncedSavePreferences();
+    _syncPipeline();
+  }
+
+  // --- JAMESDSP FEATURE PARITY STAGES ---
+
+  Future<void> setViperDdc(
+    bool enabled, {
+    String? profileName,
+    List<double>? coeffs,
+  }) async {
+    isViperDdcEnabled = enabled;
+    if (profileName != null) viperDdcProfileName = profileName;
+    if (PlatformCapabilities.isAndroid) {
+      if (coeffs != null && coeffs.isNotEmpty) {
+        await _effectsChannel.loadViperDdc(
+          ddcContent: coeffs.join(' '),
+          profileName: profileName ?? viperDdcProfileName,
+        );
+      }
+      await _effectsChannel.setViperDdcEnabled(enabled);
+    }
+    _debouncedSavePreferences();
+    _syncPipeline();
+  }
+
+  Future<void> setArbitraryEq(
+    bool enabled, {
+    String? eqString,
+  }) async {
+    isArbitraryEqEnabled = enabled;
+    if (eqString != null) arbitraryEqString = eqString;
+    if (PlatformCapabilities.isAndroid) {
+      if (eqString != null && eqString.isNotEmpty) {
+        await _effectsChannel.loadArbitraryEq(eqString: eqString);
+      }
+      await _effectsChannel.setArbitraryEqEnabled(enabled);
+    }
+    _debouncedSavePreferences();
+    _syncPipeline();
+  }
+
+  Future<void> setLiveProg(
+    bool enabled, {
+    String? code,
+  }) async {
+    isLiveProgEnabled = enabled;
+    if (code != null) liveProgCode = code;
+    if (PlatformCapabilities.isAndroid) {
+      if (code != null && code.isNotEmpty) {
+        await _effectsChannel.loadLiveProgCode(code);
+      }
+      await _effectsChannel.setLiveProgEnabled(enabled);
+    }
+    _debouncedSavePreferences();
+    _syncPipeline();
+  }
+
+  Future<void> setLiveProgSlider(int sliderIndex, double value) async {
+    liveProgSliders[sliderIndex] = value;
+    if (PlatformCapabilities.isAndroid) {
+      await _effectsChannel.setLiveProgSlider(sliderIndex, value);
+    }
   }
 
   Future<void> setStereoWidth(
@@ -2094,6 +2244,8 @@ class EqualizerManager {
   void _syncPipeline() {
     _dspPipeline?.updateState(
       isEqEnabled: isEnabled,
+      isArbitraryEqEnabled: isArbitraryEqEnabled,
+      isViperDdcEnabled: isViperDdcEnabled,
       isDynamicEqEnabled: isDynamicEqEnabled,
       isMultibandCompressorEnabled: isMultibandCompressorEnabled,
       isCrossfeedEnabled: isCrossfeedEnabled,
@@ -2101,6 +2253,7 @@ class EqualizerManager {
       stereoBalance: stereoBalance,
       isMonoMix: monoMix,
       isSaturationEnabled: isSaturationEnabled,
+      isLiveProgEnabled: isLiveProgEnabled,
       isStereoWidthEnabled: isStereoWidthEnabled,
       isSubCrossoverEnabled: isSubCrossoverEnabled,
       isDynamicBassEnabled: isDynamicBassEnabled,
@@ -2344,6 +2497,7 @@ class EqualizerManager {
       futures.add(
         _effectsChannel.setCrossfeedParams(crossfeedDelayUs, crossfeedFeedDb),
       );
+      futures.add(_effectsChannel.setCrossfeedMode(crossfeedMode));
       futures.add(_effectsChannel.setCrossfeedEnabled(true));
     }
     if (isLimiterEnabled) {
@@ -2387,6 +2541,9 @@ class EqualizerManager {
           saturationTilt,
           mode: saturationMode,
         ),
+      );
+      futures.add(
+        _effectsChannel.setSaturationMultiband(saturationMultiband),
       );
       futures.add(_effectsChannel.setSaturationEnabled(true));
     }
@@ -2449,6 +2606,17 @@ class EqualizerManager {
           devicePreset: dynamicBassPreset,
         ),
       );
+    }
+    if (isViperDdcEnabled) {
+      futures.add(_effectsChannel.setViperDdcEnabled(true));
+    }
+    if (isArbitraryEqEnabled && arbitraryEqString.isNotEmpty) {
+      futures.add(_effectsChannel.loadArbitraryEq(eqString: arbitraryEqString));
+      futures.add(_effectsChannel.setArbitraryEqEnabled(true));
+    }
+    if (isLiveProgEnabled && liveProgCode.isNotEmpty) {
+      futures.add(_effectsChannel.loadLiveProgCode(liveProgCode));
+      futures.add(_effectsChannel.setLiveProgEnabled(true));
     }
 
     // Partial-failure tolerance: one failing effect must not abort the rest.

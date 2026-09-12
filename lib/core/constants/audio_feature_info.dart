@@ -278,6 +278,33 @@ class AudioFeatureRegistry {
         'Modeled on ViPER4Android’s famous Dynamic System. Restores physical weight and tactile punch for headphones by dynamically expanding quiet bass passages and soft-saturating loud peaks. Features Mid-Side sub-bass extraction, psychoacoustic harmonic synthesis, and 9 classic headphone device calibration presets. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
   );
+
+  static const viperDdc = AudioFeatureInfo(
+    id: 'viperDdc',
+    title: 'ViPER-DDC (Digital Dynamic Correction)',
+    subtitle: 'Hardware headphone timbre & frequency linearization',
+    description:
+        'Loads authentic ViPER-DDC (.vdc) correction profiles. Implements high-order Second-Order Sections (SOS) Direct Form II stereo filtering with real-time sample rate adaptation (44.1 kHz / 48 kHz). Precisely neutralizes earphone-specific resonances. Disabled during Bit-Perfect.',
+    conflictsWith: 'Bit-Perfect bypass',
+  );
+
+  static const arbitraryEq = AudioFeatureInfo(
+    id: 'arbitraryEq',
+    title: 'Arbitrary Response EQ (GraphicEq)',
+    subtitle: 'EqualizerAPO graphic response curve parser & 512-tap FIR filter',
+    description:
+        'Parses standard EqualizerAPO "GraphicEq: <freq> <gain>; ..." curve specifications. Computes log-frequency interpolated frequency response and synthesizes a minimum-latency 512-tap windowed FIR impulse response for exact acoustic matching. Disabled during Bit-Perfect.',
+    conflictsWith: 'Bit-Perfect bypass',
+  );
+
+  static const liveProg = AudioFeatureInfo(
+    id: 'liveProg',
+    title: 'Live Programmable DSP (EEL Scripting)',
+    subtitle: 'Real-time custom audio DSP bytecode VM',
+    description:
+        'Write custom audio DSP algorithms in Jesusonic / EEL scripting syntax right on your phone. Code compiles directly to safe, zero-latency bytecode executed per-sample inside the high-priority native audio thread. Supports @init, @sample, sliders 1..8, and comprehensive transcendental math functions. Disabled during Bit-Perfect.',
+    conflictsWith: 'Bit-Perfect bypass',
+  );
 }
 
 /// Pure-logic conflict checker. Returns null if allowed, otherwise a human reason why the action must be blocked.

@@ -33,6 +33,9 @@ add_library(pulsr_dsp SHARED
     DynamicEQ.cpp
     MultibandCompressor.cpp
     DynamicBass.cpp
+    ViperDdc.cpp
+    ArbitraryResponseEq.cpp
+    LiveProg.cpp
     AudioDspEngine.cpp
     eq_jni_bridge.cpp
     AAudioSink.cpp

@@ -3,12 +3,15 @@
 /// Supported stages in the DSP audio processing chain.
 enum DspStage {
   parametricEq('Parametric EQ', 0.1),
+  arbitraryEq('Arbitrary Response EQ', 0.2),
+  viperDdc('ViPER-DDC', 0.05),
   dynamicEq('Dynamic EQ', 0.0),
   multibandCompressor('Multiband Compressor', 0.1),
   crossfeed('Crossfeed', 0.05),
   convolutionReverb('Convolution Reverb', 0.3),
   stereoPanner('Stereo Balance / Mono Mix', 0.02),
   harmonicSaturation('Harmonic Saturation', 0.0),
+  liveProg('Live Programmable DSP', 0.1),
   stereoWidth('Stereo Width', 0.0),
   subCrossover('Sub Crossover (Bass Redirection)', 0.0),
   dynamicBass('Dynamic Bass', 0.0),
@@ -24,6 +27,8 @@ enum DspStage {
 /// DSP pipeline coordinator for optimal stage ordering and zero-cost stage skipping.
 class OptimizedDspPipeline {
   bool eqEnabled = false;
+  bool arbitraryEqEnabled = false;
+  bool viperDdcEnabled = false;
   bool dynamicEqEnabled = false;
   bool multibandCompressorEnabled = false;
   bool crossfeedEnabled = false;
@@ -31,6 +36,7 @@ class OptimizedDspPipeline {
   double balance = 0.0;
   bool monoMix = false;
   bool saturationEnabled = false;
+  bool liveProgEnabled = false;
   bool stereoWidthEnabled = false;
   bool subCrossoverEnabled = false;
   bool dynamicBassEnabled = false;
@@ -44,25 +50,32 @@ class OptimizedDspPipeline {
 
   /// Pipeline execution order optimized for minimal latency and acoustic correctness:
   /// 1. Parametric EQ (10-32 bands)
-  /// 2. Dynamic EQ (energy-dependent cuts, adjacent to the static EQ)
-  /// 3. Multiband Compressor (4-band LR4 dynamics)
-  /// 4. Crossfeed (headphone acoustic cross-coupling)
-  /// 5. Convolution Reverb (spatial room impulse response)
-  /// 6. Stereo Balance / Mono Mix
-  /// 7. Harmonic Saturation (after tonal/spatial shaping, before peak control)
-  /// 8. Stereo Width (M/S, after crossfeed/reverb, before the limiter)
-  /// 9. Sub Crossover (bass redirection sum, after width, before the limiter)
-  /// 10. Lookahead Limiter (brickwall peak protection)
-  /// 11. Loudness Contour (computed against the current volume-stage value)
-  /// 12. Volume (ReplayGain + user master volume)
+  /// 2. Arbitrary Response EQ (EqualizerAPO GraphicEq)
+  /// 3. ViPER-DDC
+  /// 4. Dynamic EQ (energy-dependent cuts, adjacent to the static EQ)
+  /// 5. Multiband Compressor (4-band LR4 dynamics)
+  /// 6. Crossfeed (headphone acoustic cross-coupling / BS2B)
+  /// 7. Convolution Reverb (spatial room impulse response)
+  /// 8. Stereo Balance / Mono Mix
+  /// 9. Harmonic Saturation (multiband warmth option)
+  /// 10. Live Programmable DSP (EEL script)
+  /// 11. Stereo Width (M/S, after crossfeed/reverb, before the limiter)
+  /// 12. Sub Crossover (bass redirection sum, after width, before the limiter)
+  /// 13. Dynamic Bass
+  /// 14. Lookahead Limiter (brickwall peak protection)
+  /// 15. Loudness Contour (computed against the current volume-stage value)
+  /// 16. Volume (ReplayGain + user master volume)
   static const List<DspStage> pipelineOrder = [
     DspStage.parametricEq,
+    DspStage.arbitraryEq,
+    DspStage.viperDdc,
     DspStage.dynamicEq,
     DspStage.multibandCompressor,
     DspStage.crossfeed,
     DspStage.convolutionReverb,
     DspStage.stereoPanner,
     DspStage.harmonicSaturation,
+    DspStage.liveProg,
     DspStage.stereoWidth,
     DspStage.subCrossover,
     DspStage.dynamicBass,
@@ -77,6 +90,10 @@ class OptimizedDspPipeline {
       switch (stage) {
         case DspStage.parametricEq:
           return eqEnabled;
+        case DspStage.arbitraryEq:
+          return arbitraryEqEnabled;
+        case DspStage.viperDdc:
+          return viperDdcEnabled;
         case DspStage.dynamicEq:
           return dynamicEqEnabled;
         case DspStage.multibandCompressor:
@@ -89,6 +106,8 @@ class OptimizedDspPipeline {
           return balance.abs() > 0.001 || monoMix;
         case DspStage.harmonicSaturation:
           return saturationEnabled;
+        case DspStage.liveProg:
+          return liveProgEnabled;
         case DspStage.stereoWidth:
           return stereoWidthEnabled;
         case DspStage.subCrossover:
@@ -137,6 +156,8 @@ class OptimizedDspPipeline {
   /// Updates pipeline state from active settings.
   void updateState({
     bool? isEqEnabled,
+    bool? isArbitraryEqEnabled,
+    bool? isViperDdcEnabled,
     bool? isDynamicEqEnabled,
     bool? isMultibandCompressorEnabled,
     bool? isCrossfeedEnabled,
@@ -144,6 +165,7 @@ class OptimizedDspPipeline {
     double? stereoBalance,
     bool? isMonoMix,
     bool? isSaturationEnabled,
+    bool? isLiveProgEnabled,
     bool? isStereoWidthEnabled,
     bool? isSubCrossoverEnabled,
     bool? isDynamicBassEnabled,
@@ -152,6 +174,8 @@ class OptimizedDspPipeline {
     bool? bitPerfectBypass,
   }) {
     if (isEqEnabled != null) eqEnabled = isEqEnabled;
+    if (isArbitraryEqEnabled != null) arbitraryEqEnabled = isArbitraryEqEnabled;
+    if (isViperDdcEnabled != null) viperDdcEnabled = isViperDdcEnabled;
     if (isDynamicEqEnabled != null) dynamicEqEnabled = isDynamicEqEnabled;
     if (isMultibandCompressorEnabled != null) {
       multibandCompressorEnabled = isMultibandCompressorEnabled;
@@ -161,6 +185,7 @@ class OptimizedDspPipeline {
     if (stereoBalance != null) balance = stereoBalance;
     if (isMonoMix != null) monoMix = isMonoMix;
     if (isSaturationEnabled != null) saturationEnabled = isSaturationEnabled;
+    if (isLiveProgEnabled != null) liveProgEnabled = isLiveProgEnabled;
     if (isStereoWidthEnabled != null) stereoWidthEnabled = isStereoWidthEnabled;
     if (isSubCrossoverEnabled != null) subCrossoverEnabled = isSubCrossoverEnabled;
     if (isDynamicBassEnabled != null) dynamicBassEnabled = isDynamicBassEnabled;

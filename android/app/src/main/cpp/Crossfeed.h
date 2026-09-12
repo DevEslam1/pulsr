@@ -16,6 +16,8 @@ public:
     Crossfeed();
     void setSampleRate(double sampleRate);
     void configure(double delayUs, double feedDb, double fcut = 650.0);
+    void setMode(CrossfeedMode mode);
+    CrossfeedMode getMode() const { return mode_; }
     void setEnabled(bool enabled);
     bool isEnabled() const { return enabled_; }
     void applyParams(const CrossfeedParamSet& params);
@@ -29,7 +31,10 @@ public:
     void processInterleaved(float* buffer, int frames);
 
 private:
+    void initBs2b(double fcut, double feedDb);
+
     double sampleRate_ = 48000.0;
+    CrossfeedMode mode_ = CrossfeedMode::Bs2bDefault;
     double delayUs_ = 350.0;
     double feedDb_ = -9.0;
     double fcut_ = 650.0;
@@ -43,9 +48,21 @@ private:
     float smoothedLpCoeff_ = 0.087f;
     bool enabled_ = false;
 
+    // Delay-line states (for Custom delay-line mode)
     float delayBufferL_[MAX_DELAY_SAMPLES] = {};
     float delayBufferR_[MAX_DELAY_SAMPLES] = {};
     int writeIdx_ = 0;
     float lpL_ = 0.0f;
     float lpR_ = 0.0f;
+
+    // Authentic BS2B IIR Filter coefficients & states (JamesDSP / Bauer stereophonic-to-binaural)
+    double bs2b_a0_lo_ = 0.0;
+    double bs2b_b1_lo_ = 0.0;
+    double bs2b_a0_hi_ = 0.0;
+    double bs2b_a1_hi_ = 0.0;
+    double bs2b_b1_hi_ = 0.0;
+    double bs2b_gain_ = 1.0;
+    double bs2b_lo_[2] = {0.0, 0.0};
+    double bs2b_hi_[2] = {0.0, 0.0};
+    double bs2b_asis_[2] = {0.0, 0.0};
 };

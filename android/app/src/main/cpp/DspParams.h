@@ -36,7 +36,15 @@ struct EqParamSet {
     bool enabled = true;
 };
 
+enum class CrossfeedMode {
+    Bs2bDefault = 0,   // 700 Hz, 4.5 dB
+    Bs2bChuMoy = 1,    // 700 Hz, 6.0 dB
+    Bs2bJanMeier = 2,  // 650 Hz, 9.5 dB
+    Custom = 3         // User-configured fcut, feedDb, delayUs
+};
+
 struct CrossfeedParamSet {
+    CrossfeedMode mode = CrossfeedMode::Bs2bDefault;
     double delayUs = 350.0;
     double feedDb = -9.0;
     double fcut = 650.0;
@@ -112,6 +120,7 @@ struct SaturationParamSet {
     double mix = 0.5;   // 0..1 wet/dry blend
     double tilt = 0.0;  // 0..1 HF pre-emphasis into the shaper (tape-style)
     int mode = 0;       // 0 = Tape (odd harmonics), 1 = Tube (even+odd triode), 2 = Analog (Class-A)
+    bool multiband = false; // true = 6-band crossover mid-band warmth mode (JamesDSP)
     bool enabled = false;
 };
 
@@ -226,6 +235,27 @@ struct BitPerfectParamSet {
     bool isDop = false;
 };
 
+struct ViperDdcParamSet {
+    bool enabled = false;
+    std::string ddcContent; // Raw .vdc format text
+    std::string profileName;
+};
+
+struct ArbitraryEqParamSet {
+    bool enabled = false;
+    std::string graphicEqString; // GraphicEq: 20 0; 100 2; ...
+    bool linearPhase = false;
+};
+
+struct LiveProgParamSet {
+    bool enabled = false;
+    std::string code; // EEL script with @init and @sample
+    double slider1 = 0.0;
+    double slider2 = 0.0;
+    double slider3 = 0.0;
+    double slider4 = 0.0;
+};
+
 struct DspParamSnapshot {
     uint64_t generation = 0;
     double sampleRate = 48000.0;
@@ -247,4 +277,7 @@ struct DspParamSnapshot {
     ReplayGainParamSet replayGain;
     DitherParamSet dither;
     BitPerfectParamSet bitPerfect;
+    ViperDdcParamSet viperDdc;
+    ArbitraryEqParamSet arbitraryEq;
+    LiveProgParamSet liveProg;
 };

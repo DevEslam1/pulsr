@@ -1644,4 +1644,168 @@ class AudioEffectsChannel {
       return null;
     }
   }
+
+  // --- BS2B CROSSFEED MODE ---
+  Future<void> setCrossfeedMode(int mode) async {
+    if (!_isAndroid) return;
+    try {
+      await _channel
+          .invokeMethod('setCrossfeedMode', {'mode': mode})
+          .timeout(const Duration(seconds: 3));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set crossfeed mode ($mode)',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+    }
+  }
+
+  // --- MULTIBAND SATURATION ---
+  Future<void> setSaturationMultiband(bool multiband) async {
+    if (!_isAndroid) return;
+    try {
+      await _channel
+          .invokeMethod('setSaturationMultiband', {'multiband': multiband})
+          .timeout(const Duration(seconds: 3));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set saturation multiband ($multiband)',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+    }
+  }
+
+  // --- VIPER-DDC ---
+  Future<void> setViperDdcEnabled(bool enabled) async {
+    if (!_isAndroid) return;
+    try {
+      await _channel
+          .invokeMethod('setViperDdcEnabled', {'enabled': enabled})
+          .timeout(const Duration(seconds: 3));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set ViPER-DDC enabled ($enabled)',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+    }
+  }
+
+  Future<bool> loadViperDdc({
+    required String ddcContent,
+    required String profileName,
+  }) async {
+    if (!_isAndroid) return false;
+    try {
+      final bool? ok = await _channel.invokeMethod<bool>('loadViperDdc', {
+        'ddcContent': ddcContent,
+        'profileName': profileName,
+      });
+      return ok ?? false;
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to load ViPER-DDC ($profileName)',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return false;
+    }
+  }
+
+  // --- ARBITRARY RESPONSE EQUALIZER ---
+  Future<void> setArbitraryEqEnabled(bool enabled) async {
+    if (!_isAndroid) return;
+    try {
+      await _channel
+          .invokeMethod('setArbitraryEqEnabled', {'enabled': enabled})
+          .timeout(const Duration(seconds: 3));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set Arbitrary EQ enabled ($enabled)',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+    }
+  }
+
+  Future<bool> loadArbitraryEq({
+    required String eqString,
+    bool linearPhase = false,
+  }) async {
+    if (!_isAndroid) return false;
+    try {
+      final bool? ok = await _channel.invokeMethod<bool>('loadArbitraryEq', {
+        'eqString': eqString,
+        'linearPhase': linearPhase,
+      });
+      return ok ?? false;
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to load Arbitrary EQ',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return false;
+    }
+  }
+
+  // --- LIVE PROGRAMMABLE DSP ---
+  Future<void> setLiveProgEnabled(bool enabled) async {
+    if (!_isAndroid) return;
+    try {
+      await _channel
+          .invokeMethod('setLiveProgEnabled', {'enabled': enabled})
+          .timeout(const Duration(seconds: 3));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set LiveProg enabled ($enabled)',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+    }
+  }
+
+  Future<String> loadLiveProgCode(String code) async {
+    if (!_isAndroid) return 'Unsupported platform';
+    try {
+      final String? status = await _channel.invokeMethod<String>(
+        'loadLiveProgCode',
+        {'code': code},
+      );
+      return status ?? 'OK';
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to load LiveProg code',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return e.toString();
+    }
+  }
+
+  Future<void> setLiveProgSlider(int index, double value) async {
+    if (!_isAndroid) return;
+    try {
+      await _channel
+          .invokeMethod('setLiveProgSlider', {'index': index, 'value': value})
+          .timeout(const Duration(seconds: 2));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set LiveProg slider $index',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+    }
+  }
 }

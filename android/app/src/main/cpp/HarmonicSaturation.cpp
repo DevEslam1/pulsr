@@ -28,11 +28,12 @@ void HarmonicSaturation::setSampleRate(double sampleRate) {
     configure(drive_, mix_, tilt_, mode_);
 }
 
-void HarmonicSaturation::configure(double drive, double mix, double tilt, int mode) {
+void HarmonicSaturation::configure(double drive, double mix, double tilt, int mode, bool multiband) {
     drive_ = std::clamp(drive, 0.0, 1.0);
     mix_ = std::clamp(mix, 0.0, 1.0);
     tilt_ = std::clamp(tilt, 0.0, 1.0);
     mode_ = std::clamp(mode, 0, 2);
+    multiband_ = multiband;
     k_ = drive_ * kMaxDrive;
 
     const double fc = kTiltHpHz / (sampleRate_ * OVERSAMPLE_FACTOR);
@@ -41,7 +42,7 @@ void HarmonicSaturation::configure(double drive, double mix, double tilt, int mo
 
 void HarmonicSaturation::applyParams(const SaturationParamSet& params) {
     enabled_ = params.enabled;
-    configure(params.drive, params.mix, params.tilt, params.mode);
+    configure(params.drive, params.mix, params.tilt, params.mode, params.multiband);
 }
 
 void HarmonicSaturation::reset() {

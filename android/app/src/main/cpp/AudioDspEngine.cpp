@@ -166,6 +166,9 @@ void AudioDspEngine::resetInternal() {
     dynamicEq_.reset();
     multibandCompressor_.reset();
     dynamicBass_.reset();
+    viperDdc_.reset();
+    arbitraryEq_.reset();
+    liveProg_.reset();
 }
 
 void AudioDspEngine::reset() {
@@ -206,6 +209,9 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
             dynamicEq_.setSampleRate(sr);
             multibandCompressor_.setSampleRate(sr);
             dynamicBass_.prepare(sr);
+            viperDdc_.setSampleRate(sr);
+            arbitraryEq_.setSampleRate(sr);
+            liveProg_.setSampleRate(sr);
         }
 
         eq_.applyParams(snapshot->eq);
@@ -230,6 +236,9 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
             snapshot->dynamicBass.sideGainHigh,
             snapshot->dynamicBass.devicePreset
         );
+        viperDdc_.applyParams(snapshot->viperDdc);
+        arbitraryEq_.applyParams(snapshot->arbitraryEq);
+        liveProg_.applyParams(snapshot->liveProg);
 
         lastAppliedGeneration_.store(snapshot->generation);
     }
@@ -312,6 +321,16 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
             eq_.processInterleaved(buffer, frames, channels);
         }
 
+        // 1b. Arbitrary Response EQ (EqualizerAPO GraphicEq)
+        if ((stages & STAGE_ARBITRARY_EQ) && snapshot->arbitraryEq.enabled) {
+            arbitraryEq_.processInterleaved(buffer, frames, channels);
+        }
+
+        // 1c. ViPER-DDC (Digital Dynamic Correction)
+        if ((stages & STAGE_VIPER_DDC) && snapshot->viperDdc.enabled) {
+            viperDdc_.processInterleaved(buffer, frames, channels);
+        }
+
         // 2. Dynamic EQ Stage — adjacent to the parametric EQ so band energy
         //    is detected on the tonally-shaped (but not yet spatialized) signal
         if (stages & STAGE_DYNEQ) {
@@ -341,6 +360,11 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         // 6. Harmonic Saturation / Exciter Stage — 4x oversampled with anti-aliasing
         if (stages & STAGE_SATURATION) {
             saturation_.processInterleaved(buffer, frames, channels);
+        }
+
+        // 6b. Live Programmable DSP Stage
+        if ((stages & STAGE_LIVE_PROG) && snapshot->liveProg.enabled) {
+            liveProg_.processInterleaved(buffer, frames, channels);
         }
 
         // 7. Stereo Width Stage (M/S, stereo only) — after crossfeed/reverb so

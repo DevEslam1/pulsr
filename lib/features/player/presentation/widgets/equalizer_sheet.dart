@@ -23,6 +23,10 @@ import 'eq_curve_visualizer.dart';
 import 'autoeq_search_sheet.dart';
 import 'compressor_limiter_sheet.dart';
 import 'dsp_inspector_sheet.dart';
+import 'viper_ddc_sheet.dart';
+import 'arbitrary_eq_sheet.dart';
+import 'live_prog_sheet.dart';
+import 'audio_quality_sheet.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../settings/cubit/settings_cubit.dart';
@@ -79,6 +83,14 @@ bool dspSheetRebuildGate(PlayerState a, PlayerState b) {
       a.subCrossoverGain != b.subCrossoverGain ||
       a.isDynamicEqEnabled != b.isDynamicEqEnabled ||
       listContentDiffers(a.dynamicEqBands, b.dynamicEqBands) ||
+      a.crossfeedMode != b.crossfeedMode ||
+      a.saturationMultiband != b.saturationMultiband ||
+      a.isViperDdcEnabled != b.isViperDdcEnabled ||
+      a.viperDdcProfileName != b.viperDdcProfileName ||
+      a.isArbitraryEqEnabled != b.isArbitraryEqEnabled ||
+      a.arbitraryEqString != b.arbitraryEqString ||
+      a.isLiveProgEnabled != b.isLiveProgEnabled ||
+      a.liveProgCode != b.liveProgCode ||
       a.errorMessage != b.errorMessage;
 }
 
@@ -1303,7 +1315,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           ],
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 6),
+
+                      // Top Hardware Device Profile Bar (JamesDSP parity)
+                      _buildHardwareDeviceProfileBar(context, cubit, state, p),
+                      const SizedBox(height: 8),
 
                       // Tabs Navigation
                       Padding(
@@ -1617,6 +1633,129 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   onPressed: dspBlocked != null
                       ? null
                       : () => _showRoomCorrectionActions(cubit),
+                ),
+                const SizedBox(width: 8),
+
+                // ViPER-DDC
+                ActionChip(
+                  avatar: Icon(Icons.headphones_rounded,
+                      size: 14,
+                      color: state.isViperDdcEnabled ? p.accent : p.textSecondary),
+                  label: Text(
+                    state.isViperDdcEnabled && state.viperDdcProfileName.isNotEmpty
+                        ? 'DDC: ${state.viperDdcProfileName}'
+                        : 'ViPER-DDC',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: state.isViperDdcEnabled ? p.accent : p.textPrimary,
+                    ),
+                  ),
+                  backgroundColor: state.isViperDdcEnabled
+                      ? p.accent.withValues(alpha: 0.15)
+                      : p.surfaceContainer,
+                  side: BorderSide(
+                    color: state.isViperDdcEnabled ? p.accent : p.hairline,
+                  ),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  onPressed: () {
+                    showModalBottomSheet<void>(
+                      context: context,
+                      useRootNavigator: true,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => const ViperDdcSheet(),
+                    );
+                  },
+                ),
+                const SizedBox(width: 8),
+
+                // Arbitrary Response EQ
+                ActionChip(
+                  avatar: Icon(Icons.auto_graph_rounded,
+                      size: 14,
+                      color: state.isArbitraryEqEnabled ? p.accent : p.textSecondary),
+                  label: Text(
+                    'Arbitrary EQ',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: state.isArbitraryEqEnabled ? p.accent : p.textPrimary,
+                    ),
+                  ),
+                  backgroundColor: state.isArbitraryEqEnabled
+                      ? p.accent.withValues(alpha: 0.15)
+                      : p.surfaceContainer,
+                  side: BorderSide(
+                    color: state.isArbitraryEqEnabled ? p.accent : p.hairline,
+                  ),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  onPressed: () {
+                    showModalBottomSheet<void>(
+                      context: context,
+                      useRootNavigator: true,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => const ArbitraryEqSheet(),
+                    );
+                  },
+                ),
+                const SizedBox(width: 8),
+
+                // Live Programmable DSP
+                ActionChip(
+                  avatar: Icon(Icons.terminal_rounded,
+                      size: 14,
+                      color: state.isLiveProgEnabled ? p.accent : p.textSecondary),
+                  label: Text(
+                    'LiveProg DSP',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: state.isLiveProgEnabled ? p.accent : p.textPrimary,
+                    ),
+                  ),
+                  backgroundColor: state.isLiveProgEnabled
+                      ? p.accent.withValues(alpha: 0.15)
+                      : p.surfaceContainer,
+                  side: BorderSide(
+                    color: state.isLiveProgEnabled ? p.accent : p.hairline,
+                  ),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  onPressed: () {
+                    showModalBottomSheet<void>(
+                      context: context,
+                      useRootNavigator: true,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => const LiveProgSheet(),
+                    );
+                  },
+                ),
+                const SizedBox(width: 8),
+
+                // DSP Inspector
+                ActionChip(
+                  avatar: Icon(Icons.insights_rounded, size: 14, color: p.accent),
+                  label: const Text('DSP Chain',
+                      style:
+                          TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  backgroundColor: p.surfaceContainer,
+                  side: BorderSide(color: p.hairline),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  onPressed: () {
+                    showModalBottomSheet<void>(
+                      context: context,
+                      useRootNavigator: true,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => const DspInspectorSheet(),
+                    );
+                  },
                 ),
               ],
             ),
@@ -3345,119 +3484,220 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 if (dspBlocked != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Blocked by Bit-Perfect', style: TextStyle(color: p.error, fontSize: 10, fontWeight: FontWeight.w600))),
                 if (dspBlocked == null && _nativePcmEffectsAvailable && state.isCrossfeedEnabled) ...[
                   const SizedBox(height: 14),
-                  // Delay slider
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  // BS2B Preset Selector Chips
+                  Text(
+                    'Crossfeed Algorithm',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: p.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
                     children: [
-                      Text('Delay Time',
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: p.textSecondary,
-                              fontWeight: FontWeight.w600)),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '${state.crossfeedDelayUs.round()} µs',
-                            style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: p.accent),
-                          ),
-                          const SizedBox(width: 4),
-                          IconButton(
-                            icon: Icon(Icons.settings_backup_restore,
-                                size: 15,
-                                color: (state.crossfeedDelayUs - 350.0).abs() < 1.0
-                                    ? p.textTertiary.withValues(alpha: 0.35)
-                                    : p.accent),
-                            tooltip: 'Reset to default (350 µs)',
-                            visualDensity: VisualDensity.compact,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(
-                                minWidth: 20, minHeight: 20),
-                            onPressed: (state.crossfeedDelayUs - 350.0).abs() < 1.0
-                                ? null
-                                : () => cubit.setCrossfeed(true, delayUs: 350.0),
-                          ),
-                        ],
+                      ChoiceChip(
+                        label: const Text('Default (700Hz / 4.5dB)'),
+                        selected: state.crossfeedMode == 0,
+                        selectedColor: p.accent.withValues(alpha: 0.22),
+                        backgroundColor: p.surface,
+                        side: BorderSide(
+                          color: state.crossfeedMode == 0 ? p.accent : p.hairline,
+                        ),
+                        labelStyle: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: state.crossfeedMode == 0 ? p.accent : p.textSecondary,
+                        ),
+                        onSelected: (_) => cubit.setCrossfeedMode(0),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Chu Moy (700Hz / 6dB)'),
+                        selected: state.crossfeedMode == 1,
+                        selectedColor: p.accent.withValues(alpha: 0.22),
+                        backgroundColor: p.surface,
+                        side: BorderSide(
+                          color: state.crossfeedMode == 1 ? p.accent : p.hairline,
+                        ),
+                        labelStyle: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: state.crossfeedMode == 1 ? p.accent : p.textSecondary,
+                        ),
+                        onSelected: (_) => cubit.setCrossfeedMode(1),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Jan Meier (650Hz / 9.5dB)'),
+                        selected: state.crossfeedMode == 2,
+                        selectedColor: p.accent.withValues(alpha: 0.22),
+                        backgroundColor: p.surface,
+                        side: BorderSide(
+                          color: state.crossfeedMode == 2 ? p.accent : p.hairline,
+                        ),
+                        labelStyle: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: state.crossfeedMode == 2 ? p.accent : p.textSecondary,
+                        ),
+                        onSelected: (_) => cubit.setCrossfeedMode(2),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Custom Delay-Line'),
+                        selected: state.crossfeedMode == 3,
+                        selectedColor: p.accent.withValues(alpha: 0.22),
+                        backgroundColor: p.surface,
+                        side: BorderSide(
+                          color: state.crossfeedMode == 3 ? p.accent : p.hairline,
+                        ),
+                        labelStyle: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: state.crossfeedMode == 3 ? p.accent : p.textSecondary,
+                        ),
+                        onSelected: (_) => cubit.setCrossfeedMode(3),
                       ),
                     ],
                   ),
-                  SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: 4,
-                      thumbShape:
-                          const RoundSliderThumbShape(enabledThumbRadius: 6),
-                      activeTrackColor: p.accent,
-                      inactiveTrackColor: p.surface,
-                      thumbColor: p.accent,
-                    ),
-                    child: Slider(
-                      value: state.crossfeedDelayUs.clamp(200.0, 700.0),
-                      min: 200.0,
-                      max: 700.0,
-                      divisions: 50,
-                      onChanged: (val) =>
-                          cubit.setCrossfeed(true, delayUs: val),
-                    ),
-                  ),
-                  // Feed Level slider
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Opposite Ear Bleed',
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: p.textSecondary,
-                              fontWeight: FontWeight.w600)),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
+                  if (state.crossfeedMode < 3) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
                         children: [
-                          Text(
-                            '${state.crossfeedFeedDb.toStringAsFixed(1)} dB',
-                            style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: p.accent),
-                          ),
-                          const SizedBox(width: 4),
-                          IconButton(
-                            icon: Icon(Icons.settings_backup_restore,
-                                size: 15,
-                                color: (state.crossfeedFeedDb - (-9.0)).abs() < 0.05
-                                    ? p.textTertiary.withValues(alpha: 0.35)
-                                    : p.accent),
-                            tooltip: 'Reset to default (-9.0 dB)',
-                            visualDensity: VisualDensity.compact,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(
-                                minWidth: 20, minHeight: 20),
-                            onPressed: (state.crossfeedFeedDb - (-9.0)).abs() < 0.05
-                                ? null
-                                : () => cubit.setCrossfeed(true, feedDb: -9.0),
+                          Icon(Icons.auto_awesome_rounded, color: p.accent, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Authentic BS2B IIR crossfeed network (low-pass + high-boost biquads) active.',
+                              style: TextStyle(color: p.textSecondary, fontSize: 11),
+                            ),
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                  SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: 4,
-                      thumbShape:
-                          const RoundSliderThumbShape(enabledThumbRadius: 6),
-                      activeTrackColor: p.accent,
-                      inactiveTrackColor: p.surface,
-                      thumbColor: p.accent,
                     ),
-                    child: Slider(
-                      value: state.crossfeedFeedDb.clamp(-15.0, -6.0),
-                      min: -15.0,
-                      max: -6.0,
-                      divisions: 18,
-                      onChanged: (val) => cubit.setCrossfeed(true, feedDb: val),
+                  ],
+                  if (state.crossfeedMode == 3) ...[
+                    const SizedBox(height: 14),
+                    // Delay slider
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Delay Time',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: p.textSecondary,
+                                fontWeight: FontWeight.w600)),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '${state.crossfeedDelayUs.round()} µs',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: p.accent),
+                            ),
+                            const SizedBox(width: 4),
+                            IconButton(
+                              icon: Icon(Icons.settings_backup_restore,
+                                  size: 15,
+                                  color: (state.crossfeedDelayUs - 350.0).abs() < 1.0
+                                      ? p.textTertiary.withValues(alpha: 0.35)
+                                      : p.accent),
+                              tooltip: 'Reset to default (350 µs)',
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                  minWidth: 20, minHeight: 20),
+                              onPressed: (state.crossfeedDelayUs - 350.0).abs() < 1.0
+                                  ? null
+                                  : () => cubit.setCrossfeed(true, delayUs: 350.0),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ),
+                    SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 4,
+                        thumbShape:
+                            const RoundSliderThumbShape(enabledThumbRadius: 6),
+                        activeTrackColor: p.accent,
+                        inactiveTrackColor: p.surface,
+                        thumbColor: p.accent,
+                      ),
+                      child: Slider(
+                        value: state.crossfeedDelayUs.clamp(200.0, 700.0),
+                        min: 200.0,
+                        max: 700.0,
+                        divisions: 50,
+                        onChanged: (val) =>
+                            cubit.setCrossfeed(true, delayUs: val),
+                      ),
+                    ),
+                    // Feed Level slider
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Opposite Ear Bleed',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: p.textSecondary,
+                                fontWeight: FontWeight.w600)),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '${state.crossfeedFeedDb.toStringAsFixed(1)} dB',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: p.accent),
+                            ),
+                            const SizedBox(width: 4),
+                            IconButton(
+                              icon: Icon(Icons.settings_backup_restore,
+                                  size: 15,
+                                  color: (state.crossfeedFeedDb - (-9.0)).abs() < 0.05
+                                      ? p.textTertiary.withValues(alpha: 0.35)
+                                      : p.accent),
+                              tooltip: 'Reset to default (-9.0 dB)',
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                  minWidth: 20, minHeight: 20),
+                              onPressed: (state.crossfeedFeedDb - (-9.0)).abs() < 0.05
+                                  ? null
+                                  : () => cubit.setCrossfeed(true, feedDb: -9.0),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 4,
+                        thumbShape:
+                            const RoundSliderThumbShape(enabledThumbRadius: 6),
+                        activeTrackColor: p.accent,
+                        inactiveTrackColor: p.surface,
+                        thumbColor: p.accent,
+                      ),
+                      child: Slider(
+                        value: state.crossfeedFeedDb.clamp(-15.0, -6.0),
+                        min: -15.0,
+                        max: -6.0,
+                        divisions: 18,
+                        onChanged: (val) => cubit.setCrossfeed(true, feedDb: val),
+                      ),
+                    ),
+                  ],
                 ],
               ],
             ),
@@ -3986,6 +4226,18 @@ class _EqualizerSheetState extends State<EqualizerSheet>
 
           // 9. Sinc Resampler — previously persisted with no reachable control.
           _buildSincResamplerCard(context, state, cubit, dspBlocked, p),
+          const SizedBox(height: 16),
+
+          // 10. ViPER-DDC Headphone Correction (JamesDSP parity)
+          _buildViperDdcCard(context, state, cubit, dspBlocked, p),
+          const SizedBox(height: 16),
+
+          // 11. Arbitrary Response EQ / GraphicEq (JamesDSP parity)
+          _buildArbitraryEqCard(context, state, cubit, dspBlocked, p),
+          const SizedBox(height: 16),
+
+          // 12. Live Programmable DSP / EEL VM (JamesDSP parity)
+          _buildLiveProgCard(context, state, cubit, dspBlocked, p),
         ],
       ),
     );
@@ -4220,6 +4472,35 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               defaultValue: 0.3,
               divisions: 20,
               onChanged: (val) => cubit.setSaturation(true, tilt: val),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Multiband Warmth',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: p.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      'Restricts saturation to 300Hz–6kHz (clean sub-bass & air)',
+                      style: TextStyle(fontSize: 10, color: p.textTertiary),
+                    ),
+                  ],
+                ),
+                Switch.adaptive(
+                  value: state.saturationMultiband,
+                  activeTrackColor: p.accent,
+                  activeThumbColor: p.onAccent,
+                  onChanged: (val) => cubit.setSaturationMultiband(val),
+                ),
+              ],
             ),
           ],
         ],
@@ -4913,6 +5194,531 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         color: p.textTertiary,
                         fontSize: 10,
                         fontWeight: FontWeight.w600))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHardwareDeviceProfileBar(
+      BuildContext context, PlayerCubit cubit, PlayerState state, PulsrPalette p) {
+    final output = context.watch<SettingsCubit?>()?.state.currentOutputDevice;
+    final devType = output?.activeDeviceType.toLowerCase() ?? '';
+    final devName = (output?.deviceName ?? '').toLowerCase();
+
+    final isUsb = output?.isUsbDac == true || devType == 'usb' || devName.contains('usb');
+    final isBt = output?.isBluetooth == true || devType == 'bluetooth' || devType == 'ble' || devName.contains('bluetooth');
+    final isWired = devType == 'wired' || devName.contains('headphone') || devName.contains('headset');
+    final isSpeaker = (!isUsb && !isBt && !isWired) || devType == 'builtin' || devName.contains('speaker');
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: p.hairline),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildDeviceTypeChip(
+            label: 'Headset',
+            icon: Icons.headphones_rounded,
+            isActive: isWired,
+            p: p,
+            onTap: () {
+              if (state.currentSong != null) {
+                AudioQualitySheet.show(context, state.currentSong!, p.accent);
+              }
+            },
+          ),
+          _buildDeviceTypeChip(
+            label: 'Speaker',
+            icon: Icons.volume_up_rounded,
+            isActive: isSpeaker,
+            p: p,
+            onTap: () {
+              if (state.currentSong != null) {
+                AudioQualitySheet.show(context, state.currentSong!, p.accent);
+              }
+            },
+          ),
+          _buildDeviceTypeChip(
+            label: 'Bluetooth',
+            icon: Icons.bluetooth_audio_rounded,
+            isActive: isBt,
+            p: p,
+            onTap: () {
+              if (state.currentSong != null) {
+                AudioQualitySheet.show(context, state.currentSong!, p.accent);
+              }
+            },
+          ),
+          _buildDeviceTypeChip(
+            label: 'USB DAC',
+            icon: Icons.album_rounded,
+            isActive: isUsb,
+            p: p,
+            onTap: () {
+              if (state.currentSong != null) {
+                AudioQualitySheet.show(context, state.currentSong!, p.accent);
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeviceTypeChip({
+    required String label,
+    required IconData icon,
+    required bool isActive,
+    required PulsrPalette p,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isActive ? p.accent.withValues(alpha: 0.18) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isActive ? p.accent : Colors.transparent,
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: isActive ? p.accent : p.textTertiary,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                color: isActive ? p.accent : p.textSecondary,
+              ),
+            ),
+            if (isActive) ...[
+              const SizedBox(width: 4),
+              Container(
+                width: 5,
+                height: 5,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: p.accent,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildViperDdcCard(BuildContext context, PlayerState state,
+      PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
+    final hasProfile = state.viperDdcProfileName.isNotEmpty;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer,
+        borderRadius: AppRadii.cardRadius,
+        border: Border.all(color: p.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.headphones_rounded,
+                          color: p.accent, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(AudioFeatureRegistry.viperDdc.title,
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: p.textPrimary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                          Text(
+                            hasProfile ? state.viperDdcProfileName : AudioFeatureRegistry.viperDdc.subtitle,
+                            style: TextStyle(
+                                fontSize: 11, color: p.textTertiary),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: Icon(Icons.info_outline_rounded,
+                    size: 16, color: p.textTertiary),
+                visualDensity: VisualDensity.compact,
+                tooltip: AudioFeatureRegistry.viperDdc.title,
+                onPressed: () => _showFeatureInfo(
+                  context,
+                  AudioFeatureRegistry.viperDdc,
+                  conflictReason: dspBlocked ??
+                      (_nativePcmEffectsAvailable
+                          ? null
+                          : 'Requires PCM DSP path - not audible yet'),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Switch.adaptive(
+                value: dspBlocked == null &&
+                    _nativePcmEffectsAvailable &&
+                    state.isViperDdcEnabled,
+                activeTrackColor: p.accent,
+                activeThumbColor: p.onAccent,
+                onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
+                    ? null
+                    : (val) => cubit.setViperDdcEnabled(val),
+              ),
+            ],
+          ),
+          if (dspBlocked != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                'Blocked by Bit-Perfect',
+                style: TextStyle(
+                    color: p.error, fontSize: 10, fontWeight: FontWeight.w600),
+              ),
+            )
+          else if (!_nativePcmEffectsAvailable)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                'Native DSP unavailable on this device',
+                style: TextStyle(
+                    color: p.textTertiary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600),
+              ),
+            ),
+          if (dspBlocked == null && _nativePcmEffectsAvailable && state.isViperDdcEnabled) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.folder_open_rounded, size: 16),
+              label: Text(
+                hasProfile ? 'Change Profile: ${state.viperDdcProfileName}' : 'Select / Load .vdc Profile...',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: p.accent,
+                side: BorderSide(color: p.accent.withValues(alpha: 0.5)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+              onPressed: () {
+                showModalBottomSheet<void>(
+                  context: context,
+                  useRootNavigator: true,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => const ViperDdcSheet(),
+                );
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildArbitraryEqCard(BuildContext context, PlayerState state,
+      PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer,
+        borderRadius: AppRadii.cardRadius,
+        border: Border.all(color: p.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.auto_graph_rounded,
+                          color: p.accent, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(AudioFeatureRegistry.arbitraryEq.title,
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: p.textPrimary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                          Text(
+                            AudioFeatureRegistry.arbitraryEq.subtitle,
+                            style: TextStyle(
+                                fontSize: 11, color: p.textTertiary),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: Icon(Icons.info_outline_rounded,
+                    size: 16, color: p.textTertiary),
+                visualDensity: VisualDensity.compact,
+                tooltip: AudioFeatureRegistry.arbitraryEq.title,
+                onPressed: () => _showFeatureInfo(
+                  context,
+                  AudioFeatureRegistry.arbitraryEq,
+                  conflictReason: dspBlocked ??
+                      (_nativePcmEffectsAvailable
+                          ? null
+                          : 'Requires PCM DSP path - not audible yet'),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Switch.adaptive(
+                value: dspBlocked == null &&
+                    _nativePcmEffectsAvailable &&
+                    state.isArbitraryEqEnabled,
+                activeTrackColor: p.accent,
+                activeThumbColor: p.onAccent,
+                onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
+                    ? null
+                    : (val) => cubit.setArbitraryEqEnabled(val),
+              ),
+            ],
+          ),
+          if (dspBlocked != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                'Blocked by Bit-Perfect',
+                style: TextStyle(
+                    color: p.error, fontSize: 10, fontWeight: FontWeight.w600),
+              ),
+            )
+          else if (!_nativePcmEffectsAvailable)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                'Native DSP unavailable on this device',
+                style: TextStyle(
+                    color: p.textTertiary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600),
+              ),
+            ),
+          if (dspBlocked == null && _nativePcmEffectsAvailable && state.isArbitraryEqEnabled) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.edit_note_rounded, size: 16),
+              label: const Text(
+                'Edit GraphicEq Text & Presets...',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: p.accent,
+                side: BorderSide(color: p.accent.withValues(alpha: 0.5)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+              onPressed: () {
+                showModalBottomSheet<void>(
+                  context: context,
+                  useRootNavigator: true,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => const ArbitraryEqSheet(),
+                );
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLiveProgCard(BuildContext context, PlayerState state,
+      PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer,
+        borderRadius: AppRadii.cardRadius,
+        border: Border.all(color: p.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.code_rounded,
+                          color: p.accent, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(AudioFeatureRegistry.liveProg.title,
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: p.textPrimary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                          Text(
+                            state.liveProgStatus.isNotEmpty
+                                ? state.liveProgStatus
+                                : AudioFeatureRegistry.liveProg.subtitle,
+                            style: TextStyle(
+                                fontSize: 11, color: p.textTertiary),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: Icon(Icons.info_outline_rounded,
+                    size: 16, color: p.textTertiary),
+                visualDensity: VisualDensity.compact,
+                tooltip: AudioFeatureRegistry.liveProg.title,
+                onPressed: () => _showFeatureInfo(
+                  context,
+                  AudioFeatureRegistry.liveProg,
+                  conflictReason: dspBlocked ??
+                      (_nativePcmEffectsAvailable
+                          ? null
+                          : 'Requires PCM DSP path - not audible yet'),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Switch.adaptive(
+                value: dspBlocked == null &&
+                    _nativePcmEffectsAvailable &&
+                    state.isLiveProgEnabled,
+                activeTrackColor: p.accent,
+                activeThumbColor: p.onAccent,
+                onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
+                    ? null
+                    : (val) => cubit.setLiveProgEnabled(val),
+              ),
+            ],
+          ),
+          if (dspBlocked != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                'Blocked by Bit-Perfect',
+                style: TextStyle(
+                    color: p.error, fontSize: 10, fontWeight: FontWeight.w600),
+              ),
+            )
+          else if (!_nativePcmEffectsAvailable)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                'Native DSP unavailable on this device',
+                style: TextStyle(
+                    color: p.textTertiary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600),
+              ),
+            ),
+          if (dspBlocked == null && _nativePcmEffectsAvailable && state.isLiveProgEnabled) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.terminal_rounded, size: 16),
+              label: const Text(
+                'Open EEL Script Editor...',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: p.accent,
+                side: BorderSide(color: p.accent.withValues(alpha: 0.5)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+              onPressed: () {
+                showModalBottomSheet<void>(
+                  context: context,
+                  useRootNavigator: true,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => const LiveProgSheet(),
+                );
+              },
+            ),
+          ],
         ],
       ),
     );

@@ -120,6 +120,16 @@ class PrefsKeys {
   static const String dynamicBassSideGainHigh = 'setting_dynamic_bass_side_gain_high';
   static const String dynamicBassPreset = 'setting_dynamic_bass_preset';
 
+  // JamesDSP feature parity stages
+  static const String crossfeedMode = 'setting_crossfeed_mode';
+  static const String saturationMultiband = 'setting_saturation_multiband';
+  static const String viperDdcEnabled = 'setting_viper_ddc_enabled';
+  static const String viperDdcProfileName = 'setting_viper_ddc_profile_name';
+  static const String arbitraryEqEnabled = 'setting_arbitrary_eq_enabled';
+  static const String arbitraryEqString = 'setting_arbitrary_eq_string';
+  static const String liveProgEnabled = 'setting_live_prog_enabled';
+  static const String liveProgCode = 'setting_live_prog_code';
+
   // FIX(N1): Artwork cache disk limit key
   static const String settingMaxCacheSizeMb = 'setting_max_cache_size_mb';
 

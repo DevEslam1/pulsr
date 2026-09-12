@@ -137,6 +137,22 @@ class StubPulsrAudioHandler extends BaseAudioHandler
   @override
   List<DynamicEqBandConfig> get dynamicEqBands => const [DynamicEqBandConfig()];
   @override
+  int get crossfeedMode => 0;
+  @override
+  bool get saturationMultiband => false;
+  @override
+  bool get isViperDdcEnabled => false;
+  @override
+  String get viperDdcProfileName => '';
+  @override
+  bool get isArbitraryEqEnabled => false;
+  @override
+  String get arbitraryEqString => '';
+  @override
+  bool get isLiveProgEnabled => false;
+  @override
+  String get liveProgCode => '';
+  @override
   Duration get crossfadeDuration => Duration.zero;
   @override
   Stream<Duration> get positionStream => _positionController.stream;
@@ -182,7 +198,7 @@ class StubPulsrAudioHandler extends BaseAudioHandler
   Future<void> setVolumeBoost(double value) async {}
   @override
   Future<void> setCrossfeed(bool enabled,
-      {double? delayUs, double? feedDb}) async {}
+      {double? delayUs, double? feedDb, int? mode}) async {}
   @override
   Future<void> setLookaheadLimiter(bool enabled,
       {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {}

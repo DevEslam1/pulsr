@@ -22,10 +22,12 @@ public:
 
     void setSampleRate(double sampleRate);
     // drive: 0..1 (0 = linear/transparent), mix: 0..1 wet/dry,
-    // tilt: 0..1 HF pre-emphasis amount, mode: 0 = Tape, 1 = Tube, 2 = Analog.
-    void configure(double drive, double mix, double tilt, int mode = 0);
+    // tilt: 0..1 HF pre-emphasis amount, mode: 0 = Tape, 1 = Tube, 2 = Analog,
+    // multiband: true = 6-band crossover mid-band warmth mode
+    void configure(double drive, double mix, double tilt, int mode = 0, bool multiband = false);
     void setEnabled(bool enabled) { enabled_ = enabled; }
     bool isEnabled() const { return enabled_; }
+    bool isMultiband() const { return multiband_; }
     void applyParams(const SaturationParamSet& params);
     void reset();
 
@@ -45,6 +47,7 @@ private:
     double mix_ = 0.5;
     double tilt_ = 0.0;
     int mode_ = 0;              // 0 = Tape, 1 = Tube, 2 = Analog
+    bool multiband_ = false;    // 6-band crossover mid-band warmth mode
     double k_ = 0.0;            // drive sharpness
     float tiltHpCoeff_ = 0.0f;  // one-pole HP coeff for pre-emphasis
     bool enabled_ = false;

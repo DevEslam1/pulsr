@@ -442,12 +442,13 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSaturationEnabled(
 
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSaturationParams(
-        JNIEnv* /* env */, jobject /* thiz */, jdouble drive, jdouble mix, jdouble tilt, jint mode) {
+        JNIEnv* /* env */, jobject /* thiz */, jdouble drive, jdouble mix, jdouble tilt, jint mode, jboolean multiband) {
     AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
         snap.saturation.drive = drive;
         snap.saturation.mix = mix;
         snap.saturation.tilt = tilt;
         snap.saturation.mode = mode;
+        snap.saturation.multiband = multiband;
     });
 }
 
@@ -700,6 +701,116 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeCreateEngine(
     } catch (...) {
         return 0;
     }
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetCrossfeedMode(
+        JNIEnv* /* env */, jobject /* thiz */, jint mode) {
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        snap.crossfeed.mode = static_cast<CrossfeedMode>(mode);
+    });
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSaturationMultiband(
+        JNIEnv* /* env */, jobject /* thiz */, jboolean multiband) {
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        snap.saturation.multiband = multiband;
+    });
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetViperDdcEnabled(
+        JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        snap.viperDdc.enabled = enabled;
+    });
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadViperDdc(
+        JNIEnv* env, jobject /* thiz */, jstring jDdcContent, jstring jProfileName) {
+    if (!jDdcContent) return JNI_FALSE;
+    const char* ddcStr = env->GetStringUTFChars(jDdcContent, nullptr);
+    const char* nameStr = jProfileName ? env->GetStringUTFChars(jProfileName, nullptr) : "";
+    std::string content(ddcStr ? ddcStr : "");
+    std::string name(nameStr ? nameStr : "");
+    if (ddcStr) env->ReleaseStringUTFChars(jDdcContent, ddcStr);
+    if (jProfileName && nameStr) env->ReleaseStringUTFChars(jProfileName, nameStr);
+
+    bool ok = AudioDspEngine::instance().viperDdc().loadVdcString(content);
+    if (ok) {
+        AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+            snap.viperDdc.ddcContent = content;
+            snap.viperDdc.profileName = name;
+        });
+    }
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetArbitraryEqEnabled(
+        JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        snap.arbitraryEq.enabled = enabled;
+    });
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadArbitraryEq(
+        JNIEnv* env, jobject /* thiz */, jstring jEqString, jboolean linearPhase) {
+    if (!jEqString) return JNI_FALSE;
+    const char* eqStr = env->GetStringUTFChars(jEqString, nullptr);
+    std::string content(eqStr ? eqStr : "");
+    if (eqStr) env->ReleaseStringUTFChars(jEqString, eqStr);
+
+    bool ok = AudioDspEngine::instance().arbitraryEq().loadGraphicEqString(content, linearPhase);
+    if (ok) {
+        AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+            snap.arbitraryEq.graphicEqString = content;
+            snap.arbitraryEq.linearPhase = linearPhase;
+        });
+    }
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetLiveProgEnabled(
+        JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        snap.liveProg.enabled = enabled;
+    });
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadLiveProgCode(
+        JNIEnv* env, jobject /* thiz */, jstring jCode) {
+    if (!jCode) return env->NewStringUTF("Empty code");
+    const char* codeStr = env->GetStringUTFChars(jCode, nullptr);
+    std::string script(codeStr ? codeStr : "");
+    if (codeStr) env->ReleaseStringUTFChars(jCode, codeStr);
+
+    bool ok = AudioDspEngine::instance().liveProg().loadCode(script);
+    if (ok) {
+        AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+            snap.liveProg.code = script;
+        });
+        return env->NewStringUTF("OK");
+    } else {
+        return env->NewStringUTF(AudioDspEngine::instance().liveProg().getLastError().c_str());
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetLiveProgSlider(
+        JNIEnv* /* env */, jobject /* thiz */, jint index, jdouble value) {
+    AudioDspEngine::instance().liveProg().setSlider(index, value);
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        if (index == 1) snap.liveProg.slider1 = value;
+        else if (index == 2) snap.liveProg.slider2 = value;
+        else if (index == 3) snap.liveProg.slider3 = value;
+        else if (index == 4) snap.liveProg.slider4 = value;
+    });
 }
 
 JNIEXPORT void JNICALL

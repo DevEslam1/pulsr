@@ -16,6 +16,9 @@
 #include "DynamicEQ.h"
 #include "MultibandCompressor.h"
 #include "DynamicBass.h"
+#include "ViperDdc.h"
+#include "ArbitraryResponseEq.h"
+#include "LiveProg.h"
 
 #include <vector>
 #include <memory>
@@ -41,6 +44,10 @@ enum DspStageMask {
     STAGE_DITHER = 1 << 11,
     STAGE_MULTIBAND_COMPRESSOR = 1 << 12,
     STAGE_DYNAMIC_BASS = 1 << 13,
+    // JamesDSP Feature additions
+    STAGE_VIPER_DDC = 1 << 14,
+    STAGE_ARBITRARY_EQ = 1 << 15,
+    STAGE_LIVE_PROG = 1 << 16,
 };
 
 template<typename T>
@@ -110,6 +117,9 @@ public:
     DynamicEQ& dynamicEq() { return dynamicEq_; }
     MultibandCompressor& multibandCompressor() { return multibandCompressor_; }
     DynamicBass& dynamicBass() { return dynamicBass_; }
+    ViperDdc& viperDdc() { return viperDdc_; }
+    ArbitraryResponseEq& arbitraryEq() { return arbitraryEq_; }
+    LiveProg& liveProg() { return liveProg_; }
 
     // Combined pipeline latency (lookahead + resampler group delay + reverb partitioned delay) in frames
     int getPipelineLatencyFrames() const {
@@ -224,6 +234,9 @@ private:
     DynamicEQ dynamicEq_;
     MultibandCompressor multibandCompressor_;
     DynamicBass dynamicBass_;
+    ViperDdc viperDdc_;
+    ArbitraryResponseEq arbitraryEq_;
+    LiveProg liveProg_;
 };
 
 class DspEngineRegistry {

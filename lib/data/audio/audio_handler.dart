@@ -751,8 +751,11 @@ class PulsrAudioHandler extends BaseAudioHandler
   bool get isCrossfeedEnabled => _equalizerManager.isCrossfeedEnabled;
   double get crossfeedDelayUs => _equalizerManager.crossfeedDelayUs;
   double get crossfeedFeedDb => _equalizerManager.crossfeedFeedDb;
-  Future<void> setCrossfeed(bool enabled, {double? delayUs, double? feedDb}) =>
-      _equalizerManager.setCrossfeed(enabled, delayUs: delayUs, feedDb: feedDb);
+  int get crossfeedMode => _equalizerManager.crossfeedMode;
+  Future<void> setCrossfeed(bool enabled, {double? delayUs, double? feedDb, int? mode}) =>
+      _equalizerManager.setCrossfeed(enabled, delayUs: delayUs, feedDb: feedDb, mode: mode);
+  Future<void> setCrossfeedMode(int mode) =>
+      _equalizerManager.setCrossfeedMode(mode);
 
   bool get isLimiterEnabled => _equalizerManager.isLimiterEnabled;
   double get limiterThresholdDb => _equalizerManager.limiterThresholdDb;
@@ -5126,18 +5129,25 @@ class PulsrAudioHandler extends BaseAudioHandler
   double get saturationDrive => _equalizerManager.saturationDrive;
   double get saturationMix => _equalizerManager.saturationMix;
   double get saturationTilt => _equalizerManager.saturationTilt;
+  bool get saturationMultiband => _equalizerManager.saturationMultiband;
   Future<void> setSaturation(
     bool enabled, {
     double? drive,
     double? mix,
     double? tilt,
+    int? mode,
+    bool? multiband,
   }) =>
       _equalizerManager.setSaturation(
         enabled,
         drive: drive,
         mix: mix,
         tilt: tilt,
+        mode: mode,
+        multiband: multiband,
       );
+  Future<void> setSaturationMultiband(bool multiband) =>
+      _equalizerManager.setSaturationMultiband(multiband);
   bool get isStereoWidthEnabled => _equalizerManager.isStereoWidthEnabled;
   double get stereoWidth => _equalizerManager.stereoWidth;
   Future<void> setStereoWidth(bool enabled, {double? width}) =>
@@ -5172,6 +5182,23 @@ class PulsrAudioHandler extends BaseAudioHandler
       _equalizerManager.setDynamicEq(enabled);
   Future<void> setDynamicEqBand(int index, DynamicEqBandConfig band) =>
       _equalizerManager.setDynamicEqBand(index, band);
+
+  bool get isViperDdcEnabled => _equalizerManager.isViperDdcEnabled;
+  String get viperDdcProfileName => _equalizerManager.viperDdcProfileName;
+  Future<void> setViperDdc(bool enabled, {String? profileName, List<double>? coeffs}) =>
+      _equalizerManager.setViperDdc(enabled, profileName: profileName, coeffs: coeffs);
+
+  bool get isArbitraryEqEnabled => _equalizerManager.isArbitraryEqEnabled;
+  String get arbitraryEqString => _equalizerManager.arbitraryEqString;
+  Future<void> setArbitraryEq(bool enabled, {String? eqString}) =>
+      _equalizerManager.setArbitraryEq(enabled, eqString: eqString);
+
+  bool get isLiveProgEnabled => _equalizerManager.isLiveProgEnabled;
+  String get liveProgCode => _equalizerManager.liveProgCode;
+  Future<void> setLiveProg(bool enabled, {String? code}) =>
+      _equalizerManager.setLiveProg(enabled, code: code);
+  Future<void> setLiveProgSlider(int sliderIndex, double value) =>
+      _equalizerManager.setLiveProgSlider(sliderIndex, value);
 
   @override
   Future<void> stop() async {

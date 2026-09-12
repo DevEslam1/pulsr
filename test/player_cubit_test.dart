@@ -302,11 +302,29 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   @override
   List<DynamicEqBandConfig> get dynamicEqBands => const [];
   @override
+  int get crossfeedMode => 0;
+  @override
+  bool get saturationMultiband => false;
+  @override
+  bool get isViperDdcEnabled => false;
+  @override
+  String get viperDdcProfileName => '';
+  @override
+  bool get isArbitraryEqEnabled => false;
+  @override
+  String get arbitraryEqString => '';
+  @override
+  bool get isLiveProgEnabled => false;
+  @override
+  String get liveProgCode => '';
+  @override
   Future<void> setSaturation(
     bool enabled, {
     double? drive,
     double? mix,
     double? tilt,
+    int? mode,
+    bool? multiband,
   }) async {}
   @override
   Future<void> setStereoWidth(bool enabled, {double? width}) async {}
@@ -333,6 +351,7 @@ class TestPulsrAudioHandler extends BaseAudioHandler
     bool enabled, {
     double? delayUs,
     double? feedDb,
+    int? mode,
   }) async {}
   @override
   Future<void> setLookaheadLimiter(

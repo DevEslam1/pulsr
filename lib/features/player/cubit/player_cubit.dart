@@ -285,6 +285,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       isCrossfeedEnabled: _audioHandler.isCrossfeedEnabled,
       crossfeedDelayUs: _audioHandler.crossfeedDelayUs,
       crossfeedFeedDb: _audioHandler.crossfeedFeedDb,
+      crossfeedMode: _audioHandler.crossfeedMode,
       isLimiterEnabled: _audioHandler.isLimiterEnabled,
       limiterThresholdDb: _audioHandler.limiterThresholdDb,
       limiterReleaseMs: _audioHandler.limiterReleaseMs,
@@ -300,6 +301,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       saturationDrive: _audioHandler.saturationDrive,
       saturationMix: _audioHandler.saturationMix,
       saturationTilt: _audioHandler.saturationTilt,
+      saturationMultiband: _audioHandler.saturationMultiband,
       isStereoWidthEnabled: _audioHandler.isStereoWidthEnabled,
       stereoWidth: _audioHandler.stereoWidth,
       isLoudnessContourEnabled: _audioHandler.isLoudnessContourEnabled,
@@ -310,6 +312,12 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       subCrossoverGain: _audioHandler.subCrossoverGain,
       isDynamicEqEnabled: _audioHandler.isDynamicEqEnabled,
       dynamicEqBands: _audioHandler.dynamicEqBands,
+      isViperDdcEnabled: _audioHandler.isViperDdcEnabled,
+      viperDdcProfileName: _audioHandler.viperDdcProfileName,
+      isArbitraryEqEnabled: _audioHandler.isArbitraryEqEnabled,
+      arbitraryEqString: _audioHandler.arbitraryEqString,
+      isLiveProgEnabled: _audioHandler.isLiveProgEnabled,
+      liveProgCode: _audioHandler.liveProgCode,
       hasOemAudio: _audioHandler.hasOemAudio,
       detectedOemEngines: _audioHandler.detectedOemEngines,
     ));
@@ -2618,20 +2626,31 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   // --- NATIVE DSP METHODS ---
 
   Future<void> setCrossfeed(bool enabled,
-      {double? delayUs, double? feedDb}) async {
+      {double? delayUs, double? feedDb, int? mode}) async {
     if (enabled && !_guardDsp('Crossfeed')) return;
     safeEmit(state.copyWith(
       isCrossfeedEnabled: enabled,
       crossfeedDelayUs: delayUs ?? state.crossfeedDelayUs,
       crossfeedFeedDb: feedDb ?? state.crossfeedFeedDb,
+      crossfeedMode: mode ?? state.crossfeedMode,
       errorMessage: null,
     ));
     try {
       await _audioHandler.setCrossfeed(enabled,
-          delayUs: delayUs, feedDb: feedDb);
+          delayUs: delayUs, feedDb: feedDb, mode: mode);
     } catch (e) {
       _syncAudioEffects();
       safeEmit(state.copyWith(errorMessage: 'Failed to set crossfeed: $e'));
+    }
+  }
+
+  Future<void> setCrossfeedMode(int mode) async {
+    safeEmit(state.copyWith(crossfeedMode: mode));
+    try {
+      await _audioHandler.setCrossfeedMode(mode);
+    } catch (e) {
+      _syncAudioEffects();
+      safeEmit(state.copyWith(errorMessage: 'Failed to set crossfeed mode: $e'));
     }
   }
 
@@ -2785,21 +2804,32 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   // --- PHASE 1 DSP EXPANSION METHODS ---
 
   Future<void> setSaturation(bool enabled,
-      {double? drive, double? mix, double? tilt}) async {
+      {double? drive, double? mix, double? tilt, int? mode, bool? multiband}) async {
     if (enabled && !_guardDsp('Harmonic Saturation')) return;
     safeEmit(state.copyWith(
       isSaturationEnabled: enabled,
       saturationDrive: drive ?? state.saturationDrive,
       saturationMix: mix ?? state.saturationMix,
       saturationTilt: tilt ?? state.saturationTilt,
+      saturationMultiband: multiband ?? state.saturationMultiband,
       errorMessage: null,
     ));
     try {
       await _audioHandler.setSaturation(enabled,
-          drive: drive, mix: mix, tilt: tilt);
+          drive: drive, mix: mix, tilt: tilt, mode: mode, multiband: multiband);
     } catch (e) {
       _syncAudioEffects();
       safeEmit(state.copyWith(errorMessage: 'Failed to set saturation: $e'));
+    }
+  }
+
+  Future<void> setSaturationMultiband(bool multiband) async {
+    safeEmit(state.copyWith(saturationMultiband: multiband));
+    try {
+      await _audioHandler.setSaturationMultiband(multiband);
+    } catch (e) {
+      _syncAudioEffects();
+      safeEmit(state.copyWith(errorMessage: 'Failed to set saturation multiband: $e'));
     }
   }
 
@@ -2882,6 +2912,63 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       _syncAudioEffects();
       safeEmit(
           state.copyWith(errorMessage: 'Failed to set dynamic EQ band: $e'));
+    }
+  }
+
+  // --- JAMESDSP FEATURE PARITY METHODS ---
+
+  Future<void> setViperDdcEnabled(bool enabled,
+      {String? profileName, List<double>? coeffs}) async {
+    if (enabled && !_guardDsp('ViPER-DDC')) return;
+    safeEmit(state.copyWith(
+      isViperDdcEnabled: enabled,
+      viperDdcProfileName: profileName ?? state.viperDdcProfileName,
+      errorMessage: null,
+    ));
+    try {
+      await _audioHandler.setViperDdc(enabled,
+          profileName: profileName, coeffs: coeffs);
+    } catch (e) {
+      _syncAudioEffects();
+      safeEmit(state.copyWith(errorMessage: 'Failed to set ViPER-DDC: $e'));
+    }
+  }
+
+  Future<void> setArbitraryEqEnabled(bool enabled, {String? eqString}) async {
+    if (enabled && !_guardDsp('Arbitrary Response EQ')) return;
+    safeEmit(state.copyWith(
+      isArbitraryEqEnabled: enabled,
+      arbitraryEqString: eqString ?? state.arbitraryEqString,
+      errorMessage: null,
+    ));
+    try {
+      await _audioHandler.setArbitraryEq(enabled, eqString: eqString);
+    } catch (e) {
+      _syncAudioEffects();
+      safeEmit(state.copyWith(errorMessage: 'Failed to set Arbitrary EQ: $e'));
+    }
+  }
+
+  Future<void> setLiveProgEnabled(bool enabled, {String? code}) async {
+    if (enabled && !_guardDsp('Live Programmable DSP')) return;
+    safeEmit(state.copyWith(
+      isLiveProgEnabled: enabled,
+      liveProgCode: code ?? state.liveProgCode,
+      errorMessage: null,
+    ));
+    try {
+      await _audioHandler.setLiveProg(enabled, code: code);
+    } catch (e) {
+      _syncAudioEffects();
+      safeEmit(state.copyWith(errorMessage: 'Failed to set LiveProg DSP: $e'));
+    }
+  }
+
+  Future<void> setLiveProgSlider(int sliderIndex, double value) async {
+    try {
+      await _audioHandler.setLiveProgSlider(sliderIndex, value);
+    } catch (e) {
+      safeEmit(state.copyWith(errorMessage: 'Failed to set LiveProg slider: $e'));
     }
   }
 
