@@ -134,6 +134,11 @@ class PulsrAudioHandler extends BaseAudioHandler
   int _consecutiveFailures = 0;
   DateTime? _lastGaplessChangeTime;
   int _rapidGaplessChangeCount = 0;
+  // Last time a track-completion was reported to the sleep timer. Gapless
+  // playback reports one boundary through two independent signals (the native
+  // `ProcessingState.completed` event and the `currentIndexStream` advance), so
+  // this debounce collapses the duplicate. See [_notifySleepTrackCompleted].
+  DateTime? _lastSleepTrackCompletedAt;
   final List<int> _shuffleHistory = [];
   bool _wasPlayingBeforeInterruption = false;
   DateTime? _lastPreviousTapTime;
@@ -183,6 +188,10 @@ class PulsrAudioHandler extends BaseAudioHandler
   late final BatteryAwarePlayback _batteryAwarePlayback;
   late final StreamPreResolver _streamPreResolver;
   late final PlaybackVolumeController _volumeController;
+  /// Set once [_volumeController] has been assigned in the (async) init. The
+  /// settings cubit can emit — and call setVolume() — before that happens on a
+  /// cold start, which used to throw a LateInitializationError on every launch.
+  bool _volumeControllerReady = false;
   late final StreamResolutionPipeline _streamResolutionPipeline;
   // ── F1–F11 feature managers ──────────────────────────────────────────
   final AbLoopManager abLoopManager = AbLoopManager();
@@ -588,7 +597,11 @@ class PulsrAudioHandler extends BaseAudioHandler
     _volume = volume.clamp(0.0, 1.0);
     final song = currentSong;
     final target = _calculateReplayGainVolume(song);
-    _volumeController.updateSettings(userVolume: _volume);
+    // Guard the startup race: the settings cubit's first emission can arrive
+    // before the async init has constructed the volume controller.
+    if (_volumeControllerReady) {
+      _volumeController.updateSettings(userVolume: _volume);
+    }
     await _equalizerManager.updateLoudnessVolume(_volume);
     await _activePlayer.setVolume(target);
     unawaited(_pushNativeReplayGain(song));
@@ -780,6 +793,25 @@ class PulsrAudioHandler extends BaseAudioHandler
       _equalizerManager.setBandSolo(index, solo);
   Future<void> setBandMute(int index, bool mute) =>
       _equalizerManager.setBandMute(index, mute);
+
+  /// Whether a completion report at [now] is distinct from a previous one at
+  /// [last]. Split out so the debounce window is unit-testable.
+  @visibleForTesting
+  static bool isDistinctSleepCompletion(DateTime? last, DateTime now) =>
+      last == null ||
+      now.difference(last) >= const Duration(milliseconds: 1500);
+
+  /// Single funnel for "a track finished" so the sleep timer's after-N-tracks
+  /// and end-of-track modes decrement exactly once per boundary. In gapless
+  /// mode a boundary is reported twice — native `completed` plus the
+  /// `currentIndexStream` advance — and feeding both straight into
+  /// [SleepTimerManager.onTrackCompleted] halved an "after N songs" timer.
+  void _notifySleepTrackCompleted() {
+    final now = DateTime.now();
+    if (!isDistinctSleepCompletion(_lastSleepTrackCompletedAt, now)) return;
+    _lastSleepTrackCompletedAt = now;
+    unawaited(_sleepTimerManager.onTrackCompleted());
+  }
 
   // Sleep Timer controls
   void startSleepTimer(Duration duration, {bool fadeOut = true}) {
@@ -993,6 +1025,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       getActivePlayer: () => _activePlayer,
       getInactivePlayer: () => _inactivePlayer,
     );
+    _volumeControllerReady = true;
     _streamResolutionPipeline = StreamResolutionPipeline(
       ytmService: _ytmService,
       getLatencyTracker: () => _latencyTracker,
@@ -1085,11 +1118,19 @@ class PulsrAudioHandler extends BaseAudioHandler
                   !_crossfadeManager.isCrossfading) {
                 if (_gaplessMode) {
                   if (_activePlayer.loopMode == LoopMode.off) {
-                    unawaited(_sleepTimerManager.onTrackCompleted());
-                    unawaited(_sleepTimerManager.onQueueCompleted());
+                    // `completed` fires both mid-queue (while ExoPlayer swaps
+                    // to the next item) and at the very end. Mid-queue the
+                    // boundary is already reported by the `currentIndexStream`
+                    // advance, so only the last item reports here — otherwise
+                    // the after-N sleep timer decremented twice per song and
+                    // end-of-queue fired at the first gap.
+                    if (!_activePlayer.hasNext) {
+                      _notifySleepTrackCompleted();
+                      unawaited(_sleepTimerManager.onQueueCompleted());
+                    }
                   }
                 } else {
-                  unawaited(_sleepTimerManager.onTrackCompleted());
+                  _notifySleepTrackCompleted();
                   if (_getNextIndex(peek: true) == null) {
                     unawaited(_sleepTimerManager.onQueueCompleted());
                   }
@@ -2035,7 +2076,11 @@ class PulsrAudioHandler extends BaseAudioHandler
         _latencyTracker?.markStage(PlaybackStage.clientRequestSent);
       } catch (_) {}
       // F3: hedged resolution — race two client attempts, take first success.
-      final YtmStream stream = hedgedResolutionEnabled
+      // Disabled while an egress block is active: both duplicates target the
+      // same blocked IP, so hedging only doubles the native chain load (and the
+      // CPU/GC churn) for a verdict that is already known.
+      final coolingDown = _ytmService.isBotCoolingDown;
+      final YtmStream stream = (hedgedResolutionEnabled && !coolingDown)
           ? await HedgedStreamResolver.raceDuplicate<YtmStream>(doResolve,
               hedgeDelay: const Duration(milliseconds: 300),
               timeout: const Duration(seconds: 25))
@@ -2805,7 +2850,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         // FIX-#5: During crossfade the outgoing player is manually stopped, so
         // ProcessingState.completed never fires.  Notify the sleep timer here
         // so track-count-based timers decrement correctly.
-        unawaited(_sleepTimerManager.onTrackCompleted());
+        _notifySleepTrackCompleted();
       } catch (e, st) {
         ErrorLogger.log('Error during crossfade playback',
             error: e, stackTrace: st, category: 'AudioHandler');
@@ -3512,6 +3557,12 @@ class PulsrAudioHandler extends BaseAudioHandler
     final song = _songs[index];
     final generation = _playGeneration;
 
+    // Notify sleep timer of track completion for endOfTrack / afterNTracks
+    // modes (fixes silent never-fire). Fired before the async work below so it
+    // lands within the duplicate-collapse window of the native `completed`
+    // event that reports the same boundary.
+    _notifySleepTrackCompleted();
+
     final fastArtUri =
         song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
     mediaItem.add(_songToMediaItem(song, fastArtUri));
@@ -3532,9 +3583,6 @@ class PulsrAudioHandler extends BaseAudioHandler
         mediaItem.add(_songToMediaItem(song, artUri));
       }
     }).catchError((_) {});
-
-    // Notify sleep timer of track completion for endOfTrack / afterNTracks modes (fixes silent never-fire)
-    unawaited(_sleepTimerManager.onTrackCompleted());
   }
 
   void _planNextStreamResolution() {

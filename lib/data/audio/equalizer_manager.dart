@@ -143,9 +143,16 @@ class EqualizerManager {
   double saturationDrive = 0.3; // 0.0 - 1.0
   double saturationMix = 0.5; // 0.0 - 1.0 wet/dry
   double saturationTilt = 0.3; // 0.0 - 1.0 HF pre-emphasis
+  int saturationMode = 0; // 0=Tape, 1=Tube, 2=Analog Class-A
 
   bool isStereoWidthEnabled = false;
   double stereoWidth = 1.0; // 0.0 mono … 1.0 normal … 2.0 widened
+  bool stereoWidthMultiband = false;
+  double stereoWidthLow = 1.0;
+  double stereoWidthMid = 1.0;
+  double stereoWidthHigh = 1.0;
+  double stereoWidthLowCrossoverHz = 160.0;
+  double stereoWidthHighCrossoverHz = 2500.0;
 
   bool isLoudnessContourEnabled = false;
   double loudnessContourIntensity = 0.0; // 0.0 - 1.0
@@ -155,9 +162,36 @@ class EqualizerManager {
   double subCrossoverCornerHz = 80.0; // 60 - 150 Hz
   double subCrossoverSlopeDbPerOct = 24.0; // 12 or 24 dB/oct
   double subCrossoverGain = 0.8; // 0.0 - 1.0
+  bool subCrossoverBassMono = false;
+  bool subCrossoverAntiPop = true;
 
   bool isDynamicEqEnabled = false;
   List<DynamicEqBandConfig> dynamicEqBands = const [DynamicEqBandConfig()];
+
+  // Native C++ 4-Band Multiband Compressor
+  bool isMultibandCompressorEnabled = false;
+  List<MultibandCompressorBandConfig> multibandCompressorBands = const [
+    MultibandCompressorBandConfig(thresholdDb: -20.0, ratio: 2.5, attackMs: 20.0, releaseMs: 120.0, kneeDb: 6.0, makeupGainDb: 0.0),
+    MultibandCompressorBandConfig(thresholdDb: -18.0, ratio: 2.0, attackMs: 15.0, releaseMs: 100.0, kneeDb: 6.0, makeupGainDb: 0.0),
+    MultibandCompressorBandConfig(thresholdDb: -16.0, ratio: 1.8, attackMs: 10.0, releaseMs: 80.0, kneeDb: 4.0, makeupGainDb: 0.0),
+    MultibandCompressorBandConfig(thresholdDb: -14.0, ratio: 1.5, attackMs: 5.0, releaseMs: 60.0, kneeDb: 4.0, makeupGainDb: 0.0),
+  ];
+  double multibandCompressorF0 = 160.0;
+  double multibandCompressorF1 = 1000.0;
+  double multibandCompressorF2 = 5000.0;
+
+  // ViPER-modeled Dynamic System / Dynamic Bass
+  bool isDynamicBassEnabled = false;
+  double dynamicBassStrength = 1.0;
+  int dynamicBassXLow = 100;
+  int dynamicBassXHigh = 5600;
+  int dynamicBassYLow = 40;
+  int dynamicBassYHigh = 80;
+  double dynamicBassSideGainLow = 0.10;
+  double dynamicBassSideGainHigh = 0.50;
+  int dynamicBassPreset = 0;
+
+  double reverbCrossChannel = 0.0;
 
   /// DSP engine routing: 'native' | 'oem' | 'auto'. Single source of truth —
   /// SettingsCubit persists to the same PrefsKeys.dspPreference key.
@@ -433,10 +467,20 @@ class EqualizerManager {
       saturationDrive = prefs.getDouble(PrefsKeys.saturationDrive) ?? 0.3;
       saturationMix = prefs.getDouble(PrefsKeys.saturationMix) ?? 0.5;
       saturationTilt = prefs.getDouble(PrefsKeys.saturationTilt) ?? 0.3;
+      saturationMode = prefs.getInt(PrefsKeys.saturationMode) ?? 0;
 
       isStereoWidthEnabled =
           prefs.getBool(PrefsKeys.stereoWidthEnabled) ?? false;
       stereoWidth = prefs.getDouble(PrefsKeys.stereoWidth) ?? 1.0;
+      stereoWidthMultiband =
+          prefs.getBool(PrefsKeys.stereoWidthMultiband) ?? false;
+      stereoWidthLow = prefs.getDouble(PrefsKeys.stereoWidthLow) ?? 1.0;
+      stereoWidthMid = prefs.getDouble(PrefsKeys.stereoWidthMid) ?? 1.0;
+      stereoWidthHigh = prefs.getDouble(PrefsKeys.stereoWidthHigh) ?? 1.0;
+      stereoWidthLowCrossoverHz =
+          prefs.getDouble(PrefsKeys.stereoWidthLowCrossoverHz) ?? 160.0;
+      stereoWidthHighCrossoverHz =
+          prefs.getDouble(PrefsKeys.stereoWidthHighCrossoverHz) ?? 2500.0;
 
       isLoudnessContourEnabled =
           prefs.getBool(PrefsKeys.loudnessContourEnabled) ?? false;
@@ -450,8 +494,50 @@ class EqualizerManager {
       subCrossoverSlopeDbPerOct =
           prefs.getDouble(PrefsKeys.subCrossoverSlopeDbPerOct) ?? 24.0;
       subCrossoverGain = prefs.getDouble(PrefsKeys.subCrossoverGain) ?? 0.8;
+      subCrossoverBassMono =
+          prefs.getBool(PrefsKeys.subCrossoverBassMono) ?? false;
+      subCrossoverAntiPop =
+          prefs.getBool(PrefsKeys.subCrossoverAntiPop) ?? true;
 
       isDynamicEqEnabled = prefs.getBool(PrefsKeys.dynamicEqEnabled) ?? false;
+      reverbCrossChannel = prefs.getDouble(PrefsKeys.reverbCrossChannel) ?? 0.0;
+
+      isMultibandCompressorEnabled =
+          prefs.getBool(PrefsKeys.multibandCompressorEnabled) ?? false;
+      multibandCompressorF0 =
+          prefs.getDouble(PrefsKeys.multibandCompressorF0) ?? 160.0;
+      multibandCompressorF1 =
+          prefs.getDouble(PrefsKeys.multibandCompressorF1) ?? 1000.0;
+      multibandCompressorF2 =
+          prefs.getDouble(PrefsKeys.multibandCompressorF2) ?? 5000.0;
+      final mbcJson = prefs.getString(PrefsKeys.multibandCompressorBands);
+      if (mbcJson != null) {
+        try {
+          final decoded = (json.decode(mbcJson) as List<dynamic>)
+              .whereType<Map<String, dynamic>>()
+              .map(MultibandCompressorBandConfig.fromJson)
+              .toList();
+          if (decoded.isNotEmpty) multibandCompressorBands = decoded;
+        } catch (_) {}
+      }
+      isDynamicBassEnabled =
+          prefs.getBool(PrefsKeys.dynamicBassEnabled) ?? false;
+      dynamicBassStrength =
+          prefs.getDouble(PrefsKeys.dynamicBassStrength) ?? 1.0;
+      dynamicBassXLow =
+          prefs.getInt(PrefsKeys.dynamicBassXLow) ?? 100;
+      dynamicBassXHigh =
+          prefs.getInt(PrefsKeys.dynamicBassXHigh) ?? 5600;
+      dynamicBassYLow =
+          prefs.getInt(PrefsKeys.dynamicBassYLow) ?? 40;
+      dynamicBassYHigh =
+          prefs.getInt(PrefsKeys.dynamicBassYHigh) ?? 80;
+      dynamicBassSideGainLow =
+          prefs.getDouble(PrefsKeys.dynamicBassSideGainLow) ?? 0.10;
+      dynamicBassSideGainHigh =
+          prefs.getDouble(PrefsKeys.dynamicBassSideGainHigh) ?? 0.50;
+      dynamicBassPreset =
+          prefs.getInt(PrefsKeys.dynamicBassPreset) ?? 0;
       dspPreference = prefs.getString(PrefsKeys.dspPreference) ?? 'native';
       if (dspPreference != 'native' &&
           dspPreference != 'oem' &&
@@ -563,6 +649,11 @@ class EqualizerManager {
       if (isReverbEnabled) {
         pendingFutures.add(_effectsChannel.setReverbPreset(reverbPreset));
         pendingFutures.add(_effectsChannel.setReverbWetDry(reverbWetDry));
+        if (reverbCrossChannel > 0.0) {
+          pendingFutures.add(
+            _effectsChannel.setReverbCrossChannel(reverbCrossChannel),
+          );
+        }
         pendingFutures.add(_effectsChannel.setReverbEnabled(true));
       }
       if (stereoBalance != 0.0) {
@@ -580,12 +671,23 @@ class EqualizerManager {
             saturationDrive,
             saturationMix,
             saturationTilt,
+            mode: saturationMode,
           ),
         );
         pendingFutures.add(_effectsChannel.setSaturationEnabled(true));
       }
       if (isStereoWidthEnabled) {
-        pendingFutures.add(_effectsChannel.setStereoWidthParams(stereoWidth));
+        pendingFutures.add(
+          _effectsChannel.setStereoWidthParams(
+            stereoWidth,
+            multiband: stereoWidthMultiband,
+            lowWidth: stereoWidthLow,
+            midWidth: stereoWidthMid,
+            highWidth: stereoWidthHigh,
+            lowCrossoverHz: stereoWidthLowCrossoverHz,
+            highCrossoverHz: stereoWidthHighCrossoverHz,
+          ),
+        );
         pendingFutures.add(_effectsChannel.setStereoWidthEnabled(true));
       }
       if (isLoudnessContourEnabled) {
@@ -603,6 +705,8 @@ class EqualizerManager {
             subCrossoverCornerHz,
             subCrossoverSlopeDbPerOct,
             subCrossoverGain,
+            bassMono: subCrossoverBassMono,
+            antiPop: subCrossoverAntiPop,
           ),
         );
         pendingFutures.add(_effectsChannel.setSubCrossoverEnabled(true));
@@ -610,6 +714,27 @@ class EqualizerManager {
       if (isDynamicEqEnabled) {
         pendingFutures.add(_pushDynamicEqConfig());
         pendingFutures.add(_effectsChannel.setDynamicEqEnabled(true));
+      }
+      if (isMultibandCompressorEnabled) {
+        pendingFutures.add(_pushMultibandCompressorConfig());
+        pendingFutures.add(
+          _effectsChannel.setMultibandCompressorEnabled(true),
+        );
+      }
+      if (isDynamicBassEnabled) {
+        pendingFutures.add(
+          _effectsChannel.setDynamicBassParams(
+            enabled: true,
+            strength: dynamicBassStrength,
+            xLow: dynamicBassXLow,
+            xHigh: dynamicBassXHigh,
+            yLow: dynamicBassYLow,
+            yHigh: dynamicBassYHigh,
+            sideGainLow: dynamicBassSideGainLow,
+            sideGainHigh: dynamicBassSideGainHigh,
+            devicePreset: dynamicBassPreset,
+          ),
+        );
       }
       // Dynamics last — it triggers recalculateActiveStages which disables OEM engine; doing it last prevents intermediate dropout
       // Log individual failures so failed effect stages are diagnosable while allowing remaining stages to complete
@@ -704,18 +829,44 @@ class EqualizerManager {
         PrefsKeys.saturationDrive: saturationDrive,
         PrefsKeys.saturationMix: saturationMix,
         PrefsKeys.saturationTilt: saturationTilt,
+        PrefsKeys.saturationMode: saturationMode,
         PrefsKeys.stereoWidthEnabled: isStereoWidthEnabled,
         PrefsKeys.stereoWidth: stereoWidth,
+        PrefsKeys.stereoWidthMultiband: stereoWidthMultiband,
+        PrefsKeys.stereoWidthLow: stereoWidthLow,
+        PrefsKeys.stereoWidthMid: stereoWidthMid,
+        PrefsKeys.stereoWidthHigh: stereoWidthHigh,
+        PrefsKeys.stereoWidthLowCrossoverHz: stereoWidthLowCrossoverHz,
+        PrefsKeys.stereoWidthHighCrossoverHz: stereoWidthHighCrossoverHz,
         PrefsKeys.loudnessContourEnabled: isLoudnessContourEnabled,
         PrefsKeys.loudnessContourIntensity: loudnessContourIntensity,
         PrefsKeys.subCrossoverEnabled: isSubCrossoverEnabled,
         PrefsKeys.subCrossoverCornerHz: subCrossoverCornerHz,
         PrefsKeys.subCrossoverSlopeDbPerOct: subCrossoverSlopeDbPerOct,
         PrefsKeys.subCrossoverGain: subCrossoverGain,
+        PrefsKeys.subCrossoverBassMono: subCrossoverBassMono,
+        PrefsKeys.subCrossoverAntiPop: subCrossoverAntiPop,
         PrefsKeys.dynamicEqEnabled: isDynamicEqEnabled,
         PrefsKeys.dynamicEqBands: json.encode(
           dynamicEqBands.map((b) => b.toJson()).toList(),
         ),
+        PrefsKeys.reverbCrossChannel: reverbCrossChannel,
+        PrefsKeys.multibandCompressorEnabled: isMultibandCompressorEnabled,
+        PrefsKeys.multibandCompressorF0: multibandCompressorF0,
+        PrefsKeys.multibandCompressorF1: multibandCompressorF1,
+        PrefsKeys.multibandCompressorF2: multibandCompressorF2,
+        PrefsKeys.multibandCompressorBands: json.encode(
+          multibandCompressorBands.map((b) => b.toJson()).toList(),
+        ),
+        PrefsKeys.dynamicBassEnabled: isDynamicBassEnabled,
+        PrefsKeys.dynamicBassStrength: dynamicBassStrength,
+        PrefsKeys.dynamicBassXLow: dynamicBassXLow,
+        PrefsKeys.dynamicBassXHigh: dynamicBassXHigh,
+        PrefsKeys.dynamicBassYLow: dynamicBassYLow,
+        PrefsKeys.dynamicBassYHigh: dynamicBassYHigh,
+        PrefsKeys.dynamicBassSideGainLow: dynamicBassSideGainLow,
+        PrefsKeys.dynamicBassSideGainHigh: dynamicBassSideGainHigh,
+        PrefsKeys.dynamicBassPreset: dynamicBassPreset,
         PrefsKeys.dspPreference: dspPreference,
         PrefsKeys.ditherEnabled: isDitherEnabled,
         PrefsKeys.ditherTargetBitDepth: ditherTargetBitDepth,
@@ -1591,16 +1742,19 @@ class EqualizerManager {
     double? drive,
     double? mix,
     double? tilt,
+    int? mode,
   }) async {
     isSaturationEnabled = enabled;
     if (drive != null) saturationDrive = drive.clamp(0.0, 1.0);
     if (mix != null) saturationMix = mix.clamp(0.0, 1.0);
     if (tilt != null) saturationTilt = tilt.clamp(0.0, 1.0);
+    if (mode != null) saturationMode = mode.clamp(0, 2);
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setSaturationParams(
         saturationDrive,
         saturationMix,
         saturationTilt,
+        mode: saturationMode,
       );
       await _effectsChannel.setSaturationEnabled(enabled);
     }
@@ -1608,11 +1762,38 @@ class EqualizerManager {
     _syncPipeline();
   }
 
-  Future<void> setStereoWidth(bool enabled, {double? width}) async {
+  Future<void> setStereoWidth(
+    bool enabled, {
+    double? width,
+    bool? multiband,
+    double? lowWidth,
+    double? midWidth,
+    double? highWidth,
+    double? lowCrossoverHz,
+    double? highCrossoverHz,
+  }) async {
     isStereoWidthEnabled = enabled;
     if (width != null) stereoWidth = width.clamp(0.0, 2.0);
+    if (multiband != null) stereoWidthMultiband = multiband;
+    if (lowWidth != null) stereoWidthLow = lowWidth.clamp(0.0, 2.0);
+    if (midWidth != null) stereoWidthMid = midWidth.clamp(0.0, 2.0);
+    if (highWidth != null) stereoWidthHigh = highWidth.clamp(0.0, 2.0);
+    if (lowCrossoverHz != null) {
+      stereoWidthLowCrossoverHz = lowCrossoverHz.clamp(40.0, 1000.0);
+    }
+    if (highCrossoverHz != null) {
+      stereoWidthHighCrossoverHz = highCrossoverHz.clamp(1000.0, 10000.0);
+    }
     if (PlatformCapabilities.isAndroid) {
-      await _effectsChannel.setStereoWidthParams(stereoWidth);
+      await _effectsChannel.setStereoWidthParams(
+        stereoWidth,
+        multiband: stereoWidthMultiband,
+        lowWidth: stereoWidthLow,
+        midWidth: stereoWidthMid,
+        highWidth: stereoWidthHigh,
+        lowCrossoverHz: stereoWidthLowCrossoverHz,
+        highCrossoverHz: stereoWidthHighCrossoverHz,
+      );
       await _effectsChannel.setStereoWidthEnabled(enabled);
     }
     _debouncedSavePreferences();
@@ -1654,6 +1835,8 @@ class EqualizerManager {
     double? cornerHz,
     double? slopeDbPerOct,
     double? gain,
+    bool? bassMono,
+    bool? antiPop,
   }) async {
     isSubCrossoverEnabled = enabled;
     if (cornerHz != null) subCrossoverCornerHz = cornerHz.clamp(60.0, 150.0);
@@ -1661,11 +1844,15 @@ class EqualizerManager {
       subCrossoverSlopeDbPerOct = slopeDbPerOct < 18.0 ? 12.0 : 24.0;
     }
     if (gain != null) subCrossoverGain = gain.clamp(0.0, 1.0);
+    if (bassMono != null) subCrossoverBassMono = bassMono;
+    if (antiPop != null) subCrossoverAntiPop = antiPop;
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setSubCrossoverParams(
         subCrossoverCornerHz,
         subCrossoverSlopeDbPerOct,
         subCrossoverGain,
+        bassMono: subCrossoverBassMono,
+        antiPop: subCrossoverAntiPop,
       );
       await _effectsChannel.setSubCrossoverEnabled(enabled);
     }
@@ -1698,6 +1885,9 @@ class EqualizerManager {
         attackMs: band.attackMs,
         releaseMs: band.releaseMs,
         maxCutDb: band.maxCutDb,
+        maxBoostDb: band.maxBoostDb,
+        mode: band.mode,
+        filterType: band.filterType,
         enabled: band.enabled,
       );
     }
@@ -1720,10 +1910,143 @@ class EqualizerManager {
         attackMs: band.attackMs,
         releaseMs: band.releaseMs,
         maxCutDb: band.maxCutDb,
+        maxBoostDb: band.maxBoostDb,
+        mode: band.mode,
+        filterType: band.filterType,
         enabled: band.enabled,
       );
     }
   }
+
+  Future<void> setReverbCrossChannel(double crossChannel) async {
+    reverbCrossChannel = crossChannel.clamp(0.0, 1.0);
+    if (PlatformCapabilities.isAndroid) {
+      await _effectsChannel.setReverbCrossChannel(reverbCrossChannel);
+    }
+    _debouncedSavePreferences();
+  }
+
+  // --- NATIVE C++ 4-BAND MULTIBAND COMPRESSOR ---
+
+  Future<void> setMultibandCompressor(
+    bool enabled, {
+    List<MultibandCompressorBandConfig>? bands,
+    double? f0,
+    double? f1,
+    double? f2,
+  }) async {
+    isMultibandCompressorEnabled = enabled;
+    if (bands != null) multibandCompressorBands = List.from(bands);
+    if (f0 != null) multibandCompressorF0 = f0.clamp(40.0, 500.0);
+    if (f1 != null) multibandCompressorF1 = f1.clamp(200.0, 4000.0);
+    if (f2 != null) multibandCompressorF2 = f2.clamp(1000.0, 16000.0);
+    if (PlatformCapabilities.isAndroid) {
+      await _pushMultibandCompressorConfig();
+      await _effectsChannel.setMultibandCompressorEnabled(enabled);
+    }
+    _debouncedSavePreferences();
+    _syncPipeline();
+  }
+
+  Future<void> setMultibandCompressorBand(
+    int index,
+    MultibandCompressorBandConfig band,
+  ) async {
+    if (index < 0 || index >= multibandCompressorBands.length) return;
+    final bands =
+        List<MultibandCompressorBandConfig>.from(multibandCompressorBands);
+    bands[index] = band;
+    multibandCompressorBands = bands;
+    if (PlatformCapabilities.isAndroid && isMultibandCompressorEnabled) {
+      await _effectsChannel.setMultibandCompressorBand(
+        index,
+        thresholdDb: band.thresholdDb,
+        ratio: band.ratio,
+        attackMs: band.attackMs,
+        releaseMs: band.releaseMs,
+        kneeDb: band.kneeDb,
+        makeupGainDb: band.makeupGainDb,
+        enabled: band.enabled,
+      );
+    }
+    _debouncedSavePreferences();
+  }
+
+  Future<void> _pushMultibandCompressorConfig() async {
+    if (!PlatformCapabilities.isAndroid) return;
+    await _effectsChannel.setMultibandCompressorCrossovers(
+      f0: multibandCompressorF0,
+      f1: multibandCompressorF1,
+      f2: multibandCompressorF2,
+    );
+    for (int i = 0; i < multibandCompressorBands.length; i++) {
+      final band = multibandCompressorBands[i];
+      await _effectsChannel.setMultibandCompressorBand(
+        i,
+        thresholdDb: band.thresholdDb,
+        ratio: band.ratio,
+        attackMs: band.attackMs,
+        releaseMs: band.releaseMs,
+        kneeDb: band.kneeDb,
+        makeupGainDb: band.makeupGainDb,
+        enabled: band.enabled,
+      );
+    }
+  }
+
+  // --- NATIVE C++ DYNAMIC BASS (DYNAMIC SYSTEM) ---
+
+  Future<void> setDynamicBass({
+    required bool enabled,
+    double? strength,
+    int? xLow,
+    int? xHigh,
+    int? yLow,
+    int? yHigh,
+    double? sideGainLow,
+    double? sideGainHigh,
+    int? preset,
+  }) async {
+    isDynamicBassEnabled = enabled;
+    if (strength != null) dynamicBassStrength = strength.clamp(0.0, 8.0);
+    if (preset != null) dynamicBassPreset = preset.clamp(0, 9);
+    if (dynamicBassPreset > 0) {
+      final p = DynamicBassConfig.builtinPresets.firstWhere(
+        (it) => it.id == dynamicBassPreset,
+        orElse: () => DynamicBassConfig.builtinPresets.first,
+      );
+      dynamicBassXLow = p.xLow;
+      dynamicBassXHigh = p.xHigh;
+      dynamicBassYLow = p.yLow;
+      dynamicBassYHigh = p.yHigh;
+      dynamicBassSideGainLow = p.sideGainLow;
+      dynamicBassSideGainHigh = p.sideGainHigh;
+    } else {
+      if (xLow != null) dynamicBassXLow = xLow.clamp(20, 2400);
+      if (xHigh != null) dynamicBassXHigh = xHigh.clamp(500, 12000);
+      if (yLow != null) dynamicBassYLow = yLow.clamp(20, 200);
+      if (yHigh != null) dynamicBassYHigh = yHigh.clamp(30, 300);
+      if (sideGainLow != null) dynamicBassSideGainLow = sideGainLow.clamp(0.0, 1.0);
+      if (sideGainHigh != null) dynamicBassSideGainHigh = sideGainHigh.clamp(0.0, 1.0);
+    }
+
+    if (PlatformCapabilities.isAndroid) {
+      await _effectsChannel.setDynamicBassParams(
+        enabled: isDynamicBassEnabled,
+        strength: dynamicBassStrength,
+        xLow: dynamicBassXLow,
+        xHigh: dynamicBassXHigh,
+        yLow: dynamicBassYLow,
+        yHigh: dynamicBassYHigh,
+        sideGainLow: dynamicBassSideGainLow,
+        sideGainHigh: dynamicBassSideGainHigh,
+        devicePreset: dynamicBassPreset,
+      );
+    }
+    _debouncedSavePreferences();
+    _syncPipeline();
+  }
+
 
   /// Owned bypass: stores state, pushes to native (with DoP mirror), and
   /// syncs the pipeline mirror so reattach/route resync restores it.
@@ -1772,6 +2095,7 @@ class EqualizerManager {
     _dspPipeline?.updateState(
       isEqEnabled: isEnabled,
       isDynamicEqEnabled: isDynamicEqEnabled,
+      isMultibandCompressorEnabled: isMultibandCompressorEnabled,
       isCrossfeedEnabled: isCrossfeedEnabled,
       isReverbEnabled: isReverbEnabled,
       stereoBalance: stereoBalance,
@@ -1779,6 +2103,7 @@ class EqualizerManager {
       isSaturationEnabled: isSaturationEnabled,
       isStereoWidthEnabled: isStereoWidthEnabled,
       isSubCrossoverEnabled: isSubCrossoverEnabled,
+      isDynamicBassEnabled: isDynamicBassEnabled,
       isLoudnessContourEnabled: isLoudnessContourEnabled,
       isLimiterEnabled: isLimiterEnabled,
       bitPerfectBypass: isBitPerfectBypass,
@@ -2038,6 +2363,11 @@ class EqualizerManager {
     if (isReverbEnabled) {
       futures.add(_effectsChannel.setReverbPreset(reverbPreset));
       futures.add(_effectsChannel.setReverbWetDry(reverbWetDry));
+      if (reverbCrossChannel > 0.0) {
+        futures.add(
+          _effectsChannel.setReverbCrossChannel(reverbCrossChannel),
+        );
+      }
       futures.add(_effectsChannel.setReverbEnabled(true));
     }
     if (stereoBalance != 0.0) {
@@ -2055,12 +2385,23 @@ class EqualizerManager {
           saturationDrive,
           saturationMix,
           saturationTilt,
+          mode: saturationMode,
         ),
       );
       futures.add(_effectsChannel.setSaturationEnabled(true));
     }
     if (isStereoWidthEnabled) {
-      futures.add(_effectsChannel.setStereoWidthParams(stereoWidth));
+      futures.add(
+        _effectsChannel.setStereoWidthParams(
+          stereoWidth,
+          multiband: stereoWidthMultiband,
+          lowWidth: stereoWidthLow,
+          midWidth: stereoWidthMid,
+          highWidth: stereoWidthHigh,
+          lowCrossoverHz: stereoWidthLowCrossoverHz,
+          highCrossoverHz: stereoWidthHighCrossoverHz,
+        ),
+      );
       futures.add(_effectsChannel.setStereoWidthEnabled(true));
     }
     if (isLoudnessContourEnabled) {
@@ -2078,6 +2419,8 @@ class EqualizerManager {
           subCrossoverCornerHz,
           subCrossoverSlopeDbPerOct,
           subCrossoverGain,
+          bassMono: subCrossoverBassMono,
+          antiPop: subCrossoverAntiPop,
         ),
       );
       futures.add(_effectsChannel.setSubCrossoverEnabled(true));
@@ -2085,6 +2428,27 @@ class EqualizerManager {
     if (isDynamicEqEnabled) {
       futures.add(_pushDynamicEqConfig());
       futures.add(_effectsChannel.setDynamicEqEnabled(true));
+    }
+    if (isMultibandCompressorEnabled) {
+      futures.add(_pushMultibandCompressorConfig());
+      futures.add(
+        _effectsChannel.setMultibandCompressorEnabled(true),
+      );
+    }
+    if (isDynamicBassEnabled) {
+      futures.add(
+        _effectsChannel.setDynamicBassParams(
+          enabled: true,
+          strength: dynamicBassStrength,
+          xLow: dynamicBassXLow,
+          xHigh: dynamicBassXHigh,
+          yLow: dynamicBassYLow,
+          yHigh: dynamicBassYHigh,
+          sideGainLow: dynamicBassSideGainLow,
+          sideGainHigh: dynamicBassSideGainHigh,
+          devicePreset: dynamicBassPreset,
+        ),
+      );
     }
 
     // Partial-failure tolerance: one failing effect must not abort the rest.

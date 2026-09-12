@@ -98,9 +98,9 @@ class AudioFeatureRegistry {
   static const reverb = AudioFeatureInfo(
     id: 'reverb',
     title: 'Convolution Reverb',
-    subtitle: '8 rooms (RT60 0.35–5 s) or custom IR',
+    subtitle: '8 rooms (RT60 0.35–5 s), cross-channel crosstalk, or custom IR',
     description:
-        'Partitioned convolution (512-frame blocks) against a synthesized room impulse — Studio, Room, Chamber, Hall, Concert Hall, Cathedral, Plate, Spring — or an impulse response you load. Largest latency (~10 ms). IR synthesis runs off the main thread. Needs the native DSP path; disabled during Bit-Perfect.',
+        'Partitioned convolution (512-frame blocks) against a synthesized room impulse or custom impulse response you load. Features adjustable cross-channel crosstalk for authentic binaural IRS stereo spatialization. Zero heap allocations in audio loop. Needs the native DSP path; disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
   );
 
@@ -219,18 +219,18 @@ class AudioFeatureRegistry {
   static const saturation = AudioFeatureInfo(
     id: 'saturation',
     title: 'Harmonic Saturation / Exciter',
-    subtitle: 'Tube/tape tanh waveshaping, drive · mix · tilt',
+    subtitle: 'Tape, Vacuum Tube (2nd harmonic), or Analog Class-A with 4× sinc oversampling',
     description:
-        'Generates harmonics via tanh waveshaping with a tape-style HF tilt emphasis and wet/dry mix. Zero latency. Adds density and warmth; excessive drive increases THD. Disabled during Bit-Perfect.',
+        'Generates rich analog warmth and harmonic density. Offers 3 selectable color profiles: Tape (smooth odd-order saturation), Vacuum Tube (asymmetric 6J1 triode with warm even 2nd harmonics), and Analog Class-A (full vintage transformer response). Features 4× polyphase sinc anti-aliasing and DC blocking. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
   );
 
   static const stereoWidth = AudioFeatureInfo(
     id: 'stereoWidth',
-    title: 'Stereo Width (Mid/Side)',
-    subtitle: '0 = mono · 1 = normal · 2 = widest',
+    title: '3-Band Stereo Imager & Bass Mono',
+    subtitle: 'Multiband width + sub-bass mono phase protection',
     description:
-        'Mid/Side matrix that scales the side signal (L−R). Independent from Crossfeed and the Virtualizer: width 0 collapses to mono, values above 1 widen the field. Zero latency. Disabled during Bit-Perfect.',
+        'Mid/Side multiband stereo imager utilizing phase-linear Linkwitz-Riley crossovers. Features dedicated low (<160 Hz), mid (160 Hz–2.5 kHz), and high (>2.5 kHz) width controls. Sub-bass mono isolation eliminates stereo low-end phase cancellation and comb filtering. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
   );
 
@@ -246,18 +246,36 @@ class AudioFeatureRegistry {
   static const subCrossover = AudioFeatureInfo(
     id: 'subCrossover',
     title: 'Subwoofer Crossover (Bass Redirection)',
-    subtitle: '60–150 Hz low-pass, 12/24 dB/oct, summed mono tap',
+    subtitle: '60–150 Hz Linkwitz-Riley, Bass Mono + Anti-Pop limiting',
     description:
-        'Bass redirection for stereo rigs: a Linkwitz-Riley-style low-passed mono sum is mixed back into both channels at user gain. Mains keep full range — this is not true multichannel LFE routing. Disabled during Bit-Perfect.',
+        'Bass redirection for stereo rigs: a 4th-order Linkwitz-Riley low-pass mono sum is mixed into both channels. Features Bass Mono side-channel subtraction to keep sub-bass punchy and mono-centered, plus tanh anti-pop soft-limiting to eliminate clicks. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
   );
 
   static const dynamicEq = AudioFeatureInfo(
     id: 'dynamicEq',
-    title: 'Dynamic EQ',
-    subtitle: 'Frequency bands that cut only when energy exceeds threshold',
+    title: 'Dynamic EQ (Cut & Boost)',
+    subtitle: 'Multi-mode dynamic filters (Peaking, Low-Shelf, High-Shelf)',
     description:
-        'Per-band dynamic cut: engages only while signal energy inside the band exceeds its threshold (threshold/ratio/attack/release per band, capped max cut). Tames resonances without static EQ coloration. Note: it interacts with the OEM DynamicsProcessing compressor — using both may double-compress the same band. Disabled during Bit-Perfect.',
+        'Per-band dynamic equalization supporting both Cut (resonance taming) and Boost (transient expansion) modes. Selectable between Peaking biquad, Low-Shelf, and High-Shelf dynamic responses with smooth soft-knee detection. Disabled during Bit-Perfect.',
+    conflictsWith: 'Bit-Perfect bypass',
+  );
+
+  static const multibandCompressor = AudioFeatureInfo(
+    id: 'multibandCompressor',
+    title: 'Native 4-Band Multiband Compressor',
+    subtitle: 'Phase-aligned Linkwitz-Riley 4th order crossovers, zero-latency C++',
+    description:
+        'Professional 4-band studio mastering compressor built directly into the C++ native DSP engine. Uses Linkwitz-Riley 4th order (LR4) crossovers for exact flat magnitude summation with zero phase distortion. Features independent threshold, ratio, attack, release, soft-knee, and makeup gain per band. Replaces fragile HAL compressor paths. Disabled during Bit-Perfect.',
+    conflictsWith: 'Bit-Perfect bypass',
+  );
+
+  static const dynamicBass = AudioFeatureInfo(
+    id: 'dynamicBass',
+    title: 'Dynamic Bass (Dynamic System)',
+    subtitle: 'Envelope-adaptive sub-bass punch & headphone virtualization',
+    description:
+        'Modeled on ViPER4Android’s famous Dynamic System. Restores physical weight and tactile punch for headphones by dynamically expanding quiet bass passages and soft-saturating loud peaks. Features Mid-Side sub-bass extraction, psychoacoustic harmonic synthesis, and 9 classic headphone device calibration presets. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
   );
 }

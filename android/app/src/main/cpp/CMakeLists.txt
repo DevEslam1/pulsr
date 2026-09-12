@@ -31,6 +31,8 @@ add_library(pulsr_dsp SHARED
     LoudnessContour.cpp
     SubCrossover.cpp
     DynamicEQ.cpp
+    MultibandCompressor.cpp
+    DynamicBass.cpp
     AudioDspEngine.cpp
     eq_jni_bridge.cpp
     AAudioSink.cpp

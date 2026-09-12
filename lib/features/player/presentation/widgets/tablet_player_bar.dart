@@ -5,6 +5,7 @@ import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/widgets/cached_artwork.dart';
+import '../../../../core/widgets/pulsr_slider.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
@@ -292,48 +293,37 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
-                                  child: SliderTheme(
-                                    data: SliderTheme.of(context).copyWith(
-                                      trackHeight: 3.5,
-                                      thumbShape: const RoundSliderThumbShape(
-                                          enabledThumbRadius: 5.5),
-                                      overlayShape: const RoundSliderOverlayShape(
-                                          overlayRadius: 11),
-                                      activeTrackColor: activeColor,
-                                      inactiveTrackColor:
-                                          p.textSecondary.withValues(alpha: 0.25),
-                                      thumbColor: activeColor,
-                                      overlayColor:
-                                          activeColor.withValues(alpha: 0.15),
-                                    ),
-                                    child: Slider(
-                                      min: 0.0,
-                                      max: state.duration.inMilliseconds
-                                                  .toDouble() >
+                                  child: PulsrSlider(
+                                    min: 0.0,
+                                    max: state.duration.inMilliseconds
+                                                .toDouble() >
+                                            0
+                                        ? state.duration.inMilliseconds
+                                            .toDouble()
+                                        : 1.0,
+                                    value: (_dragSeekValue ??
+                                            position.inMilliseconds
+                                                .toDouble())
+                                        .clamp(
+                                      0.0,
+                                      state.duration.inMilliseconds.toDouble() >
                                               0
                                           ? state.duration.inMilliseconds
                                               .toDouble()
                                           : 1.0,
-                                      value: (_dragSeekValue ??
-                                              position.inMilliseconds
-                                                  .toDouble())
-                                          .clamp(
-                                        0.0,
-                                        state.duration.inMilliseconds.toDouble() >
-                                                0
-                                            ? state.duration.inMilliseconds
-                                                .toDouble()
-                                            : 1.0,
-                                      ),
-                                      onChanged: (val) {
-                                        setState(() => _dragSeekValue = val);
-                                      },
-                                      onChangeEnd: (val) {
-                                        cubit.seek(
-                                            Duration(milliseconds: val.toInt()));
-                                        setState(() => _dragSeekValue = null);
-                                      },
                                     ),
+                                    activeColor: activeColor,
+                                    onChangeStart: (val) {
+                                      setState(() => _dragSeekValue = val);
+                                    },
+                                    onChanged: (val) {
+                                      setState(() => _dragSeekValue = val);
+                                    },
+                                    onChangeEnd: (val) {
+                                      cubit.seek(
+                                          Duration(milliseconds: val.toInt()));
+                                      setState(() => _dragSeekValue = null);
+                                    },
                                   ),
                                 ),
                                 const SizedBox(width: 8),
@@ -399,31 +389,19 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                           },
                         ),
                         SizedBox(
-                          width: 76,
-                          child: SliderTheme(
-                            data: SliderTheme.of(context).copyWith(
-                              trackHeight: 3,
-                              thumbShape: const RoundSliderThumbShape(
-                                  enabledThumbRadius: 4.5),
-                              overlayShape: const RoundSliderOverlayShape(
-                                  overlayRadius: 9),
-                              activeTrackColor: p.textPrimary,
-                              inactiveTrackColor:
-                                  p.textSecondary.withValues(alpha: 0.25),
-                              thumbColor: p.textPrimary,
-                            ),
-                            child: Slider(
-                              min: 0.0,
-                              max: 1.0,
-                              value: _volume.clamp(0.0, 1.0),
-                              onChanged: (v) {
-                                setState(() {
-                                  _volume = v;
-                                  _isMuted = v == 0;
-                                });
-                                cubit.setVolume(v);
-                              },
-                            ),
+                          width: 80,
+                          child: PulsrSlider(
+                            min: 0.0,
+                            max: 1.0,
+                            value: _volume.clamp(0.0, 1.0),
+                            activeColor: p.textPrimary,
+                            onChanged: (v) {
+                              setState(() {
+                                _volume = v;
+                                _isMuted = v == 0;
+                              });
+                              cubit.setVolume(v);
+                            },
                           ),
                         ),
                         const SizedBox(width: 2),

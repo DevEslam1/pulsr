@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
+import '../../../../core/widgets/pulsr_slider.dart';
 
 String _fmt(Duration? d) {
   if (d == null) return '--:--';
@@ -146,7 +147,7 @@ class _DelaySheetState extends State<_DelaySheet> {
             Text('Audio delay: ${value.round()} ms',
                 style: Theme.of(context).textTheme.titleMedium),
             const Text('Positive delays audio (e.g. slow Bluetooth/video).'),
-            Slider(
+            PulsrSlider(
               min: -2000,
               max: 2000,
               divisions: 80,

@@ -547,6 +547,7 @@ void ConvolutionReverb::applyParams(const ReverbParamSet& params) {
     targetWet_ = std::clamp(params.wetDry, 0.0, 1.0);
     setPredelay(params.predelayMs);
     damping_ = std::clamp(params.damping, 0.0, 1.0);
+    setCrossChannel(params.crossChannel);
 
     // BUG-001 / [A1]: Audio-thread RT safety:
     // If preparedIr is provided, apply it. If null, DO NOT allocate or lock cache on audio thread.
@@ -760,8 +761,18 @@ void ConvolutionReverb::processCore(const float* inL, const float* inR, float* o
                 convR += rR[-tap] * irR[tap];
             }
 
-            outL[i] = inL[i] * dryGain + convL * wetGain;
-            outR[i] = inR[i] * dryGain + convR * wetGain;
+            float wetSampleL = convL;
+            float wetSampleR = convR;
+            if (crossChannel_ > 0.001) {
+                const float cross = static_cast<float>(crossChannel_);
+                const float cL = (1.0f - 0.5f * cross) * wetSampleL + (0.5f * cross) * wetSampleR;
+                const float cR = (1.0f - 0.5f * cross) * wetSampleR + (0.5f * cross) * wetSampleL;
+                wetSampleL = cL;
+                wetSampleR = cR;
+            }
+
+            outL[i] = inL[i] * dryGain + wetSampleL * wetGain;
+            outR[i] = inR[i] * dryGain + wetSampleR * wetGain;
 
             directPos_ = (directPos_ + 1) % totalTaps;
         }
@@ -803,8 +814,18 @@ void ConvolutionReverb::processCore(const float* inL, const float* inR, float* o
         const float convSampleL = accumFreqL_[PARTITION_SIZE + inputBlockPos_].real();
         const float convSampleR = accumFreqR_[PARTITION_SIZE + inputBlockPos_].real();
 
-        outL[i] = inL[i] * dryGain + convSampleL * wetGain;
-        outR[i] = inR[i] * dryGain + convSampleR * wetGain;
+        float wetSampleL = convSampleL;
+        float wetSampleR = convSampleR;
+        if (crossChannel_ > 0.001) {
+            const float cross = static_cast<float>(crossChannel_);
+            const float cL = (1.0f - 0.5f * cross) * wetSampleL + (0.5f * cross) * wetSampleR;
+            const float cR = (1.0f - 0.5f * cross) * wetSampleR + (0.5f * cross) * wetSampleL;
+            wetSampleL = cL;
+            wetSampleR = cR;
+        }
+
+        outL[i] = inL[i] * dryGain + wetSampleL * wetGain;
+        outR[i] = inR[i] * dryGain + wetSampleR * wetGain;
 
         inputBlockPos_++;
 

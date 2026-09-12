@@ -31,11 +31,16 @@ class _ModalGate extends StatelessWidget {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
       valueListenable: PulsrModalTracker.isModalOpen,
-      builder: (context, modalOpen, _) => AnimatedOpacity(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
-        opacity: modalOpen ? 0.0 : 1.0,
-        child: IgnorePointer(ignoring: modalOpen, child: child),
+      builder: (context, modalOpen, _) => AnimatedSlide(
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeInOutCubic,
+        offset: modalOpen ? const Offset(0, 1.4) : Offset.zero,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+          opacity: modalOpen ? 0.0 : 1.0,
+          child: IgnorePointer(ignoring: modalOpen, child: child),
+        ),
       ),
     );
   }

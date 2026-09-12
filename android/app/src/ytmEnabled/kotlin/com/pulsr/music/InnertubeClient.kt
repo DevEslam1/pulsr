@@ -286,11 +286,15 @@ internal class InnertubeClient(
                     val parsedSignal = YtmBlockSignal.parse(200, status, playability)
                     updateBestSignal(parsedSignal)
                     Log.w(TAG, "[$traceId] Client ${client.name} returned status $status (reason='$reason', sub='$subreason') -> $parsedSignal")
-                    if ((parsedSignal == YtmBlockSignal.BotChallenge || parsedSignal == YtmBlockSignal.PoTokenInvalid) &&
+                    if ((parsedSignal == YtmBlockSignal.PoTokenInvalid ||
+                            PoTokenManager.isExpired() ||
+                            PoTokenManager.isLimitedMode) &&
                         (client == ClientType.ANDROID_MUSIC || client == ClientType.WEB_REMIX)) {
-                        // Throttled: during an IP-flagged sweep every client hits
-                        // this branch; the refresh itself is a no-op while the
-                        // token is fresh, so once a minute is plenty.
+                        // Only re-mint when attestation is actually suspect: an
+                        // explicit token rejection, or an expired/limited token.
+                        // Refreshing on a generic BotChallenge while the token is
+                        // still valid just burns a BotGuard round trip and churns
+                        // state for an IP-level verdict the token cannot change.
                         val now = android.os.SystemClock.elapsedRealtime()
                         if (now - lastBotRefreshTriggerMs > 30_000L) {
                             lastBotRefreshTriggerMs = now
@@ -298,15 +302,30 @@ internal class InnertubeClient(
                             PoTokenManager.triggerBackgroundRefresh()
                         }
                     }
-                    // Short-circuit on both IpBlocked AND BotChallenge: on VPN exits
-                    // every client returns BotChallenge but the old code only counted
-                    // IpBlocked, so all 9 clients ran serially (~10s) with no exit.
-                    // Threshold 4 gives early clients a chance to succeed while still
-                    // aborting a sweep that is clearly doomed.
-                    if (parsedSignal == YtmBlockSignal.IpBlocked || parsedSignal == YtmBlockSignal.BotChallenge) {
+                    // Count every "this egress is refused" signal. On a VPN exit
+                    // the clients do not all return the same thing: typically one
+                    // BotChallenge plus several "please sign in" / "no usable
+                    // formats" replies. Only BotChallenge/IpBlocked used to count,
+                    // so a sweep that was already clearly doomed ran all nine
+                    // clients (~25s) with no exit. Threshold 3 still gives the
+                    // first two clients a chance to prove the exit is usable.
+                    val isEgressBlock = parsedSignal == YtmBlockSignal.IpBlocked ||
+                        parsedSignal == YtmBlockSignal.BotChallenge ||
+                        parsedSignal == YtmBlockSignal.PoTokenInvalid
+                    // A guest client that normally streams anonymously answering
+                    // "please sign in" is an egress challenge, not a per-video
+                    // condition. Fold it in only once a bot/attestation signal has
+                    // already appeared, so a genuinely private or members-only
+                    // track (which asks every client to sign in) is not misread as
+                    // an IP block.
+                    val guestSignInAsBlock =
+                        parsedSignal == YtmBlockSignal.SignInRequired &&
+                            !cookieStore.isSessionValid() &&
+                            blockSignalCount.get() > 0
+                    if (isEgressBlock || guestSignInAsBlock) {
                         blockClients.add(client.name)
                         val count = blockSignalCount.incrementAndGet()
-                        if (count >= 4) {
+                        if (count >= 3) {
                             Log.w(TAG, "[$traceId] Short-circuiting chain: $count block signals ($parsedSignal) from (${blockClients.joinToString()}) for $videoId")
                             shortCircuit.compareAndSet(
                                 null,
@@ -567,7 +586,14 @@ internal class InnertubeClient(
 
         fun tryPoTokenRecovery(): Map<String, Any?>? {
             val sc = shortCircuit.get()
-            if (lastSignalRef.get() == YtmBlockSignal.BotChallenge || sc?.signal == YtmBlockSignal.BotChallenge) {
+            val recoverySignal = sc?.signal ?: lastSignalRef.get()
+            // Recovery only helps when the attestation itself is the problem. A
+            // generic BotChallenge against a valid (non-expired) token is an
+            // egress/IP verdict, so re-minting the same token on the same IP just
+            // repeats the refusal and doubles the chain cost on every track.
+            val tokenStale = PoTokenManager.isExpired() || PoTokenManager.isLimitedMode
+            if (recoverySignal == YtmBlockSignal.PoTokenInvalid ||
+                (recoverySignal == YtmBlockSignal.BotChallenge && tokenStale)) {
                 val refreshed = runCatching { PoTokenManager.ensureReadySync() }.getOrDefault(false)
                 if (refreshed && !PoTokenManager.isLimitedMode) {
                     Log.i(TAG, "[$traceId] PoToken refreshed, retrying WEB_REMIX...")

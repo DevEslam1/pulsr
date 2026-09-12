@@ -9,6 +9,7 @@ import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
+import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/di/injection.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
@@ -39,22 +40,13 @@ class QueueScreen extends StatelessWidget {
                 final cubit = context.read<PlayerCubit>();
                 switch (v) {
                   case 'clear':
-                    final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (c) => AlertDialog(
-                        title: Text(context.l10n.queue),
-                        content: const Text('Clear queue? (Playing track will be kept)'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(c, false),
-                            child: const Text('Cancel'),
-                          ),
-                          FilledButton(
-                            onPressed: () => Navigator.pop(c, true),
-                            child: const Text('Clear'),
-                          ),
-                        ],
-                      ),
+                    final confirm = await PulsrDialogHelper.showConfirmDialog(
+                      context,
+                      title: context.l10n.queue,
+                      message: 'Clear queue? (Playing track will be kept)',
+                      icon: Icons.clear_all_rounded,
+                      confirmLabel: 'Clear',
+                      isDestructive: true,
                     );
                     if (confirm == true) {
                       await cubit.clearQueue();
@@ -67,29 +59,15 @@ class QueueScreen extends StatelessWidget {
                     if (current != null) await cubit.playSong(current, queue: shuffled);
                     break;
                   case 'save':
-                    final nameCtrl = TextEditingController(
-                      text: 'Queue ${DateTime.now().toIso8601String().substring(0, 10)}',
-                    );
-                    final name = await showDialog<String>(
-                      context: context,
-                      builder: (c) => AlertDialog(
-                        title: const Text('Save as playlist'),
-                        content: TextField(
-                          controller: nameCtrl,
-                          decoration: const InputDecoration(labelText: 'Playlist name'),
-                          autofocus: true,
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(c),
-                            child: const Text('Cancel'),
-                          ),
-                          FilledButton(
-                            onPressed: () => Navigator.pop(c, nameCtrl.text.trim()),
-                            child: const Text('Save'),
-                          ),
-                        ],
-                      ),
+                    final defaultName =
+                        'Queue ${DateTime.now().toIso8601String().substring(0, 10)}';
+                    final name = await PulsrDialogHelper.showInputDialog(
+                      context,
+                      title: 'Save as Playlist',
+                      initialText: defaultName,
+                      icon: Icons.playlist_add_rounded,
+                      confirmLabel: 'Save',
+                      cancelLabel: 'Cancel',
                     );
                     if (name != null && name.isNotEmpty && context.mounted) {
                       final songIds = state.queue.map((s) => s.id).toList();

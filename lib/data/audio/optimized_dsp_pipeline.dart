@@ -4,12 +4,14 @@
 enum DspStage {
   parametricEq('Parametric EQ', 0.1),
   dynamicEq('Dynamic EQ', 0.0),
+  multibandCompressor('Multiband Compressor', 0.1),
   crossfeed('Crossfeed', 0.05),
   convolutionReverb('Convolution Reverb', 0.3),
   stereoPanner('Stereo Balance / Mono Mix', 0.02),
   harmonicSaturation('Harmonic Saturation', 0.0),
   stereoWidth('Stereo Width', 0.0),
   subCrossover('Sub Crossover (Bass Redirection)', 0.0),
+  dynamicBass('Dynamic Bass', 0.0),
   lookaheadLimiter('Lookahead Limiter', 0.08),
   loudnessContour('Loudness Contour', 0.0),
   volume('Volume & ReplayGain', 0.01);
@@ -23,6 +25,7 @@ enum DspStage {
 class OptimizedDspPipeline {
   bool eqEnabled = false;
   bool dynamicEqEnabled = false;
+  bool multibandCompressorEnabled = false;
   bool crossfeedEnabled = false;
   bool reverbEnabled = false;
   double balance = 0.0;
@@ -30,6 +33,7 @@ class OptimizedDspPipeline {
   bool saturationEnabled = false;
   bool stereoWidthEnabled = false;
   bool subCrossoverEnabled = false;
+  bool dynamicBassEnabled = false;
   bool loudnessContourEnabled = false;
   bool limiterEnabled = false;
   bool isBitPerfectBypass = false;
@@ -41,24 +45,27 @@ class OptimizedDspPipeline {
   /// Pipeline execution order optimized for minimal latency and acoustic correctness:
   /// 1. Parametric EQ (10-32 bands)
   /// 2. Dynamic EQ (energy-dependent cuts, adjacent to the static EQ)
-  /// 3. Crossfeed (headphone acoustic cross-coupling)
-  /// 4. Convolution Reverb (spatial room impulse response)
-  /// 5. Stereo Balance / Mono Mix
-  /// 6. Harmonic Saturation (after tonal/spatial shaping, before peak control)
-  /// 7. Stereo Width (M/S, after crossfeed/reverb, before the limiter)
-  /// 8. Sub Crossover (bass redirection sum, after width, before the limiter)
-  /// 9. Lookahead Limiter (brickwall peak protection)
-  /// 10. Loudness Contour (computed against the current volume-stage value)
-  /// 11. Volume (ReplayGain + user master volume)
+  /// 3. Multiband Compressor (4-band LR4 dynamics)
+  /// 4. Crossfeed (headphone acoustic cross-coupling)
+  /// 5. Convolution Reverb (spatial room impulse response)
+  /// 6. Stereo Balance / Mono Mix
+  /// 7. Harmonic Saturation (after tonal/spatial shaping, before peak control)
+  /// 8. Stereo Width (M/S, after crossfeed/reverb, before the limiter)
+  /// 9. Sub Crossover (bass redirection sum, after width, before the limiter)
+  /// 10. Lookahead Limiter (brickwall peak protection)
+  /// 11. Loudness Contour (computed against the current volume-stage value)
+  /// 12. Volume (ReplayGain + user master volume)
   static const List<DspStage> pipelineOrder = [
     DspStage.parametricEq,
     DspStage.dynamicEq,
+    DspStage.multibandCompressor,
     DspStage.crossfeed,
     DspStage.convolutionReverb,
     DspStage.stereoPanner,
     DspStage.harmonicSaturation,
     DspStage.stereoWidth,
     DspStage.subCrossover,
+    DspStage.dynamicBass,
     DspStage.lookaheadLimiter,
     DspStage.loudnessContour,
     DspStage.volume,
@@ -72,6 +79,8 @@ class OptimizedDspPipeline {
           return eqEnabled;
         case DspStage.dynamicEq:
           return dynamicEqEnabled;
+        case DspStage.multibandCompressor:
+          return multibandCompressorEnabled;
         case DspStage.crossfeed:
           return crossfeedEnabled;
         case DspStage.convolutionReverb:
@@ -84,6 +93,8 @@ class OptimizedDspPipeline {
           return stereoWidthEnabled;
         case DspStage.subCrossover:
           return subCrossoverEnabled;
+        case DspStage.dynamicBass:
+          return dynamicBassEnabled;
         case DspStage.lookaheadLimiter:
           return limiterEnabled;
         case DspStage.loudnessContour:
@@ -127,6 +138,7 @@ class OptimizedDspPipeline {
   void updateState({
     bool? isEqEnabled,
     bool? isDynamicEqEnabled,
+    bool? isMultibandCompressorEnabled,
     bool? isCrossfeedEnabled,
     bool? isReverbEnabled,
     double? stereoBalance,
@@ -134,12 +146,16 @@ class OptimizedDspPipeline {
     bool? isSaturationEnabled,
     bool? isStereoWidthEnabled,
     bool? isSubCrossoverEnabled,
+    bool? isDynamicBassEnabled,
     bool? isLoudnessContourEnabled,
     bool? isLimiterEnabled,
     bool? bitPerfectBypass,
   }) {
     if (isEqEnabled != null) eqEnabled = isEqEnabled;
     if (isDynamicEqEnabled != null) dynamicEqEnabled = isDynamicEqEnabled;
+    if (isMultibandCompressorEnabled != null) {
+      multibandCompressorEnabled = isMultibandCompressorEnabled;
+    }
     if (isCrossfeedEnabled != null) crossfeedEnabled = isCrossfeedEnabled;
     if (isReverbEnabled != null) reverbEnabled = isReverbEnabled;
     if (stereoBalance != null) balance = stereoBalance;
@@ -147,6 +163,7 @@ class OptimizedDspPipeline {
     if (isSaturationEnabled != null) saturationEnabled = isSaturationEnabled;
     if (isStereoWidthEnabled != null) stereoWidthEnabled = isStereoWidthEnabled;
     if (isSubCrossoverEnabled != null) subCrossoverEnabled = isSubCrossoverEnabled;
+    if (isDynamicBassEnabled != null) dynamicBassEnabled = isDynamicBassEnabled;
     if (isLoudnessContourEnabled != null) {
       loudnessContourEnabled = isLoudnessContourEnabled;
     }

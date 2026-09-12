@@ -87,6 +87,7 @@ struct ReverbParamSet {
     double wetDry = 0.20;
     double predelayMs = 0.0;
     double damping = 0.5;
+    double crossChannel = 0.0; // 0.0 to 1.0 (binaural crosstalk blend)
     bool enabled = false;
     std::shared_ptr<const PreparedIr> preparedIr = nullptr;
 };
@@ -110,12 +111,20 @@ struct SaturationParamSet {
     double drive = 0.0; // 0..1 (0 = linear/transparent)
     double mix = 0.5;   // 0..1 wet/dry blend
     double tilt = 0.0;  // 0..1 HF pre-emphasis into the shaper (tape-style)
+    int mode = 0;       // 0 = Tape (odd harmonics), 1 = Tube (even+odd triode), 2 = Analog (Class-A)
     bool enabled = false;
 };
 
 struct StereoWidthParamSet {
     double width = 1.0; // 0 = mono, 1 = normal, up to 2 = widened
     bool enabled = false;
+    // 3-Band Multiband Stereo Imager with Bass Mono
+    bool multiband = false;
+    double lowWidth = 0.0;           // default 0.0 (Bass Mono)
+    double midWidth = 1.0;           // 0..2
+    double highWidth = 1.5;          // 0..2
+    double lowCrossoverHz = 160.0;   // Low/Mid cutoff
+    double highCrossoverHz = 4000.0; // Mid/High cutoff
 };
 
 // Fletcher-Munson equal-loudness compensation. `volumeLinear` is the current
@@ -127,14 +136,13 @@ struct LoudnessContourParamSet {
     bool enabled = false;
 };
 
-// Subwoofer / LFE crossover. NOTE: the current pipeline is stereo-only, so this
-// is implemented as bass-management *redirection* — a Linkwitz-Riley-style
-// low-passed mono sum added back into both channels at `subGain`. Mains keep
-// full range (no high-pass); this is NOT true multichannel LFE routing.
+// Subwoofer / LFE crossover & Bass Management
 struct SubCrossoverParamSet {
     double cornerHz = 80.0;      // 60..150
     double slopeDbPerOct = 24.0; // 12 or 24 (Linkwitz-Riley 2/4)
     double subGain = 0.8;        // 0..1 gain of the redirected sub tap
+    bool bassMono = true;        // collapse low-end below cornerHz to pure mono
+    bool antiPop = true;         // soft-knee saturation on sub transients to protect voice coils
     bool enabled = false;
 };
 
@@ -142,10 +150,13 @@ struct DynamicEqBandParam {
     double frequency = 1000.0;
     double q = 2.0;
     double thresholdDb = -30.0; // band energy threshold
-    double ratio = 3.0;         // compression above threshold
+    double ratio = 3.0;         // compression or expansion ratio above threshold
     double attackMs = 5.0;
     double releaseMs = 120.0;
-    double maxCutDb = -12.0; // gain reduction ceiling (<= 0; cuts only)
+    double maxCutDb = -12.0;    // gain reduction ceiling (<= 0)
+    double maxBoostDb = 12.0;   // gain boost ceiling (>= 0)
+    int mode = 0;               // 0 = Cut (Compress), 1 = Boost (Expand/Lift)
+    int filterType = 0;         // 0 = Peaking, 1 = LowShelf, 2 = HighShelf
     bool enabled = true;
 };
 
@@ -155,6 +166,37 @@ struct DynamicEqParamSet {
     int bandCount = 1;
     bool enabled = false;
 };
+
+struct MultibandBandParam {
+    double thresholdDb = -18.0;   // -60.0 to 0.0 dB
+    double ratio = 2.0;           // 1.0 (bypass) to 20.0 (limiting)
+    double attackMs = 15.0;       // 0.1 to 200.0 ms
+    double releaseMs = 100.0;     // 5.0 to 1000.0 ms
+    double kneeDb = 3.0;          // 0.0 to 12.0 dB
+    double makeupGainDb = 0.0;    // 0.0 to 24.0 dB
+    bool enabled = true;
+};
+
+struct MultibandCompressorParamSet {
+    static constexpr int NUM_BANDS = 4;
+    MultibandBandParam bands[NUM_BANDS];
+    double crossoverFreqs[NUM_BANDS - 1] = {150.0, 1000.0, 5000.0};
+    bool enabled = false;
+};
+
+// ViPER-modeled Dynamic System / Dynamic Bass
+struct DynamicBassParamSet {
+    bool enabled = false;
+    double strength = 1.0;
+    int xLow = 100;
+    int xHigh = 5600;
+    int yLow = 40;
+    int yHigh = 80;
+    double sideGainLow = 0.10;
+    double sideGainHigh = 0.50;
+    int devicePreset = 0; // 0 = Custom, 1..9 = Presets
+};
+
 
 enum class ReplayGainMode {
     Off = 0,
@@ -175,11 +217,7 @@ struct ReplayGainParamSet {
 
 struct DitherParamSet {
     bool enabled = false;
-    // Target output depth. Defaults to 16 because the Android native DSP sink
-    // (NativeDspAudioProcessor) is 16-bit PCM by construction; 24/32 are only
-    // meaningful on a path that actually requantizes to those depths.
     int targetBitDepth = 16;  // 16, 24, 32
-    // Dither is SKIPPED on Bluetooth (lossy encode happens downstream — dithering before SBC/AAC/LDAC is wasted noise)
     bool isBluetooth = false;
 };
 
@@ -204,6 +242,8 @@ struct DspParamSnapshot {
     LoudnessContourParamSet loudness;
     SubCrossoverParamSet subCrossover;
     DynamicEqParamSet dynamicEq;
+    MultibandCompressorParamSet multibandCompressor;
+    DynamicBassParamSet dynamicBass;
     ReplayGainParamSet replayGain;
     DitherParamSet dither;
     BitPerfectParamSet bitPerfect;

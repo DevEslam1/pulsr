@@ -40,10 +40,13 @@ import '../../../domain/models/radio_station.dart';
 import '../../../domain/repositories/music_repository_interface.dart';
 import '../../../domain/usecases/toggle_favorite_usecase.dart';
 import '../../../core/services/device_profile_service.dart';
+import '../../../core/services/earbud_optimization_service.dart';
 import '../../../core/services/hires_audio_service.dart';
+import '../../../core/services/quran_mode_service.dart';
 import '../../../core/services/room_correction_service.dart';
 import '../../../core/services/settings_profiles_service.dart';
 import '../../../domain/models/audio_output_info.dart';
+import '../../../domain/models/quran_mode_profile.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../widgets/widget_service.dart';
 import 'player_state.dart';
@@ -59,6 +62,44 @@ class _QueueSlotData {
     required this.currentIndex,
     required this.position,
     this.speed = 1.0,
+  });
+}
+
+/// Captures the DSP settings that Quran Mode overrides so they can be restored
+/// verbatim when the mode is switched off.
+class _QuranRestoreSnapshot {
+  final EqPreset eqPreset;
+  final bool isEqEnabled;
+  final HeadphoneProfile? headphoneProfile;
+  final bool isReverbEnabled;
+  final int reverbPreset;
+  final double reverbWetDry;
+  final bool isDynamicsEnabled;
+  final DynamicsPreset dynamicsPreset;
+  final bool isSaturationEnabled;
+  final double saturationDrive;
+  final double saturationMix;
+  final double saturationTilt;
+  final double playbackSpeed;
+  final bool isShuffle;
+  final double preampDb;
+
+  const _QuranRestoreSnapshot({
+    required this.eqPreset,
+    required this.isEqEnabled,
+    required this.headphoneProfile,
+    required this.isReverbEnabled,
+    required this.reverbPreset,
+    required this.reverbWetDry,
+    required this.isDynamicsEnabled,
+    required this.dynamicsPreset,
+    required this.isSaturationEnabled,
+    required this.saturationDrive,
+    required this.saturationMix,
+    required this.saturationTilt,
+    required this.playbackSpeed,
+    required this.isShuffle,
+    required this.preampDb,
   });
 }
 
@@ -80,6 +121,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   final PerSongEqStore _perSongEqStore;
   final PerSongVolumeStore _perSongVolumeStore;
   final SongRatingStore _songRatingStore;
+  final QuranModeService? _quranModeService;
+  final EarbudOptimizationService? _earbudOptimizationService;
+  _QuranRestoreSnapshot? _quranRestore;
   String? _lastAutoAppliedDeviceKey;
 
   // FIX(BUG-14): Expose unthrottled position stream for high-fps UI components like MiniPlayer
@@ -152,6 +196,8 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     PerSongEqStore? perSongEqStore,
     PerSongVolumeStore? perSongVolumeStore,
     SongRatingStore? songRatingStore,
+    QuranModeService? quranModeService,
+    EarbudOptimizationService? earbudOptimizationService,
   })  : _audioHandler = audioHandler,
         _repository = repository,
         _toggleFavoriteUseCase = toggleFavoriteUseCase,
@@ -186,6 +232,14 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
             (getIt.isRegistered<SongRatingStore>()
                 ? getIt<SongRatingStore>()
                 : SongRatingStore()),
+        _quranModeService = quranModeService ??
+            (getIt.isRegistered<QuranModeService>()
+                ? getIt<QuranModeService>()
+                : null),
+        _earbudOptimizationService = earbudOptimizationService ??
+            (getIt.isRegistered<EarbudOptimizationService>()
+                ? getIt<EarbudOptimizationService>()
+                : null),
         super(const PlayerState()) {
     _listenToAudioService();
     _loadPlaybackSpeed();
@@ -199,6 +253,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     _audioHandler.effectsReady.then((_) async {
       if (isClosed) return;
       _syncAudioEffects();
+      await _restoreQuranMode();
       // ReplayGain re-apply: with the fully restored session (song tags +
       // cached prefs) a restored 'on' gain mode must be actually audible,
       // not just displayed as enabled.
@@ -3252,6 +3307,197 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
         safeEmit(state.copyWith(
             bookmarkPosition: Duration(milliseconds: b.positionMs)));
       }
+    }
+  }
+
+  // ── Quran Mode ───────────────────────────────────────────────────────
+
+  /// Restores Quran Mode from preferences on launch. No snapshot is captured:
+  /// the restored prefs already reflect whatever the previous session left.
+  Future<void> _restoreQuranMode() async {
+    final service = _quranModeService;
+    if (service == null) return;
+    try {
+      final profile = await service.loadActiveProfile();
+      if (profile == null || isClosed) return;
+      safeEmit(state.copyWith(
+        quranReciterStyle: profile.style,
+        isQuranModeEnabled: true,
+      ));
+      await _applyQuranProfile(profile.style);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to restore Quran Mode',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+    }
+  }
+
+  /// Enables or disables Quran Mode. Enabling snapshots the current DSP state,
+  /// then applies the vocal-optimized profile. Disabling restores the snapshot.
+  Future<void> setQuranModeEnabled(bool enabled) async {
+    if (enabled == state.isQuranModeEnabled) return;
+    if (enabled) {
+      _quranRestore = _captureQuranRestoreSnapshot();
+      await _applyQuranProfile(state.quranReciterStyle);
+      await _quranModeService?.setEnabled(true);
+      if (!isClosed) {
+        safeEmit(
+            state.copyWith(isQuranModeEnabled: true, errorMessage: null));
+      }
+    } else {
+      await _quranModeService?.setEnabled(false);
+      await _restoreQuranSnapshot();
+      _quranRestore = null;
+      if (!isClosed) {
+        safeEmit(
+            state.copyWith(isQuranModeEnabled: false, errorMessage: null));
+      }
+    }
+  }
+
+  Future<void> toggleQuranMode() =>
+      setQuranModeEnabled(!state.isQuranModeEnabled);
+
+  /// Switches the active reciter style, re-applying the profile when the mode
+  /// is already on.
+  Future<void> setQuranReciterStyle(QuranReciterStyle style) async {
+    await _quranModeService?.setStyle(style);
+    if (isClosed) return;
+    safeEmit(state.copyWith(quranReciterStyle: style));
+    if (state.isQuranModeEnabled) {
+      await _applyQuranProfile(style);
+    }
+  }
+
+  /// Re-applies the current style's profile (e.g. after a "reset" tap).
+  Future<void> reapplyQuranProfile() =>
+      _applyQuranProfile(state.quranReciterStyle);
+
+  /// Applies a single reverb tweak on top of the active Quran profile (used by
+  /// the ambience slider).
+  Future<void> setQuranAmbience(double wetDry) async {
+    final profile = QuranModeProfile.forStyle(state.quranReciterStyle);
+    final caps = _earbudOptimizationService
+        ?.detect(_hiResAudioService?.currentOutputInfo);
+    await setReverb(
+      wetDry > 0.001,
+      preset: profile.reverbPreset.wireValue,
+      wetDry: (wetDry * (caps?.reverbScale ?? 1.0)).clamp(0.0, 1.0),
+    );
+  }
+
+  /// Detects the current output route's real capabilities for display.
+  Future<EarbudCapabilities> detectEarbudCapabilities() async {
+    final service = _earbudOptimizationService;
+    if (service == null) {
+      return const EarbudCapabilities(
+        deviceName: 'Default output',
+        codec: EarbudCodec.unknown,
+        isBluetooth: false,
+        isLeAudio: false,
+        isUsbDac: false,
+        sampleRateHz: 44100,
+        bitDepth: 16,
+        latencyMs: 0,
+      );
+    }
+    var info = _hiResAudioService?.currentOutputInfo;
+    try {
+      info ??= await _hiResAudioService?.getAudioOutputInfo();
+    } catch (_) {
+      info = null;
+    }
+    return service.detect(info);
+  }
+
+  Future<void> _applyQuranProfile(QuranReciterStyle style) async {
+    final profile = QuranModeProfile.forStyle(style);
+    final caps = _earbudOptimizationService
+        ?.detect(_hiResAudioService?.currentOutputInfo);
+    final gains = caps == null
+        ? profile.eqGains
+        : _earbudOptimizationService!.mergeCompensation(profile.eqGains, caps);
+
+    // 1. Vocal-optimized EQ (bulk apply, single native push).
+    await applyPreset(profile.toEqPreset(gains));
+    try {
+      await _audioHandler.equalizerManager.setPreamp(profile.preampDb);
+    } catch (_) {}
+
+    // 2. Room / mosque-style convolution reverb, scaled for lossy Bluetooth.
+    await setReverb(
+      profile.reverbEnabled,
+      preset: profile.reverbPreset.wireValue,
+      wetDry:
+          (profile.reverbWetDry * (caps?.reverbScale ?? 1.0)).clamp(0.0, 1.0),
+    );
+
+    // 3. Gentle harmonic warmth.
+    await setSaturation(
+      profile.saturationEnabled,
+      drive: profile.saturationDrive,
+      mix: profile.saturationMix,
+      tilt: profile.saturationTilt,
+    );
+
+    // 4. Vocal dynamics.
+    await setDynamicsPreset(
+      profile.dynamicsPreset,
+      enabled: profile.dynamicsEnabled,
+    );
+
+    // 5. Learning speed (memorization style only; others are 1.0x).
+    if ((state.playbackSpeed - profile.playbackSpeed).abs() > 0.001) {
+      await setPlaybackSpeed(profile.playbackSpeed);
+    }
+
+    // 6. Continuous order: recitation is never shuffled.
+    if (state.isShuffle) {
+      await toggleShuffle();
+    }
+  }
+
+  _QuranRestoreSnapshot _captureQuranRestoreSnapshot() {
+    return _QuranRestoreSnapshot(
+      eqPreset: state.eqPreset,
+      isEqEnabled: state.isEqEnabled,
+      headphoneProfile: state.selectedHeadphoneProfile,
+      isReverbEnabled: state.isReverbEnabled,
+      reverbPreset: state.reverbPreset,
+      reverbWetDry: state.reverbWetDry,
+      isDynamicsEnabled: state.isDynamicsEnabled,
+      dynamicsPreset: state.dynamicsPreset,
+      isSaturationEnabled: state.isSaturationEnabled,
+      saturationDrive: state.saturationDrive,
+      saturationMix: state.saturationMix,
+      saturationTilt: state.saturationTilt,
+      playbackSpeed: state.playbackSpeed,
+      isShuffle: state.isShuffle,
+      preampDb: _audioHandler.equalizerManager.preampDb,
+    );
+  }
+
+  Future<void> _restoreQuranSnapshot() async {
+    final s = _quranRestore;
+    if (s == null) return;
+    if (s.headphoneProfile != null) {
+      await applyHeadphoneProfile(s.headphoneProfile);
+    } else {
+      await applyPreset(s.eqPreset);
+    }
+    await setEqualizerEnabled(s.isEqEnabled);
+    try {
+      await _audioHandler.equalizerManager.setPreamp(s.preampDb);
+    } catch (_) {}
+    await setReverb(s.isReverbEnabled,
+        preset: s.reverbPreset, wetDry: s.reverbWetDry);
+    await setDynamicsPreset(s.dynamicsPreset, enabled: s.isDynamicsEnabled);
+    await setSaturation(s.isSaturationEnabled,
+        drive: s.saturationDrive,
+        mix: s.saturationMix,
+        tilt: s.saturationTilt);
+    await setPlaybackSpeed(s.playbackSpeed);
+    if (state.isShuffle != s.isShuffle) {
+      await toggleShuffle();
     }
   }
 

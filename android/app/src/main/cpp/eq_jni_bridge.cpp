@@ -277,6 +277,14 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReverbDamping(
     });
 }
 
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReverbCrossChannel(
+        JNIEnv* /* env */, jobject /* thiz */, jdouble crossChannel) {
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        snap.reverb.crossChannel = std::clamp(crossChannel, 0.0, 1.0);
+    });
+}
+
 JNIEXPORT jboolean JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadImpulseResponse(
         JNIEnv* env, jobject /* thiz */, jfloatArray irSamples, jint channels) {
@@ -434,15 +442,16 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSaturationEnabled(
 
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSaturationParams(
-        JNIEnv* /* env */, jobject /* thiz */, jdouble drive, jdouble mix, jdouble tilt) {
+        JNIEnv* /* env */, jobject /* thiz */, jdouble drive, jdouble mix, jdouble tilt, jint mode) {
     AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
         snap.saturation.drive = drive;
         snap.saturation.mix = mix;
         snap.saturation.tilt = tilt;
+        snap.saturation.mode = mode;
     });
 }
 
-// ---- Phase 1 DSP expansion: Stereo Width (Mid/Side) ----
+// ---- Phase 1 DSP expansion: Stereo Width (3-Band Multiband Stereo Imager) ----
 
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetStereoWidthEnabled(
@@ -454,9 +463,16 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetStereoWidthEnabled(
 
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetStereoWidthParams(
-        JNIEnv* /* env */, jobject /* thiz */, jdouble width) {
+        JNIEnv* /* env */, jobject /* thiz */, jdouble width, jboolean multiband,
+        jdouble lowWidth, jdouble midWidth, jdouble highWidth, jdouble lowCrossoverHz, jdouble highCrossoverHz) {
     AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
         snap.stereoWidth.width = width;
+        snap.stereoWidth.multiband = multiband;
+        snap.stereoWidth.lowWidth = lowWidth;
+        snap.stereoWidth.midWidth = midWidth;
+        snap.stereoWidth.highWidth = highWidth;
+        snap.stereoWidth.lowCrossoverHz = lowCrossoverHz;
+        snap.stereoWidth.highCrossoverHz = highCrossoverHz;
     });
 }
 
@@ -479,7 +495,7 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetLoudnessContourParams(
     });
 }
 
-// ---- Phase 1 DSP expansion: Subwoofer / LFE Crossover (bass redirection) ----
+// ---- Phase 1 DSP expansion: Subwoofer Crossover & Bass Management (Bass Mono + Anti-Pop) ----
 
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSubCrossoverEnabled(
@@ -491,15 +507,18 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSubCrossoverEnabled(
 
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSubCrossoverParams(
-        JNIEnv* /* env */, jobject /* thiz */, jdouble cornerHz, jdouble slopeDbPerOct, jdouble subGain) {
+        JNIEnv* /* env */, jobject /* thiz */, jdouble cornerHz, jdouble slopeDbPerOct, jdouble subGain,
+        jboolean bassMono, jboolean antiPop) {
     AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
         snap.subCrossover.cornerHz = cornerHz;
         snap.subCrossover.slopeDbPerOct = slopeDbPerOct;
         snap.subCrossover.subGain = subGain;
+        snap.subCrossover.bassMono = bassMono;
+        snap.subCrossover.antiPop = antiPop;
     });
 }
 
-// ---- Phase 1 DSP expansion: Dynamic EQ ----
+// ---- Phase 1 DSP expansion: Dynamic EQ (Cut & Boost modes, Peaking/Shelves) ----
 
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetDynamicEqEnabled(
@@ -521,7 +540,8 @@ JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetDynamicEqBand(
         JNIEnv* /* env */, jobject /* thiz */,
         jint index, jdouble freq, jdouble q, jdouble thresholdDb, jdouble ratio,
-        jdouble attackMs, jdouble releaseMs, jdouble maxCutDb, jboolean enabled) {
+        jdouble attackMs, jdouble releaseMs, jdouble maxCutDb, jdouble maxBoostDb,
+        jint mode, jint filterType, jboolean enabled) {
     if (index < 0 || index >= DynamicEqParamSet::MAX_BANDS) return;
     AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
         if (index >= snap.dynamicEq.bandCount) snap.dynamicEq.bandCount = index + 1;
@@ -533,9 +553,74 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetDynamicEqBand(
         band.attackMs = attackMs;
         band.releaseMs = releaseMs;
         band.maxCutDb = maxCutDb;
+        band.maxBoostDb = maxBoostDb;
+        band.mode = mode;
+        band.filterType = filterType;
         band.enabled = enabled;
     });
 }
+
+// ---- Native Multiband Compressor ----
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetMultibandCompressorEnabled(
+        JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        snap.multibandCompressor.enabled = enabled;
+    });
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetMultibandCompressorBand(
+        JNIEnv* /* env */, jobject /* thiz */,
+        jint bandIndex, jdouble thresholdDb, jdouble ratio, jdouble attackMs,
+        jdouble releaseMs, jdouble kneeDb, jdouble makeupGainDb, jboolean enabled) {
+    if (bandIndex < 0 || bandIndex >= MultibandCompressorParamSet::NUM_BANDS) return;
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        auto& b = snap.multibandCompressor.bands[bandIndex];
+        b.thresholdDb = thresholdDb;
+        b.ratio = ratio;
+        b.attackMs = attackMs;
+        b.releaseMs = releaseMs;
+        b.kneeDb = kneeDb;
+        b.makeupGainDb = makeupGainDb;
+        b.enabled = enabled;
+    });
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetMultibandCompressorCrossovers(
+        JNIEnv* /* env */, jobject /* thiz */,
+        jdouble f0, jdouble f1, jdouble f2) {
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        snap.multibandCompressor.crossoverFreqs[0] = f0;
+        snap.multibandCompressor.crossoverFreqs[1] = f1;
+        snap.multibandCompressor.crossoverFreqs[2] = f2;
+    });
+}
+
+// ---- ViPER-modeled Dynamic System / Dynamic Bass ----
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetDynamicBassParams(
+        JNIEnv* /* env */, jobject /* thiz */,
+        jboolean enabled, jdouble strength,
+        jint xLow, jint xHigh, jint yLow, jint yHigh,
+        jdouble sideGainLow, jdouble sideGainHigh,
+        jint devicePreset) {
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        snap.dynamicBass.enabled = enabled;
+        snap.dynamicBass.strength = strength;
+        snap.dynamicBass.xLow = xLow;
+        snap.dynamicBass.xHigh = xHigh;
+        snap.dynamicBass.yLow = yLow;
+        snap.dynamicBass.yHigh = yHigh;
+        snap.dynamicBass.sideGainLow = sideGainLow;
+        snap.dynamicBass.sideGainHigh = sideGainHigh;
+        snap.dynamicBass.devicePreset = devicePreset;
+    });
+}
+
 
 // ---- ReplayGain 2.0 / EBU R128 pre-gain (bit-transparent, in-DSP) ----
 

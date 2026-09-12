@@ -4,6 +4,7 @@ import '../../core/di/injection.dart';
 import '../../core/theme/aura_theme.dart';
 import '../../core/utils/adaptive.dart';
 import '../../core/utils/l10n_extensions.dart';
+import '../../core/widgets/pulsr_dialog.dart';
 import '../../data/db/app_database.dart';
 import '../../domain/usecases/playlist_usecases.dart';
 
@@ -24,67 +25,48 @@ class AddToPlaylistSheet extends StatelessWidget {
   PlaylistUseCases get _useCases =>
       playlistUseCases ?? getIt<PlaylistUseCases>();
 
-  void _showNewPlaylistDialog(BuildContext context) {
-    final p = context.palette;
-    final controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: p.surface,
-        title: Text(context.l10n.createPlaylist,
-            style:
-                TextStyle(color: p.textPrimary, fontWeight: FontWeight.w800)),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          style: TextStyle(color: p.textPrimary),
-          decoration: InputDecoration(
-            hintText: context.l10n.enterPlaylistName,
-            filled: true,
-            fillColor: p.surfaceContainer,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(context.l10n.cancel,
-                style: TextStyle(color: p.textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final name = controller.text.trim();
-              if (name.isNotEmpty) {
-                final result = await _useCases.createPlaylist(name);
-                result.fold(
-                  (failure) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(failure.message)),
-                      );
-                    }
-                  },
-                  (id) async {
-                    if (_allSongs.length == 1) {
-                      await _useCases.addSongToPlaylist(id, song.id);
-                    } else {
-                      await _useCases.addSongsToPlaylist(id, _allSongs.map((s) => s.id).toList());
-                    }
-                    if (context.mounted) {
-                      Navigator.pop(ctx);
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(context.l10n.addedTo(name))),
-                      );
-                    }
-                  },
-                );
-              }
-            },
-            child: Text(context.l10n.save),
-          ),
-        ],
-      ),
+  void _showNewPlaylistDialog(BuildContext context) async {
+    final name = await PulsrDialogHelper.showInputDialog(
+      context,
+      title: context.l10n.createPlaylist,
+      hintText: context.l10n.enterPlaylistName,
+      icon: Icons.playlist_add_rounded,
+      confirmLabel: context.l10n.save,
+      cancelLabel: context.l10n.cancel,
     );
+
+    if (name != null && name.isNotEmpty && context.mounted) {
+      final result = await _useCases.createPlaylist(name);
+      result.fold(
+        (failure) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(failure.message)),
+            );
+          }
+        },
+        (id) async {
+          if (_allSongs.length == 1) {
+            await _useCases.addSongToPlaylist(id, song.id);
+          } else {
+            await _useCases.addSongsToPlaylist(
+                id, _allSongs.map((s) => s.id).toList());
+          }
+          if (context.mounted) {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  _allSongs.length == 1
+                      ? '${song.title}: ${context.l10n.addedToPlaylist} ($name)'
+                      : '${context.l10n.addedToPlaylist} (${_allSongs.length}): $name',
+                ),
+              ),
+            );
+          }
+        },
+      );
+    }
   }
 
   @override

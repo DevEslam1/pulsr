@@ -43,11 +43,47 @@ import '../../features/downloads/presentation/downloads_screen.dart';
 import '../../features/library/presentation/favorites_screen.dart';
 import '../../features/playlist_detail/presentation/online_playlist_detail_screen.dart';
 import '../../features/playlists/cubit/playlist_cubit.dart';
+import '../../features/quran_mode/presentation/quran_mode_screen.dart';
 import '../services/ytm_account_service.dart';
 import '../widgets/pulsr_modal_tracker.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'root');
+
+Page<dynamic> _buildPulsrPageRoute({
+  required LocalKey key,
+  required Widget child,
+}) {
+  return CustomTransitionPage<void>(
+    key: key,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 300),
+    reverseTransitionDuration: const Duration(milliseconds: 260),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+      final slide = Tween<Offset>(
+        begin: const Offset(0.08, 0.0),
+        end: Offset.zero,
+      ).animate(curved);
+      final fade = Tween<double>(
+        begin: 0.0,
+        end: 1.0,
+      ).animate(curved);
+
+      return SlideTransition(
+        position: slide,
+        child: FadeTransition(
+          opacity: fade,
+          child: child,
+        ),
+      );
+    },
+  );
+}
 
 GoRouter createRouter(MediaScannerService scannerService) {
   return GoRouter(
@@ -100,6 +136,7 @@ GoRouter createRouter(MediaScannerService scannerService) {
         branches: [
           // Tab 1: Home
           StatefulShellBranch(
+            observers: [PulsrModalObserver()],
             routes: [
               GoRoute(
                 path: '/',
@@ -113,6 +150,7 @@ GoRouter createRouter(MediaScannerService scannerService) {
 
           // Tab 2: Library
           StatefulShellBranch(
+            observers: [PulsrModalObserver()],
             routes: [
               GoRoute(
                 path: '/library',
@@ -126,6 +164,7 @@ GoRouter createRouter(MediaScannerService scannerService) {
 
           // Tab 3: Search
           StatefulShellBranch(
+            observers: [PulsrModalObserver()],
             routes: [
               GoRoute(
                 path: '/search',
@@ -139,6 +178,7 @@ GoRouter createRouter(MediaScannerService scannerService) {
 
           // Tab 4: Playlists
           StatefulShellBranch(
+            observers: [PulsrModalObserver()],
             routes: [
               GoRoute(
                 path: '/playlists',
@@ -152,6 +192,7 @@ GoRouter createRouter(MediaScannerService scannerService) {
 
           // Tab 5: Settings
           StatefulShellBranch(
+            observers: [PulsrModalObserver()],
             routes: [
               GoRoute(
                 path: '/settings',
@@ -188,69 +229,97 @@ GoRouter createRouter(MediaScannerService scannerService) {
         path: '/album',
         name: 'album',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final album = state.extra is AlbumsTableData
               ? state.extra as AlbumsTableData
               : null;
           if (album == null) {
-            return const Scaffold(body: Center(child: Text('Album not found')));
+            return _buildPulsrPageRoute(
+              key: state.pageKey,
+              child: const Scaffold(body: Center(child: Text('Album not found'))),
+            );
           }
-          return AlbumDetailScreen(album: album);
+          return _buildPulsrPageRoute(
+            key: state.pageKey,
+            child: AlbumDetailScreen(album: album),
+          );
         },
       ),
       GoRoute(
         path: '/artist',
         name: 'artist',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final artist = state.extra is ArtistsTableData
               ? state.extra as ArtistsTableData
               : null;
           if (artist == null) {
-            return const Scaffold(
-                body: Center(child: Text('Artist not found')));
+            return _buildPulsrPageRoute(
+              key: state.pageKey,
+              child: const Scaffold(body: Center(child: Text('Artist not found'))),
+            );
           }
-          return ArtistDetailScreen(artist: artist);
+          return _buildPulsrPageRoute(
+            key: state.pageKey,
+            child: ArtistDetailScreen(artist: artist),
+          );
         },
       ),
       GoRoute(
         path: '/genre',
         name: 'genre',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final genre =
               state.extra is GenreItem ? state.extra as GenreItem : null;
           if (genre == null) {
-            return const Scaffold(body: Center(child: Text('Genre not found')));
+            return _buildPulsrPageRoute(
+              key: state.pageKey,
+              child: const Scaffold(body: Center(child: Text('Genre not found'))),
+            );
           }
-          return GenreDetailScreen(genreItem: genre);
+          return _buildPulsrPageRoute(
+            key: state.pageKey,
+            child: GenreDetailScreen(genreItem: genre),
+          );
         },
       ),
       GoRoute(
         path: '/year',
         name: 'year',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final year = state.extra is YearItem ? state.extra as YearItem : null;
           if (year == null) {
-            return const Scaffold(body: Center(child: Text('Year not found')));
+            return _buildPulsrPageRoute(
+              key: state.pageKey,
+              child: const Scaffold(body: Center(child: Text('Year not found'))),
+            );
           }
-          return YearDetailScreen(yearItem: year);
+          return _buildPulsrPageRoute(
+            key: state.pageKey,
+            child: YearDetailScreen(yearItem: year),
+          );
         },
       ),
       GoRoute(
         path: '/playlist',
         name: 'playlist',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final playlist = state.extra is PlaylistsTableData
               ? state.extra as PlaylistsTableData
               : null;
           if (playlist == null) {
-            return const Scaffold(
-                body: Center(child: Text('Playlist not found')));
+            return _buildPulsrPageRoute(
+              key: state.pageKey,
+              child: const Scaffold(body: Center(child: Text('Playlist not found'))),
+            );
           }
-          return PlaylistDetailScreen(playlist: playlist);
+          return _buildPulsrPageRoute(
+            key: state.pageKey,
+            child: PlaylistDetailScreen(playlist: playlist),
+          );
         },
       ),
       GoRoute(
@@ -428,6 +497,13 @@ GoRouter createRouter(MediaScannerService scannerService) {
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const CloudBackupDashboardScreen(),
       ),
+      GoRoute(
+        path: '/quran-mode',
+        name: 'quran-mode',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const QuranModeScreen(),
+      ),
+
       GoRoute(
         path: '/favorites',
         name: 'favorites',

@@ -15,6 +15,7 @@ import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../domain/models/smart_playlist_criteria.dart';
 import '../../../domain/models/ytm_track.dart';
 import '../../../domain/usecases/get_songs_usecase.dart';
@@ -106,62 +107,33 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     }
   }
 
-  void _showCreateDialog(BuildContext context, PlaylistCubit cubit) {    final controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(context.l10n.createPlaylist,
-            style: const TextStyle(fontWeight: FontWeight.w800)),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(hintText: context.l10n.enterPlaylistName),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(context.l10n.cancel)),
-          ElevatedButton(
-            onPressed: () async {
-              final name = controller.text.trim();
-              if (name.isNotEmpty) {
-                await cubit.createPlaylist(name);
-                if (context.mounted) Navigator.pop(ctx);
-              }
-            },
-            child: Text(context.l10n.save),
-          ),
-        ],
-      ),
+  void _showCreateDialog(BuildContext context, PlaylistCubit cubit) async {
+    final name = await PulsrDialogHelper.showInputDialog(
+      context,
+      title: context.l10n.createPlaylist,
+      hintText: context.l10n.enterPlaylistName,
+      icon: Icons.playlist_add_rounded,
+      confirmLabel: context.l10n.save,
+      cancelLabel: context.l10n.cancel,
     );
+    if (name != null && name.isNotEmpty) {
+      await cubit.createPlaylist(name);
+    }
   }
 
   void _showRenameDialog(
-      BuildContext context, PlaylistCubit cubit, PlaylistsTableData pl) {
-    final controller = TextEditingController(text: pl.name);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Rename playlist',
-            style: TextStyle(fontWeight: FontWeight.w800)),
-        content: TextField(controller: controller, autofocus: true),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              final name = controller.text.trim();
-              if (name.isNotEmpty) {
-                await cubit.renamePlaylist(pl.id, name);
-                if (context.mounted) Navigator.pop(ctx);
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
+      BuildContext context, PlaylistCubit cubit, PlaylistsTableData pl) async {
+    final name = await PulsrDialogHelper.showInputDialog(
+      context,
+      title: 'Rename Playlist',
+      initialText: pl.name,
+      icon: Icons.drive_file_rename_outline_rounded,
+      confirmLabel: 'Save',
+      cancelLabel: 'Cancel',
     );
+    if (name != null && name.isNotEmpty) {
+      await cubit.renamePlaylist(pl.id, name);
+    }
   }
 
   /// Exports (or shares) a playlist from the list cards. Smart playlists
@@ -301,27 +273,18 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
   }
 
   void _confirmDelete(
-      BuildContext context, PlaylistCubit cubit, PlaylistsTableData pl) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Delete "${pl.name}"?'),
-        content: const Text('This cannot be undone.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-            onPressed: () async {
-              await cubit.deletePlaylist(pl.id);
-              if (context.mounted) Navigator.pop(ctx);
-            },
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      BuildContext context, PlaylistCubit cubit, PlaylistsTableData pl) async {
+    final confirmed = await PulsrDialogHelper.showConfirmDialog(
+      context,
+      title: 'Delete "${pl.name}"?',
+      message: 'This cannot be undone.',
+      icon: Icons.delete_outline_rounded,
+      confirmLabel: 'Delete',
+      isDestructive: true,
     );
+    if (confirmed == true) {
+      await cubit.deletePlaylist(pl.id);
+    }
   }
 
   Future<void> _importPlaylist(BuildContext context) async {
@@ -352,60 +315,43 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
         );
       },
       (importResult) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text(context.l10n.playlistImported,
-                style: const TextStyle(fontWeight: FontWeight.w800)),
-            content: Text(
-                '${importResult.matchedTrackCount} of ${importResult.totalExtractedPaths} tracks matched.'),
-            actions: [
-              ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: Text(context.l10n.close))
-            ],
-          ),
+        PulsrDialogHelper.showPulsrDialog(
+          context,
+          icon: Icon(Icons.check_circle_rounded,
+              color: context.palette.success, size: 28),
+          title: Text(context.l10n.playlistImported,
+              style: const TextStyle(fontWeight: FontWeight.w800)),
+          content: Text(
+              '${importResult.matchedTrackCount} of ${importResult.totalExtractedPaths} tracks matched.'),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+              child: Text(context.l10n.close),
+            ),
+          ],
         );
       },
     );
   }
 
-  void _showAddOnlinePlaylistDialog(BuildContext context, PlaylistCubit cubit) {
-    final controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(context.l10n.addYouTubePlaylist,
-            style: const TextStyle(fontWeight: FontWeight.w800)),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(
-            hintText: context.l10n.pastePlaylistUrl,
-            helperText: 'e.g. https://www.youtube.com/playlist?list=PLxxx',
-          ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(context.l10n.cancel)),
-          ElevatedButton(
-            onPressed: () {
-              final url = controller.text.trim();
-              if (url.isNotEmpty) {
-                Navigator.pop(ctx);
-                cubit.fetchOnlinePlaylistByUrl(url);
-                context.push(
-                  '/online-playlist',
-                  extra: OnlinePlaylistDetailArgs(playlistId: url),
-                );
-              }
-            },
-            child: Text(context.l10n.confirm),
-          ),
-        ],
-      ),
+  void _showAddOnlinePlaylistDialog(
+      BuildContext context, PlaylistCubit cubit) async {
+    final url = await PulsrDialogHelper.showInputDialog(
+      context,
+      title: context.l10n.addYouTubePlaylist,
+      message: 'Paste a YouTube or YouTube Music playlist link.',
+      hintText: 'https://www.youtube.com/playlist?list=PLxxx',
+      icon: Icons.cloud_download_rounded,
+      confirmLabel: context.l10n.confirm,
+      cancelLabel: context.l10n.cancel,
     );
+    if (url != null && url.isNotEmpty && context.mounted) {
+      cubit.fetchOnlinePlaylistByUrl(url);
+      context.push(
+        '/online-playlist',
+        extra: OnlinePlaylistDetailArgs(playlistId: url),
+      );
+    }
   }
 
   @override

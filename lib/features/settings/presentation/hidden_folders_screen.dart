@@ -6,7 +6,9 @@ import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
+import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
+import '../../../core/widgets/pulsr_slider.dart';
 import '../../../domain/usecases/folder_usecases.dart';
 import '../../library/cubit/library_cubit.dart';
 import '../cubit/settings_cubit.dart';
@@ -72,81 +74,18 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
 
   Future<void> _showAddCustomFolderDialog(
       BuildContext context, PulsrPalette p) async {
-    _customPathController.clear();
-    await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: p.surfaceContainer,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: p.hairline),
-        ),
-        title: Text(
-          context.l10n.hideCustomFolder,
-          style: TextStyle(
-              color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 18),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              context.l10n.hideFolderDesc,
-              style: TextStyle(color: p.textSecondary, fontSize: 13),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _customPathController,
-              autofocus: true,
-              style: TextStyle(color: p.textPrimary, fontSize: 13),
-              decoration: InputDecoration(
-                hintText: '/storage/emulated/0/Recordings',
-                hintStyle: TextStyle(color: p.textTertiary, fontSize: 12),
-                filled: true,
-                fillColor: p.surface,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: p.hairline),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: p.hairline),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: p.accent, width: 1.5),
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(context.l10n.cancel,
-                style: TextStyle(color: p.textSecondary)),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: p.accent,
-              foregroundColor: p.onAccent,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: () async {
-              final path = _customPathController.text.trim();
-              if (path.isNotEmpty) {
-                Navigator.pop(ctx);
-                await _toggleFolder(path);
-              }
-            },
-            child: Text(context.l10n.hideFolder),
-          ),
-        ],
-      ),
+    final path = await PulsrDialogHelper.showInputDialog(
+      context,
+      title: context.l10n.hideCustomFolder,
+      message: context.l10n.hideFolderDesc,
+      hintText: '/storage/emulated/0/Recordings',
+      icon: Icons.folder_off_rounded,
+      confirmLabel: context.l10n.hideFolder,
+      cancelLabel: context.l10n.cancel,
     );
+    if (path != null && path.isNotEmpty) {
+      await _toggleFolder(path);
+    }
   }
 
   @override
@@ -353,12 +292,11 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                 ],
                               ),
                               const SizedBox(height: 8),
-                              Slider(
+                              PulsrSlider(
                                 value: state.minDurationSec.toDouble(),
                                 min: 0,
                                 max: 90,
                                 divisions: 18,
-                                activeColor: p.accent,
                                 onChanged: (val) =>
                                     cubit.setMinDuration(val.toInt()),
                               ),

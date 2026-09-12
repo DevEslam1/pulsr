@@ -10,6 +10,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../../domain/usecases/backup_usecases.dart';
 import '../../cubit/settings_cubit.dart';
 
@@ -166,55 +167,52 @@ class _BackupSectionState extends State<BackupSection> {
 
     if (!context.mounted) return;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        title: Row(
-          children: [
-            Icon(Icons.restore_rounded, color: context.palette.accent),
-            const SizedBox(width: 8),
-            Text(context.l10n.confirmRestore),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              context.l10n.confirmRestoreDesc,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 12),
-            Text('• ${context.l10n.favorites}: $favsCount'),
-            Text('• ${context.l10n.playlists}: $playlistsCount'),
-            Text('• History: $historyCount'),
-            Text(
-                '• ${context.l10n.settings}: ${hasSettings ? "Included" : "None"}'),
-            const SizedBox(height: 12),
-            Text(
-              context.l10n.existingLibraryUpdateNotice,
-              style:
-                  TextStyle(fontSize: 12, color: context.palette.textSecondary),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(context.l10n.cancel,
-                style: TextStyle(color: context.palette.textSecondary)),
+    final confirmed = await PulsrDialogHelper.showPulsrDialog<bool>(
+      context,
+      title: Row(
+        children: [
+          Icon(Icons.restore_rounded, color: context.palette.accent),
+          const SizedBox(width: 8),
+          Expanded(child: Text(context.l10n.confirmRestore)),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            context.l10n.confirmRestoreDesc,
+            style: const TextStyle(fontWeight: FontWeight.w600),
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: context.palette.accent,
-              foregroundColor: Colors.white,
-            ),
-            child: Text(context.l10n.confirmRestore),
+          const SizedBox(height: 12),
+          Text('• ${context.l10n.favorites}: $favsCount'),
+          Text('• ${context.l10n.playlists}: $playlistsCount'),
+          Text('• History: $historyCount'),
+          Text(
+              '• ${context.l10n.settings}: ${hasSettings ? "Included" : "None"}'),
+          const SizedBox(height: 12),
+          Text(
+            context.l10n.existingLibraryUpdateNotice,
+            style:
+                TextStyle(fontSize: 12, color: context.palette.textSecondary),
           ),
         ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: Text(context.l10n.cancel,
+              style: TextStyle(color: context.palette.textSecondary)),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, true),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: context.palette.accent,
+            foregroundColor: Colors.white,
+          ),
+          child: Text(context.l10n.confirmRestore),
+        ),
+      ],
     );
 
     if (confirmed != true) return;
@@ -231,48 +229,45 @@ class _BackupSectionState extends State<BackupSection> {
 
         if (!context.mounted) return;
 
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            title: Row(
-              children: [
-                Icon(Icons.check_circle_rounded, color: context.palette.accent),
-                const SizedBox(width: 8),
-                const Text('Backup Restored'),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                    '• Restored Favorites: ${importResult.restoredFavoritesCount}'),
-                Text(
-                    '• Restored Playlists: ${importResult.restoredPlaylistsCount}'),
-                Text(
-                    '• Restored History Entries: ${importResult.restoredHistoryCount}'),
-                Text(
-                    '• Restored Settings: ${importResult.restoredSettingsCount} keys'),
-                if (importResult.restoredExcludedFoldersCount > 0)
-                  Text(
-                      '• Restored Excluded Folders: ${importResult.restoredExcludedFoldersCount}'),
-                if (importResult.unmatchedPaths.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    '⚠️ ${importResult.unmatchedPaths.length} song paths could not be matched in your current library.',
-                    style: const TextStyle(color: Colors.amber, fontSize: 12),
-                  ),
-                ],
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Done'),
-              ),
+        PulsrDialogHelper.showPulsrDialog<void>(
+          context,
+          title: Row(
+            children: [
+              Icon(Icons.check_circle_rounded, color: context.palette.accent),
+              const SizedBox(width: 8),
+              const Expanded(child: Text('Backup Restored')),
             ],
           ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                  '• Restored Favorites: ${importResult.restoredFavoritesCount}'),
+              Text(
+                  '• Restored Playlists: ${importResult.restoredPlaylistsCount}'),
+              Text(
+                  '• Restored History Entries: ${importResult.restoredHistoryCount}'),
+              Text(
+                  '• Restored Settings: ${importResult.restoredSettingsCount} keys'),
+              if (importResult.restoredExcludedFoldersCount > 0)
+                Text(
+                    '• Restored Excluded Folders: ${importResult.restoredExcludedFoldersCount}'),
+              if (importResult.unmatchedPaths.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  '⚠️ ${importResult.unmatchedPaths.length} song paths could not be matched in your current library.',
+                  style: const TextStyle(color: Colors.amber, fontSize: 12),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Done'),
+            ),
+          ],
         );
       }
     } catch (e) {

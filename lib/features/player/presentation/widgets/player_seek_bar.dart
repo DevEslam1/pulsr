@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/error_logger.dart';
@@ -9,6 +8,7 @@ import '../../../../core/services/waveform_service.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
+import '../../../../core/widgets/pulsr_slider.dart';
 import 'waveform_seek_bar.dart';
 
 class PlayerSeekBar extends StatefulWidget {
@@ -127,13 +127,6 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
       final double currentPos = position.inMilliseconds.toDouble();
       final double effectiveValue = (_dragValue ?? currentPos)
           .clamp(0.0, maxDuration > 0 ? maxDuration : 1.0);
-      final double progressPercent = maxDuration > 0
-          ? (effectiveValue / maxDuration).clamp(0.0, 1.0)
-          : 0.0;
-      final isDragging = _dragValue != null;
-      final trackHeight = isDragging ? 7.0 : 4.5;
-      final thumbSize = isDragging ? 16.0 : 13.0;
-
       return Directionality(
         textDirection: TextDirection.ltr,
         child: RepaintBoundary(
@@ -142,130 +135,27 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Custom Gesture-driven scrubber track
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final trackWidth = constraints.maxWidth;
-                    return GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onHorizontalDragStart: (details) {
-                        if (trackWidth > 0 && maxDuration > 0) {
-                          HapticFeedback.selectionClick();
-                          final ratio = (details.localPosition.dx / trackWidth)
-                              .clamp(0.0, 1.0);
-                          setState(() {
-                            _dragValue = ratio * maxDuration;
-                          });
-                        }
-                      },
-                      onHorizontalDragUpdate: (details) {
-                        if (trackWidth > 0 && maxDuration > 0) {
-                          final ratio = (details.localPosition.dx / trackWidth)
-                              .clamp(0.0, 1.0);
-                          setState(() {
-                            _dragValue = ratio * maxDuration;
-                          });
-                        }
-                      },
-                      onHorizontalDragEnd: (details) {
-                        if (_dragValue != null) {
-                          HapticFeedback.lightImpact();
-                          widget.onSeek(
-                              Duration(milliseconds: _dragValue!.round()));
-                          setState(() {
-                            _dragValue = null;
-                          });
-                        }
-                      },
-                      onTapDown: (details) {
-                        if (trackWidth > 0 && maxDuration > 0) {
-                          HapticFeedback.selectionClick();
-                          final ratio = (details.localPosition.dx / trackWidth)
-                              .clamp(0.0, 1.0);
-                          final seekMs = ratio * maxDuration;
-                          widget.onSeek(
-                              Duration(milliseconds: seekMs.round()));
-                        }
-                      },
-                      child: SizedBox(
-                        height: 32,
-                        child: Stack(
-                          alignment: Alignment.centerLeft,
-                          children: [
-                            // Inactive Track
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 150),
-                              height: trackHeight,
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).brightness ==
-                                        Brightness.dark
-                                    ? Colors.white.withValues(alpha: 0.14)
-                                    : context.palette.hairline
-                                        .withValues(alpha: 0.8),
-                                borderRadius: BorderRadius.circular(trackHeight),
-                              ),
-                            ),
-                            // Active Progress Track
-                            FractionallySizedBox(
-                              widthFactor: progressPercent,
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 150),
-                                height: trackHeight,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      widget.activeColor.withValues(alpha: 0.85),
-                                      widget.activeColor,
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(trackHeight),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: widget.activeColor
-                                          .withValues(alpha: isDragging ? 0.65 : 0.35),
-                                      blurRadius: isDragging ? 12 : 8,
-                                      offset: const Offset(0, 1),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            // Scrubber Thumb
-                            Positioned(
-                              left: (progressPercent * trackWidth - (thumbSize / 2)).clamp(
-                                  0.0,
-                                  (trackWidth - thumbSize).clamp(0.0, trackWidth)),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 120),
-                                width: thumbSize,
-                                height: thumbSize,
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: widget.activeColor.withValues(alpha: 0.35),
-                                    width: isDragging ? 2.5 : 1.5,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.35),
-                                      blurRadius: 6,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                    if (isDragging)
-                                      BoxShadow(
-                                        color: widget.activeColor.withValues(alpha: 0.5),
-                                        blurRadius: 10,
-                                        spreadRadius: 1,
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
+                // Modern wavy gesture-driven scrubber
+                PulsrSlider(
+                  value: effectiveValue,
+                  min: 0.0,
+                  max: maxDuration > 0 ? maxDuration : 1.0,
+                  height: 32,
+                  activeColor: widget.activeColor,
+                  inactiveColor: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white.withValues(alpha: 0.14)
+                      : context.palette.hairline.withValues(alpha: 0.8),
+                  isWavy: true,
+                  animateWave: true,
+                  onChangeStart: (val) {
+                    setState(() => _dragValue = val);
+                  },
+                  onChanged: (val) {
+                    setState(() => _dragValue = val);
+                  },
+                  onChangeEnd: (val) {
+                    widget.onSeek(Duration(milliseconds: val.round()));
+                    setState(() => _dragValue = null);
                   },
                 ),
                 const SizedBox(height: 2),

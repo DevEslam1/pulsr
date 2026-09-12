@@ -26,6 +26,8 @@ set(DSP_SRCS
     ${MAIN_CPP}/LoudnessContour.cpp
     ${MAIN_CPP}/SubCrossover.cpp
     ${MAIN_CPP}/DynamicEQ.cpp
+    ${MAIN_CPP}/MultibandCompressor.cpp
+    ${MAIN_CPP}/DynamicBass.cpp
     ${MAIN_CPP}/AudioDspEngine.cpp
 )
 

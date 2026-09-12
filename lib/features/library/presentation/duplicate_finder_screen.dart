@@ -7,6 +7,7 @@ import '../../../core/services/missing_artwork_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
+import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/widgets/pulsr_toast.dart';
 import '../../../core/widgets/song_tile.dart';
@@ -55,31 +56,13 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
   }
 
   Future<void> _fetchMissingArtwork() async {
-    final p = context.palette;
     final l10n = context.l10n;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: p.surface,
-        title: Text(
-          l10n.fetchMissingArtworkTitle,
-          style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.bold),
-        ),
-        content: Text(
-          l10n.fetchMissingArtworkBody,
-          style: TextStyle(color: p.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(l10n.cancel, style: TextStyle(color: p.textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(l10n.fetchArtwork),
-          ),
-        ],
-      ),
+    final confirmed = await PulsrDialogHelper.showConfirmDialog(
+      context,
+      title: l10n.fetchMissingArtworkTitle,
+      message: l10n.fetchMissingArtworkBody,
+      icon: Icons.image_search_rounded,
+      confirmLabel: l10n.fetchArtwork,
     );
     if (confirmed != true || !mounted) return;
     if (!getIt.isRegistered<MissingArtworkService>()) {
@@ -159,35 +142,14 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
   }
 
   Future<void> _confirmDelete(DuplicateGroup group, SongsTableData song) async {
-    final p = context.palette;
     final l10n = context.l10n;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: p.surface,
-        title: Text(
-          l10n.deleteThisFile,
-          style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.bold),
-        ),
-        content: Text(
-          l10n.deleteFileConfirmBody(song.title),
-          style: TextStyle(color: p.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(l10n.cancel, style: TextStyle(color: p.textSecondary)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: p.error,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(l10n.delete),
-          ),
-        ],
-      ),
+    final confirmed = await PulsrDialogHelper.showConfirmDialog(
+      context,
+      title: l10n.deleteThisFile,
+      message: l10n.deleteFileConfirmBody(song.title),
+      icon: Icons.delete_outline_rounded,
+      confirmLabel: l10n.delete,
+      isDestructive: true,
     );
     if (confirmed != true || !mounted) return;
     await _deleteSong(group, song);

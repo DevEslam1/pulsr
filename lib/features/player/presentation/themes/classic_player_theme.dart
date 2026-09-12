@@ -30,6 +30,7 @@ import '../widgets/now_playing_queue_view.dart';
 import '../widgets/advanced_playback_bar.dart';
 import '../widgets/player_controls.dart';
 import '../widgets/player_seek_bar.dart';
+import '../widgets/quran_mode_button.dart';
 import '../widgets/speed_picker_sheet.dart';
 import 'player_theme.dart';
 
@@ -1002,7 +1003,16 @@ class ClassicPlayerTheme extends StatelessWidget {
                     ),
                   ),
 
-                  // 5. Add to Playlist
+                  // 5. Quran Mode
+                  Expanded(
+                    child: QuranModeDockButton(
+                      activeColor: props.activeColor,
+                      inactiveColor: p.textSecondary,
+                      isTablet: isTablet,
+                    ),
+                  ),
+
+                  // 6. Add to Playlist
                   Expanded(
                     child: _DockIconButton(
                       icon: Icons.playlist_add_rounded,

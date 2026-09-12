@@ -18,15 +18,18 @@ class GlassContainer extends StatelessWidget {
   /// low-end devices.
   final bool enableBlur;
 
+  final List<BoxShadow>? boxShadow;
+
   const GlassContainer({
     super.key,
     required this.child,
-    this.blur = 20.0,
-    this.opacity = 0.85,
+    this.blur = 12.0,
+    this.opacity = 0.78,
     this.borderRadius,
     this.border,
     this.padding,
     this.color,
+    this.boxShadow,
     this.enableBlur = true,
   });
 
@@ -36,16 +39,20 @@ class GlassContainer extends StatelessWidget {
     final effectiveRadius = borderRadius ?? AppRadii.cardRadius;
     final baseColor = (color ?? p.surface).withValues(alpha: opacity);
 
+    final effectiveBorder = border ??
+        Border.all(
+          color: (p.isDark ? Colors.white : Colors.black)
+              .withValues(alpha: p.isDark ? 0.10 : 0.06),
+          width: 1.0,
+        );
+
     Widget content = Container(
       padding: padding,
       decoration: BoxDecoration(
         color: baseColor,
         borderRadius: effectiveRadius,
-        border: border ??
-            Border.all(
-              color: p.hairline.withValues(alpha: 0.5),
-              width: 1.0,
-            ),
+        border: effectiveBorder,
+        boxShadow: boxShadow,
       ),
       child: child,
     );
@@ -54,11 +61,13 @@ class GlassContainer extends StatelessWidget {
       return ClipRRect(borderRadius: effectiveRadius, child: content);
     }
 
-    return ClipRRect(
-      borderRadius: effectiveRadius,
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-        child: content,
+    return RepaintBoundary(
+      child: ClipRRect(
+        borderRadius: effectiveRadius,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+          child: content,
+        ),
       ),
     );
   }

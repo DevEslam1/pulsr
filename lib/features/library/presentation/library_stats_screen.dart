@@ -2,11 +2,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
-import '../../../core/constants/app_radii.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
+import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/widgets/pulsr_toast.dart';
 import '../../../data/db/app_database.dart';
@@ -44,38 +44,14 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
   }
 
   Future<void> _confirmClearHistory(BuildContext context) async {
-    final p = context.palette;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: p.surface,
-        shape: RoundedRectangleBorder(borderRadius: AppRadii.cardRadius),
-        title: Text(
-          'Clear Play History?',
-          style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.bold),
-        ),
-        content: Text(
+    final confirmed = await PulsrDialogHelper.showConfirmDialog(
+      context,
+      title: 'Clear Play History?',
+      message:
           'This will reset your recently played list and listening history. Your song files and playlists will not be affected.',
-          style: TextStyle(color: p.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel', style: TextStyle(color: p.textSecondary)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: p.error,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: AppRadii.buttonRadius,
-              ),
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Clear History'),
-          ),
-        ],
-      ),
+      icon: Icons.history_rounded,
+      confirmLabel: 'Clear History',
+      isDestructive: true,
     );
 
     if (confirmed == true && context.mounted) {

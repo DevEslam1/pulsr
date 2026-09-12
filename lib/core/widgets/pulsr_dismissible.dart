@@ -9,8 +9,8 @@ import 'package:flutter/material.dart';
 /// pull (≥55 % of the tile width) before the action fires.
 abstract class PulsrDismissible {
   static Map<DismissDirection, double> get thresholds => const {
-        DismissDirection.startToEnd: 0.55,
-        DismissDirection.endToStart: 0.55,
+        DismissDirection.startToEnd: 0.75,
+        DismissDirection.endToStart: 0.75,
       };
 
   /// Only horizontal swipe gestures trigger the action.

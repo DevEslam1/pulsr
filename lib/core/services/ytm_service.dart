@@ -138,7 +138,7 @@ class YtmService {
   /// down, [resolveStream] skips the native tiers and goes straight to the
   /// remote backend instead of piling up doomed chains (which also starves
   /// the native thread pool into cascading YTM_TIMEOUTs).
-  static const _botCooldown = Duration(seconds: 25);
+  static const _botCooldown = Duration(seconds: 45);
   /// Extended cooldown for IP-level blocks (every client fails instantly).
   static const _ipBlockCooldown = Duration(seconds: 180);
   DateTime _botChallengeUntil = DateTime.fromMillisecondsSinceEpoch(0);
@@ -757,17 +757,28 @@ class YtmService {
     // FIX-C01: Check per-video cooldown as well as global IP cooldown
     var inBotCooldown = isBotCoolingDown || isVideoCoolingDown(videoId);
     if (inBotCooldown) {
-      // If native PoTokenManager has already refreshed the token in the background,
-      // lift the cooldown immediately so resolution can succeed with the new token.
-      try {
-        final ready = await ensurePoTokenReady().timeout(const Duration(seconds: 4));
-        if (ready) {
-          debugPrint(
-              '[YTM_SERVICE] Native poToken is ready, lifting bot cooldown for $videoId');
-          _noteResolveSuccess(videoId: videoId);
-          inBotCooldown = false;
-        }
-      } catch (_) {}
+      // Only a stale-attestation block can be cured by a fresh token. A generic
+      // bot challenge or an IP block is an egress verdict: the native token is
+      // already valid, so `ensurePoTokenReady()` returning true does NOT mean the
+      // IP is unblocked. The old code lifted the cooldown whenever the token was
+      // "ready", which re-ran the whole native chain for every track on a blocked
+      // VPN — the repeated 25s-timeout sweeps seen in the logs.
+      final lastSignal = _lastBotChallenge?.signal;
+      if (lastSignal == YtmBlockSignal.poTokenInvalid) {
+        try {
+          final ready =
+              await ensurePoTokenReady().timeout(const Duration(seconds: 4));
+          if (ready) {
+            debugPrint(
+                '[YTM_SERVICE] Fresh poToken ready, lifting token cooldown for $videoId');
+            _noteResolveSuccess(videoId: videoId);
+            inBotCooldown = false;
+          }
+        } catch (_) {}
+      } else {
+        debugPrint(
+            '[YTM_SERVICE] Block cooldown active (${lastSignal?.name ?? 'unknown'}); failing fast for $videoId');
+      }
     }
     if (inBotCooldown) {
       debugPrint(
@@ -889,8 +900,7 @@ class YtmService {
     // invalidate + mint + single native retry recovers without burning the
     // full Dart chain or imposing a bot cooldown on a non-bot failure.
     if (nativeError is YtmException &&
-        (nativeError.signal == YtmBlockSignal.poTokenInvalid ||
-            nativeError.signal == YtmBlockSignal.botChallenge) &&
+        nativeError.signal == YtmBlockSignal.poTokenInvalid &&
         breaker.shouldAllow(YtmBlockSignal.poTokenInvalid)) {
       try {
         debugPrint('[YTM_SERVICE] Tier-2.5 poToken refresh-and-retry for $videoId');
@@ -918,6 +928,20 @@ class YtmService {
         debugPrint('[YTM_SERVICE] Tier-2.5 retry failed: $e');
         if (e is YtmException) breaker.classifyAndRecord(e);
       }
+    }
+
+    // 2.9 While an egress block is active, the pure-Dart sweep below pays three
+    // 12s client timeouts for the same refusal. Surface the structured block
+    // immediately so the UI can explain it and the queue can skip on instead of
+    // stalling for another half minute per track.
+    if (inBotCooldown) {
+      final blocked = firstError;
+      if (blocked is YtmException &&
+          (blocked.isBotBlocked || blocked.isIpBlocked || blocked.isThrottled)) {
+        throw blocked;
+      }
+      throw const YtmException('BOT_CHALLENGE',
+          'YouTube is blocking this network. Try another connection or a proxy.');
     }
 
     // 3. Pure-Dart InnerTube Stream Resolver (Desktop / Non-Android / Native Plugin Fallback)

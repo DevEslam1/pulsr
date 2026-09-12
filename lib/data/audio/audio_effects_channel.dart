@@ -979,8 +979,9 @@ class AudioEffectsChannel {
   Future<void> setSaturationParams(
     double drive,
     double mix,
-    double tilt,
-  ) async {
+    double tilt, {
+    int mode = 0,
+  }) async {
     if (!_isAndroid) return;
     try {
       await _channel
@@ -988,6 +989,7 @@ class AudioEffectsChannel {
             'drive': drive,
             'mix': mix,
             'tilt': tilt,
+            'mode': mode,
           })
           .timeout(const Duration(seconds: 3));
     } catch (e, st) {
@@ -1018,11 +1020,27 @@ class AudioEffectsChannel {
     }
   }
 
-  Future<void> setStereoWidthParams(double width) async {
+  Future<void> setStereoWidthParams(
+    double width, {
+    bool multiband = false,
+    double lowWidth = 1.0,
+    double midWidth = 1.0,
+    double highWidth = 1.0,
+    double lowCrossoverHz = 160.0,
+    double highCrossoverHz = 2500.0,
+  }) async {
     if (!_isAndroid) return;
     try {
       await _channel
-          .invokeMethod('setStereoWidthParams', {'width': width})
+          .invokeMethod('setStereoWidthParams', {
+            'width': width,
+            'multiband': multiband,
+            'lowWidth': lowWidth,
+            'midWidth': midWidth,
+            'highWidth': highWidth,
+            'lowCrossoverHz': lowCrossoverHz,
+            'highCrossoverHz': highCrossoverHz,
+          })
           .timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log(
@@ -1095,8 +1113,10 @@ class AudioEffectsChannel {
   Future<void> setSubCrossoverParams(
     double cornerHz,
     double slopeDbPerOct,
-    double subGain,
-  ) async {
+    double subGain, {
+    bool bassMono = false,
+    bool antiPop = true,
+  }) async {
     if (!_isAndroid) return;
     try {
       await _channel
@@ -1104,6 +1124,8 @@ class AudioEffectsChannel {
             'cornerHz': cornerHz,
             'slopeDbPerOct': slopeDbPerOct,
             'subGain': subGain,
+            'bassMono': bassMono,
+            'antiPop': antiPop,
           })
           .timeout(const Duration(seconds: 3));
     } catch (e, st) {
@@ -1159,6 +1181,9 @@ class AudioEffectsChannel {
     required double attackMs,
     required double releaseMs,
     required double maxCutDb,
+    double maxBoostDb = 12.0,
+    int mode = 0,
+    int filterType = 0,
     bool enabled = true,
   }) async {
     if (!_isAndroid) return;
@@ -1173,12 +1198,127 @@ class AudioEffectsChannel {
             'attackMs': attackMs,
             'releaseMs': releaseMs,
             'maxCutDb': maxCutDb,
+            'maxBoostDb': maxBoostDb,
+            'mode': mode,
+            'filterType': filterType,
             'enabled': enabled,
           })
           .timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set dynamic EQ band $index',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+    }
+  }
+
+  // --- NATIVE C++ 4-BAND MULTIBAND COMPRESSOR ---
+
+  Future<void> setMultibandCompressorEnabled(bool enabled) async {
+    if (!_isAndroid) return;
+    try {
+      await _channel
+          .invokeMethod('setMultibandCompressorEnabled', {'enabled': enabled})
+          .timeout(const Duration(seconds: 3));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set multiband compressor enabled ($enabled)',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+    }
+  }
+
+  Future<void> setMultibandCompressorBand(
+    int bandIndex, {
+    required double thresholdDb,
+    required double ratio,
+    required double attackMs,
+    required double releaseMs,
+    required double kneeDb,
+    required double makeupGainDb,
+    bool enabled = true,
+  }) async {
+    if (!_isAndroid) return;
+    try {
+      await _channel
+          .invokeMethod('setMultibandCompressorBand', {
+            'bandIndex': bandIndex,
+            'thresholdDb': thresholdDb,
+            'ratio': ratio,
+            'attackMs': attackMs,
+            'releaseMs': releaseMs,
+            'kneeDb': kneeDb,
+            'makeupGainDb': makeupGainDb,
+            'enabled': enabled,
+          })
+          .timeout(const Duration(seconds: 3));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set multiband compressor band $bandIndex',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+    }
+  }
+
+  Future<void> setMultibandCompressorCrossovers({
+    required double f0,
+    required double f1,
+    required double f2,
+  }) async {
+    if (!_isAndroid) return;
+    try {
+      await _channel
+          .invokeMethod('setMultibandCompressorCrossovers', {
+            'f0': f0,
+            'f1': f1,
+            'f2': f2,
+          })
+          .timeout(const Duration(seconds: 3));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set multiband compressor crossovers',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+    }
+  }
+
+  Future<void> setDynamicBassParams({
+    required bool enabled,
+    required double strength,
+    required int xLow,
+    required int xHigh,
+    required int yLow,
+    required int yHigh,
+    required double sideGainLow,
+    required double sideGainHigh,
+    required int devicePreset,
+  }) async {
+    if (!_isAndroid) return;
+    try {
+      await _channel
+          .invokeMethod('setDynamicBassParams', {
+            'enabled': enabled,
+            'strength': strength,
+            'xLow': xLow,
+            'xHigh': xHigh,
+            'yLow': yLow,
+            'yHigh': yHigh,
+            'sideGainLow': sideGainLow,
+            'sideGainHigh': sideGainHigh,
+            'devicePreset': devicePreset,
+          })
+          .timeout(const Duration(seconds: 3));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set dynamic bass params',
         error: e,
         stackTrace: st,
         category: 'AudioEffectsChannel',
@@ -1270,6 +1410,7 @@ class AudioEffectsChannel {
   Future<void> setReverbParams({
     double predelayMs = 0.0,
     double damping = 0.5,
+    double crossChannel = 0.0,
   }) async {
     if (!_isAndroid) return;
     try {
@@ -1277,6 +1418,7 @@ class AudioEffectsChannel {
           .invokeMethod('setReverbParams', {
             'predelayMs': predelayMs,
             'damping': damping,
+            'crossChannel': crossChannel,
           })
           .timeout(const Duration(seconds: 2));
     } catch (e, st) {
@@ -1289,19 +1431,45 @@ class AudioEffectsChannel {
     }
   }
 
-  Future<void> setDspPreference(String preference) async {
+  Future<void> setReverbCrossChannel(double crossChannel) async {
     if (!_isAndroid) return;
     try {
       await _channel
-          .invokeMethod('setDspPreference', {'preference': preference})
+          .invokeMethod('setReverbCrossChannel', {'crossChannel': crossChannel})
           .timeout(const Duration(seconds: 2));
     } catch (e, st) {
       ErrorLogger.log(
-        'setDspPreference failed',
+        'setReverbCrossChannel failed',
         error: e,
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+    }
+  }
+
+  Future<void> setDspPreference(String preference) async {
+    if (!_isAndroid) return;
+    // Called during settings load, which can run before the native effects
+    // plugin has attached to the engine. Retry once after a short delay instead
+    // of surfacing a startup TimeoutException crash report.
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        await _channel
+            .invokeMethod('setDspPreference', {'preference': preference})
+            .timeout(Duration(seconds: attempt == 0 ? 2 : 4));
+        return;
+      } catch (e, st) {
+        if (attempt == 1) {
+          ErrorLogger.log(
+            'setDspPreference failed',
+            error: e,
+            stackTrace: st,
+            category: 'AudioEffectsChannel',
+          );
+        } else {
+          await Future.delayed(const Duration(milliseconds: 800));
+        }
+      }
     }
   }
 

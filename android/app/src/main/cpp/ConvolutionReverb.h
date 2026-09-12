@@ -34,6 +34,8 @@ public:
     void setWetDry(double wet); // 0.0 (dry) to 1.0 (wet)
     void setPredelay(double predelayMs); // 0.0 to 150.0 ms
     void setDamping(double damping); // 0.0 (bright) to 1.0 (dark/damped)
+    void setCrossChannel(double crossChannel) { crossChannel_ = std::clamp(crossChannel, 0.0, 1.0); }
+    double getCrossChannel() const { return crossChannel_; }
     void setEnabled(bool enabled);
     bool isEnabled() const { return enabled_; }
     void applyParams(const ReverbParamSet& params);
@@ -125,4 +127,5 @@ private:
     int rawCustomFrames_ = 0;
     int rawCustomChannels_ = 2;
     double rawCustomSampleRate_ = 48000.0;
+    double crossChannel_ = 0.0;
 };

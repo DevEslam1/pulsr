@@ -46,5 +46,8 @@ class PulsrModalObserver extends NavigatorObserver {
   }
 
   bool _isModal(Route route) =>
-      route is DialogRoute || route is ModalBottomSheetRoute;
+      route is PopupRoute ||
+      route is DialogRoute ||
+      route is RawDialogRoute ||
+      route is ModalBottomSheetRoute;
 }

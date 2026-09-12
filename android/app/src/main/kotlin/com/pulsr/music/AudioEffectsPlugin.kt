@@ -118,9 +118,16 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var saturationDrive = 0.3
     private var saturationMix = 0.5
     private var saturationTilt = 0.3
+    private var saturationMode = 0
 
     private var isStereoWidthEnabled = false
     private var stereoWidth = 1.0
+    private var stereoWidthMultiband = false
+    private var stereoWidthLow = 1.0
+    private var stereoWidthMid = 1.0
+    private var stereoWidthHigh = 1.0
+    private var stereoWidthLowCrossoverHz = 160.0
+    private var stereoWidthHighCrossoverHz = 2500.0
 
     private var isLoudnessContourEnabled = false
     private var loudnessIntensity = 0.0
@@ -130,9 +137,23 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var subCrossoverCornerHz = 80.0
     private var subCrossoverSlopeDbPerOct = 24.0
     private var subCrossoverGain = 0.8
+    private var subCrossoverBassMono = false
+    private var subCrossoverAntiPop = true
 
     private var isDynamicEqEnabled = false
     private var dynamicEqBandCount = 1
+
+    private var isMultibandCompressorEnabled = false
+
+    private var isDynamicBassEnabled = false
+    private var dynamicBassStrength = 1.0
+    private var dynamicBassXLow = 100
+    private var dynamicBassXHigh = 5600
+    private var dynamicBassYLow = 40
+    private var dynamicBassYHigh = 80
+    private var dynamicBassSideGainLow = 0.10
+    private var dynamicBassSideGainHigh = 0.50
+    private var dynamicBassDevicePreset = 0
 
     private var isSincResamplerEnabled = true
     private var resamplerInRate = 48000.0
@@ -232,13 +253,17 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var lastNativeSaturationEnabled: Boolean? = null
     private var lastNativeSaturationParams: String? = null
     private var lastNativeStereoWidthEnabled: Boolean? = null
-    private var lastNativeStereoWidthParams: Double? = null
+    private var lastNativeStereoWidthParams: String? = null
     private var lastNativeLoudnessEnabled: Boolean? = null
     private var lastNativeLoudnessParams: String? = null
     private var lastNativeSubCrossoverEnabled: Boolean? = null
     private var lastNativeSubCrossoverParams: String? = null
     private var lastNativeDynamicEqEnabled: Boolean? = null
     private val lastNativeDynamicEqBands = mutableMapOf<Int, String>()
+    private var lastNativeMultibandCompressorEnabled: Boolean? = null
+    private val lastNativeMultibandCompressorBands = mutableMapOf<Int, String>()
+    private var lastNativeMultibandCompressorCrossovers: String? = null
+    private var lastNativeDynamicBassParams: String? = null
 
     init {
         try {
@@ -279,6 +304,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeSetReverbWetDry(wetRatio: Float)
     private external fun nativeSetReverbPredelay(predelayMs: Double)
     private external fun nativeSetReverbDamping(damping: Double)
+    private external fun nativeSetReverbCrossChannel(crossChannel: Double)
     private external fun nativeLoadImpulseResponse(irSamples: FloatArray, channels: Int): Boolean
     private external fun nativeSetStereoBalance(balance: Double)
     private external fun nativeSetMonoMix(mono: Boolean)
@@ -286,18 +312,36 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeSetSincResamplerRates(inRate: Double, outRate: Double)
     private external fun nativeSetSincResamplerQuality(quality: Int)
     private external fun nativeSetSaturationEnabled(enabled: Boolean)
-    private external fun nativeSetSaturationParams(drive: Double, mix: Double, tilt: Double)
+    private external fun nativeSetSaturationParams(drive: Double, mix: Double, tilt: Double, mode: Int)
     private external fun nativeSetStereoWidthEnabled(enabled: Boolean)
-    private external fun nativeSetStereoWidthParams(width: Double)
+    private external fun nativeSetStereoWidthParams(
+        width: Double, multiband: Boolean, lowWidth: Double, midWidth: Double,
+        highWidth: Double, lowCrossoverHz: Double, highCrossoverHz: Double
+    )
     private external fun nativeSetLoudnessContourEnabled(enabled: Boolean)
     private external fun nativeSetLoudnessContourParams(intensity: Double, volumeLinear: Double)
     private external fun nativeSetSubCrossoverEnabled(enabled: Boolean)
-    private external fun nativeSetSubCrossoverParams(cornerHz: Double, slopeDbPerOct: Double, subGain: Double)
+    private external fun nativeSetSubCrossoverParams(
+        cornerHz: Double, slopeDbPerOct: Double, subGain: Double, bassMono: Boolean, antiPop: Boolean
+    )
     private external fun nativeSetDynamicEqEnabled(enabled: Boolean)
     private external fun nativeSetDynamicEqBandCount(count: Int)
     private external fun nativeSetDynamicEqBand(
         index: Int, freq: Double, q: Double, thresholdDb: Double, ratio: Double,
-        attackMs: Double, releaseMs: Double, maxCutDb: Double, enabled: Boolean
+        attackMs: Double, releaseMs: Double, maxCutDb: Double, maxBoostDb: Double,
+        mode: Int, filterType: Int, enabled: Boolean
+    )
+    private external fun nativeSetMultibandCompressorEnabled(enabled: Boolean)
+    private external fun nativeSetMultibandCompressorBand(
+        bandIndex: Int, thresholdDb: Double, ratio: Double, attackMs: Double,
+        releaseMs: Double, kneeDb: Double, makeupGainDb: Double, enabled: Boolean
+    )
+    private external fun nativeSetMultibandCompressorCrossovers(f0: Double, f1: Double, f2: Double)
+    private external fun nativeSetDynamicBassParams(
+        enabled: Boolean, strength: Double,
+        xLow: Int, xHigh: Int, yLow: Int, yHigh: Int,
+        sideGainLow: Double, sideGainHigh: Double,
+        devicePreset: Int
     )
     private external fun nativeSetReplayGainEnabled(enabled: Boolean)
     private external fun nativeSetReplayGainParams(
@@ -373,6 +417,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         if (isLoudnessContourEnabled && loudnessIntensity > 0.001) mask = mask or STAGE_LOUDNESS
         if (isSubCrossoverEnabled) mask = mask or STAGE_CROSSOVER
         if (isDynamicEqEnabled && dynamicEqBandCount > 0) mask = mask or STAGE_DYNEQ
+        if (isMultibandCompressorEnabled) mask = mask or STAGE_MULTIBAND_COMPRESSOR
+        if (isDynamicBassEnabled && dynamicBassStrength > 0.001) mask = mask or STAGE_DYNAMIC_BASS
         // Dither is a standalone stage: it must run even with every other
         // effect off, so it is gated by its own bit rather than by chain gain.
         if (isDitherEnabled) mask = mask or STAGE_DITHER
@@ -414,6 +460,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         const val STAGE_DYNEQ = 1 shl 10
         // Standalone dither stage (must mirror DspStageMask in AudioDspEngine.h)
         const val STAGE_DITHER = 1 shl 11
+        // 4-Band Multiband Compressor (must mirror DspStageMask in AudioDspEngine.h)
+        const val STAGE_MULTIBAND_COMPRESSOR = 1 shl 12
+        // Dynamic Bass (must mirror DspStageMask in AudioDspEngine.h)
+        const val STAGE_DYNAMIC_BASS = 1 shl 13
 
         /**
          * Ordinal of `ReverbPreset::Custom` in ConvolutionReverb.h — the one
@@ -772,6 +822,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         lastNativeSubCrossoverParams = null
         lastNativeDynamicEqEnabled = null
         lastNativeDynamicEqBands.clear()
+        lastNativeMultibandCompressorEnabled = null
+        lastNativeMultibandCompressorBands.clear()
+        lastNativeMultibandCompressorCrossovers = null
         releaseEffects()
         releaseNativeDsp()
         try { methodChannel.setMethodCallHandler(null) } catch (_: Exception) {}
@@ -790,6 +843,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             nativeSetLoudnessContourEnabled(false)
             nativeSetSubCrossoverEnabled(false)
             nativeSetDynamicEqEnabled(false)
+            nativeSetMultibandCompressorEnabled(false)
+            nativeSetDynamicBassParams(false, 1.0, 100, 5600, 40, 80, 0.10, 0.50, 0)
             nativeSetSincResamplerEnabled(false)
             nativeSetActiveStages(0)
             nativeReset()
@@ -810,6 +865,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         lastNativeLoudnessEnabled = null
         lastNativeSubCrossoverEnabled = null
         lastNativeDynamicEqEnabled = null
+        lastNativeMultibandCompressorEnabled = null
+        lastNativeDynamicBassParams = null
 
         try { nativeSetSincResamplerEnabled(isSincResamplerEnabled) } catch (_: Exception) {}
         try { nativeSetEqEnabled(isEqEnabled && dspPreference == "native") } catch (_: Exception) {}
@@ -821,6 +878,14 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         try { nativeSetLoudnessContourEnabled(isLoudnessContourEnabled) } catch (_: Exception) {}
         try { nativeSetSubCrossoverEnabled(isSubCrossoverEnabled) } catch (_: Exception) {}
         try { nativeSetDynamicEqEnabled(isDynamicEqEnabled) } catch (_: Exception) {}
+        try { nativeSetMultibandCompressorEnabled(isMultibandCompressorEnabled) } catch (_: Exception) {}
+        try {
+            nativeSetDynamicBassParams(
+                isDynamicBassEnabled, dynamicBassStrength,
+                dynamicBassXLow, dynamicBassXHigh, dynamicBassYLow, dynamicBassYHigh,
+                dynamicBassSideGainLow, dynamicBassSideGainHigh, dynamicBassDevicePreset
+            )
+        } catch (_: Exception) {}
         // Re-assert bit-perfect/dither snapshot truth after bypass so the
         // C++ early-return and BT dither-skip match the restored route.
         try { nativeSetBitPerfectParams(false, isDopActive) } catch (_: Exception) {}
@@ -1258,17 +1323,33 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "setReverbParams" -> {
                     val predelayMs = clamp((call.argument<Number>("predelayMs"))?.toDouble() ?: 0.0, 0.0, 150.0)
                     val damping = clamp((call.argument<Number>("damping"))?.toDouble() ?: 0.5, 0.0, 1.0)
+                    val crossChannel = clamp((call.argument<Number>("crossChannel"))?.toDouble() ?: 0.0, 0.0, 1.0)
                     if (isNativeDspLoaded) {
-                        val key = String.format(java.util.Locale.US, "%.1f:%.2f", predelayMs, damping)
+                        val key = String.format(java.util.Locale.US, "%.1f:%.2f:%.2f", predelayMs, damping, crossChannel)
                         if (lastNativeReverbParams != key) {
                             safeReverbExecute {
                                 try {
                                     nativeSetReverbPredelay(predelayMs)
                                     nativeSetReverbDamping(damping)
+                                    nativeSetReverbCrossChannel(crossChannel)
                                     lastNativeReverbParams = key
                                 } catch (e: Exception) {
                                     Log.w(TAG, "nativeSetReverbParams async failed: ${e.message}")
                                 }
+                            }
+                        }
+                    }
+                    result.success(true)
+                }
+
+                "setReverbCrossChannel" -> {
+                    val crossChannel = clamp((call.argument<Number>("crossChannel"))?.toDouble() ?: 0.0, 0.0, 1.0)
+                    if (isNativeDspLoaded) {
+                        safeReverbExecute {
+                            try {
+                                nativeSetReverbCrossChannel(crossChannel)
+                            } catch (e: Exception) {
+                                Log.w(TAG, "nativeSetReverbCrossChannel failed: ${e.message}")
                             }
                         }
                     }
@@ -1473,14 +1554,16 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     val drive = clamp((call.argument<Number>("drive"))?.toDouble() ?: 0.3, 0.0, 1.0)
                     val mix = clamp((call.argument<Number>("mix"))?.toDouble() ?: 0.5, 0.0, 1.0)
                     val tilt = clamp((call.argument<Number>("tilt"))?.toDouble() ?: 0.3, 0.0, 1.0)
+                    val mode = call.argument<Int>("mode") ?: 0
                     saturationDrive = drive
                     saturationMix = mix
                     saturationTilt = tilt
+                    saturationMode = mode
                     if (isNativeDspLoaded) {
-                        val key = String.format(java.util.Locale.US, "%.2f:%.2f:%.2f", drive, mix, tilt)
+                        val key = String.format(java.util.Locale.US, "%.2f:%.2f:%.2f:%d", drive, mix, tilt, mode)
                         if (lastNativeSaturationParams != key) {
                             try {
-                                nativeSetSaturationParams(drive, mix, tilt)
+                                nativeSetSaturationParams(drive, mix, tilt, mode)
                                 lastNativeSaturationParams = key
                             } catch (e: Exception) {
                                 Log.w(TAG, "nativeSetSaturationParams failed: ${e.message}")
@@ -1512,15 +1595,31 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
                 "setStereoWidthParams" -> {
                     val width = clamp((call.argument<Number>("width"))?.toDouble() ?: 1.0, 0.0, 2.0)
+                    val multiband = call.argument<Boolean>("multiband") ?: false
+                    val lowWidth = clamp((call.argument<Number>("lowWidth"))?.toDouble() ?: 1.0, 0.0, 2.0)
+                    val midWidth = clamp((call.argument<Number>("midWidth"))?.toDouble() ?: 1.0, 0.0, 2.0)
+                    val highWidth = clamp((call.argument<Number>("highWidth"))?.toDouble() ?: 1.0, 0.0, 2.0)
+                    val lowCrossoverHz = clamp((call.argument<Number>("lowCrossoverHz"))?.toDouble() ?: 160.0, 40.0, 1000.0)
+                    val highCrossoverHz = clamp((call.argument<Number>("highCrossoverHz"))?.toDouble() ?: 2500.0, 1000.0, 10000.0)
                     stereoWidth = width
-                    if (isNativeDspLoaded && lastNativeStereoWidthParams != width) {
-                        try {
-                            nativeSetStereoWidthParams(width)
-                            lastNativeStereoWidthParams = width
-                        } catch (e: Exception) {
-                            Log.w(TAG, "nativeSetStereoWidthParams failed: ${e.message}")
-                            result.error("NATIVE_ERROR", e.message, null)
-                            return
+                    stereoWidthMultiband = multiband
+                    stereoWidthLow = lowWidth
+                    stereoWidthMid = midWidth
+                    stereoWidthHigh = highWidth
+                    stereoWidthLowCrossoverHz = lowCrossoverHz
+                    stereoWidthHighCrossoverHz = highCrossoverHz
+                    if (isNativeDspLoaded) {
+                        val key = String.format(java.util.Locale.US, "%.2f:%b:%.2f:%.2f:%.2f:%.1f:%.1f",
+                            width, multiband, lowWidth, midWidth, highWidth, lowCrossoverHz, highCrossoverHz)
+                        if (lastNativeStereoWidthParams != key) {
+                            try {
+                                nativeSetStereoWidthParams(width, multiband, lowWidth, midWidth, highWidth, lowCrossoverHz, highCrossoverHz)
+                                lastNativeStereoWidthParams = key
+                            } catch (e: Exception) {
+                                Log.w(TAG, "nativeSetStereoWidthParams failed: ${e.message}")
+                                result.error("NATIVE_ERROR", e.message, null)
+                                return
+                            }
                         }
                     }
                     result.success(true)
@@ -1588,6 +1687,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     val rawCornerHz = (call.argument<Number>("cornerHz"))?.toDouble() ?: 80.0
                     val rawSlope = (call.argument<Number>("slopeDbPerOct"))?.toDouble() ?: 24.0
                     val rawSubGain = (call.argument<Number>("subGain"))?.toDouble() ?: 0.8
+                    val bassMono = call.argument<Boolean>("bassMono") ?: false
+                    val antiPop = call.argument<Boolean>("antiPop") ?: true
                     if (!rawCornerHz.isFinite() || !rawSlope.isFinite() || !rawSubGain.isFinite()) {
                         result.error("INVALID_ARGUMENT", "Sub crossover parameters must be finite", null)
                         return
@@ -1598,11 +1699,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     subCrossoverCornerHz = cornerHz
                     subCrossoverSlopeDbPerOct = slopeDbPerOct
                     subCrossoverGain = subGain
+                    subCrossoverBassMono = bassMono
+                    subCrossoverAntiPop = antiPop
                     if (isNativeDspLoaded) {
-                        val key = String.format(java.util.Locale.US, "%.1f:%.1f:%.2f", cornerHz, slopeDbPerOct, subGain)
+                        val key = String.format(java.util.Locale.US, "%.1f:%.1f:%.2f:%b:%b", cornerHz, slopeDbPerOct, subGain, bassMono, antiPop)
                         if (lastNativeSubCrossoverParams != key) {
                             try {
-                                nativeSetSubCrossoverParams(cornerHz, slopeDbPerOct, subGain)
+                                nativeSetSubCrossoverParams(cornerHz, slopeDbPerOct, subGain, bassMono, antiPop)
                                 lastNativeSubCrossoverParams = key
                             } catch (e: Exception) {
                                 Log.w(TAG, "nativeSetSubCrossoverParams failed: ${e.message}")
@@ -1666,13 +1769,16 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     val attackMs = clamp((call.argument<Number>("attackMs"))?.toDouble() ?: 5.0, 0.1, 500.0)
                     val releaseMs = clamp((call.argument<Number>("releaseMs"))?.toDouble() ?: 120.0, 5.0, 2000.0)
                     val maxCutDb = clamp((call.argument<Number>("maxCutDb"))?.toDouble() ?: -12.0, -48.0, 0.0)
+                    val maxBoostDb = clamp((call.argument<Number>("maxBoostDb"))?.toDouble() ?: 12.0, 0.0, 48.0)
+                    val mode = call.argument<Int>("mode") ?: 0
+                    val filterType = call.argument<Int>("filterType") ?: 0
                     val enabled = call.argument<Boolean>("enabled") ?: true
                     if (isNativeDspLoaded) {
-                        val key = String.format(java.util.Locale.US, "%.1f:%.2f:%.1f:%.1f:%.1f:%.1f:%.1f:%b",
-                            freq, q, thresholdDb, ratio, attackMs, releaseMs, maxCutDb, enabled)
+                        val key = String.format(java.util.Locale.US, "%.1f:%.2f:%.1f:%.1f:%.1f:%.1f:%.1f:%.1f:%d:%d:%b",
+                            freq, q, thresholdDb, ratio, attackMs, releaseMs, maxCutDb, maxBoostDb, mode, filterType, enabled)
                         if (lastNativeDynamicEqBands[index] != key) {
                             try {
-                                nativeSetDynamicEqBand(index, freq, q, thresholdDb, ratio, attackMs, releaseMs, maxCutDb, enabled)
+                                nativeSetDynamicEqBand(index, freq, q, thresholdDb, ratio, attackMs, releaseMs, maxCutDb, maxBoostDb, mode, filterType, enabled)
                                 lastNativeDynamicEqBands[index] = key
                             } catch (e: Exception) {
                                 Log.w(TAG, "nativeSetDynamicEqBand failed: ${e.message}")
@@ -1681,6 +1787,116 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             }
                         }
                     }
+                    result.success(true)
+                }
+
+                // ---- Native C++ 4-Band Multiband Compressor ----
+                "setMultibandCompressorEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    isMultibandCompressorEnabled = enabled
+                    if (isNativeDspLoaded && lastNativeMultibandCompressorEnabled != enabled) {
+                        try {
+                            nativeSetMultibandCompressorEnabled(enabled)
+                            lastNativeMultibandCompressorEnabled = enabled
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetMultibandCompressorEnabled failed: ${e.message}")
+                            result.error("NATIVE_ERROR", e.message, null)
+                            return
+                        }
+                    }
+                    recalculateActiveStages()
+                    result.success(true)
+                }
+
+                "setMultibandCompressorBand" -> {
+                    val bandIndex = call.argument<Int>("bandIndex") ?: 0
+                    if (bandIndex !in 0 until 4) {
+                        result.error("INVALID_ARGUMENT", "Band index out of range [0..3]: $bandIndex", null)
+                        return
+                    }
+                    val thresholdDb = clamp((call.argument<Number>("thresholdDb"))?.toDouble() ?: -20.0, -60.0, 0.0)
+                    val ratio = clamp((call.argument<Number>("ratio"))?.toDouble() ?: 2.0, 1.0, 20.0)
+                    val attackMs = clamp((call.argument<Number>("attackMs"))?.toDouble() ?: 20.0, 0.1, 500.0)
+                    val releaseMs = clamp((call.argument<Number>("releaseMs"))?.toDouble() ?: 100.0, 5.0, 2000.0)
+                    val kneeDb = clamp((call.argument<Number>("kneeDb"))?.toDouble() ?: 6.0, 0.0, 24.0)
+                    val makeupGainDb = clamp((call.argument<Number>("makeupGainDb"))?.toDouble() ?: 0.0, -24.0, 24.0)
+                    val enabled = call.argument<Boolean>("enabled") ?: true
+                    if (isNativeDspLoaded) {
+                        val key = String.format(java.util.Locale.US, "%.1f:%.1f:%.1f:%.1f:%.1f:%.1f:%b",
+                            thresholdDb, ratio, attackMs, releaseMs, kneeDb, makeupGainDb, enabled)
+                        if (lastNativeMultibandCompressorBands[bandIndex] != key) {
+                            try {
+                                nativeSetMultibandCompressorBand(bandIndex, thresholdDb, ratio, attackMs, releaseMs, kneeDb, makeupGainDb, enabled)
+                                lastNativeMultibandCompressorBands[bandIndex] = key
+                            } catch (e: Exception) {
+                                Log.w(TAG, "nativeSetMultibandCompressorBand failed: ${e.message}")
+                                result.error("NATIVE_ERROR", e.message, null)
+                                return
+                            }
+                        }
+                    }
+                    result.success(true)
+                }
+
+                "setMultibandCompressorCrossovers" -> {
+                    val f0 = clamp((call.argument<Number>("f0"))?.toDouble() ?: 160.0, 40.0, 500.0)
+                    val f1 = clamp((call.argument<Number>("f1"))?.toDouble() ?: 1000.0, 200.0, 4000.0)
+                    val f2 = clamp((call.argument<Number>("f2"))?.toDouble() ?: 5000.0, 1000.0, 16000.0)
+                    if (isNativeDspLoaded) {
+                        val key = String.format(java.util.Locale.US, "%.1f:%.1f:%.1f", f0, f1, f2)
+                        if (lastNativeMultibandCompressorCrossovers != key) {
+                            try {
+                                nativeSetMultibandCompressorCrossovers(f0, f1, f2)
+                                lastNativeMultibandCompressorCrossovers = key
+                            } catch (e: Exception) {
+                                Log.w(TAG, "nativeSetMultibandCompressorCrossovers failed: ${e.message}")
+                                result.error("NATIVE_ERROR", e.message, null)
+                                return
+                            }
+                        }
+                    }
+                    result.success(true)
+                }
+
+                "setDynamicBassParams" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    val strength = clamp((call.argument<Number>("strength"))?.toDouble() ?: 1.0, 0.0, 8.0)
+                    val xLow = (call.argument<Int>("xLow") ?: 100).coerceIn(20, 2400)
+                    val xHigh = (call.argument<Int>("xHigh") ?: 5600).coerceIn(500, 12000)
+                    val yLow = (call.argument<Int>("yLow") ?: 40).coerceIn(20, 200)
+                    val yHigh = (call.argument<Int>("yHigh") ?: 80).coerceIn(30, 300)
+                    val sideGainLow = clamp((call.argument<Number>("sideGainLow"))?.toDouble() ?: 0.10, 0.0, 1.0)
+                    val sideGainHigh = clamp((call.argument<Number>("sideGainHigh"))?.toDouble() ?: 0.50, 0.0, 1.0)
+                    val devicePreset = (call.argument<Int>("devicePreset") ?: 0).coerceIn(0, 9)
+
+                    isDynamicBassEnabled = enabled
+                    dynamicBassStrength = strength
+                    dynamicBassXLow = xLow
+                    dynamicBassXHigh = xHigh
+                    dynamicBassYLow = yLow
+                    dynamicBassYHigh = yHigh
+                    dynamicBassSideGainLow = sideGainLow
+                    dynamicBassSideGainHigh = sideGainHigh
+                    dynamicBassDevicePreset = devicePreset
+
+                    if (isNativeDspLoaded) {
+                        val key = String.format(java.util.Locale.US, "%b:%.2f:%d:%d:%d:%d:%.2f:%.2f:%d",
+                            enabled, strength, xLow, xHigh, yLow, yHigh, sideGainLow, sideGainHigh, devicePreset)
+                        if (lastNativeDynamicBassParams != key) {
+                            try {
+                                nativeSetDynamicBassParams(
+                                    enabled, strength, xLow, xHigh, yLow, yHigh,
+                                    sideGainLow, sideGainHigh, devicePreset
+                                )
+                                lastNativeDynamicBassParams = key
+                            } catch (e: Exception) {
+                                Log.w(TAG, "nativeSetDynamicBassParams failed: ${e.message}")
+                                result.error("NATIVE_ERROR", e.message, null)
+                                return
+                            }
+                        }
+                    }
+                    recalculateActiveStages()
                     result.success(true)
                 }
 
@@ -1765,6 +1981,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         "hasLoudnessContour" to isNativeDspLoaded,
                         "hasSubCrossover" to isNativeDspLoaded,
                         "hasDynamicEq" to isNativeDspLoaded,
+                        "hasMultibandCompressor" to isNativeDspLoaded,
+                        "hasDynamicBass" to isNativeDspLoaded,
                         "eqBandCount" to if (isNativeDspLoaded) 32 else (if (dynamicsSupported) eqBandCount else 0),
                         "eqCenterFrequencies" to eqCenterFreqs.toList(),
                         "hasAudioEffects" to true,
@@ -3067,6 +3285,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         lastNativeSubCrossoverParams = null
         lastNativeDynamicEqEnabled = null
         lastNativeDynamicEqBands.clear()
+        lastNativeMultibandCompressorEnabled = null
+        lastNativeMultibandCompressorBands.clear()
+        lastNativeMultibandCompressorCrossovers = null
+        lastNativeDynamicBassParams = null
         dpBuildFailures = 0
         dpBuildFailureSessionId = 0
     }
@@ -3092,6 +3314,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 isLoudnessContourEnabled ||
                 isSubCrossoverEnabled ||
                 isDynamicEqEnabled ||
+                isMultibandCompressorEnabled ||
+                (isDynamicBassEnabled && dynamicBassStrength > 0.001) ||
                 isSincResamplerEnabled
         )
 

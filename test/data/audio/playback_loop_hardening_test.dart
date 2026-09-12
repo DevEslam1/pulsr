@@ -424,4 +424,36 @@ void main() {
       expect(maxSimultaneous, lessThanOrEqualTo(maxConcurrency));
     });
   });
+
+  group('Sleep timer completion dedup', () {
+    test('collapses duplicate boundary signals inside the debounce window', () {
+      final now = DateTime(2026, 1, 1, 12, 0, 0);
+      expect(PulsrAudioHandler.isDistinctSleepCompletion(null, now), isTrue);
+      expect(
+        PulsrAudioHandler.isDistinctSleepCompletion(
+            now, now.add(const Duration(milliseconds: 5))),
+        isFalse,
+        reason: 'native completed + currentIndexStream fire back to back',
+      );
+      expect(
+        PulsrAudioHandler.isDistinctSleepCompletion(
+            now, now.add(const Duration(milliseconds: 1499))),
+        isFalse,
+      );
+    });
+
+    test('accepts a genuine completion once the window elapses', () {
+      final now = DateTime(2026, 1, 1, 12, 0, 0);
+      expect(
+        PulsrAudioHandler.isDistinctSleepCompletion(
+            now, now.add(const Duration(milliseconds: 1500))),
+        isTrue,
+      );
+      expect(
+        PulsrAudioHandler.isDistinctSleepCompletion(
+            now, now.add(const Duration(seconds: 3))),
+        isTrue,
+      );
+    });
+  });
 }

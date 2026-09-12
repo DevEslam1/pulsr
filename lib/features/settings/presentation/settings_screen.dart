@@ -1,5 +1,5 @@
-// lib/features/settings/presentation/settings_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -32,6 +32,22 @@ class SettingsScreen extends StatefulWidget {
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsCategoryItem {
+  final String id;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color tintColor;
+
+  const _SettingsCategoryItem({
+    required this.id,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.tintColor,
+  });
 }
 
 class _Category {
@@ -76,28 +92,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final cubit = context.read<SettingsCubit>();
         _assignCategoryTitles(context);
 
+        final isTabletView =
+            context.isLargeTablet || MediaQuery.sizeOf(context).width >= 900;
+        final effectiveCategoryId =
+            (isTabletView && _selectedCategoryId == 'all')
+                ? 'audio'
+                : _selectedCategoryId;
+
         return Scaffold(
           body: SafeArea(
             bottom: false,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: context.isTabletLandscape ? 1040 : 760,
-                ),
-                child: Column(
-                  children: [
-                    _buildTopHeader(context),
-                    if (_searchQuery.isEmpty) _buildCategoryFilterBar(context),
-                    const SizedBox(height: 6),
-                    Expanded(
-                      child: _searchQuery.isNotEmpty
-                          ? _buildSearchResultsList(context, state, cubit)
-                          : _buildSettingsBody(context, state, cubit),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            child: isTabletView
+                ? _buildTabletLayout(
+                    context, state, cubit, effectiveCategoryId)
+                : _buildPhoneLayout(context, state, cubit),
           ),
         );
       },
@@ -199,23 +207,95 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   // ==========================================================================
-  // Category Filter Bar (Pills)
+  // ==========================================================================
+  // Category Metadata & Definitions
+  // ==========================================================================
+
+  List<_SettingsCategoryItem> _getCategories(BuildContext context) {
+    return [
+      _SettingsCategoryItem(
+        id: 'audio',
+        title: 'Audio & Sound',
+        subtitle: 'Equalizer, DSP, Hi-Res, ReplayGain',
+        icon: Icons.equalizer_rounded,
+        tintColor: const Color(0xFFFF9500),
+      ),
+      _SettingsCategoryItem(
+        id: 'playback',
+        title: 'Playback',
+        subtitle: 'Crossfade, gapless, sleep timer, skip',
+        icon: Icons.play_circle_outline_rounded,
+        tintColor: const Color(0xFFAF52DE),
+      ),
+      _SettingsCategoryItem(
+        id: 'appearance',
+        title: 'Appearance',
+        subtitle: 'Theme mode, accent colors, visualizer',
+        icon: Icons.palette_outlined,
+        tintColor: const Color(0xFFFF2D55),
+      ),
+      _SettingsCategoryItem(
+        id: 'gestures',
+        title: 'Gestures',
+        subtitle: 'Mini-player swipes, artwork double-tap',
+        icon: Icons.swipe_rounded,
+        tintColor: const Color(0xFF007AFF),
+      ),
+      _SettingsCategoryItem(
+        id: 'profiles',
+        title: 'Profiles & Rules',
+        subtitle: 'Hardware DAC mappings, trigger rules',
+        icon: Icons.devices_other_rounded,
+        tintColor: const Color(0xFF5856D6),
+      ),
+      _SettingsCategoryItem(
+        id: 'library',
+        title: 'Library',
+        subtitle: 'Folders, hidden media, duration filter',
+        icon: Icons.library_music_outlined,
+        tintColor: const Color(0xFF34C759),
+      ),
+      _SettingsCategoryItem(
+        id: 'online',
+        title: 'Network & YTM',
+        subtitle: 'Audio quality, streaming cache, proxy',
+        icon: Icons.cloud_outlined,
+        tintColor: const Color(0xFF5AC8FA),
+      ),
+      _SettingsCategoryItem(
+        id: 'storage',
+        title: 'Storage & Cache',
+        subtitle: 'Disk usage, cached artwork, cleanup',
+        icon: Icons.storage_rounded,
+        tintColor: const Color(0xFFFFCC00),
+      ),
+      _SettingsCategoryItem(
+        id: 'privacy',
+        title: 'Privacy & Backup',
+        subtitle: 'Offline guarantee, scrobbling, backups',
+        icon: Icons.shield_outlined,
+        tintColor: const Color(0xFF30B0C7),
+      ),
+      _SettingsCategoryItem(
+        id: 'about',
+        title: 'About',
+        subtitle: 'Version ${AppConfig.appVersion}, licenses, specs',
+        icon: Icons.info_outline_rounded,
+        tintColor: const Color(0xFF8E8E93),
+      ),
+    ];
+  }
+
+  // ==========================================================================
+  // Category Filter Bar (Pills for Phone)
   // ==========================================================================
 
   Widget _buildCategoryFilterBar(BuildContext context) {
     final p = context.palette;
+    final categories = _getCategories(context);
     final items = [
-      (id: 'all', title: 'All', icon: Icons.tune_rounded),
-      (id: 'audio', title: 'Audio & Sound', icon: Icons.equalizer_rounded),
-      (id: 'playback', title: 'Playback', icon: Icons.play_circle_outline_rounded),
-      (id: 'appearance', title: 'Appearance', icon: Icons.palette_outlined),
-      (id: 'gestures', title: 'Gestures', icon: Icons.swipe_rounded),
-      (id: 'profiles', title: 'Profiles & Rules', icon: Icons.devices_other_rounded),
-      (id: 'library', title: 'Library', icon: Icons.library_music_outlined),
-      (id: 'online', title: 'Network & YTM', icon: Icons.cloud_outlined),
-      (id: 'storage', title: 'Storage & Cache', icon: Icons.storage_rounded),
-      (id: 'privacy', title: 'Privacy & Backup', icon: Icons.shield_outlined),
-      (id: 'about', title: 'About', icon: Icons.info_outline_rounded),
+      (id: 'all', title: 'All', icon: Icons.tune_rounded, color: p.accent),
+      ...categories.map((c) => (id: c.id, title: c.title, icon: c.icon, color: c.tintColor)),
     ];
 
     return SizedBox(
@@ -233,29 +313,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           return GestureDetector(
             onTap: () {
+              HapticFeedback.selectionClick();
               setState(() => _selectedCategoryId = item.id);
-              if (item.id != 'all') {
-                final ctx = _catById(item.id).key.currentContext;
-                if (ctx != null) {
-                  Scrollable.ensureVisible(
-                    ctx,
-                    duration: const Duration(milliseconds: 350),
-                    curve: Curves.easeOutCubic,
-                    alignment: 0.04,
-                  );
-                }
-              } else {
-                if (_scrollController.hasClients) {
-                  _scrollController.animateTo(
-                    0,
-                    duration: const Duration(milliseconds: 350),
-                    curve: Curves.easeOutCubic,
-                  );
-                }
-              }
             },
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
                 color: isSelected
@@ -273,7 +336,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Icon(
                     item.icon,
                     size: 15,
-                    color: isSelected ? p.accent : p.textSecondary,
+                    color: isSelected ? p.accent : item.color,
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -295,48 +358,464 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   // ==========================================================================
-  // Main Settings Body
+  // Layouts: Tablet Master-Detail & Phone Category Views
   // ==========================================================================
 
-  Widget _buildSettingsBody(
+  Widget _buildTabletLayout(
+    BuildContext context,
+    SettingsState state,
+    SettingsCubit cubit,
+    String activeCatId,
+  ) {
+    final p = context.palette;
+    final categories = _getCategories(context);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Left Master Navigation Pane
+        SizedBox(
+          width: 320,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildTabletMasterHeader(context),
+              const SizedBox(height: 8),
+              Expanded(
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: categories.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 4),
+                  itemBuilder: (context, i) {
+                    final cat = categories[i];
+                    final isSelected = activeCatId == cat.id;
+
+                    return Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(AppRadii.card),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          setState(() {
+                            _selectedCategoryId = cat.id;
+                            if (_searchQuery.isNotEmpty) {
+                              _searchController.clear();
+                              _searchQuery = '';
+                            }
+                          });
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          curve: Curves.easeOutCubic,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? p.accent.withValues(alpha: 0.15)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(AppRadii.card),
+                            border: Border.all(
+                              color: isSelected
+                                  ? p.accent.withValues(alpha: 0.45)
+                                  : Colors.transparent,
+                              width: 1.2,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: cat.tintColor.withValues(
+                                      alpha: isSelected ? 0.22 : 0.12),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                  cat.icon,
+                                  size: 20,
+                                  color: cat.tintColor,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      cat.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: isSelected
+                                            ? p.accent
+                                            : p.textPrimary,
+                                        fontSize: 13.5,
+                                        fontWeight: isSelected
+                                            ? FontWeight.w800
+                                            : FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      cat.subtitle,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: p.textSecondary,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Icon(
+                                Icons.chevron_right_rounded,
+                                size: 18,
+                                color: isSelected
+                                    ? p.accent
+                                    : p.textTertiary.withValues(alpha: 0.6),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Vertical hairline divider
+        Container(
+          width: 1,
+          color: p.hairline,
+        ),
+
+        // Right Detail Pane
+        Expanded(
+          child: _searchQuery.isNotEmpty
+              ? _buildSearchResultsList(context, state, cubit)
+              : _buildDetailPane(context, state, cubit, activeCatId),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTabletMasterHeader(BuildContext context) {
+    final p = context.palette;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            context.l10n.settings,
+            style: TextStyle(
+              color: p.textPrimary,
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Pulsr v${AppConfig.appVersion} • Audiophile Engine',
+            style: TextStyle(
+              color: p.textTertiary,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Search Box
+          Container(
+            height: 42,
+            decoration: BoxDecoration(
+              color: p.surfaceContainer,
+              borderRadius: BorderRadius.circular(AppRadii.card),
+              border: Border.all(
+                color: _searchQuery.isNotEmpty
+                    ? p.accent.withValues(alpha: 0.5)
+                    : p.hairline,
+              ),
+            ),
+            child: TextField(
+              controller: _searchController,
+              style: TextStyle(
+                color: p.textPrimary,
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Search settings, sound, appearance...',
+                hintStyle: TextStyle(
+                  color: p.textTertiary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                ),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: _searchQuery.isNotEmpty ? p.accent : p.textTertiary,
+                  size: 19,
+                ),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: Icon(Icons.clear_rounded,
+                            color: p.textSecondary, size: 16),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      )
+                    : null,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailPane(
+    BuildContext context,
+    SettingsState state,
+    SettingsCubit cubit,
+    String activeCatId,
+  ) {
+    final categories = _getCategories(context);
+    final currentCat = categories.firstWhere(
+      (c) => c.id == activeCatId,
+      orElse: () => categories.first,
+    );
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 220),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0.015, 0),
+            end: Offset.zero,
+          ).animate(animation),
+          child: child,
+        ),
+      ),
+      child: KeyedSubtree(
+        key: ValueKey(activeCatId),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 820),
+            child: ListView(
+              padding: EdgeInsets.fromLTRB(
+                Adaptive.pagePadding(context),
+                18,
+                Adaptive.pagePadding(context),
+                160,
+              ),
+              physics: const BouncingScrollPhysics(),
+              children: [
+                _buildCategoryHeroHeader(context, currentCat),
+                const SizedBox(height: 16),
+                ..._buildCategoryWidgets(context, activeCatId, state, cubit),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPhoneLayout(
     BuildContext context,
     SettingsState state,
     SettingsCubit cubit,
   ) {
-    final showAll = _selectedCategoryId == 'all';
-
-    return ListView(
-      controller: _scrollController,
-      physics: const BouncingScrollPhysics(),
-      padding: EdgeInsets.only(
-        bottom: 160,
-        top: 10,
-        left: Adaptive.pagePadding(context),
-        right: Adaptive.pagePadding(context),
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 760),
+        child: Column(
+          children: [
+            _buildTopHeader(context),
+            if (_searchQuery.isEmpty) _buildCategoryFilterBar(context),
+            const SizedBox(height: 6),
+            Expanded(
+              child: _searchQuery.isNotEmpty
+                  ? _buildSearchResultsList(context, state, cubit)
+                  : _buildPhoneCategoryView(context, state, cubit),
+            ),
+          ],
+        ),
       ),
-      children: [
-        // Top Hero Account Card
-        if (showAll || _selectedCategoryId == 'privacy')
+    );
+  }
+
+  Widget _buildPhoneCategoryView(
+    BuildContext context,
+    SettingsState state,
+    SettingsCubit cubit,
+  ) {
+    if (_selectedCategoryId == 'all') {
+      return ListView(
+        controller: _scrollController,
+        physics: const BouncingScrollPhysics(),
+        padding: EdgeInsets.only(
+          bottom: 160,
+          top: 10,
+          left: Adaptive.pagePadding(context),
+          right: Adaptive.pagePadding(context),
+        ),
+        children: [
           const SettingsHeroCard(),
+          ..._buildCategoryWidgets(context, 'audio', state, cubit),
+          ..._buildCategoryWidgets(context, 'playback', state, cubit),
+          ..._buildCategoryWidgets(context, 'appearance', state, cubit),
+          ..._buildCategoryWidgets(context, 'gestures', state, cubit),
+          ..._buildCategoryWidgets(context, 'profiles', state, cubit),
+          ..._buildCategoryWidgets(context, 'library', state, cubit),
+          ..._buildCategoryWidgets(context, 'online', state, cubit),
+          ..._buildCategoryWidgets(context, 'storage', state, cubit),
+          _buildPrivacyBackupSection(context),
+          ..._buildCategoryWidgets(context, 'about', state, cubit),
+        ],
+      );
+    }
 
-        // Audio & Sound
-        if (showAll || _selectedCategoryId == 'audio')
-          _catSection(context, 'audio', AudioSoundSection(state: state)),
+    final categories = _getCategories(context);
+    final currentCat = categories.firstWhere(
+      (c) => c.id == _selectedCategoryId,
+      orElse: () => categories.first,
+    );
 
-        // Playback
-        if (showAll || _selectedCategoryId == 'playback')
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 220),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0.015, 0),
+            end: Offset.zero,
+          ).animate(animation),
+          child: child,
+        ),
+      ),
+      child: KeyedSubtree(
+        key: ValueKey(_selectedCategoryId),
+        child: ListView(
+          physics: const BouncingScrollPhysics(),
+          padding: EdgeInsets.only(
+            bottom: 160,
+            top: 10,
+            left: Adaptive.pagePadding(context),
+            right: Adaptive.pagePadding(context),
+          ),
+          children: [
+            _buildCategoryHeroHeader(context, currentCat),
+            const SizedBox(height: 14),
+            ..._buildCategoryWidgets(context, _selectedCategoryId, state, cubit),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryHeroHeader(
+    BuildContext context,
+    _SettingsCategoryItem cat,
+  ) {
+    final p = context.palette;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: p.hairline),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: cat.tintColor.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(cat.icon, color: cat.tintColor, size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  cat.title,
+                  style: TextStyle(
+                    color: p.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  cat.subtitle,
+                  style: TextStyle(
+                    color: p.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildCategoryWidgets(
+    BuildContext context,
+    String catId,
+    SettingsState state,
+    SettingsCubit cubit,
+  ) {
+    switch (catId) {
+      case 'audio':
+        return [_catSection(context, 'audio', AudioSoundSection(state: state))];
+      case 'playback':
+        return [
           _catSection(context, 'playback', PlaybackSection(state: state)),
-
-        // Appearance
-        if (showAll || _selectedCategoryId == 'appearance')
-          _buildAppearanceSection(context, state, cubit),
-
-        // Gestures
-        if (showAll || _selectedCategoryId == 'gestures')
-          _buildGesturesSection(context, state, cubit),
-
-        // Device Profiles & Automation
-        if (showAll || _selectedCategoryId == 'profiles') ...[
+          _section(
+            context,
+            'QURAN MODE',
+            'Vocal-optimized recitation profiles',
+            [
+              _navTile(
+                context,
+                Icons.menu_book_rounded,
+                'Quran Mode',
+                'Vocal EQ, mosque ambience, memorization speed',
+                onTap: () => context.push('/quran-mode'),
+              ),
+            ],
+          ),
+        ];
+      case 'appearance':
+        return [_buildAppearanceSection(context, state, cubit)];
+      case 'gestures':
+        return [_buildGesturesSection(context, state, cubit)];
+      case 'profiles':
+        return [
           _section(
             context,
             'DEVICE PROFILES',
@@ -364,18 +843,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
             key: _catById('automation').key,
           ),
-        ],
-
-        // Library & Scanning
-        if (showAll || _selectedCategoryId == 'library')
-          _buildLibrarySection(context, state, cubit),
-
-        // Online / YouTube Music / Proxy
-        if (showAll || _selectedCategoryId == 'online')
-          _buildOnlineSection(context, state, cubit),
-
-        // Storage & Cache
-        if (showAll || _selectedCategoryId == 'storage')
+        ];
+      case 'library':
+        return [_buildLibrarySection(context, state, cubit)];
+      case 'online':
+        return [_buildOnlineSection(context, state, cubit)];
+      case 'storage':
+        return [
           _section(
             context,
             context.l10n.storageAndCache,
@@ -383,13 +857,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             [const StorageCacheSection()],
             key: _catById('storage').key,
           ),
-
-        // Privacy & Backup
-        if (showAll || _selectedCategoryId == 'privacy')
+        ];
+      case 'privacy':
+        return [
+          const SettingsHeroCard(),
           _buildPrivacyBackupSection(context),
-
-        // About
-        if (showAll || _selectedCategoryId == 'about')
+        ];
+      case 'about':
+        return [
           _section(
             context,
             context.l10n.about,
@@ -405,8 +880,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
             key: _catById('about').key,
           ),
-      ],
-    );
+        ];
+      default:
+        return [];
+    }
   }
 
   // ==========================================================================

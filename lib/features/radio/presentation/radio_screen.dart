@@ -5,6 +5,7 @@ import '../../../core/services/radio_station_store.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
+import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../domain/models/radio_station.dart';
 import '../../player/cubit/player_cubit.dart';
 
@@ -38,94 +39,22 @@ class _RadioScreenState extends State<RadioScreen> {
   }
 
   Future<void> _showAddDialog() async {
-    final nameController = TextEditingController();
-    final urlController = TextEditingController();
-    String? error;
-
-    final added = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: Text(context.l10n.radioAddStation),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                textInputAction: TextInputAction.next,
-                decoration:
-                    InputDecoration(labelText: context.l10n.radioStationName),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: urlController,
-                keyboardType: TextInputType.url,
-                decoration: InputDecoration(
-                  labelText: context.l10n.radioStationUrl,
-                  errorText: error,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(context.l10n.radioCancel),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final url = urlController.text.trim();
-                if (!RadioStation.isHttpUrl(url)) {
-                  setDialogState(() => error = context.l10n.radioInvalidUrl);
-                  return;
-                }
-                Navigator.pop(ctx, true);
-              },
-              child: Text(context.l10n.radioAdd),
-            ),
-          ],
-        ),
-      ),
+    final station = await PulsrDialogHelper.showCustomDialog<RadioStation>(
+      context,
+      builder: (_) => const _AddStationDialog(),
     );
 
-    if (added == true && mounted) {
-      await _store.add(RadioStation.create(
-        name: nameController.text,
-        url: urlController.text,
-      ));
+    if (station != null && mounted) {
+      await _store.add(station);
       _refresh();
     }
-    nameController.dispose();
-    urlController.dispose();
   }
 
   Future<void> _showImportDialog() async {
-    final controller = TextEditingController();
-    final content = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(context.l10n.radioImportTitle),
-        content: TextField(
-          controller: controller,
-          maxLines: 8,
-          decoration: InputDecoration(
-            hintText: context.l10n.radioImportHint,
-            border: const OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(context.l10n.radioCancel),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, controller.text),
-            child: Text(context.l10n.radioImport),
-          ),
-        ],
-      ),
+    final content = await PulsrDialogHelper.showCustomDialog<String>(
+      context,
+      builder: (_) => const _ImportStationsDialog(),
     );
-    controller.dispose();
     if (content == null || content.trim().isEmpty || !mounted) return;
 
     final urls = RadioStationStore.extractStreamUrls(content);
@@ -148,22 +77,13 @@ class _RadioScreenState extends State<RadioScreen> {
   }
 
   Future<void> _confirmDelete(RadioStation station) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(context.l10n.radioDeleteTitle),
-        content: Text(context.l10n.radioDeleteMessage(station.name)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(context.l10n.radioCancel),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(context.l10n.radioDelete),
-          ),
-        ],
-      ),
+    final confirmed = await PulsrDialogHelper.showConfirmDialog(
+      context,
+      title: context.l10n.radioDeleteTitle,
+      message: context.l10n.radioDeleteMessage(station.name),
+      icon: Icons.delete_outline_rounded,
+      confirmLabel: context.l10n.radioDelete,
+      isDestructive: true,
     );
     if (confirmed == true) {
       await _store.remove(station.id);
@@ -203,48 +123,96 @@ class _RadioScreenState extends State<RadioScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.radio_rounded,
-                        size: 56, color: p.textTertiary),
-                    const SizedBox(height: 16),
+                    Container(
+                      width: 76,
+                      height: 76,
+                      decoration: BoxDecoration(
+                        color: p.accentContainer.withValues(alpha: 0.35),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: p.accent.withValues(alpha: 0.25),
+                          width: 1.5,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(Icons.radio_rounded,
+                          size: 38, color: p.accent),
+                    ),
+                    const SizedBox(height: 20),
                     Text(
                       context.l10n.radioEmptyTitle,
                       style: TextStyle(
                         color: p.textPrimary,
-                        fontSize: 16,
+                        fontSize: 18,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     Text(
                       context.l10n.radioEmptySubtitle,
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: p.textSecondary, fontSize: 13),
+                      style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: 13.5,
+                        height: 1.45,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    FilledButton.icon(
+                      onPressed: _showAddDialog,
+                      icon: const Icon(Icons.add_rounded, size: 20),
+                      label: Text(
+                        context.l10n.radioAddStation,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: p.accent,
+                        foregroundColor: p.onAccent,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 22, vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
             )
           : ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.only(top: 8, bottom: 120),
               itemCount: _stations.length,
               separatorBuilder: (_, __) => Divider(
                 height: 1,
+                indent: 72,
+                endIndent: 16,
                 color: p.hairline,
               ),
               itemBuilder: (context, index) {
                 final station = _stations[index];
                 return ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: p.accentContainer,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  leading: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: p.accentContainer.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    alignment: Alignment.center,
                     child: Icon(Icons.radio_rounded,
-                        color: p.accent, size: 20),
+                        color: p.accent, size: 22),
                   ),
                   title: Text(
                     station.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                        color: p.textPrimary, fontWeight: FontWeight.w600),
+                      color: p.textPrimary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
                   ),
                   subtitle: Text(
                     station.url,
@@ -254,7 +222,8 @@ class _RadioScreenState extends State<RadioScreen> {
                   ),
                   trailing: IconButton(
                     tooltip: context.l10n.radioPlay,
-                    icon: Icon(Icons.play_arrow_rounded, color: p.accent),
+                    icon: Icon(Icons.play_circle_fill_rounded,
+                        color: p.accent, size: 30),
                     onPressed: () => playerCubit.playRadioStation(station),
                   ),
                   onTap: () => playerCubit.playRadioStation(station),
@@ -265,3 +234,230 @@ class _RadioScreenState extends State<RadioScreen> {
     );
   }
 }
+
+class _AddStationDialog extends StatefulWidget {
+  const _AddStationDialog();
+
+  @override
+  State<_AddStationDialog> createState() => _AddStationDialogState();
+}
+
+class _AddStationDialogState extends State<_AddStationDialog> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _urlController;
+  String? _urlError;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController();
+    _urlController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _urlController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final url = _urlController.text.trim();
+    if (!RadioStation.isHttpUrl(url)) {
+      setState(() {
+        _urlError = context.l10n.radioInvalidUrl;
+      });
+      return;
+    }
+    final name = _nameController.text.trim();
+    Navigator.of(context, rootNavigator: true).pop(
+      RadioStation.create(
+        name: name,
+        url: url,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return PulsrDialog(
+      icon: Icon(Icons.radio_rounded, color: p.accent, size: 28),
+      title: Text(context.l10n.radioAddStation),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _nameController,
+              textInputAction: TextInputAction.next,
+              style: TextStyle(color: p.textPrimary, fontSize: 14.5),
+              decoration: InputDecoration(
+                labelText: context.l10n.radioStationName,
+                labelStyle: TextStyle(color: p.textSecondary),
+                hintText: 'e.g. Chillhop Radio',
+                hintStyle: TextStyle(color: p.textTertiary),
+                filled: true,
+                fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: p.hairline),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: p.hairline),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: p.accent, width: 1.5),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _urlController,
+              keyboardType: TextInputType.url,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _submit(),
+              style: TextStyle(color: p.textPrimary, fontSize: 14.5),
+              decoration: InputDecoration(
+                labelText: context.l10n.radioStationUrl,
+                labelStyle: TextStyle(color: p.textSecondary),
+                hintText: 'https://...',
+                hintStyle: TextStyle(color: p.textTertiary),
+                errorText: _urlError,
+                filled: true,
+                fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: p.hairline),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: p.hairline),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: p.accent, width: 1.5),
+                ),
+              ),
+              onChanged: (_) {
+                if (_urlError != null) {
+                  setState(() => _urlError = null);
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(null),
+          style: TextButton.styleFrom(
+            foregroundColor: p.textSecondary,
+          ),
+          child: Text(context.l10n.radioCancel),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          style: FilledButton.styleFrom(
+            backgroundColor: p.accent,
+            foregroundColor: p.onAccent,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: Text(
+            context.l10n.radioAdd,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ImportStationsDialog extends StatefulWidget {
+  const _ImportStationsDialog();
+
+  @override
+  State<_ImportStationsDialog> createState() => _ImportStationsDialogState();
+}
+
+class _ImportStationsDialogState extends State<_ImportStationsDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return PulsrDialog(
+      icon: Icon(Icons.download_rounded, color: p.accent, size: 28),
+      title: Text(context.l10n.radioImportTitle),
+      content: SingleChildScrollView(
+        child: TextField(
+          controller: _controller,
+          maxLines: 6,
+          style: TextStyle(color: p.textPrimary, fontSize: 13),
+          decoration: InputDecoration(
+            hintText: context.l10n.radioImportHint,
+            hintStyle: TextStyle(color: p.textTertiary, fontSize: 13),
+            filled: true,
+            fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: p.hairline),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: p.hairline),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: p.accent, width: 1.5),
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(null),
+          style: TextButton.styleFrom(
+            foregroundColor: p.textSecondary,
+          ),
+          child: Text(context.l10n.radioCancel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context, rootNavigator: true)
+              .pop(_controller.text),
+          style: FilledButton.styleFrom(
+            backgroundColor: p.accent,
+            foregroundColor: p.onAccent,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: Text(
+            context.l10n.radioImport,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
+    );
+  }
+}
+

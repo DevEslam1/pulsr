@@ -9,11 +9,9 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-// Dynamic EQ: bands reuse the parametric EQ band structure (frequency/Q
-// peaking sections) but their gain collapses automatically when the signal
-// energy inside the band exceeds the band threshold. Cuts only (resonance
-// taming) — boost is intentionally out of scope. Per-band threshold, ratio,
-// attack, release and max cut.
+// Dynamic EQ: bands apply dynamic gain reduction (Cut/Compression) or dynamic
+// expansion (Boost/Lift) when signal energy inside the band exceeds threshold.
+// Supports Peaking, Low-Shelf, and High-Shelf dynamic filter sections.
 class DynamicEQ {
 public:
     static constexpr int MAX_BANDS = DynamicEqParamSet::MAX_BANDS;
@@ -33,8 +31,9 @@ public:
     void process(float* L, float* R, int frames);
     void processInterleaved(float* buffer, int frames, int channels = 2);
 
-    // Current smoothed gain reduction per band (dB, <= 0) — tests/metering.
-    double getGainReductionDb(int band) const;
+    // Current smoothed gain adjustment per band (dB, cut <= 0, boost >= 0)
+    double getGainAdjustmentDb(int band) const;
+    double getGainReductionDb(int band) const { return getGainAdjustmentDb(band); }
 
 private:
     struct BandState {
@@ -46,21 +45,30 @@ private:
         double attackMs = 5.0;
         double releaseMs = 120.0;
         double maxCutDb = -12.0;
+        double maxBoostDb = 12.0;
+        int mode = 0;        // 0 = Cut, 1 = Boost
+        int filterType = 0;  // 0 = Peaking, 1 = LowShelf, 2 = HighShelf
         bool enabled = true;
         // Detection: band-pass biquad state + smoothed |bp| envelope per channel
         double dx1[MAX_CHANNELS] = {}, dx2[MAX_CHANNELS] = {};
         double dy1[MAX_CHANNELS] = {}, dy2[MAX_CHANNELS] = {};
         double env[MAX_CHANNELS] = {};
-        // Application: peaking biquad with modulated gain per channel
+        // Application: biquad with modulated gain per channel
         double b0 = 1.0, b1 = 0.0, b2 = 0.0, a1 = 0.0, a2 = 0.0;
         double x1[MAX_CHANNELS] = {}, x2[MAX_CHANNELS] = {};
         double y1[MAX_CHANNELS] = {}, y2[MAX_CHANNELS] = {};
-        double currentCutDb = 0.0; // smoothed gain reduction (0..-maxCut)
+        double currentGainDb = 0.0; // smoothed dynamic gain (cut <= 0 or boost >= 0)
         double lastCoeffGainDb = 0.0;
     };
 
-    void computeBandCoeffs(BandState& band, double cutDb);
+    void computeBandCoeffs(BandState& band, double gainDb);
     static double computePeakingCoeffs(double& b0, double& b1, double& b2,
+                                       double& a1, double& a2,
+                                       double f0, double q, double gainDb, double fs);
+    static void computeLowShelfCoeffs(double& b0, double& b1, double& b2,
+                                      double& a1, double& a2,
+                                      double f0, double q, double gainDb, double fs);
+    static void computeHighShelfCoeffs(double& b0, double& b1, double& b2,
                                        double& a1, double& a2,
                                        double f0, double q, double gainDb, double fs);
 

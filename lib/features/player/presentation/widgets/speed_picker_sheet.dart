@@ -8,6 +8,7 @@ import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
+import '../../../../core/widgets/pulsr_slider.dart';
 
 class SpeedPickerSheet extends StatelessWidget {
   const SpeedPickerSheet({super.key});
@@ -204,23 +205,14 @@ class SpeedPickerSheet extends StatelessWidget {
                                 TextStyle(color: p.textSecondary, fontSize: 13),
                           ),
                           const SizedBox(height: 12),
-                          SliderTheme(
-                            data: SliderTheme.of(context).copyWith(
-                              activeTrackColor: p.accent,
-                              inactiveTrackColor: p.surfaceContainer,
-                              thumbColor: p.accent,
-                              overlayColor: p.accent.withValues(alpha: 0.15),
-                              trackHeight: 4,
-                            ),
-                            child: Slider(
-                              value: currentPitch.clamp(0.5, 2.0),
-                              min: 0.5,
-                              max: 2.0,
-                              divisions: 30,
-                              onChanged: (value) {
-                                cubit.setPlaybackPitch(value);
-                              },
-                            ),
+                          PulsrSlider(
+                            value: currentPitch.clamp(0.5, 2.0),
+                            min: 0.5,
+                            max: 2.0,
+                            divisions: 30,
+                            onChanged: (value) {
+                              cubit.setPlaybackPitch(value);
+                            },
                           ),
                           SingleChildScrollView(
                             scrollDirection: Axis.horizontal,

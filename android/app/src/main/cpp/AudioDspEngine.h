@@ -14,6 +14,8 @@
 #include "LoudnessContour.h"
 #include "SubCrossover.h"
 #include "DynamicEQ.h"
+#include "MultibandCompressor.h"
+#include "DynamicBass.h"
 
 #include <vector>
 #include <memory>
@@ -37,6 +39,8 @@ enum DspStageMask {
     // Dither has its own stage bit so it can act standalone: toggling dither
     // alone (no EQ/gain stage active) must still requantize at the target depth.
     STAGE_DITHER = 1 << 11,
+    STAGE_MULTIBAND_COMPRESSOR = 1 << 12,
+    STAGE_DYNAMIC_BASS = 1 << 13,
 };
 
 template<typename T>
@@ -104,6 +108,8 @@ public:
     LoudnessContour& loudnessContour() { return loudnessContour_; }
     SubCrossover& subCrossover() { return subCrossover_; }
     DynamicEQ& dynamicEq() { return dynamicEq_; }
+    MultibandCompressor& multibandCompressor() { return multibandCompressor_; }
+    DynamicBass& dynamicBass() { return dynamicBass_; }
 
     // Combined pipeline latency (lookahead + resampler group delay + reverb partitioned delay) in frames
     int getPipelineLatencyFrames() const {
@@ -216,6 +222,8 @@ private:
     LoudnessContour loudnessContour_;
     SubCrossover subCrossover_;
     DynamicEQ dynamicEq_;
+    MultibandCompressor multibandCompressor_;
+    DynamicBass dynamicBass_;
 };
 
 class DspEngineRegistry {

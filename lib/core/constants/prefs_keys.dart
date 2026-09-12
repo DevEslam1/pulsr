@@ -77,8 +77,17 @@ class PrefsKeys {
   static const String saturationDrive = 'setting_saturation_drive';
   static const String saturationMix = 'setting_saturation_mix';
   static const String saturationTilt = 'setting_saturation_tilt';
+  static const String saturationMode = 'setting_saturation_mode';
   static const String stereoWidthEnabled = 'setting_stereo_width_enabled';
   static const String stereoWidth = 'setting_stereo_width';
+  static const String stereoWidthMultiband = 'setting_stereo_width_multiband';
+  static const String stereoWidthLow = 'setting_stereo_width_low';
+  static const String stereoWidthMid = 'setting_stereo_width_mid';
+  static const String stereoWidthHigh = 'setting_stereo_width_high';
+  static const String stereoWidthLowCrossoverHz =
+      'setting_stereo_width_low_crossover_hz';
+  static const String stereoWidthHighCrossoverHz =
+      'setting_stereo_width_high_crossover_hz';
   static const String loudnessContourEnabled =
       'setting_loudness_contour_enabled';
   static const String loudnessContourIntensity =
@@ -88,8 +97,28 @@ class PrefsKeys {
   static const String subCrossoverSlopeDbPerOct =
       'setting_sub_crossover_slope_db_per_oct';
   static const String subCrossoverGain = 'setting_sub_crossover_gain';
+  static const String subCrossoverBassMono = 'setting_sub_crossover_bass_mono';
+  static const String subCrossoverAntiPop = 'setting_sub_crossover_anti_pop';
   static const String dynamicEqEnabled = 'setting_dynamic_eq_enabled';
   static const String dynamicEqBands = 'setting_dynamic_eq_bands';
+  static const String reverbCrossChannel = 'setting_reverb_cross_channel';
+  static const String multibandCompressorEnabled =
+      'setting_multiband_compressor_enabled';
+  static const String multibandCompressorBands =
+      'setting_multiband_compressor_bands';
+  static const String multibandCompressorF0 = 'setting_multiband_compressor_f0';
+  static const String multibandCompressorF1 = 'setting_multiband_compressor_f1';
+  static const String multibandCompressorF2 = 'setting_multiband_compressor_f2';
+
+  static const String dynamicBassEnabled = 'setting_dynamic_bass_enabled';
+  static const String dynamicBassStrength = 'setting_dynamic_bass_strength';
+  static const String dynamicBassXLow = 'setting_dynamic_bass_x_low';
+  static const String dynamicBassXHigh = 'setting_dynamic_bass_x_high';
+  static const String dynamicBassYLow = 'setting_dynamic_bass_y_low';
+  static const String dynamicBassYHigh = 'setting_dynamic_bass_y_high';
+  static const String dynamicBassSideGainLow = 'setting_dynamic_bass_side_gain_low';
+  static const String dynamicBassSideGainHigh = 'setting_dynamic_bass_side_gain_high';
+  static const String dynamicBassPreset = 'setting_dynamic_bass_preset';
 
   // FIX(N1): Artwork cache disk limit key
   static const String settingMaxCacheSizeMb = 'setting_max_cache_size_mb';

@@ -9,15 +9,11 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-// Subwoofer / LFE crossover for stereo rigs.
-//
-// HONEST LIMITATION: the current playback pipeline is stereo-only (no
-// multichannel/LFE output exists downstream of this engine), so this stage is
-// implemented as *bass redirection*, not true multichannel routing: a
-// Linkwitz-Riley-style low-passed mono sum (12 or 24 dB/oct) is added back
-// into BOTH channels at the user sub gain. Main channels keep full range —
-// no high-pass is applied — so this reinforces/re-centres low bass as a
-// mono sub tap. UI copy must describe it as "bass redirection".
+// Subwoofer / Bass Management:
+// 1. Bass Redirection: low-passed mono sum tap added back to both channels
+// 2. Bass Mono: subtracts low-frequency side channel below cornerHz to force low bass into mono,
+//    eliminating low-end phase cancellation and tightening punch
+// 3. Anti-Pop: soft-saturation tanh limiting on high-transient bass bursts to protect voice coils
 class SubCrossover {
 public:
     static constexpr int MAX_CHANNELS = 8;
@@ -25,8 +21,7 @@ public:
     SubCrossover();
 
     void setSampleRate(double sampleRate);
-    // cornerHz: 60..150, slopeDbPerOct: 12 (LR2) or 24 (LR4), subGain: 0..1.
-    void configure(double cornerHz, double slopeDbPerOct, double subGain);
+    void configure(double cornerHz, double slopeDbPerOct, double subGain, bool bassMono = true, bool antiPop = true);
     void setEnabled(bool enabled) { enabled_ = enabled; }
     bool isEnabled() const { return enabled_; }
     void applyParams(const SubCrossoverParamSet& params);
@@ -38,6 +33,8 @@ public:
     double getCornerHz() const { return cornerHz_; }
     double getSlopeDbPerOct() const { return slopeDbPerOct_; }
     double getSubGain() const { return subGain_; }
+    bool isBassMono() const { return bassMono_; }
+    bool isAntiPop() const { return antiPop_; }
 
 private:
     struct LpStage { // transposed direct-form II 2nd-order low-pass
@@ -63,12 +60,16 @@ private:
     double targetSubGain_ = 0.8;
     double smoothedSubGain_ = 0.8;
     double subGain_ = 0.8;
+    bool bassMono_ = true;
+    bool antiPop_ = true;
     bool enabled_ = false;
     bool cascade_ = true; // 24 dB/oct = two cascaded sections
 
     static constexpr int MAX_PAIRS = MAX_CHANNELS / 2; // 4 stereo pairs
 
-    // Per channel pair: up to two cascaded 2nd-order Butterworth LP sections
     LpStage stage1_[MAX_PAIRS];
     LpStage stage2_[MAX_PAIRS];
+    // Filter stages for side channel lowpass in Bass Mono
+    LpStage stageSide1_[MAX_PAIRS];
+    LpStage stageSide2_[MAX_PAIRS];
 };

@@ -16,6 +16,8 @@ import '../../core/utils/formatters.dart';
 import '../../core/utils/l10n_extensions.dart';
 import '../../core/utils/platform_capabilities.dart';
 import '../../core/widgets/cached_artwork.dart';
+import '../../core/widgets/pulsr_dialog.dart';
+import '../../core/widgets/pulsr_slider.dart';
 import '../../data/audio/bpm_override_store.dart';
 import '../../data/audio/headphone_profiles_repository.dart';
 import '../../data/audio/per_song_eq_store.dart';
@@ -61,29 +63,18 @@ class SongInfoSheet extends StatelessWidget {
                 true;
         if (!canWrite) {
           if (!context.mounted) return;
-          final proceed = await showDialog<bool>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: Text(context.l10n.permissionRequired),
-              content: Text(
+          final proceed = await PulsrDialogHelper.showConfirmDialog(
+            context,
+            title: context.l10n.permissionRequired,
+            message:
                 'To set $label directly, Android requires the "Modify system settings" permission.',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(false),
-                  child: Text(context.l10n.cancel),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    Navigator.of(ctx).pop(true);
-                    channel.invokeMethod('openWriteSettings');
-                  },
-                  child: Text(context.l10n.openSettings),
-                ),
-              ],
-            ),
+            icon: Icons.security_rounded,
+            confirmLabel: context.l10n.openSettings,
+            cancelLabel: context.l10n.cancel,
           );
-          if (proceed != true) return;
+          if (proceed == true) {
+            channel.invokeMethod('openWriteSettings');
+          }
           return;
         }
       }
@@ -576,30 +567,22 @@ class SongInfoSheet extends StatelessWidget {
                   ),
                 ],
               ),
-              SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  activeTrackColor: p.accent,
-                  inactiveTrackColor: p.surface,
-                  thumbColor: p.accent,
-                  trackHeight: 3,
-                ),
-                child: Slider(
-                  value: currentSliderVol.clamp(-12.0, 6.0),
-                  min: -12.0,
-                  max: 6.0,
-                  divisions: 36,
-                  onChanged: (val) {
-                    currentSliderVol = val;
-                    setLocalState(() {});
-                  },
-                  onChangeEnd: (val) async {
-                    final clamped = val.abs() < 0.2 ? 0.0 : val;
-                    currentSliderVol = clamped;
-                    await volStore.setGainDbForTrack(trackKey, clamped);
-                    playerCubit?.setSongVolumeOverride(song.id, clamped);
-                    setLocalState(() {});
-                  },
-                ),
+              PulsrSlider(
+                value: currentSliderVol.clamp(-12.0, 6.0),
+                min: -12.0,
+                max: 6.0,
+                divisions: 36,
+                onChanged: (val) {
+                  currentSliderVol = val;
+                  setLocalState(() {});
+                },
+                onChangeEnd: (val) async {
+                  final clamped = val.abs() < 0.2 ? 0.0 : val;
+                  currentSliderVol = clamped;
+                  await volStore.setGainDbForTrack(trackKey, clamped);
+                  playerCubit?.setSongVolumeOverride(song.id, clamped);
+                  setLocalState(() {});
+                },
               ),
               const SizedBox(height: 8),
               Divider(color: p.hairline, height: 1),
@@ -830,75 +813,11 @@ class SongInfoSheet extends StatelessWidget {
     double? currentBpm, {
     required void Function(VoidCallback) onSaved,
   }) async {
-    final controller =
-        TextEditingController(text: currentBpm?.toStringAsFixed(0) ?? '');
-    String? error;
     // null = cancel, '' = clear override, otherwise the BPM text to save.
-    final result = await showDialog<String?>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Track BPM'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                  'Used by BPM-synced crossfade to align fades to the beat. '
-                  'Range 40–240.'),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                autofocus: true,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(
-                  hintText: 'e.g. 128',
-                  errorText: error,
-                ),
-                onChanged: (_) {
-                  if (error != null) {
-                    setDialogState(() => error = null);
-                  }
-                },
-              ),
-            ],
-          ),
-          actions: [
-            if (currentBpm != null)
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, ''),
-                child: const Text('Clear'),
-              ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, null),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final raw = controller.text.trim();
-                if (raw.isEmpty) {
-                  Navigator.pop(ctx, currentBpm != null ? '' : null);
-                  return;
-                }
-                final bpm = double.tryParse(raw);
-                if (bpm == null ||
-                    !bpm.isFinite ||
-                    bpm < BpmOverrideStore.minBpm ||
-                    bpm > BpmOverrideStore.maxBpm) {
-                  setDialogState(
-                      () => error = 'Enter a BPM between 40 and 240.');
-                  return;
-                }
-                Navigator.pop(ctx, raw);
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        ),
-      ),
+    final result = await PulsrDialogHelper.showCustomDialog<String?>(
+      context,
+      builder: (_) => _BpmOverrideDialog(currentBpm: currentBpm),
     );
-    controller.dispose();
     if (result == null || !context.mounted) return;
     // Clear, or save the validated text returned by the dialog.
     await _persistBpmChoice(
@@ -982,3 +901,132 @@ class SongInfoSheet extends StatelessWidget {
     );
   }
 }
+
+class _BpmOverrideDialog extends StatefulWidget {
+  final double? currentBpm;
+
+  const _BpmOverrideDialog({this.currentBpm});
+
+  @override
+  State<_BpmOverrideDialog> createState() => _BpmOverrideDialogState();
+}
+
+class _BpmOverrideDialogState extends State<_BpmOverrideDialog> {
+  late final TextEditingController _controller;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: widget.currentBpm?.toStringAsFixed(0) ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final raw = _controller.text.trim();
+    if (raw.isEmpty) {
+      Navigator.of(context, rootNavigator: true)
+          .pop(widget.currentBpm != null ? '' : null);
+      return;
+    }
+    final bpm = double.tryParse(raw);
+    if (bpm == null ||
+        !bpm.isFinite ||
+        bpm < BpmOverrideStore.minBpm ||
+        bpm > BpmOverrideStore.maxBpm) {
+      setState(() {
+        _error = 'Enter a BPM between 40 and 240.';
+      });
+      return;
+    }
+    Navigator.of(context, rootNavigator: true).pop(raw);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return PulsrDialog(
+      icon: Icon(Icons.speed_rounded, color: p.accent, size: 28),
+      title: const Text('Track BPM'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Used by BPM-synced crossfade to align fades to the beat. '
+              'Range 40–240.',
+              style: TextStyle(color: p.textSecondary, fontSize: 13.5),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _controller,
+              autofocus: true,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              style: TextStyle(color: p.textPrimary),
+              decoration: InputDecoration(
+                hintText: 'e.g. 128',
+                hintStyle: TextStyle(color: p.textTertiary),
+                errorText: _error,
+                filled: true,
+                fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: p.hairline),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: p.hairline),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: p.accent, width: 1.5),
+                ),
+              ),
+              onChanged: (_) {
+                if (_error != null) {
+                  setState(() => _error = null);
+                }
+              },
+              onSubmitted: (_) => _save(),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        if (widget.currentBpm != null)
+          TextButton(
+            onPressed: () => Navigator.of(context, rootNavigator: true).pop(''),
+            child: const Text('Clear'),
+          ),
+        TextButton(
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(null),
+          style: TextButton.styleFrom(
+            foregroundColor: p.textSecondary,
+          ),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _save,
+          style: FilledButton.styleFrom(
+            backgroundColor: p.accent,
+            foregroundColor: p.onAccent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+

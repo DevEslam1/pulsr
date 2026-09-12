@@ -91,6 +91,8 @@ mixin _$PlayerState {
   double get currentSongVolumeOverrideDb;
   List<ChapterInfo> get cueChapters;
   int get currentCueIndex;
+  bool get isQuranModeEnabled;
+  QuranReciterStyle get quranReciterStyle;
 
   /// Create a copy of PlayerState
   /// with the given fields replaced by the non-null parameter values.
@@ -214,7 +216,9 @@ mixin _$PlayerState {
             (identical(other.currentSongEqOverride, _this.currentSongEqOverride) || other.currentSongEqOverride == _this.currentSongEqOverride) &&
             (identical(other.currentSongVolumeOverrideDb, _this.currentSongVolumeOverrideDb) || other.currentSongVolumeOverrideDb == _this.currentSongVolumeOverrideDb) &&
             const DeepCollectionEquality().equals(other.cueChapters, _this.cueChapters) &&
-            (identical(other.currentCueIndex, _this.currentCueIndex) || other.currentCueIndex == _this.currentCueIndex));
+            (identical(other.currentCueIndex, _this.currentCueIndex) || other.currentCueIndex == _this.currentCueIndex) &&
+            (identical(other.isQuranModeEnabled, _this.isQuranModeEnabled) || other.isQuranModeEnabled == _this.isQuranModeEnabled) &&
+            (identical(other.quranReciterStyle, _this.quranReciterStyle) || other.quranReciterStyle == _this.quranReciterStyle));
   }
 
   @override
@@ -297,14 +301,16 @@ mixin _$PlayerState {
       _this.currentSongEqOverride,
       _this.currentSongVolumeOverrideDb,
       const DeepCollectionEquality().hash(_this.cueChapters),
-      _this.currentCueIndex
+      _this.currentCueIndex,
+      _this.isQuranModeEnabled,
+      _this.quranReciterStyle
     ]);
   }
 
   @override
   String toString() {
     final _this = this as PlayerState;
-    return 'PlayerState(currentSong: ${_this.currentSong}, isPlaying: ${_this.isPlaying}, position: ${_this.position}, duration: ${_this.duration}, isShuffle: ${_this.isShuffle}, repeatMode: ${_this.repeatMode}, queue: ${_this.queue}, currentIndex: ${_this.currentIndex}, isExpanded: ${_this.isExpanded}, dominantColor: ${_this.dominantColor}, sleepTimerRemaining: ${_this.sleepTimerRemaining}, lyrics: ${_this.lyrics}, lyricsSource: ${_this.lyricsSource}, isLoadingLyrics: ${_this.isLoadingLyrics}, isLyricsVisible: ${_this.isLyricsVisible}, isQueueVisible: ${_this.isQueueVisible}, eqPreset: ${_this.eqPreset}, isEqEnabled: ${_this.isEqEnabled}, isVirtualizerEnabled: ${_this.isVirtualizerEnabled}, virtualizerStrength: ${_this.virtualizerStrength}, isVirtualizerSupported: ${_this.isVirtualizerSupported}, isDynamicsEnabled: ${_this.isDynamicsEnabled}, isDynamicsSupported: ${_this.isDynamicsSupported}, dynamicsPreset: ${_this.dynamicsPreset}, selectedHeadphoneProfile: ${_this.selectedHeadphoneProfile}, isSpatializerSupported: ${_this.isSpatializerSupported}, isSpatializerEnabled: ${_this.isSpatializerEnabled}, volumeBoost: ${_this.volumeBoost}, isVolumeBoostSupported: ${_this.isVolumeBoostSupported}, isBassBoostSupported: ${_this.isBassBoostSupported}, isCrossfeedEnabled: ${_this.isCrossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, isLimiterEnabled: ${_this.isLimiterEnabled}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, isReverbEnabled: ${_this.isReverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, isSincResamplerEnabled: ${_this.isSincResamplerEnabled}, isDitherEnabled: ${_this.isDitherEnabled}, ditherTargetBitDepth: ${_this.ditherTargetBitDepth}, isSaturationEnabled: ${_this.isSaturationEnabled}, saturationDrive: ${_this.saturationDrive}, saturationMix: ${_this.saturationMix}, saturationTilt: ${_this.saturationTilt}, isStereoWidthEnabled: ${_this.isStereoWidthEnabled}, stereoWidth: ${_this.stereoWidth}, isLoudnessContourEnabled: ${_this.isLoudnessContourEnabled}, loudnessContourIntensity: ${_this.loudnessContourIntensity}, isSubCrossoverEnabled: ${_this.isSubCrossoverEnabled}, subCrossoverCornerHz: ${_this.subCrossoverCornerHz}, subCrossoverSlopeDbPerOct: ${_this.subCrossoverSlopeDbPerOct}, subCrossoverGain: ${_this.subCrossoverGain}, isDynamicEqEnabled: ${_this.isDynamicEqEnabled}, dynamicEqBands: ${_this.dynamicEqBands}, hasOemAudio: ${_this.hasOemAudio}, detectedOemEngines: ${_this.detectedOemEngines}, activeQueueSlot: ${_this.activeQueueSlot}, playbackSpeed: ${_this.playbackSpeed}, playbackPitch: ${_this.playbackPitch}, audioSessionId: ${_this.audioSessionId}, errorMessage: ${_this.errorMessage}, abLoopEnabled: ${_this.abLoopEnabled}, abPointA: ${_this.abPointA}, abPointB: ${_this.abPointB}, trackDelayMs: ${_this.trackDelayMs}, bookmarkPosition: ${_this.bookmarkPosition}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, currentSongRating: ${_this.currentSongRating}, currentSongEqOverride: ${_this.currentSongEqOverride}, currentSongVolumeOverrideDb: ${_this.currentSongVolumeOverrideDb}, cueChapters: ${_this.cueChapters}, currentCueIndex: ${_this.currentCueIndex})';
+    return 'PlayerState(currentSong: ${_this.currentSong}, isPlaying: ${_this.isPlaying}, position: ${_this.position}, duration: ${_this.duration}, isShuffle: ${_this.isShuffle}, repeatMode: ${_this.repeatMode}, queue: ${_this.queue}, currentIndex: ${_this.currentIndex}, isExpanded: ${_this.isExpanded}, dominantColor: ${_this.dominantColor}, sleepTimerRemaining: ${_this.sleepTimerRemaining}, lyrics: ${_this.lyrics}, lyricsSource: ${_this.lyricsSource}, isLoadingLyrics: ${_this.isLoadingLyrics}, isLyricsVisible: ${_this.isLyricsVisible}, isQueueVisible: ${_this.isQueueVisible}, eqPreset: ${_this.eqPreset}, isEqEnabled: ${_this.isEqEnabled}, isVirtualizerEnabled: ${_this.isVirtualizerEnabled}, virtualizerStrength: ${_this.virtualizerStrength}, isVirtualizerSupported: ${_this.isVirtualizerSupported}, isDynamicsEnabled: ${_this.isDynamicsEnabled}, isDynamicsSupported: ${_this.isDynamicsSupported}, dynamicsPreset: ${_this.dynamicsPreset}, selectedHeadphoneProfile: ${_this.selectedHeadphoneProfile}, isSpatializerSupported: ${_this.isSpatializerSupported}, isSpatializerEnabled: ${_this.isSpatializerEnabled}, volumeBoost: ${_this.volumeBoost}, isVolumeBoostSupported: ${_this.isVolumeBoostSupported}, isBassBoostSupported: ${_this.isBassBoostSupported}, isCrossfeedEnabled: ${_this.isCrossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, isLimiterEnabled: ${_this.isLimiterEnabled}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, isReverbEnabled: ${_this.isReverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, isSincResamplerEnabled: ${_this.isSincResamplerEnabled}, isDitherEnabled: ${_this.isDitherEnabled}, ditherTargetBitDepth: ${_this.ditherTargetBitDepth}, isSaturationEnabled: ${_this.isSaturationEnabled}, saturationDrive: ${_this.saturationDrive}, saturationMix: ${_this.saturationMix}, saturationTilt: ${_this.saturationTilt}, isStereoWidthEnabled: ${_this.isStereoWidthEnabled}, stereoWidth: ${_this.stereoWidth}, isLoudnessContourEnabled: ${_this.isLoudnessContourEnabled}, loudnessContourIntensity: ${_this.loudnessContourIntensity}, isSubCrossoverEnabled: ${_this.isSubCrossoverEnabled}, subCrossoverCornerHz: ${_this.subCrossoverCornerHz}, subCrossoverSlopeDbPerOct: ${_this.subCrossoverSlopeDbPerOct}, subCrossoverGain: ${_this.subCrossoverGain}, isDynamicEqEnabled: ${_this.isDynamicEqEnabled}, dynamicEqBands: ${_this.dynamicEqBands}, hasOemAudio: ${_this.hasOemAudio}, detectedOemEngines: ${_this.detectedOemEngines}, activeQueueSlot: ${_this.activeQueueSlot}, playbackSpeed: ${_this.playbackSpeed}, playbackPitch: ${_this.playbackPitch}, audioSessionId: ${_this.audioSessionId}, errorMessage: ${_this.errorMessage}, abLoopEnabled: ${_this.abLoopEnabled}, abPointA: ${_this.abPointA}, abPointB: ${_this.abPointB}, trackDelayMs: ${_this.trackDelayMs}, bookmarkPosition: ${_this.bookmarkPosition}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, currentSongRating: ${_this.currentSongRating}, currentSongEqOverride: ${_this.currentSongEqOverride}, currentSongVolumeOverrideDb: ${_this.currentSongVolumeOverrideDb}, cueChapters: ${_this.cueChapters}, currentCueIndex: ${_this.currentCueIndex}, isQuranModeEnabled: ${_this.isQuranModeEnabled}, quranReciterStyle: ${_this.quranReciterStyle})';
   }
 }
 
@@ -390,7 +396,9 @@ abstract mixin class $PlayerStateCopyWith<$Res> {
       String? currentSongEqOverride,
       double currentSongVolumeOverrideDb,
       List<ChapterInfo> cueChapters,
-      int currentCueIndex});
+      int currentCueIndex,
+      bool isQuranModeEnabled,
+      QuranReciterStyle quranReciterStyle});
 }
 
 /// @nodoc
@@ -481,6 +489,8 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
     Object? currentSongVolumeOverrideDb = null,
     Object? cueChapters = null,
     Object? currentCueIndex = null,
+    Object? isQuranModeEnabled = null,
+    Object? quranReciterStyle = null,
   }) {
     return _then(PlayerState(
       currentSong: freezed == currentSong
@@ -787,6 +797,14 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
           ? _self.currentCueIndex
           : currentCueIndex // ignore: cast_nullable_to_non_nullable
               as int,
+      isQuranModeEnabled: null == isQuranModeEnabled
+          ? _self.isQuranModeEnabled
+          : isQuranModeEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      quranReciterStyle: null == quranReciterStyle
+          ? _self.quranReciterStyle
+          : quranReciterStyle // ignore: cast_nullable_to_non_nullable
+              as QuranReciterStyle,
     ));
   }
 }
@@ -960,7 +978,9 @@ extension PlayerStatePatterns on PlayerState {
             String? currentSongEqOverride,
             double currentSongVolumeOverrideDb,
             List<ChapterInfo> cueChapters,
-            int currentCueIndex)?
+            int currentCueIndex,
+            bool isQuranModeEnabled,
+            QuranReciterStyle quranReciterStyle)?
         $default, {
     required TResult orElse(),
   }) {
@@ -1043,7 +1063,9 @@ extension PlayerStatePatterns on PlayerState {
             _that.currentSongEqOverride,
             _that.currentSongVolumeOverrideDb,
             _that.cueChapters,
-            _that.currentCueIndex);
+            _that.currentCueIndex,
+            _that.isQuranModeEnabled,
+            _that.quranReciterStyle);
       case _:
         return orElse();
     }
@@ -1140,7 +1162,9 @@ extension PlayerStatePatterns on PlayerState {
             String? currentSongEqOverride,
             double currentSongVolumeOverrideDb,
             List<ChapterInfo> cueChapters,
-            int currentCueIndex)
+            int currentCueIndex,
+            bool isQuranModeEnabled,
+            QuranReciterStyle quranReciterStyle)
         $default,
   ) {
     final _that = this;
@@ -1222,7 +1246,9 @@ extension PlayerStatePatterns on PlayerState {
             _that.currentSongEqOverride,
             _that.currentSongVolumeOverrideDb,
             _that.cueChapters,
-            _that.currentCueIndex);
+            _that.currentCueIndex,
+            _that.isQuranModeEnabled,
+            _that.quranReciterStyle);
       case _:
         throw StateError('Unexpected subclass');
     }
@@ -1318,7 +1344,9 @@ extension PlayerStatePatterns on PlayerState {
             String? currentSongEqOverride,
             double currentSongVolumeOverrideDb,
             List<ChapterInfo> cueChapters,
-            int currentCueIndex)?
+            int currentCueIndex,
+            bool isQuranModeEnabled,
+            QuranReciterStyle quranReciterStyle)?
         $default,
   ) {
     final _that = this;
@@ -1400,7 +1428,9 @@ extension PlayerStatePatterns on PlayerState {
             _that.currentSongEqOverride,
             _that.currentSongVolumeOverrideDb,
             _that.cueChapters,
-            _that.currentCueIndex);
+            _that.currentCueIndex,
+            _that.isQuranModeEnabled,
+            _that.quranReciterStyle);
       case _:
         return null;
     }
@@ -1487,7 +1517,9 @@ class _PlayerState extends PlayerState {
       this.currentSongEqOverride,
       this.currentSongVolumeOverrideDb = 0.0,
       List<ChapterInfo> cueChapters = const [],
-      this.currentCueIndex = 0})
+      this.currentCueIndex = 0,
+      this.isQuranModeEnabled = false,
+      this.quranReciterStyle = QuranReciterStyle.murattal})
       : _queue = queue,
         _lyrics = lyrics,
         _dynamicEqBands = dynamicEqBands,
@@ -1744,6 +1776,12 @@ class _PlayerState extends PlayerState {
   @override
   @JsonKey()
   final int currentCueIndex;
+  @override
+  @JsonKey()
+  final bool isQuranModeEnabled;
+  @override
+  @JsonKey()
+  final QuranReciterStyle quranReciterStyle;
 
   /// Create a copy of PlayerState
   /// with the given fields replaced by the non-null parameter values.
@@ -1873,7 +1911,9 @@ class _PlayerState extends PlayerState {
             (identical(other.currentSongEqOverride, currentSongEqOverride) || other.currentSongEqOverride == currentSongEqOverride) &&
             (identical(other.currentSongVolumeOverrideDb, currentSongVolumeOverrideDb) || other.currentSongVolumeOverrideDb == currentSongVolumeOverrideDb) &&
             const DeepCollectionEquality().equals(other.cueChapters, _cueChapters) &&
-            (identical(other.currentCueIndex, currentCueIndex) || other.currentCueIndex == currentCueIndex));
+            (identical(other.currentCueIndex, currentCueIndex) || other.currentCueIndex == currentCueIndex) &&
+            (identical(other.isQuranModeEnabled, isQuranModeEnabled) || other.isQuranModeEnabled == isQuranModeEnabled) &&
+            (identical(other.quranReciterStyle, quranReciterStyle) || other.quranReciterStyle == quranReciterStyle));
   }
 
   @override
@@ -1955,13 +1995,15 @@ class _PlayerState extends PlayerState {
       currentSongEqOverride,
       currentSongVolumeOverrideDb,
       const DeepCollectionEquality().hash(_cueChapters),
-      currentCueIndex
+      currentCueIndex,
+      isQuranModeEnabled,
+      quranReciterStyle
     ]);
   }
 
   @override
   String toString() {
-    return 'PlayerState(currentSong: $currentSong, isPlaying: $isPlaying, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, queue: $queue, currentIndex: $currentIndex, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, lyrics: $lyrics, lyricsSource: $lyricsSource, isLoadingLyrics: $isLoadingLyrics, isLyricsVisible: $isLyricsVisible, isQueueVisible: $isQueueVisible, eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isVirtualizerSupported: $isVirtualizerSupported, isDynamicsEnabled: $isDynamicsEnabled, isDynamicsSupported: $isDynamicsSupported, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, isVolumeBoostSupported: $isVolumeBoostSupported, isBassBoostSupported: $isBassBoostSupported, isCrossfeedEnabled: $isCrossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, isLimiterEnabled: $isLimiterEnabled, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, isReverbEnabled: $isReverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, isSincResamplerEnabled: $isSincResamplerEnabled, isDitherEnabled: $isDitherEnabled, ditherTargetBitDepth: $ditherTargetBitDepth, isSaturationEnabled: $isSaturationEnabled, saturationDrive: $saturationDrive, saturationMix: $saturationMix, saturationTilt: $saturationTilt, isStereoWidthEnabled: $isStereoWidthEnabled, stereoWidth: $stereoWidth, isLoudnessContourEnabled: $isLoudnessContourEnabled, loudnessContourIntensity: $loudnessContourIntensity, isSubCrossoverEnabled: $isSubCrossoverEnabled, subCrossoverCornerHz: $subCrossoverCornerHz, subCrossoverSlopeDbPerOct: $subCrossoverSlopeDbPerOct, subCrossoverGain: $subCrossoverGain, isDynamicEqEnabled: $isDynamicEqEnabled, dynamicEqBands: $dynamicEqBands, hasOemAudio: $hasOemAudio, detectedOemEngines: $detectedOemEngines, activeQueueSlot: $activeQueueSlot, playbackSpeed: $playbackSpeed, playbackPitch: $playbackPitch, audioSessionId: $audioSessionId, errorMessage: $errorMessage, abLoopEnabled: $abLoopEnabled, abPointA: $abPointA, abPointB: $abPointB, trackDelayMs: $trackDelayMs, bookmarkPosition: $bookmarkPosition, silenceSkipSensitivity: $silenceSkipSensitivity, currentSongRating: $currentSongRating, currentSongEqOverride: $currentSongEqOverride, currentSongVolumeOverrideDb: $currentSongVolumeOverrideDb, cueChapters: $cueChapters, currentCueIndex: $currentCueIndex)';
+    return 'PlayerState(currentSong: $currentSong, isPlaying: $isPlaying, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, queue: $queue, currentIndex: $currentIndex, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, lyrics: $lyrics, lyricsSource: $lyricsSource, isLoadingLyrics: $isLoadingLyrics, isLyricsVisible: $isLyricsVisible, isQueueVisible: $isQueueVisible, eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isVirtualizerSupported: $isVirtualizerSupported, isDynamicsEnabled: $isDynamicsEnabled, isDynamicsSupported: $isDynamicsSupported, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, isVolumeBoostSupported: $isVolumeBoostSupported, isBassBoostSupported: $isBassBoostSupported, isCrossfeedEnabled: $isCrossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, isLimiterEnabled: $isLimiterEnabled, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, isReverbEnabled: $isReverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, isSincResamplerEnabled: $isSincResamplerEnabled, isDitherEnabled: $isDitherEnabled, ditherTargetBitDepth: $ditherTargetBitDepth, isSaturationEnabled: $isSaturationEnabled, saturationDrive: $saturationDrive, saturationMix: $saturationMix, saturationTilt: $saturationTilt, isStereoWidthEnabled: $isStereoWidthEnabled, stereoWidth: $stereoWidth, isLoudnessContourEnabled: $isLoudnessContourEnabled, loudnessContourIntensity: $loudnessContourIntensity, isSubCrossoverEnabled: $isSubCrossoverEnabled, subCrossoverCornerHz: $subCrossoverCornerHz, subCrossoverSlopeDbPerOct: $subCrossoverSlopeDbPerOct, subCrossoverGain: $subCrossoverGain, isDynamicEqEnabled: $isDynamicEqEnabled, dynamicEqBands: $dynamicEqBands, hasOemAudio: $hasOemAudio, detectedOemEngines: $detectedOemEngines, activeQueueSlot: $activeQueueSlot, playbackSpeed: $playbackSpeed, playbackPitch: $playbackPitch, audioSessionId: $audioSessionId, errorMessage: $errorMessage, abLoopEnabled: $abLoopEnabled, abPointA: $abPointA, abPointB: $abPointB, trackDelayMs: $trackDelayMs, bookmarkPosition: $bookmarkPosition, silenceSkipSensitivity: $silenceSkipSensitivity, currentSongRating: $currentSongRating, currentSongEqOverride: $currentSongEqOverride, currentSongVolumeOverrideDb: $currentSongVolumeOverrideDb, cueChapters: $cueChapters, currentCueIndex: $currentCueIndex, isQuranModeEnabled: $isQuranModeEnabled, quranReciterStyle: $quranReciterStyle)';
   }
 }
 
@@ -2049,7 +2091,9 @@ abstract mixin class _$PlayerStateCopyWith<$Res>
       String? currentSongEqOverride,
       double currentSongVolumeOverrideDb,
       List<ChapterInfo> cueChapters,
-      int currentCueIndex});
+      int currentCueIndex,
+      bool isQuranModeEnabled,
+      QuranReciterStyle quranReciterStyle});
 }
 
 /// @nodoc
@@ -2140,6 +2184,8 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
     Object? currentSongVolumeOverrideDb = null,
     Object? cueChapters = null,
     Object? currentCueIndex = null,
+    Object? isQuranModeEnabled = null,
+    Object? quranReciterStyle = null,
   }) {
     return _then(_PlayerState(
       currentSong: freezed == currentSong
@@ -2446,6 +2492,14 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
           ? _self.currentCueIndex
           : currentCueIndex // ignore: cast_nullable_to_non_nullable
               as int,
+      isQuranModeEnabled: null == isQuranModeEnabled
+          ? _self.isQuranModeEnabled
+          : isQuranModeEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      quranReciterStyle: null == quranReciterStyle
+          ? _self.quranReciterStyle
+          : quranReciterStyle // ignore: cast_nullable_to_non_nullable
+              as QuranReciterStyle,
     ));
   }
 }

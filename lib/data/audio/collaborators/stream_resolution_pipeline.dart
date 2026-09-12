@@ -96,8 +96,10 @@ class StreamResolutionPipeline {
 
       Future<YtmStream> doResolve() =>
           ytmService.resolveStream(videoId, quality: quality, forceRefresh: forceRefresh);
-      // F3: hedged resolution — staggered duplicate race.
-      final YtmStream stream = hedgedEnabled
+      // F3: hedged resolution — staggered duplicate race. Skipped while an egress
+      // block is active: both duplicates hit the same blocked IP and only double
+      // the native chain load for a verdict that is already known.
+      final YtmStream stream = (hedgedEnabled && !ytmService.isBotCoolingDown)
           ? await HedgedStreamResolver.raceDuplicate<YtmStream>(doResolve,
               hedgeDelay: const Duration(milliseconds: 300))
           : await doResolve();

@@ -1479,9 +1479,26 @@ class _LibraryScreenState extends State<LibraryScreen>
                             ),
                             confirmDismiss: (direction) async {
                               if (direction == DismissDirection.startToEnd) {
+                                HapticFeedback.lightImpact();
                                 playerCubit.playNext(song);
                               } else {
+                                HapticFeedback.mediumImpact();
                                 cubit.toggleFavorite(song.id);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Removed "${song.title}" from favorites'),
+                                      duration: const Duration(seconds: 4),
+                                      action: SnackBarAction(
+                                        label: 'UNDO',
+                                        onPressed: () {
+                                          cubit.toggleFavorite(song.id);
+                                        },
+                                      ),
+                                    ),
+                                  );
+                                }
                               }
                               return false;
                             },

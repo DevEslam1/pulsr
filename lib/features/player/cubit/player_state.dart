@@ -8,6 +8,7 @@ import '../../../domain/models/chapter_info.dart';
 import '../../../domain/models/eq_preset.dart';
 import '../../../domain/models/headphone_profile.dart';
 import '../../../domain/models/lyrics_line.dart';
+import '../../../domain/models/quran_mode_profile.dart';
 
 part 'player_state.freezed.dart';
 
@@ -101,6 +102,9 @@ abstract class PlayerState with _$PlayerState {
     // T10: chapters of the CUE image backing the current song, if any.
     @Default([]) List<ChapterInfo> cueChapters,
     @Default(0) int currentCueIndex,
+    // Quran Mode: vocal-optimized recitation profile.
+    @Default(false) bool isQuranModeEnabled,
+    @Default(QuranReciterStyle.murattal) QuranReciterStyle quranReciterStyle,
   }) = _PlayerState;
 
   /// True when every field other than [position] is equal to [other]'s, i.e.
@@ -191,7 +195,9 @@ abstract class PlayerState with _$PlayerState {
         currentSongEqOverride != other.currentSongEqOverride ||
         currentSongVolumeOverrideDb != other.currentSongVolumeOverrideDb ||
         listContentDiffers(cueChapters, other.cueChapters) ||
-        currentCueIndex != other.currentCueIndex;
+        currentCueIndex != other.currentCueIndex ||
+        isQuranModeEnabled != other.isQuranModeEnabled ||
+        quranReciterStyle != other.quranReciterStyle;
   }
 
   bool get isDspActive =>

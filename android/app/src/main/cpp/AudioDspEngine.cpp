@@ -164,6 +164,8 @@ void AudioDspEngine::resetInternal() {
     loudnessContour_.reset();
     subCrossover_.reset();
     dynamicEq_.reset();
+    multibandCompressor_.reset();
+    dynamicBass_.reset();
 }
 
 void AudioDspEngine::reset() {
@@ -202,6 +204,8 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
             loudnessContour_.setSampleRate(sr);
             subCrossover_.setSampleRate(sr);
             dynamicEq_.setSampleRate(sr);
+            multibandCompressor_.setSampleRate(sr);
+            dynamicBass_.prepare(sr);
         }
 
         eq_.applyParams(snapshot->eq);
@@ -214,6 +218,18 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         loudnessContour_.applyParams(snapshot->loudness);
         subCrossover_.applyParams(snapshot->subCrossover);
         dynamicEq_.applyParams(snapshot->dynamicEq);
+        multibandCompressor_.applyParams(snapshot->multibandCompressor);
+        dynamicBass_.setParams(
+            snapshot->dynamicBass.enabled,
+            snapshot->dynamicBass.strength,
+            snapshot->dynamicBass.xLow,
+            snapshot->dynamicBass.xHigh,
+            snapshot->dynamicBass.yLow,
+            snapshot->dynamicBass.yHigh,
+            snapshot->dynamicBass.sideGainLow,
+            snapshot->dynamicBass.sideGainHigh,
+            snapshot->dynamicBass.devicePreset
+        );
 
         lastAppliedGeneration_.store(snapshot->generation);
     }
@@ -264,6 +280,9 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
     if (snapshot->stereoWidth.enabled && snapshot->stereoWidth.width > 1.01) {
         hasNetPositiveGain = true;
     }
+    if (snapshot->dynamicBass.enabled && snapshot->dynamicBass.strength > 1.01) {
+        hasNetPositiveGain = true;
+    }
 
     const uint32_t rawStages = snapshot->activeStages;
     const uint32_t degraded = autoDegradedStages_.load();
@@ -299,6 +318,11 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
             dynamicEq_.processInterleaved(buffer, frames, channels);
         }
 
+        // 2b. Native Multiband Compressor Stage — 4-band LR4 dynamics
+        if ((stages & STAGE_MULTIBAND_COMPRESSOR) && snapshot->multibandCompressor.enabled && channels == 2) {
+            multibandCompressor_.processInterleaved(buffer, frames, channels);
+        }
+
         // 3. Spatial Panner & Balance (All channels) — positioner before reverb for natural acoustics
         if (stages & STAGE_PANNER) {
             panner_.processInterleaved(buffer, frames, channels);
@@ -328,6 +352,11 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         // 8. Subwoofer / LFE Crossover Stage (bass redirection sum, stereo pairs)
         if (stages & STAGE_CROSSOVER) {
             subCrossover_.processInterleaved(buffer, frames, channels);
+        }
+
+        // 8b. Dynamic Bass Stage (ViPER-modeled Dynamic System, stereo only)
+        if ((stages & STAGE_DYNAMIC_BASS) && snapshot->dynamicBass.enabled && channels == 2) {
+            dynamicBass_.processInterleaved(buffer, frames, channels);
         }
 
         // 9. Loudness Contour Stage — computed against the current volume-stage

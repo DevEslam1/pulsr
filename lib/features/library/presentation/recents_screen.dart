@@ -8,6 +8,7 @@ import '../../../core/theme/aura_theme.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/glass_container.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
+import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/widgets/pulsr_toast.dart';
 import '../../../core/widgets/staggered_list_item.dart';
@@ -54,33 +55,14 @@ class _RecentsScreenState extends State<RecentsScreen> {
   }
 
   Future<void> _showClearConfirmation(BuildContext context) async {
-    final p = context.palette;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: p.surface,
-        shape: RoundedRectangleBorder(borderRadius: AppRadii.cardRadius),
-        title: const Text('Clear Listening History?'),
-        content: const Text(
+    final confirmed = await PulsrDialogHelper.showConfirmDialog(
+      context,
+      title: 'Clear Listening History?',
+      message:
           'This will remove all tracks from your Recently Played history. Your actual audio files and playlists will not be affected.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel', style: TextStyle(color: p.textSecondary)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: p.error,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: AppRadii.buttonRadius),
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Clear History'),
-          ),
-        ],
-      ),
+      icon: Icons.history_rounded,
+      confirmLabel: 'Clear History',
+      isDestructive: true,
     );
 
     if (confirmed == true && mounted) {
