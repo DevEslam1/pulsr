@@ -419,7 +419,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                               height: 10,
                               color: const Color(0xFF7C4DFF)),
                           const SizedBox(width: 6),
-                          Text('Measured Response',
+                          Text(l10n.rcMeasuredResponse,
                               style: TextStyle(
                                   color: p.textSecondary, fontSize: 11)),
                           const SizedBox(width: 16),
@@ -428,7 +428,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                               height: 10,
                               color: const Color(0xFF2BB673)),
                           const SizedBox(width: 6),
-                          Text('Fitted EQ Gain',
+                          Text(l10n.rcFittedEqGain,
                               style: TextStyle(
                                   color: p.textSecondary, fontSize: 11)),
                         ],
@@ -448,12 +448,12 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                         onChanged: (v) => setState(
                             () => _mergeWithHeadphone = v ?? false),
                         title: Text(
-                          'Stack with headphone AutoEQ',
+                          l10n.rcStackWithHeadphoneEq,
                           style: TextStyle(
                               color: p.textPrimary, fontSize: 13),
                         ),
                         subtitle: Text(
-                          'Combine this room correction with the selected headphone profile.',
+                          l10n.rcStackWithHeadphoneEqSubtitle,
                           style: TextStyle(
                               color: p.textSecondary, fontSize: 11),
                         ),

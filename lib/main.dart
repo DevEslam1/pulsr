@@ -95,25 +95,30 @@ Future<void> main() async {
     Future.microtask(() async {
       try {
         await Future.wait([
-          YtmRateLimiter.shared.restore().timeout(const Duration(seconds: 8)).catchError((e, st) {
-            ErrorLogger.log('YtmRateLimiter restore failed or timed out',
-                error: e, stackTrace: st, category: 'Startup');
-          }),
-          getIt<AuthService>().initialize().timeout(const Duration(seconds: 8)).catchError((e, st) {
-            ErrorLogger.log('AuthService initialize failed or timed out',
-                error: e, stackTrace: st, category: 'Startup');
-          }),
-          getIt<YtmAccountService>().init().timeout(const Duration(seconds: 8)).catchError((e, st) {
-            ErrorLogger.log('YtmAccountService init failed or timed out',
-                error: e, stackTrace: st, category: 'Startup');
-          }),
+          // Pure builds have no INTERNET permission: skip every online
+          // initializer so Pulsr Pure performs zero network work at startup.
+          if (AppConfig.ytmEnabled)
+            YtmRateLimiter.shared.restore().timeout(const Duration(seconds: 8)).catchError((e, st) {
+              ErrorLogger.log('YtmRateLimiter restore failed or timed out',
+                  error: e, stackTrace: st, category: 'Startup');
+            }),
+          if (AppConfig.isCloudSyncAllowed)
+            getIt<AuthService>().initialize().timeout(const Duration(seconds: 8)).catchError((e, st) {
+              ErrorLogger.log('AuthService initialize failed or timed out',
+                  error: e, stackTrace: st, category: 'Startup');
+            }),
+          if (AppConfig.ytmEnabled)
+            getIt<YtmAccountService>().init().timeout(const Duration(seconds: 8)).catchError((e, st) {
+              ErrorLogger.log('YtmAccountService init failed or timed out',
+                  error: e, stackTrace: st, category: 'Startup');
+            }),
         ]);
         // Warm the native extractor (BotGuard WebView + client matrix) while
         // the user is still looking at the home screen, so the first YTM
         // search/tap doesn't pay cold-start attestation (~seconds).
         // Fire-and-forget, guarded: never blocks or throws into startup.
         try {
-          if (getIt.isRegistered<YtmService>()) {
+          if (AppConfig.ytmEnabled && getIt.isRegistered<YtmService>()) {
             unawaited(getIt<YtmService>()
                 .preWarm()
                 .timeout(const Duration(seconds: 15))
@@ -127,7 +132,7 @@ Future<void> main() async {
     });
   }
 
-  if (AppConfig.sentryDsn.isNotEmpty) {
+  if (AppConfig.isTelemetryAllowed) {
     await SentryFlutter.init(
       (options) {
         options.dsn = AppConfig.sentryDsn;
@@ -169,8 +174,8 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     _router = createRouter(getIt<MediaScannerService>());
     _autoScanOnStartup();
     _checkInitialAudioIntent();
-    _listenForYtmSessionExpiry();
-    _startNetworkChangeMonitor();
+    if (AppConfig.ytmEnabled) _listenForYtmSessionExpiry();
+    if (AppConfig.isCloudSyncAllowed) _startNetworkChangeMonitor();
     _startAutomationTriggers();
   }
 

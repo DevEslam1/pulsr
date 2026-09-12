@@ -40,27 +40,24 @@ class FolderUseCases {
   }
 
   Future<Result<List<FolderItem>>> getFolderHierarchy() async {
-    final songsResult = await _repository.getAllSongs();
+    final pathsResult = await _repository.getLocalSongPaths();
     final excludedResult = await _repository.getExcludedFolderPaths();
 
-    if (songsResult.isLeft()) {
+    if (pathsResult.isLeft()) {
       return Left(
-          songsResult.fold((l) => l, (r) => const DatabaseFailure('Error')));
+          pathsResult.fold((l) => l, (r) => const DatabaseFailure('Error')));
     }
     if (excludedResult.isLeft()) {
       return Left(
           excludedResult.fold((l) => l, (r) => const DatabaseFailure('Error')));
     }
 
-    final List<SongsTableData> songs = songsResult.fold((l) => [], (r) => r);
+    final List<String> paths = pathsResult.fold((l) => [], (r) => r);
     final List<String> excludedPaths = excludedResult.fold((l) => [], (r) => r);
     final Map<String, int> folderSongCounts = {};
 
-    for (final song in songs) {
-      // `ytmusic://` sentinels would otherwise collapse into one phantom folder
-      // that the user could then "exclude".
-      if (song.source != SongSource.local) continue;
-      final parentDir = p.dirname(song.path);
+    for (final path in paths) {
+      final parentDir = p.dirname(path);
       folderSongCounts[parentDir] = (folderSongCounts[parentDir] ?? 0) + 1;
     }
 
@@ -88,17 +85,6 @@ class FolderUseCases {
   }
 
   Stream<Result<List<SongsTableData>>> watchFolderSongs(String folderPath) {
-    return _repository.watchAllSongs().map((result) {
-      return result.map((songs) {
-        final normalizedTarget =
-            folderPath.replaceAll('\\', '/').toLowerCase().trim();
-        return songs.where((s) {
-          if (s.source != SongSource.local) return false;
-          final parentDir =
-              p.dirname(s.path).replaceAll('\\', '/').toLowerCase().trim();
-          return parentDir == normalizedTarget;
-        }).toList();
-      });
-    });
+    return _repository.watchSongsInFolder(folderPath);
   }
 }

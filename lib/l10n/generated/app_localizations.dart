@@ -2848,6 +2848,528 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Go Home'**
   String get goHome;
+
+  /// No description provided for @resetToDefault30s.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to default (30s)'**
+  String get resetToDefault30s;
+
+  /// No description provided for @autoFilteringVoiceMemos.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-filtering voice memos • Custom paths'**
+  String get autoFilteringVoiceMemos;
+
+  /// No description provided for @manageExcludedDirectories.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage excluded directories'**
+  String get manageExcludedDirectories;
+
+  /// No description provided for @scanningStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Scanning storage…'**
+  String get scanningStorage;
+
+  /// No description provided for @lastScanTracks.
+  ///
+  /// In en, this message translates to:
+  /// **'Last scan: {count} tracks'**
+  String lastScanTracks(int count);
+
+  /// No description provided for @scanDeviceStorageForAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan device storage for audio'**
+  String get scanDeviceStorageForAudio;
+
+  /// No description provided for @removeMissingFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove missing files'**
+  String get removeMissingFiles;
+
+  /// No description provided for @removeMissingFilesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete indexed tracks whose files no longer exist'**
+  String get removeMissingFilesSubtitle;
+
+  /// No description provided for @removeMissingFilesConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove missing files?'**
+  String get removeMissingFilesConfirmTitle;
+
+  /// No description provided for @removeMissingFilesConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This permanently deletes indexed tracks whose files no longer exist on disk.'**
+  String get removeMissingFilesConfirmBody;
+
+  /// No description provided for @remove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get remove;
+
+  /// No description provided for @removedMissingTracks.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No missing files found} =1{Removed 1 missing track} other{Removed {count} missing tracks}}'**
+  String removedMissingTracks(int count);
+
+  /// No description provided for @artworkCache.
+  ///
+  /// In en, this message translates to:
+  /// **'Artwork Cache'**
+  String get artworkCache;
+
+  /// No description provided for @calculating.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculating…'**
+  String get calculating;
+
+  /// No description provided for @cacheUsedOfMax.
+  ///
+  /// In en, this message translates to:
+  /// **'{used} used of {max} MB max'**
+  String cacheUsedOfMax(String used, int max);
+
+  /// No description provided for @clear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get clear;
+
+  /// No description provided for @artworkCacheCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Artwork cache cleared successfully'**
+  String get artworkCacheCleared;
+
+  /// No description provided for @youtubeStreamDiskCache.
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube Stream Disk Cache'**
+  String get youtubeStreamDiskCache;
+
+  /// No description provided for @streamCacheCachedForReplay.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} cached for zero-latency replay'**
+  String streamCacheCachedForReplay(String size);
+
+  /// No description provided for @streamCacheCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Stream cache cleared successfully'**
+  String get streamCacheCleared;
+
+  /// No description provided for @maximumArtworkCacheLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum Artwork Cache Limit'**
+  String get maximumArtworkCacheLimit;
+
+  /// No description provided for @maxMbAutoEvicts.
+  ///
+  /// In en, this message translates to:
+  /// **'{max} MB • Auto-evicts oldest artworks when full'**
+  String maxMbAutoEvicts(int max);
+
+  /// No description provided for @maximumCacheSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum Cache Size'**
+  String get maximumCacheSize;
+
+  /// No description provided for @mbValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{mb} MB'**
+  String mbValue(int mb);
+
+  /// No description provided for @scrobblerSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Scrobbler Settings'**
+  String get scrobblerSettings;
+
+  /// No description provided for @listenBrainzRestScrobbler.
+  ///
+  /// In en, this message translates to:
+  /// **'ListenBrainz REST Scrobbler'**
+  String get listenBrainzRestScrobbler;
+
+  /// No description provided for @enableListenBrainz.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable ListenBrainz'**
+  String get enableListenBrainz;
+
+  /// No description provided for @userToken.
+  ///
+  /// In en, this message translates to:
+  /// **'User Token'**
+  String get userToken;
+
+  /// No description provided for @enterListenBrainzUserToken.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter ListenBrainz User Token'**
+  String get enterListenBrainzUserToken;
+
+  /// No description provided for @lastFmRestScrobbler.
+  ///
+  /// In en, this message translates to:
+  /// **'Last.fm REST Scrobbler'**
+  String get lastFmRestScrobbler;
+
+  /// No description provided for @enableLastFmDirectScrobbling.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Last.fm Direct Scrobbling'**
+  String get enableLastFmDirectScrobbling;
+
+  /// No description provided for @lastFmApiKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Last.fm API Key'**
+  String get lastFmApiKey;
+
+  /// No description provided for @lastFmSharedSecret.
+  ///
+  /// In en, this message translates to:
+  /// **'Last.fm Shared Secret'**
+  String get lastFmSharedSecret;
+
+  /// No description provided for @lastFmSessionKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Last.fm Session Key (sk)'**
+  String get lastFmSessionKey;
+
+  /// No description provided for @scrobblerConfigSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Scrobbler configuration saved!'**
+  String get scrobblerConfigSaved;
+
+  /// No description provided for @saveSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Settings'**
+  String get saveSettings;
+
+  /// No description provided for @youtubeMusicWeb.
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube Music Web'**
+  String get youtubeMusicWeb;
+
+  /// No description provided for @selectPageToOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a page to open in the in-app browser'**
+  String get selectPageToOpen;
+
+  /// No description provided for @homePage.
+  ///
+  /// In en, this message translates to:
+  /// **'Home Page'**
+  String get homePage;
+
+  /// No description provided for @homePageSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Personalized recommendations, mixes & quick picks'**
+  String get homePageSubtitle;
+
+  /// No description provided for @youtubeWeb.
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube Web'**
+  String get youtubeWeb;
+
+  /// No description provided for @youtubeWebSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse all music videos & playlists (no geo-restrictions)'**
+  String get youtubeWebSubtitle;
+
+  /// No description provided for @exploreAndCharts.
+  ///
+  /// In en, this message translates to:
+  /// **'Explore & Charts'**
+  String get exploreAndCharts;
+
+  /// No description provided for @exploreAndChartsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Trending songs, top global charts & music videos'**
+  String get exploreAndChartsSubtitle;
+
+  /// No description provided for @yourLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Library'**
+  String get yourLibrary;
+
+  /// No description provided for @yourLibrarySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved playlists, albums, songs & subscribed artists'**
+  String get yourLibrarySubtitle;
+
+  /// No description provided for @likedMusic.
+  ///
+  /// In en, this message translates to:
+  /// **'Liked Music'**
+  String get likedMusic;
+
+  /// No description provided for @likedMusicSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Thumbed-up songs synced with your Google account'**
+  String get likedMusicSubtitle;
+
+  /// No description provided for @newReleases.
+  ///
+  /// In en, this message translates to:
+  /// **'New Releases'**
+  String get newReleases;
+
+  /// No description provided for @newReleasesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Latest album drops, EPs and trending single releases'**
+  String get newReleasesSubtitle;
+
+  /// No description provided for @listeningHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Listening History'**
+  String get listeningHistory;
+
+  /// No description provided for @listeningHistorySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently played tracks and stations on your account'**
+  String get listeningHistorySubtitle;
+
+  /// No description provided for @bySongs.
+  ///
+  /// In en, this message translates to:
+  /// **'By Songs'**
+  String get bySongs;
+
+  /// No description provided for @endOfTrack.
+  ///
+  /// In en, this message translates to:
+  /// **'End of track'**
+  String get endOfTrack;
+
+  /// No description provided for @endOfQueue.
+  ///
+  /// In en, this message translates to:
+  /// **'End of queue'**
+  String get endOfQueue;
+
+  /// No description provided for @songsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 song} other{{count} songs}}'**
+  String songsCount(int count);
+
+  /// No description provided for @musicWillStopEndOfTrack.
+  ///
+  /// In en, this message translates to:
+  /// **'Music will stop at the end of this track'**
+  String get musicWillStopEndOfTrack;
+
+  /// No description provided for @musicWillStopAfterSongs.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Music will stop after 1 song} other{Music will stop after {count} songs}}'**
+  String musicWillStopAfterSongs(int count);
+
+  /// No description provided for @musicWillStopEndOfQueue.
+  ///
+  /// In en, this message translates to:
+  /// **'Music will stop at the end of the queue'**
+  String get musicWillStopEndOfQueue;
+
+  /// No description provided for @musicWillStopIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Music will stop in {minutes}m {seconds}s'**
+  String musicWillStopIn(int minutes, int seconds);
+
+  /// No description provided for @rcStackWithHeadphoneEq.
+  ///
+  /// In en, this message translates to:
+  /// **'Stack with headphone AutoEQ'**
+  String get rcStackWithHeadphoneEq;
+
+  /// No description provided for @rcStackWithHeadphoneEqSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Combine this room correction with the selected headphone profile.'**
+  String get rcStackWithHeadphoneEqSubtitle;
+
+  /// No description provided for @rcMeasuredResponse.
+  ///
+  /// In en, this message translates to:
+  /// **'Measured Response'**
+  String get rcMeasuredResponse;
+
+  /// No description provided for @rcFittedEqGain.
+  ///
+  /// In en, this message translates to:
+  /// **'Fitted EQ Gain'**
+  String get rcFittedEqGain;
+
+  /// No description provided for @fetchMissingArtworkTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fetch Missing Artwork?'**
+  String get fetchMissingArtworkTitle;
+
+  /// No description provided for @fetchMissingArtworkBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Pulsr will look up albums without artwork online and save the results to your library. This needs an internet connection.'**
+  String get fetchMissingArtworkBody;
+
+  /// No description provided for @fetchArtwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Fetch Artwork'**
+  String get fetchArtwork;
+
+  /// No description provided for @artworkServiceUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Artwork service is unavailable'**
+  String get artworkServiceUnavailable;
+
+  /// No description provided for @noMissingArtworkFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No missing artwork found online'**
+  String get noMissingArtworkFound;
+
+  /// No description provided for @updatedArtworkForAlbums.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Updated artwork for 1 album} other{Updated artwork for {count} albums}}'**
+  String updatedArtworkForAlbums(int count);
+
+  /// No description provided for @keepThisOne.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep this one'**
+  String get keepThisOne;
+
+  /// No description provided for @markAsCopyToKeep.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark \"{title}\" as the copy to keep'**
+  String markAsCopyToKeep(String title);
+
+  /// No description provided for @deleteFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete file'**
+  String get deleteFile;
+
+  /// No description provided for @removeFromDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove \"{title}\" from your device'**
+  String removeFromDevice(String title);
+
+  /// No description provided for @keepingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keeping \"{title}\"'**
+  String keepingTitle(String title);
+
+  /// No description provided for @deleteThisFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this file?'**
+  String get deleteThisFile;
+
+  /// No description provided for @deleteFileConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'\"{title}\" will be permanently removed from your device. This cannot be undone.'**
+  String deleteFileConfirmBody(String title);
+
+  /// No description provided for @deleteIsUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete is unavailable right now'**
+  String get deleteIsUnavailable;
+
+  /// No description provided for @failedToDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to delete: {message}'**
+  String failedToDelete(String message);
+
+  /// No description provided for @deletedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted \"{title}\"'**
+  String deletedTitle(String title);
+
+  /// No description provided for @duplicateCleaner.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate Cleaner'**
+  String get duplicateCleaner;
+
+  /// No description provided for @fetchMissingArtworkTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Fetch missing artwork'**
+  String get fetchMissingArtworkTooltip;
+
+  /// No description provided for @noDuplicatesFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No Duplicates Found!'**
+  String get noDuplicatesFound;
+
+  /// No description provided for @libraryCleanlyOrganized.
+  ///
+  /// In en, this message translates to:
+  /// **'Your library is cleanly organized.'**
+  String get libraryCleanlyOrganized;
+
+  /// No description provided for @kept.
+  ///
+  /// In en, this message translates to:
+  /// **'Kept'**
+  String get kept;
+
+  /// No description provided for @resolveDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'Resolve duplicate'**
+  String get resolveDuplicate;
+
+  /// No description provided for @sleepTimerMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min'**
+  String sleepTimerMinutes(int minutes);
 }
 
 class _AppLocalizationsDelegate

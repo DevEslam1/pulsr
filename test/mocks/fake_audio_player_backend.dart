@@ -1,7 +1,7 @@
 // test/mocks/fake_audio_player_backend.dart
 import 'dart:async';
 import 'package:just_audio/just_audio.dart';
-import 'package:pulsr/data/audio/audio_player_backend.dart';
+import 'audio_player_backend.dart';
 
 /// Simulated, deterministic clock-driven fake audio backend for testing playback engines,
 /// queue mutations, crossfade schedules, and sleep timers without touching native platform audio.

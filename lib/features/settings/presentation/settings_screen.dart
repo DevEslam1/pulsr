@@ -308,19 +308,20 @@ class SettingsScreen extends StatelessWidget {
                         Icons.folder_off_rounded,
                         context.l10n.hiddenAndExcludedFolders,
                         state.autoHideSystemMedia
-                            ? 'Auto-filtering voice memos • Custom paths'
-                            : 'Manage excluded directories',
+                            ? context.l10n.autoFilteringVoiceMemos
+                            : context.l10n.manageExcludedDirectories,
                         onTap: () => context.push('/hidden-folders')),
                     _divider(p),
                     _navTile(
                         context,
                         Icons.refresh_rounded,
                         state.isScanning
-                            ? 'Scanning storage…'
+                            ? context.l10n.scanningStorage
                             : context.l10n.rescanLibrary,
                         state.scanResultCount != null
-                            ? 'Last scan: ${state.scanResultCount} tracks'
-                            : 'Scan device storage for audio',
+                            ? context.l10n
+                                .lastScanTracks(state.scanResultCount!)
+                            : context.l10n.scanDeviceStorageForAudio,
                         trailing: state.isScanning
                             ? StreamBuilder<double>(
                                 stream: cubit.scanProgress,
@@ -359,8 +360,8 @@ class SettingsScreen extends StatelessWidget {
                     _navTile(
                         context,
                         Icons.cleaning_services_rounded,
-                        'Remove missing files',
-                        'Delete indexed tracks whose files no longer exist',
+                        context.l10n.removeMissingFiles,
+                        context.l10n.removeMissingFilesSubtitle,
                         onTap: () => _removeMissingFiles(context, cubit)),
                   ]),
                   if (AppConfig.ytmEnabled)
@@ -665,7 +666,7 @@ class SettingsScreen extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      'Exclude tracks under $selected seconds (filters voice notes):',
+                      context.l10n.excludeTracksUnder(selected),
                     ),
                   ),
                   IconButton(
@@ -677,7 +678,7 @@ class SettingsScreen extends StatelessWidget {
                                 .onSurface
                                 .withValues(alpha: 0.38)
                             : primaryColor),
-                    tooltip: 'Reset to default (30s)',
+                    tooltip: context.l10n.resetToDefault30s,
                     visualDensity: VisualDensity.compact,
                     onPressed: selected == 30
                         ? null
@@ -717,19 +718,19 @@ class SettingsScreen extends StatelessWidget {
 
   Future<void> _removeMissingFiles(
       BuildContext context, SettingsCubit cubit) async {
+    final l10n = context.l10n;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Remove missing files?'),
-        content: const Text(
-            'This permanently deletes indexed tracks whose files no longer exist on disk.'),
+        title: Text(l10n.removeMissingFilesConfirmTitle),
+        content: Text(l10n.removeMissingFilesConfirmBody),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
               child: Text(context.l10n.cancel)),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Remove'),
+            child: Text(l10n.remove),
           ),
         ],
       ),
@@ -739,11 +740,7 @@ class SettingsScreen extends StatelessWidget {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          removed > 0
-              ? 'Removed $removed missing ${removed == 1 ? 'track' : 'tracks'}'
-              : 'No missing files found',
-        ),
+        content: Text(l10n.removedMissingTracks(removed)),
       ),
     );
   }
@@ -1980,7 +1977,7 @@ class SettingsScreen extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'YouTube Music Web',
+                                  ctx.l10n.youtubeMusicWeb,
                                   style: TextStyle(
                                     color: p.textPrimary,
                                     fontWeight: FontWeight.w700,
@@ -1988,7 +1985,7 @@ class SettingsScreen extends StatelessWidget {
                                   ),
                                 ),
                                 Text(
-                                  'Select a page to open in the in-app browser',
+                                  ctx.l10n.selectPageToOpen,
                                   style: TextStyle(
                                       color: p.textSecondary, fontSize: 12),
                                 ),
@@ -2001,63 +1998,56 @@ class SettingsScreen extends StatelessWidget {
                       _ytmWebOptionTile(
                         ctx,
                         icon: Icons.home_rounded,
-                        title: 'Home Page',
-                        subtitle:
-                            'Personalized recommendations, mixes & quick picks',
+                        title: ctx.l10n.homePage,
+                        subtitle: ctx.l10n.homePageSubtitle,
                         url: 'https://music.youtube.com/?gl=EG&hl=en',
                         p: p,
                       ),
                       _ytmWebOptionTile(
                         ctx,
                         icon: Icons.video_library_rounded,
-                        title: 'YouTube Web',
-                        subtitle:
-                            'Browse all music videos & playlists (no geo-restrictions)',
+                        title: ctx.l10n.youtubeWeb,
+                        subtitle: ctx.l10n.youtubeWebSubtitle,
                         url: 'https://www.youtube.com',
                         p: p,
                       ),
                       _ytmWebOptionTile(
                         ctx,
                         icon: Icons.explore_rounded,
-                        title: 'Explore & Charts',
-                        subtitle:
-                            'Trending songs, top global charts & music videos',
+                        title: ctx.l10n.exploreAndCharts,
+                        subtitle: ctx.l10n.exploreAndChartsSubtitle,
                         url: 'https://music.youtube.com/explore?gl=EG&hl=en',
                         p: p,
                       ),
                       _ytmWebOptionTile(
                         ctx,
                         icon: Icons.library_music_rounded,
-                        title: 'Your Library',
-                        subtitle:
-                            'Saved playlists, albums, songs & subscribed artists',
+                        title: ctx.l10n.yourLibrary,
+                        subtitle: ctx.l10n.yourLibrarySubtitle,
                         url: 'https://music.youtube.com/library?gl=EG&hl=en',
                         p: p,
                       ),
                       _ytmWebOptionTile(
                         ctx,
                         icon: Icons.favorite_rounded,
-                        title: 'Liked Music',
-                        subtitle:
-                            'Thumbed-up songs synced with your Google account',
+                        title: ctx.l10n.likedMusic,
+                        subtitle: ctx.l10n.likedMusicSubtitle,
                         url: 'https://music.youtube.com/playlist?list=LM&gl=EG&hl=en',
                         p: p,
                       ),
                       _ytmWebOptionTile(
                         ctx,
                         icon: Icons.fiber_new_rounded,
-                        title: 'New Releases',
-                        subtitle:
-                            'Latest album drops, EPs and trending single releases',
+                        title: ctx.l10n.newReleases,
+                        subtitle: ctx.l10n.newReleasesSubtitle,
                         url: 'https://music.youtube.com/new_releases?gl=EG&hl=en',
                         p: p,
                       ),
                       _ytmWebOptionTile(
                         ctx,
                         icon: Icons.history_rounded,
-                        title: 'Listening History',
-                        subtitle:
-                            'Recently played tracks and stations on your account',
+                        title: ctx.l10n.listeningHistory,
+                        subtitle: ctx.l10n.listeningHistorySubtitle,
                         url: 'https://music.youtube.com/history?gl=EG&hl=en',
                         p: p,
                       ),
@@ -2546,7 +2536,7 @@ class _CacheSectionState extends State<_CacheSection>
                 color: p.accent, size: 22),
           ),
           title: Text(
-            'Artwork Cache',
+            context.l10n.artworkCache,
             style: TextStyle(
                 color: p.textPrimary,
                 fontWeight: FontWeight.w700,
@@ -2554,8 +2544,9 @@ class _CacheSectionState extends State<_CacheSection>
           ),
           subtitle: Text(
             _isLoading
-                ? 'Calculating…'
-                : '${_formatSize(_artCacheSizeBytes)} used of $maxMb MB max',
+                ? context.l10n.calculating
+                : context.l10n.cacheUsedOfMax(
+                    _formatSize(_artCacheSizeBytes), maxMb),
             style: TextStyle(color: p.textSecondary, fontSize: 12.5),
           ),
           trailing: TextButton.icon(
@@ -2564,14 +2555,14 @@ class _CacheSectionState extends State<_CacheSection>
               visualDensity: VisualDensity.compact,
             ),
             icon: const Icon(Icons.delete_outline_rounded, size: 18),
-            label: const Text('Clear'),
+            label: Text(context.l10n.clear),
             onPressed: () async {
               await manager.clearAllCache();
               await _refreshCacheSize();
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Artwork cache cleared successfully')),
+                  SnackBar(
+                      content: Text(context.l10n.artworkCacheCleared)),
                 );
               }
             },
@@ -2592,7 +2583,7 @@ class _CacheSectionState extends State<_CacheSection>
                   color: Colors.redAccent, size: 22),
             ),
             title: Text(
-              'YouTube Stream Disk Cache',
+              context.l10n.youtubeStreamDiskCache,
               style: TextStyle(
                   color: p.textPrimary,
                   fontWeight: FontWeight.w700,
@@ -2600,8 +2591,9 @@ class _CacheSectionState extends State<_CacheSection>
             ),
             subtitle: Text(
               _isLoading
-                  ? 'Calculating…'
-                  : '${_formatSize(_streamCacheSizeBytes)} cached for zero-latency replay',
+                  ? context.l10n.calculating
+                  : context.l10n.streamCacheCachedForReplay(
+                      _formatSize(_streamCacheSizeBytes)),
               style: TextStyle(color: p.textSecondary, fontSize: 12.5),
             ),
             trailing: TextButton.icon(
@@ -2610,7 +2602,7 @@ class _CacheSectionState extends State<_CacheSection>
                 visualDensity: VisualDensity.compact,
               ),
               icon: const Icon(Icons.delete_outline_rounded, size: 18),
-              label: const Text('Clear'),
+              label: Text(context.l10n.clear),
               onPressed: () async {
                 final cacheManager = _ytmCacheManager;
                 if (cacheManager == null) return;
@@ -2618,8 +2610,8 @@ class _CacheSectionState extends State<_CacheSection>
                 await _refreshCacheSize();
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Stream cache cleared successfully')),
+                    SnackBar(
+                        content: Text(context.l10n.streamCacheCleared)),
                   );
                 }
               },
@@ -2640,14 +2632,14 @@ class _CacheSectionState extends State<_CacheSection>
                 Icon(Icons.disc_full_rounded, color: p.textSecondary, size: 22),
           ),
           title: Text(
-            'Maximum Artwork Cache Limit',
+            context.l10n.maximumArtworkCacheLimit,
             style: TextStyle(
                 color: p.textPrimary,
                 fontWeight: FontWeight.w700,
                 fontSize: 14.5),
           ),
           subtitle: Text(
-            '$maxMb MB • Auto-evicts oldest artworks when full',
+            context.l10n.maxMbAutoEvicts(maxMb),
             style: TextStyle(color: p.textSecondary, fontSize: 12.5),
           ),
           trailing: Icon(Icons.arrow_forward_ios_rounded,
@@ -2676,7 +2668,7 @@ class _CacheSectionState extends State<_CacheSection>
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Maximum Cache Size',
+                context.l10n.maximumCacheSize,
                 style: TextStyle(
                     color: p.textPrimary,
                     fontWeight: FontWeight.w800,
@@ -2694,7 +2686,7 @@ class _CacheSectionState extends State<_CacheSection>
                         : p.textTertiary,
                   ),
                   title: Text(
-                    '$mb MB',
+                    context.l10n.mbValue(mb),
                     style: TextStyle(
                       color: manager.maxCacheSizeMb == mb
                           ? p.accent
@@ -2850,7 +2842,7 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Scrobbler configuration saved!')),
+        SnackBar(content: Text(context.l10n.scrobblerConfigSaved)),
       );
       Navigator.pop(context);
     }
@@ -2893,7 +2885,7 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
                 Icon(Icons.equalizer_rounded, color: p.accent, size: 24),
                 const SizedBox(width: 10),
                 Text(
-                  'Scrobbler Settings',
+                  context.l10n.scrobblerSettings,
                   style: TextStyle(
                     color: p.textPrimary,
                     fontWeight: FontWeight.w800,
@@ -2904,7 +2896,7 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
             ),
             const SizedBox(height: 16),
             Text(
-              'ListenBrainz REST Scrobbler',
+              context.l10n.listenBrainzRestScrobbler,
               style: TextStyle(
                   color: p.textPrimary,
                   fontWeight: FontWeight.w700,
@@ -2912,7 +2904,7 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text('Enable ListenBrainz',
+              title: Text(context.l10n.enableListenBrainz,
                   style: TextStyle(color: p.textPrimary, fontSize: 14)),
               value: _listenBrainzEnabled,
               activeThumbColor: p.accent,
@@ -2923,8 +2915,8 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
                 controller: _listenBrainzTokenController,
                 style: TextStyle(color: p.textPrimary, fontSize: 13),
                 decoration: InputDecoration(
-                  labelText: 'User Token',
-                  hintText: 'Enter ListenBrainz User Token',
+                  labelText: context.l10n.userToken,
+                  hintText: context.l10n.enterListenBrainzUserToken,
                   labelStyle: TextStyle(color: p.textSecondary),
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12)),
@@ -2935,7 +2927,7 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
             Divider(color: p.hairline),
             const SizedBox(height: 8),
             Text(
-              'Last.fm REST Scrobbler',
+              context.l10n.lastFmRestScrobbler,
               style: TextStyle(
                   color: p.textPrimary,
                   fontWeight: FontWeight.w700,
@@ -2943,7 +2935,7 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text('Enable Last.fm Direct Scrobbling',
+              title: Text(context.l10n.enableLastFmDirectScrobbling,
                   style: TextStyle(color: p.textPrimary, fontSize: 14)),
               value: _lastFmEnabled,
               activeThumbColor: p.accent,
@@ -2954,7 +2946,7 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
                 controller: _lastFmApiKeyController,
                 style: TextStyle(color: p.textPrimary, fontSize: 13),
                 decoration: InputDecoration(
-                  labelText: 'Last.fm API Key',
+                  labelText: context.l10n.lastFmApiKey,
                   labelStyle: TextStyle(color: p.textSecondary),
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12)),
@@ -2966,7 +2958,7 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
                 controller: _lastFmSecretController,
                 style: TextStyle(color: p.textPrimary, fontSize: 13),
                 decoration: InputDecoration(
-                  labelText: 'Last.fm Shared Secret',
+                  labelText: context.l10n.lastFmSharedSecret,
                   labelStyle: TextStyle(color: p.textSecondary),
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12)),
@@ -2978,7 +2970,7 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
                 controller: _lastFmSessionKeyController,
                 style: TextStyle(color: p.textPrimary, fontSize: 13),
                 decoration: InputDecoration(
-                  labelText: 'Last.fm Session Key (sk)',
+                  labelText: context.l10n.lastFmSessionKey,
                   labelStyle: TextStyle(color: p.textSecondary),
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12)),
@@ -2997,8 +2989,8 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
                       borderRadius: BorderRadius.circular(14)),
                 ),
                 onPressed: _saveScrobblerPrefs,
-                child: const Text('Save Settings',
-                    style: TextStyle(
+                child: Text(context.l10n.saveSettings,
+                    style: const TextStyle(
                         fontWeight: FontWeight.w700, color: Colors.black)),
               ),
             ),

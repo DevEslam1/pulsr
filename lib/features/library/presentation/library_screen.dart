@@ -13,6 +13,7 @@ import '../../auth/cubit/auth_cubit.dart';
 import '../../auth/presentation/ytm_web_login_sheet.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
+import '../../../core/utils/song_classification.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/song_tile.dart';
@@ -885,18 +886,7 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
   }
 
-  bool _isOnlineDownload(SongsTableData s) {
-    if (s.path.isEmpty || s.path.startsWith('ytmusic://')) return false;
-    // Primary: use the isDownloaded flag from DB
-    if (s.isDownloaded == true) return true;
-    // Secondary: source is local but has remoteId (reconciled download)
-    if (s.source == SongSource.local &&
-        s.remoteId != null &&
-        s.remoteId!.isNotEmpty) {
-      return true;
-    }
-    return false;
-  }
+  bool _isOnlineDownload(SongsTableData s) => isDownloadedOnlineTrack(s);
 
   // ================= ALBUMS (adaptive grid / list) =================
   Widget _buildAlbumsTab(BuildContext context, LibraryState state) {
@@ -1517,11 +1507,7 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
   }
 
-  bool _isOnlineFavorite(SongsTableData s) {
-    return s.source == SongSource.youtube ||
-        (s.remoteId != null && s.remoteId!.isNotEmpty) ||
-        s.isDownloaded == true;
-  }
+  bool _isOnlineFavorite(SongsTableData s) => isOnlineFavorite(s);
 
   Widget _buildFavoritesEmptyState(
       BuildContext context, PulsrPalette p, int tabIndex) {

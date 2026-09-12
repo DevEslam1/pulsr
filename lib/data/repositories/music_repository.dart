@@ -300,6 +300,47 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
+  Future<Result<List<String>>> getLocalSongPaths() async {
+    try {
+      final query = _db.selectOnly(_db.songsTable)
+        ..addColumns([_db.songsTable.path])
+        ..where(_db.songsTable.isMissing.equals(false) &
+            _db.songsTable.source.equals(SongSource.local) &
+            _db.songsTable.path.like('ytmusic://%').not());
+      final rows = await query.get();
+      final paths = rows
+          .map((r) => r.read(_db.songsTable.path))
+          .whereType<String>()
+          .toList();
+      return Right(paths);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to fetch song paths', e));
+    }
+  }
+
+  @override
+  Stream<Result<List<SongsTableData>>> watchSongsInFolder(String folderPath) {
+    try {
+      final target = _normalizeDirPath(folderPath);
+      final query = _db.select(_db.songsTable)
+        ..where((t) =>
+            t.isMissing.equals(false) &
+            t.source.equals(SongSource.local) &
+            t.path.like('$folderPath%'));
+      return query.watch().map((songs) {
+        final filtered = songs
+            .where((s) => _normalizeDirPath(_parentDirPath(s.path)) == target)
+            .toList();
+        return Right<AppFailure, List<SongsTableData>>(filtered);
+      }).handleError((Object e) => Left<AppFailure, List<SongsTableData>>(
+          DatabaseFailure('Failed to watch folder songs', e)));
+    } catch (e) {
+      return Stream.value(
+          Left(DatabaseFailure('Failed to watch folder songs', e)));
+    }
+  }
+
+  @override
   Future<Result<SongsTableData?>> getSongById(int id) async {
     try {
       final song = await (_db.select(_db.songsTable)
@@ -1852,4 +1893,14 @@ class MusicRepository implements IMusicRepository {
           Left(DatabaseFailure('Failed to watch year songs', e)));
     }
   }
+}
+
+String _normalizeDirPath(String path) =>
+    path.replaceAll('\\', '/').toLowerCase().trim();
+
+String _parentDirPath(String path) {
+  final slash = path.lastIndexOf('/');
+  final backslash = path.lastIndexOf('\\');
+  final i = slash > backslash ? slash : backslash;
+  return i <= 0 ? path : path.substring(0, i);
 }

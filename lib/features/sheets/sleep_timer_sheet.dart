@@ -99,12 +99,20 @@ class SleepTimerSheet extends StatelessWidget {
                                     const EdgeInsets.symmetric(vertical: 8.0),
                                 child: Text(
                                   isQueueMode
-                                      ? 'Music will stop at the end of the queue'
+                                      ? context.l10n.musicWillStopEndOfQueue
                                       : remainingTracks != null
                                           ? (remainingTracks == 1
-                                              ? 'Music will stop at the end of this track'
-                                              : 'Music will stop after $remainingTracks songs')
-                                          : 'Music will stop in ${state.sleepTimerRemaining!.inMinutes}m ${state.sleepTimerRemaining!.inSeconds % 60}s',
+                                              ? context.l10n
+                                                  .musicWillStopEndOfTrack
+                                              : context.l10n
+                                                  .musicWillStopAfterSongs(
+                                                      remainingTracks))
+                                          : context.l10n.musicWillStopIn(
+                                              state.sleepTimerRemaining!
+                                                  .inMinutes,
+                                              state.sleepTimerRemaining!
+                                                      .inSeconds %
+                                                  60),
                                   style: TextStyle(
                                     color: p.accent,
                                     fontWeight: FontWeight.w600,
@@ -113,7 +121,7 @@ class SleepTimerSheet extends StatelessWidget {
                               ),
                             const SizedBox(height: 16),
                             Text(
-                              'By Songs',
+                              context.l10n.bySongs,
                               style: TextStyle(
                                 color: p.textSecondary,
                                 fontWeight: FontWeight.w600,
@@ -126,12 +134,12 @@ class SleepTimerSheet extends StatelessWidget {
                               runSpacing: 8,
                               children: [
                                 ChoiceChip(
-                                  label: const Row(
+                                  label: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.skip_next_rounded, size: 14),
-                                      SizedBox(width: 4),
-                                      Text('End of track'),
+                                      const Icon(Icons.skip_next_rounded, size: 14),
+                                      const SizedBox(width: 4),
+                                      Text(context.l10n.endOfTrack),
                                     ],
                                   ),
                                   selected: false,
@@ -141,12 +149,12 @@ class SleepTimerSheet extends StatelessWidget {
                                   },
                                 ),
                                 ChoiceChip(
-                                  label: const Row(
+                                  label: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.queue_music_rounded, size: 14),
-                                      SizedBox(width: 4),
-                                      Text('End of queue'),
+                                      const Icon(Icons.queue_music_rounded, size: 14),
+                                      const SizedBox(width: 4),
+                                      Text(context.l10n.endOfQueue),
                                     ],
                                   ),
                                   selected: false,
@@ -156,7 +164,7 @@ class SleepTimerSheet extends StatelessWidget {
                                   },
                                 ),
                                 ChoiceChip(
-                                  label: const Text('2 songs'),
+                                  label: Text(context.l10n.songsCount(2)),
                                   selected: false,
                                   onSelected: (_) {
                                     cubit.startAfterNTracksTimer(2);
@@ -164,7 +172,7 @@ class SleepTimerSheet extends StatelessWidget {
                                   },
                                 ),
                                 ChoiceChip(
-                                  label: const Text('3 songs'),
+                                  label: Text(context.l10n.songsCount(3)),
                                   selected: false,
                                   onSelected: (_) {
                                     cubit.startAfterNTracksTimer(3);
@@ -172,7 +180,7 @@ class SleepTimerSheet extends StatelessWidget {
                                   },
                                 ),
                                 ChoiceChip(
-                                  label: const Text('5 songs'),
+                                  label: Text(context.l10n.songsCount(5)),
                                   selected: false,
                                   onSelected: (_) {
                                     cubit.startAfterNTracksTimer(5);
@@ -180,7 +188,7 @@ class SleepTimerSheet extends StatelessWidget {
                                   },
                                 ),
                                 ChoiceChip(
-                                  label: const Text('10 songs'),
+                                  label: Text(context.l10n.songsCount(10)),
                                   selected: false,
                                   onSelected: (_) {
                                     cubit.startAfterNTracksTimer(10);
@@ -205,7 +213,7 @@ class SleepTimerSheet extends StatelessWidget {
                               children: [
                                 ...presets.map((mins) {
                                   return ChoiceChip(
-                                    label: Text('$mins min'),
+                                    label: Text(context.l10n.sleepTimerMinutes(mins)),
                                     selected: false,
                                     onSelected: (_) {
                                       cubit.startSleepTimer(mins);

@@ -21,7 +21,7 @@ done this pass, with reason.
 | ID | Status | Result |
 |---|---|---|
 | F-01 | DONE | Onboarding copy standardized to 10-band EQ. |
-| F-02 | DEFERRED | `AppConfig` helper consolidation (no behavior bug). |
+| F-02 | DONE | Sentry gated on `isTelemetryAllowed`; Pure skips all online init. |
 | F-03 | DONE | `scanProgress` surfaced in Settings via `StreamBuilder`. |
 | F-04 | DONE | Router error page localized (en/es/ar). |
 | F-05 | DONE | Duplicate Cleaner now has resolve actions. |
@@ -31,8 +31,8 @@ done this pass, with reason.
 | F-09 | DONE | `clearNomediaCache()` invoked on rescan/auto-hide changes. |
 | F-10 | DONE | "Remove missing files" action in Settings. |
 | F-11 | FIXED | Select All resolves full library; batch actions fetch missing rows. |
-| F-12 | DEFERRED | Favorites screen/tab duplication (refactor, low risk value). |
-| F-13 | DEFERRED | Folder aggregation push-down to SQL (perf). |
+| F-12 | DONE | Shared `song_classification.dart` used by Library tab and `/favorites`. |
+| F-13 | DONE | Path-only folder aggregation + SQL-prefixed folder song watch. |
 | F-14 | DONE | Genre hierarchy view toggle in Genres tab. |
 | F-15 | DONE | Folder tree view toggle in Folders tab. |
 | F-16 | FIXED | Fuzzy fallback scans the entire library (was first 300). |
@@ -61,7 +61,7 @@ done this pass, with reason.
 | F-39 | DONE | Preamp persistence verified in restore path. |
 | F-40 | DONE | MQA detection/unfold wired into source resolution; status reported honestly. |
 | F-41 | HONEST | Native DSD/DoP documented as unsupported; encoder left dormant. |
-| F-42 | PARTIAL | `FormatAwareDecoder` now used; `AudioPlayerBackend` still unused. |
+| F-42 | DONE | Production backend abstraction removed; interface relocated to test seam. |
 | F-43 | DONE | `trackSeed` passed to the visualizer per track. |
 | F-44 | DEFERRED | Test-referenced; retained. |
 | F-45 | CLEANED | Removed unused analytics error-counter methods. |
@@ -71,7 +71,7 @@ done this pass, with reason.
 | F-49 | SKIPPED | Cloud Backup dashboard (Firebase/cloud out of scope). |
 | F-50 | CLEANED | Deleted 7 dead settings section widgets. |
 | F-51 | DONE | Privacy Guarantee and About tiles wired. |
-| F-52 | PARTIAL | Remaining hardcoded strings in a few sheets (ongoing i18n). |
+| F-52 | DONE | Flagged sheets (cache/scrobbler/YTM/duration) + new UI localized en/es/ar. |
 | F-53 | DONE | YTM moods use real bridge data; radio uses real mix with honest fallback. |
 | F-54 | DONE | Metadata service docs corrected to iTunes-only. |
 | F-55 | DONE | YTM cache size gated on YTM and refreshed after clear. |
@@ -85,10 +85,20 @@ done this pass, with reason.
 | F-63 | DONE | Automation triggers (Bluetooth/headphones) + rules UI. |
 | F-64 | DONE | Bluetooth "Auto-calibrate" action wired (codec-derived estimate). |
 | F-65 | CLEANED | Removed dead `SubsonicService` + DI registration. |
-| F-66 | DEFERRED | DI graph conditional gating (privacy already enforced natively). |
+| F-66 | DONE | Pure builds skip all online/YTM/auth initializers at startup. |
 | F-67 | DONE | SponsorBlock enable/category controls in Settings. |
 
 **Verification:** `flutter analyze` clean; `flutter test` — **801 passing** after the pass.
+A second remediation pass completed F-02, F-12, F-13, F-42, F-52 and F-66 (new ARB keys
+across en/es/ar).
+
+**Remaining open (14 → 6):** F-49/F-56 are skipped by design (Firebase/cloud out of scope);
+F-20, F-29, F-36 and F-44 are test-locked or documented as intentional design — see their
+rows above.
+
+**Housekeeping:** `lib/core/di/injection.config.dart` was hand-edited for the removed
+Subsonic registration; run `dart run build_runner build --delete-conflicting-outputs` to
+regenerate it cleanly before release.
 
 ---
 

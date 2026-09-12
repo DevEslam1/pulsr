@@ -840,5 +840,218 @@
       }
     }
   },
-  "goHome": "Go Home"
+  "goHome": "Go Home",
+
+  "resetToDefault30s": "Reset to default (30s)",
+  "autoFilteringVoiceMemos": "Auto-filtering voice memos • Custom paths",
+  "manageExcludedDirectories": "Manage excluded directories",
+  "scanningStorage": "Scanning storage…",
+  "lastScanTracks": "Last scan: {count} tracks",
+  "@lastScanTracks": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scanDeviceStorageForAudio": "Scan device storage for audio",
+  "removeMissingFiles": "Remove missing files",
+  "removeMissingFilesSubtitle": "Delete indexed tracks whose files no longer exist",
+  "removeMissingFilesConfirmTitle": "Remove missing files?",
+  "removeMissingFilesConfirmBody": "This permanently deletes indexed tracks whose files no longer exist on disk.",
+  "remove": "Remove",
+  "removedMissingTracks": "{count, plural, =0{No missing files found} =1{Removed 1 missing track} other{Removed {count} missing tracks}}",
+  "@removedMissingTracks": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "artworkCache": "Artwork Cache",
+  "calculating": "Calculating…",
+  "cacheUsedOfMax": "{used} used of {max} MB max",
+  "@cacheUsedOfMax": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "clear": "Clear",
+  "artworkCacheCleared": "Artwork cache cleared successfully",
+  "youtubeStreamDiskCache": "YouTube Stream Disk Cache",
+  "streamCacheCachedForReplay": "{size} cached for zero-latency replay",
+  "@streamCacheCachedForReplay": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "streamCacheCleared": "Stream cache cleared successfully",
+  "maximumArtworkCacheLimit": "Maximum Artwork Cache Limit",
+  "maxMbAutoEvicts": "{max} MB • Auto-evicts oldest artworks when full",
+  "@maxMbAutoEvicts": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "maximumCacheSize": "Maximum Cache Size",
+  "mbValue": "{mb} MB",
+  "@mbValue": {
+    "placeholders": {
+      "mb": {
+        "type": "int"
+      }
+    }
+  },
+  "scrobblerSettings": "Scrobbler Settings",
+  "listenBrainzRestScrobbler": "ListenBrainz REST Scrobbler",
+  "enableListenBrainz": "Enable ListenBrainz",
+  "userToken": "User Token",
+  "enterListenBrainzUserToken": "Enter ListenBrainz User Token",
+  "lastFmRestScrobbler": "Last.fm REST Scrobbler",
+  "enableLastFmDirectScrobbling": "Enable Last.fm Direct Scrobbling",
+  "lastFmApiKey": "Last.fm API Key",
+  "lastFmSharedSecret": "Last.fm Shared Secret",
+  "lastFmSessionKey": "Last.fm Session Key (sk)",
+  "scrobblerConfigSaved": "Scrobbler configuration saved!",
+  "saveSettings": "Save Settings",
+  "youtubeMusicWeb": "YouTube Music Web",
+  "selectPageToOpen": "Select a page to open in the in-app browser",
+  "homePage": "Home Page",
+  "homePageSubtitle": "Personalized recommendations, mixes & quick picks",
+  "youtubeWeb": "YouTube Web",
+  "youtubeWebSubtitle": "Browse all music videos & playlists (no geo-restrictions)",
+  "exploreAndCharts": "Explore & Charts",
+  "exploreAndChartsSubtitle": "Trending songs, top global charts & music videos",
+  "yourLibrary": "Your Library",
+  "yourLibrarySubtitle": "Saved playlists, albums, songs & subscribed artists",
+  "likedMusic": "Liked Music",
+  "likedMusicSubtitle": "Thumbed-up songs synced with your Google account",
+  "newReleases": "New Releases",
+  "newReleasesSubtitle": "Latest album drops, EPs and trending single releases",
+  "listeningHistory": "Listening History",
+  "listeningHistorySubtitle": "Recently played tracks and stations on your account",
+  "bySongs": "By Songs",
+  "endOfTrack": "End of track",
+  "endOfQueue": "End of queue",
+  "songsCount": "{count, plural, =1{1 song} other{{count} songs}}",
+  "@songsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "musicWillStopEndOfTrack": "Music will stop at the end of this track",
+  "musicWillStopAfterSongs": "{count, plural, =1{Music will stop after 1 song} other{Music will stop after {count} songs}}",
+  "@musicWillStopAfterSongs": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "musicWillStopEndOfQueue": "Music will stop at the end of the queue",
+  "musicWillStopIn": "Music will stop in {minutes}m {seconds}s",
+  "@musicWillStopIn": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      },
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "rcStackWithHeadphoneEq": "Stack with headphone AutoEQ",
+  "rcStackWithHeadphoneEqSubtitle": "Combine this room correction with the selected headphone profile.",
+  "rcMeasuredResponse": "Measured Response",
+  "rcFittedEqGain": "Fitted EQ Gain",
+  "fetchMissingArtworkTitle": "Fetch Missing Artwork?",
+  "fetchMissingArtworkBody": "Pulsr will look up albums without artwork online and save the results to your library. This needs an internet connection.",
+  "fetchArtwork": "Fetch Artwork",
+  "artworkServiceUnavailable": "Artwork service is unavailable",
+  "noMissingArtworkFound": "No missing artwork found online",
+  "updatedArtworkForAlbums": "{count, plural, =1{Updated artwork for 1 album} other{Updated artwork for {count} albums}}",
+  "@updatedArtworkForAlbums": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "keepThisOne": "Keep this one",
+  "markAsCopyToKeep": "Mark \"{title}\" as the copy to keep",
+  "@markAsCopyToKeep": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteFile": "Delete file",
+  "removeFromDevice": "Remove \"{title}\" from your device",
+  "@removeFromDevice": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "keepingTitle": "Keeping \"{title}\"",
+  "@keepingTitle": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteThisFile": "Delete this file?",
+  "deleteFileConfirmBody": "\"{title}\" will be permanently removed from your device. This cannot be undone.",
+  "@deleteFileConfirmBody": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteIsUnavailable": "Delete is unavailable right now",
+  "failedToDelete": "Failed to delete: {message}",
+  "@failedToDelete": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "deletedTitle": "Deleted \"{title}\"",
+  "@deletedTitle": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "duplicateCleaner": "Duplicate Cleaner",
+  "fetchMissingArtworkTooltip": "Fetch missing artwork",
+  "noDuplicatesFound": "No Duplicates Found!",
+  "libraryCleanlyOrganized": "Your library is cleanly organized.",
+  "kept": "Kept",
+  "resolveDuplicate": "Resolve duplicate",
+  "sleepTimerMinutes": "{minutes} min",
+  "@sleepTimerMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  }
 }

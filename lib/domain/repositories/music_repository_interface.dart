@@ -22,6 +22,30 @@ abstract class IMusicRepository {
     int? offset,
   });
 
+  /// Path-only listing of local songs. Folder aggregation uses this instead of
+  /// [getAllSongs] so it never materializes full song rows. The production
+  /// repository overrides this with a column-projected query.
+  Future<Result<List<String>>> getLocalSongPaths() async {
+    final res = await getAllSongs();
+    return res.map((songs) => songs
+        .where((s) =>
+            s.source == SongSource.local && !s.path.startsWith('ytmusic://'))
+        .map((s) => s.path)
+        .toList());
+  }
+
+  /// Songs directly inside [folderPath] (not recursive). The production
+  /// repository overrides this with a SQL prefix filter to avoid watching the
+  /// whole table.
+  Stream<Result<List<SongsTableData>>> watchSongsInFolder(String folderPath) {
+    final target = _normalizeDir(folderPath);
+    return watchAllSongs().map((result) => result.map((songs) => songs
+        .where((s) =>
+            s.source == SongSource.local &&
+            _normalizeDir(_parentDir(s.path)) == target)
+        .toList()));
+  }
+
   Future<Result<SongsTableData?>> getSongById(int id);
   Future<Result<SongsTableData?>> getSongByPath(String path);
   Future<Result<SongsTableData?>> getSongByUri(String uri);
@@ -141,4 +165,14 @@ abstract class IMusicRepository {
   // --- YEARS ---
   Stream<Result<List<YearItem>>> watchYears();
   Stream<Result<List<SongsTableData>>> watchYearSongs(int year);
+}
+
+String _normalizeDir(String path) =>
+    path.replaceAll('\\', '/').toLowerCase().trim();
+
+String _parentDir(String path) {
+  final slash = path.lastIndexOf('/');
+  final backslash = path.lastIndexOf('\\');
+  final i = slash > backslash ? slash : backslash;
+  return i <= 0 ? path : path.substring(0, i);
 }

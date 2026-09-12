@@ -5,6 +5,7 @@ import '../../../core/di/injection.dart';
 import '../../../core/services/duplicate_finder_service.dart';
 import '../../../core/services/missing_artwork_service.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/widgets/pulsr_toast.dart';
@@ -55,26 +56,27 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
 
   Future<void> _fetchMissingArtwork() async {
     final p = context.palette;
+    final l10n = context.l10n;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: p.surface,
         title: Text(
-          'Fetch Missing Artwork?',
+          l10n.fetchMissingArtworkTitle,
           style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.bold),
         ),
         content: Text(
-          'Pulsr will look up albums without artwork online and save the results to your library. This needs an internet connection.',
+          l10n.fetchMissingArtworkBody,
           style: TextStyle(color: p.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel', style: TextStyle(color: p.textSecondary)),
+            child: Text(l10n.cancel, style: TextStyle(color: p.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Fetch Artwork'),
+            child: Text(l10n.fetchArtwork),
           ),
         ],
       ),
@@ -82,7 +84,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     if (confirmed != true || !mounted) return;
     if (!getIt.isRegistered<MissingArtworkService>()) {
       PulsrToast.show(context,
-          message: 'Artwork service is unavailable', isError: true);
+          message: l10n.artworkServiceUnavailable, isError: true);
       return;
     }
     setState(() => _isFetchingArtwork = true);
@@ -93,8 +95,8 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     PulsrToast.show(
       context,
       message: count == 0
-          ? 'No missing artwork found online'
-          : 'Updated artwork for $count album${count == 1 ? '' : 's'}',
+          ? l10n.noMissingArtworkFound
+          : l10n.updatedArtworkForAlbums(count),
       icon: Icons.image_rounded,
     );
   }
@@ -102,6 +104,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
   Future<void> _showResolveSheet(
       DuplicateGroup group, SongsTableData song) async {
     final p = context.palette;
+    final l10n = context.l10n;
     final action = await showModalBottomSheet<_ResolveAction>(
       context: context,
       backgroundColor: p.surfaceCard,
@@ -115,10 +118,10 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
             ListTile(
               leading:
                   Icon(Icons.check_circle_outline_rounded, color: p.accent),
-              title:
-                  Text('Keep this one', style: TextStyle(color: p.textPrimary)),
+              title: Text(l10n.keepThisOne,
+                  style: TextStyle(color: p.textPrimary)),
               subtitle: Text(
-                'Mark "${song.title}" as the copy to keep',
+                l10n.markAsCopyToKeep(song.title),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(color: p.textSecondary),
@@ -127,9 +130,9 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
             ),
             ListTile(
               leading: Icon(Icons.delete_outline_rounded, color: p.error),
-              title: Text('Delete file', style: TextStyle(color: p.error)),
+              title: Text(l10n.deleteFile, style: TextStyle(color: p.error)),
               subtitle: Text(
-                'Remove "${song.title}" from your device',
+                l10n.removeFromDevice(song.title),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(color: p.textSecondary),
@@ -151,27 +154,29 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
   void _keepSong(DuplicateGroup group, SongsTableData song) {
     setState(() => _keptSongByGroup[group.key] = song.id);
     PulsrToast.show(context,
-        message: 'Keeping "${song.title}"', icon: Icons.check_circle_rounded);
+        message: context.l10n.keepingTitle(song.title),
+        icon: Icons.check_circle_rounded);
   }
 
   Future<void> _confirmDelete(DuplicateGroup group, SongsTableData song) async {
     final p = context.palette;
+    final l10n = context.l10n;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: p.surface,
         title: Text(
-          'Delete this file?',
+          l10n.deleteThisFile,
           style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.bold),
         ),
         content: Text(
-          '"${song.title}" will be permanently removed from your device. This cannot be undone.',
+          l10n.deleteFileConfirmBody(song.title),
           style: TextStyle(color: p.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel', style: TextStyle(color: p.textSecondary)),
+            child: Text(l10n.cancel, style: TextStyle(color: p.textSecondary)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -179,7 +184,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -189,16 +194,17 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
   }
 
   Future<void> _deleteSong(DuplicateGroup group, SongsTableData song) async {
+    final l10n = context.l10n;
     if (!getIt.isRegistered<IMusicRepository>()) {
       PulsrToast.show(context,
-          message: 'Delete is unavailable right now', isError: true);
+          message: l10n.deleteIsUnavailable, isError: true);
       return;
     }
     final res = await getIt<IMusicRepository>().deleteSongs([song.id]);
     if (!mounted) return;
     res.fold(
       (failure) => PulsrToast.show(context,
-          message: 'Failed to delete: ${failure.message}', isError: true),
+          message: l10n.failedToDelete(failure.message), isError: true),
       (_) {
         setState(() {
           _duplicateGroups = _duplicateGroups
@@ -214,7 +220,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
           }
         });
         PulsrToast.show(context,
-            message: 'Deleted "${song.title}"',
+            message: l10n.deletedTitle(song.title),
             icon: Icons.delete_outline_rounded);
       },
     );
@@ -232,7 +238,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
           elevation: 0,
           leading: const PulsrBackButton(),
           title: Text(
-            'Duplicate Cleaner',
+            context.l10n.duplicateCleaner,
             style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.bold),
           ),
           actions: [
@@ -247,12 +253,12 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                       ),
                     )
                   : Icon(Icons.image_search_rounded, color: p.textPrimary),
-              tooltip: 'Fetch missing artwork',
+              tooltip: context.l10n.fetchMissingArtworkTooltip,
               onPressed: _isFetchingArtwork ? null : _fetchMissingArtwork,
             ),
             IconButton(
               icon: Icon(Icons.refresh_rounded, color: p.textPrimary),
-              tooltip: 'Rescan',
+              tooltip: context.l10n.rescanLibrary,
               onPressed: _isScanning ? null : _scan,
             ),
           ],
@@ -286,7 +292,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
           Icon(Icons.check_circle_outline_rounded, size: 64, color: p.accent),
           const SizedBox(height: 16),
           Text(
-            'No Duplicates Found!',
+            context.l10n.noDuplicatesFound,
             textAlign: TextAlign.center,
             style: TextStyle(
                 fontSize: 18,
@@ -295,7 +301,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Your library is cleanly organized.',
+            context.l10n.libraryCleanlyOrganized,
             textAlign: TextAlign.center,
             style: TextStyle(color: p.textSecondary, fontSize: 13),
           ),
@@ -343,7 +349,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '${group.songs.length} Tracks',
+                      context.l10n.tracksCount(group.songs.length),
                       style: TextStyle(fontSize: 11, color: p.textSecondary),
                     ),
                   ),
@@ -367,7 +373,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            'Kept',
+                            context.l10n.kept,
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
@@ -378,7 +384,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                       PopupMenuButton<_ResolveAction>(
                         icon: Icon(Icons.more_vert_rounded,
                             size: 20, color: p.textTertiary),
-                        tooltip: 'Resolve duplicate',
+                        tooltip: context.l10n.resolveDuplicate,
                         onSelected: (action) {
                           if (action == _ResolveAction.keep) {
                             _keepSong(group, song);
@@ -394,7 +400,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                                 Icon(Icons.check_circle_outline_rounded,
                                     size: 20, color: p.accent),
                                 const SizedBox(width: 12),
-                                const Text('Keep this one'),
+                                Text(context.l10n.keepThisOne),
                               ],
                             ),
                           ),
@@ -405,7 +411,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                                 Icon(Icons.delete_outline_rounded,
                                     size: 20, color: p.error),
                                 const SizedBox(width: 12),
-                                const Text('Delete file'),
+                                Text(context.l10n.deleteFile),
                               ],
                             ),
                           ),

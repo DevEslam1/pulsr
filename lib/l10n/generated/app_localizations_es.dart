@@ -1510,4 +1510,346 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get goHome => 'Ir al inicio';
+
+  @override
+  String get resetToDefault30s => 'Restablecer a predeterminado (30 s)';
+
+  @override
+  String get autoFilteringVoiceMemos =>
+      'Filtrado automático de notas de voz • Rutas personalizadas';
+
+  @override
+  String get manageExcludedDirectories => 'Gestionar directorios excluidos';
+
+  @override
+  String get scanningStorage => 'Escaneando almacenamiento…';
+
+  @override
+  String lastScanTracks(int count) {
+    return 'Último escaneo: $count pistas';
+  }
+
+  @override
+  String get scanDeviceStorageForAudio =>
+      'Escanear el almacenamiento del dispositivo para buscar audio';
+
+  @override
+  String get removeMissingFiles => 'Eliminar archivos faltantes';
+
+  @override
+  String get removeMissingFilesSubtitle =>
+      'Eliminar pistas indexadas cuyos archivos ya no existen';
+
+  @override
+  String get removeMissingFilesConfirmTitle => '¿Eliminar archivos faltantes?';
+
+  @override
+  String get removeMissingFilesConfirmBody =>
+      'Esto elimina permanentemente las pistas indexadas cuyos archivos ya no existen en el disco.';
+
+  @override
+  String get remove => 'Eliminar';
+
+  @override
+  String removedMissingTracks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Se eliminaron $count pistas faltantes',
+      one: 'Se eliminó 1 pista faltante',
+      zero: 'No se encontraron archivos faltantes',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get artworkCache => 'Caché de portadas';
+
+  @override
+  String get calculating => 'Calculando…';
+
+  @override
+  String cacheUsedOfMax(String used, int max) {
+    return '$used usados de $max MB máx.';
+  }
+
+  @override
+  String get clear => 'Limpiar';
+
+  @override
+  String get artworkCacheCleared => 'Caché de portadas borrada correctamente';
+
+  @override
+  String get youtubeStreamDiskCache =>
+      'Caché en disco de transmisión de YouTube';
+
+  @override
+  String streamCacheCachedForReplay(String size) {
+    return '$size en caché para reproducción sin latencia';
+  }
+
+  @override
+  String get streamCacheCleared => 'Caché de transmisión borrada correctamente';
+
+  @override
+  String get maximumArtworkCacheLimit => 'Límite máximo de caché de portadas';
+
+  @override
+  String maxMbAutoEvicts(int max) {
+    return '$max MB • Elimina automáticamente las portadas más antiguas al llenarse';
+  }
+
+  @override
+  String get maximumCacheSize => 'Tamaño máximo de caché';
+
+  @override
+  String mbValue(int mb) {
+    return '$mb MB';
+  }
+
+  @override
+  String get scrobblerSettings => 'Ajustes de Scrobbler';
+
+  @override
+  String get listenBrainzRestScrobbler => 'Scrobbler REST de ListenBrainz';
+
+  @override
+  String get enableListenBrainz => 'Activar ListenBrainz';
+
+  @override
+  String get userToken => 'Token de usuario';
+
+  @override
+  String get enterListenBrainzUserToken =>
+      'Introduce el token de usuario de ListenBrainz';
+
+  @override
+  String get lastFmRestScrobbler => 'Scrobbler REST de Last.fm';
+
+  @override
+  String get enableLastFmDirectScrobbling =>
+      'Activar scrobbling directo de Last.fm';
+
+  @override
+  String get lastFmApiKey => 'Clave API de Last.fm';
+
+  @override
+  String get lastFmSharedSecret => 'Secreto compartido de Last.fm';
+
+  @override
+  String get lastFmSessionKey => 'Clave de sesión de Last.fm (sk)';
+
+  @override
+  String get scrobblerConfigSaved => '¡Configuración de Scrobbler guardada!';
+
+  @override
+  String get saveSettings => 'Guardar ajustes';
+
+  @override
+  String get youtubeMusicWeb => 'YouTube Music Web';
+
+  @override
+  String get selectPageToOpen =>
+      'Selecciona una página para abrir en el navegador integrado';
+
+  @override
+  String get homePage => 'Página de inicio';
+
+  @override
+  String get homePageSubtitle =>
+      'Recomendaciones personalizadas, mezclas y selecciones rápidas';
+
+  @override
+  String get youtubeWeb => 'YouTube Web';
+
+  @override
+  String get youtubeWebSubtitle =>
+      'Explora todos los videos musicales y listas (sin restricciones geográficas)';
+
+  @override
+  String get exploreAndCharts => 'Explorar y listas';
+
+  @override
+  String get exploreAndChartsSubtitle =>
+      'Canciones en tendencia, mejores listas globales y videos musicales';
+
+  @override
+  String get yourLibrary => 'Tu biblioteca';
+
+  @override
+  String get yourLibrarySubtitle =>
+      'Listas guardadas, álbumes, canciones y artistas suscritos';
+
+  @override
+  String get likedMusic => 'Música que te gusta';
+
+  @override
+  String get likedMusicSubtitle =>
+      'Canciones que te gustan sincronizadas con tu cuenta de Google';
+
+  @override
+  String get newReleases => 'Novedades';
+
+  @override
+  String get newReleasesSubtitle =>
+      'Últimos lanzamientos de álbumes, EPs y sencillos en tendencia';
+
+  @override
+  String get listeningHistory => 'Historial de escucha';
+
+  @override
+  String get listeningHistorySubtitle =>
+      'Pistas y estaciones reproducidas recientemente en tu cuenta';
+
+  @override
+  String get bySongs => 'Por canciones';
+
+  @override
+  String get endOfTrack => 'Fin de la pista';
+
+  @override
+  String get endOfQueue => 'Fin de la cola';
+
+  @override
+  String songsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count canciones',
+      one: '1 canción',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get musicWillStopEndOfTrack =>
+      'La música se detendrá al final de esta pista';
+
+  @override
+  String musicWillStopAfterSongs(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'La música se detendrá después de $count canciones',
+      one: 'La música se detendrá después de 1 canción',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get musicWillStopEndOfQueue =>
+      'La música se detendrá al final de la cola';
+
+  @override
+  String musicWillStopIn(int minutes, int seconds) {
+    return 'La música se detendrá en $minutes min $seconds s';
+  }
+
+  @override
+  String get rcStackWithHeadphoneEq => 'Combinar con AutoEQ de auriculares';
+
+  @override
+  String get rcStackWithHeadphoneEqSubtitle =>
+      'Combina esta corrección de sala con el perfil de auriculares seleccionado.';
+
+  @override
+  String get rcMeasuredResponse => 'Respuesta medida';
+
+  @override
+  String get rcFittedEqGain => 'Ganancia de EQ ajustada';
+
+  @override
+  String get fetchMissingArtworkTitle => '¿Obtener portadas faltantes?';
+
+  @override
+  String get fetchMissingArtworkBody =>
+      'Pulsr buscará en línea álbumes sin portada y guardará los resultados en tu biblioteca. Esto requiere conexión a internet.';
+
+  @override
+  String get fetchArtwork => 'Obtener portadas';
+
+  @override
+  String get artworkServiceUnavailable =>
+      'El servicio de portadas no está disponible';
+
+  @override
+  String get noMissingArtworkFound =>
+      'No se encontraron portadas faltantes en línea';
+
+  @override
+  String updatedArtworkForAlbums(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Portadas actualizadas para $count álbumes',
+      one: 'Portada actualizada para 1 álbum',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get keepThisOne => 'Conservar esta';
+
+  @override
+  String markAsCopyToKeep(String title) {
+    return 'Marcar \"$title\" como la copia a conservar';
+  }
+
+  @override
+  String get deleteFile => 'Eliminar archivo';
+
+  @override
+  String removeFromDevice(String title) {
+    return 'Eliminar \"$title\" de tu dispositivo';
+  }
+
+  @override
+  String keepingTitle(String title) {
+    return 'Conservando \"$title\"';
+  }
+
+  @override
+  String get deleteThisFile => '¿Eliminar este archivo?';
+
+  @override
+  String deleteFileConfirmBody(String title) {
+    return '\"$title\" se eliminará permanentemente de tu dispositivo. Esta acción no se puede deshacer.';
+  }
+
+  @override
+  String get deleteIsUnavailable =>
+      'La eliminación no está disponible en este momento';
+
+  @override
+  String failedToDelete(String message) {
+    return 'Error al eliminar: $message';
+  }
+
+  @override
+  String deletedTitle(String title) {
+    return 'Se eliminó \"$title\"';
+  }
+
+  @override
+  String get duplicateCleaner => 'Limpiador de duplicados';
+
+  @override
+  String get fetchMissingArtworkTooltip => 'Obtener portadas faltantes';
+
+  @override
+  String get noDuplicatesFound => '¡No se encontraron duplicados!';
+
+  @override
+  String get libraryCleanlyOrganized => 'Tu biblioteca está bien organizada.';
+
+  @override
+  String get kept => 'Conservada';
+
+  @override
+  String get resolveDuplicate => 'Resolver duplicado';
+
+  @override
+  String sleepTimerMinutes(int minutes) {
+    return '$minutes min';
+  }
 }

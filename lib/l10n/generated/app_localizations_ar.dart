@@ -1508,4 +1508,353 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get goHome => 'العودة إلى الرئيسية';
+
+  @override
+  String get resetToDefault30s => 'إعادة التعيين إلى الافتراضي (٣٠ ث)';
+
+  @override
+  String get autoFilteringVoiceMemos =>
+      'تصفية تلقائية للملاحظات الصوتية • مسارات مخصصة';
+
+  @override
+  String get manageExcludedDirectories => 'إدارة الأدلة المستبعدة';
+
+  @override
+  String get scanningStorage => 'جارٍ فحص وحدة التخزين…';
+
+  @override
+  String lastScanTracks(int count) {
+    return 'آخر فحص: $count مسار';
+  }
+
+  @override
+  String get scanDeviceStorageForAudio =>
+      'فحص وحدة تخزين الجهاز بحثًا عن الملفات الصوتية';
+
+  @override
+  String get removeMissingFiles => 'إزالة الملفات المفقودة';
+
+  @override
+  String get removeMissingFilesSubtitle =>
+      'حذف المقاطع المفهرسة التي لم تعد ملفاتها موجودة';
+
+  @override
+  String get removeMissingFilesConfirmTitle => 'إزالة الملفات المفقودة؟';
+
+  @override
+  String get removeMissingFilesConfirmBody =>
+      'سيؤدي هذا إلى حذف المقاطع المفهرسة نهائيًا التي لم تعد ملفاتها موجودة على القرص.';
+
+  @override
+  String get remove => 'إزالة';
+
+  @override
+  String removedMissingTracks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تمت إزالة $count مسار مفقود',
+      many: 'تمت إزالة $count مسارًا مفقودًا',
+      few: 'تمت إزالة $count مسارات مفقودة',
+      two: 'تمت إزالة مسارين مفقودين',
+      one: 'تمت إزالة مسار واحد مفقود',
+      zero: 'لم يتم العثور على ملفات مفقودة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get artworkCache => 'ذاكرة الأغلفة المؤقتة';
+
+  @override
+  String get calculating => 'جارٍ الحساب…';
+
+  @override
+  String cacheUsedOfMax(String used, int max) {
+    return '$used مستخدمة من أصل $max ميجابايت كحد أقصى';
+  }
+
+  @override
+  String get clear => 'مسح';
+
+  @override
+  String get artworkCacheCleared => 'تم مسح ذاكرة الأغلفة المؤقتة بنجاح';
+
+  @override
+  String get youtubeStreamDiskCache => 'ذاكرة التخزين المؤقت لبث يوتيوب';
+
+  @override
+  String streamCacheCachedForReplay(String size) {
+    return '$size مخزّنة مؤقتًا للتشغيل بدون تأخير';
+  }
+
+  @override
+  String get streamCacheCleared => 'تم مسح ذاكرة البث المؤقتة بنجاح';
+
+  @override
+  String get maximumArtworkCacheLimit => 'الحد الأقصى لذاكرة الأغلفة المؤقتة';
+
+  @override
+  String maxMbAutoEvicts(int max) {
+    return '$max ميجابايت • يزيل الأغلفة الأقدم تلقائيًا عند الامتلاء';
+  }
+
+  @override
+  String get maximumCacheSize => 'الحد الأقصى لحجم الذاكرة المؤقتة';
+
+  @override
+  String mbValue(int mb) {
+    return '$mb ميجابايت';
+  }
+
+  @override
+  String get scrobblerSettings => 'إعدادات السكروب';
+
+  @override
+  String get listenBrainzRestScrobbler => 'سكروبلر ListenBrainz REST';
+
+  @override
+  String get enableListenBrainz => 'تفعيل ListenBrainz';
+
+  @override
+  String get userToken => 'رمز المستخدم';
+
+  @override
+  String get enterListenBrainzUserToken => 'أدخل رمز مستخدم ListenBrainz';
+
+  @override
+  String get lastFmRestScrobbler => 'سكروبلر Last.fm REST';
+
+  @override
+  String get enableLastFmDirectScrobbling =>
+      'تفعيل السكروبلر المباشر لـ Last.fm';
+
+  @override
+  String get lastFmApiKey => 'مفتاح API لـ Last.fm';
+
+  @override
+  String get lastFmSharedSecret => 'السر المشترك لـ Last.fm';
+
+  @override
+  String get lastFmSessionKey => 'مفتاح جلسة Last.fm (sk)';
+
+  @override
+  String get scrobblerConfigSaved => 'تم حفظ إعدادات السكروب!';
+
+  @override
+  String get saveSettings => 'حفظ الإعدادات';
+
+  @override
+  String get youtubeMusicWeb => 'يوتيوب ميوزك ويب';
+
+  @override
+  String get selectPageToOpen => 'اختر صفحة لفتحها في المتصفح المدمج';
+
+  @override
+  String get homePage => 'الصفحة الرئيسية';
+
+  @override
+  String get homePageSubtitle => 'توصيات مخصصة ومزيجات واختيارات سريعة';
+
+  @override
+  String get youtubeWeb => 'يوتيوب ويب';
+
+  @override
+  String get youtubeWebSubtitle =>
+      'تصفح جميع مقاطع الفيديو الموسيقية وقوائم التشغيل (بدون قيود جغرافية)';
+
+  @override
+  String get exploreAndCharts => 'استكشاف وتريندات';
+
+  @override
+  String get exploreAndChartsSubtitle =>
+      'الأغاني الرائجة وأفضل القوائم العالمية ومقاطع الفيديو';
+
+  @override
+  String get yourLibrary => 'مكتبتك';
+
+  @override
+  String get yourLibrarySubtitle =>
+      'قوائم التشغيل والألبومات والأغاني والفنانون المشتركون';
+
+  @override
+  String get likedMusic => 'الموسيقى التي أعجبتك';
+
+  @override
+  String get likedMusicSubtitle =>
+      'الأغاني التي أعجبتك والمتزامنة مع حساب Google';
+
+  @override
+  String get newReleases => 'الإصدارات الجديدة';
+
+  @override
+  String get newReleasesSubtitle =>
+      'أحدث الألبومات والأسطوانات القصيرة والأغاني الفردية الرائجة';
+
+  @override
+  String get listeningHistory => 'سجل الاستماع';
+
+  @override
+  String get listeningHistorySubtitle =>
+      'المقاطع والمحطات التي تم تشغيلها مؤخرًا في حسابك';
+
+  @override
+  String get bySongs => 'حسب عدد الأغاني';
+
+  @override
+  String get endOfTrack => 'نهاية المقطع';
+
+  @override
+  String get endOfQueue => 'نهاية قائمة الانتظار';
+
+  @override
+  String songsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count أغنية',
+      many: '$count أغنية',
+      few: '$count أغانٍ',
+      two: 'أغنيتان',
+      one: 'أغنية واحدة',
+      zero: '٠ أغانٍ',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get musicWillStopEndOfTrack => 'ستتوقف الموسيقى عند نهاية هذا المقطع';
+
+  @override
+  String musicWillStopAfterSongs(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'ستتوقف الموسيقى بعد $count أغنية',
+      many: 'ستتوقف الموسيقى بعد $count أغنية',
+      few: 'ستتوقف الموسيقى بعد $count أغانٍ',
+      two: 'ستتوقف الموسيقى بعد أغنيتين',
+      one: 'ستتوقف الموسيقى بعد أغنية واحدة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get musicWillStopEndOfQueue =>
+      'ستتوقف الموسيقى عند نهاية قائمة الانتظار';
+
+  @override
+  String musicWillStopIn(int minutes, int seconds) {
+    return 'ستتوقف الموسيقى خلال $minutes د $seconds ث';
+  }
+
+  @override
+  String get rcStackWithHeadphoneEq => 'دمج مع AutoEQ للسماعات';
+
+  @override
+  String get rcStackWithHeadphoneEqSubtitle =>
+      'ادمج تصحيح الغرفة هذا مع ملف تعريف السماعات المحدد.';
+
+  @override
+  String get rcMeasuredResponse => 'الاستجابة المقاسة';
+
+  @override
+  String get rcFittedEqGain => 'كسب المعادل المطابق';
+
+  @override
+  String get fetchMissingArtworkTitle => 'جلب الأغلفة المفقودة؟';
+
+  @override
+  String get fetchMissingArtworkBody =>
+      'سيبحث Pulsr عبر الإنترنت عن الألبومات التي تفتقد الأغلفة ويحفظ النتائج في مكتبتك. يتطلب ذلك اتصالًا بالإنترنت.';
+
+  @override
+  String get fetchArtwork => 'جلب الأغلفة';
+
+  @override
+  String get artworkServiceUnavailable => 'خدمة الأغلفة غير متوفرة';
+
+  @override
+  String get noMissingArtworkFound =>
+      'لم يتم العثور على أغلفة مفقودة عبر الإنترنت';
+
+  @override
+  String updatedArtworkForAlbums(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تم تحديث أغلفة $count ألبوم',
+      many: 'تم تحديث أغلفة $count ألبومًا',
+      few: 'تم تحديث أغلفة $count ألبومات',
+      two: 'تم تحديث غلافي ألبومين',
+      one: 'تم تحديث غلاف ألبوم واحد',
+      zero: 'لم يتم تحديث أي غلاف',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get keepThisOne => 'الاحتفاظ بهذا';
+
+  @override
+  String markAsCopyToKeep(String title) {
+    return 'وضع علامة على \"$title\" كالنسخة المحفوظة';
+  }
+
+  @override
+  String get deleteFile => 'حذف الملف';
+
+  @override
+  String removeFromDevice(String title) {
+    return 'إزالة \"$title\" من جهازك';
+  }
+
+  @override
+  String keepingTitle(String title) {
+    return 'الاحتفاظ بـ \"$title\"';
+  }
+
+  @override
+  String get deleteThisFile => 'حذف هذا الملف؟';
+
+  @override
+  String deleteFileConfirmBody(String title) {
+    return 'سيتم حذف \"$title\" نهائيًا من جهازك. لا يمكن التراجع عن هذا الإجراء.';
+  }
+
+  @override
+  String get deleteIsUnavailable => 'الحذف غير متاح الآن';
+
+  @override
+  String failedToDelete(String message) {
+    return 'فشل الحذف: $message';
+  }
+
+  @override
+  String deletedTitle(String title) {
+    return 'تم حذف \"$title\"';
+  }
+
+  @override
+  String get duplicateCleaner => 'منظف المكررات';
+
+  @override
+  String get fetchMissingArtworkTooltip => 'جلب الأغلفة المفقودة';
+
+  @override
+  String get noDuplicatesFound => 'لم يتم العثور على مكررات!';
+
+  @override
+  String get libraryCleanlyOrganized => 'مكتبتك منظمة بشكل جيد.';
+
+  @override
+  String get kept => 'محفوظ';
+
+  @override
+  String get resolveDuplicate => 'حل التكرار';
+
+  @override
+  String sleepTimerMinutes(int minutes) {
+    return '$minutes د';
+  }
 }

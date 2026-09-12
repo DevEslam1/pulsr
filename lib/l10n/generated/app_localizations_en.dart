@@ -1500,4 +1500,338 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get goHome => 'Go Home';
+
+  @override
+  String get resetToDefault30s => 'Reset to default (30s)';
+
+  @override
+  String get autoFilteringVoiceMemos =>
+      'Auto-filtering voice memos • Custom paths';
+
+  @override
+  String get manageExcludedDirectories => 'Manage excluded directories';
+
+  @override
+  String get scanningStorage => 'Scanning storage…';
+
+  @override
+  String lastScanTracks(int count) {
+    return 'Last scan: $count tracks';
+  }
+
+  @override
+  String get scanDeviceStorageForAudio => 'Scan device storage for audio';
+
+  @override
+  String get removeMissingFiles => 'Remove missing files';
+
+  @override
+  String get removeMissingFilesSubtitle =>
+      'Delete indexed tracks whose files no longer exist';
+
+  @override
+  String get removeMissingFilesConfirmTitle => 'Remove missing files?';
+
+  @override
+  String get removeMissingFilesConfirmBody =>
+      'This permanently deletes indexed tracks whose files no longer exist on disk.';
+
+  @override
+  String get remove => 'Remove';
+
+  @override
+  String removedMissingTracks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Removed $count missing tracks',
+      one: 'Removed 1 missing track',
+      zero: 'No missing files found',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get artworkCache => 'Artwork Cache';
+
+  @override
+  String get calculating => 'Calculating…';
+
+  @override
+  String cacheUsedOfMax(String used, int max) {
+    return '$used used of $max MB max';
+  }
+
+  @override
+  String get clear => 'Clear';
+
+  @override
+  String get artworkCacheCleared => 'Artwork cache cleared successfully';
+
+  @override
+  String get youtubeStreamDiskCache => 'YouTube Stream Disk Cache';
+
+  @override
+  String streamCacheCachedForReplay(String size) {
+    return '$size cached for zero-latency replay';
+  }
+
+  @override
+  String get streamCacheCleared => 'Stream cache cleared successfully';
+
+  @override
+  String get maximumArtworkCacheLimit => 'Maximum Artwork Cache Limit';
+
+  @override
+  String maxMbAutoEvicts(int max) {
+    return '$max MB • Auto-evicts oldest artworks when full';
+  }
+
+  @override
+  String get maximumCacheSize => 'Maximum Cache Size';
+
+  @override
+  String mbValue(int mb) {
+    return '$mb MB';
+  }
+
+  @override
+  String get scrobblerSettings => 'Scrobbler Settings';
+
+  @override
+  String get listenBrainzRestScrobbler => 'ListenBrainz REST Scrobbler';
+
+  @override
+  String get enableListenBrainz => 'Enable ListenBrainz';
+
+  @override
+  String get userToken => 'User Token';
+
+  @override
+  String get enterListenBrainzUserToken => 'Enter ListenBrainz User Token';
+
+  @override
+  String get lastFmRestScrobbler => 'Last.fm REST Scrobbler';
+
+  @override
+  String get enableLastFmDirectScrobbling => 'Enable Last.fm Direct Scrobbling';
+
+  @override
+  String get lastFmApiKey => 'Last.fm API Key';
+
+  @override
+  String get lastFmSharedSecret => 'Last.fm Shared Secret';
+
+  @override
+  String get lastFmSessionKey => 'Last.fm Session Key (sk)';
+
+  @override
+  String get scrobblerConfigSaved => 'Scrobbler configuration saved!';
+
+  @override
+  String get saveSettings => 'Save Settings';
+
+  @override
+  String get youtubeMusicWeb => 'YouTube Music Web';
+
+  @override
+  String get selectPageToOpen => 'Select a page to open in the in-app browser';
+
+  @override
+  String get homePage => 'Home Page';
+
+  @override
+  String get homePageSubtitle =>
+      'Personalized recommendations, mixes & quick picks';
+
+  @override
+  String get youtubeWeb => 'YouTube Web';
+
+  @override
+  String get youtubeWebSubtitle =>
+      'Browse all music videos & playlists (no geo-restrictions)';
+
+  @override
+  String get exploreAndCharts => 'Explore & Charts';
+
+  @override
+  String get exploreAndChartsSubtitle =>
+      'Trending songs, top global charts & music videos';
+
+  @override
+  String get yourLibrary => 'Your Library';
+
+  @override
+  String get yourLibrarySubtitle =>
+      'Saved playlists, albums, songs & subscribed artists';
+
+  @override
+  String get likedMusic => 'Liked Music';
+
+  @override
+  String get likedMusicSubtitle =>
+      'Thumbed-up songs synced with your Google account';
+
+  @override
+  String get newReleases => 'New Releases';
+
+  @override
+  String get newReleasesSubtitle =>
+      'Latest album drops, EPs and trending single releases';
+
+  @override
+  String get listeningHistory => 'Listening History';
+
+  @override
+  String get listeningHistorySubtitle =>
+      'Recently played tracks and stations on your account';
+
+  @override
+  String get bySongs => 'By Songs';
+
+  @override
+  String get endOfTrack => 'End of track';
+
+  @override
+  String get endOfQueue => 'End of queue';
+
+  @override
+  String songsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count songs',
+      one: '1 song',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get musicWillStopEndOfTrack =>
+      'Music will stop at the end of this track';
+
+  @override
+  String musicWillStopAfterSongs(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Music will stop after $count songs',
+      one: 'Music will stop after 1 song',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get musicWillStopEndOfQueue =>
+      'Music will stop at the end of the queue';
+
+  @override
+  String musicWillStopIn(int minutes, int seconds) {
+    return 'Music will stop in ${minutes}m ${seconds}s';
+  }
+
+  @override
+  String get rcStackWithHeadphoneEq => 'Stack with headphone AutoEQ';
+
+  @override
+  String get rcStackWithHeadphoneEqSubtitle =>
+      'Combine this room correction with the selected headphone profile.';
+
+  @override
+  String get rcMeasuredResponse => 'Measured Response';
+
+  @override
+  String get rcFittedEqGain => 'Fitted EQ Gain';
+
+  @override
+  String get fetchMissingArtworkTitle => 'Fetch Missing Artwork?';
+
+  @override
+  String get fetchMissingArtworkBody =>
+      'Pulsr will look up albums without artwork online and save the results to your library. This needs an internet connection.';
+
+  @override
+  String get fetchArtwork => 'Fetch Artwork';
+
+  @override
+  String get artworkServiceUnavailable => 'Artwork service is unavailable';
+
+  @override
+  String get noMissingArtworkFound => 'No missing artwork found online';
+
+  @override
+  String updatedArtworkForAlbums(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Updated artwork for $count albums',
+      one: 'Updated artwork for 1 album',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get keepThisOne => 'Keep this one';
+
+  @override
+  String markAsCopyToKeep(String title) {
+    return 'Mark \"$title\" as the copy to keep';
+  }
+
+  @override
+  String get deleteFile => 'Delete file';
+
+  @override
+  String removeFromDevice(String title) {
+    return 'Remove \"$title\" from your device';
+  }
+
+  @override
+  String keepingTitle(String title) {
+    return 'Keeping \"$title\"';
+  }
+
+  @override
+  String get deleteThisFile => 'Delete this file?';
+
+  @override
+  String deleteFileConfirmBody(String title) {
+    return '\"$title\" will be permanently removed from your device. This cannot be undone.';
+  }
+
+  @override
+  String get deleteIsUnavailable => 'Delete is unavailable right now';
+
+  @override
+  String failedToDelete(String message) {
+    return 'Failed to delete: $message';
+  }
+
+  @override
+  String deletedTitle(String title) {
+    return 'Deleted \"$title\"';
+  }
+
+  @override
+  String get duplicateCleaner => 'Duplicate Cleaner';
+
+  @override
+  String get fetchMissingArtworkTooltip => 'Fetch missing artwork';
+
+  @override
+  String get noDuplicatesFound => 'No Duplicates Found!';
+
+  @override
+  String get libraryCleanlyOrganized => 'Your library is cleanly organized.';
+
+  @override
+  String get kept => 'Kept';
+
+  @override
+  String get resolveDuplicate => 'Resolve duplicate';
+
+  @override
+  String sleepTimerMinutes(int minutes) {
+    return '$minutes min';
+  }
 }

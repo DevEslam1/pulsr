@@ -6,6 +6,7 @@ import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/l10n_extensions.dart';
+import '../../../core/utils/song_classification.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
@@ -36,17 +37,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     super.dispose();
   }
 
-  bool _isOnlineFavorite(SongsTableData s) {
-    // A downloaded local favorite stays Local; only true YouTube rows
-    // (streaming source or remote id without a local file) count as Online.
-    if (s.source == SongSource.youtube) {
-      final hasLocalFile = s.path.isNotEmpty &&
-          !s.path.startsWith('ytmusic://') &&
-          (s.path.startsWith('content:') || s.isDownloaded == true);
-      return !hasLocalFile;
-    }
-    return s.remoteId != null && s.remoteId!.isNotEmpty;
-  }
+  bool _isOnlineFavorite(SongsTableData s) => isOnlineFavorite(s);
 
   List<SongsTableData> _filterSongs(List<SongsTableData> songs) {
     if (_searchQuery.isEmpty) return songs;
