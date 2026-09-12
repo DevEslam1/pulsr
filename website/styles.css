@@ -2814,3 +2814,34 @@ a {
     }
 }
 
+/* Nav robustness for the expanded section link set */
+@media (max-width: 1320px) {
+    .nav-center {
+        gap: 0;
+    }
+
+    .nav-link {
+        padding: 6px 8px;
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 1160px) {
+    .nav-link {
+        padding: 6px 6px;
+        font-size: 0.76rem;
+    }
+}
+
+@media (max-width: 1040px) {
+    .nav-center {
+        overflow-x: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .nav-center::-webkit-scrollbar {
+        display: none;
+    }
+}
+

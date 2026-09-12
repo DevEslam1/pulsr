@@ -6,7 +6,7 @@
   ### Premium Offline-First Local Music Player for Android & Beyond
 
   <p align="center">
-    <strong>Studio-grade DSP • 10-Band AutoEQ • Synced LRC Lyrics • Dynamic Aura Theming • Offline-First & Private (Pulsr Pure)</strong>
+    <strong>Studio-grade DSP Suite • 10/32-Band AutoEQ • Room Correction • Synced LRC Lyrics • 8 Aura Themes • Offline-First &amp; Private (Pulsr Pure)</strong>
   </p>
 
   <p align="center">
@@ -34,7 +34,7 @@
 
 **Pulsr Music** is an audiophile-grade, offline-first music player engineered with Flutter, Dart, BLoC, and Drift SQLite. It strips away cloud bloat, algorithmic subscriptions, and privacy-invasive analytics to deliver an ultra-fast, local music playback experience with dynamic aesthetics and hardware-accelerated DSP.
 
-Whether you're listening to 24-bit/192kHz lossless FLAC albums or organizing your local MP3 catalog, Pulsr provides bit-perfect audio decoding, precision acoustic equalization, interactive karaoke lyrics, and a fluid Aura design system.
+Whether you're listening to 24-bit/192kHz lossless FLAC albums or organizing your local MP3 catalog, Pulsr provides bit-perfect audio decoding, a complete studio DSP chain (10/32-band EQ, spatializer, dynamics, convolution reverb and room correction), interactive karaoke lyrics, and a fluid Aura design system.
 
 ---
 
@@ -47,6 +47,8 @@ Pulsr comes with an interactive landing website located in [`website/`](website/
 - **Karaoke Lyrics Scroller**: Millisecond-synced lyrics with tap-to-seek preview.
 - **Audio Format Compatibility Matrix**: FLAC, ALAC, WAV, AAC, MP3, OPUS, and OGG.
 - **Direct APK & SHA-256 Download Hub**: Universal release verification.
+- **Complete DSP Suite Showcase**: Every stage of the audio chain, from 10/32-band EQ and room correction to spatializer, dynamics and convolution reverb.
+- **Editions, Library Tools & Sync**: Pulsr Pure vs Pulsr Plus, smart playlists, duplicate cleanup, and scrobbling/automation.
 
 > To preview the website locally, open [`website/index.html`](website/index.html) in any modern web browser or serve via `npx serve website` / GitHub Pages.
 
@@ -55,42 +57,49 @@ Pulsr comes with an interactive landing website located in [`website/`](website/
 ## ✨ Key Features
 
 ### 🎧 1. Audiophile Audio Engine & DSP
-- **10-Band Graphic Equalizer**: Precision ±12dB sliders spanning from 31Hz sub-bass up to 16kHz brilliance.
-- **AutoEQ Headphone Calibration**: Bundled compensation curves for industry-leading headphones (*Harman Target 2019/2018, Apple AirPods Pro, Sony WH-1000XM4/XM5, Sennheiser HD600, Beyerdynamic*).
-- **Acoustic Enhancement Suite**: Bass Boost, 3D Spatial Virtualizer, Preamp Gain adjustment, and Reverb simulation.
-- **Bit-Perfect Hi-Res Badging**: Real-time playback detection for sample rates (44.1kHz – 192kHz) and bit depths (16-bit, 24-bit, 32-bit float).
-- **Audiophile Playback Controls**: Gapless playback, crossfade transitions, variable pitch/playback speed (0.5x to 2.5x), and sleep timer with gradual volume ducking.
+- **10 & 32-Band Parametric Equalizer**: Switch between the classic 10-band graphic curve (±12 dB, 31 Hz–16 kHz) and a 32-band parametric engine with a custom frequency editor, A/B flat compare, and four recallable A/B/C/D slots.
+- **AutoEQ Headphone Calibration**: Bundled compensation curves for industry-leading headphones (*Harman Target 2019/2018, Apple AirPods Pro, Sony WH-1000XM4/XM5, Sennheiser HD600, Beyerdynamic*), an online AutoEQ search, and per-song auto-apply by name.
+- **Full Effects Chain**: Bass boost, per-band mute/solo, manual preamp, 3D spatial virtualizer, multiband dynamics, studio compressor, lookahead brickwall limiter, crossfeed, convolution reverb with custom WAV impulse responses, harmonic saturation/exciter, mid/side stereo width, Fletcher–Munson loudness contour, subwoofer crossover, dynamic EQ, high-quality sinc resampler, and TPDF dither.
+- **Room Correction Wizard**: Stepped-sine sweep measurement with mic capture, auto-fitted correction curve, optional stacking with a headphone AutoEQ profile, and linear-phase FIR export.
+- **ReplayGain & Per-Song Overrides**: Track/album ReplayGain with preamp, plus per-song EQ, volume and BPM overrides and per-album DSP memory.
+- **Bit-Perfect Hi-Res Badging & Output**: Detection for sample rates (44.1 kHz–192 kHz) and bit depths (16/24/32-bit float), bit-perfect mode, float DSP path, AAudio direct output, USB-DAC negotiation, and Bluetooth codec control (LDAC/aptX).
+- **DSP Inspector & Conflict Guards**: A live view of every active/degraded stage, with protection against mutually exclusive effects (e.g. ReplayGain vs bit-perfect).
+- **Audiophile Playback Controls**: Gapless playback with encoder-delay trims, crossfade transitions (curves + BPM sync), variable pitch/playback speed, A-B loop, per-track delay, long-form bookmarks, silence skip, SponsorBlock auto-skip, and sleep timer (duration / end of track / after N tracks / end of queue).
 
 ### 💎 2. Aura Dynamic Design System
 - **Album-Art Color Extraction**: Dynamic UI palettes generated in real time from album artwork using `palette_generator`.
-- **4 Now Playing Themes**:
+- **8 Now Playing Themes**:
   1. *Classic Glassmorphism*: Deep blur overlays and ambient neon glow.
   2. *Minimalist*: Clean typography and distraction-free audio controls.
   3. *Card Deck*: Tactile card elevation with swipeable queue gestures.
   4. *Modern Vinyl / Circle*: Rotating vinyl turntable with acoustic concentric rings.
-- **AMOLED Pure Black & Light Modes**: True `#000000` AMOLED mode for battery saving on OLED screens.
+  5. *Retro Cassette Deck*: Spinning spools and a magnetic tape counter.
+  6. *Full-Bleed Waveform*: Audio-reactive glowing waveform backdrop.
+  7. *Karaoke Lyrics Immersion*: Magnified, lyrics-first singing view.
+  8. *Custom Theme Studio*: Build, export and share your own player theme.
+- **AMOLED Pure Black & Light Modes**: True `#000000` AMOLED mode plus a high-contrast accessibility theme.
 - **Edge-to-Edge Experience**: Fully transparent status bar and gesture navigation bar on Android 14+.
+- **Theme Scheduler**: Optional automatic light/dark switching by time of day.
 
 ### ⚡ 3. SQLite-Indexed Smart Music Library
 - **Blazing Fast Scanning**: Powered by Drift SQLite, scanning and indexing 10,000+ local tracks in under 2 seconds.
 - **Multi-Dimensional Navigation**: Browse by *Songs, Albums, Artists, Genres, Folders, Playlists, Years, and Favorites*.
-- **Advanced Folder Browser**: Direct storage hierarchy navigation with `.nomedia` compliance and custom blacklist folder exclusions.
-- **Smart Auto-Playlists**:
-  - *Most Played* (dynamic play count tracker)
-  - *Recently Added* (indexed timestamp sorting)
-  - *Recently Played* (listening history)
-  - *Forgotten Gems* (high-rated or frequently played songs untouched for 30+ days)
-  - *High Energy / BPM* (custom smart rule builder)
+- **Advanced Folder Browser**: Flat or hierarchical folder tree with breadcrumbs, `.nomedia` compliance and custom blacklist folder exclusions.
+- **Intelligent Search**: FTS5 full-text search with Arabic diacritic/Latin accent normalization plus whole-library fuzzy fallback.
+- **Smart Auto-Playlists**: *Most Played, Recently Added, Recently Played, Forgotten Gems, Top Rated, Long Tracks* — plus a rule builder with combined criteria including BPM.
+- **Library Power Tools**: Duplicate finder with keep/delete resolution, missing-artwork online backfill, full-library statistics, and an artwork wall.
+- **Three Independent Queues**: Persisted queue slots with drag reorder, add-next/add-last, and YTM session position restore.
 
 ### 🎤 4. Millisecond Synced LRC Lyrics
-- **Kinetic Karaoke Autoscroll**: Millisecond-precision scrolling that tracks the active vocal line.
+- **Kinetic Karaoke Autoscroll**: Millisecond-precision scrolling that tracks the active vocal line, with a dedicated full-screen karaoke view.
 - **Interactive Tap-to-Seek**: Tap any lyric line to jump directly to that song timestamp.
 - **Offset Calibration**: On-the-fly latency adjuster (±50ms steps) to fix out-of-sync files.
-- **Universal Fallback**: Automatic detection of external `.lrc` files, embedded ID3 tags, and unsynced plain text lyrics.
+- **Universal Fallback**: Automatic detection of external `.lrc` files, embedded ID3 tags, LRCLIB, YouTube Music, and unsynced plain text lyrics.
+- **Lyrics Editor**: Edit and persist synced lyrics to a sidecar `.lrc` file.
 
 ### 🏷️ 5. Embedded ID3 & Cover Art Editor
-- **Direct In-Place Editing**: Modify Title, Artist, Album, Genre, Year, Track Number, and Disc Number directly in the audio files.
-- **Artwork Injector**: Pick high-res album covers from your gallery or camera and embed them into MP3, FLAC, M4A, OGG, and WAV containers.
+- **Direct In-Place Editing**: Modify Title, Artist, Album, Genre, Year, Track Number, and Disc Number directly in the audio files, including batch multi-select editing.
+- **Artwork Injector**: Pick high-res album covers from your gallery or camera and embed them into MP3, FLAC, M4A, OGG, and WAV containers, with optional online metadata matching.
 
 ### 📱 6. Deep Android OS Integration
 - **Android Home Screen Widgets**: Interactive home screen playback widgets (`home_widget`) with live album art and transport controls.
@@ -99,9 +108,23 @@ Pulsr comes with an interactive landing website located in [`website/`](website/
 - **Audio File Intent Handler**: Instantly opens and plays `.mp3`, `.flac`, `.wav`, `.m4a` files opened from file managers or chat apps.
 
 ### 🛡️ 7. Privacy-First & Offline-Capable
-- **Pulsr Pure (prod flavor): 100% Offline Operation**: No account creation, no `INTERNET` permission, no trackers, and no ad SDKs.
+- **Pulsr Pure (prod flavor) — 100% Offline Operation**: No account creation, no `INTERNET` permission, no trackers, and no ad SDKs. All online initializers are skipped at startup.
 - **Standard builds** optionally use network for YouTube Music streaming/downloads, artwork/lyrics metadata, scrobbling, and cloud backup — all gated behind `Offline-only mode` in Settings.
 - **Data Safety**: All library indexes, ratings, and playlists remain strictly on your device unless you opt into cloud sync.
+
+### 📡 8. Pulsr Pure & Pulsr Plus (Optional Online)
+- **Pulsr Pure**: The Play-Store build ships with the `INTERNET` permission removed at the manifest level, no Firebase/Sentry, and no YouTube code.
+- **Pulsr Plus (`ENABLE_YTM=true`)**: Optional account sign-in, search, browse, real radio/mixes, streaming and offline downloads, gated behind a build flag so production builds never expose it.
+- **Downloads Manager**: Queue/pause/resume/retry with storage stats and MediaStore export, plus proxy/Wi-Fi-only/adaptive-quality controls.
+
+### 🔄 9. Sync, Scrobble & Automate
+- **Scrobbling**: Direct-API Last.fm and ListenBrainz scrobbling with a resilient offline queue and a listening-stats dashboard.
+- **Optional Cloud Backup**: Google sign-in to sync favorites and playlists to Firestore — inactive in Pure builds, opt-in elsewhere.
+- **Device Profiles**: Auto-apply EQ, effects and output settings per connected device, with Bluetooth/headphone automation triggers.
+- **Settings Profiles**: Save and recall complete configuration bundles.
+
+### 🌍 10. Localization
+- Full English, Spanish and Arabic (RTL) UI with an in-app language switcher.
 
 ---
 
@@ -172,8 +195,10 @@ pulsr/
 │   ├── eq_profiles/          # AutoEQ headphone JSON calibrations
 │   └── fonts/                # Manrope variable typography
 ├── docs/
+│   ├── PULSR_FEATURES_SPEC.md      # Master feature spec + gap audit & remediation status
 │   ├── AUDIO_INTERRUPT_MATRIX.md   # Audio focus & ducking test matrix
 │   └── PLAY_CONSOLE_READINESS.md   # Google Play data safety & compliance audit
+├── RUNBOOK.md                      # Build, release & troubleshooting runbook
 ├── lib/
 │   ├── core/
 │   │   ├── config/           # App constants & Sentry crash config
@@ -214,6 +239,17 @@ pulsr/
 
 ---
 
+## 📚 Documentation
+
+| Document | Purpose |
+|---|---|
+| [`docs/PULSR_FEATURES_SPEC.md`](docs/PULSR_FEATURES_SPEC.md) | Master spec for every feature, its functions and wiring, plus the prioritized gap audit and remediation status. |
+| [`docs/AUDIO_INTERRUPT_MATRIX.md`](docs/AUDIO_INTERRUPT_MATRIX.md) | Audio focus, interruption and ducking test matrix. |
+| [`docs/PLAY_CONSOLE_READINESS.md`](docs/PLAY_CONSOLE_READINESS.md) | Google Play data-safety and permission compliance audit. |
+| [`RUNBOOK.md`](RUNBOOK.md) | Build, release and troubleshooting runbook. |
+
+---
+
 ## 🚀 Getting Started & Build Guide
 
 ### Prerequisites
@@ -241,9 +277,13 @@ flutter run
 ```
 
 ### 4. Run Automated Tests
-Execute unit tests, Cubit state tests, and repository mocks:
+Execute unit tests, Cubit state tests, and repository mocks (800+ tests):
 ```bash
 flutter test
+```
+Static analysis should be clean:
+```bash
+flutter analyze
 ```
 
 ### 5. Build Release Artifacts
