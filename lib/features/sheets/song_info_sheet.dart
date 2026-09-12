@@ -327,6 +327,7 @@ class SongInfoSheet extends StatelessWidget {
                         '${(song.fileSize! / (1024 * 1024)).toStringAsFixed(2)} MB',
                         p),
                   _buildAudioOverridesSection(context, p),
+                  _buildPlaybackToolsSection(context, p),
                   const SizedBox(height: 12),
                   Row(
                     children: [
@@ -649,6 +650,174 @@ class SongInfoSheet extends StatelessWidget {
               ),
             ],
           ),
+        );
+      },
+    );
+  }
+
+  /// F-28 (save DSP snapshot) + F-57 (per-track bookmark controls).
+  Widget _buildPlaybackToolsSection(BuildContext context, PulsrPalette p) {
+    PlayerCubit? playerCubit;
+    try {
+      playerCubit = context.read<PlayerCubit>();
+    } catch (_) {}
+    if (playerCubit == null) return const SizedBox.shrink();
+    final cubit = playerCubit;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: p.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Playback Tools',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: p.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          // F-28: manual DSP snapshot save for the current album.
+          InkWell(
+            onTap: () async {
+              await cubit.saveDspSnapshot();
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text('DSP settings saved for this album.')),
+              );
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Save DSP settings for this album',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: p.textPrimary),
+                  ),
+                  Icon(Icons.save_outlined, size: 18, color: p.accent),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Divider(color: p.hairline, height: 1),
+          const SizedBox(height: 6),
+          // F-57: bookmark controls for the currently playing track.
+          _buildBookmarkRow(p, cubit),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBookmarkRow(PulsrPalette p, PlayerCubit cubit) {
+    final current = cubit.state.currentSong;
+    if (current == null || current.id != song.id) {
+      return Text(
+        'Bookmarks are available for the track currently playing.',
+        style: TextStyle(color: p.textSecondary, fontSize: 12),
+      );
+    }
+
+    return StatefulBuilder(
+      builder: (context, setLocalState) {
+        final stored = cubit.storedBookmarkFor(song);
+        final storedLabel = stored == null
+            ? 'Not set'
+            : Formatters.formatDuration(
+                Duration(milliseconds: stored.positionMs));
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Bookmark',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: p.textSecondary),
+                ),
+                Text(
+                  stored == null ? storedLabel : 'Resume at $storedLabel',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: stored == null ? p.textSecondary : p.accent),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                if (stored != null)
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: p.accent,
+                      side:
+                          BorderSide(color: p.accent.withValues(alpha: 0.4)),
+                    ),
+                    onPressed: () async {
+                      await cubit.seek(
+                          Duration(milliseconds: stored.positionMs));
+                    },
+                    icon: const Icon(Icons.play_arrow_rounded, size: 16),
+                    label: const Text('Resume'),
+                  ),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: p.textPrimary,
+                    side: BorderSide(color: p.hairline),
+                  ),
+                  onPressed: () async {
+                    final saved = await cubit.saveBookmark();
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(saved
+                          ? 'Bookmark saved.'
+                          : 'Play past 0:05 to save a bookmark.'),
+                    ));
+                    setLocalState(() {});
+                  },
+                  icon: const Icon(Icons.bookmark_add_outlined, size: 16),
+                  label: const Text('Save'),
+                ),
+                if (stored != null)
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: p.textPrimary,
+                      side: BorderSide(color: p.hairline),
+                    ),
+                    onPressed: () async {
+                      await cubit.clearBookmark();
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Bookmark cleared.')),
+                      );
+                      setLocalState(() {});
+                    },
+                    icon:
+                        const Icon(Icons.bookmark_remove_outlined, size: 16),
+                    label: const Text('Clear'),
+                  ),
+              ],
+            ),
+          ],
         );
       },
     );

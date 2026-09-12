@@ -35,7 +35,6 @@ import 'package:pulsr/core/services/playlist_suggestions_service.dart' as _i179;
 import 'package:pulsr/core/services/scrobbler_service.dart' as _i629;
 import 'package:pulsr/core/services/settings_profiles_service.dart' as _i461;
 import 'package:pulsr/core/services/sponsorblock_service.dart' as _i912;
-import 'package:pulsr/core/services/subsonic_service.dart' as _i628;
 import 'package:pulsr/core/services/theme_scheduler_service.dart' as _i991;
 import 'package:pulsr/core/services/xdm_backend_service.dart' as _i1031;
 import 'package:pulsr/core/services/yt_download_service.dart' as _i742;
@@ -130,7 +129,6 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i118.PlaylistShareService());
     gh.singleton<_i179.PlaylistSuggestionsService>(
         () => _i179.PlaylistSuggestionsService());
-    gh.singleton<_i628.SubsonicService>(() => _i628.SubsonicService());
     gh.singleton<_i991.ThemeSchedulerService>(
         () => _i991.ThemeSchedulerService());
     gh.singleton<_i498.YtmCacheManager>(() => _i498.YtmCacheManager());

@@ -1,9 +1,14 @@
 // lib/features/settings/presentation/widgets/playback_section.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/audio_feature_info.dart';
+import '../../../../core/constants/prefs_keys.dart';
+import '../../../../core/di/injection.dart';
+import '../../../../core/services/sponsorblock_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../data/audio/audio_handler.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
 import '../../../sheets/sleep_timer_sheet.dart';
@@ -201,6 +206,15 @@ class PlaybackSection extends StatelessWidget {
             ));
           },
         ),
+        settingsCardDivider(p),
+        // F-67: SponsorBlock auto-skip controls.
+        const _SponsorBlockSettingTile(),
+        settingsCardDivider(p),
+        // F-26: extended 0.1x–8.0x speed range.
+        const _AdvancedSpeedSettingTile(),
+        settingsCardDivider(p),
+        // F-27: manual loudness normalization.
+        const _AudioNormalizationSettingTile(),
       ],
     );
   }
@@ -222,4 +236,280 @@ class PlaybackSection extends StatelessWidget {
           onChanged: onChanged,
           featureInfo: featureInfo,
           disabledReason: disabledReason);
+}
+
+/// F-67: SponsorBlock auto-skip enable switch plus category picker.
+class _SponsorBlockSettingTile extends StatefulWidget {
+  const _SponsorBlockSettingTile();
+
+  @override
+  State<_SponsorBlockSettingTile> createState() =>
+      _SponsorBlockSettingTileState();
+}
+
+class _SponsorBlockSettingTileState extends State<_SponsorBlockSettingTile> {
+  static const Map<String, String> _labels = {
+    'sponsor': 'Sponsors',
+    'selfpromo': 'Self-promotion',
+    'interaction': 'Interaction reminders',
+    'intro': 'Intros / intermissions',
+    'outro': 'Outros / endcards',
+    'music_offtopic': 'Non-music sections',
+  };
+
+  bool _enabled = true;
+  Set<String> _categories = Set.of(SponsorBlockService.supportedCategories);
+
+  SponsorBlockService get _service =>
+      getIt.isRegistered<SponsorBlockService>()
+          ? getIt<SponsorBlockService>()
+          : SponsorBlockService.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final service = _service;
+    await service.loadPreferences();
+    if (!mounted) return;
+    setState(() {
+      _enabled = service.isEnabled;
+      _categories = service.enabledCategories.toSet();
+    });
+  }
+
+  Future<void> _setEnabled(bool value) async {
+    setState(() => _enabled = value);
+    await _service.setSkipEnabled(value);
+  }
+
+  Future<void> _openCategoryPicker() async {
+    final p = context.palette;
+    final result = await showModalBottomSheet<Set<String>>(
+      context: context,
+      useRootNavigator: true,
+      backgroundColor: p.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        var selected = Set<String>.from(_categories);
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 14),
+                      decoration: BoxDecoration(
+                        color: p.hairline,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      'SponsorBlock categories',
+                      style: TextStyle(
+                        color: p.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  ...SponsorBlockService.supportedCategories.map(
+                    (category) => CheckboxListTile(
+                      dense: true,
+                      activeColor: p.accent,
+                      value: selected.contains(category),
+                      title: Text(
+                        _labels[category] ?? category,
+                        style: TextStyle(color: p.textPrimary, fontSize: 14),
+                      ),
+                      onChanged: (checked) {
+                        setSheetState(() {
+                          if (checked == true) {
+                            selected.add(category);
+                          } else {
+                            selected.remove(category);
+                          }
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(backgroundColor: p.accent),
+                      onPressed: () =>
+                          Navigator.of(sheetContext).pop(selected),
+                      child: const Text('Done'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    if (result == null) return;
+    await _service.setEnabledCategories(result);
+    if (!mounted) return;
+    setState(() => _categories = result);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final categorySummary = SponsorBlockService.supportedCategories
+        .where(_categories.contains)
+        .map((c) => _labels[c] ?? c)
+        .join(', ');
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SettingsSwitchTile(
+          Icons.fast_forward_rounded,
+          'SponsorBlock',
+          'Auto-skip sponsor and non-music segments in YouTube tracks',
+          value: _enabled,
+          onChanged: _setEnabled,
+        ),
+        settingsCardDivider(p),
+        SettingsNavTile(
+          Icons.category_outlined,
+          'Skip categories',
+          categorySummary.isEmpty
+              ? 'None selected — auto-skip disabled'
+              : categorySummary,
+          onTap: _openCategoryPicker,
+        ),
+      ],
+    );
+  }
+}
+
+/// F-26: toggles the handler's advanced 0.1x–8.0x speed range.
+class _AdvancedSpeedSettingTile extends StatefulWidget {
+  const _AdvancedSpeedSettingTile();
+
+  @override
+  State<_AdvancedSpeedSettingTile> createState() =>
+      _AdvancedSpeedSettingTileState();
+}
+
+class _AdvancedSpeedSettingTileState extends State<_AdvancedSpeedSettingTile> {
+  bool _value = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    bool value = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      value = prefs.getBool(PrefsKeys.advancedPlaybackSpeed) ?? false;
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() => _value = value);
+  }
+
+  Future<void> _onChanged(bool value) async {
+    setState(() => _value = value);
+    try {
+      if (getIt.isRegistered<PulsrAudioHandler>()) {
+        await getIt<PulsrAudioHandler>().setAdvancedSpeedEnabled(value);
+      } else {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(PrefsKeys.advancedPlaybackSpeed, value);
+      }
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SettingsSwitchTile(
+      Icons.speed_rounded,
+      'Extended speed range',
+      'Allow 0.1x–8.0x playback speed (default 0.25x–4.0x)',
+      value: _value,
+      onChanged: _onChanged,
+    );
+  }
+}
+
+/// F-27: manual loudness normalization, bridged to PulsrAudioHandler.
+class _AudioNormalizationSettingTile extends StatefulWidget {
+  const _AudioNormalizationSettingTile();
+
+  @override
+  State<_AudioNormalizationSettingTile> createState() =>
+      _AudioNormalizationSettingTileState();
+}
+
+class _AudioNormalizationSettingTileState
+    extends State<_AudioNormalizationSettingTile> {
+  bool _value = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    bool value = false;
+    try {
+      if (getIt.isRegistered<PulsrAudioHandler>()) {
+        value = getIt<PulsrAudioHandler>().isAudioNormalizationEnabled;
+      }
+      if (!value) {
+        final prefs = await SharedPreferences.getInstance();
+        value =
+            prefs.getBool(PrefsKeys.audioNormalizationEnabled) ?? false;
+      }
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() => _value = value);
+  }
+
+  Future<void> _onChanged(bool value) async {
+    setState(() => _value = value);
+    try {
+      if (getIt.isRegistered<PulsrAudioHandler>()) {
+        await getIt<PulsrAudioHandler>()
+            .setAudioNormalizationEnabled(value);
+      } else {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(PrefsKeys.audioNormalizationEnabled, value);
+      }
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SettingsSwitchTile(
+      Icons.volume_up_outlined,
+      'Audio normalization',
+      'Even out loudness for tracks without ReplayGain tags',
+      value: _value,
+      onChanged: _onChanged,
+    );
+  }
 }

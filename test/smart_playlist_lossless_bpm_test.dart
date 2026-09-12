@@ -10,8 +10,8 @@ import 'package:pulsr/domain/models/smart_playlist_criteria.dart';
 ///
 /// * `isLossless=false` must match LOSSY tracks (it previously returned the
 ///   lossless predicate regardless of the requested value), and
-/// * the `bpm` rule (no BPM column indexed) must be skipped safely instead
-///   of filtering everything out.
+/// * the `bpm` rule is evaluated against manual BPM overrides (prefs-backed)
+///   instead of being ignored.
 void main() {
   late AppDatabase db;
   late SmartPlaylistEngine engine;
@@ -89,7 +89,8 @@ void main() {
       }
     });
 
-    test('bpm rule is skipped safely and returns all songs', () async {
+    test('bpm rule is enforced against overrides and excludes unmatched songs',
+        () async {
       await insertSong(id: 1, title: 'One', path: '/m/1.mp3', codec: 'MP3');
       await insertSong(id: 2, title: 'Two', path: '/m/2.mp3', codec: 'MP3');
 
@@ -103,7 +104,8 @@ void main() {
         ],
       ));
 
-      expect(result.map((s) => s.title).toSet(), {'One', 'Two'});
+      // No BPM overrides are set in this test, so the rule matches nothing.
+      expect(result, isEmpty);
     });
   });
 }

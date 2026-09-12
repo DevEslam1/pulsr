@@ -830,5 +830,15 @@
         "type": "int"
       }
     }
-  }
+  },
+  "pageNotFoundTitle": "Page Not Found",
+  "pageNotFoundMessage": "No page found at {path}",
+  "@pageNotFoundMessage": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "goHome": "Go Home"
 }

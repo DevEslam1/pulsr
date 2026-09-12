@@ -13,6 +13,7 @@ import 'core/config/app_config.dart';
 import 'core/di/injection.dart';
 import 'core/network/app_http_overrides.dart';
 import 'core/services/artwork_cache_manager.dart';
+import 'core/services/automation_trigger_service.dart';
 import 'core/theme/aura_theme.dart';
 import 'core/theme/dynamic_theme_cubit.dart';
 import 'core/widgets/cached_artwork.dart';
@@ -158,6 +159,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
   StreamSubscription<void>? _authExpiredSub;
   StreamSubscription<void>? _networkChangeSub;
   NetworkChangeMonitor? _networkMonitor;
+  AutomationTriggerService? _automationTriggerService;
   DateTime? _lastAuthExpiredPrompt;
 
   @override
@@ -169,6 +171,21 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     _checkInitialAudioIntent();
     _listenForYtmSessionExpiry();
     _startNetworkChangeMonitor();
+    _startAutomationTriggers();
+  }
+
+  /// Watches output-device changes (Bluetooth/headphones) and fires the
+  /// matching user automation rules. Charging is intentionally not wired: it
+  /// is not reliably observable from Dart without a native change.
+  void _startAutomationTriggers() {
+    try {
+      final service = AutomationTriggerService();
+      _automationTriggerService = service;
+      service.start();
+    } catch (e, st) {
+      ErrorLogger.log('Failed to start automation trigger service',
+          error: e, stackTrace: st, category: 'Startup');
+    }
   }
 
   @override
@@ -257,6 +274,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     _authExpiredSub?.cancel();
     _networkChangeSub?.cancel();
     _networkMonitor?.dispose();
+    _automationTriggerService?.dispose();
     super.dispose();
   }
 
@@ -409,13 +427,15 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                 ThemeColorSource colorSource,
                 AppThemeMode themeMode,
                 Color customAccent,
-                String languageCode
+                String languageCode,
+                bool highContrast
               })>(
             selector: (state) => (
               colorSource: state.themeColorSource,
               themeMode: state.themeMode,
               customAccent: state.customAccentColor,
               languageCode: state.languageCode,
+              highContrast: state.highContrast,
             ),
             builder: (context, settingsConfig) {
               return BlocSelector<DynamicThemeCubit, DynamicThemeState,
@@ -444,17 +464,21 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                         }
                       }
 
-                      final lightTheme = AuraTheme.customTheme(
-                        resolveAccent(lightDynamic?.primary),
-                        brightness: Brightness.light,
-                      );
+                      final lightTheme = settingsConfig.highContrast
+                          ? AuraTheme.highContrastTheme
+                          : AuraTheme.customTheme(
+                              resolveAccent(lightDynamic?.primary),
+                              brightness: Brightness.light,
+                            );
 
-                      final darkTheme = AuraTheme.customTheme(
-                        resolveAccent(darkDynamic?.primary),
-                        brightness: Brightness.dark,
-                        isAmoled:
-                            settingsConfig.themeMode == AppThemeMode.amoled,
-                      );
+                      final darkTheme = settingsConfig.highContrast
+                          ? AuraTheme.highContrastTheme
+                          : AuraTheme.customTheme(
+                              resolveAccent(darkDynamic?.primary),
+                              brightness: Brightness.dark,
+                              isAmoled: settingsConfig.themeMode ==
+                                  AppThemeMode.amoled,
+                            );
 
                       final ThemeMode flutterThemeMode;
                       switch (settingsConfig.themeMode) {
@@ -470,7 +494,8 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                           break;
                       }
 
-                      final isDarkTheme = flutterThemeMode == ThemeMode.dark ||
+                      final isDarkTheme = settingsConfig.highContrast ||
+                          flutterThemeMode == ThemeMode.dark ||
                           (flutterThemeMode == ThemeMode.system &&
                               MediaQuery.platformBrightnessOf(context) ==
                                   Brightness.dark);

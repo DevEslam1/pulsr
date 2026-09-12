@@ -15,8 +15,33 @@ import '../../player/cubit/player_cubit.dart';
 import '../cubit/library_cubit.dart';
 import '../cubit/library_state.dart';
 
-class LibraryStatsScreen extends StatelessWidget {
+class LibraryStatsScreen extends StatefulWidget {
   const LibraryStatsScreen({super.key});
+
+  @override
+  State<LibraryStatsScreen> createState() => _LibraryStatsScreenState();
+}
+
+class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
+  /// Full-library snapshot for accurate totals. The live `LibraryCubit.songs`
+  /// list is a paginated window, so deriving stats from it under-counts large
+  /// libraries. Falls back to the window until the query completes.
+  List<SongsTableData>? _allSongs;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAllSongs();
+  }
+
+  Future<void> _loadAllSongs() async {
+    if (!getIt.isRegistered<IMusicRepository>()) return;
+    final res = await getIt<IMusicRepository>().getAllSongs();
+    if (!mounted) return;
+    res.fold((_) {}, (songs) {
+      if (mounted) setState(() => _allSongs = songs);
+    });
+  }
 
   Future<void> _confirmClearHistory(BuildContext context) async {
     final p = context.palette;
@@ -100,7 +125,7 @@ class LibraryStatsScreen extends StatelessWidget {
         ),
         body: BlocBuilder<LibraryCubit, LibraryState>(
           builder: (context, state) {
-            final songs = state.songs;
+            final songs = _allSongs ?? state.songs;
             final artists = state.artists;
             final albums = state.albums;
 

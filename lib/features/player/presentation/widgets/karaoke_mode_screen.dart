@@ -59,6 +59,13 @@ class KaraokeModeScreen extends StatelessWidget {
                     ? effectiveLyrics[0]
                     : null);
 
+        // Real playback progress (replaces the previously hardcoded metric).
+        final durationMs = state.duration.inMilliseconds;
+        final progressPct = durationMs > 0
+            ? ((pos.inMilliseconds / durationMs).clamp(0.0, 1.0) * 100)
+                .round()
+            : 0;
+
         return PulsrPagePopScope(
           child: Scaffold(
             backgroundColor: const Color(0xFF08090E),
@@ -86,10 +93,10 @@ class KaraokeModeScreen extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.mic_rounded, size: 16, color: p.primary),
+                    Icon(Icons.timelapse_rounded, size: 16, color: p.primary),
                     const SizedBox(width: 4),
                     Text(
-                      'VOCAL SCORE: 96%',
+                      '$progressPct%',
                       style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w900,

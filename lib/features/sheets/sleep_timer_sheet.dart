@@ -42,7 +42,11 @@ class SleepTimerSheet extends StatelessWidget {
                         prev.sleepTimerRemaining != curr.sleepTimerRemaining,
                     builder: (context, state) {
                       final cubit = context.read<PlayerCubit>();
-                      final isActive = state.sleepTimerRemaining != null;
+                      final remainingTracks = cubit.sleepTimerRemainingTracks;
+                      final isQueueMode = cubit.isEndOfQueueSleepTimer;
+                      final isActive = state.sleepTimerRemaining != null ||
+                          remainingTracks != null ||
+                          isQueueMode;
 
                       return SingleChildScrollView(
                         physics: const BouncingScrollPhysics(),
@@ -94,11 +98,13 @@ class SleepTimerSheet extends StatelessWidget {
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 8.0),
                                 child: Text(
-                                  cubit.sleepTimerRemainingTracks != null
-                                      ? (cubit.sleepTimerRemainingTracks == 1
-                                          ? 'Music will stop at the end of this track'
-                                          : 'Music will stop after ${cubit.sleepTimerRemainingTracks} songs')
-                                      : 'Music will stop in ${state.sleepTimerRemaining!.inMinutes}m ${state.sleepTimerRemaining!.inSeconds % 60}s',
+                                  isQueueMode
+                                      ? 'Music will stop at the end of the queue'
+                                      : remainingTracks != null
+                                          ? (remainingTracks == 1
+                                              ? 'Music will stop at the end of this track'
+                                              : 'Music will stop after $remainingTracks songs')
+                                          : 'Music will stop in ${state.sleepTimerRemaining!.inMinutes}m ${state.sleepTimerRemaining!.inSeconds % 60}s',
                                   style: TextStyle(
                                     color: p.accent,
                                     fontWeight: FontWeight.w600,
@@ -131,6 +137,21 @@ class SleepTimerSheet extends StatelessWidget {
                                   selected: false,
                                   onSelected: (_) {
                                     cubit.startEndOfTrackTimer();
+                                    Navigator.pop(context);
+                                  },
+                                ),
+                                ChoiceChip(
+                                  label: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.queue_music_rounded, size: 14),
+                                      SizedBox(width: 4),
+                                      Text('End of queue'),
+                                    ],
+                                  ),
+                                  selected: false,
+                                  onSelected: (_) {
+                                    cubit.startEndOfQueueTimer();
                                     Navigator.pop(context);
                                   },
                                 ),

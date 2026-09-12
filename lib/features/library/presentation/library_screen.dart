@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/ytm_account_service.dart';
@@ -28,6 +29,8 @@ import '../../tag_editor/tag_editor_screen.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import 'widgets/folder_browser_tab.dart';
+import 'widgets/folder_tree_browser_tab.dart';
+import 'widgets/genre_hierarchy_view.dart';
 
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
@@ -42,11 +45,48 @@ class _LibraryScreenState extends State<LibraryScreen>
   final ScrollController _songsScrollController = ScrollController();
   int _favTabFilter = 0; // 0: Local, 1: Online
 
+  static const String _genreHierarchyPrefKey = 'library_genre_hierarchy';
+  static const String _folderTreePrefKey = 'library_folder_tree';
+
+  bool _genreHierarchy = false;
+  bool _folderTree = false;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 8, vsync: this);
     _songsScrollController.addListener(_onSongsScrollNearBottom);
+    _loadLayoutPreferences();
+  }
+
+  Future<void> _loadLayoutPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      setState(() {
+        _genreHierarchy = prefs.getBool(_genreHierarchyPrefKey) ?? false;
+        _folderTree = prefs.getBool(_folderTreePrefKey) ?? false;
+      });
+    } catch (_) {}
+  }
+
+  void _setGenreHierarchy(bool value) {
+    if (_genreHierarchy == value) return;
+    setState(() => _genreHierarchy = value);
+    _persistLayoutPref(_genreHierarchyPrefKey, value);
+  }
+
+  void _setFolderTree(bool value) {
+    if (_folderTree == value) return;
+    setState(() => _folderTree = value);
+    _persistLayoutPref(_folderTreePrefKey, value);
+  }
+
+  Future<void> _persistLayoutPref(String key, bool value) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(key, value);
+    } catch (_) {}
   }
 
   @override
@@ -115,12 +155,13 @@ class _LibraryScreenState extends State<LibraryScreen>
                     IconButton(
                         icon: const Icon(Icons.select_all_rounded),
                         tooltip: 'Select All',
-                        onPressed: cubit.selectAllSongs),
+                        onPressed: () => cubit.selectAllSongs()),
                     IconButton(
                       icon: const Icon(Icons.playlist_add_rounded),
                       tooltip: 'Add to Playlist',
-                      onPressed: () {
-                        final selected = cubit.getSelectedSongs();
+                      onPressed: () async {
+                        final selected = await cubit.getSelectedSongs();
+                        if (!context.mounted) return;
                         if (selected.isNotEmpty) {
                           showModalBottomSheet(
                             context: context,
@@ -139,8 +180,9 @@ class _LibraryScreenState extends State<LibraryScreen>
                     IconButton(
                       icon: const Icon(Icons.edit_note_rounded),
                       tooltip: 'Batch Edit Tags',
-                      onPressed: () {
-                        final selected = cubit.getSelectedSongs();
+                      onPressed: () async {
+                        final selected = await cubit.getSelectedSongs();
+                        if (!context.mounted) return;
                         if (selected.isNotEmpty) {
                           cubit.clearSelection();
                           Navigator.of(context).push(
@@ -157,8 +199,9 @@ class _LibraryScreenState extends State<LibraryScreen>
                     IconButton(
                       icon: const Icon(Icons.queue_music_rounded),
                       tooltip: 'Add to Queue',
-                      onPressed: () {
-                        final selected = cubit.getSelectedSongs();
+                      onPressed: () async {
+                        final selected = await cubit.getSelectedSongs();
+                        if (!context.mounted) return;
                         for (final s in selected) {
                           playerCubit.addToQueue(s);
                         }
@@ -250,7 +293,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                   _buildAlbumsTab(context, state),
                   _buildArtistsTab(context, state),
                   _buildFavoritesTab(context, state, playerCubit),
-                  const FolderBrowserTab(),
+                  _buildFoldersTab(context),
                   _buildGenresTab(context, state),
                   _buildYearsTab(context, state),
                 ],
@@ -1064,7 +1107,28 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
   }
 
-  // ================= GENRES / YEARS =================
+  // ================= FOLDERS / GENRES / YEARS =================
+  Widget _buildFoldersTab(BuildContext context) {
+    return Column(
+      children: [
+        _buildLayoutToggleHeader(
+          context,
+          hierarchySelected: _folderTree,
+          flatLabel: 'List',
+          hierarchyLabel: 'Tree',
+          flatIcon: Icons.view_list_rounded,
+          hierarchyIcon: Icons.account_tree_rounded,
+          onChanged: _setFolderTree,
+        ),
+        Expanded(
+          child: _folderTree
+              ? const FolderTreeBrowserTab()
+              : const FolderBrowserTab(),
+        ),
+      ],
+    );
+  }
+
   Widget _buildGenresTab(BuildContext context, LibraryState state) {
     final p = context.palette;
     final genres = state.genres;
@@ -1074,19 +1138,73 @@ class _LibraryScreenState extends State<LibraryScreen>
           subtitle: 'Scan your media library to view all song genres.',
           icon: Icons.style_rounded);
     }
-    return _chipCategoryGrid(
-      context,
-      count: genres.length,
-      builder: (context, i) {
-        final g = genres[i];
-        return _CategoryCard(
-          icon: Icons.style_rounded,
-          title: g.name,
-          subtitle: Formatters.formatTrackCount(g.songCount),
-          color: p.accent,
-          onTap: () => context.push('/genre', extra: g),
-        );
-      },
+    return Column(
+      children: [
+        _buildLayoutToggleHeader(
+          context,
+          hierarchySelected: _genreHierarchy,
+          flatLabel: 'Flat',
+          hierarchyLabel: 'Categories',
+          flatIcon: Icons.grid_view_rounded,
+          hierarchyIcon: Icons.category_rounded,
+          onChanged: _setGenreHierarchy,
+        ),
+        Expanded(
+          child: _genreHierarchy
+              ? GenreHierarchyView(genres: genres)
+              : _chipCategoryGrid(
+                  context,
+                  count: genres.length,
+                  builder: (context, i) {
+                    final g = genres[i];
+                    return _CategoryCard(
+                      icon: Icons.style_rounded,
+                      title: g.name,
+                      subtitle: Formatters.formatTrackCount(g.songCount),
+                      color: p.accent,
+                      onTap: () => context.push('/genre', extra: g),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLayoutToggleHeader(
+    BuildContext context, {
+    required bool hierarchySelected,
+    required String flatLabel,
+    required String hierarchyLabel,
+    required IconData flatIcon,
+    required IconData hierarchyIcon,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        Adaptive.pagePadding(context),
+        10,
+        Adaptive.pagePadding(context),
+        2,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          _LayoutToggleButton(
+            icon: flatIcon,
+            label: flatLabel,
+            selected: !hierarchySelected,
+            onTap: () => onChanged(false),
+          ),
+          const SizedBox(width: 8),
+          _LayoutToggleButton(
+            icon: hierarchyIcon,
+            label: hierarchyLabel,
+            selected: hierarchySelected,
+            onTap: () => onChanged(true),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2025,6 +2143,55 @@ class _CategoryCard extends StatelessWidget {
             ),
             Icon(Icons.chevron_right_rounded, color: p.textTertiary, size: 20),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LayoutToggleButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _LayoutToggleButton({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Material(
+      color: selected ? p.accent : p.surfaceContainer,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: selected ? p.onAccent : p.textSecondary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? p.onAccent : p.textSecondary,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

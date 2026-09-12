@@ -448,6 +448,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                                       : 36,
                                   isPlaying: state.isPlaying,
                                   audioSessionId: state.audioSessionId,
+                                  trackSeed: song?.id,
                                 ),
                               ),
                             ),

@@ -555,5 +555,8 @@
   "systemEffectsTryDisable": "محاولة التعطيل",
   "systemEffectsLeaveOn": "إبقاء التشغيل",
   "bluetoothLatencyTitle": "مزامنة زمن استجابة البلوتوث (AVRCP / الكلمات)",
-  "bluetoothLatencySubtitle": "تعويض تأخير ذاكرة التخزين المؤقت للبلوتوث ({offset} مللي ثانية)."
+  "bluetoothLatencySubtitle": "تعويض تأخير ذاكرة التخزين المؤقت للبلوتوث ({offset} مللي ثانية).",
+  "pageNotFoundTitle": "الصفحة غير موجودة",
+  "pageNotFoundMessage": "لم يتم العثور على صفحة في {path}",
+  "goHome": "العودة إلى الرئيسية"
 }

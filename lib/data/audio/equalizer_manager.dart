@@ -1745,61 +1745,6 @@ class EqualizerManager {
     }
   }
 
-  static final Map<String, EqPreset> _genreEqMap = {
-    'rock': const EqPreset(
-      name: 'Rock',
-      gains: [4.0, 3.0, -1.0, -1.0, 2.0, 4.0, 5.0, 5.0, 5.0, 6.0],
-      bassBoost: 0.2,
-    ),
-    'pop': const EqPreset(
-      name: 'Pop',
-      gains: [-1.5, -0.5, 1.5, 3.0, 4.0, 3.5, 2.0, 0.5, -0.5, -1.0],
-      bassBoost: 0.1,
-    ),
-    'jazz': const EqPreset(
-      name: 'Jazz',
-      gains: [3.0, 2.0, 1.0, 2.0, -1.0, -1.0, 0.0, 1.0, 2.0, 3.0],
-      bassBoost: 0.0,
-    ),
-    'classical': const EqPreset(
-      name: 'Classical',
-      gains: [4.0, 3.0, 2.0, 1.0, -1.0, -1.0, 0.0, 2.0, 3.0, 4.0],
-      bassBoost: 0.0,
-    ),
-    'electronic': const EqPreset(
-      name: 'Electronic',
-      gains: [5.0, 4.0, 2.0, 0.0, -1.0, 0.0, 2.0, 4.0, 5.0, 5.0],
-      bassBoost: 0.3,
-    ),
-    'hip-hop': const EqPreset(
-      name: 'Hip-Hop',
-      gains: [5.0, 4.0, 3.0, 1.0, 0.0, 0.0, 1.0, 3.0, 4.0, 4.0],
-      bassBoost: 0.35,
-    ),
-    'acoustic': const EqPreset(
-      name: 'Acoustic',
-      gains: [2.5, 1.5, 0.0, 1.0, 2.0, 2.5, 2.0, 1.5, 2.0, 2.5],
-      bassBoost: 0.05,
-    ),
-    'metal': const EqPreset(
-      name: 'Metal',
-      gains: [4.5, 3.5, 0.0, -1.5, -2.0, 0.0, 3.0, 5.0, 5.5, 6.0],
-      bassBoost: 0.25,
-    ),
-  };
-
-  Future<bool> applyGenreBasedEq(String? genre) async {
-    if (genre == null || genre.trim().isEmpty) return false;
-    final normalized = genre.trim().toLowerCase();
-    for (final entry in _genreEqMap.entries) {
-      if (normalized.contains(entry.key)) {
-        await setPreset(entry.value);
-        return true;
-      }
-    }
-    return false;
-  }
-
   /// Serializes re-attach + resync operations so concurrent session ids and
   /// route changes can never race release/recreate on the native side.
   Future<void> _reattachChain = Future<void>.value();

@@ -1499,4 +1499,15 @@ class AppLocalizationsEs extends AppLocalizations {
   String bluetoothLatencySubtitle(int offset) {
     return 'Compensa la latencia del búfer del códec Bluetooth ($offset ms).';
   }
+
+  @override
+  String get pageNotFoundTitle => 'Página no encontrada';
+
+  @override
+  String pageNotFoundMessage(String path) {
+    return 'No se encontró ninguna página en $path';
+  }
+
+  @override
+  String get goHome => 'Ir al inicio';
 }

@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/constants/app_radii.dart';
+import '../../../../core/services/bluetooth_latency_calibrator.dart';
 import '../../../../core/telemetry/audio_session_log.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -41,6 +42,21 @@ class AudioSoundSection extends StatelessWidget {
       behavior: SnackBarBehavior.floating,
       content:
           Text('Resolved: Bit-Perfect bypass disabled — ReplayGain is adjustable again'),
+    ));
+  }
+
+  Future<void> _autoCalibrateBluetoothLatency(
+      BuildContext context, SettingsCubit cubit) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final codec = state.currentOutputDevice?.btCodecName;
+    final result =
+        await BluetoothLatencyCalibrator().calibrate(codecName: codec);
+    await cubit.setBluetoothLatencyOffsetMs(result.offsetMs);
+    messenger?.showSnackBar(SnackBar(
+      content: Text(
+        'Bluetooth latency calibrated to ${result.offsetMs} ms'
+        '${codec != null && codec.isNotEmpty ? ' ($codec)' : ''}',
+      ),
     ));
   }
 
@@ -745,6 +761,16 @@ class AudioSoundSection extends StatelessWidget {
                 formatValue: (v) => '${v.round()} ms',
                 onChanged: (v) => cubit.setBluetoothLatencyOffsetMs(v.round()),
               ),
+              if (isAndroid && state.currentOutputDevice?.isBluetooth == true)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: () =>
+                        _autoCalibrateBluetoothLatency(context, cubit),
+                    icon: const Icon(Icons.auto_fix_high_rounded, size: 16),
+                    label: const Text('Auto-calibrate'),
+                  ),
+                ),
             ],
           ),
         ),

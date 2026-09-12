@@ -26,6 +26,18 @@ class AutomationRule {
     this.enabled = true,
   });
 
+  AutomationRule copyWith({
+    AutomationTrigger? trigger,
+    String? targetProfileId,
+    bool? enabled,
+  }) =>
+      AutomationRule(
+        id: id,
+        trigger: trigger ?? this.trigger,
+        targetProfileId: targetProfileId ?? this.targetProfileId,
+        enabled: enabled ?? this.enabled,
+      );
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'trigger': trigger.name,

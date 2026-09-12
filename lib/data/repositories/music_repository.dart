@@ -753,6 +753,18 @@ class MusicRepository implements IMusicRepository {
     }
   }
 
+  @override
+  Future<Result<void>> updateAlbumArtwork(
+      int albumId, String artworkUrl) async {
+    try {
+      await (_db.update(_db.albumsTable)..where((t) => t.id.equals(albumId)))
+          .write(AlbumsTableCompanion(artworkUri: Value(artworkUrl)));
+      return const Right(null);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to update album artwork', e));
+    }
+  }
+
   // --- ARTISTS ---
   @override
   Stream<Result<List<ArtistsTableData>>> watchArtists() {
@@ -1347,6 +1359,50 @@ class MusicRepository implements IMusicRepository {
       return Right(deletedCount);
     } catch (e) {
       return Left(DatabaseFailure('Failed to hard delete missing songs', e));
+    }
+  }
+
+  @override
+  Future<Result<void>> deleteSongs(List<int> ids) async {
+    if (ids.isEmpty) return const Right(null);
+    try {
+      final songs = await (_db.select(_db.songsTable)
+            ..where((t) => t.id.isIn(ids)))
+          .get();
+
+      await (_db.delete(_db.songsTable)..where((t) => t.id.isIn(ids))).go();
+
+      for (final song in songs) {
+        if (song.source != SongSource.local) continue;
+        final path = song.path;
+        if (path.isEmpty || path.startsWith('ytmusic://')) continue;
+        try {
+          final file = File(path);
+          if (await file.exists()) {
+            await file.delete();
+          }
+        } catch (e, st) {
+          ErrorLogger.log('Failed to delete file for song ${song.id}',
+              error: e, stackTrace: st, category: 'MusicRepository');
+        }
+      }
+
+      await _db.customStatement(
+        'DELETE FROM albums WHERE NOT EXISTS (SELECT 1 FROM songs WHERE songs.album_id = albums.id AND songs.is_missing = 0);',
+      );
+      await _db.customStatement(
+        'DELETE FROM artists WHERE NOT EXISTS (SELECT 1 FROM songs WHERE songs.artist_id = artists.id AND songs.is_missing = 0);',
+      );
+      await _db.customStatement(
+        'UPDATE albums SET song_count = (SELECT COUNT(*) FROM songs WHERE songs.album_id = albums.id AND songs.is_missing = 0);',
+      );
+      await _db.customStatement(
+        'UPDATE artists SET song_count = (SELECT COUNT(*) FROM songs WHERE songs.artist_id = artists.id AND songs.is_missing = 0);',
+      );
+
+      return const Right(null);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to delete songs', e));
     }
   }
 

@@ -3,7 +3,8 @@ import 'package:injectable/injectable.dart';
 import 'package:rxdart/rxdart.dart';
 import '../../core/di/injection.dart';
 import '../../core/utils/error_logger.dart';
-import '../../data/audio/song_rating_store.dart';
+import '../audio/audio_handler.dart';
+import '../audio/song_rating_store.dart';
 import '../../domain/models/smart_playlist_criteria.dart';
 import '../../domain/repositories/smart_playlist_engine_interface.dart';
 import '../db/app_database.dart';
@@ -26,9 +27,9 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
       query.where((t) {
         Expression<bool>? combined;
         for (final rule in criteria.rules) {
-          // Rating lives in SharedPreferences, not Drift: skipped here
-          // without noise and applied as a Dart post-filter below.
-          if (rule.field == SmartRuleField.rating) continue;
+          // Rating and BPM live outside Drift (SharedPreferences): skipped
+          // here without noise and applied as a Dart post-filter below.
+          if (_isDartRule(rule.field)) continue;
           final expr = _buildRuleExpression(t, rule);
           if (expr == null) {
             ErrorLogger.log(
@@ -87,15 +88,19 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     // When rating rules exist (or rating sort is requested) the limit is
     // applied in Dart AFTER the prefs-backed filter/sort; a SQL limit first
     // would truncate candidates before ratings are even considered.
-    final hasRatingRules =
-        criteria.rules.any((r) => r.field == SmartRuleField.rating);
-    final needsDartPost = hasRatingRules || criteria.sortBy == 'rating';
+    final needsDartPost = criteria.rules.any((r) => _isDartRule(r.field)) ||
+        criteria.sortBy == 'rating';
     if (!needsDartPost && criteria.limit != null && criteria.limit! > 0) {
       query.limit(criteria.limit!);
     }
 
     return query;
   }
+
+  /// Rules whose source of truth is not a Drift column (SharedPreferences):
+  /// they are excluded from the SQL shape and applied as Dart post-filters.
+  bool _isDartRule(SmartRuleField field) =>
+      field == SmartRuleField.rating || field == SmartRuleField.bpm;
 
   Expression<bool>? _buildRuleExpression($SongsTableTable t, SmartRule rule) {
     final valStr = rule.value.trim();
@@ -311,7 +316,9 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
         }
 
       case SmartRuleField.bpm:
-        ErrorLogger.log('BPM smart rule ignored — BPM column not indexed, rule will be skipped until enrichment', category: 'SmartPlaylist');
+        // BPM overrides live in SharedPreferences, not a Drift column: the
+        // SQL builder skips this rule and it is evaluated in Dart via
+        // [_matchesDartRule] / [_bpmOf].
         return null;
 
       case SmartRuleField.loudnessRange:
@@ -391,37 +398,37 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
 
   @override
   Future<List<SongsTableData>> evaluateCriteria(SmartCriteria criteria) async {
-    final ratingRules = criteria.rules
-        .where((r) => r.field == SmartRuleField.rating)
+    final dartRules = criteria.rules
+        .where((r) => _isDartRule(r.field))
         .toList();
-    if (ratingRules.isEmpty) {
+    if (dartRules.isEmpty) {
       var list = await _buildQuery(criteria).get();
       return _postProcess(list, criteria, const []);
     }
     if (criteria.matchAll) {
       final base = await _buildQuery(criteria).get();
-      return _postProcess(base, criteria, ratingRules);
+      return _postProcess(base, criteria, dartRules);
     }
-    // matchAny: union of SQL matches and rating matches.
+    // matchAny: union of SQL matches and prefs-backed matches.
     final sqlRules = criteria.rules
-        .where((r) => r.field != SmartRuleField.rating)
+        .where((r) => !_isDartRule(r.field))
         .toList();
     final base = sqlRules.isEmpty
         ? <SongsTableData>[]
-        : await _buildQuery(_withoutRating(criteria)).get();
+        : await _buildQuery(_withoutDartRules(criteria)).get();
     final all = await _buildQuery(_allLocal(criteria)).get();
     final baseIds = base.map((s) => s.id).toSet();
     final merged = List<SongsTableData>.from(base)
       ..addAll(all.where((s) => !baseIds.contains(s.id)));
-    return _postProcessAny(merged, baseIds, criteria, ratingRules);
+    return _postProcessAny(merged, baseIds, criteria, dartRules);
   }
 
   @override
   Stream<List<SongsTableData>> watchCriteria(SmartCriteria criteria) {
-    final ratingRules = criteria.rules
-        .where((r) => r.field == SmartRuleField.rating)
+    final dartRules = criteria.rules
+        .where((r) => _isDartRule(r.field))
         .toList();
-    if (ratingRules.isEmpty) {
+    if (dartRules.isEmpty) {
       final stream =
           _buildQuery(criteria).watch().debounceTime(const Duration(milliseconds: 500));
       if (criteria.sortBy == 'rating') {
@@ -433,14 +440,14 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
       return _buildQuery(criteria)
           .watch()
           .debounceTime(const Duration(milliseconds: 500))
-          .map((list) => _postProcess(list, criteria, ratingRules));
+          .map((list) => _postProcess(list, criteria, dartRules));
     }
     final sqlRules = criteria.rules
-        .where((r) => r.field != SmartRuleField.rating)
+        .where((r) => !_isDartRule(r.field))
         .toList();
     final baseStream = sqlRules.isEmpty
         ? Stream.value(<SongsTableData>[])
-        : _buildQuery(_withoutRating(criteria)).watch();
+        : _buildQuery(_withoutDartRules(criteria)).watch();
     return Rx.combineLatest2(
       baseStream,
       _buildQuery(_allLocal(criteria)).watch(),
@@ -453,33 +460,33 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     )
         .debounceTime(const Duration(milliseconds: 500))
         .map((parts) =>
-            _postProcessAny(parts.$1, parts.$2, criteria, ratingRules));
+            _postProcessAny(parts.$1, parts.$2, criteria, dartRules));
   }
 
-  /// [criteria] with rating rules removed (SQL shape only).
-  SmartCriteria _withoutRating(SmartCriteria criteria) => SmartCriteria(
+  /// [criteria] with prefs-backed rules removed (SQL shape only).
+  SmartCriteria _withoutDartRules(SmartCriteria criteria) => SmartCriteria(
         rules: criteria.rules
-            .where((r) => r.field != SmartRuleField.rating)
+            .where((r) => !_isDartRule(r.field))
             .toList(),
         matchAll: criteria.matchAll,
         sortAscending: criteria.sortAscending,
       );
 
-  /// Bare local-songs shape used to resolve rating matches under matchAny.
+  /// Bare local-songs shape used to resolve prefs-backed matches under matchAny.
   SmartCriteria _allLocal(SmartCriteria criteria) =>
       SmartCriteria(matchAll: criteria.matchAll);
 
-  /// matchAll post-step: AND-filter by every rating rule, then rating sort
-  /// and limit.
+  /// matchAll post-step: AND-filter by every prefs-backed rule, then rating
+  /// sort and limit.
   List<SongsTableData> _postProcess(
     List<SongsTableData> songs,
     SmartCriteria criteria,
-    List<SmartRule> ratingRules,
+    List<SmartRule> dartRules,
   ) {
     var list = songs;
-    if (ratingRules.isNotEmpty) {
+    if (dartRules.isNotEmpty) {
       list = list
-          .where((s) => ratingRules.every((r) => _matchesRating(s, r)))
+          .where((s) => dartRules.every((r) => _matchesDartRule(s, r)))
           .toList();
     }
     if (criteria.sortBy == 'rating') {
@@ -493,17 +500,17 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
 
   /// matchAny post-step over the union of SQL and full-table candidates:
   /// a song is kept when the SQL half already matched it (tracked via
-  /// [baseIds]) or when it matches any rating rule.
+  /// [baseIds]) or when it matches any prefs-backed rule.
   List<SongsTableData> _postProcessAny(
     List<SongsTableData> merged,
     Set<int> baseIds,
     SmartCriteria criteria,
-    List<SmartRule> ratingRules,
+    List<SmartRule> dartRules,
   ) {
     var list = merged
         .where((s) =>
             baseIds.contains(s.id) ||
-            ratingRules.any((r) => _matchesRating(s, r)))
+            dartRules.any((r) => _matchesDartRule(s, r)))
         .toList();
     if (criteria.sortBy == 'rating') {
       list = _sortByRating(list, ascending: criteria.sortAscending);
@@ -548,6 +555,54 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
         return rating <= valInt;
       default:
         return rating == valInt;
+    }
+  }
+
+  /// Dispatches a prefs-backed rule to its concrete evaluator.
+  bool _matchesDartRule(SongsTableData song, SmartRule rule) =>
+      switch (rule.field) {
+        SmartRuleField.rating => _matchesRating(song, rule),
+        SmartRuleField.bpm => _matchesBpm(song, rule),
+        _ => false,
+      };
+
+  /// Manual BPM override (40–240, prefs-backed) for [song], or null.
+  double? _bpmOf(SongsTableData song) {
+    try {
+      if (getIt.isRegistered<PulsrAudioHandler>()) {
+        return getIt<PulsrAudioHandler>()
+            .bpmOverrideStore
+            .getBpmForTrack(PulsrAudioHandler.trackKeyFor(song));
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Evaluates one BPM rule (numeric operators + between) in Dart.
+  bool _matchesBpm(SongsTableData song, SmartRule rule) {
+    final bpm = _bpmOf(song);
+    if (bpm == null) return false;
+    final valStr = rule.value.trim();
+    if (rule.operator == SmartOperator.between) {
+      final b = _parseDoubleBetween(valStr);
+      if (b == null) return false;
+      return bpm >= b.$1 && bpm <= b.$2;
+    }
+    final valDouble = double.tryParse(valStr);
+    if (valDouble == null) return false;
+    switch (rule.operator) {
+      case SmartOperator.equals:
+        return (bpm - valDouble).abs() < 0.5;
+      case SmartOperator.greaterThan:
+        return bpm > valDouble;
+      case SmartOperator.lessThan:
+        return bpm < valDouble;
+      case SmartOperator.greaterThanOrEqual:
+        return bpm >= valDouble;
+      case SmartOperator.lessThanOrEqual:
+        return bpm <= valDouble;
+      default:
+        return (bpm - valDouble).abs() < 0.5;
     }
   }
 

@@ -1,11 +1,15 @@
 // lib/features/playlist_detail/presentation/playlist_detail_screen.dart
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/di/injection.dart';
+import '../../../core/services/playlist_share_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/widgets/empty_state_widget.dart';
@@ -101,6 +105,11 @@ class PlaylistDetailScreen extends StatelessWidget {
       );
       return;
     }
+
+    // Primary path: PlaylistShareService's portable JSON bundle.
+    if (await _sharePlaylistBundle(playlist.name, songs)) return;
+
+    // Graceful fallback: existing M3U share.
     final exportUseCase = getIt<PlaylistExportUseCase>();
     final file = await exportUseCase.exportToFile(playlist.name, songs);
     try {
@@ -116,6 +125,40 @@ class PlaylistDetailScreen extends StatelessWidget {
           await file.delete();
         }
       } catch (_) {}
+    }
+  }
+
+  /// Shares the playlist as a [PlaylistShareService] JSON bundle. Returns
+  /// false when the service cannot produce/validate it, so the caller can fall
+  /// back to the M3U share.
+  Future<bool> _sharePlaylistBundle(
+      String name, List<SongsTableData> songs) async {
+    try {
+      final shareService = getIt<PlaylistShareService>();
+      final json = shareService.exportPlaylist(name, songs);
+      if (json.isEmpty || shareService.importPlaylist(json) == null) {
+        return false;
+      }
+
+      final tempDir = await getTemporaryDirectory();
+      final safeName = name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final bundle = File('${tempDir.path}/$safeName.pulsr.json');
+      await bundle.writeAsString(json);
+      try {
+        await SharePlus.instance.share(
+          ShareParams(
+            files: [XFile(bundle.path, mimeType: 'application/json')],
+            text: 'Playlist: $name',
+          ),
+        );
+        return true;
+      } finally {
+        try {
+          if (await bundle.exists()) await bundle.delete();
+        } catch (_) {}
+      }
+    } catch (_) {
+      return false;
     }
   }
 

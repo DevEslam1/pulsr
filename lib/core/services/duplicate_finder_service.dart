@@ -74,30 +74,6 @@ class DuplicateFinderService {
     return result;
   }
 
-  /// Synchronous fallback when async I/O is unavailable.
-  List<DuplicateGroup> findDuplicatesSync(List<SongsTableData> allSongs) {
-    final Map<String, List<SongsTableData>> byTitleArtist = {};
-
-    for (final song in allSongs) {
-      final normTitle = _normalizeString(song.title);
-      final normArtist = _normalizeString(song.artist);
-      final titleArtistKey = '$normTitle-$normArtist';
-      byTitleArtist.putIfAbsent(titleArtistKey, () => []).add(song);
-    }
-
-    final List<DuplicateGroup> result = [];
-    for (final entry in byTitleArtist.entries) {
-      if (entry.value.length > 1) {
-        result.add(DuplicateGroup(
-          key: entry.key,
-          songs: entry.value,
-          reason: 'Identical Title & Artist (${entry.value.length} copies)',
-        ));
-      }
-    }
-    return result;
-  }
-
   Future<List<SongsTableData>> _verifyWithChecksum(List<SongsTableData> candidates) async {
     final Map<String, List<SongsTableData>> byHash = {};
     for (final song in candidates) {

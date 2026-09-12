@@ -555,5 +555,8 @@
   "systemEffectsTryDisable": "Intentar desactivar",
   "systemEffectsLeaveOn": "Dejar activo",
   "bluetoothLatencyTitle": "Sincronización de latencia Bluetooth (AVRCP / Letras)",
-  "bluetoothLatencySubtitle": "Compensa la latencia del búfer del códec Bluetooth ({offset} ms)."
+  "bluetoothLatencySubtitle": "Compensa la latencia del búfer del códec Bluetooth ({offset} ms).",
+  "pageNotFoundTitle": "Página no encontrada",
+  "pageNotFoundMessage": "No se encontró ninguna página en {path}",
+  "goHome": "Ir al inicio"
 }

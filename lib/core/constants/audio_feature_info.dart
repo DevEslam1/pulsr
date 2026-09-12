@@ -144,7 +144,15 @@ class AudioFeatureRegistry {
     title: 'DSD (Native PCM Decode)',
     subtitle: 'PCM decode only — DoP output unavailable',
     description:
-        'DSD files (DSF/DFF) decode to PCM through the native DSD decoder and then follow the normal DSP pipeline. There is no user-selectable DoP (DSD over PCM) output mode: native-DSD / DoP USB streaming is not implemented in this build, so DoP framing is not exposed in the UI and this feature only reports DAC class diagnostics (UAC1/UAC2/UAC3) without claiming native-DSD capability.',
+        'DSD files (DSF/DFF) decode to PCM through the native DSD decoder and then follow the normal DSP pipeline. There is no user-selectable DoP (DSD over PCM) output mode: native-DSD / DoP USB streaming is not implemented in this build and the DoP encoder is intentionally dormant, so DoP framing is not exposed in the UI. This feature only reports DAC class diagnostics (UAC1/UAC2/UAC3) without claiming native-DSD capability.',
+  );
+
+  static const mqa = AudioFeatureInfo(
+    id: 'mqa',
+    title: 'MQA (Master Quality Authenticated)',
+    subtitle: 'Detected — core unfold only, no authenticated rendering',
+    description:
+        'MQA-encoded files are detected from their signature and labeled "MQA" in the quality sheet. Core unfold is handled by the in-app decoder; full authenticated/native MQA rendering is not available in this build, so MQA status is never silently reported as plain lossless and authenticated MQA output is never claimed.',
   );
 
   static const gapless = AudioFeatureInfo(

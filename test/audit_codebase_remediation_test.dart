@@ -260,7 +260,8 @@ void main() {
   });
 
   group('P1-7: GetSongsUseCase Input Validation Tests', () {
-    test('clamps limit and offset and truncates oversized search query', () {
+    test('passes limit through without an upper cap, clamps offset and query',
+        () {
       final fakeRepo = FakeMusicRepository();
       final useCase = GetSongsUseCase(fakeRepo);
 
@@ -270,9 +271,20 @@ void main() {
         searchQuery: 'a' * 300,
       );
 
-      expect(fakeRepo.lastLimit, 1000); // clamped to 1000 max
+      // F-07: no upper cap — libraries can exceed 1k rows and the cubit
+      // paginates by growing the window.
+      expect(fakeRepo.lastLimit, 9999);
       expect(fakeRepo.lastOffset, 0); // clamped to >= 0
       expect(fakeRepo.lastSearchQuery?.length, 200); // truncated to 200 chars
+    });
+
+    test('clamps a negative limit to zero', () {
+      final fakeRepo = FakeMusicRepository();
+      final useCase = GetSongsUseCase(fakeRepo);
+
+      useCase.watchSongs(limit: -5);
+
+      expect(fakeRepo.lastLimit, 0);
     });
   });
 

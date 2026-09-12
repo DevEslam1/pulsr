@@ -131,9 +131,11 @@ class SearchCubit extends PulsrCubit<SearchState> {
                   if (generation != _generation || isClosed) return;
                   final allSongs =
                       allSongsRes.fold((l) => <SongsTableData>[], (r) => r);
-                  final candidateSubset =
-                      allSongs.length > 300 ? allSongs.sublist(0, 300) : allSongs;
-                  filtered = _filterWithFuzzy(candidateSubset, q, filter);
+                  // Scan the entire library: fuzzy matching must not miss
+                  // valid typo/variant matches beyond an arbitrary window.
+                  // Levenshtein early-exits on length mismatch, keeping this
+                  // fast even for 10k-row libraries.
+                  filtered = _filterWithFuzzy(allSongs, q, filter);
                 } catch (_) {}
               }
 

@@ -40,23 +40,19 @@ import 'adaptive_buffer_engine.dart';
 import 'audio_memory_manager.dart';
 import 'battery_aware_playback.dart';
 import 'format_aware_decoder.dart';
-import 'latency_optimizer.dart';
 import 'optimized_dsp_pipeline.dart';
 import 'output_format_negotiation.dart';
 import 'playback_analytics.dart';
 import 'replay_gain_math.dart';
-import 'seamless_queue_transition.dart';
 import 'smart_preload_scheduler.dart';
 import 'stream_pre_resolver.dart';
 import 'triple_buffer_pipeline.dart';
 import 'dsd_decoder_helper.dart';
+import 'mqa_decoder_helper.dart';
 import '../../core/services/ytm_url_cache.dart';
 import 'collaborators/float_output_controller.dart';
 import 'collaborators/aaudio_output_controller.dart';
-import 'collaborators/playback_queue_manager.dart';
-import 'collaborators/playback_state_coordinator.dart';
 import 'collaborators/playback_volume_controller.dart';
-import 'collaborators/playback_preload_orchestrator.dart';
 import 'collaborators/stream_resolution_pipeline.dart';
 import 'ab_loop_manager.dart';
 import 'adaptive_quality_manager.dart';
@@ -185,12 +181,8 @@ class PulsrAudioHandler extends BaseAudioHandler
   late final FormatAwareDecoder _formatDecoder;
   late final TripleBufferPipeline _tripleBufferPipeline;
   late final BatteryAwarePlayback _batteryAwarePlayback;
-  late final SeamlessQueueTransition _queueTransition;
   late final StreamPreResolver _streamPreResolver;
-  late final PlaybackQueueManager _queueManager;
   late final PlaybackVolumeController _volumeController;
-  late final PlaybackStateCoordinator _playbackStateCoordinator;
-  late final PlaybackPreloadOrchestrator _preloadOrchestrator;
   late final StreamResolutionPipeline _streamResolutionPipeline;
   // ── F1–F11 feature managers ──────────────────────────────────────────
   final AbLoopManager abLoopManager = AbLoopManager();
@@ -356,12 +348,8 @@ class PulsrAudioHandler extends BaseAudioHandler
   FormatAwareDecoder get formatDecoder => _formatDecoder;
   TripleBufferPipeline get tripleBufferPipeline => _tripleBufferPipeline;
   BatteryAwarePlayback get batteryAwarePlayback => _batteryAwarePlayback;
-  SeamlessQueueTransition get queueTransition => _queueTransition;
   StreamPreResolver get streamPreResolver => _streamPreResolver;
-  PlaybackQueueManager get queueManager => _queueManager;
   PlaybackVolumeController get volumeController => _volumeController;
-  PlaybackStateCoordinator get playbackStateCoordinator => _playbackStateCoordinator;
-  PlaybackPreloadOrchestrator get preloadOrchestrator => _preloadOrchestrator;
   StreamResolutionPipeline get streamResolutionPipeline => _streamResolutionPipeline;
 
   /// Mirrors the cached output route's Bluetooth flag into the effects layer.
@@ -429,17 +417,6 @@ class PulsrAudioHandler extends BaseAudioHandler
       );
     } catch (_) {}
   }
-
-  int getOptimalBufferFrames({
-    required bool isLocalFile,
-    required int sampleRate,
-    bool isHighRes = false,
-  }) =>
-      LatencyOptimizer.getOptimalBufferFrames(
-        isLocalFile: isLocalFile,
-        sampleRate: sampleRate,
-        isHighRes: isHighRes,
-      );
 
   factory PulsrAudioHandler(
       IMusicRepository repository, YtmService ytmService) {
@@ -839,6 +816,14 @@ class PulsrAudioHandler extends BaseAudioHandler
     );
   }
 
+  void startEndOfQueueTimer({bool fadeOut = true}) {
+    _sleepTimerManager.startEndOfQueueTimer(
+      fadeOut: fadeOut,
+      onTimerExpired: () async => pause(),
+      getActivePlayer: () => _activePlayer,
+    );
+  }
+
   void cancelSleepTimer() {
     _sleepTimerManager.cancelSleepTimer();
   }
@@ -924,19 +909,6 @@ class PulsrAudioHandler extends BaseAudioHandler
         // F4: adaptive quality step-down mid-track.
         unawaited(_maybeAdaptiveStepDown());
       },
-      onStreamRecoveryRequested: (videoId, error) async {
-        debugPrint(
-            '[AudioHandler] Attempting self-healing recovery for $videoId: $error');
-        unawaited(AudioSessionLog.instance.recordDropout());
-        try {
-          await _ytmService.invalidatePoToken();
-          await _ytmService.ensurePoTokenReady();
-        } catch (_) {}
-      },
-      onCorruptedFileDetected: (path, error) {
-        debugPrint('[AudioHandler] Corrupted file flagged at $path: $error');
-        unawaited(AudioSessionLog.instance.recordDropout());
-      },
     );
 
     _memoryManager = AudioMemoryManager(
@@ -1012,17 +984,9 @@ class PulsrAudioHandler extends BaseAudioHandler
       },
     );
 
-    _queueManager = PlaybackQueueManager();
     _volumeController = PlaybackVolumeController(
       getActivePlayer: () => _activePlayer,
       getInactivePlayer: () => _inactivePlayer,
-    );
-    _playbackStateCoordinator = PlaybackStateCoordinator(
-      onSavePositionRequested: () => saveCurrentPositionImmediate(),
-    );
-    _preloadOrchestrator = PlaybackPreloadOrchestrator(
-      scheduler: _preloadScheduler,
-      preResolver: _streamPreResolver,
     );
     _streamResolutionPipeline = StreamResolutionPipeline(
       ytmService: _ytmService,
@@ -1053,24 +1017,6 @@ class PulsrAudioHandler extends BaseAudioHandler
     BatteryOptimizationService.getBatteryLevel().then((level) {
       _batteryAwarePlayback.onBatteryLevelChanged(level);
     }).catchError((_) {});
-
-    _queueTransition = SeamlessQueueTransition(
-      buildAudioSources: (songs) => _buildAudioSources(songs),
-      crossfadeToInactive: (active, inactive) async {
-        final fadeId = _crossfadeManager.nextFadeId();
-        // Fade from the player's ACTUAL volume (ReplayGain-compensated), not
-        // the raw user volume: interpolating from `_volume` would jump the
-        // audible level to `_volume` on the first tick whenever ReplayGain
-        // has the player running below/above it.
-        await _crossfadeManager.fadeVolume(
-          active,
-          active.volume,
-          0.0,
-          _crossfadeManager.duration,
-          fadeId,
-        );
-      },
-    );
 
     void setupPlayerListeners(AudioPlayer player, bool isPlayerA) {
       bool isTargetActive() =>
@@ -1125,14 +1071,25 @@ class PulsrAudioHandler extends BaseAudioHandler
                 unawaited(_activePlayer.play());
                 return;
               }
-              // In gapless mode the ConcatenatingAudioSource advances itself; only
-              // the crossfade engine (one source per track) needs a manual skip on
-              // completion. A completed event at the very end (loop off) just stops.
-              if (!_gaplessMode &&
-                  state.processingState == ProcessingState.completed &&
+              // In gapless mode the ConcatenatingAudioSource advances itself, so a
+              // `completed` event at the very end (repeat off) means the queue is
+              // exhausted. The crossfade engine (one source per track) needs a
+              // manual skip only while a next item exists; both paths report queue
+              // completion so the sleep timer's endOfQueue mode can fire.
+              if (state.processingState == ProcessingState.completed &&
                   !_crossfadeManager.isCrossfading) {
-                unawaited(_sleepTimerManager.onTrackCompleted());
-                skipToNext();
+                if (_gaplessMode) {
+                  if (_activePlayer.loopMode == LoopMode.off) {
+                    unawaited(_sleepTimerManager.onTrackCompleted());
+                    unawaited(_sleepTimerManager.onQueueCompleted());
+                  }
+                } else {
+                  unawaited(_sleepTimerManager.onTrackCompleted());
+                  if (_getNextIndex(peek: true) == null) {
+                    unawaited(_sleepTimerManager.onQueueCompleted());
+                  }
+                  skipToNext();
+                }
               }
             }
           },
@@ -1575,6 +1532,16 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
     _lastPlayedSong = song;
     _onTrackChangedSubject.add(song);
+    // Signature-scan local lossless files so MQA material is labeled honestly
+    // instead of silently reported as plain FLAC on the next quality rebuild.
+    if (song.source == SongSource.local && !song.path.startsWith('content:')) {
+      final lowerPath = song.path.toLowerCase();
+      if (lowerPath.endsWith('.flac') || lowerPath.endsWith('.wav')) {
+        unawaited(MqaDecoderHelper.isMqaFile(song.path).then((isMqa) {
+          if (isMqa) MqaDecoderHelper.markMqaPath(song.path);
+        }).catchError((_) {}));
+      }
+    }
     unawaited(_beginAudioSession(song));
     unawaited(_maybeNegotiateOutputFormat(song));
   }
@@ -1858,9 +1825,20 @@ class PulsrAudioHandler extends BaseAudioHandler
   Future<AudioSource> _resolveAudioSource(
       SongsTableData song, MediaItem tag) async {
     if (song.source != SongSource.youtube) {
-      final ext = song.path.split('.').last.toLowerCase();
+      final cleanPath = song.path.split('?').first;
+      final dot = cleanPath.lastIndexOf('.');
+      final ext = dot >= 0 ? cleanPath.substring(dot + 1).toLowerCase() : '';
       if (ext == 'dsf' || ext == 'dff') {
         return DsdDecoderHelper.decodeDsdFile(song, tag);
+      }
+      // Route lossless containers through the format-aware decoder so MQA files
+      // are detected (and unfolded when the helper is enabled) instead of
+      // silently playing as plain FLAC. content:// URIs are excluded: the
+      // decoder builds a file URI and cannot read through a content resolver.
+      if ((ext == 'flac' || ext == 'wav') &&
+          !song.path.startsWith('content:') &&
+          song.uri?.startsWith('content:') != true) {
+        return _formatDecoder.decodeForFormat(song, tag);
       }
       return _createAudioSource(song, tag);
     }
@@ -5117,13 +5095,10 @@ class PulsrAudioHandler extends BaseAudioHandler
     } catch (_) {}
     _streamPreResolver.dispose();
     try {
+      _preloadScheduler.clear();
+    } catch (_) {}
+    try {
       _adaptiveBufferEngine.dispose();
-    } catch (_) {}
-    try {
-      _playbackStateCoordinator.dispose();
-    } catch (_) {}
-    try {
-      _preloadOrchestrator.dispose();
     } catch (_) {}
     try {
       _memoryManager.clearAll();

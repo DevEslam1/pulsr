@@ -38,6 +38,7 @@ import '../../../domain/repositories/music_repository_interface.dart';
 import '../../../domain/usecases/toggle_favorite_usecase.dart';
 import '../../../core/services/device_profile_service.dart';
 import '../../../core/services/hires_audio_service.dart';
+import '../../../core/services/room_correction_service.dart';
 import '../../../core/services/settings_profiles_service.dart';
 import '../../../domain/models/audio_output_info.dart';
 import '../../settings/cubit/settings_cubit.dart';
@@ -80,6 +81,11 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
 
   // FIX(BUG-14): Expose unthrottled position stream for high-fps UI components like MiniPlayer
   Stream<Duration> get rawPositionStream => _audioHandler.positionStream;
+
+  SponsorBlockService get _sponsorBlock =>
+      getIt.isRegistered<SponsorBlockService>()
+          ? getIt<SponsorBlockService>()
+          : SponsorBlockService.instance;
 
   StreamSubscription<void>? _widgetClickSub;
   DateTime? _lastWidgetUpdateTime;
@@ -966,6 +972,14 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   }
 
   Future<void> _loadSponsorBlockSegments(SongsTableData song, int gen) async {
+    // F-67: respect the persisted enable flag; the service loads it lazily.
+    await _sponsorBlock.loadPreferences();
+    if (!_sponsorBlock.isEnabled) {
+      _currentSponsorSegments = const [];
+      _sponsorSegmentsVideoId = null;
+      _lastSkippedSegmentEnd = null;
+      return;
+    }
     // Offline-only mode disables all network lookups including SponsorBlock.
     if (_settingsCubit?.state.offlineOnlyMode == true) {
       _currentSponsorSegments = const [];
@@ -998,9 +1012,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     _lastSkippedSegmentEnd = null;
 
     try {
-      final service = getIt.isRegistered<SponsorBlockService>()
-          ? getIt<SponsorBlockService>()
-          : SponsorBlockService.instance;
+      final service = _sponsorBlock;
       final segments = await service.getSegments(videoId);
       if (isClosed || gen != _mediaItemResolutionGen) return;
       _currentSponsorSegments = segments;
@@ -1011,12 +1023,17 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
 
   void _checkSponsorBlockSkip(Duration pos) {
     if (_currentSponsorSegments.isEmpty || !state.isPlaying) return;
+    // F-67: gate auto-skip on the persisted enable flag and enabled categories.
+    final service = _sponsorBlock;
+    if (!service.isEnabled) return;
+    final enabledCategories = service.enabledCategories;
     final now = DateTime.now();
     if (_lastSponsorSkipTime != null &&
         now.difference(_lastSponsorSkipTime!).inMilliseconds < 1500) {
       return;
     }
     for (final segment in _currentSponsorSegments) {
+      if (!enabledCategories.contains(segment.category)) continue;
       if (segment.contains(pos)) {
         if (_lastSkippedSegmentEnd != null &&
             (_lastSkippedSegmentEnd == segment.end ||
@@ -1218,6 +1235,64 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     if (song != null) {
       LrcParser.invalidateSong(songId: song.id, path: song.path);
       await _loadLyricsForSong(song);
+    }
+  }
+
+  /// Applies user-edited lyrics for the current song (F-31).
+  ///
+  /// Updates in-memory state and, for local files with a real path, writes a
+  /// sidecar `.lrc` next to the audio file so the edit survives restarts.
+  /// Returns true when the sidecar was persisted; false means the change is
+  /// session-only (e.g. online tracks or a write failure).
+  Future<bool> updateLyrics(List<LyricsLine> lines) async {
+    // Discard any in-flight loader so its late result cannot overwrite this edit.
+    ++_lyricsLoadGen;
+    final source =
+        lines.isNotEmpty ? LyricsSource.externalLrc : LyricsSource.none;
+    safeEmit(state.copyWith(
+      lyrics: lines,
+      lyricsSource: source,
+      isLoadingLyrics: false,
+    ));
+
+    final song = state.currentSong;
+    if (song == null) return false;
+
+    LrcParser.invalidateSong(songId: song.id, path: song.path);
+
+    final path = song.path;
+    final isLocal = song.source == SongSource.local &&
+        path.isNotEmpty &&
+        !path.startsWith('http') &&
+        !path.startsWith('ytmusic://');
+    if (!isLocal) {
+      LrcParser.cacheLyricsResult(
+        LyricsResult(lines: lines, source: source),
+        songId: song.id,
+        path: path,
+      );
+      return false;
+    }
+
+    try {
+      final file = File(path);
+      final dir = file.parent;
+      final baseName = path.split(RegExp(r'[\\/]')).last;
+      final dot = baseName.lastIndexOf('.');
+      final stem = dot > 0 ? baseName.substring(0, dot) : baseName;
+      final sidecar =
+          File('${dir.path}${Platform.pathSeparator}$stem.lrc');
+      await sidecar.writeAsString(LrcParser.formatToLrc(lines), flush: true);
+      LrcParser.cacheLyricsResult(
+        LyricsResult(lines: lines, source: source),
+        songId: song.id,
+        path: path,
+      );
+      return true;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist sidecar .lrc for $path',
+          error: e, stackTrace: st, category: 'Lyrics');
+      return false;
     }
   }
 
@@ -2117,6 +2192,40 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     return ok;
   }
 
+  /// F-37: merge a fitted room-correction curve with the currently selected
+  /// AutoEQ headphone profile (band-wise, clamped). Returns [roomGains]
+  /// unchanged (clamped) when no profile is selected. Thin passthrough to
+  /// [RoomCorrectionService.mergeWithHeadphoneCurve] for the room-correction
+  /// wizard's "stack with headphone" option.
+  List<double> mergeRoomCorrectionWithHeadphoneCurve(
+    List<double> roomGains, {
+    double maxGainDb = 15.0,
+  }) {
+    final profile = state.selectedHeadphoneProfile;
+    return RoomCorrectionService.mergeWithHeadphoneCurve(
+      roomGains,
+      profile?.gains ?? const <double>[],
+      maxGainDb: maxGainDb,
+    );
+  }
+
+  /// F-37: design a linear-phase FIR impulse response from a correction curve
+  /// for the native convolution stage. Thin passthrough to
+  /// [RoomCorrectionService.exportCorrectionImpulseResponse].
+  List<double> exportCorrectionImpulseResponse(
+    List<double> gains, {
+    List<double>? centers,
+    int sampleRate = RoomCorrectionService.captureSampleRate,
+    int taps = 127,
+  }) {
+    return RoomCorrectionService.exportCorrectionImpulseResponse(
+      gains,
+      centers: centers ?? EqPreset.centerFrequencies,
+      sampleRate: sampleRate,
+      taps: taps,
+    );
+  }
+
   Future<void> setVirtualizerEnabled(bool enabled) async {
     if (enabled && !_guardDsp('Virtualizer')) return;
     safeEmit(state.copyWith(isVirtualizerEnabled: enabled, errorMessage: null));
@@ -2740,6 +2849,11 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     safeEmit(state.copyWith(sleepTimerRemaining: null));
   }
 
+  void startEndOfQueueTimer() {
+    _audioHandler.startEndOfQueueTimer();
+    safeEmit(state.copyWith(sleepTimerRemaining: null));
+  }
+
   void cancelSleepTimer() {
     _audioHandler.cancelSleepTimer();
     safeEmit(state.copyWith(sleepTimerRemaining: null));
@@ -2747,6 +2861,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
 
   int? get sleepTimerRemainingTracks => _audioHandler.sleepTimerRemainingTracks;
   SleepTimerMode get sleepTimerMode => _audioHandler.sleepTimerMode;
+  bool get isEndOfQueueSleepTimer => sleepTimerMode == SleepTimerMode.endOfQueue;
   Stream<int?> get sleepTimerRemainingTracksStream =>
       _audioHandler.sleepTimerRemainingTracksStream;
 
@@ -2973,6 +3088,37 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     final song = state.currentSong;
     if (song != null) await _audioHandler.clearBookmarkFor(song);
     safeEmit(state.copyWith(bookmarkPosition: null));
+  }
+
+  /// Saves the current playback position as a bookmark. Returns false when
+  /// there is no current song or the position is too close to the head for the
+  /// store to accept it.
+  Future<bool> saveBookmark() async {
+    final song = state.currentSong;
+    if (song == null) return false;
+    final posMs = state.position.inMilliseconds;
+    if (posMs < 5000) return false;
+    try {
+      final key = PlaybackBookmarkStore.keyFor(
+          songId: song.id, remoteId: song.remoteId, path: song.path);
+      _audioHandler.bookmarkStore.save(key, posMs,
+          durationMs: state.duration.inMilliseconds);
+      await _audioHandler.persistBookmarks();
+      safeEmit(
+          state.copyWith(bookmarkPosition: Duration(milliseconds: posMs)));
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Reads the stored bookmark for [song] without mutating playback state.
+  PlaybackBookmark? storedBookmarkFor(SongsTableData song) {
+    try {
+      return _audioHandler.recallBookmarkFor(song);
+    } catch (_) {
+      return null;
+    }
   }
 
   void checkBookmarkOffer() {

@@ -443,21 +443,68 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     ));
   }
 
-  /// Selects all currently loaded songs. With DB pagination this is the
-  /// visible window, not the entire 10k library — scroll to load more first.
-  void selectAllSongs() {
-    final allIds = state.songs.map((s) => s.id).toSet();
-    safeEmit(state.copyWith(selectedSongIds: allIds, isMultiSelectMode: true));
+  /// Selects every song in the library. When only a paginated window is
+  /// loaded, resolves the full ID set from the repository so "Select All"
+  /// batch actions cover the entire library rather than the visible page.
+  Future<void> selectAllSongs() async {
+    if (!_hasMoreSongs) {
+      final allIds = state.songs.map((s) => s.id).toSet();
+      safeEmit(
+          state.copyWith(selectedSongIds: allIds, isMultiSelectMode: true));
+      return;
+    }
+    final repo = _musicRepository;
+    if (repo == null) {
+      final allIds = state.songs.map((s) => s.id).toSet();
+      safeEmit(
+          state.copyWith(selectedSongIds: allIds, isMultiSelectMode: true));
+      return;
+    }
+    final excluded =
+        (await _folderUseCases.getExcludedFolders()).fold((_) => <String>[], (r) => r);
+    if (isClosed) return;
+    final res = await repo
+        .watchAllSongs(limit: null, excludedFolders: excluded)
+        .first;
+    if (isClosed) return;
+    res.fold(
+      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
+      (songs) => safeEmit(state.copyWith(
+          selectedSongIds: songs.map((s) => s.id).toSet(),
+          isMultiSelectMode: true)),
+    );
   }
 
   void clearSelection() {
     safeEmit(state.copyWith(selectedSongIds: {}, isMultiSelectMode: false));
   }
 
-  List<SongsTableData> getSelectedSongs() {
-    return state.songs
-        .where((s) => state.selectedSongIds.contains(s.id))
-        .toList();
+  /// Resolves the selected songs, fetching any that are outside the currently
+  /// loaded page from the repository so batch actions are not silently
+  /// truncated to the visible window.
+  Future<List<SongsTableData>> getSelectedSongs() async {
+    final ids = state.selectedSongIds;
+    if (ids.isEmpty) return const [];
+    final loaded = <int, SongsTableData>{
+      for (final s in state.songs) s.id: s,
+    };
+    final result = <SongsTableData>[];
+    final missing = <int>[];
+    for (final id in ids) {
+      final s = loaded[id];
+      if (s != null) {
+        result.add(s);
+      } else {
+        missing.add(id);
+      }
+    }
+    final repo = _musicRepository;
+    if (missing.isNotEmpty && repo != null) {
+      final res = await repo.getSongsByIds(missing);
+      if (isClosed) return result;
+      res.fold((_) {}, result.addAll);
+    }
+    return result;
   }
 
   /// Batch imports YouTube Music playlist tracks as Favorites.

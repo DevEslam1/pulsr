@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:path/path.dart' as p_path;
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/widgets/song_tile.dart';
+import '../../../../domain/usecases/folder_usecases.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../cubit/library_cubit.dart';
 import '../../cubit/library_state.dart';
@@ -54,6 +56,16 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
         final childFolders = folders
             .where((f) => f != currentDir && f.startsWith(currentDir))
             .toList();
+
+        FolderItem? folderItemFor(String path) {
+          final normalized = path.replaceAll('\\', '/').toLowerCase();
+          for (final f in state.folders) {
+            if (f.path.replaceAll('\\', '/').toLowerCase() == normalized) {
+              return f;
+            }
+          }
+          return null;
+        }
 
         // Breadcrumb parts
         final breadcrumbs = p_path.split(currentDir);
@@ -131,8 +143,25 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                         style: TextStyle(
                             color: p.textPrimary, fontWeight: FontWeight.w600),
                       ),
-                      trailing: Icon(Icons.chevron_right_rounded,
-                          color: p.textSecondary),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (folderItemFor(sub) != null)
+                            IconButton(
+                              icon: Icon(Icons.open_in_new_rounded,
+                                  color: p.textSecondary, size: 18),
+                              tooltip: 'Open folder details',
+                              onPressed: () {
+                                final item = folderItemFor(sub);
+                                if (item != null) {
+                                  context.push('/folder', extra: item);
+                                }
+                              },
+                            ),
+                          Icon(Icons.chevron_right_rounded,
+                              color: p.textSecondary),
+                        ],
+                      ),
                       onTap: () => setState(() => _currentPath = sub),
                     ),
                   ],

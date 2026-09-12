@@ -20,6 +20,19 @@ class MqaDecoderHelper {
   /// Injected unfold processor for tests.
   static Future<Uint8List?> Function(Uint8List rawBytes, {required int originalRate})? testUnfold;
 
+  /// Paths whose bytes were confirmed to carry an MQA signature while resolving
+  /// playback. Lets the quality model report MQA honestly without a fresh scan.
+  static final Set<String> _confirmedMqaPaths = <String>{};
+
+  /// Records [filePath] as a signature-confirmed MQA file.
+  static void markMqaPath(String filePath) {
+    if (filePath.isNotEmpty) _confirmedMqaPaths.add(filePath);
+  }
+
+  /// True when [filePath] was previously confirmed to carry an MQA signature.
+  static bool isConfirmedMqaPath(String filePath) =>
+      filePath.isNotEmpty && _confirmedMqaPaths.contains(filePath);
+
   /// Checks if file headers or tags contain the MQA indicator.
   static Future<bool> isMqaFile(String filePath) async {
     try {

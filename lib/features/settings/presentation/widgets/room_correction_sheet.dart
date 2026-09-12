@@ -73,6 +73,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
   List<double>? _responseDb;
   List<double>? _gains;
   String? _error;
+  bool _mergeWithHeadphone = false;
 
   @override
   void dispose() {
@@ -165,8 +166,11 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
 
   Future<void> _apply() async {
     if (_gains == null) return;
-    final preset = RoomCorrectionService.buildPreset(_gains!);
     final cubit = context.read<PlayerCubit>();
+    final effectiveGains = _mergeWithHeadphone
+        ? cubit.mergeRoomCorrectionWithHeadphoneCurve(_gains!)
+        : _gains!;
+    final preset = RoomCorrectionService.buildPreset(effectiveGains);
     await cubit.setEqualizerEnabled(true);
     await cubit.applyPreset(preset);
     if (!mounted) return;
@@ -434,7 +438,27 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                         l10n.rcKeepPlayerPaused,
                         style: TextStyle(color: p.textTertiary, fontSize: 11),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 4),
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        value: _mergeWithHeadphone,
+                        activeColor: p.accent,
+                        onChanged: (v) => setState(
+                            () => _mergeWithHeadphone = v ?? false),
+                        title: Text(
+                          'Stack with headphone AutoEQ',
+                          style: TextStyle(
+                              color: p.textPrimary, fontSize: 13),
+                        ),
+                        subtitle: Text(
+                          'Combine this room correction with the selected headphone profile.',
+                          style: TextStyle(
+                              color: p.textSecondary, fontSize: 11),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
                       Row(
                         children: [
                           Expanded(

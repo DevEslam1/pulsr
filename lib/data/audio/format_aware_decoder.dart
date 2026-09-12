@@ -34,8 +34,11 @@ class FormatAwareDecoder {
       case 'flac':
       case 'wav':
         final isMqa = await MqaDecoderHelper.isMqaFile(song.path);
-        if (isMqa && (MqaDecoderHelper.isMqaEnabled?.call() ?? true)) {
-          return MqaDecoderHelper.decodeMqaFile(song, tag);
+        if (isMqa) {
+          MqaDecoderHelper.markMqaPath(song.path);
+          if (MqaDecoderHelper.isMqaEnabled?.call() ?? true) {
+            return MqaDecoderHelper.decodeMqaFile(song, tag);
+          }
         }
         return AudioSource.uri(Uri.file(song.path), tag: tag);
       case 'alac':

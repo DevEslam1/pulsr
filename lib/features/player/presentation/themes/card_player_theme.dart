@@ -28,6 +28,7 @@ import '../widgets/audio_visualizer.dart';
 import '../widgets/equalizer_sheet.dart';
 import '../widgets/lyrics_view.dart';
 import '../widgets/now_playing_queue_view.dart';
+import '../widgets/advanced_playback_bar.dart';
 import '../widgets/player_controls.dart';
 import '../widgets/player_seek_bar.dart';
 import '../widgets/speed_picker_sheet.dart';
@@ -260,6 +261,7 @@ class CardPlayerTheme extends StatelessWidget {
                                 : 40,
                             isPlaying: state.isPlaying,
                             audioSessionId: state.audioSessionId,
+                            trackSeed: song?.id,
                           ),
                         )
                       : const SizedBox.shrink();
@@ -403,6 +405,9 @@ class CardPlayerTheme extends StatelessWidget {
                     ),
 
                     SizedBox(height: spacingSeekToControls),
+
+                    // F1/F2/F11 advanced playback (AB loop, delay, bookmark)
+                    const AdvancedPlaybackBar(),
 
                     // Player Controls
                     PlayerControls(

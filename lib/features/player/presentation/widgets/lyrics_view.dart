@@ -12,6 +12,8 @@ import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
+import 'karaoke_mode_screen.dart';
+import 'lyrics_editor_sheet.dart';
 
 class LyricsView extends StatefulWidget {
   /// Playback position used to highlight the active line.
@@ -194,6 +196,74 @@ class _LyricsViewState extends State<LyricsView> {
     );
   }
 
+  void _openKaraoke() {
+    Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute<void>(
+        builder: (_) => KaraokeModeScreen(lyrics: widget.lyrics),
+      ),
+    );
+  }
+
+  Future<void> _openEditor() async {
+    final PlayerCubit cubit;
+    try {
+      cubit = context.read<PlayerCubit>();
+    } catch (_) {
+      return;
+    }
+    final song = cubit.state.currentSong;
+    if (song == null) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    await showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => LyricsEditorSheet(
+        song: song,
+        currentPosition: cubit.state.position,
+        initialLyrics: cubit.state.lyrics,
+        onSave: (lines) async {
+          final persisted = await cubit.updateLyrics(lines);
+          messenger?.showSnackBar(SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text(persisted
+                ? 'Lyrics saved'
+                : 'Lyrics updated for this session only'),
+          ));
+        },
+      ),
+    );
+  }
+
+  Widget _headerIconButton(
+      IconData icon, String tooltip, VoidCallback onPressed) {
+    return IconButton(
+      icon: Icon(icon, color: widget.activeColor, size: 20),
+      tooltip: tooltip,
+      visualDensity: VisualDensity.compact,
+      onPressed: onPressed,
+    );
+  }
+
+  Widget _buildHeaderActions() {
+    PlayerCubit? cubit;
+    try {
+      cubit = context.read<PlayerCubit>();
+    } catch (_) {}
+    final hasSong = cubit?.state.currentSong != null;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (hasSong)
+          _headerIconButton(
+              Icons.edit_note_rounded, 'Edit lyrics', _openEditor),
+        _headerIconButton(
+            Icons.fullscreen_rounded, 'Karaoke mode', _openKaraoke),
+      ],
+    );
+  }
+
   Widget _buildPlainTextList() {
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
@@ -277,8 +347,13 @@ class _LyricsViewState extends State<LyricsView> {
       child: Stack(
         children: [
           Padding(
-            padding: const EdgeInsets.only(top: 16),
+            padding: const EdgeInsets.only(top: 48),
             child: isSynced ? _buildSyncedLyricView() : _buildPlainTextList(),
+          ),
+          Positioned(
+            top: 4,
+            left: 4,
+            child: _buildHeaderActions(),
           ),
           if (source != LyricsSource.none)
             Positioned(

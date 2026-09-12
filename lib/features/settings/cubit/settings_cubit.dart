@@ -14,11 +14,13 @@ import '../../../core/di/injection.dart';
 import '../../../core/network/app_http_overrides.dart';
 import '../../../core/network/proxy_config.dart';
 import '../../../core/services/hires_audio_service.dart';
+import '../../../core/services/theme_scheduler_service.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../data/audio/audio_effects_channel.dart';
 import '../../../data/audio/audio_handler.dart';
 import '../../../data/audio/equalizer_manager.dart';
 import '../../../data/scanner/media_scanner_service.dart';
+import '../../../domain/repositories/music_repository_interface.dart';
 import '../../../core/constants/audio_feature_info.dart';
 import '../../player/presentation/widgets/audio_visualizer.dart';
 import 'settings_state.dart';
@@ -41,6 +43,8 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       'setting_resume_after_interruption';
   static const String _keyWaveformSeekBar = 'setting_waveform_seek_bar';
   static const String _keyThemeMode = 'setting_theme_mode';
+  static const String _keyAutoThemeByTime = 'setting_auto_theme_by_time';
+  static const String _keyHighContrast = 'setting_high_contrast';
   static const String _keyLanguageCode = PrefsKeys.languageCode;
   static const String _keyCustomAccent = 'setting_custom_accent';
   static const String _keyPlayerThemeMode = 'setting_player_theme_mode';
@@ -78,6 +82,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       'proxy_pool_passwords_secure';
 
   final FlutterSecureStorage _secureStorage;
+  ThemeSchedulerService? _themeScheduler;
   String _proxyPassword = '';
 
   /// Set by the proxy setters, cleared when a load starts. Lets a load that is
@@ -87,6 +92,8 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
 
   ProxyConfig get activeProxyConfig =>
       state.proxyConfig.copyWith(password: _proxyPassword);
+
+  Stream<double> get scanProgress => _scannerService.scanProgress;
 
   Future<String> getProxyPassword() async {
     if (_proxyPassword.isNotEmpty) return _proxyPassword;
@@ -127,7 +134,47 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
         ),
       );
     });
+    _initThemeScheduler();
     _loadPreferences();
+  }
+
+  /// Resolves the scheduler and consumes its stream. The callback is gated on
+  /// [SettingsState.autoThemeByTime] so it never overrides a manual theme mode
+  /// unless the user has opted into scheduled switching.
+  void _initThemeScheduler() {
+    try {
+      _themeScheduler = getIt.isRegistered<ThemeSchedulerService>()
+          ? getIt<ThemeSchedulerService>()
+          : ThemeSchedulerService();
+      autoSub(_themeScheduler!.isNightStream, _onNightChanged);
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to start theme scheduler',
+        error: e,
+        stackTrace: st,
+        category: 'SettingsCubit',
+      );
+    }
+  }
+
+  void _onNightChanged(bool isNight) {
+    if (isClosed || !state.autoThemeByTime) return;
+    setThemeMode(isNight ? AppThemeMode.dark : AppThemeMode.light);
+  }
+
+  /// Starts the periodic schedule check. Only ever called when the preference
+  /// is on, so installs that never opt in carry no timer.
+  void _startThemeScheduler() {
+    try {
+      if (isClosed || !state.autoThemeByTime) return;
+      _themeScheduler?.startScheduler((_) {});
+    } catch (_) {}
+  }
+
+  @override
+  Future<void> close() {
+    _themeScheduler?.stopScheduler();
+    return super.close();
   }
 
   void clearError() {
@@ -416,6 +463,9 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
         waveformSeekBarEnabled:
             prefs.getBool(_keyWaveformSeekBar) ?? state.waveformSeekBarEnabled,
         themeMode: themeMode,
+        autoThemeByTime:
+            prefs.getBool(_keyAutoThemeByTime) ?? state.autoThemeByTime,
+        highContrast: prefs.getBool(_keyHighContrast) ?? state.highContrast,
         languageCode: prefs.getString(_keyLanguageCode) ?? state.languageCode,
         customAccentColorValue: customAccentValue,
         playerThemeMode: playerThemeMode,
@@ -594,6 +644,8 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       } catch (e) {
         debugPrint('[SettingsCubit] Failed to sync proxy settings during load: $e');
       }
+      // Resume scheduled theming across restarts only when the user opted in.
+      _startThemeScheduler();
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to load settings preferences from SharedPreferences',
@@ -668,6 +720,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
   }
 
   Future<void> setAutoHideSystemMedia(bool value) async {
+    MediaScannerService.clearNomediaCache();
     safeEmit(state.copyWith(autoHideSystemMedia: value));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyAutoHideSystemMedia, value);
@@ -701,6 +754,26 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyThemeMode, mode.name);
     _syncSystemUiOverlay(mode);
+  }
+
+  /// Opt-in day/night theme switching. When enabled, the scheduler re-checks
+  /// the schedule immediately so the toggle takes effect without waiting for
+  /// the next 15-minute tick.
+  Future<void> setAutoThemeByTime(bool value) async {
+    safeEmit(state.copyWith(autoThemeByTime: value));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyAutoThemeByTime, value);
+    if (value) {
+      _startThemeScheduler();
+    } else {
+      _themeScheduler?.stopScheduler();
+    }
+  }
+
+  Future<void> setHighContrast(bool value) async {
+    safeEmit(state.copyWith(highContrast: value));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyHighContrast, value);
   }
 
   /// Keeps the Android status/nav bars in sync with the app theme so a
@@ -1209,6 +1282,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
   }
 
   Future<int> rescanLibrary() async {
+    MediaScannerService.clearNomediaCache();
     safeEmit(
       state.copyWith(
         isScanning: true,
@@ -1229,6 +1303,18 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       return count;
     } catch (e) {
       safeEmit(state.copyWith(isScanning: false, errorMessage: e.toString()));
+      return 0;
+    }
+  }
+
+  Future<int> removeMissingFiles() async {
+    try {
+      if (!getIt.isRegistered<IMusicRepository>()) return 0;
+      final result = await getIt<IMusicRepository>().hardDeleteMissingSongs();
+      return result.fold<int>((_) => 0, (count) => count);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to remove missing files',
+          error: e, stackTrace: st, category: 'SettingsCubit');
       return 0;
     }
   }

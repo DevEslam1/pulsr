@@ -360,7 +360,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildPlaybackFeatureIcon(
-                    Icons.equalizer_rounded, '5-Band EQ', p.accent),
+                    Icons.equalizer_rounded, '10-Band Graphic EQ', p.accent),
                 _buildPlaybackFeatureIcon(
                     Icons.tune_rounded, 'Crossfade', p.accent),
                 _buildPlaybackFeatureIcon(
@@ -382,7 +382,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1, end: 0),
           const SizedBox(height: 16),
           Text(
-            'Tailor your sound with a 10-band graphic equalizer, smooth crossfade transitions, gapless playback, and smart sleep timers.',
+            'Tailor your sound with a 10-band graphic equalizer (±12 dB, 31Hz–16kHz), smooth crossfade transitions, gapless playback, and smart sleep timers.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: p.textSecondary,
@@ -395,7 +395,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             runSpacing: 8,
             alignment: WrapAlignment.center,
             children: const [
-              _FeatureBadge(label: '5-Band Equalizer'),
+              _FeatureBadge(label: '10-Band Graphic EQ'),
               _FeatureBadge(label: 'Smooth Crossfade'),
               _FeatureBadge(label: 'Sleep Timer'),
               _FeatureBadge(label: 'Gapless Playback'),

@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:injectable/injectable.dart';
 import '../../domain/models/ytm_track.dart';
+import '../di/injection.dart';
 import '../utils/error_logger.dart';
+import 'ytm_account_service.dart';
 import 'ytm_service.dart';
 
 class YtmBrowseItem {
@@ -82,7 +84,7 @@ class YtmBrowseService {
         ),
         YtmBrowseSection(
           title: 'Moods & Genres',
-          subtitle: 'Curated by vibe and style',
+          subtitle: 'Popular tracks from YouTube Music moods & genres',
           items: moods,
         ),
       ];
@@ -162,50 +164,84 @@ class YtmBrowseService {
     return const [];
   }
 
-  /// Fetches Moods and Genres.
+  /// Fetches Moods & Genres from the native YTM bridge.
+  ///
+  /// The native extractor browses `FEmusic_moods_and_genres` and returns real
+  /// track items (`YtmExtractorPlugin.browseMusicSection`); there is no
+  /// category-tile API, so results are surfaced as playable songs. Returns an
+  /// empty list when the bridge is unavailable — never fabricated IDs/art.
   Future<List<YtmBrowseItem>> getMoodsAndGenres() async {
-    return const [
-      YtmBrowseItem(
-        id: 'mood_chill',
-        title: 'Chill & Relax',
-        subtitle: 'Calm beats and ambient vibes',
-        artworkUrl:
-            'https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=500',
-        type: 'playlist',
-      ),
-      YtmBrowseItem(
-        id: 'mood_workout',
-        title: 'Workout & Energy',
-        subtitle: 'High BPM hype and motivation',
-        artworkUrl:
-            'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500',
-        type: 'playlist',
-      ),
-      YtmBrowseItem(
-        id: 'mood_focus',
-        title: 'Deep Focus & Study',
-        subtitle: 'Lo-Fi, piano and instrumental',
-        artworkUrl:
-            'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=500',
-        type: 'playlist',
-      ),
-      YtmBrowseItem(
-        id: 'mood_party',
-        title: 'Party & Dance',
-        subtitle: 'EDM, House and club bangers',
-        artworkUrl:
-            'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=500',
-        type: 'playlist',
-      ),
-    ];
+    try {
+      final moods = await _ytmService.getMoods(limit: 15);
+      if (moods.isNotEmpty) {
+        return moods
+            .take(8)
+            .map((t) => YtmBrowseItem(
+                  id: t.videoId,
+                  title: t.title,
+                  subtitle: t.artist,
+                  artworkUrl: t.artworkUrl,
+                  type: 'song',
+                  duration: t.duration,
+                ))
+            .toList();
+      }
+    } catch (_) {}
+
+    return const [];
   }
 
-  /// Starts dynamic radio based on a seed song videoId.
+  /// Returns tracks to queue after the seed track [videoId].
+  ///
+  /// First uses YouTube Music's real auto-mix/radio playlist
+  /// (`RDAMVM<videoId>`), which the account service `/next` endpoint resolves
+  /// into actual radio tracks. When that path is unavailable the native bridge
+  /// exposes no radio method, so this falls back to an honest search over the
+  /// seed's title/artist (and finally real trending tracks). Callers should
+  /// label fallback results as "Similar tracks", never as a real radio.
   Future<List<YtmTrack>> startRadio(String videoId) async {
+    final seed = videoId.trim();
+    if (seed.isEmpty) return const [];
+
+    // 1. Real YTM radio/auto-mix playlist for the seed video.
     try {
-      final related = await _ytmService.search('related to $videoId');
-      if (related.isNotEmpty) return related;
+      if (getIt.isRegistered<YtmAccountService>()) {
+        final radio = await getIt<YtmAccountService>()
+            .fetchPlaylistTracks('RDAMVM$seed', maxTracks: 25);
+        final filtered = radio
+            .where((t) => t.videoId.isNotEmpty && t.videoId != seed)
+            .toList();
+        if (filtered.isNotEmpty) return filtered;
+      }
     } catch (_) {}
+
+    // 2. Honest fallback: real search/trending results, no fabricated IDs.
+    return _similarTracks(seed);
+  }
+
+  Future<List<YtmTrack>> _similarTracks(String seed) async {
+    try {
+      final seedMatches = await _ytmService.searchWithFallback(seed, limit: 1);
+      if (seedMatches.isNotEmpty) {
+        final t = seedMatches.first;
+        final parts = <String>[
+          if (t.title.trim().isNotEmpty && t.title != 'Unknown Title')
+            t.title.trim(),
+          if (t.artist.trim().isNotEmpty && t.artist != 'Unknown Artist')
+            t.artist.trim(),
+        ];
+        if (parts.isNotEmpty) {
+          final similar = await _ytmService.searchWithFallback(
+            parts.join(' '),
+            limit: 25,
+          );
+          final filtered =
+              similar.where((track) => track.videoId != seed).toList();
+          if (filtered.isNotEmpty) return filtered;
+        }
+      }
+    } catch (_) {}
+
     return (await getTrendingCharts()).map((e) => e.toYtmTrack()).toList();
   }
 }

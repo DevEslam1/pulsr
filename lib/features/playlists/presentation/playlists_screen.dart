@@ -1,9 +1,14 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/di/injection.dart';
+import '../../../core/services/playlist_share_service.dart';
+import '../../../core/services/playlist_suggestions_service.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/services/ytm_service.dart';
 import '../../../core/theme/aura_theme.dart';
@@ -37,6 +42,61 @@ class PlaylistsScreen extends StatefulWidget {
 class _PlaylistsScreenState extends State<PlaylistsScreen> {
   _PlaylistTabMode _selectedTab = _PlaylistTabMode.local;
   PlaylistsTableData? _selectedPlaylist;
+  List<PlaylistSuggestion> _suggestions = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSuggestions());
+  }
+
+  /// Suggestion service output is optional and non-intrusive: it stays hidden
+  /// until real library songs produce at least one suggestion.
+  Future<void> _loadSuggestions() async {
+    try {
+      final result = await getIt<GetSongsUseCase>().getAllSongs();
+      final allSongs = result.fold((_) => <SongsTableData>[], (songs) => songs);
+      final suggestions =
+          getIt<PlaylistSuggestionsService>().generateSuggestions(allSongs);
+      if (!mounted) return;
+      setState(() => _suggestions = suggestions);
+    } catch (_) {
+      // Suggestions are a best-effort convenience; stay hidden on failure.
+    }
+  }
+
+  Future<void> _createPlaylistFromSuggestion(
+      PlaylistSuggestion suggestion) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final useCases = getIt<PlaylistUseCases>();
+    try {
+      final created = await useCases.createPlaylist(suggestion.title);
+      final playlistId = created.fold<int?>((_) => null, (id) => id);
+      if (playlistId == null) {
+        messenger.showSnackBar(
+          const SnackBar(
+              content: Text('Could not create the suggested playlist.')),
+        );
+        return;
+      }
+      // Suggestions already carry resolved songs; persist them by id.
+      final songIds = suggestion.songs.map((s) => s.id).toList();
+      if (songIds.isNotEmpty) {
+        await useCases.addSongsToPlaylist(playlistId, songIds);
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+              'Created "${suggestion.title}" with ${songIds.length} tracks.'),
+        ),
+      );
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(
+            content: Text('Could not create the suggested playlist.')),
+      );
+    }
+  }
 
   void _onSelectPlaylist(PlaylistsTableData pl) {
     if (context.isTabletLandscape) {
@@ -133,6 +193,13 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
           await getIt<PlaylistExportUseCase>().exportToFile(pl.name, songs);
       if (!context.mounted) return;
       if (share) {
+        final sharedBundle = await _sharePlaylistBundle(pl.name, songs);
+        if (sharedBundle) {
+          try {
+            if (await file.exists()) await file.delete();
+          } catch (_) {}
+          return;
+        }
         try {
           await SharePlus.instance.share(
             ShareParams(
@@ -158,6 +225,40 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
           const SnackBar(content: Text('Export failed. Please try again.')),
         );
       }
+    }
+  }
+
+  /// Routes sharing through [PlaylistShareService] so the portable JSON bundle
+  /// is the primary format. Returns false (caller falls back to the existing
+  /// M3U share) when the service cannot produce or validate a bundle.
+  Future<bool> _sharePlaylistBundle(
+      String name, List<SongsTableData> songs) async {
+    try {
+      final shareService = getIt<PlaylistShareService>();
+      final json = shareService.exportPlaylist(name, songs);
+      if (json.isEmpty || shareService.importPlaylist(json) == null) {
+        return false;
+      }
+
+      final tempDir = await getTemporaryDirectory();
+      final safeName = name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final bundle = File('${tempDir.path}/$safeName.pulsr.json');
+      await bundle.writeAsString(json);
+      try {
+        await SharePlus.instance.share(
+          ShareParams(
+            files: [XFile(bundle.path, mimeType: 'application/json')],
+            text: 'Playlist: $name',
+          ),
+        );
+        return true;
+      } finally {
+        try {
+          if (await bundle.exists()) await bundle.delete();
+        } catch (_) {}
+      }
+    } catch (_) {
+      return false;
     }
   }
 
@@ -425,6 +526,43 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               onTap: () => context.push('/favorites'),
             ),
           ),
+
+          // Suggested for you (optional; hidden until real library data yields
+          // at least one suggestion).
+          if (_suggestions.isNotEmpty) ...[
+            Padding(
+              padding: EdgeInsets.only(
+                left: Adaptive.pagePadding(context),
+                right: Adaptive.pagePadding(context),
+                top: 24,
+                bottom: 10,
+              ),
+              child: Text(
+                'SUGGESTED FOR YOU',
+                style: Theme.of(context)
+                    .textTheme
+                    .labelSmall
+                    ?.copyWith(color: p.textTertiary),
+              ),
+            ),
+            SizedBox(
+              height: 140,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.symmetric(
+                    horizontal: Adaptive.pagePadding(context)),
+                itemCount: _suggestions.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  final suggestion = _suggestions[index];
+                  return _SuggestionCard(
+                    suggestion: suggestion,
+                    onTap: () => _createPlaylistFromSuggestion(suggestion),
+                  );
+                },
+              ),
+            ),
+          ],
 
           // SMART PLAYLISTS Header
           Padding(
@@ -1602,6 +1740,66 @@ class _PlaylistHeroCard extends StatelessWidget {
                   color: Colors.white, shape: BoxShape.circle),
               child:
                   Icon(Icons.play_arrow_rounded, color: colors.first, size: 26),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SuggestionCard extends StatelessWidget {
+  final PlaylistSuggestion suggestion;
+  final VoidCallback onTap;
+
+  const _SuggestionCard({required this.suggestion, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: 230,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: p.surfaceContainer,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: p.hairline),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.auto_awesome_rounded, color: p.accent, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    suggestion.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: p.textPrimary,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              suggestion.description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: p.textSecondary, fontSize: 12),
+            ),
+            const Spacer(),
+            Text(
+              '${suggestion.songs.length} tracks • Tap to create',
+              style: TextStyle(color: p.textTertiary, fontSize: 11),
             ),
           ],
         ),

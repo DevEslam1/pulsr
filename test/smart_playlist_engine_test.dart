@@ -244,7 +244,8 @@ void main() {
       expect(resPlays.map((s) => s.title), isNot(contains('NinetiesSong')));
     });
 
-    test('bpm rule field is ignored safely and returns all songs', () async {
+    test('bpm rule filters using the override store and drops songs without one',
+        () async {
       await insertSong(id: 401, title: 'Song1');
       await insertSong(id: 402, title: 'Song2');
 
@@ -258,8 +259,10 @@ void main() {
         ],
       );
 
+      // F-17: BPM rules are evaluated against manual overrides; with none set
+      // no song matches, so the rule is enforced rather than ignored.
       final result = await engine.evaluateCriteria(criteria);
-      expect(result.length, 2);
+      expect(result, isEmpty);
     });
 
     test('empty criteria returns all songs', () async {

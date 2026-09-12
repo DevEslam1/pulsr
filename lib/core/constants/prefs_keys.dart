@@ -145,6 +145,13 @@ class PrefsKeys {
   static const String trackDelayMap = 'per_track_audio_delay_v1';
   static const String bookmarksMap = 'playback_bookmarks_v1';
 
+  // F-67: SponsorBlock auto-skip controls.
+  static const String sponsorBlockEnabled = 'sponsorblock_enabled';
+  static const String sponsorBlockCategories = 'sponsorblock_categories';
+
+  // F-27: manual loudness normalization toggle (read by PulsrAudioHandler).
+  static const String audioNormalizationEnabled = 'audio_normalization_enabled';
+
   static const String dspPreference = 'setting_dsp_preference'; // 'native' | 'oem' | 'auto'
   static const String ditherEnabled = 'setting_dither_enabled';
   static const String ditherTargetBitDepth = 'setting_dither_target_bit_depth';

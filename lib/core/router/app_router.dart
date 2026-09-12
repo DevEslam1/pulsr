@@ -59,19 +59,20 @@ GoRouter createRouter(MediaScannerService scannerService) {
       return null;
     },
     errorBuilder: (context, state) => Scaffold(
-      appBar: AppBar(title: const Text('Page Not Found')),
+      appBar: AppBar(title: Text(context.l10n.pageNotFoundTitle)),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(Icons.music_off_outlined, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
-            Text('No page found at ${state.uri}',
+            Text(
+                context.l10n.pageNotFoundMessage(state.uri.toString()),
                 style: const TextStyle(fontSize: 16)),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () => context.go('/'),
-              child: Text(context.l10n.navHome),
+              child: Text(context.l10n.goHome),
             ),
           ],
         ),

@@ -1497,4 +1497,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String bluetoothLatencySubtitle(int offset) {
     return 'تعويض تأخير ذاكرة التخزين المؤقت للبلوتوث ($offset مللي ثانية).';
   }
+
+  @override
+  String get pageNotFoundTitle => 'الصفحة غير موجودة';
+
+  @override
+  String pageNotFoundMessage(String path) {
+    return 'لم يتم العثور على صفحة في $path';
+  }
+
+  @override
+  String get goHome => 'العودة إلى الرئيسية';
 }

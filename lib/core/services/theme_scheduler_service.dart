@@ -25,6 +25,14 @@ class ThemeSchedulerService {
     });
   }
 
+  /// Cancels the periodic check without tearing down the stream, so the
+  /// scheduler can be started again later (e.g. when the user re-enables
+  /// scheduled theming) and so closing a cubit releases its timer.
+  void stopScheduler() {
+    _timer?.cancel();
+    _timer = null;
+  }
+
   void _checkSchedule(void Function(bool isNight) onThemeChange) {
     final now = DateTime.now();
     final bool isNight;

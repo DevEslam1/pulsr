@@ -1,5 +1,6 @@
 // lib/domain/models/audio_quality_info.dart
 import 'package:flutter/material.dart';
+import '../../data/audio/mqa_decoder_helper.dart';
 import '../../data/db/app_database.dart';
 import 'ytm_audio_quality.dart';
 
@@ -172,6 +173,15 @@ class AudioQualityInfo {
         : (ext == 'dsf' || ext == 'dff');
     final bool isLosslessFormat = isFlac || isWav || isAlac || isAiff || isDsd;
 
+    // MQA is carried inside a lossless container (usually FLAC). A confirmed
+    // signature scan wins; otherwise fall back to a filename/tag heuristic so
+    // the badge never silently presents MQA material as plain lossless.
+    final bool isMqa = (realCodec != null && realCodec.contains('mqa')) ||
+        MqaDecoderHelper.isConfirmedMqaPath(song.path) ||
+        RegExp(r'(?:^|[\s_\-\.\/])mqa(?:$|[\s_\-\.\/])',
+                caseSensitive: false)
+            .hasMatch(path);
+
     final bool hasRealHiRes = (realBitDepth != null && realBitDepth >= 24) ||
         (realSampleRate != null && realSampleRate > 48000);
 
@@ -222,7 +232,8 @@ class AudioQualityInfo {
       tier = AudioQualityTier.hiResLossless;
       tierLabel = 'Ultra Hi-Res DSD';
       shortBadgeLabel = 'DSD • HI-RES';
-      description = '1-bit High Density Studio Master audio stream';
+      description =
+          '1-bit High Density Studio Master, decoded to PCM (native DSD/DoP output is not supported in this build)';
       badgeColor = const Color(0xFFFFB800);
       icon = Icons.stars_rounded;
       sampleRate =
@@ -327,18 +338,22 @@ class AudioQualityInfo {
     }
 
     return AudioQualityInfo(
-      format: formatLabel,
-      codecName: codecName,
+      format: isMqa ? 'MQA' : formatLabel,
+      codecName: isMqa ? 'Master Quality Authenticated (MQA)' : codecName,
       bitrateKbps: calculatedBitrate,
       sampleRate: sampleRate,
       bitDepth: bitDepth,
       channels: 'Stereo (2.0)',
       tier: tier,
-      tierLabel: tierLabel,
-      shortBadgeLabel: shortBadgeLabel,
-      description: description,
-      badgeColor: badgeColor,
-      icon: icon,
+      tierLabel: isMqa ? 'MQA (core unfold)' : tierLabel,
+      shortBadgeLabel: isMqa ? 'MQA' : shortBadgeLabel,
+      description: isMqa
+          ? 'MQA-encoded stream. Core unfold is handled in-app; full '
+              'authenticated/native MQA rendering is not available in this '
+              'build, so no authenticated MQA output is claimed.'
+          : description,
+      badgeColor: isMqa ? const Color(0xFFF59E0B) : badgeColor,
+      icon: isMqa ? Icons.verified_rounded : icon,
     );
   }
 }

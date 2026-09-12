@@ -18,7 +18,9 @@ class GetSongsUseCase {
     String? searchQuery,
     List<String> excludedFolders = const [],
   }) {
-    final validatedLimit = limit?.clamp(0, 1000);
+    // No upper cap: the library cubit paginates by growing the window, and
+    // libraries can exceed 1k rows. Only guard against negative values.
+    final validatedLimit = (limit != null && limit < 0) ? 0 : limit;
     final validatedOffset = offset != null ? (offset < 0 ? 0 : offset) : null;
     final validatedQuery = (searchQuery != null && searchQuery.length > 200)
         ? searchQuery.substring(0, 200)
@@ -59,7 +61,7 @@ class GetSongsUseCase {
     int? limit,
     int? offset,
   }) {
-    final validatedLimit = limit?.clamp(0, 1000);
+    final validatedLimit = (limit != null && limit < 0) ? 0 : limit;
     final validatedOffset = offset != null ? (offset < 0 ? 0 : offset) : null;
 
     return _repository.getAllSongs(

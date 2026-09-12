@@ -8,7 +8,10 @@ import '../../../core/config/app_config.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/artwork_cache_manager.dart';
+import '../../../core/services/automation_rules_service.dart';
+import '../../../core/services/automation_trigger_service.dart';
 import '../../../core/services/scrobbler_service.dart';
+import '../../../core/services/settings_profiles_service.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/services/ytm_cache_manager.dart';
 import '../../../core/theme/aura_theme.dart';
@@ -23,6 +26,7 @@ import '../cubit/settings_cubit.dart';
 import '../cubit/settings_state.dart';
 import 'widgets/audio_sound_section.dart';
 import 'widgets/backup_section.dart';
+import 'widgets/device_profiles_section.dart';
 import 'widgets/playback_section.dart';
 import 'widgets/ytm_account_disconnect_dialog.dart';
 
@@ -198,6 +202,22 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ),
                     _divider(p),
+                    _switchTile(
+                        context,
+                        Icons.nightlight_round,
+                        'Auto Dark Mode by Time',
+                        'Follow a 7 PM – 6 AM day/night schedule',
+                        value: state.autoThemeByTime,
+                        onChanged: cubit.setAutoThemeByTime),
+                    _divider(p),
+                    _switchTile(
+                        context,
+                        Icons.contrast_rounded,
+                        'High Contrast',
+                        'Boost contrast with an AMOLED-friendly palette',
+                        value: state.highContrast,
+                        onChanged: cubit.setHighContrast),
+                    _divider(p),
                     _navTile(
                         context,
                         Icons.art_track_rounded,
@@ -268,6 +288,20 @@ class SettingsScreen extends StatelessWidget {
                         onTap: () => _showNowPlayingArtworkSwipePickerSheet(
                             context, cubit, state.nowPlayingArtworkSwipe)),
                   ]),
+                  _section(context, 'Device Profiles', [
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+                      child: DeviceProfilesSection(),
+                    ),
+                  ]),
+                  _section(context, 'Automation', [
+                    _navTile(
+                        context,
+                        Icons.auto_awesome_rounded,
+                        'Automation Rules',
+                        'Apply profiles automatically on device events',
+                        onTap: () => _showAutomationRulesSheet(context)),
+                  ]),
                   _section(context, context.l10n.libraryAndScanning, [
                     _navTile(
                         context,
@@ -288,11 +322,27 @@ class SettingsScreen extends StatelessWidget {
                             ? 'Last scan: ${state.scanResultCount} tracks'
                             : 'Scan device storage for audio',
                         trailing: state.isScanning
-                            ? SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: p.accent))
+                            ? StreamBuilder<double>(
+                                stream: cubit.scanProgress,
+                                initialData: 0.0,
+                                builder: (context, snapshot) {
+                                  final progress =
+                                      (snapshot.data ?? 0.0).clamp(0.0, 1.0);
+                                  return SizedBox(
+                                    width: 40,
+                                    height: 40,
+                                    child: Center(
+                                      child: Text(
+                                        '${(progress * 100).round()}%',
+                                        style: TextStyle(
+                                            color: p.accent,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 12),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              )
                             : null,
                         onTap: state.isScanning
                             ? () {}
@@ -305,6 +355,13 @@ class SettingsScreen extends StatelessWidget {
                         context.l10n.ignoreFilesUnder(state.minDurationSec),
                         onTap: () => _showDurationFilterDialog(
                             context, cubit, state.minDurationSec)),
+                    _divider(p),
+                    _navTile(
+                        context,
+                        Icons.cleaning_services_rounded,
+                        'Remove missing files',
+                        'Delete indexed tracks whose files no longer exist',
+                        onTap: () => _removeMissingFiles(context, cubit)),
                   ]),
                   if (AppConfig.ytmEnabled)
                     _section(context, context.l10n.youtubeMusicAndOnline, [
@@ -495,12 +552,12 @@ class SettingsScreen extends StatelessWidget {
                         Icons.security_rounded,
                         context.l10n.privacyGuarantee,
                         context.l10n.privacyGuaranteeSubtitle,
-                        onTap: () {}),
+                        onTap: () => _showPrivacyGuaranteeSheet(context)),
                   ]),
                   _section(context, context.l10n.about, [
                     _navTile(context, Icons.info_outline_rounded,
                         context.l10n.appTitle, context.l10n.aboutAppSubtitle,
-                        onTap: () {}),
+                        onTap: () => _showAboutSheet(context)),
                   ]),
                 ],
               ),
@@ -654,6 +711,39 @@ class SettingsScreen extends StatelessWidget {
             child: Text(context.l10n.save),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _removeMissingFiles(
+      BuildContext context, SettingsCubit cubit) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove missing files?'),
+        content: const Text(
+            'This permanently deletes indexed tracks whose files no longer exist on disk.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(context.l10n.cancel)),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final removed = await cubit.removeMissingFiles();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          removed > 0
+              ? 'Removed $removed missing ${removed == 1 ? 'track' : 'tracks'}'
+              : 'No missing files found',
+        ),
       ),
     );
   }
@@ -2027,6 +2117,352 @@ class SettingsScreen extends StatelessWidget {
       ),
     );
   }
+
+  void _showPrivacyGuaranteeSheet(BuildContext context) {
+    final p = context.palette;
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: p.surfaceContainer,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.8,
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.security_rounded, color: p.accent, size: 24),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Privacy Guarantee',
+                      style: TextStyle(
+                        color: p.textPrimary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _privacyPoint(
+                  context,
+                  Icons.offline_bolt_rounded,
+                  'Offline-first',
+                  'Your library, playback and settings live on this device. Nothing is uploaded unless you explicitly sign in for cloud sync.',
+                ),
+                _privacyPoint(
+                  context,
+                  Icons.visibility_off_rounded,
+                  'No trackers in Pure',
+                  'Pure (Play Store) builds ship without the INTERNET permission, analytics SDKs or advertising identifiers.',
+                ),
+                _privacyPoint(
+                  context,
+                  Icons.folder_shared_rounded,
+                  'Permissions are purposeful',
+                  'Storage/media access is used only to scan and play your local audio. Bluetooth and notification access are requested only for connected-audio features and playback controls.',
+                ),
+                _privacyPoint(
+                  context,
+                  Icons.cloud_off_rounded,
+                  'You stay in control',
+                  'Cloud sync and remote metadata can be disabled. Automation rules and device profiles are stored locally.',
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _privacyPoint(
+      BuildContext context, IconData icon, String title, String body) {
+    final p = context.palette;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: p.accent, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: p.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  body,
+                  style: TextStyle(
+                    color: p.textSecondary,
+                    fontSize: 12.5,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAboutSheet(BuildContext context) {
+    final p = context.palette;
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      backgroundColor: p.surfaceContainer,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: p.accentContainer,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Icon(Icons.graphic_eq_rounded, color: p.accent, size: 34),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                AppConfig.appTitle,
+                style: TextStyle(
+                  color: p.textPrimary,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 20,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Version ${AppConfig.appVersion}',
+                style: TextStyle(color: p.textSecondary, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'An audiophile-grade local music player with bit-perfect output, a full DSP chain, per-device profiles and automation.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: p.textSecondary,
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: p.accent,
+                    foregroundColor: p.onAccent,
+                  ),
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Close'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showAutomationRulesSheet(BuildContext context) {
+    final p = context.palette;
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: p.surfaceContainer,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => const _AutomationRulesSheet(),
+    );
+  }
+}
+
+class _AutomationRulesSheet extends StatefulWidget {
+  const _AutomationRulesSheet();
+
+  @override
+  State<_AutomationRulesSheet> createState() => _AutomationRulesSheetState();
+}
+
+class _AutomationRulesSheetState extends State<_AutomationRulesSheet> {
+  final AutomationRulesService _rulesService = getIt<AutomationRulesService>();
+  final SettingsProfilesService _profilesService =
+      getIt<SettingsProfilesService>();
+
+  List<AutomationRule> _rules = const [];
+  Map<String, String> _profileNames = const {};
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final rules = await _rulesService.getRules();
+      final profiles = await _profilesService.getProfiles();
+      if (!mounted) return;
+      setState(() {
+        _rules = rules;
+        _profileNames = {for (final p in profiles) p.id: p.name};
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _toggle(AutomationRule rule, bool value) async {
+    final updated = rule.copyWith(enabled: value);
+    setState(() {
+      _rules = [
+        for (final r in _rules) if (r.id == rule.id) updated else r,
+      ];
+    });
+    await _rulesService.saveRule(updated);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.8,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.auto_awesome_rounded, color: p.accent, size: 24),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Automation Rules',
+                    style: TextStyle(
+                      color: p.textPrimary,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 18,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Apply a settings profile automatically when a device event fires.',
+                style: TextStyle(color: p.textSecondary, fontSize: 12.5),
+              ),
+              const SizedBox(height: 16),
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                      child: CircularProgressIndicator(strokeWidth: 2)),
+                )
+              else if (_rules.isEmpty)
+                Text(
+                  'No automation rules configured.',
+                  style: TextStyle(color: p.textSecondary, fontSize: 13),
+                )
+              else
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      for (final rule in _rules) _ruleTile(p, rule),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _ruleTile(PulsrPalette p, AutomationRule rule) {
+    final supported = AutomationTriggerService.supportsTrigger(rule.trigger);
+    final profileName =
+        _profileNames[rule.targetProfileId] ?? rule.targetProfileId;
+    final IconData icon;
+    switch (rule.trigger) {
+      case AutomationTrigger.bluetoothConnected:
+        icon = Icons.bluetooth_rounded;
+        break;
+      case AutomationTrigger.headphonesPlugged:
+        icon = Icons.headphones_rounded;
+        break;
+      case AutomationTrigger.deviceCharging:
+        icon = Icons.battery_charging_full_rounded;
+        break;
+    }
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: p.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: p.hairline),
+      ),
+      child: SwitchListTile(
+        value: rule.enabled && supported,
+        onChanged: supported ? (v) => _toggle(rule, v) : null,
+        secondary: Icon(
+          icon,
+          color: supported ? p.accent : p.textTertiary,
+        ),
+        title: Text(
+          rule.trigger.label,
+          style: TextStyle(
+            color: p.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
+          ),
+        ),
+        subtitle: Text(
+          supported ? 'Apply: $profileName' : 'Not detectable on this platform',
+          style: TextStyle(
+            color: supported ? p.textSecondary : p.error,
+            fontSize: 12,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _CacheSection extends StatefulWidget {
@@ -2041,7 +2477,13 @@ class _CacheSectionState extends State<_CacheSection>
   int _artCacheSizeBytes = 0;
   int _streamCacheSizeBytes = 0;
   bool _isLoading = true;
-  final YtmCacheManager _ytmCacheManager = YtmCacheManager();
+
+  /// YTM is only present in ENABLE_YTM builds; keep Pure builds from touching
+  /// the stream-cache directory entirely (no directory creation/reads).
+  YtmCacheManager? get _ytmCacheManager =>
+      AppConfig.ytmEnabled && getIt.isRegistered<YtmCacheManager>()
+          ? getIt<YtmCacheManager>()
+          : null;
 
   @override
   void initState() {
@@ -2065,7 +2507,9 @@ class _CacheSectionState extends State<_CacheSection>
 
   Future<void> _refreshCacheSize() async {
     final artSize = await ArtworkCacheManager().getDiskCacheSizeBytes();
-    final streamSize = await _ytmCacheManager.getCacheSizeBytes();
+    final cacheManager = _ytmCacheManager;
+    final streamSize =
+        cacheManager == null ? 0 : await cacheManager.getCacheSizeBytes();
     if (mounted) {
       setState(() {
         _artCacheSizeBytes = artSize;
@@ -2134,51 +2578,55 @@ class _CacheSectionState extends State<_CacheSection>
           ),
         ),
         Divider(height: 1, color: p.hairline),
-        ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          leading: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.redAccent.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
+        if (AppConfig.ytmEnabled) ...[
+          ListTile(
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.cloud_download_rounded,
+                  color: Colors.redAccent, size: 22),
             ),
-            child: const Icon(Icons.cloud_download_rounded,
-                color: Colors.redAccent, size: 22),
-          ),
-          title: Text(
-            'YouTube Stream Disk Cache',
-            style: TextStyle(
-                color: p.textPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: 14.5),
-          ),
-          subtitle: Text(
-            _isLoading
-                ? 'Calculating…'
-                : '${_formatSize(_streamCacheSizeBytes)} cached for zero-latency replay',
-            style: TextStyle(color: p.textSecondary, fontSize: 12.5),
-          ),
-          trailing: TextButton.icon(
-            style: TextButton.styleFrom(
-              foregroundColor: p.error,
-              visualDensity: VisualDensity.compact,
+            title: Text(
+              'YouTube Stream Disk Cache',
+              style: TextStyle(
+                  color: p.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14.5),
             ),
-            icon: const Icon(Icons.delete_outline_rounded, size: 18),
-            label: const Text('Clear'),
-            onPressed: () async {
-              await _ytmCacheManager.clearCache();
-              await _refreshCacheSize();
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Stream cache cleared successfully')),
-                );
-              }
-            },
+            subtitle: Text(
+              _isLoading
+                  ? 'Calculating…'
+                  : '${_formatSize(_streamCacheSizeBytes)} cached for zero-latency replay',
+              style: TextStyle(color: p.textSecondary, fontSize: 12.5),
+            ),
+            trailing: TextButton.icon(
+              style: TextButton.styleFrom(
+                foregroundColor: p.error,
+                visualDensity: VisualDensity.compact,
+              ),
+              icon: const Icon(Icons.delete_outline_rounded, size: 18),
+              label: const Text('Clear'),
+              onPressed: () async {
+                final cacheManager = _ytmCacheManager;
+                if (cacheManager == null) return;
+                await cacheManager.clearCache();
+                await _refreshCacheSize();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Stream cache cleared successfully')),
+                  );
+                }
+              },
+            ),
           ),
-        ),
-        Divider(height: 1, color: p.hairline),
+          Divider(height: 1, color: p.hairline),
+        ],
         ListTile(
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 16, vertical: 4),

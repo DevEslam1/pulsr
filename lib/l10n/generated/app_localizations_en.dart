@@ -1489,4 +1489,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String bluetoothLatencySubtitle(int offset) {
     return 'Compensates for Bluetooth audio codec buffer latency ($offset ms). Volume deferral: AVRCP absolute volume active.';
   }
+
+  @override
+  String get pageNotFoundTitle => 'Page Not Found';
+
+  @override
+  String pageNotFoundMessage(String path) {
+    return 'No page found at $path';
+  }
+
+  @override
+  String get goHome => 'Go Home';
 }

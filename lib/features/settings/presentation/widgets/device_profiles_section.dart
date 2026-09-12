@@ -90,7 +90,13 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
   Future<void> _applyForDevice(DeviceProfileEntry device) async {
     final link = _links[device.deviceKey];
     if (link == null) return;
-    final profile = _profiles.where((p) => p.id == link.profileId).firstOrNull;
+    SettingsProfile? profile;
+    for (final p in _profiles) {
+      if (p.id == link.profileId) {
+        profile = p;
+        break;
+      }
+    }
     if (profile == null) return;
     final l10n = context.l10n;
     await context.read<PlayerCubit>().applyProfile(profile, manual: true);
@@ -144,6 +150,9 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
       BuildContext context, DeviceProfileEntry device, AppLocalizations l10n) {
     final link = _links[device.deviceKey];
     final isCurrent = device.deviceKey == _currentDeviceKey;
+    final linkedId = link?.profileId;
+    final hasLinkedProfile =
+        linkedId != null && _profiles.any((p) => p.id == linkedId);
     return Row(
       children: [
         Expanded(
@@ -172,7 +181,7 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
                 underline: const SizedBox.shrink(),
                 hint: Text(l10n.profileDropdownLabel,
                     style: Theme.of(context).textTheme.bodySmall),
-                value: link?.profileId,
+                value: hasLinkedProfile ? linkedId : null,
                 items: [
                   for (final p in _profiles)
                     DropdownMenuItem<String>(value: p.id, child: Text(p.name)),

@@ -35,7 +35,8 @@ class MetadataSearchService {
   MetadataSearchService([http.Client? httpClient])
       : _httpClient = httpClient ?? http.Client();
 
-  /// Searches iTunes and MusicBrainz APIs for track metadata matching [query] or [artist] & [title].
+  /// Searches the iTunes Search API for track metadata matching [title] & [artist].
+  /// MusicBrainz is not implemented; only iTunes is queried.
   /// Returns empty when offline-only mode is enabled.
   Future<List<OnlineTrackMetadata>> searchMetadata({
     required String title,

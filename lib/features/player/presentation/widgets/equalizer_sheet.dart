@@ -26,6 +26,7 @@ import 'dsp_inspector_sheet.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../settings/cubit/settings_cubit.dart';
+import '../../../settings/presentation/widgets/room_correction_sheet.dart';
 
 // Rebuild gate for the whole DSP sheet. Every user-facing toggle/slider field
 // MUST be listed here or its switch will not flip until the sheet is reopened
@@ -34,6 +35,7 @@ import '../../../settings/cubit/settings_cubit.dart';
 bool dspSheetRebuildGate(PlayerState a, PlayerState b) {
   return a.isEqEnabled != b.isEqEnabled ||
       a.eqPreset.name != b.eqPreset.name ||
+      a.eqPreset.gains.length != b.eqPreset.gains.length ||
       a.eqPreset.bassBoost != b.eqPreset.bassBoost ||
       a.isVirtualizerEnabled != b.isVirtualizerEnabled ||
       a.virtualizerStrength != b.virtualizerStrength ||
@@ -102,18 +104,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   bool _isLoadingProfiles = true;
   bool _isAbComparing = false;
 
-  static const List<String> _bandLabels = [
-    '32',
-    '64',
-    '125',
-    '250',
-    '500',
-    '1K',
-    '2K',
-    '4K',
-    '8K',
-    '16K'
-  ];
+  /// F-35: per-band solo/mute are push-to-native only (the engine exposes no
+  /// getter), so the sheet owns the transient UI state. Cleared on a band-count
+  /// switch because the indices then refer to a different frequency plan.
+  final Set<int> _mutedBands = <int>{};
+  final Set<int> _soloedBands = <int>{};
 
   @override
   void initState() {
@@ -191,6 +186,36 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     } catch (_) {
       return null;
     }
+  }
+
+  /// F-32: active band plan length (10 or 32). The manager is the source of
+  /// truth; fall back to the emitted preset length when DI is not registered.
+  int _activeBandCount(PlayerState state) {
+    final manager = _equalizerManagerOrNull();
+    if (manager != null) return manager.activeFrequencies.length;
+    return state.eqPreset.gains.length == 32 ? 32 : 10;
+  }
+
+  /// F-32: center frequencies matching [_activeBandCount].
+  List<double> _activeFrequencies(PlayerState state) {
+    final manager = _equalizerManagerOrNull();
+    if (manager != null) return manager.activeFrequencies;
+    return state.eqPreset.gains.length == 32
+        ? EqPreset.iso32Frequencies
+        : EqPreset.centerFrequencies;
+  }
+
+  String _formatHz(double hz) {
+    if (hz >= 1000) {
+      final k = hz / 1000.0;
+      final s = k == k.roundToDouble()
+          ? k.toStringAsFixed(0)
+          : k.toStringAsFixed(1);
+      return '${s}K';
+    }
+    return hz == hz.roundToDouble()
+        ? hz.toStringAsFixed(0)
+        : hz.toStringAsFixed(1);
   }
 
   /// Truthful native status: shown under an effect control when the engine
@@ -423,6 +448,351 @@ class _EqualizerSheetState extends State<EqualizerSheet>
         );
       }
     }
+  }
+
+  /// F-32: edit the active band plan's center frequencies. Validates strictly
+  /// ascending order and a sane 10 Hz..30 kHz range before applying, then
+  /// re-pushes to the engine (the center-frequency setters only persist).
+  Future<void> _showCustomFrequencyEditor(
+      PlayerCubit cubit, PlayerState state) async {
+    final is32 = _activeBandCount(state) == 32;
+    final initial = List<double>.from(_activeFrequencies(state));
+    final controllers = [
+      for (final f in initial)
+        TextEditingController(
+            text: f == f.roundToDouble()
+                ? f.toStringAsFixed(0)
+                : f.toStringAsFixed(1)),
+    ];
+    String? error;
+    final applied = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text('Custom ${initial.length}-band Frequencies'),
+          content: SizedBox(
+            width: 340,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Set the center frequency (Hz) for each band. Values must be '
+                  'strictly ascending between 10 Hz and 30 kHz.',
+                  style: TextStyle(fontSize: 12),
+                ),
+                if (error != null) ...[
+                  const SizedBox(height: 8),
+                  Text(error!,
+                      style: const TextStyle(color: Colors.red, fontSize: 12)),
+                ],
+                const SizedBox(height: 8),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 360),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        for (var i = 0; i < controllers.length; i++)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: TextField(
+                              controller: controllers[i],
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      decimal: true),
+                              decoration: InputDecoration(
+                                isDense: true,
+                                labelText: 'Band ${i + 1}',
+                                suffixText: 'Hz',
+                                border: const OutlineInputBorder(),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final parsed = <double>[];
+                for (final c in controllers) {
+                  final v = double.tryParse(c.text.trim());
+                  if (v == null) {
+                    setDialogState(
+                        () => error = 'Every band needs a valid number.');
+                    return;
+                  }
+                  parsed.add(v);
+                }
+                for (var i = 0; i < parsed.length; i++) {
+                  if (parsed[i] < 10 || parsed[i] > 30000) {
+                    setDialogState(() =>
+                        error = 'Frequencies must stay within 10-30000 Hz.');
+                    return;
+                  }
+                  if (i > 0 && parsed[i] <= parsed[i - 1]) {
+                    setDialogState(() =>
+                        error = 'Frequencies must be strictly ascending.');
+                    return;
+                  }
+                }
+                Navigator.pop(ctx, true);
+              },
+              child: const Text('Apply'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (applied == true) {
+      final parsed = [
+        for (final c in controllers) double.parse(c.text.trim()),
+      ];
+      final manager = _equalizerManagerOrNull();
+      if (manager != null) {
+        if (is32) {
+          await manager.setCustom32Frequencies(parsed);
+        } else {
+          await manager.setCustomFrequencies(parsed);
+        }
+      }
+      // The center-frequency setters only persist; re-push the active plan so
+      // the native parametric EQ picks up the new centers immediately.
+      await cubit.set32BandMode(is32);
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(
+            content: Text('Custom band frequencies applied.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+    for (final c in controllers) {
+      c.dispose();
+    }
+  }
+
+  /// F-37: room-correction entry surfaced from the EQ sheet. Opens the
+  /// measurement wizard or exports the current curve to the convolution stage
+  /// as a linear-phase FIR (see [PlayerCubit.exportCorrectionImpulseResponse]).
+  Future<void> _showRoomCorrectionActions(PlayerCubit cubit) async {
+    final action = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Room Correction'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Measure your room, then export the correction as a convolution '
+              'impulse response. Stacking with an AutoEQ profile is applied by '
+              'the room-correction wizard.',
+              style: TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.mic_rounded),
+              title: const Text('Measure room response'),
+              subtitle: const Text('Run the stepped-sine wizard'),
+              onTap: () => Navigator.pop(ctx, 'measure'),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.tune_rounded),
+              title: const Text('Export current EQ as FIR'),
+              subtitle: const Text('Loads the curve into the convolution stage'),
+              onTap: () => Navigator.pop(ctx, 'export'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || action == null) return;
+    if (action == 'measure') {
+      await RoomCorrectionSheet.show(context);
+    } else if (action == 'export') {
+      await _exportCurrentCurveAsFir(cubit, cubit.state);
+    }
+  }
+
+  Future<void> _exportCurrentCurveAsFir(
+      PlayerCubit cubit, PlayerState state) async {
+    final gains = List<double>.from(state.eqPreset.gains);
+    final centers = _activeFrequencies(state);
+    final ir = cubit.exportCorrectionImpulseResponse(
+      gains,
+      centers: centers.length == gains.length ? centers : null,
+    );
+    final loaded = await cubit.loadCustomImpulseResponse(ir);
+    if (!mounted) return;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(
+        content: Text(loaded
+            ? 'Room-correction FIR loaded into the convolution stage.'
+            : 'The audio engine rejected the FIR export.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Widget _buildBandControl({
+    required int index,
+    required String label,
+    required bool isEnabled,
+    required Color accentColor,
+    required Color trackColor,
+    required Color surfaceColor,
+    required Color textColor,
+    required Color errorColor,
+    required PlayerState state,
+    required PlayerCubit cubit,
+  }) {
+    final isMuted = _mutedBands.contains(index);
+    final isSoloed = _soloedBands.contains(index);
+    return BlocSelector<PlayerCubit, PlayerState, double>(
+      selector: (s) =>
+          index < s.eqPreset.gains.length ? s.eqPreset.gains[index] : 0.0,
+      builder: (context, gain) => RepaintBoundary(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _VerticalEqSlider(
+              value: gain,
+              label: label,
+              isEnabled: isEnabled,
+              accentColor: accentColor,
+              trackColor: trackColor,
+              surfaceColor: surfaceColor,
+              textColor: textColor,
+              onInteraction: () {
+                if (!state.isEqEnabled) {
+                  cubit.setEqualizerEnabled(true);
+                }
+              },
+              onChanged: (val) {
+                if (!state.isEqEnabled) {
+                  cubit.setEqualizerEnabled(true);
+                }
+                cubit.setBandGain(index, val);
+              },
+            ),
+            const SizedBox(height: 4),
+            // F-35: fast solo/mute toggles. State is transient (native has no
+            // getter), so it is mirrored locally for the current session only.
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _bandToggle(
+                  label: 'M',
+                  tooltip: isMuted ? 'Unmute band' : 'Mute band',
+                  active: isMuted,
+                  activeColor: errorColor,
+                  onTap: isEnabled
+                      ? () async {
+                          final next = !isMuted;
+                          final manager = _equalizerManagerOrNull();
+                          if (manager != null) {
+                            await manager.setBandMute(index, next);
+                          }
+                          if (!mounted) return;
+                          setState(() {
+                            if (next) {
+                              _mutedBands.add(index);
+                            } else {
+                              _mutedBands.remove(index);
+                            }
+                          });
+                        }
+                      : null,
+                ),
+                const SizedBox(width: 2),
+                _bandToggle(
+                  label: 'S',
+                  tooltip: isSoloed ? 'Unsolo band' : 'Solo band',
+                  active: isSoloed,
+                  activeColor: accentColor,
+                  onTap: isEnabled
+                      ? () async {
+                          final next = !isSoloed;
+                          final manager = _equalizerManagerOrNull();
+                          if (manager != null) {
+                            await manager.setBandSolo(index, next);
+                          }
+                          if (!mounted) return;
+                          setState(() {
+                            if (next) {
+                              _soloedBands.add(index);
+                            } else {
+                              _soloedBands.remove(index);
+                            }
+                          });
+                        }
+                      : null,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _bandToggle({
+    required String label,
+    required String tooltip,
+    required bool active,
+    required Color activeColor,
+    required VoidCallback? onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(4),
+        child: Container(
+          width: 16,
+          height: 16,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color:
+                active ? activeColor.withValues(alpha: 0.18) : Colors.transparent,
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(
+              color:
+                  active ? activeColor : Colors.grey.withValues(alpha: 0.35),
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 9,
+              height: 1.0,
+              fontWeight: FontWeight.w800,
+              color: active ? activeColor : Colors.grey,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -1227,6 +1597,23 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     );
                   },
                 ),
+                const SizedBox(width: 8),
+
+                // F-37: room-correction entry with FIR export.
+                ActionChip(
+                  avatar:
+                      Icon(Icons.graphic_eq_rounded, size: 14, color: p.accent),
+                  label: const Text('Room Correction',
+                      style:
+                          TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  backgroundColor: p.surfaceContainer,
+                  side: BorderSide(color: p.hairline),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  onPressed: dspBlocked != null
+                      ? null
+                      : () => _showRoomCorrectionActions(cubit),
+                ),
               ],
             ),
           ),
@@ -1355,7 +1742,86 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           ),
           const SizedBox(height: 14),
 
-          // 10-Band Equalizer Vertical Sliders
+          // F-32: 10-band / 32-band mode toggle + custom frequency editor.
+          Row(
+            children: [
+              Text(
+                'Bands',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: p.textSecondary),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: p.surfaceContainer,
+                  borderRadius: BorderRadius.circular(9),
+                  border: Border.all(color: p.hairline),
+                ),
+                child: Row(
+                  children: [
+                    for (final bandCount in const [10, 32])
+                      InkWell(
+                        borderRadius: BorderRadius.circular(7),
+                        onTap: dspBlocked != null
+                            ? null
+                            : () async {
+                                if (_activeBandCount(state) == bandCount) {
+                                  return;
+                                }
+                                _mutedBands.clear();
+                                _soloedBands.clear();
+                                await cubit
+                                    .set32BandMode(bandCount == 32);
+                                if (mounted) setState(() {});
+                              },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _activeBandCount(state) == bandCount
+                                ? p.accent
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(7),
+                          ),
+                          child: Text(
+                            '$bandCount',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: _activeBandCount(state) == bandCount
+                                  ? p.onAccent
+                                  : p.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: dspBlocked != null
+                    ? null
+                    : () => _showCustomFrequencyEditor(cubit, state),
+                icon: Icon(Icons.tune_rounded, size: 16, color: p.accent),
+                label: Text('Frequencies',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: p.accent,
+                        fontWeight: FontWeight.w700)),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Equalizer band sliders — 10-band ISO or 32-band 1/3-octave.
           Container(
             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 6),
             decoration: BoxDecoration(
@@ -1363,45 +1829,227 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               borderRadius: AppRadii.cardRadius,
               border: Border.all(color: p.hairline),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: List.generate(_bandLabels.length, (index) {
-                // F-10: each band subscribes to its own gain via
-                // BlocSelector, so a band-drag delta rebuilds only the
-                // dragged slider (plus the curve) instead of the whole sheet.
-                return Expanded(
-                  child: BlocSelector<PlayerCubit, PlayerState, double>(
-                    selector: (s) => index < s.eqPreset.gains.length
-                        ? s.eqPreset.gains[index]
-                        : 0.0,
-                    builder: (context, gain) => RepaintBoundary(
-                      child: _VerticalEqSlider(
-                        value: gain,
-                        label: _bandLabels[index],
-                        isEnabled: effectiveEnabled,
-                        accentColor: p.accent,
-                        trackColor: p.hairline,
-                        surfaceColor: p.surface,
-                        textColor: p.textPrimary,
-                        onInteraction: () {
-                          if (!state.isEqEnabled) {
-                            cubit.setEqualizerEnabled(true);
-                          }
-                        },
-                        onChanged: (val) {
-                          if (!state.isEqEnabled) {
-                            cubit.setEqualizerEnabled(true);
-                          }
-                          cubit.setBandGain(index, val);
-                        },
-                      ),
-                    ),
-                  ),
+            child: Builder(
+              builder: (context) {
+                final bandCount = _activeBandCount(state);
+                final frequencies = _activeFrequencies(state);
+                final compact = bandCount > 10;
+                final sliders = Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: List.generate(bandCount, (index) {
+                    // F-10: each band subscribes to its own gain via
+                    // BlocSelector, so a band-drag delta rebuilds only the
+                    // dragged slider (plus the curve) instead of the whole sheet.
+                    final control = _buildBandControl(
+                      index: index,
+                      label: index < frequencies.length
+                          ? _formatHz(frequencies[index])
+                          : '',
+                      isEnabled: effectiveEnabled,
+                      accentColor: p.accent,
+                      trackColor: p.hairline,
+                      surfaceColor: p.surface,
+                      textColor: p.textPrimary,
+                      errorColor: p.error,
+                      state: state,
+                      cubit: cubit,
+                    );
+                    return compact
+                        ? SizedBox(width: 40, child: control)
+                        : Expanded(child: control);
+                  }),
                 );
-              }),
+                if (!compact) return sliders;
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: sliders,
+                );
+              },
             ),
           ),
           const SizedBox(height: 16),
+
+          // F-33: manual preamp / gain staging with clipping warning.
+          Builder(
+            builder: (context) => StatefulBuilder(
+              builder: (context, setCardState) {
+              final manager = _equalizerManagerOrNull();
+              final currentPreamp = manager?.preampDb ??
+                  (state.selectedHeadphoneProfile?.preampGain ?? 0.0);
+              final maxBoost = state.eqPreset.gains.isEmpty
+                  ? 0.0
+                  : state.eqPreset.gains.reduce((a, b) => a > b ? a : b);
+              final clipRisk = currentPreamp + maxBoost > 0.0;
+              return Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: p.surfaceContainer,
+                  borderRadius: AppRadii.cardRadius,
+                  border: Border.all(
+                    color: clipRisk
+                        ? p.error.withValues(alpha: 0.45)
+                        : p.hairline,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: (clipRisk ? p.error : p.accent)
+                                .withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.vertical_align_center_rounded,
+                            color: clipRisk ? p.error : p.accent,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Preamp',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13,
+                                    color: p.textPrimary),
+                              ),
+                              Text(
+                                state.selectedHeadphoneProfile != null
+                                    ? 'Manual override (AutoEQ suggests '
+                                        '${state.selectedHeadphoneProfile!.preampGain.toStringAsFixed(1)} dB)'
+                                    : 'Output gain applied before the EQ',
+                                style: TextStyle(
+                                    fontSize: 11, color: p.textTertiary),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: (clipRisk
+                                    ? p.error
+                                    : (currentPreamp.abs() > 0.05
+                                        ? p.accent
+                                        : p.surface))
+                                .withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: clipRisk
+                                  ? p.error.withValues(alpha: 0.4)
+                                  : (currentPreamp.abs() > 0.05
+                                      ? p.accent.withValues(alpha: 0.3)
+                                      : p.hairline),
+                            ),
+                          ),
+                          child: Text(
+                            '${currentPreamp > 0 ? '+' : ''}${currentPreamp.toStringAsFixed(1)} dB',
+                            style: TextStyle(
+                              color: clipRisk
+                                  ? p.error
+                                  : (currentPreamp.abs() > 0.05
+                                      ? p.accent
+                                      : p.textSecondary),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        IconButton(
+                          icon: Icon(Icons.settings_backup_restore,
+                              size: 16,
+                              color: currentPreamp.abs() <= 0.05 ||
+                                      dspBlocked != null
+                                  ? p.textTertiary.withValues(alpha: 0.35)
+                                  : p.accent),
+                          tooltip: 'Reset preamp',
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints:
+                              const BoxConstraints(minWidth: 24, minHeight: 24),
+                          onPressed: currentPreamp.abs() <= 0.05 ||
+                                  dspBlocked != null
+                              ? null
+                              : () {
+                                  final target =
+                                      state.selectedHeadphoneProfile
+                                              ?.preampGain ??
+                                          0.0;
+                                  manager?.setPreamp(target);
+                                  setCardState(() {});
+                                },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 4,
+                        thumbShape: const RoundSliderThumbShape(
+                            enabledThumbRadius: 6),
+                        overlayShape: const RoundSliderOverlayShape(
+                            overlayRadius: 14),
+                        activeTrackColor: clipRisk ? p.error : p.accent,
+                        inactiveTrackColor: p.surface,
+                        thumbColor: clipRisk ? p.error : p.accent,
+                      ),
+                      child: Slider(
+                        value: currentPreamp.clamp(-12.0, 12.0),
+                        min: -12.0,
+                        max: 12.0,
+                        divisions: 48,
+                        onChanged: dspBlocked != null
+                            ? null
+                            : (val) {
+                                if (!state.isEqEnabled) {
+                                  cubit.setEqualizerEnabled(true);
+                                }
+                                final rounded =
+                                    (val * 10).roundToDouble() / 10.0;
+                                manager?.setPreamp(rounded);
+                                setCardState(() {});
+                              },
+                      ),
+                    ),
+                    if (clipRisk)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2, left: 4),
+                        child: Row(
+                          children: [
+                            Icon(Icons.warning_amber_rounded,
+                                color: p.error, size: 13),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Preamp ${currentPreamp > 0 ? '+' : ''}${currentPreamp.toStringAsFixed(1)} dB with peak EQ '
+                                '+${maxBoost.toStringAsFixed(1)} dB may clip. Lower the preamp.',
+                                style: TextStyle(
+                                    color: p.error,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              );
+              },
+            ),
+          ),
+          const SizedBox(height: 12),
 
           // Bass Boost Slider
           Container(

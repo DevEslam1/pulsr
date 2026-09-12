@@ -29,6 +29,10 @@ abstract class IMusicRepository {
   Future<Result<SongsTableData?>> findMatchingLocalSong(
       {String? remoteId, String? title, String? artist});
   Future<Result<List<SongsTableData>>> getSongsByIds(List<int> ids);
+
+  /// Permanently removes the given song rows and, for local files, deletes the
+  /// backing file from disk. Never touches `ytmusic://` sentinel rows.
+  Future<Result<void>> deleteSongs(List<int> ids);
   Future<Result<int>> hardDeleteMissingSongs();
 
   /// Folds a downloaded YouTube row (negative [oldId]) into the positive-id
@@ -61,6 +65,7 @@ abstract class IMusicRepository {
   Stream<Result<List<SongsTableData>>> watchAlbumSongs(int albumId);
   Future<Result<List<AlbumsTableData>>> getAlbums();
   Future<Result<List<SongsTableData>>> getAlbumSongs(int albumId);
+  Future<Result<void>> updateAlbumArtwork(int albumId, String artworkUrl);
 
   // --- ARTISTS ---
   Stream<Result<List<ArtistsTableData>>> watchArtists();

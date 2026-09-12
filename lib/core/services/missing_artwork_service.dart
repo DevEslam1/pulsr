@@ -4,6 +4,8 @@ import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/db/app_database.dart';
+import '../../domain/repositories/music_repository_interface.dart';
+import '../di/injection.dart';
 import '../utils/error_logger.dart';
 
 class _ArtworkRateLimiter {
@@ -127,5 +129,36 @@ class MissingArtworkService {
     }
 
     return results;
+  }
+
+  /// Finds albums without artwork, looks each one up on iTunes and writes every
+  /// resolved URL back to the `albums` table. Returns the number of albums
+  /// updated. No-ops (returns 0) when offline-only mode is enabled.
+  Future<int> fetchAndPersistMissingArtwork({
+    void Function(int processed, int total)? onProgress,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool('setting_offline_only_mode') == true) return 0;
+    } catch (_) {}
+
+    if (!getIt.isRegistered<IMusicRepository>()) return 0;
+    final repo = getIt<IMusicRepository>();
+
+    final albumsRes = await repo.getAlbums();
+    final albums = albumsRes.fold((_) => const <AlbumsTableData>[], (r) => r);
+    final missing = findMissingArtworkAlbums(albums);
+    if (missing.isEmpty) return 0;
+
+    final fetched = await batchFetchArtwork(missing, onProgress: onProgress);
+
+    int persisted = 0;
+    for (final entry in fetched.entries) {
+      final res = await repo.updateAlbumArtwork(entry.key, entry.value);
+      res.fold((_) {}, (_) {
+        persisted++;
+      });
+    }
+    return persisted;
   }
 }

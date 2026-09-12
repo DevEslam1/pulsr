@@ -337,9 +337,25 @@ class WidgetService {
 
   // FIX-G01: Deleted unused dead code _roundCorners (native rounding moved to RemoteViews)
 
+  static const Set<String> _knownWidgetActions = {
+    'play_pause',
+    'prev',
+    'next',
+    'favorite',
+    'open',
+    'main',
+  };
+
   StreamSubscription<Uri?> listenToWidgetClicks(
       void Function(Uri? uri) onUriReceived) {
-    return HomeWidget.widgetClicked.listen(onUriReceived);
+    return HomeWidget.widgetClicked.listen((uri) {
+      if (uri == null) return;
+      if (uri.scheme.toLowerCase() != 'pulsrwidget') return;
+      final action =
+          uri.host.isNotEmpty ? uri.host : uri.path.replaceAll('/', '');
+      if (!_knownWidgetActions.contains(action)) return;
+      onUriReceived(uri);
+    });
   }
 
   @visibleForTesting
