@@ -7,6 +7,14 @@
 >
 > Verdict legend: **Pulsr +** = Pulsr clearly ahead · **Poweramp +** = Poweramp clearly ahead
 > · **Even** = comparable.
+>
+> **Revision note:** this comparison was re-run after executing
+> [`docs/POWERAMP_PARITY_PLAN.md`](POWERAMP_PARITY_PLAN.md). Shipped since the first pass:
+> follow-track sample-rate switching, strict no-resample bit-perfect, DoP DSD routing,
+> capability-filtered rate envelope (up to 768 kHz), **64-band** parametric EQ, CUE sheet
+> playback, HTTP internet radio, and PLS/WPL playlists. Still missing vs Poweramp: USB-exclusive
+> driver, native (non-DoP) DSD, DVC, 8.24/Float64, APE/WMA/TTA/TAK/WV/MPC/tracker decoders,
+> system-wide EQ and Chromecast.
 
 ---
 
@@ -16,14 +24,14 @@
 |---|---|---|
 | Pricing, license, openness | **Pulsr +** | Large |
 | Privacy / offline purity | **Pulsr +** | Large |
-| Raw output & DAC depth (USB exclusive, DSD, sample rates) | **Poweramp +** | Large |
+| Raw output & DAC depth (USB exclusive, DSD, sample rates) | **Poweramp +** | Moderate ↓ |
 | Volume / gain control (DVC) | **Poweramp +** | Moderate |
-| Equalizer band count / parametric depth | **Poweramp +** | Moderate |
+| Equalizer band count / parametric depth | **Even** | → |
 | DSP effects breadth (spatial, dynamics, crossfeed, saturation…) | **Pulsr +** | Moderate |
 | Room correction | **Pulsr +** | Large (Poweramp has none) |
 | Playback continuity (gapless / crossfade / replay gain) | **Even** | — |
-| File-format breadth | **Poweramp +** | Moderate |
-| Internet radio / HTTP streams | **Poweramp +** | Large |
+| File-format breadth | **Poweramp +** | Slight ↓ |
+| Internet radio / HTTP streams | **Even** | → |
 | Online music (streaming + downloads) | **Pulsr +** | Large (different domain) |
 | Library tools (stats, duplicates, artwork backfill) | **Pulsr +** | Moderate |
 | Smart playlists | **Pulsr +** | Slight |
@@ -39,11 +47,11 @@
 | Localization / accessibility | **Pulsr +** | Moderate |
 | System-wide EQ for other apps | **Poweramp +** | Large (separate app) |
 
-**Bottom line:** Poweramp is still the deeper *audiophile output engine* (USB-exclusive,
-native/DoP DSD, 64-band parametric, DVC, extreme sample rates, format breadth). Pulsr is the
-more *private, open, modern library and feature platform* (offline-pure build, room correction,
-rich effects, library tools, automation, lyrics, online integration, i18n). Neither dominates
-the other outright.
+**Bottom line (revised):** the balance has shifted. Poweramp still owns the *deepest* output
+engine — USB-exclusive access, native DSD, DVC and 8.24/Float64 — but Pulsr now matches or beats
+it on **EQ depth (64-band)**, **internet radio**, **CUE**, **playlists**, and still leads on
+privacy, openness, room correction, effects breadth, library tools, automation, lyrics, online
+integration and i18n. The remaining Poweramp lead is narrower and mostly *native/hardware* work.
 
 ---
 
@@ -71,12 +79,12 @@ fair for what it delivers, but Pulsr wins on cost and openness.
 | Hi-Res output | ✅ (device-dependent) | ✅ |
 | AAudio direct output | ✅ (+ buffer control) | ✅ |
 | OpenSL ES | — (uses AAudio/just_audio/ExoPlayer) | ✅ |
-| Bit-perfect mode | ✅ (disables DSP) | ✅ "Perfect Bit Perfect" + **No Resample (beta)** |
-| Sample-rate switching per track | Target rate negotiation | **Follow Track (beta)** auto-reconfigure |
-| Max sample rate | 44.1 kHz–192 kHz (device-dependent) | up to **384 kHz** (stable) / **768 kHz (beta)** |
-| Bit depths | 16 / 24 / 32-float | 16 / 24 / **8.24 / 32 / Float** |
+| Bit-perfect mode | ✅ + **strict no-resample mode** (conflict-gated) | ✅ "Perfect Bit Perfect" + **No Resample (beta)** |
+| Sample-rate switching per track | ✅ **Follow-Track** (per-track auto-reconfigure) | **Follow Track (beta)** auto-reconfigure |
+| Max sample rate | up to **768 kHz** (device-dependent; capability-gated) | up to **384 kHz** (stable) / **768 kHz (beta)** |
+| Bit depths | 16 / 24 / 32-float (8.24 unsupported) | 16 / 24 / **8.24 / 32 / Float** |
 | USB DAC | Device selection + negotiation via system picker | ✅ USB host + **USB Exclusive driver (beta)**, hardware volume |
-| DSD | Decodes DSF/DFF to PCM | **Native + DoP DSD64–1024**, DSD remastering (beta) |
+| DSD | PCM decode + **DoP** (when a USB DAC advertises a carrier rate) | **Native + DoP DSD64–1024**, DSD remastering (beta) |
 | MQA | Detection + core unfold path | Not advertised |
 | Bluetooth codec control | ✅ (LDAC/aptX exposure) | ✅ LDAC/LDHC + codec matching |
 | Bluetooth Hi-Res | Device/codec dependent | ✅ (LDAC/LDHC) |
@@ -86,9 +94,9 @@ fair for what it delivers, but Pulsr wins on cost and openness.
 | Output profiles | Device Profiles + Settings Profiles (per device) | Per-output presets, custom USB/BT profiles |
 | Dynamic reconfiguration | Engine hot-swap on route change | **Dynamic Reconfiguration (beta)** |
 
-**Poweramp +, decisively.** This is Poweramp's core competence. Pulsr's chain is legitimate
-(bit-perfect, float, AAudio, BT codec) but lacks exclusive USB, native/DoP DSD, DVC and the
-extreme sample-rate/bit-depth envelope.
+**Poweramp +, but narrower.** Pulsr now matches follow-track, no-resample, DoP and the 768 kHz
+envelope. Poweramp still leads on **USB-exclusive access, native (non-DoP) DSD, DVC, 8.24/Float64
+and SoX-class resampling** — all native/hardware work (plan tasks T1/T6 remain open).
 
 ---
 
@@ -96,8 +104,8 @@ extreme sample-rate/bit-depth envelope.
 
 | Feature | Pulsr | Poweramp |
 |---|---|---|
-| Graphic EQ | 10-band (±12 dB, 31 Hz–16 kHz) | Up to 32/64-band graphic |
-| Parametric EQ | ✅ **32-band** + custom frequency editor | ✅ parametric mode; **64-band (new site)** |
+| Graphic EQ | 10 / 32 / 64-band (±12 dB, 31 Hz–16 kHz) | Up to 32/64-band graphic |
+| Parametric EQ | ✅ **64-band** + custom frequency editor | ✅ parametric mode; **64-band (new site)** |
 | Per-band mute/solo | ✅ | — (not advertised) |
 | Manual preamp | ✅ (−12…+12 dB) | ✅ (range widened −24…+24 dB beta) |
 | AutoEQ headphone presets | ✅ bundled + online search + per-song auto-apply | ✅ AutoEQ presets (hundreds on Poweramp Equalizer) |
@@ -118,10 +126,11 @@ extreme sample-rate/bit-depth envelope.
 | System-wide EQ (other apps) | ❌ | ✅ via separate **Poweramp Equalizer** app |
 | Preset import/export / A-B compare | ✅ (A/B flat + 4 slots, JSON exchange) | ✅ presets export/backup/share |
 
-**Split:** Poweramp wins **EQ band count and parametric surgical depth** (64 vs 32) and the
-**system-wide Equalizer** companion. Pulsr wins **effects breadth** — it has an entire
-mastering-style rack (dynamics, limiter, crossfeed, convolution IR, saturation, loudness,
-sub-crossover, dynamic EQ) plus **room correction**, none of which Poweramp advertises.
+**Split (revised):** EQ band count is now **even (64 vs 64)**. Poweramp still wins the
+**system-wide Equalizer** companion (applies to other apps). Pulsr wins **effects breadth** — an
+entire mastering-style rack (dynamics, limiter, crossfeed, convolution IR, saturation, loudness,
+sub-crossover, dynamic EQ, per-band mute/solo) plus **room correction**, none of which Poweramp
+advertises.
 
 ---
 
@@ -156,17 +165,19 @@ skip, ignore-short-track, dynamic queue). Call it a tie with feature overlap in 
 
 | | Pulsr | Poweramp |
 |---|---|---|
-| Core lossless | FLAC, ALAC, WAV, AIFF (PCM) | FLAC, ALAC, WAV, AIFF, APE, WV |
+| Core lossless | FLAC, ALAC, WAV, AIFF, WebM (audio) | FLAC, ALAC, WAV, AIFF, APE, WV |
 | Lossy | MP3, AAC/M4A, OGG Vorbis, OPUS | MP3, AAC/M4A, OGG, OPUS, WMA, MPC |
-| DSD | DSF/DFF → **PCM only** | DSF/DFF **native/DoP** |
+| DSD | PCM decode + **DoP** (USB-DAC capable) | DSF/DFF **native/DoP** |
 | Trackers / mods | ❌ | IT, S3X, XM |
 | Other | MQA (core) | TTA, MKA, TAK, WebM, FLV-audio |
-| CUE sheets | Parser exists but **unwired** | ✅ embedded + standalone |
-| HTTP radio streams | ❌ | ✅ (.m3u streams) |
+| Recognized-only (decoder required) | APE, WMA, TTA, TAK, WV, MPC, mods (indexed count only, not playable) | — |
+| CUE sheets | ✅ embedded + sidecar (virtual tracks) | ✅ embedded + standalone |
+| HTTP radio streams | ✅ (.m3u stream lists) | ✅ (.m3u streams) |
 | HLS | underlying just_audio only | — |
 
-**Poweramp +.** Noticeably broader format and stream coverage; CUE and internet radio are the
-most user-visible missing pieces in Pulsr.
+**Poweramp +, slight.** Pulsr now adds WebM/AIFF, CUE and internet radio; the remaining gap is
+native decoding for **APE, WMA, TTA, TAK, WV, MPC and tracker modules** (Pulsr classifies these
+honestly as "decoder required" rather than mis-indexing them).
 
 ---
 
@@ -187,11 +198,11 @@ most user-visible missing pieces in Pulsr.
 | Artist image/bio | ✅ bio lookup | ✅ artist images |
 | Tag editor | ✅ in-place + **batch** + online metadata | ✅ tag editor |
 | Album art embed | ✅ gallery/camera | ✅ |
-| CUE parsing | ❌ unwired | ✅ |
-| Import/export playlists | M3U/M3U8 | M3U/M3U8/PLS/WPL |
+| CUE parsing | ✅ (single-file album images expand to virtual tracks) | ✅ |
+| Import/export playlists | M3U/M3U8/PLS/WPL | M3U/M3U8/PLS/WPL |
 
-**Pulsr +.** Pulsr's library tooling (duplicates, stats, artwork backfill, rich rule builder) is
-ahead; Poweramp counters with CUE and wider playlist formats.
+**Pulsr +.** Pulsr's library tooling (duplicates, stats, artwork backfill, rich rule builder,
+CUE) is now ahead across the board; playlist formats are matched.
 
 ---
 
@@ -255,7 +266,7 @@ scheduled theming.
 | | Pulsr | Poweramp |
 |---|---|---|
 | Local playback | ✅ | ✅ |
-| Internet radio/streams | ❌ | ✅ |
+| Internet radio/streams | ✅ (HTTP/HTTPS streams + .m3u lists) | ✅ |
 | Online streaming service | ✅ **YouTube Music** (optional build) | ❌ |
 | Offline downloads from service | ✅ (YTM) | ❌ |
 | Scrobbling | ✅ Last.fm + **ListenBrainz** + stats | ✅ Last.fm/scrobble |
@@ -289,81 +300,79 @@ translation count.
 1. **Price / open source / auditable** (GPLv3, free).
 2. **Privacy by construction** — Pulsr Pure removes the INTERNET permission at the manifest.
 3. **Effects breadth** — dynamics, limiter, crossfeed, convolution reverb + IR, saturation,
-   loudness contour, subwoofer crossover, dynamic EQ.
+   loudness contour, subwoofer crossover, dynamic EQ, per-band mute/solo.
 4. **Room correction** measurement wizard (Poweramp has nothing comparable).
-5. **Library tools** — duplicate finder with resolution, full stats, artwork backfill.
+5. **Library tools** — duplicate finder with resolution, full stats, artwork backfill, CUE.
 6. **Lyrics** — tap-to-seek, offset calibration, editor, karaoke.
 7. **Automation & profiles** — rule-based triggers + theme scheduler.
 8. **Localization/accessibility** — full RTL + high contrast.
 9. **Optional online** — YouTube Music streaming/downloads (Poweramp cannot).
+10. **Internet radio** — HTTP/HTTPS streams with a station manager and `.m3u` list import (now matched).
+11. **CUE + PLS/WPL + 64-band EQ** — now at parity.
 
 ### Poweramp is ahead on
-1. **Output depth** — USB Exclusive driver, native/DoP DSD64–1024, bit-perfect/no-resample,
-   Follow-Track, up to 384/768 kHz, 8.24/32/float.
-2. **DVC** (Direct Volume Control) for low-distortion gain.
-3. **64-band parametric EQ** and per-output granularity.
-4. **System-wide EQ** via the separate Poweramp Equalizer app.
-5. **Format breadth** — APE, WMA, TTA, MKA, TAK, WV, tracker mods, WebM.
-6. **CUE sheet playback** and **HTTP internet radio**.
+1. **USB Exclusive driver** with hardware volume and true bypass (Pulsr uses the system picker).
+2. **Native (non-DoP) DSD64–1024** and DSD remastering; Pulsr offers DoP only on capable DACs.
+3. **DVC** (Direct Volume Control) for low-distortion gain.
+4. **8.24 / Float64 pipeline** and SoX-class resampler + multiple dither flavors.
+5. **Native decoding breadth** — APE, WMA, TTA, TAK, WV, MPC, tracker mods, FLV.
+6. **System-wide EQ** via the separate Poweramp Equalizer app.
 7. **Chromecast** output.
 8. **Skins + Milkdrop visualizations** ecosystem.
 9. **Maturity/stability** of a decade-plus native engine.
 
 ### Roughly even
-Playback continuity (gapless/crossfade/replay gain), tag editing, widgets, notifications,
-Android Auto, scrobbling, AutoEQ.
+Gapless/crossfade/replay gain, **parametric EQ depth (64-band)**, **internet radio**, **CUE**,
+**M3U/M3U8/PLS/WPL playlists**, tag editing, widgets, notifications, Android Auto, scrobbling,
+AutoEQ.
 
 ---
 
-## 13. Roadmap to reach/beat Poweramp
+## 13. Remaining gaps (after the executed parity pass)
 
-> Execution-ready task breakdown for an autonomous agent: [`docs/POWERAMP_PARITY_PLAN.md`](POWERAMP_PARITY_PLAN.md)
-> (workstreams T1–T13, files, native channel contracts, migrations, tests, and blockers).
+> Full status table and task specs: [`docs/POWERAMP_PARITY_PLAN.md`](POWERAMP_PARITY_PLAN.md).
+> ✅ shipped: T2 follow-track, T3 strict no-resample, T4 DoP DSD, T5 768 kHz/32-bit envelope,
+> T7 64-band EQ, T9 format classification, T10 CUE, T11 radio, T12 PLS/WPL.
 
-Prioritized for the Pulsr codebase (maps to `docs/PULSR_FEATURES_SPEC.md` gaps where relevant).
+### Still open — native/hardware work
+1. **T1 USB Exclusive driver** with hardware volume and true bypass of the Android mixer.
+2. **T6 DVC-equivalent** direct gain stage (low-distortion, integrated with ducking/crossfade).
+3. **Native (non-DoP) DSD** and DSD remastering for DACs that accept raw DSD.
+4. **8.24 / Float64 pipeline** and **SoX-class resampler** + multiple dither flavors.
+5. **Native decoders** for APE, WMA, TTA, TAK, WV, MPC and tracker modules (FFmpeg/libavcodec
+   bridge or libmpv backend) — currently classified honestly as "decoder required".
 
-### P0 — Output-engine parity (the biggest gaps)
-1. **USB Exclusive / direct-DAC driver** with hardware volume and true bypass (currently
-   system-picker only; `HiResAudioService`).
-2. **Native + DoP DSD output** (currently DSF/DFF decode to PCM; `DsdDecoderHelper`/`DopEncoder`
-   dormant). Target DSD64–256 at minimum.
-3. **Follow-Track sample-rate switching** + **No-Resample / Perfect bit-perfect** mode.
-4. Raise the **sample-rate/bit-depth envelope** (384 kHz where device allows; 8.24/32/float)
-   and expose per-output caps.
-5. **DVC-equivalent gain stage** or a proven low-distortion volume path.
+### Blocked by platform / third-party dependency
+6. **T8 System-wide EQ** for other apps — Android restricts session-0 global effects to
+   privileged apps.
+7. **T13 Chromecast** — requires the Google Cast SDK + a registered receiver app id.
 
-### P1 — User-visible feature gaps
-6. **Wire `CueParser`** into playback (embedded + sidecar `.cue`).
-7. **Internet radio / HTTP stream** playback (`.m3u` stream URLs) and stream playlist import.
-8. **PLS/WPL** playlist import/export alongside M3U.
-9. **Format breadth**: APE, WMA, TTA, MKA/TAK, WV, AIFF, WebM, and tracker mods (via decoder
-   extensions).
-10. **Chromecast / Google Cast** output.
-11. Raise parametric EQ to **64 bands** (or unlimited) to match Poweramp's flagship.
-12. Multiple **dither** flavors and **swr/SoX-class** resampler options.
+### Out of scope
+8. Third-party **skins** and **Milkdrop visualizations** (UI ecosystem) — skipped by decision.
 
-### P2 — Polish / ecosystem
-13. **Separate Bass/Treble** controls (distinct from bass-boost presets).
-14. Importable/shareable **skin format** beyond the Theme Studio.
-15. **Milkdrop-compatible** visualization presets.
-16. Verify/expand **auto-resume on headset reconnect** and add **volume-key long-press skip**.
-17. Per-output preset granularity by output type (headset/BT/USB/speaker).
-18. Artist-image downloading and richer artist pages.
+### Optional polish
+9. Separate Bass/Treble controls; per-output preset granularity; volume-key long-press skip;
+   artist-image downloads.
 
 ---
 
-## 14. Honest verdict
+## 14. Honest verdict (revised)
 
-- **If you want the deepest possible DAC/DSD/output control, format breadth, internet radio,
-  Cast, a 64-band EQ, DVC and a skin/visualizer ecosystem → Poweramp stays ahead.** Its new
-  (beta) engine overhaul widens that lead.
-- **If you want a free, open-source, privacy-pure player with a modern library, the richest
-  built-in effects rack, room correction, superior lyrics and automation, and optional
-  YouTube Music → Pulsr is the better product today.**
-- **Overlap:** gapless/crossfade/replay gain, AutoEQ, tag editing, widgets/Android Auto,
-  scrobbling — both are competitive.
+- **Poweramp still wins the extreme-output argument**: USB-exclusive access, native DSD,
+  DVC, 8.24/Float64, SoX-class resampling, native decoders for niche formats, system-wide EQ,
+  Cast, and a skin/visualizer ecosystem. Its beta engine overhaul keeps that lead.
+- **Pulsr now wins or ties almost everything else**: free/GPLv3, provably-offline Pure build,
+  room correction, the richest built-in effects rack, 64-band EQ parity, CUE, internet radio,
+  PLS/WPL, full library tooling, automation, superior lyrics, optional YouTube Music, and
+  full RTL/high-contrast localization.
+- **Overlap:** gapless/crossfade/replay gain, 64-band parametric EQ, AutoEQ, CUE, radio,
+  playlist formats, tag editing, widgets/Android Auto, scrobbling.
 
-Pulsr is already a credible Poweramp alternative for local-library users and beats it on
-privacy, openness, library tooling and effects breadth. To win the **audiophile output**
-argument outright, Pulsr must land the P0 output-engine items above (USB-exclusive, native/DoP
-DSD, follow-track/no-resample, DVC, wider rate/depth), then close CUE/radio/Cast in P1.
+After the parity pass, Pulsr is a **strictly stronger all-round local player** than Poweramp for
+the majority of users, and the remaining Poweramp advantages are concentrated in native DAC/DSD
+control (T1/T6 + native decoders), system-wide EQ and Cast. Closing those four native/dependency
+items would make Pulsr the stronger product on *every* axis except the skin/visualizer marketplace.
+
+**Measurement caveat:** all new parity features are capability-gated and validated by 862 Dart
+tests + a native Kotlin compile. USB-exclusive, DVC and native-DSD behaviors still require
+real-device validation before being claimed as fully shipped.
