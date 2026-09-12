@@ -21,8 +21,11 @@ import '../../../core/utils/lrc_parser.dart';
 import '../../../core/constants/audio_feature_info.dart';
 import '../../../data/audio/audio_handler.dart';
 import '../../../data/audio/equalizer_manager.dart';
+import '../../../data/audio/per_song_eq_store.dart';
+import '../../../data/audio/per_song_volume_store.dart';
 import '../../../data/audio/playback_bookmark_store.dart';
 import '../../../data/audio/sleep_timer_manager.dart';
+import '../../../data/audio/song_rating_store.dart';
 import '../../../data/db/app_database.dart';
 import '../../../data/scanner/media_scanner_service.dart';
 import '../../../domain/models/audio_effects_config.dart';
@@ -70,6 +73,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   final SettingsProfilesService? _settingsProfilesService;
   final DeviceProfileService? _deviceProfileService;
   final HiResAudioService? _hiResAudioService;
+  final PerSongEqStore _perSongEqStore;
+  final PerSongVolumeStore _perSongVolumeStore;
+  final SongRatingStore _songRatingStore;
   String? _lastAutoAppliedDeviceKey;
 
   // FIX(BUG-14): Expose unthrottled position stream for high-fps UI components like MiniPlayer
@@ -130,6 +136,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     DeviceProfileService? deviceProfileService,
     HiResAudioService? hiResAudioService,
     PlaybackLatencyTracker? latencyTracker,
+    PerSongEqStore? perSongEqStore,
+    PerSongVolumeStore? perSongVolumeStore,
+    SongRatingStore? songRatingStore,
   })  : _audioHandler = audioHandler,
         _repository = repository,
         _toggleFavoriteUseCase = toggleFavoriteUseCase,
@@ -152,9 +161,22 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
             (getIt.isRegistered<PlaybackLatencyTracker>()
                 ? getIt<PlaybackLatencyTracker>()
                 : null),
+        _perSongEqStore = perSongEqStore ??
+            (getIt.isRegistered<PerSongEqStore>()
+                ? getIt<PerSongEqStore>()
+                : PerSongEqStore()),
+        _perSongVolumeStore = perSongVolumeStore ??
+            (getIt.isRegistered<PerSongVolumeStore>()
+                ? getIt<PerSongVolumeStore>()
+                : PerSongVolumeStore()),
+        _songRatingStore = songRatingStore ??
+            (getIt.isRegistered<SongRatingStore>()
+                ? getIt<SongRatingStore>()
+                : SongRatingStore()),
         super(const PlayerState()) {
     _listenToAudioService();
     _loadPlaybackSpeed();
+    _loadPlaybackPitch();
     _listenToSettings();
     _listenToWidgetClicks();
     _syncAudioEffects();
@@ -627,6 +649,11 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       _updateWidgetThrottled(force: true);
       _debouncedScrobble(song, state.position, state.isPlaying);
       if (!isSameSong) {
+        final trackKey = song.id.toString();
+        final songRating = _songRatingStore.getRating(trackKey);
+        final songEq = _perSongEqStore.getPresetForTrack(trackKey);
+        final songVol = _perSongVolumeStore.getGainDbForTrack(trackKey);
+
         // F1/F2/F11: reset per-track UI state on song change.
         // Guarded: test doubles of the handler may not implement the
         // newer F1–F11 members (noSuchMethod throws).
@@ -640,10 +667,23 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
           abLoopEnabled: false,
           trackDelayMs: delayMs,
           bookmarkPosition: null,
+          currentSongRating: songRating,
+          currentSongEqOverride: songEq,
+          currentSongVolumeOverrideDb: songVol,
         ));
         try {
           checkBookmarkOffer();
         } catch (_) {}
+
+        // Auto-apply per-song EQ if assigned
+        if (songEq != null) {
+          final match = EqPreset.defaultPresets
+              .where((p) => p.name.toLowerCase() == songEq.toLowerCase())
+              .firstOrNull;
+          if (match != null) {
+            unawaited(applyPreset(match));
+          }
+        }
       }
     });
 
@@ -2686,6 +2726,71 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       speed: speed,
     );
     _debouncedPersistQueueSlots();
+  }
+
+  // Playback Pitch / Tone Control (PowerAmp parity)
+  Future<void> _loadPlaybackPitch() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final pitch = prefs.getDouble(PrefsKeys.playbackPitch) ?? 1.0;
+      await _audioHandler.setPitch(pitch);
+      safeEmit(state.copyWith(playbackPitch: pitch));
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load playback pitch from SharedPreferences',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+    }
+  }
+
+  Future<void> setPlaybackPitch(double pitch) async {
+    final clamped = pitch.clamp(0.5, 2.0);
+    safeEmit(state.copyWith(playbackPitch: clamped));
+    await _audioHandler.setPitch(clamped);
+  }
+
+  // Per-Song Star Rating (1 to 5 stars, 0 = unrated)
+  Future<void> setSongRating(int songId, int rating) async {
+    await _songRatingStore.setRating(songId.toString(), rating);
+    if (state.currentSong?.id == songId) {
+      safeEmit(state.copyWith(currentSongRating: rating));
+    }
+  }
+
+  // Per-Song EQ Preset Override
+  Future<void> setSongEqOverride(int songId, String? presetName) async {
+    await _perSongEqStore.setPresetForTrack(songId.toString(), presetName);
+    if (state.currentSong?.id == songId) {
+      safeEmit(state.copyWith(currentSongEqOverride: presetName));
+      if (presetName != null) {
+        final match = EqPreset.defaultPresets
+            .where((p) => p.name.toLowerCase() == presetName.toLowerCase())
+            .firstOrNull;
+        if (match != null) {
+          await applyPreset(match);
+        }
+      }
+    }
+  }
+
+  // Per-Song Volume Override (-12.0 to +6.0 dB)
+  Future<void> setSongVolumeOverride(int songId, double gainDb) async {
+    await _perSongVolumeStore.setGainDbForTrack(songId.toString(), gainDb);
+    if (state.currentSong?.id == songId) {
+      safeEmit(state.copyWith(currentSongVolumeOverrideDb: gainDb));
+      await _audioHandler.setVolume(_audioHandler.volume);
+    }
+  }
+
+  // EQ Preset JSON Import & Export
+  String exportCurrentEqPreset() {
+    return _audioHandler.exportPresetToJson(state.eqPreset);
+  }
+
+  Future<bool> importEqPreset(String jsonString) async {
+    final success = await _audioHandler.importPresetFromJson(jsonString);
+    if (success) {
+      _syncAudioEffects();
+    }
+    return success;
   }
 
   // Volume Control

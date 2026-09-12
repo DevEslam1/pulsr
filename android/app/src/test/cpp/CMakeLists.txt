@@ -58,6 +58,7 @@ pulsr_add_test(test_dsd_decoder_correctness ${MAIN_CPP}/DsdDecoder.cpp)
 pulsr_add_test(test_limiter_true_peak ${MAIN_CPP}/LookaheadLimiter.cpp)
 
 pulsr_add_test(test_sinc_resampler ${MAIN_CPP}/SincResampler.cpp)
+pulsr_add_test(test_dop_framer)
 pulsr_add_test(test_resampler_polyphase ${MAIN_CPP}/SincResampler.cpp)
 
 pulsr_add_test(test_dsp_effects

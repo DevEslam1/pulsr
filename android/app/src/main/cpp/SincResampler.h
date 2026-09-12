@@ -23,6 +23,13 @@ public:
     void setEnabled(bool enabled);
     bool isEnabled() const { return enabled_; }
     void applyParams(const ResamplerParamSet& params);
+
+    // Quality selector: 0 = Fast (linear), 1 = Standard (16 taps),
+    // 2 = High (32 taps), 3 = Ultra (full 64-tap table). Uses a centered
+    // truncation of the existing Blackman-Harris-windowed table, so quality
+    // changes need no table regeneration - only a FIFO reset (latency is
+    // quality/2 frames; 0 for linear).
+    void setQuality(int quality);
     void reset();
 
     double getInRate() const { return inRate_; }
@@ -31,7 +38,7 @@ public:
     bool isBypassed() const { return std::abs(inRate_ - outRate_) < 0.5; }
 
     // Latency reporting in frames (exact group delay)
-    int getLatencyFrames() const { return HALF_TAPS; }
+    int getLatencyFrames() const { return linearQuality_ ? 0 : activeHalfTaps_; }
 
     // HARD CONTRACT: Consumes N input frames and returns exactly N output frames
     int processInterleaved(float* buffer, int frames, int channels = 2);
@@ -49,6 +56,9 @@ private:
     double ratio_ = 1.0;
     double phase_ = 0.0;
     bool enabled_ = false;
+    int quality_ = 3;
+    int activeHalfTaps_ = TAPS_PER_PHASE / 2;
+    bool linearQuality_ = false;
 
     // Polyphase FIR filter coefficients [NUM_PHASES][TAPS_PER_PHASE]
     float polyphaseTable_[NUM_PHASES][TAPS_PER_PHASE] = {};

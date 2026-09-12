@@ -696,6 +696,74 @@ class AudioSoundSection extends StatelessWidget {
               !isAndroid ? (v) {} : cubit.setFloatOutputEnabled,
         ),
         settingsCardDivider(p),
+        // Opt-in AAudio Direct output. Off by default: the sink stays the
+        // historical DefaultAudioSink + native DSP chain. When on, playback
+        // goes through a native AAudio stream (EXCLUSIVE attempt, SHARED
+        // fallback) and the DSP chain is bypassed for bit-perfect output.
+        SettingsSwitchTile(
+          Icons.surround_sound_rounded,
+          'AAudio Direct Output (Bit-Perfect)',
+          'Bypasses the system mixer with a native AAudio stream opened at '
+              'each track rate (EXCLUSIVE attempt, SHARED fallback). The DSP '
+              'chain is bypassed in this mode; applies to newly built players',
+          value: isAndroid && state.aaudioOutputEnabled,
+          disabledReason: isAndroid ? null : unsupported,
+          onChanged:
+              !isAndroid ? (v) {} : cubit.setAaudioOutputEnabled,
+        ),
+        // AAudio stream buffer capacity (Direct output only).
+        SettingSliderRow(
+          label: 'AAudio Buffer Size',
+          subtitle: 'Stream buffer capacity hint in milliseconds. Lower = '
+              'lower latency (wired), higher = more stall resistance',
+          value: state.aaudioTargetBufferMs.toDouble(),
+          min: 20,
+          max: 500,
+          divisions: 24,
+          defaultValue: 150,
+          formatValue: (v) => '${v.round()} ms',
+          enabled: isAndroid && state.aaudioOutputEnabled,
+          onChanged: (v) => cubit.setAaudioTargetBufferMs(v.round()),
+        ),
+        settingsCardDivider(p),
+        // Resampler quality: Fast (linear) .. Ultra (full 64-tap polyphase).
+        SettingSliderRow(
+          label: 'Resampler Quality',
+          subtitle: 'Sample-rate conversion quality. Ultra is the full '
+              '64-tap polyphase sinc (historical default); Fast is linear '
+              'interpolation for minimal CPU on battery',
+          value: state.sincResamplerQuality.toDouble(),
+          min: 0,
+          max: 3,
+          divisions: 3,
+          defaultValue: 3,
+          formatValue: (v) {
+            switch (v.round()) {
+              case 0:
+                return 'Fast (Linear)';
+              case 1:
+                return 'Standard (16-tap)';
+              case 2:
+                return 'High (32-tap)';
+              default:
+                return 'Ultra (64-tap)';
+            }
+          },
+          onChanged: (v) => cubit.setSincResamplerQuality(v.round()),
+        ),
+        settingsCardDivider(p),
+        // BPM-synced crossfade: aligns the fade to the nearest beats of the
+        // incoming track when a BPM value is known for it.
+        SettingsSwitchTile(
+          Icons.music_note_rounded,
+          'BPM-Synced Crossfade',
+          'Aligns the crossfade duration to the nearest 2/4/8/16/32 beats of '
+              'the incoming track when its BPM is known; otherwise the '
+              'configured duration is used',
+          value: state.bpmSyncCrossfadeEnabled,
+          onChanged: cubit.setBpmSyncCrossfadeEnabled,
+        ),
+        settingsCardDivider(p),
         // Per-session audio diagnostics (pure Dart; works on every platform).
         SettingsSwitchTile(
           Icons.monitor_heart_rounded,

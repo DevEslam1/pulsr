@@ -33,6 +33,8 @@ add_library(pulsr_dsp SHARED
     DynamicEQ.cpp
     AudioDspEngine.cpp
     eq_jni_bridge.cpp
+    AAudioSink.cpp
+    aaudio_jni_bridge.cpp
 )
 
 target_compile_options(pulsr_dsp PRIVATE
@@ -47,5 +49,6 @@ find_library(android-lib android)
 target_link_libraries(pulsr_dsp
     ${log-lib}
     ${android-lib}
+    aaudio
     m
 )

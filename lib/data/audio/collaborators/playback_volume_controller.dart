@@ -1,5 +1,6 @@
 // lib/data/audio/collaborators/playback_volume_controller.dart
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:just_audio/just_audio.dart';
 import 'package:pulsr/core/utils/error_logger.dart';
 import 'package:pulsr/data/db/app_database.dart';
@@ -47,8 +48,9 @@ class PlaybackVolumeController {
     if (duckFactor != null) _duckFactor = duckFactor.clamp(0.05, 1.0);
   }
 
-  /// Calculates target volume for [song] with current ReplayGain and ducking state.
-  double calculateTargetVolume(SongsTableData? song, {bool albumContext = false}) {
+  /// Calculates target volume for [song] with current ReplayGain, ducking, and per-song offset.
+  double calculateTargetVolume(SongsTableData? song,
+      {bool albumContext = false, double perSongOffsetDb = 0.0}) {
     // During DSD DoP transmission, volume must strictly stay at 1.0 (unity gain)
     // to avoid corrupting 0x05 / 0xFA marker bits into white noise.
     if (_isDopActive) return 1.0;
@@ -58,7 +60,7 @@ class PlaybackVolumeController {
     }
 
     final baseVolume = _isDucked ? (_userVolume * _duckFactor) : _userVolume;
-    return ReplayGainMath.apply(
+    final rgVolume = ReplayGainMath.apply(
       mode: _replayGainMode,
       volume: baseVolume,
       trackGainDb: song.replayGainTrack,
@@ -69,6 +71,12 @@ class PlaybackVolumeController {
       preampWithRg: _preampWithRg,
       preampWithoutRg: _preampWithoutRg,
     );
+
+    if (perSongOffsetDb.abs() >= 0.1) {
+      final multiplier = math.pow(10, perSongOffsetDb / 20.0).toDouble();
+      return (rgVolume * multiplier).clamp(0.0, 1.0);
+    }
+    return rgVolume;
   }
 
   /// Applies calculated volume to [player] with an optional 500ms smooth ramp (P2-1).

@@ -79,7 +79,17 @@ void SincResampler::setEnabled(bool enabled) {
     enabled_ = enabled;
 }
 
+void SincResampler::setQuality(int quality) {
+    const int q = std::clamp(quality, 0, 3);
+    if (q == quality_) return;
+    quality_ = q;
+    linearQuality_ = q == 0;
+    activeHalfTaps_ = q == 0 ? 0 : (q == 1 ? 8 : (q == 2 ? 16 : TAPS_PER_PHASE / 2));
+    reset();
+}
+
 void SincResampler::applyParams(const ResamplerParamSet& params) {
+    setQuality(params.quality);
     enabled_ = params.enabled;
     setRates(params.inRate, params.outRate);
 }
@@ -128,9 +138,22 @@ int SincResampler::processInterleaved(float* buffer, int frames, int channels) {
 
 
         for (int ch = 0; ch < channels; ++ch) {
+            if (linearQuality_) {
+                // Fast mode: first-order linear interpolation between the two
+                // frames surrounding the fractional read position.
+                const int off0 = availableFrames_ - baseInt;
+                int i0 = (writePos_ - off0) % FIFO_CAPACITY;
+                if (i0 < 0) i0 += FIFO_CAPACITY;
+                int i1 = (writePos_ - off0 + 1) % FIFO_CAPACITY;
+                if (i1 < 0) i1 += FIFO_CAPACITY;
+                const float fracF = static_cast<float>(frac);
+                tempOutBuf_[outF * channels + ch] =
+                    ringBuf_[ch][i0] * (1.0f - fracF) + ringBuf_[ch][i1] * fracF;
+                continue;
+            }
 #if defined(__ARM_NEON)
             float32x4_t sumVec = vdupq_n_f32(0.0f);
-            for (int tap = 0; tap < TAPS_PER_PHASE; tap += 4) {
+            for (int tap = HALF_TAPS - activeHalfTaps_; tap < HALF_TAPS + activeHalfTaps_; tap += 4) {
                 const int readOffset0 = availableFrames_ - baseInt + (HALF_TAPS - tap);
                 int ringIndex0 = (writePos_ - readOffset0) % FIFO_CAPACITY;
                 if (ringIndex0 < 0) ringIndex0 += FIFO_CAPACITY;
@@ -166,7 +189,7 @@ int SincResampler::processInterleaved(float* buffer, int frames, int channels) {
 #endif
 #else
             float sum = 0.0f;
-            for (int tap = 0; tap < TAPS_PER_PHASE; ++tap) {
+            for (int tap = HALF_TAPS - activeHalfTaps_; tap < HALF_TAPS + activeHalfTaps_; ++tap) {
                 // Sinc history lookup relative to current write position & phase
                 const int readOffset = availableFrames_ - baseInt + (HALF_TAPS - tap);
                 int ringIndex = (writePos_ - readOffset) % FIFO_CAPACITY;
@@ -243,7 +266,7 @@ int SincResampler::processPlanar(const float* const* in, float* const* out, int 
 
         for (int ch = 0; ch < channels; ++ch) {
             float sum = 0.0f;
-            for (int tap = 0; tap < TAPS_PER_PHASE; ++tap) {
+            for (int tap = HALF_TAPS - activeHalfTaps_; tap < HALF_TAPS + activeHalfTaps_; ++tap) {
                 const int readOffset = availableFrames_ - baseInt + (HALF_TAPS - tap);
                 int ringIndex = (writePos_ - readOffset) % FIFO_CAPACITY;
                 if (ringIndex < 0) ringIndex += FIFO_CAPACITY;

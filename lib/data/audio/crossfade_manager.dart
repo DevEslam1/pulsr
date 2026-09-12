@@ -49,6 +49,13 @@ class CrossfadeManager {
   Duration duration = Duration.zero;
   CrossfadeCurve curve = CrossfadeCurve.equalPower;
   bool isCrossfading = false;
+  /// BPM-synced crossfade: when true and a BPM value is available for the
+  /// incoming track, the configured duration is aligned to the nearest
+  /// 2/4/8/16/32 beats via [calculateBpmAlignedDuration].
+  bool bpmSyncEnabled = false;
+  /// Per-track BPM overrides (track id -> bpm). BPM sources: tag metadata or
+  /// manual entry; tracks without an override fall back to the base duration.
+  final Map<String, double> bpmOverrides = <String, double>{};
   int? pendingIndex;
   int _fadeId = 0;
   Completer<void>? _crossfadeCompleter;
@@ -100,6 +107,15 @@ class CrossfadeManager {
   /// Returns the effective crossfade duration, optionally aligned to song [bpm].
   Duration getEffectiveDuration({double? bpm}) =>
       bpm != null ? calculateBpmAlignedDuration(duration, bpm) : duration;
+
+  /// Effective fade duration for an incoming track, honouring BPM sync when
+  /// enabled and a BPM override exists for [trackId].
+  Duration effectiveFadeDuration({String? trackId}) {
+    if (!bpmSyncEnabled || trackId == null) return duration;
+    final bpm = bpmOverrides[trackId];
+    if (bpm == null) return duration;
+    return calculateBpmAlignedDuration(duration, bpm);
+  }
 
   /// Evaluates the curve fraction (0.0 to 1.0) based on active [curve].
   /// Always returns 0→1; the caller controls direction via [from]/[to].

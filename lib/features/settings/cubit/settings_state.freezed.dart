@@ -91,6 +91,11 @@ mixin _$SettingsState {
   bool get sessionLogEnabled;
   bool get outputFormatNegotiationEnabled;
   bool get floatOutputEnabled;
+  bool get aaudioOutputEnabled;
+  bool get aaudioPreferExclusive;
+  int get aaudioTargetBufferMs;
+  int get sincResamplerQuality;
+  bool get bpmSyncCrossfadeEnabled;
 
   /// Create a copy of SettingsState
   /// with the given fields replaced by the non-null parameter values.
@@ -208,7 +213,12 @@ mixin _$SettingsState {
             (identical(other.silenceSkipSensitivity, _this.silenceSkipSensitivity) || other.silenceSkipSensitivity == _this.silenceSkipSensitivity) &&
             (identical(other.sessionLogEnabled, _this.sessionLogEnabled) || other.sessionLogEnabled == _this.sessionLogEnabled) &&
             (identical(other.outputFormatNegotiationEnabled, _this.outputFormatNegotiationEnabled) || other.outputFormatNegotiationEnabled == _this.outputFormatNegotiationEnabled) &&
-            (identical(other.floatOutputEnabled, _this.floatOutputEnabled) || other.floatOutputEnabled == _this.floatOutputEnabled));
+            (identical(other.floatOutputEnabled, _this.floatOutputEnabled) || other.floatOutputEnabled == _this.floatOutputEnabled) &&
+            (identical(other.aaudioOutputEnabled, _this.aaudioOutputEnabled) || other.aaudioOutputEnabled == _this.aaudioOutputEnabled) &&
+            (identical(other.aaudioPreferExclusive, _this.aaudioPreferExclusive) || other.aaudioPreferExclusive == _this.aaudioPreferExclusive) &&
+            (identical(other.aaudioTargetBufferMs, _this.aaudioTargetBufferMs) || other.aaudioTargetBufferMs == _this.aaudioTargetBufferMs) &&
+            (identical(other.sincResamplerQuality, _this.sincResamplerQuality) || other.sincResamplerQuality == _this.sincResamplerQuality) &&
+            (identical(other.bpmSyncCrossfadeEnabled, _this.bpmSyncCrossfadeEnabled) || other.bpmSyncCrossfadeEnabled == _this.bpmSyncCrossfadeEnabled));
   }
 
   @override
@@ -291,14 +301,19 @@ mixin _$SettingsState {
       _this.silenceSkipSensitivity,
       _this.sessionLogEnabled,
       _this.outputFormatNegotiationEnabled,
-      _this.floatOutputEnabled
+      _this.floatOutputEnabled,
+      _this.aaudioOutputEnabled,
+      _this.aaudioPreferExclusive,
+      _this.aaudioTargetBufferMs,
+      _this.sincResamplerQuality,
+      _this.bpmSyncCrossfadeEnabled
     ]);
   }
 
   @override
   String toString() {
     final _this = this as SettingsState;
-    return 'SettingsState(gaplessPlayback: ${_this.gaplessPlayback}, crossfadeSeconds: ${_this.crossfadeSeconds}, minDurationSec: ${_this.minDurationSec}, autoHideSystemMedia: ${_this.autoHideSystemMedia}, themeColorSource: ${_this.themeColorSource}, resumeAfterInterruption: ${_this.resumeAfterInterruption}, waveformSeekBarEnabled: ${_this.waveformSeekBarEnabled}, themeMode: ${_this.themeMode}, languageCode: ${_this.languageCode}, customAccentColorValue: ${_this.customAccentColorValue}, playerThemeMode: ${_this.playerThemeMode}, visualizerStyle: ${_this.visualizerStyle}, miniPlayerSwipeLeft: ${_this.miniPlayerSwipeLeft}, miniPlayerSwipeRight: ${_this.miniPlayerSwipeRight}, nowPlayingDoubleTap: ${_this.nowPlayingDoubleTap}, nowPlayingArtworkSwipe: ${_this.nowPlayingArtworkSwipe}, replayGainMode: ${_this.replayGainMode}, replayGainPreampWithRg: ${_this.replayGainPreampWithRg}, replayGainPreampWithoutRg: ${_this.replayGainPreampWithoutRg}, streamingQuality: ${_this.streamingQuality}, downloadQuality: ${_this.downloadQuality}, wifiOnlyMode: ${_this.wifiOnlyMode}, offlineOnlyMode: ${_this.offlineOnlyMode}, isScanning: ${_this.isScanning}, proxyEnabled: ${_this.proxyEnabled}, proxyType: ${_this.proxyType}, proxyHost: ${_this.proxyHost}, proxyPort: ${_this.proxyPort}, proxyUsername: ${_this.proxyUsername}, hasProxyPassword: ${_this.hasProxyPassword}, proxyBypassHosts: ${_this.proxyBypassHosts}, proxyList: ${_this.proxyList}, isTestingAllProxies: ${_this.isTestingAllProxies}, extractorEngine: ${_this.extractorEngine}, ytdlpBackendEnabled: ${_this.ytdlpBackendEnabled}, ytdlpBackendUrl: ${_this.ytdlpBackendUrl}, ytdlpBackendToken: ${_this.ytdlpBackendToken}, syncCookiesToBackend: ${_this.syncCookiesToBackend}, isTestingYtdlpBackend: ${_this.isTestingYtdlpBackend}, ytdlpBackendStatusMessage: ${_this.ytdlpBackendStatusMessage}, ytdlpBackendVersion: ${_this.ytdlpBackendVersion}, ytdlpBackendProxyCount: ${_this.ytdlpBackendProxyCount}, ytdlpBackendCircuitState: ${_this.ytdlpBackendCircuitState}, bitPerfectOutput: ${_this.bitPerfectOutput}, bypassDspOnBitPerfect: ${_this.bypassDspOnBitPerfect}, currentOutputDevice: ${_this.currentOutputDevice}, scanResultCount: ${_this.scanResultCount}, errorMessage: ${_this.errorMessage}, crossfeedEnabled: ${_this.crossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, limiterEnabled: ${_this.limiterEnabled}, limiterLookaheadMs: ${_this.limiterLookaheadMs}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, reverbEnabled: ${_this.reverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, sincResamplerEnabled: ${_this.sincResamplerEnabled}, dspPreference: ${_this.dspPreference}, systemEffectsPolicy: ${_this.systemEffectsPolicy}, systemEffectsStatus: ${_this.systemEffectsStatus}, systemEffectsBundles: ${_this.systemEffectsBundles}, bluetoothLatencyOffsetMs: ${_this.bluetoothLatencyOffsetMs}, hedgedResolutionEnabled: ${_this.hedgedResolutionEnabled}, adaptiveQualityEnabled: ${_this.adaptiveQualityEnabled}, duckingMode: ${_this.duckingMode}, duckingLevel: ${_this.duckingLevel}, multiOutputMode: ${_this.multiOutputMode}, dspSnapshotEnabled: ${_this.dspSnapshotEnabled}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, sessionLogEnabled: ${_this.sessionLogEnabled}, outputFormatNegotiationEnabled: ${_this.outputFormatNegotiationEnabled}, floatOutputEnabled: ${_this.floatOutputEnabled})';
+    return 'SettingsState(gaplessPlayback: ${_this.gaplessPlayback}, crossfadeSeconds: ${_this.crossfadeSeconds}, minDurationSec: ${_this.minDurationSec}, autoHideSystemMedia: ${_this.autoHideSystemMedia}, themeColorSource: ${_this.themeColorSource}, resumeAfterInterruption: ${_this.resumeAfterInterruption}, waveformSeekBarEnabled: ${_this.waveformSeekBarEnabled}, themeMode: ${_this.themeMode}, languageCode: ${_this.languageCode}, customAccentColorValue: ${_this.customAccentColorValue}, playerThemeMode: ${_this.playerThemeMode}, visualizerStyle: ${_this.visualizerStyle}, miniPlayerSwipeLeft: ${_this.miniPlayerSwipeLeft}, miniPlayerSwipeRight: ${_this.miniPlayerSwipeRight}, nowPlayingDoubleTap: ${_this.nowPlayingDoubleTap}, nowPlayingArtworkSwipe: ${_this.nowPlayingArtworkSwipe}, replayGainMode: ${_this.replayGainMode}, replayGainPreampWithRg: ${_this.replayGainPreampWithRg}, replayGainPreampWithoutRg: ${_this.replayGainPreampWithoutRg}, streamingQuality: ${_this.streamingQuality}, downloadQuality: ${_this.downloadQuality}, wifiOnlyMode: ${_this.wifiOnlyMode}, offlineOnlyMode: ${_this.offlineOnlyMode}, isScanning: ${_this.isScanning}, proxyEnabled: ${_this.proxyEnabled}, proxyType: ${_this.proxyType}, proxyHost: ${_this.proxyHost}, proxyPort: ${_this.proxyPort}, proxyUsername: ${_this.proxyUsername}, hasProxyPassword: ${_this.hasProxyPassword}, proxyBypassHosts: ${_this.proxyBypassHosts}, proxyList: ${_this.proxyList}, isTestingAllProxies: ${_this.isTestingAllProxies}, extractorEngine: ${_this.extractorEngine}, ytdlpBackendEnabled: ${_this.ytdlpBackendEnabled}, ytdlpBackendUrl: ${_this.ytdlpBackendUrl}, ytdlpBackendToken: ${_this.ytdlpBackendToken}, syncCookiesToBackend: ${_this.syncCookiesToBackend}, isTestingYtdlpBackend: ${_this.isTestingYtdlpBackend}, ytdlpBackendStatusMessage: ${_this.ytdlpBackendStatusMessage}, ytdlpBackendVersion: ${_this.ytdlpBackendVersion}, ytdlpBackendProxyCount: ${_this.ytdlpBackendProxyCount}, ytdlpBackendCircuitState: ${_this.ytdlpBackendCircuitState}, bitPerfectOutput: ${_this.bitPerfectOutput}, bypassDspOnBitPerfect: ${_this.bypassDspOnBitPerfect}, currentOutputDevice: ${_this.currentOutputDevice}, scanResultCount: ${_this.scanResultCount}, errorMessage: ${_this.errorMessage}, crossfeedEnabled: ${_this.crossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, limiterEnabled: ${_this.limiterEnabled}, limiterLookaheadMs: ${_this.limiterLookaheadMs}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, reverbEnabled: ${_this.reverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, sincResamplerEnabled: ${_this.sincResamplerEnabled}, dspPreference: ${_this.dspPreference}, systemEffectsPolicy: ${_this.systemEffectsPolicy}, systemEffectsStatus: ${_this.systemEffectsStatus}, systemEffectsBundles: ${_this.systemEffectsBundles}, bluetoothLatencyOffsetMs: ${_this.bluetoothLatencyOffsetMs}, hedgedResolutionEnabled: ${_this.hedgedResolutionEnabled}, adaptiveQualityEnabled: ${_this.adaptiveQualityEnabled}, duckingMode: ${_this.duckingMode}, duckingLevel: ${_this.duckingLevel}, multiOutputMode: ${_this.multiOutputMode}, dspSnapshotEnabled: ${_this.dspSnapshotEnabled}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, sessionLogEnabled: ${_this.sessionLogEnabled}, outputFormatNegotiationEnabled: ${_this.outputFormatNegotiationEnabled}, floatOutputEnabled: ${_this.floatOutputEnabled}, aaudioOutputEnabled: ${_this.aaudioOutputEnabled}, aaudioPreferExclusive: ${_this.aaudioPreferExclusive}, aaudioTargetBufferMs: ${_this.aaudioTargetBufferMs}, sincResamplerQuality: ${_this.sincResamplerQuality}, bpmSyncCrossfadeEnabled: ${_this.bpmSyncCrossfadeEnabled})';
   }
 }
 
@@ -384,7 +399,12 @@ abstract mixin class $SettingsStateCopyWith<$Res> {
       int silenceSkipSensitivity,
       bool sessionLogEnabled,
       bool outputFormatNegotiationEnabled,
-      bool floatOutputEnabled});
+      bool floatOutputEnabled,
+      bool aaudioOutputEnabled,
+      bool aaudioPreferExclusive,
+      int aaudioTargetBufferMs,
+      int sincResamplerQuality,
+      bool bpmSyncCrossfadeEnabled});
 }
 
 /// @nodoc
@@ -476,6 +496,11 @@ class _$SettingsStateCopyWithImpl<$Res>
     Object? sessionLogEnabled = null,
     Object? outputFormatNegotiationEnabled = null,
     Object? floatOutputEnabled = null,
+    Object? aaudioOutputEnabled = null,
+    Object? aaudioPreferExclusive = null,
+    Object? aaudioTargetBufferMs = null,
+    Object? sincResamplerQuality = null,
+    Object? bpmSyncCrossfadeEnabled = null,
   }) {
     return _then(SettingsState(
       gaplessPlayback: null == gaplessPlayback
@@ -782,6 +807,26 @@ class _$SettingsStateCopyWithImpl<$Res>
           ? _self.floatOutputEnabled
           : floatOutputEnabled // ignore: cast_nullable_to_non_nullable
               as bool,
+      aaudioOutputEnabled: null == aaudioOutputEnabled
+          ? _self.aaudioOutputEnabled
+          : aaudioOutputEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      aaudioPreferExclusive: null == aaudioPreferExclusive
+          ? _self.aaudioPreferExclusive
+          : aaudioPreferExclusive // ignore: cast_nullable_to_non_nullable
+              as bool,
+      aaudioTargetBufferMs: null == aaudioTargetBufferMs
+          ? _self.aaudioTargetBufferMs
+          : aaudioTargetBufferMs // ignore: cast_nullable_to_non_nullable
+              as int,
+      sincResamplerQuality: null == sincResamplerQuality
+          ? _self.sincResamplerQuality
+          : sincResamplerQuality // ignore: cast_nullable_to_non_nullable
+              as int,
+      bpmSyncCrossfadeEnabled: null == bpmSyncCrossfadeEnabled
+          ? _self.bpmSyncCrossfadeEnabled
+          : bpmSyncCrossfadeEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
     ));
   }
 }
@@ -955,7 +1000,12 @@ extension SettingsStatePatterns on SettingsState {
             int silenceSkipSensitivity,
             bool sessionLogEnabled,
             bool outputFormatNegotiationEnabled,
-            bool floatOutputEnabled)?
+            bool floatOutputEnabled,
+            bool aaudioOutputEnabled,
+            bool aaudioPreferExclusive,
+            int aaudioTargetBufferMs,
+            int sincResamplerQuality,
+            bool bpmSyncCrossfadeEnabled)?
         $default, {
     required TResult orElse(),
   }) {
@@ -1038,7 +1088,12 @@ extension SettingsStatePatterns on SettingsState {
             _that.silenceSkipSensitivity,
             _that.sessionLogEnabled,
             _that.outputFormatNegotiationEnabled,
-            _that.floatOutputEnabled);
+            _that.floatOutputEnabled,
+            _that.aaudioOutputEnabled,
+            _that.aaudioPreferExclusive,
+            _that.aaudioTargetBufferMs,
+            _that.sincResamplerQuality,
+            _that.bpmSyncCrossfadeEnabled);
       case _:
         return orElse();
     }
@@ -1135,7 +1190,12 @@ extension SettingsStatePatterns on SettingsState {
             int silenceSkipSensitivity,
             bool sessionLogEnabled,
             bool outputFormatNegotiationEnabled,
-            bool floatOutputEnabled)
+            bool floatOutputEnabled,
+            bool aaudioOutputEnabled,
+            bool aaudioPreferExclusive,
+            int aaudioTargetBufferMs,
+            int sincResamplerQuality,
+            bool bpmSyncCrossfadeEnabled)
         $default,
   ) {
     final _that = this;
@@ -1217,7 +1277,12 @@ extension SettingsStatePatterns on SettingsState {
             _that.silenceSkipSensitivity,
             _that.sessionLogEnabled,
             _that.outputFormatNegotiationEnabled,
-            _that.floatOutputEnabled);
+            _that.floatOutputEnabled,
+            _that.aaudioOutputEnabled,
+            _that.aaudioPreferExclusive,
+            _that.aaudioTargetBufferMs,
+            _that.sincResamplerQuality,
+            _that.bpmSyncCrossfadeEnabled);
       case _:
         throw StateError('Unexpected subclass');
     }
@@ -1313,7 +1378,12 @@ extension SettingsStatePatterns on SettingsState {
             int silenceSkipSensitivity,
             bool sessionLogEnabled,
             bool outputFormatNegotiationEnabled,
-            bool floatOutputEnabled)?
+            bool floatOutputEnabled,
+            bool aaudioOutputEnabled,
+            bool aaudioPreferExclusive,
+            int aaudioTargetBufferMs,
+            int sincResamplerQuality,
+            bool bpmSyncCrossfadeEnabled)?
         $default,
   ) {
     final _that = this;
@@ -1395,7 +1465,12 @@ extension SettingsStatePatterns on SettingsState {
             _that.silenceSkipSensitivity,
             _that.sessionLogEnabled,
             _that.outputFormatNegotiationEnabled,
-            _that.floatOutputEnabled);
+            _that.floatOutputEnabled,
+            _that.aaudioOutputEnabled,
+            _that.aaudioPreferExclusive,
+            _that.aaudioTargetBufferMs,
+            _that.sincResamplerQuality,
+            _that.bpmSyncCrossfadeEnabled);
       case _:
         return null;
     }
@@ -1482,7 +1557,12 @@ class _SettingsState extends SettingsState {
       this.silenceSkipSensitivity = 0,
       this.sessionLogEnabled = true,
       this.outputFormatNegotiationEnabled = false,
-      this.floatOutputEnabled = false})
+      this.floatOutputEnabled = false,
+      this.aaudioOutputEnabled = false,
+      this.aaudioPreferExclusive = true,
+      this.aaudioTargetBufferMs = 150,
+      this.sincResamplerQuality = 3,
+      this.bpmSyncCrossfadeEnabled = false})
       : _proxyList = proxyList,
         _systemEffectsBundles = systemEffectsBundles,
         super._();
@@ -1721,6 +1801,21 @@ class _SettingsState extends SettingsState {
   @override
   @JsonKey()
   final bool floatOutputEnabled;
+  @override
+  @JsonKey()
+  final bool aaudioOutputEnabled;
+  @override
+  @JsonKey()
+  final bool aaudioPreferExclusive;
+  @override
+  @JsonKey()
+  final int aaudioTargetBufferMs;
+  @override
+  @JsonKey()
+  final int sincResamplerQuality;
+  @override
+  @JsonKey()
+  final bool bpmSyncCrossfadeEnabled;
 
   /// Create a copy of SettingsState
   /// with the given fields replaced by the non-null parameter values.
@@ -1842,7 +1937,12 @@ class _SettingsState extends SettingsState {
             (identical(other.silenceSkipSensitivity, silenceSkipSensitivity) || other.silenceSkipSensitivity == silenceSkipSensitivity) &&
             (identical(other.sessionLogEnabled, sessionLogEnabled) || other.sessionLogEnabled == sessionLogEnabled) &&
             (identical(other.outputFormatNegotiationEnabled, outputFormatNegotiationEnabled) || other.outputFormatNegotiationEnabled == outputFormatNegotiationEnabled) &&
-            (identical(other.floatOutputEnabled, floatOutputEnabled) || other.floatOutputEnabled == floatOutputEnabled));
+            (identical(other.floatOutputEnabled, floatOutputEnabled) || other.floatOutputEnabled == floatOutputEnabled) &&
+            (identical(other.aaudioOutputEnabled, aaudioOutputEnabled) || other.aaudioOutputEnabled == aaudioOutputEnabled) &&
+            (identical(other.aaudioPreferExclusive, aaudioPreferExclusive) || other.aaudioPreferExclusive == aaudioPreferExclusive) &&
+            (identical(other.aaudioTargetBufferMs, aaudioTargetBufferMs) || other.aaudioTargetBufferMs == aaudioTargetBufferMs) &&
+            (identical(other.sincResamplerQuality, sincResamplerQuality) || other.sincResamplerQuality == sincResamplerQuality) &&
+            (identical(other.bpmSyncCrossfadeEnabled, bpmSyncCrossfadeEnabled) || other.bpmSyncCrossfadeEnabled == bpmSyncCrossfadeEnabled));
   }
 
   @override
@@ -1924,13 +2024,18 @@ class _SettingsState extends SettingsState {
       silenceSkipSensitivity,
       sessionLogEnabled,
       outputFormatNegotiationEnabled,
-      floatOutputEnabled
+      floatOutputEnabled,
+      aaudioOutputEnabled,
+      aaudioPreferExclusive,
+      aaudioTargetBufferMs,
+      sincResamplerQuality,
+      bpmSyncCrossfadeEnabled
     ]);
   }
 
   @override
   String toString() {
-    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, hasProxyPassword: $hasProxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, syncCookiesToBackend: $syncCookiesToBackend, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, ytdlpBackendVersion: $ytdlpBackendVersion, ytdlpBackendProxyCount: $ytdlpBackendProxyCount, ytdlpBackendCircuitState: $ytdlpBackendCircuitState, bitPerfectOutput: $bitPerfectOutput, bypassDspOnBitPerfect: $bypassDspOnBitPerfect, currentOutputDevice: $currentOutputDevice, scanResultCount: $scanResultCount, errorMessage: $errorMessage, crossfeedEnabled: $crossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, limiterEnabled: $limiterEnabled, limiterLookaheadMs: $limiterLookaheadMs, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, reverbEnabled: $reverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, sincResamplerEnabled: $sincResamplerEnabled, dspPreference: $dspPreference, systemEffectsPolicy: $systemEffectsPolicy, systemEffectsStatus: $systemEffectsStatus, systemEffectsBundles: $systemEffectsBundles, bluetoothLatencyOffsetMs: $bluetoothLatencyOffsetMs, hedgedResolutionEnabled: $hedgedResolutionEnabled, adaptiveQualityEnabled: $adaptiveQualityEnabled, duckingMode: $duckingMode, duckingLevel: $duckingLevel, multiOutputMode: $multiOutputMode, dspSnapshotEnabled: $dspSnapshotEnabled, silenceSkipSensitivity: $silenceSkipSensitivity, sessionLogEnabled: $sessionLogEnabled, outputFormatNegotiationEnabled: $outputFormatNegotiationEnabled, floatOutputEnabled: $floatOutputEnabled)';
+    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, hasProxyPassword: $hasProxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, syncCookiesToBackend: $syncCookiesToBackend, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, ytdlpBackendVersion: $ytdlpBackendVersion, ytdlpBackendProxyCount: $ytdlpBackendProxyCount, ytdlpBackendCircuitState: $ytdlpBackendCircuitState, bitPerfectOutput: $bitPerfectOutput, bypassDspOnBitPerfect: $bypassDspOnBitPerfect, currentOutputDevice: $currentOutputDevice, scanResultCount: $scanResultCount, errorMessage: $errorMessage, crossfeedEnabled: $crossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, limiterEnabled: $limiterEnabled, limiterLookaheadMs: $limiterLookaheadMs, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, reverbEnabled: $reverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, sincResamplerEnabled: $sincResamplerEnabled, dspPreference: $dspPreference, systemEffectsPolicy: $systemEffectsPolicy, systemEffectsStatus: $systemEffectsStatus, systemEffectsBundles: $systemEffectsBundles, bluetoothLatencyOffsetMs: $bluetoothLatencyOffsetMs, hedgedResolutionEnabled: $hedgedResolutionEnabled, adaptiveQualityEnabled: $adaptiveQualityEnabled, duckingMode: $duckingMode, duckingLevel: $duckingLevel, multiOutputMode: $multiOutputMode, dspSnapshotEnabled: $dspSnapshotEnabled, silenceSkipSensitivity: $silenceSkipSensitivity, sessionLogEnabled: $sessionLogEnabled, outputFormatNegotiationEnabled: $outputFormatNegotiationEnabled, floatOutputEnabled: $floatOutputEnabled, aaudioOutputEnabled: $aaudioOutputEnabled, aaudioPreferExclusive: $aaudioPreferExclusive, aaudioTargetBufferMs: $aaudioTargetBufferMs, sincResamplerQuality: $sincResamplerQuality, bpmSyncCrossfadeEnabled: $bpmSyncCrossfadeEnabled)';
   }
 }
 
@@ -2018,7 +2123,12 @@ abstract mixin class _$SettingsStateCopyWith<$Res>
       int silenceSkipSensitivity,
       bool sessionLogEnabled,
       bool outputFormatNegotiationEnabled,
-      bool floatOutputEnabled});
+      bool floatOutputEnabled,
+      bool aaudioOutputEnabled,
+      bool aaudioPreferExclusive,
+      int aaudioTargetBufferMs,
+      int sincResamplerQuality,
+      bool bpmSyncCrossfadeEnabled});
 }
 
 /// @nodoc
@@ -2110,6 +2220,11 @@ class __$SettingsStateCopyWithImpl<$Res>
     Object? sessionLogEnabled = null,
     Object? outputFormatNegotiationEnabled = null,
     Object? floatOutputEnabled = null,
+    Object? aaudioOutputEnabled = null,
+    Object? aaudioPreferExclusive = null,
+    Object? aaudioTargetBufferMs = null,
+    Object? sincResamplerQuality = null,
+    Object? bpmSyncCrossfadeEnabled = null,
   }) {
     return _then(_SettingsState(
       gaplessPlayback: null == gaplessPlayback
@@ -2415,6 +2530,26 @@ class __$SettingsStateCopyWithImpl<$Res>
       floatOutputEnabled: null == floatOutputEnabled
           ? _self.floatOutputEnabled
           : floatOutputEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      aaudioOutputEnabled: null == aaudioOutputEnabled
+          ? _self.aaudioOutputEnabled
+          : aaudioOutputEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      aaudioPreferExclusive: null == aaudioPreferExclusive
+          ? _self.aaudioPreferExclusive
+          : aaudioPreferExclusive // ignore: cast_nullable_to_non_nullable
+              as bool,
+      aaudioTargetBufferMs: null == aaudioTargetBufferMs
+          ? _self.aaudioTargetBufferMs
+          : aaudioTargetBufferMs // ignore: cast_nullable_to_non_nullable
+              as int,
+      sincResamplerQuality: null == sincResamplerQuality
+          ? _self.sincResamplerQuality
+          : sincResamplerQuality // ignore: cast_nullable_to_non_nullable
+              as int,
+      bpmSyncCrossfadeEnabled: null == bpmSyncCrossfadeEnabled
+          ? _self.bpmSyncCrossfadeEnabled
+          : bpmSyncCrossfadeEnabled // ignore: cast_nullable_to_non_nullable
               as bool,
     ));
   }

@@ -52,6 +52,7 @@ import 'triple_buffer_pipeline.dart';
 import 'dsd_decoder_helper.dart';
 import '../../core/services/ytm_url_cache.dart';
 import 'collaborators/float_output_controller.dart';
+import 'collaborators/aaudio_output_controller.dart';
 import 'collaborators/playback_queue_manager.dart';
 import 'collaborators/playback_state_coordinator.dart';
 import 'collaborators/playback_volume_controller.dart';
@@ -904,6 +905,22 @@ class PulsrAudioHandler extends BaseAudioHandler
     await setFloatOutputEnabled(
       _cachedPrefs?.getBool(PrefsKeys.floatOutputEnabled) ?? false,
     );
+    // Restore the opt-in AAudio Direct output before any other player call
+    // so the sink is built with the persisted preference. Off by default.
+    await setAaudioOutputEnabled(
+      _cachedPrefs?.getBool(PrefsKeys.aaudioOutputEnabled) ?? false,
+      preferExclusive:
+          _cachedPrefs?.getBool(PrefsKeys.aaudioPreferExclusive) ?? true,
+      targetBufferMs:
+          _cachedPrefs?.getInt(PrefsKeys.aaudioTargetBufferMs) ?? 150,
+    );
+    // Restore the resampler quality and BPM-sync preference (defaults keep
+    // the historical 64-tap polyphase and plain-duration crossfade).
+    await AudioEffectsChannel().setSincResamplerQuality(
+      _cachedPrefs?.getInt(PrefsKeys.sincResamplerQuality) ?? 3,
+    );
+    _crossfadeManager.bpmSyncEnabled =
+        _cachedPrefs?.getBool(PrefsKeys.bpmSyncCrossfadeEnabled) ?? false;
 
     _playbackAnalytics = PlaybackAnalytics(
       onIncreaseBufferSizeRequested: () {
@@ -2138,6 +2155,29 @@ class PulsrAudioHandler extends BaseAudioHandler
     );
   }
 
+  /// Resampler quality (0=Fast/linear .. 3=Ultra/64-tap). Best-effort push.
+  Future<void> setSincResamplerQuality(int quality) async {
+    await AudioEffectsChannel().setSincResamplerQuality(quality);
+  }
+
+  /// BPM-synced crossfade toggle on the shared crossfade manager.
+  Future<void> setBpmSyncCrossfadeEnabled(bool enabled) async {
+    _crossfadeManager.bpmSyncEnabled = enabled;
+  }
+
+  /// Pushes the opt-in AAudio Direct output preference to every player  /// Pushes the opt-in AAudio Direct output preference to every player
+  /// (active, inactive and prefetch). Off by default; with `false` the sink
+  /// stays the historical DefaultAudioSink path. Never throws.
+  Future<void> setAaudioOutputEnabled(bool enabled,
+      {bool preferExclusive = true, int targetBufferMs = 150}) async {
+    await pushAaudioOutputToPlayers(
+      enabled,
+      preferExclusive: preferExclusive,
+      targetBufferMs: targetBufferMs,
+      players: [_playerA, _playerB, _prefetchPlayer],
+    );
+  }
+
   Future<void> _restoreSkipSilence() async {
     try {
       final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
@@ -2464,6 +2504,7 @@ class PulsrAudioHandler extends BaseAudioHandler
 
         // Synchronize speed on inactive player before loading & playback
         await _inactivePlayer.setSpeed(_activePlayer.speed);
+        await _inactivePlayer.setPitch(_pitch);
         await _inactivePlayer.setAudioSource(source, preload: true);
 
         if (_crossfadeManager.currentFadeId != currentFadeId) {
@@ -2595,7 +2636,11 @@ class PulsrAudioHandler extends BaseAudioHandler
         final active = _activePlayer;
         final inactive = _inactivePlayer;
 
-        final fadeDuration = _crossfadeManager.duration;
+        // BPM-synced crossfade: when enabled and the incoming track has a
+        // known BPM, align the fade to the nearest 2/4/8/16/32 beats.
+        final fadeDuration = _crossfadeManager.effectiveFadeDuration(
+          trackId: nextSong.id.toString(),
+        );
 
         final targetNextVolume = _calculateReplayGainVolume(nextSong);
         final isRepeatOne = _activePlayer.loopMode == LoopMode.one;
@@ -3884,6 +3929,36 @@ class PulsrAudioHandler extends BaseAudioHandler
     await prefs.setString(PrefsKeys.playbackRepeatMode, persistMode);
   }
 
+  // --- ANDROID AUTO & HEADSET BUTTON SUPPORT ---
+  Timer? _headsetClickTimer;
+  int _headsetClickCount = 0;
+
+  @override
+  Future<void> click([MediaButton button = MediaButton.media]) async {
+    _headsetClickCount++;
+    _headsetClickTimer?.cancel();
+
+    if (_headsetClickCount >= 3) {
+      _headsetClickCount = 0;
+      await skipToPrevious();
+      return;
+    }
+
+    _headsetClickTimer = Timer(const Duration(milliseconds: 350), () async {
+      final count = _headsetClickCount;
+      _headsetClickCount = 0;
+      if (count == 1) {
+        if (_activePlayer.playing) {
+          await pause();
+        } else {
+          await play();
+        }
+      } else if (count == 2) {
+        await skipToNext();
+      }
+    });
+  }
+
   static const int maxQueueSize = 500;
 
   static const double _minPlaybackSpeed = 0.25;
@@ -3912,6 +3987,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
   }
 
+  double _pitch = 1.0;
+  double get pitch => _pitch;
+
   Future<void> restorePersistedSpeed() async {
     try {
       final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
@@ -3925,6 +4003,15 @@ class PulsrAudioHandler extends BaseAudioHandler
           _playerB.setSpeed(clamped),
         ]);
         playbackState.add(playbackState.value.copyWith(speed: clamped));
+      }
+      final savedPitch = prefs.getDouble(PrefsKeys.playbackPitch);
+      if (savedPitch != null) {
+        final clampedPitch = savedPitch.clamp(0.5, 2.0);
+        _pitch = clampedPitch;
+        await Future.wait([
+          _playerA.setPitch(clampedPitch),
+          _playerB.setPitch(clampedPitch),
+        ]);
       }
     } catch (_) {}
   }
@@ -3940,6 +4027,19 @@ class PulsrAudioHandler extends BaseAudioHandler
     try {
       final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
       await prefs.setDouble(PrefsKeys.playbackSpeed, clamped);
+    } catch (_) {}
+  }
+
+  Future<void> setPitch(double pitch) async {
+    final clamped = pitch.clamp(0.5, 2.0);
+    _pitch = clamped;
+    await Future.wait([
+      _playerA.setPitch(clamped),
+      _playerB.setPitch(clamped),
+    ]);
+    try {
+      final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
+      await prefs.setDouble(PrefsKeys.playbackPitch, clamped);
     } catch (_) {}
   }
 
@@ -4238,6 +4338,8 @@ class PulsrAudioHandler extends BaseAudioHandler
 
       case 'root':
       case 'android_auto_root':
+      case '/':
+      case '':
         return [
           const MediaItem(
             id: 'songs',

@@ -80,6 +80,7 @@ abstract class PlayerState with _$PlayerState {
     @Default([]) List<String> detectedOemEngines,
     @Default(0) int activeQueueSlot,
     @Default(1.0) double playbackSpeed,
+    @Default(1.0) double playbackPitch,
     int? audioSessionId,
     String? errorMessage,
     // F1: AB loop
@@ -92,6 +93,10 @@ abstract class PlayerState with _$PlayerState {
     Duration? bookmarkPosition,
     // F10: silence-skip sensitivity mirror
     @Default(0) int silenceSkipSensitivity,
+    // PowerAmp Parity: per-song rating (1-5), EQ override, Volume offset (dB)
+    @Default(0) int currentSongRating,
+    String? currentSongEqOverride,
+    @Default(0.0) double currentSongVolumeOverrideDb,
   }) = _PlayerState;
 
   /// True when every field other than [position] is equal to [other]'s, i.e.
@@ -176,7 +181,11 @@ abstract class PlayerState with _$PlayerState {
         abPointB != other.abPointB ||
         trackDelayMs != other.trackDelayMs ||
         bookmarkPosition != other.bookmarkPosition ||
-        silenceSkipSensitivity != other.silenceSkipSensitivity;
+        silenceSkipSensitivity != other.silenceSkipSensitivity ||
+        playbackPitch != other.playbackPitch ||
+        currentSongRating != other.currentSongRating ||
+        currentSongEqOverride != other.currentSongEqOverride ||
+        currentSongVolumeOverrideDb != other.currentSongVolumeOverrideDb;
   }
 
   bool get isDspActive =>

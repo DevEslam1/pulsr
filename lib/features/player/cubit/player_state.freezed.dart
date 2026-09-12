@@ -77,6 +77,7 @@ mixin _$PlayerState {
   List<String> get detectedOemEngines;
   int get activeQueueSlot;
   double get playbackSpeed;
+  double get playbackPitch;
   int? get audioSessionId;
   String? get errorMessage;
   bool get abLoopEnabled;
@@ -85,6 +86,9 @@ mixin _$PlayerState {
   int get trackDelayMs;
   Duration? get bookmarkPosition;
   int get silenceSkipSensitivity;
+  int get currentSongRating;
+  String? get currentSongEqOverride;
+  double get currentSongVolumeOverrideDb;
 
   /// Create a copy of PlayerState
   /// with the given fields replaced by the non-null parameter values.
@@ -195,6 +199,7 @@ mixin _$PlayerState {
             const DeepCollectionEquality().equals(other.detectedOemEngines, _this.detectedOemEngines) &&
             (identical(other.activeQueueSlot, _this.activeQueueSlot) || other.activeQueueSlot == _this.activeQueueSlot) &&
             (identical(other.playbackSpeed, _this.playbackSpeed) || other.playbackSpeed == _this.playbackSpeed) &&
+            (identical(other.playbackPitch, _this.playbackPitch) || other.playbackPitch == _this.playbackPitch) &&
             (identical(other.audioSessionId, _this.audioSessionId) || other.audioSessionId == _this.audioSessionId) &&
             (identical(other.errorMessage, _this.errorMessage) || other.errorMessage == _this.errorMessage) &&
             (identical(other.abLoopEnabled, _this.abLoopEnabled) || other.abLoopEnabled == _this.abLoopEnabled) &&
@@ -202,7 +207,10 @@ mixin _$PlayerState {
             (identical(other.abPointB, _this.abPointB) || other.abPointB == _this.abPointB) &&
             (identical(other.trackDelayMs, _this.trackDelayMs) || other.trackDelayMs == _this.trackDelayMs) &&
             (identical(other.bookmarkPosition, _this.bookmarkPosition) || other.bookmarkPosition == _this.bookmarkPosition) &&
-            (identical(other.silenceSkipSensitivity, _this.silenceSkipSensitivity) || other.silenceSkipSensitivity == _this.silenceSkipSensitivity));
+            (identical(other.silenceSkipSensitivity, _this.silenceSkipSensitivity) || other.silenceSkipSensitivity == _this.silenceSkipSensitivity) &&
+            (identical(other.currentSongRating, _this.currentSongRating) || other.currentSongRating == _this.currentSongRating) &&
+            (identical(other.currentSongEqOverride, _this.currentSongEqOverride) || other.currentSongEqOverride == _this.currentSongEqOverride) &&
+            (identical(other.currentSongVolumeOverrideDb, _this.currentSongVolumeOverrideDb) || other.currentSongVolumeOverrideDb == _this.currentSongVolumeOverrideDb));
   }
 
   @override
@@ -272,6 +280,7 @@ mixin _$PlayerState {
       const DeepCollectionEquality().hash(_this.detectedOemEngines),
       _this.activeQueueSlot,
       _this.playbackSpeed,
+      _this.playbackPitch,
       _this.audioSessionId,
       _this.errorMessage,
       _this.abLoopEnabled,
@@ -279,14 +288,17 @@ mixin _$PlayerState {
       _this.abPointB,
       _this.trackDelayMs,
       _this.bookmarkPosition,
-      _this.silenceSkipSensitivity
+      _this.silenceSkipSensitivity,
+      _this.currentSongRating,
+      _this.currentSongEqOverride,
+      _this.currentSongVolumeOverrideDb
     ]);
   }
 
   @override
   String toString() {
     final _this = this as PlayerState;
-    return 'PlayerState(currentSong: ${_this.currentSong}, isPlaying: ${_this.isPlaying}, position: ${_this.position}, duration: ${_this.duration}, isShuffle: ${_this.isShuffle}, repeatMode: ${_this.repeatMode}, queue: ${_this.queue}, currentIndex: ${_this.currentIndex}, isExpanded: ${_this.isExpanded}, dominantColor: ${_this.dominantColor}, sleepTimerRemaining: ${_this.sleepTimerRemaining}, lyrics: ${_this.lyrics}, lyricsSource: ${_this.lyricsSource}, isLoadingLyrics: ${_this.isLoadingLyrics}, isLyricsVisible: ${_this.isLyricsVisible}, isQueueVisible: ${_this.isQueueVisible}, eqPreset: ${_this.eqPreset}, isEqEnabled: ${_this.isEqEnabled}, isVirtualizerEnabled: ${_this.isVirtualizerEnabled}, virtualizerStrength: ${_this.virtualizerStrength}, isVirtualizerSupported: ${_this.isVirtualizerSupported}, isDynamicsEnabled: ${_this.isDynamicsEnabled}, isDynamicsSupported: ${_this.isDynamicsSupported}, dynamicsPreset: ${_this.dynamicsPreset}, selectedHeadphoneProfile: ${_this.selectedHeadphoneProfile}, isSpatializerSupported: ${_this.isSpatializerSupported}, isSpatializerEnabled: ${_this.isSpatializerEnabled}, volumeBoost: ${_this.volumeBoost}, isVolumeBoostSupported: ${_this.isVolumeBoostSupported}, isBassBoostSupported: ${_this.isBassBoostSupported}, isCrossfeedEnabled: ${_this.isCrossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, isLimiterEnabled: ${_this.isLimiterEnabled}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, isReverbEnabled: ${_this.isReverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, isSincResamplerEnabled: ${_this.isSincResamplerEnabled}, isDitherEnabled: ${_this.isDitherEnabled}, ditherTargetBitDepth: ${_this.ditherTargetBitDepth}, isSaturationEnabled: ${_this.isSaturationEnabled}, saturationDrive: ${_this.saturationDrive}, saturationMix: ${_this.saturationMix}, saturationTilt: ${_this.saturationTilt}, isStereoWidthEnabled: ${_this.isStereoWidthEnabled}, stereoWidth: ${_this.stereoWidth}, isLoudnessContourEnabled: ${_this.isLoudnessContourEnabled}, loudnessContourIntensity: ${_this.loudnessContourIntensity}, isSubCrossoverEnabled: ${_this.isSubCrossoverEnabled}, subCrossoverCornerHz: ${_this.subCrossoverCornerHz}, subCrossoverSlopeDbPerOct: ${_this.subCrossoverSlopeDbPerOct}, subCrossoverGain: ${_this.subCrossoverGain}, isDynamicEqEnabled: ${_this.isDynamicEqEnabled}, dynamicEqBands: ${_this.dynamicEqBands}, hasOemAudio: ${_this.hasOemAudio}, detectedOemEngines: ${_this.detectedOemEngines}, activeQueueSlot: ${_this.activeQueueSlot}, playbackSpeed: ${_this.playbackSpeed}, audioSessionId: ${_this.audioSessionId}, errorMessage: ${_this.errorMessage}, abLoopEnabled: ${_this.abLoopEnabled}, abPointA: ${_this.abPointA}, abPointB: ${_this.abPointB}, trackDelayMs: ${_this.trackDelayMs}, bookmarkPosition: ${_this.bookmarkPosition}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity})';
+    return 'PlayerState(currentSong: ${_this.currentSong}, isPlaying: ${_this.isPlaying}, position: ${_this.position}, duration: ${_this.duration}, isShuffle: ${_this.isShuffle}, repeatMode: ${_this.repeatMode}, queue: ${_this.queue}, currentIndex: ${_this.currentIndex}, isExpanded: ${_this.isExpanded}, dominantColor: ${_this.dominantColor}, sleepTimerRemaining: ${_this.sleepTimerRemaining}, lyrics: ${_this.lyrics}, lyricsSource: ${_this.lyricsSource}, isLoadingLyrics: ${_this.isLoadingLyrics}, isLyricsVisible: ${_this.isLyricsVisible}, isQueueVisible: ${_this.isQueueVisible}, eqPreset: ${_this.eqPreset}, isEqEnabled: ${_this.isEqEnabled}, isVirtualizerEnabled: ${_this.isVirtualizerEnabled}, virtualizerStrength: ${_this.virtualizerStrength}, isVirtualizerSupported: ${_this.isVirtualizerSupported}, isDynamicsEnabled: ${_this.isDynamicsEnabled}, isDynamicsSupported: ${_this.isDynamicsSupported}, dynamicsPreset: ${_this.dynamicsPreset}, selectedHeadphoneProfile: ${_this.selectedHeadphoneProfile}, isSpatializerSupported: ${_this.isSpatializerSupported}, isSpatializerEnabled: ${_this.isSpatializerEnabled}, volumeBoost: ${_this.volumeBoost}, isVolumeBoostSupported: ${_this.isVolumeBoostSupported}, isBassBoostSupported: ${_this.isBassBoostSupported}, isCrossfeedEnabled: ${_this.isCrossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, isLimiterEnabled: ${_this.isLimiterEnabled}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, isReverbEnabled: ${_this.isReverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, isSincResamplerEnabled: ${_this.isSincResamplerEnabled}, isDitherEnabled: ${_this.isDitherEnabled}, ditherTargetBitDepth: ${_this.ditherTargetBitDepth}, isSaturationEnabled: ${_this.isSaturationEnabled}, saturationDrive: ${_this.saturationDrive}, saturationMix: ${_this.saturationMix}, saturationTilt: ${_this.saturationTilt}, isStereoWidthEnabled: ${_this.isStereoWidthEnabled}, stereoWidth: ${_this.stereoWidth}, isLoudnessContourEnabled: ${_this.isLoudnessContourEnabled}, loudnessContourIntensity: ${_this.loudnessContourIntensity}, isSubCrossoverEnabled: ${_this.isSubCrossoverEnabled}, subCrossoverCornerHz: ${_this.subCrossoverCornerHz}, subCrossoverSlopeDbPerOct: ${_this.subCrossoverSlopeDbPerOct}, subCrossoverGain: ${_this.subCrossoverGain}, isDynamicEqEnabled: ${_this.isDynamicEqEnabled}, dynamicEqBands: ${_this.dynamicEqBands}, hasOemAudio: ${_this.hasOemAudio}, detectedOemEngines: ${_this.detectedOemEngines}, activeQueueSlot: ${_this.activeQueueSlot}, playbackSpeed: ${_this.playbackSpeed}, playbackPitch: ${_this.playbackPitch}, audioSessionId: ${_this.audioSessionId}, errorMessage: ${_this.errorMessage}, abLoopEnabled: ${_this.abLoopEnabled}, abPointA: ${_this.abPointA}, abPointB: ${_this.abPointB}, trackDelayMs: ${_this.trackDelayMs}, bookmarkPosition: ${_this.bookmarkPosition}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, currentSongRating: ${_this.currentSongRating}, currentSongEqOverride: ${_this.currentSongEqOverride}, currentSongVolumeOverrideDb: ${_this.currentSongVolumeOverrideDb})';
   }
 }
 
@@ -359,6 +371,7 @@ abstract mixin class $PlayerStateCopyWith<$Res> {
       List<String> detectedOemEngines,
       int activeQueueSlot,
       double playbackSpeed,
+      double playbackPitch,
       int? audioSessionId,
       String? errorMessage,
       bool abLoopEnabled,
@@ -366,7 +379,10 @@ abstract mixin class $PlayerStateCopyWith<$Res> {
       Duration? abPointB,
       int trackDelayMs,
       Duration? bookmarkPosition,
-      int silenceSkipSensitivity});
+      int silenceSkipSensitivity,
+      int currentSongRating,
+      String? currentSongEqOverride,
+      double currentSongVolumeOverrideDb});
 }
 
 /// @nodoc
@@ -443,6 +459,7 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
     Object? detectedOemEngines = null,
     Object? activeQueueSlot = null,
     Object? playbackSpeed = null,
+    Object? playbackPitch = null,
     Object? audioSessionId = freezed,
     Object? errorMessage = freezed,
     Object? abLoopEnabled = null,
@@ -451,6 +468,9 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
     Object? trackDelayMs = null,
     Object? bookmarkPosition = freezed,
     Object? silenceSkipSensitivity = null,
+    Object? currentSongRating = null,
+    Object? currentSongEqOverride = freezed,
+    Object? currentSongVolumeOverrideDb = null,
   }) {
     return _then(PlayerState(
       currentSong: freezed == currentSong
@@ -701,6 +721,10 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
           ? _self.playbackSpeed
           : playbackSpeed // ignore: cast_nullable_to_non_nullable
               as double,
+      playbackPitch: null == playbackPitch
+          ? _self.playbackPitch
+          : playbackPitch // ignore: cast_nullable_to_non_nullable
+              as double,
       audioSessionId: freezed == audioSessionId
           ? _self.audioSessionId
           : audioSessionId // ignore: cast_nullable_to_non_nullable
@@ -733,6 +757,18 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
           ? _self.silenceSkipSensitivity
           : silenceSkipSensitivity // ignore: cast_nullable_to_non_nullable
               as int,
+      currentSongRating: null == currentSongRating
+          ? _self.currentSongRating
+          : currentSongRating // ignore: cast_nullable_to_non_nullable
+              as int,
+      currentSongEqOverride: freezed == currentSongEqOverride
+          ? _self.currentSongEqOverride
+          : currentSongEqOverride // ignore: cast_nullable_to_non_nullable
+              as String?,
+      currentSongVolumeOverrideDb: null == currentSongVolumeOverrideDb
+          ? _self.currentSongVolumeOverrideDb
+          : currentSongVolumeOverrideDb // ignore: cast_nullable_to_non_nullable
+              as double,
     ));
   }
 }
@@ -893,6 +929,7 @@ extension PlayerStatePatterns on PlayerState {
             List<String> detectedOemEngines,
             int activeQueueSlot,
             double playbackSpeed,
+            double playbackPitch,
             int? audioSessionId,
             String? errorMessage,
             bool abLoopEnabled,
@@ -900,7 +937,10 @@ extension PlayerStatePatterns on PlayerState {
             Duration? abPointB,
             int trackDelayMs,
             Duration? bookmarkPosition,
-            int silenceSkipSensitivity)?
+            int silenceSkipSensitivity,
+            int currentSongRating,
+            String? currentSongEqOverride,
+            double currentSongVolumeOverrideDb)?
         $default, {
     required TResult orElse(),
   }) {
@@ -970,6 +1010,7 @@ extension PlayerStatePatterns on PlayerState {
             _that.detectedOemEngines,
             _that.activeQueueSlot,
             _that.playbackSpeed,
+            _that.playbackPitch,
             _that.audioSessionId,
             _that.errorMessage,
             _that.abLoopEnabled,
@@ -977,7 +1018,10 @@ extension PlayerStatePatterns on PlayerState {
             _that.abPointB,
             _that.trackDelayMs,
             _that.bookmarkPosition,
-            _that.silenceSkipSensitivity);
+            _that.silenceSkipSensitivity,
+            _that.currentSongRating,
+            _that.currentSongEqOverride,
+            _that.currentSongVolumeOverrideDb);
       case _:
         return orElse();
     }
@@ -1061,6 +1105,7 @@ extension PlayerStatePatterns on PlayerState {
             List<String> detectedOemEngines,
             int activeQueueSlot,
             double playbackSpeed,
+            double playbackPitch,
             int? audioSessionId,
             String? errorMessage,
             bool abLoopEnabled,
@@ -1068,7 +1113,10 @@ extension PlayerStatePatterns on PlayerState {
             Duration? abPointB,
             int trackDelayMs,
             Duration? bookmarkPosition,
-            int silenceSkipSensitivity)
+            int silenceSkipSensitivity,
+            int currentSongRating,
+            String? currentSongEqOverride,
+            double currentSongVolumeOverrideDb)
         $default,
   ) {
     final _that = this;
@@ -1137,6 +1185,7 @@ extension PlayerStatePatterns on PlayerState {
             _that.detectedOemEngines,
             _that.activeQueueSlot,
             _that.playbackSpeed,
+            _that.playbackPitch,
             _that.audioSessionId,
             _that.errorMessage,
             _that.abLoopEnabled,
@@ -1144,7 +1193,10 @@ extension PlayerStatePatterns on PlayerState {
             _that.abPointB,
             _that.trackDelayMs,
             _that.bookmarkPosition,
-            _that.silenceSkipSensitivity);
+            _that.silenceSkipSensitivity,
+            _that.currentSongRating,
+            _that.currentSongEqOverride,
+            _that.currentSongVolumeOverrideDb);
       case _:
         throw StateError('Unexpected subclass');
     }
@@ -1227,6 +1279,7 @@ extension PlayerStatePatterns on PlayerState {
             List<String> detectedOemEngines,
             int activeQueueSlot,
             double playbackSpeed,
+            double playbackPitch,
             int? audioSessionId,
             String? errorMessage,
             bool abLoopEnabled,
@@ -1234,7 +1287,10 @@ extension PlayerStatePatterns on PlayerState {
             Duration? abPointB,
             int trackDelayMs,
             Duration? bookmarkPosition,
-            int silenceSkipSensitivity)?
+            int silenceSkipSensitivity,
+            int currentSongRating,
+            String? currentSongEqOverride,
+            double currentSongVolumeOverrideDb)?
         $default,
   ) {
     final _that = this;
@@ -1303,6 +1359,7 @@ extension PlayerStatePatterns on PlayerState {
             _that.detectedOemEngines,
             _that.activeQueueSlot,
             _that.playbackSpeed,
+            _that.playbackPitch,
             _that.audioSessionId,
             _that.errorMessage,
             _that.abLoopEnabled,
@@ -1310,7 +1367,10 @@ extension PlayerStatePatterns on PlayerState {
             _that.abPointB,
             _that.trackDelayMs,
             _that.bookmarkPosition,
-            _that.silenceSkipSensitivity);
+            _that.silenceSkipSensitivity,
+            _that.currentSongRating,
+            _that.currentSongEqOverride,
+            _that.currentSongVolumeOverrideDb);
       case _:
         return null;
     }
@@ -1384,6 +1444,7 @@ class _PlayerState extends PlayerState {
       List<String> detectedOemEngines = const [],
       this.activeQueueSlot = 0,
       this.playbackSpeed = 1.0,
+      this.playbackPitch = 1.0,
       this.audioSessionId,
       this.errorMessage,
       this.abLoopEnabled = false,
@@ -1391,7 +1452,10 @@ class _PlayerState extends PlayerState {
       this.abPointB,
       this.trackDelayMs = 0,
       this.bookmarkPosition,
-      this.silenceSkipSensitivity = 0})
+      this.silenceSkipSensitivity = 0,
+      this.currentSongRating = 0,
+      this.currentSongEqOverride,
+      this.currentSongVolumeOverrideDb = 0.0})
       : _queue = queue,
         _lyrics = lyrics,
         _dynamicEqBands = dynamicEqBands,
@@ -1606,6 +1670,9 @@ class _PlayerState extends PlayerState {
   @JsonKey()
   final double playbackSpeed;
   @override
+  @JsonKey()
+  final double playbackPitch;
+  @override
   final int? audioSessionId;
   @override
   final String? errorMessage;
@@ -1624,6 +1691,14 @@ class _PlayerState extends PlayerState {
   @override
   @JsonKey()
   final int silenceSkipSensitivity;
+  @override
+  @JsonKey()
+  final int currentSongRating;
+  @override
+  final String? currentSongEqOverride;
+  @override
+  @JsonKey()
+  final double currentSongVolumeOverrideDb;
 
   /// Create a copy of PlayerState
   /// with the given fields replaced by the non-null parameter values.
@@ -1740,6 +1815,7 @@ class _PlayerState extends PlayerState {
             const DeepCollectionEquality().equals(other.detectedOemEngines, _detectedOemEngines) &&
             (identical(other.activeQueueSlot, activeQueueSlot) || other.activeQueueSlot == activeQueueSlot) &&
             (identical(other.playbackSpeed, playbackSpeed) || other.playbackSpeed == playbackSpeed) &&
+            (identical(other.playbackPitch, playbackPitch) || other.playbackPitch == playbackPitch) &&
             (identical(other.audioSessionId, audioSessionId) || other.audioSessionId == audioSessionId) &&
             (identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage) &&
             (identical(other.abLoopEnabled, abLoopEnabled) || other.abLoopEnabled == abLoopEnabled) &&
@@ -1747,7 +1823,10 @@ class _PlayerState extends PlayerState {
             (identical(other.abPointB, abPointB) || other.abPointB == abPointB) &&
             (identical(other.trackDelayMs, trackDelayMs) || other.trackDelayMs == trackDelayMs) &&
             (identical(other.bookmarkPosition, bookmarkPosition) || other.bookmarkPosition == bookmarkPosition) &&
-            (identical(other.silenceSkipSensitivity, silenceSkipSensitivity) || other.silenceSkipSensitivity == silenceSkipSensitivity));
+            (identical(other.silenceSkipSensitivity, silenceSkipSensitivity) || other.silenceSkipSensitivity == silenceSkipSensitivity) &&
+            (identical(other.currentSongRating, currentSongRating) || other.currentSongRating == currentSongRating) &&
+            (identical(other.currentSongEqOverride, currentSongEqOverride) || other.currentSongEqOverride == currentSongEqOverride) &&
+            (identical(other.currentSongVolumeOverrideDb, currentSongVolumeOverrideDb) || other.currentSongVolumeOverrideDb == currentSongVolumeOverrideDb));
   }
 
   @override
@@ -1816,6 +1895,7 @@ class _PlayerState extends PlayerState {
       const DeepCollectionEquality().hash(_detectedOemEngines),
       activeQueueSlot,
       playbackSpeed,
+      playbackPitch,
       audioSessionId,
       errorMessage,
       abLoopEnabled,
@@ -1823,13 +1903,16 @@ class _PlayerState extends PlayerState {
       abPointB,
       trackDelayMs,
       bookmarkPosition,
-      silenceSkipSensitivity
+      silenceSkipSensitivity,
+      currentSongRating,
+      currentSongEqOverride,
+      currentSongVolumeOverrideDb
     ]);
   }
 
   @override
   String toString() {
-    return 'PlayerState(currentSong: $currentSong, isPlaying: $isPlaying, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, queue: $queue, currentIndex: $currentIndex, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, lyrics: $lyrics, lyricsSource: $lyricsSource, isLoadingLyrics: $isLoadingLyrics, isLyricsVisible: $isLyricsVisible, isQueueVisible: $isQueueVisible, eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isVirtualizerSupported: $isVirtualizerSupported, isDynamicsEnabled: $isDynamicsEnabled, isDynamicsSupported: $isDynamicsSupported, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, isVolumeBoostSupported: $isVolumeBoostSupported, isBassBoostSupported: $isBassBoostSupported, isCrossfeedEnabled: $isCrossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, isLimiterEnabled: $isLimiterEnabled, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, isReverbEnabled: $isReverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, isSincResamplerEnabled: $isSincResamplerEnabled, isDitherEnabled: $isDitherEnabled, ditherTargetBitDepth: $ditherTargetBitDepth, isSaturationEnabled: $isSaturationEnabled, saturationDrive: $saturationDrive, saturationMix: $saturationMix, saturationTilt: $saturationTilt, isStereoWidthEnabled: $isStereoWidthEnabled, stereoWidth: $stereoWidth, isLoudnessContourEnabled: $isLoudnessContourEnabled, loudnessContourIntensity: $loudnessContourIntensity, isSubCrossoverEnabled: $isSubCrossoverEnabled, subCrossoverCornerHz: $subCrossoverCornerHz, subCrossoverSlopeDbPerOct: $subCrossoverSlopeDbPerOct, subCrossoverGain: $subCrossoverGain, isDynamicEqEnabled: $isDynamicEqEnabled, dynamicEqBands: $dynamicEqBands, hasOemAudio: $hasOemAudio, detectedOemEngines: $detectedOemEngines, activeQueueSlot: $activeQueueSlot, playbackSpeed: $playbackSpeed, audioSessionId: $audioSessionId, errorMessage: $errorMessage, abLoopEnabled: $abLoopEnabled, abPointA: $abPointA, abPointB: $abPointB, trackDelayMs: $trackDelayMs, bookmarkPosition: $bookmarkPosition, silenceSkipSensitivity: $silenceSkipSensitivity)';
+    return 'PlayerState(currentSong: $currentSong, isPlaying: $isPlaying, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, queue: $queue, currentIndex: $currentIndex, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, lyrics: $lyrics, lyricsSource: $lyricsSource, isLoadingLyrics: $isLoadingLyrics, isLyricsVisible: $isLyricsVisible, isQueueVisible: $isQueueVisible, eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isVirtualizerSupported: $isVirtualizerSupported, isDynamicsEnabled: $isDynamicsEnabled, isDynamicsSupported: $isDynamicsSupported, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, isVolumeBoostSupported: $isVolumeBoostSupported, isBassBoostSupported: $isBassBoostSupported, isCrossfeedEnabled: $isCrossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, isLimiterEnabled: $isLimiterEnabled, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, isReverbEnabled: $isReverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, isSincResamplerEnabled: $isSincResamplerEnabled, isDitherEnabled: $isDitherEnabled, ditherTargetBitDepth: $ditherTargetBitDepth, isSaturationEnabled: $isSaturationEnabled, saturationDrive: $saturationDrive, saturationMix: $saturationMix, saturationTilt: $saturationTilt, isStereoWidthEnabled: $isStereoWidthEnabled, stereoWidth: $stereoWidth, isLoudnessContourEnabled: $isLoudnessContourEnabled, loudnessContourIntensity: $loudnessContourIntensity, isSubCrossoverEnabled: $isSubCrossoverEnabled, subCrossoverCornerHz: $subCrossoverCornerHz, subCrossoverSlopeDbPerOct: $subCrossoverSlopeDbPerOct, subCrossoverGain: $subCrossoverGain, isDynamicEqEnabled: $isDynamicEqEnabled, dynamicEqBands: $dynamicEqBands, hasOemAudio: $hasOemAudio, detectedOemEngines: $detectedOemEngines, activeQueueSlot: $activeQueueSlot, playbackSpeed: $playbackSpeed, playbackPitch: $playbackPitch, audioSessionId: $audioSessionId, errorMessage: $errorMessage, abLoopEnabled: $abLoopEnabled, abPointA: $abPointA, abPointB: $abPointB, trackDelayMs: $trackDelayMs, bookmarkPosition: $bookmarkPosition, silenceSkipSensitivity: $silenceSkipSensitivity, currentSongRating: $currentSongRating, currentSongEqOverride: $currentSongEqOverride, currentSongVolumeOverrideDb: $currentSongVolumeOverrideDb)';
   }
 }
 
@@ -1904,6 +1987,7 @@ abstract mixin class _$PlayerStateCopyWith<$Res>
       List<String> detectedOemEngines,
       int activeQueueSlot,
       double playbackSpeed,
+      double playbackPitch,
       int? audioSessionId,
       String? errorMessage,
       bool abLoopEnabled,
@@ -1911,7 +1995,10 @@ abstract mixin class _$PlayerStateCopyWith<$Res>
       Duration? abPointB,
       int trackDelayMs,
       Duration? bookmarkPosition,
-      int silenceSkipSensitivity});
+      int silenceSkipSensitivity,
+      int currentSongRating,
+      String? currentSongEqOverride,
+      double currentSongVolumeOverrideDb});
 }
 
 /// @nodoc
@@ -1988,6 +2075,7 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
     Object? detectedOemEngines = null,
     Object? activeQueueSlot = null,
     Object? playbackSpeed = null,
+    Object? playbackPitch = null,
     Object? audioSessionId = freezed,
     Object? errorMessage = freezed,
     Object? abLoopEnabled = null,
@@ -1996,6 +2084,9 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
     Object? trackDelayMs = null,
     Object? bookmarkPosition = freezed,
     Object? silenceSkipSensitivity = null,
+    Object? currentSongRating = null,
+    Object? currentSongEqOverride = freezed,
+    Object? currentSongVolumeOverrideDb = null,
   }) {
     return _then(_PlayerState(
       currentSong: freezed == currentSong
@@ -2246,6 +2337,10 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
           ? _self.playbackSpeed
           : playbackSpeed // ignore: cast_nullable_to_non_nullable
               as double,
+      playbackPitch: null == playbackPitch
+          ? _self.playbackPitch
+          : playbackPitch // ignore: cast_nullable_to_non_nullable
+              as double,
       audioSessionId: freezed == audioSessionId
           ? _self.audioSessionId
           : audioSessionId // ignore: cast_nullable_to_non_nullable
@@ -2278,6 +2373,18 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
           ? _self.silenceSkipSensitivity
           : silenceSkipSensitivity // ignore: cast_nullable_to_non_nullable
               as int,
+      currentSongRating: null == currentSongRating
+          ? _self.currentSongRating
+          : currentSongRating // ignore: cast_nullable_to_non_nullable
+              as int,
+      currentSongEqOverride: freezed == currentSongEqOverride
+          ? _self.currentSongEqOverride
+          : currentSongEqOverride // ignore: cast_nullable_to_non_nullable
+              as String?,
+      currentSongVolumeOverrideDb: null == currentSongVolumeOverrideDb
+          ? _self.currentSongVolumeOverrideDb
+          : currentSongVolumeOverrideDb // ignore: cast_nullable_to_non_nullable
+              as double,
     ));
   }
 }

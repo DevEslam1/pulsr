@@ -334,6 +334,14 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSincResamplerRates(
     });
 }
 
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSincResamplerQuality(
+        JNIEnv* /* env */, jobject /* thiz */, jint quality) {
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        snap.resampler.quality = quality;
+    });
+}
+
 JNIEXPORT jfloatArray JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeDecodeDsd(
         JNIEnv* env, jobject /* thiz */,

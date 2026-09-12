@@ -592,7 +592,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                       constraints: BoxConstraints(
                         maxWidth: (state.isLyricsVisible || state.isQueueVisible)
                             ? (isTablet ? 560.0 : double.infinity)
-                            : 420.0,
+                            : (isTablet ? 560.0 : double.infinity),
                         maxHeight: double.infinity,
                       ),
                       child: centerDisplay,
@@ -921,13 +921,16 @@ class _WaveformHeroStage extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final availableW = constraints.maxWidth - (isTablet ? 48.0 : 28.0);
-        final availableH = constraints.maxHeight - (isTablet ? 36.0 : 16.0);
+        final availableW = constraints.maxWidth - (isTablet ? 40.0 : 20.0);
+        final availableH = constraints.maxHeight - (isTablet ? 24.0 : 12.0);
         final maxDimension = math.min(availableW, availableH);
 
         final double artSize = isLandscape
-            ? (constraints.maxHeight * 0.78).clamp(160.0, 260.0)
-            : (maxDimension * 0.88).clamp(260.0, isTablet ? 440.0 : 320.0);
+            ? (constraints.maxHeight * 0.82).clamp(160.0, 300.0)
+            : math.min(
+                maxDimension * 0.98,
+                isTablet ? 540.0 : 400.0,
+              ).clamp(180.0, double.infinity);
 
         final double waveBaselineY =
             (constraints.maxHeight / 2) + (artSize * 0.28);
@@ -975,7 +978,7 @@ class _WaveformHeroStage extends StatelessWidget {
                 width: artSize,
                 height: artSize,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(26),
+                  borderRadius: BorderRadius.circular(28),
                   boxShadow: [
                     BoxShadow(
                       color:
@@ -1002,7 +1005,7 @@ class _WaveformHeroStage extends StatelessWidget {
                         remoteUrl: song.remoteArtworkUrl,
                         type: ArtworkType.AUDIO,
                         size: artSize,
-                        borderRadius: 26,
+                        borderRadius: 28,
                         highQuality: true,
                         fallbackIcon: Icons.music_note_rounded,
                       )

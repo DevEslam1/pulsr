@@ -24,6 +24,7 @@ class PrefsKeys {
   static const String dynamicThemingEnabled = 'setting_dynamic_theming_enabled';
   static const String playerThemeMode = 'setting_player_theme_mode';
   static const String playbackSpeed = 'setting_playback_speed';
+  static const String playbackPitch = 'setting_playback_pitch';
   static const String advancedPlaybackSpeed = 'setting_advanced_playback_speed';
   static const String playbackShuffle = 'setting_playback_shuffle';
   static const String playbackRepeatMode = 'setting_playback_repeat_mode';
@@ -163,4 +164,23 @@ class PrefsKeys {
   // Opt-in 24/32-bit float DSP path (default OFF: the native DSP chain stays
   // on the historical 16-bit sink path, byte-identical to today).
   static const String floatOutputEnabled = 'setting_float_output_enabled';
+
+  // Opt-in AAudio "Direct" output path (default OFF: the sink stays the
+  // historical DefaultAudioSink + native DSP chain). When on, playback goes
+  // through a native AAudio stream (EXCLUSIVE attempt, SHARED fallback) and
+  // the DSP processor chain is bypassed for bit-perfect output.
+  static const String aaudioOutputEnabled = 'setting_aaudio_output_enabled';
+  static const String aaudioPreferExclusive =
+      'setting_aaudio_prefer_exclusive';
+  static const String aaudioTargetBufferMs =
+      'setting_aaudio_target_buffer_ms';
+
+  // Resampler quality: 0 = Fast (linear), 1 = Standard (16-tap),
+  // 2 = High (32-tap), 3 = Ultra (64-tap, default).
+  static const String sincResamplerQuality = 'setting_sinc_resampler_quality';
+
+  // BPM-synced crossfade: align crossfade duration to the nearest
+  // 2/4/8/16/32 beats of the incoming track when a BPM value is known.
+  static const String bpmSyncCrossfadeEnabled =
+      'setting_bpm_sync_crossfade_enabled';
 }

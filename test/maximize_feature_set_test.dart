@@ -101,11 +101,18 @@ void main() {
   });
 
   group('F6 gapless trim', () {
-    test('opus gets preskip, mp3 gets none', () {
+    test('opus gets preskip, mp3/aac get codec trims (B3)', () {
       final opus = GaplessTrimHandler.trimFor(path: 'a.opus');
       expect(opus.preSkip, GaplessTrimHandler.opusPreSkip);
+      // B3: MP3 now carries the LAME encoder delay/padding trim.
       final mp3 = GaplessTrimHandler.trimFor(path: 'a.mp3', codec: 'MP3');
-      expect(mp3.isEmpty, isTrue);
+      expect(mp3.preSkip, GaplessTrimHandler.mp3EncoderDelay);
+      expect(mp3.postTrim, GaplessTrimHandler.mp3EncoderPadding);
+      // AAC containers carry the iTunes priming pre-skip.
+      final aac = GaplessTrimHandler.trimFor(path: 'a.m4a');
+      expect(aac.preSkip, GaplessTrimHandler.aacEncoderDelay);
+      // Lossless stays untouched.
+      expect(GaplessTrimHandler.trimFor(path: 'a.flac').isEmpty, isTrue);
     });
     test('header overrides win and effective end trims tail', () {
       final t = GaplessTrimHandler.trimFor(

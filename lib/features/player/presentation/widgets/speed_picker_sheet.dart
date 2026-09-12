@@ -61,11 +61,20 @@ class SpeedPickerSheet extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
                   child: BlocBuilder<PlayerCubit, PlayerState>(
-                    // Only playbackSpeed drives this sheet; ignore 10Hz position ticks.
-                    buildWhen: (a, b) => a.playbackSpeed != b.playbackSpeed,
+                    // Only playbackSpeed and playbackPitch drive this sheet; ignore 10Hz position ticks.
+                    buildWhen: (a, b) =>
+                        a.playbackSpeed != b.playbackSpeed ||
+                        a.playbackPitch != b.playbackPitch,
                     builder: (context, state) {
                       final cubit = context.read<PlayerCubit>();
                       final currentSpeed = state.playbackSpeed;
+                      final currentPitch = state.playbackPitch;
+
+                      // Convert pitch multiplier to approximate semitones:
+                      // pitch = 2^(semitones / 12)  =>  semitones = 12 * log2(pitch)
+                      final semitones = currentPitch == 1.0
+                          ? 0
+                          : (12.0 * (currentPitch > 0 ? (currentPitch - 1.0) * 1.442695 : 0.0)).round();
 
                       return Column(
                         mainAxisSize: MainAxisSize.min,
@@ -82,15 +91,32 @@ class SpeedPickerSheet extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 20),
-                          Text(
-                            context.l10n.playbackSpeed,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleLarge
-                                ?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  color: p.textPrimary,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                context.l10n.playbackSpeed,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleLarge
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      color: p.textPrimary,
+                                    ),
+                              ),
+                              if (currentSpeed != 1.0)
+                                TextButton(
+                                  onPressed: () => cubit.setPlaybackSpeed(1.0),
+                                  style: TextButton.styleFrom(
+                                    padding: EdgeInsets.zero,
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: Text('Reset',
+                                      style: TextStyle(
+                                          color: p.accent, fontSize: 13)),
                                 ),
+                            ],
                           ),
                           const SizedBox(height: 8),
                           Text(
@@ -98,7 +124,7 @@ class SpeedPickerSheet extends StatelessWidget {
                             style:
                                 TextStyle(color: p.textSecondary, fontSize: 13),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 14),
                           SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
                             physics: const BouncingScrollPhysics(),
@@ -127,6 +153,111 @@ class SpeedPickerSheet extends StatelessWidget {
                                     onSelected: (selected) {
                                       if (selected) {
                                         cubit.setPlaybackSpeed(speed);
+                                      }
+                                    },
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          Divider(color: p.hairline),
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Pitch / Tone Shift',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      color: p.textPrimary,
+                                    ),
+                              ),
+                              if ((currentPitch - 1.0).abs() > 0.01)
+                                TextButton(
+                                  onPressed: () => cubit.setPlaybackPitch(1.0),
+                                  style: TextButton.styleFrom(
+                                    padding: EdgeInsets.zero,
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: Text('Reset',
+                                      style: TextStyle(
+                                          color: p.accent, fontSize: 13)),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            (currentPitch - 1.0).abs() < 0.01
+                                ? 'Original Pitch (1.00x)'
+                                : '${semitones > 0 ? '+' : ''}$semitones semitones (${currentPitch.toStringAsFixed(2)}x)',
+                            style:
+                                TextStyle(color: p.textSecondary, fontSize: 13),
+                          ),
+                          const SizedBox(height: 12),
+                          SliderTheme(
+                            data: SliderTheme.of(context).copyWith(
+                              activeTrackColor: p.accent,
+                              inactiveTrackColor: p.surfaceContainer,
+                              thumbColor: p.accent,
+                              overlayColor: p.accent.withValues(alpha: 0.15),
+                              trackHeight: 4,
+                            ),
+                            child: Slider(
+                              value: currentPitch.clamp(0.5, 2.0),
+                              min: 0.5,
+                              max: 2.0,
+                              divisions: 30,
+                              onChanged: (value) {
+                                cubit.setPlaybackPitch(value);
+                              },
+                            ),
+                          ),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            child: Row(
+                              children: [
+                                0.75,
+                                0.85,
+                                0.9,
+                                1.0,
+                                1.1,
+                                1.15,
+                                1.25,
+                              ].map((pitch) {
+                                final isSelected =
+                                    (currentPitch - pitch).abs() < 0.02;
+                                final label = pitch == 1.0
+                                    ? 'Normal'
+                                    : '${pitch > 1.0 ? '+' : ''}${((pitch - 1.0) * 100).round()}%';
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 8.0),
+                                  child: ChoiceChip(
+                                    label: Text(label),
+                                    selected: isSelected,
+                                    selectedColor:
+                                        p.accent.withValues(alpha: 0.2),
+                                    backgroundColor: p.surfaceContainer,
+                                    labelStyle: TextStyle(
+                                      color: isSelected
+                                          ? p.accent
+                                          : p.textPrimary,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w800
+                                          : FontWeight.w500,
+                                      fontSize: 12,
+                                    ),
+                                    side: BorderSide(
+                                      color: isSelected ? p.accent : p.hairline,
+                                    ),
+                                    onSelected: (selected) {
+                                      if (selected) {
+                                        cubit.setPlaybackPitch(pitch);
                                       }
                                     },
                                   ),

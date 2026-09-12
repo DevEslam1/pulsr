@@ -940,7 +940,25 @@ class AudioEffectsChannel {
     }
   }
 
-  // --- PHASE 1 DSP EXPANSION: HARMONIC SATURATION / EXCITER ---
+  /// Resampler quality: 0 = Fast (linear), 1 = Standard (16-tap),
+  /// 2 = High (32-tap), 3 = Ultra (64-tap). Best-effort on Android only.
+  Future<void> setSincResamplerQuality(int quality) async {
+    if (!_isAndroid) return;
+    try {
+      await _channel.invokeMethod('setSincResamplerQuality', {
+        'quality': quality.clamp(0, 3),
+      });
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set sinc resampler quality ($quality)',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+    }
+  }
+
+  // --- PHASE 1 DSP EXPANSION: HARMONIC SATURATION / EXCITER ---  // --- PHASE 1 DSP EXPANSION: HARMONIC SATURATION / EXCITER ---
 
   Future<void> setSaturationEnabled(bool enabled) async {
     if (!_isAndroid) return;

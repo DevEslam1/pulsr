@@ -100,6 +100,10 @@ struct ResamplerParamSet {
     double inRate = 48000.0;
     double outRate = 48000.0;
     bool enabled = false;
+    // User-selectable resampler quality: 0 = Fast (linear interpolation),
+    // 1 = Standard (16-tap polyphase), 2 = High (32-tap), 3 = Ultra (64-tap,
+    // full table; the historical behaviour and default).
+    int quality = 3;
 };
 
 struct SaturationParamSet {

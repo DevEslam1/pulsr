@@ -81,6 +81,11 @@ class AudioPlayer {
   /// the native player when it is (re)created, so the sink is built with the
   /// right encodings. Default `false` = historical 16-bit path.
   bool _floatOutputEnabled = false;
+  // Pulsr fork: remembered AAudio Direct output preference, replayed on
+  // every platform activation before the native sink is built.
+  bool _aaudioOutputEnabled = false;
+  bool _aaudioPreferExclusive = true;
+  int _aaudioTargetBufferMs = 150;
 
   /// This is set to [_nativePlatform] when [_active] is `true` and
   /// [_idlePlatform] otherwise.
@@ -1282,6 +1287,41 @@ class AudioPlayer {
     }
   }
 
+  /// Pulsr fork: switches this player's audio sink to the native AAudio
+  /// "Direct" output (bit-perfect; bypasses the DSP processor chain).
+  ///
+  /// [preferExclusive] requests AAudio EXCLUSIVE sharing (automatic SHARED
+  /// fallback when the device refuses); [targetBufferMs] hints the stream
+  /// buffer capacity in milliseconds. The preference must be pushed BEFORE
+  /// the player's sink is built; it is also replayed on platform activation.
+  /// Returns the effective flag (false on unsupported platforms).
+  Future<bool> dspSetAaudioOutput(
+    bool enabled, {
+    bool preferExclusive = true,
+    int targetBufferMs = 150,
+  }) async {
+    if (_disposed) return false;
+    _aaudioOutputEnabled = enabled;
+    _aaudioPreferExclusive = preferExclusive;
+    _aaudioTargetBufferMs = targetBufferMs;
+    try {
+      if (!_active) return true; // remembered; flushed on platform activation
+      final platform = _platformValue;
+      if (platform == null) return true;
+      final channel =
+          MethodChannel('com.ryanheise.just_audio.methods.${platform.id}');
+      return await channel.invokeMethod<bool>('dspSetAaudioOutput', {
+            'enabled': enabled,
+            'preferExclusive': preferExclusive,
+            'targetBufferMs': targetBufferMs,
+          }) ??
+          false;
+    } catch (_) {
+      // Not the Pulsr Android fork (web/iOS/macOS/windows).
+      return false;
+    }
+  }
+
   /// Sets whether silence should be skipped in audio playback. (Currently
   /// Android only).
   Future<void> setSkipSilenceEnabled(bool enabled) async {
@@ -1776,6 +1816,11 @@ class AudioPlayer {
               'com.ryanheise.just_audio.methods.${platform.id}');
           await dspChannel.invokeMethod<bool>(
               'dspSetFloatOutput', {'enabled': _floatOutputEnabled});
+          await dspChannel.invokeMethod<bool>('dspSetAaudioOutput', {
+            'enabled': _aaudioOutputEnabled,
+            'preferExclusive': _aaudioPreferExclusive,
+            'targetBufferMs': _aaudioTargetBufferMs,
+          });
         } catch (_) {
           // Not the Pulsr Android fork — keep the default 16-bit path.
         }

@@ -104,6 +104,30 @@ class MusicRepository implements IMusicRepository {
               expression: t.album,
               mode: ascending ? OrderingMode.asc : OrderingMode.desc)
         ]);
+      } else if (sortBy == 'playCount') {
+        query.orderBy([
+          (t) => OrderingTerm(
+              expression: t.playCount,
+              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
+        ]);
+      } else if (sortBy == 'lastPlayed') {
+        query.orderBy([
+          (t) => OrderingTerm(
+              expression: t.lastPlayed,
+              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
+        ]);
+      } else if (sortBy == 'fileSize') {
+        query.orderBy([
+          (t) => OrderingTerm(
+              expression: t.fileSize,
+              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
+        ]);
+      } else if (sortBy == 'year') {
+        query.orderBy([
+          (t) => OrderingTerm(
+              expression: t.year,
+              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
+        ]);
       }
 
       if (limit != null) {
@@ -156,6 +180,10 @@ class MusicRepository implements IMusicRepository {
         'dateAdded' => 's.date_added',
         'duration' => 's.duration_ms',
         'album' => 's.album',
+        'playCount' => 's.play_count',
+        'lastPlayed' => 's.last_played',
+        'fileSize' => 's.file_size',
+        'year' => 's.year',
         _ => 's.title',
       };
       final dir = ascending ? 'ASC' : 'DESC';
@@ -228,6 +256,36 @@ class MusicRepository implements IMusicRepository {
         query.orderBy([
           (t) => OrderingTerm(
               expression: t.durationMs,
+              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
+        ]);
+      } else if (sortBy == 'album') {
+        query.orderBy([
+          (t) => OrderingTerm(
+              expression: t.album,
+              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
+        ]);
+      } else if (sortBy == 'playCount') {
+        query.orderBy([
+          (t) => OrderingTerm(
+              expression: t.playCount,
+              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
+        ]);
+      } else if (sortBy == 'lastPlayed') {
+        query.orderBy([
+          (t) => OrderingTerm(
+              expression: t.lastPlayed,
+              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
+        ]);
+      } else if (sortBy == 'fileSize') {
+        query.orderBy([
+          (t) => OrderingTerm(
+              expression: t.fileSize,
+              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
+        ]);
+      } else if (sortBy == 'year') {
+        query.orderBy([
+          (t) => OrderingTerm(
+              expression: t.year,
               mode: ascending ? OrderingMode.asc : OrderingMode.desc)
         ]);
       }

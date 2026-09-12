@@ -6,16 +6,23 @@ import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/constants/app_radii.dart';
 import '../../core/constants/channels.dart';
+import '../../core/di/injection.dart';
 import '../../core/theme/aura_theme.dart';
 import '../../core/utils/adaptive.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/l10n_extensions.dart';
 import '../../core/utils/platform_capabilities.dart';
 import '../../core/widgets/cached_artwork.dart';
+import '../../data/audio/per_song_eq_store.dart';
+import '../../data/audio/per_song_volume_store.dart';
+import '../../data/audio/song_rating_store.dart';
 import '../../data/db/app_database.dart';
 import '../../domain/models/audio_quality_info.dart';
+import '../../domain/models/eq_preset.dart';
+import '../player/cubit/player_cubit.dart';
 import '../player/presentation/widgets/audio_quality_badge.dart';
 
 class SongInfoSheet extends StatelessWidget {
@@ -317,7 +324,8 @@ class SongInfoSheet extends StatelessWidget {
                         context.l10n.fileSize,
                         '${(song.fileSize! / (1024 * 1024)).toStringAsFixed(2)} MB',
                         p),
-                  const SizedBox(height: 20),
+                  _buildAudioOverridesSection(context, p),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
@@ -396,6 +404,186 @@ class SongInfoSheet extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildAudioOverridesSection(BuildContext context, PulsrPalette p) {
+    final trackKey = song.id.toString();
+    PlayerCubit? playerCubit;
+    try {
+      playerCubit = context.read<PlayerCubit>();
+    } catch (_) {}
+    final ratingStore = getIt.isRegistered<SongRatingStore>()
+        ? getIt<SongRatingStore>()
+        : SongRatingStore();
+    final eqStore = getIt.isRegistered<PerSongEqStore>()
+        ? getIt<PerSongEqStore>()
+        : PerSongEqStore();
+    final volStore = getIt.isRegistered<PerSongVolumeStore>()
+        ? getIt<PerSongVolumeStore>()
+        : PerSongVolumeStore();
+
+    double currentSliderVol = volStore.getGainDbForTrack(trackKey);
+
+    return StatefulBuilder(
+      builder: (context, setLocalState) {
+        final currentRating = ratingStore.getRating(trackKey);
+        final currentEq = eqStore.getPresetForTrack(trackKey);
+
+        return Container(
+          margin: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: p.surfaceContainer,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: p.hairline),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Rating Bar
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Track Rating',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: p.textSecondary,
+                    ),
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: List.generate(5, (index) {
+                      final starNum = index + 1;
+                      final isFilled = starNum <= currentRating;
+                      return GestureDetector(
+                        onTap: () async {
+                          final newRating =
+                              currentRating == starNum ? 0 : starNum;
+                          await ratingStore.setRating(trackKey, newRating);
+                          playerCubit?.setSongRating(song.id, newRating);
+                          setLocalState(() {});
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                          child: Icon(
+                            isFilled
+                                ? Icons.star_rounded
+                                : Icons.star_outline_rounded,
+                            size: 22,
+                            color: isFilled ? Colors.amber : p.textTertiary,
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Divider(color: p.hairline, height: 1),
+              const SizedBox(height: 8),
+
+              // Per-Track EQ Preset Override
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Track EQ Override',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: p.textSecondary,
+                    ),
+                  ),
+                  DropdownButton<String?>(
+                    value: currentEq,
+                    underline: const SizedBox(),
+                    dropdownColor: p.surfaceContainer,
+                    icon: Icon(Icons.arrow_drop_down, color: p.accent),
+                    style: TextStyle(
+                      color: currentEq != null ? p.accent : p.textPrimary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('Default (Global EQ)'),
+                      ),
+                      ...EqPreset.defaultPresets.map(
+                        (preset) => DropdownMenuItem<String?>(
+                          value: preset.name,
+                          child: Text(preset.name),
+                        ),
+                      ),
+                    ],
+                    onChanged: (newPreset) async {
+                      await eqStore.setPresetForTrack(trackKey, newPreset);
+                      playerCubit?.setSongEqOverride(song.id, newPreset);
+                      setLocalState(() {});
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Divider(color: p.hairline, height: 1),
+              const SizedBox(height: 8),
+
+              // Per-Track Volume Offset
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Track Volume Offset',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: p.textSecondary,
+                    ),
+                  ),
+                  Text(
+                    currentSliderVol.abs() < 0.1
+                        ? '0.0 dB'
+                        : '${currentSliderVol > 0 ? '+' : ''}${currentSliderVol.toStringAsFixed(1)} dB',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: currentSliderVol.abs() < 0.1 ? p.textSecondary : p.accent,
+                    ),
+                  ),
+                ],
+              ),
+              SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  activeTrackColor: p.accent,
+                  inactiveTrackColor: p.surface,
+                  thumbColor: p.accent,
+                  trackHeight: 3,
+                ),
+                child: Slider(
+                  value: currentSliderVol.clamp(-12.0, 6.0),
+                  min: -12.0,
+                  max: 6.0,
+                  divisions: 36,
+                  onChanged: (val) {
+                    currentSliderVol = val;
+                    setLocalState(() {});
+                  },
+                  onChangeEnd: (val) async {
+                    final clamped = val.abs() < 0.2 ? 0.0 : val;
+                    currentSliderVol = clamped;
+                    await volStore.setGainDbForTrack(trackKey, clamped);
+                    playerCubit?.setSongVolumeOverride(song.id, clamped);
+                    setLocalState(() {});
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

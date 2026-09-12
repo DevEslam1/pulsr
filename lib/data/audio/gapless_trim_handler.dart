@@ -29,6 +29,14 @@ class GaplessTrimHandler {
   /// Opus encoder delay: 312 samples @ 48kHz.
   static const Duration opusPreSkip = Duration(microseconds: 6500);
 
+  /// MP3 (LAME): 576-sample encoder delay (@44.1kHz ~13.06ms).
+  static const Duration mp3EncoderDelay = Duration(microseconds: 13061);
+  /// MP3 (LAME): 529-sample encoder padding (@44.1kHz ~11.99ms).
+  static const Duration mp3EncoderPadding = Duration(microseconds: 11995);
+  /// AAC/iTunes gapless priming: 2048-sample encoder delay + 64 lead-in
+  /// (@44.1kHz ~47.9ms).
+  static const Duration aacEncoderDelay = Duration(microseconds: 47873);
+
   /// Detects container/codec from a file path and returns the trim.
   /// [preSkipOverrideMs]/[postTrimOverrideMs] come from parsed headers
   /// (OpusHead pre-skip, granule end-trim) when available.
@@ -57,6 +65,22 @@ class GaplessTrimHandler {
       // Vorbis codec delay: ~2 short blocks (~512 samples @44.1k ≈ 11.6ms).
       return const GaplessTrim(
           preSkip: Duration(microseconds: 11600));
+    }
+    final isMp3 = c.contains('mp3') || lower.endsWith('.mp3');
+    if (isMp3) {
+      return const GaplessTrim(
+        preSkip: mp3EncoderDelay,
+        postTrim: mp3EncoderPadding,
+      );
+    }
+    final isAac = c.contains('aac') ||
+        c.contains('mp4a') ||
+        lower.endsWith('.aac') ||
+        lower.endsWith('.m4a') ||
+        lower.endsWith('.mp4') ||
+        lower.endsWith('.m4b');
+    if (isAac) {
+      return const GaplessTrim(preSkip: aacEncoderDelay);
     }
     return const GaplessTrim();
   }

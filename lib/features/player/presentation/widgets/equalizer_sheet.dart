@@ -2,6 +2,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
@@ -350,6 +351,80 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     }
   }
 
+  Future<void> _exportCurrentPreset(
+      BuildContext context, PlayerCubit cubit) async {
+    try {
+      final jsonString = cubit.exportCurrentEqPreset();
+      await SharePlus.instance.share(
+        ShareParams(
+          text: jsonString,
+          subject: 'Pulsr EQ Preset - ${cubit.state.eqPreset.name}',
+        ),
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text('Export failed: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _importPresetDialog(
+      BuildContext context, PlayerCubit cubit) async {
+    final textController = TextEditingController();
+    final jsonString = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Import EQ Preset'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Paste a JSON preset string below:',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: textController,
+              autofocus: true,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                hintText: '{"name": "...", "gains": [...]}',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, textController.text.trim()),
+            child: const Text('Import'),
+          ),
+        ],
+      ),
+    );
+
+    if (jsonString != null && jsonString.isNotEmpty) {
+      final success = await cubit.importEqPreset(jsonString);
+      if (context.mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(
+            content: Text(success
+                ? 'EQ Preset imported successfully!'
+                : 'Failed to import preset: invalid JSON format'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
@@ -481,15 +556,87 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                               ),
                             ),
                             const Spacer(),
-                            IconButton(
-                              tooltip: 'DSP Signal Inspector & Debug',
-                              icon: Icon(Icons.sensors_rounded,
+                            PopupMenuButton<String>(
+                              tooltip: 'Preset Options',
+                              icon: Icon(Icons.more_vert_rounded,
                                   color: p.accent, size: 20),
-                              visualDensity: VisualDensity.compact,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                  minWidth: 32, minHeight: 32),
-                              onPressed: () => DspInspectorSheet.show(context),
+                              color: p.surfaceContainer,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16)),
+                              onSelected: (value) {
+                                switch (value) {
+                                  case 'save':
+                                    _showSaveCustomPresetDialog(cubit, state);
+                                    break;
+                                  case 'export':
+                                    _exportCurrentPreset(context, cubit);
+                                    break;
+                                  case 'import':
+                                    _importPresetDialog(context, cubit);
+                                    break;
+                                  case 'inspector':
+                                    DspInspectorSheet.show(context);
+                                    break;
+                                }
+                              },
+                              itemBuilder: (context) => [
+                                PopupMenuItem(
+                                  value: 'save',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.save_rounded,
+                                          size: 18, color: p.textPrimary),
+                                      const SizedBox(width: 10),
+                                      Text('Save Custom Preset',
+                                          style: TextStyle(
+                                              color: p.textPrimary,
+                                              fontSize: 13)),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem(
+                                  value: 'export',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.upload_rounded,
+                                          size: 18, color: p.textPrimary),
+                                      const SizedBox(width: 10),
+                                      Text('Export Preset (JSON)',
+                                          style: TextStyle(
+                                              color: p.textPrimary,
+                                              fontSize: 13)),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem(
+                                  value: 'import',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.download_rounded,
+                                          size: 18, color: p.textPrimary),
+                                      const SizedBox(width: 10),
+                                      Text('Import Preset (JSON)',
+                                          style: TextStyle(
+                                              color: p.textPrimary,
+                                              fontSize: 13)),
+                                    ],
+                                  ),
+                                ),
+                                const PopupMenuDivider(),
+                                PopupMenuItem(
+                                  value: 'inspector',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.sensors_rounded,
+                                          size: 18, color: p.accent),
+                                      const SizedBox(width: 10),
+                                      Text('DSP Signal Inspector',
+                                          style: TextStyle(
+                                              color: p.accent, fontSize: 13)),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),

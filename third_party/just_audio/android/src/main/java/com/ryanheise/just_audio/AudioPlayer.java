@@ -116,6 +116,13 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     // Pulsr fork: opt-in 24/32-bit float output path. Off by default so the
     // audio sink is built exactly as before (16-bit) unless Dart enables it.
     private boolean floatOutputEnabled = false;
+    // Pulsr fork: opt-in AAudio "Direct" output path. Off by default so the
+    // sink is built exactly as before (DefaultAudioSink + DSP chain). When
+    // enabled, the whole Media3 sink is replaced by AAudioAudioSink
+    // (bit-perfect; the DSP processor chain is bypassed in this mode).
+    private volatile boolean aaudioOutputEnabled = false;
+    private boolean aaudioPreferExclusive = true;
+    private int aaudioTargetBufferMs = 150;
     private Integer errorCode;
     private String errorMessage;
     private Integer currentIndex;
@@ -455,6 +462,24 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             Boolean requested = call.argument("enabled");
             boolean enabled = requested != null && requested;
             result.success(applyFloatOutput(enabled));
+            return;
+        }
+
+        // Pulsr fork: AAudio Direct output preference must reach the player
+        // BEFORE the sink is built, so handle it without forcing
+        // initialization (same pattern as dspSetFloatOutput).
+        if ("dspSetAaudioOutput".equals(call.method)) {
+            Boolean requested = call.argument("enabled");
+            Boolean exclusive = call.argument("preferExclusive");
+            Integer bufferMs = call.argument("targetBufferMs");
+            boolean enabled = requested != null && requested;
+            if (exclusive != null) aaudioPreferExclusive = exclusive;
+            if (bufferMs != null && bufferMs >= 20 && bufferMs <= 1000) {
+                aaudioTargetBufferMs = bufferMs;
+            }
+            boolean effective = enabled && Build.VERSION.SDK_INT >= 28;
+            aaudioOutputEnabled = effective;
+            result.success(effective);
             return;
         }
 
@@ -867,6 +892,18 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                 @Override
                 protected AudioSink buildAudioSink(Context context, boolean enableFloatOutput,
                         boolean enableAudioTrackPlaybackParams) {
+                    // Pulsr fork: opt-in AAudio Direct output (bit-perfect,
+                    // DSP chain bypassed). Falls back to DefaultAudioSink on
+                    // any construction failure so playback is never broken.
+                    if (aaudioOutputEnabled) {
+                        try {
+                            return new AAudioAudioSink(aaudioPreferExclusive,
+                                aaudioTargetBufferMs);
+                        } catch (Throwable t) {
+                            Log.w(TAG, "AAudio sink unavailable, using DefaultAudioSink: "
+                                + t.getMessage());
+                        }
+                    }
                     return new DefaultAudioSink.Builder(context)
                         .setEnableFloatOutput(enableFloatOutput)
                         .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
@@ -895,6 +932,12 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                 builder.setLivePlaybackSpeedControl(livePlaybackSpeedControl);
             }
             player = builder.build();
+            // Pulsr fork: sample-accurate seeking. EXACT forces the decoder to
+            // pre-roll from the previous sync point and discard up to the
+            // requested sample, giving frame-accurate (0-sample error) seeks
+            // on local formats - the Poweramp playback-engine behaviour.
+            player.setSeekParameters(androidx.media3.exoplayer.SeekParameters.EXACT);
+
             player.setTrackSelectionParameters(
                 player.getTrackSelectionParameters()
                     .buildUpon()

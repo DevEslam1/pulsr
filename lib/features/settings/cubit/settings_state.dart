@@ -138,6 +138,14 @@ abstract class SettingsState with _$SettingsState {
     // Opt-in 24/32-bit float DSP path (default OFF: the native DSP chain keeps
     // today's 16-bit sink path byte-identical).
     @Default(false) bool floatOutputEnabled,
+    // Opt-in AAudio Direct output (bit-perfect; DSP chain bypassed).
+    @Default(false) bool aaudioOutputEnabled,
+    @Default(true) bool aaudioPreferExclusive,
+    @Default(150) int aaudioTargetBufferMs,
+    // Resampler quality (0=Fast/linear .. 3=Ultra/64-tap).
+    @Default(3) int sincResamplerQuality,
+    // BPM-synced crossfade (needs a known BPM for the incoming track).
+    @Default(false) bool bpmSyncCrossfadeEnabled,
   }) = _SettingsState;
 
   Color get customAccentColor => Color(customAccentColorValue);

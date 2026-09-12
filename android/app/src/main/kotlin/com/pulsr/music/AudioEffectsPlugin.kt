@@ -137,6 +137,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var isSincResamplerEnabled = true
     private var resamplerInRate = 48000.0
     private var resamplerOutRate = 48000.0
+    private var resamplerQuality = 3
     private var dspPreference: String = "native" // "native", "oem", "auto"
     private var _oemWarningLogged = false
     private var isBitPerfectBypassActive = false
@@ -227,6 +228,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var lastNativeMonoMix: Boolean? = null
     private var lastNativeResamplerEnabled: Boolean? = null
     private var lastNativeResamplerRates: String? = null
+    private var lastNativeResamplerQuality: Int? = null
     private var lastNativeSaturationEnabled: Boolean? = null
     private var lastNativeSaturationParams: String? = null
     private var lastNativeStereoWidthEnabled: Boolean? = null
@@ -282,6 +284,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeSetMonoMix(mono: Boolean)
     private external fun nativeSetSincResamplerEnabled(enabled: Boolean)
     private external fun nativeSetSincResamplerRates(inRate: Double, outRate: Double)
+    private external fun nativeSetSincResamplerQuality(quality: Int)
     private external fun nativeSetSaturationEnabled(enabled: Boolean)
     private external fun nativeSetSaturationParams(drive: Double, mix: Double, tilt: Double)
     private external fun nativeSetStereoWidthEnabled(enabled: Boolean)
@@ -1402,6 +1405,25 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     recalculateActiveStages()
                     result.success(true)
                 }
+
+                "setSincResamplerQuality" -> {
+                    val quality = (call.argument<Number>("quality"))?.toInt() ?: 3
+                    if (quality < 0 || quality > 3) {
+                        result.error("INVALID_ARGUMENT", "Invalid resampler quality: $quality", null)
+                        return
+                    }
+                    resamplerQuality = quality
+                    if (isNativeDspLoaded && lastNativeResamplerQuality != quality) {
+                        try {
+                            nativeSetSincResamplerQuality(quality)
+                            lastNativeResamplerQuality = quality
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetSincResamplerQuality failed: ${e.message}")
+                        }
+                    }
+                    result.success(true)
+                }
+
 
                 "setSincResamplerRates" -> {
                     val inRate = (call.argument<Number>("inRate"))?.toDouble() ?: 44100.0

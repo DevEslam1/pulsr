@@ -50,6 +50,9 @@ import 'package:pulsr/core/telemetry/clock.dart' as _i621;
 import 'package:pulsr/core/telemetry/playback_latency_tracker.dart' as _i626;
 import 'package:pulsr/core/theme/dynamic_theme_cubit.dart' as _i401;
 import 'package:pulsr/data/audio/audio_handler.dart' as _i366;
+import 'package:pulsr/data/audio/per_song_eq_store.dart' as _i1054;
+import 'package:pulsr/data/audio/per_song_volume_store.dart' as _i866;
+import 'package:pulsr/data/audio/song_rating_store.dart' as _i227;
 import 'package:pulsr/data/db/app_database.dart' as _i682;
 import 'package:pulsr/data/repositories/download_repository_impl.dart' as _i877;
 import 'package:pulsr/data/repositories/music_repository.dart' as _i627;
@@ -140,6 +143,9 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.singleton<_i492.YtmUrlCache>(() => _i492.YtmUrlCache());
     gh.singleton<_i401.DynamicThemeCubit>(() => _i401.DynamicThemeCubit());
+    gh.singleton<_i1054.PerSongEqStore>(() => _i1054.PerSongEqStore());
+    gh.singleton<_i866.PerSongVolumeStore>(() => _i866.PerSongVolumeStore());
+    gh.singleton<_i227.SongRatingStore>(() => _i227.SongRatingStore());
     gh.singleton<_i682.AppDatabase>(() => _i682.AppDatabase());
     gh.singleton<_i341.SettingsProfilesService>(
         () => _i341.SettingsProfilesService());
@@ -239,6 +245,12 @@ extension GetItInjectableX on _i174.GetIt {
       ),
       dispose: (i) => i.dispose(),
     );
+    gh.factory<_i984.SearchCubit>(() => _i984.SearchCubit(
+          searchUseCase: gh<_i644.SearchMusicUseCase>(),
+          folderUseCases: gh<_i1017.FolderUseCases>(),
+        ));
+    gh.singleton<_i783.IDownloadRepository>(
+        () => _i877.DownloadRepositoryImpl(gh<_i742.YtDownloadService>()));
     gh.singletonAsync<_i147.PlayerCubit>(() async => _i147.PlayerCubit(
           audioHandler: await getAsync<_i366.PulsrAudioHandler>(),
           repository: gh<_i320.IMusicRepository>(),
@@ -250,13 +262,10 @@ extension GetItInjectableX on _i174.GetIt {
           deviceProfileService: gh<_i971.DeviceProfileService>(),
           hiResAudioService: gh<_i722.HiResAudioService>(),
           latencyTracker: gh<_i626.PlaybackLatencyTracker>(),
+          perSongEqStore: gh<_i1054.PerSongEqStore>(),
+          perSongVolumeStore: gh<_i866.PerSongVolumeStore>(),
+          songRatingStore: gh<_i227.SongRatingStore>(),
         ));
-    gh.factory<_i984.SearchCubit>(() => _i984.SearchCubit(
-          searchUseCase: gh<_i644.SearchMusicUseCase>(),
-          folderUseCases: gh<_i1017.FolderUseCases>(),
-        ));
-    gh.singleton<_i783.IDownloadRepository>(
-        () => _i877.DownloadRepositoryImpl(gh<_i742.YtDownloadService>()));
     gh.factory<_i633.LibraryCubit>(() => _i633.LibraryCubit(
           getSongsUseCase: gh<_i168.GetSongsUseCase>(),
           getAlbumsUseCase: gh<_i496.GetAlbumsUseCase>(),

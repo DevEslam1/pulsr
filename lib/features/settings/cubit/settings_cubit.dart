@@ -517,6 +517,16 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
             false,
         floatOutputEnabled:
             prefs.getBool(PrefsKeys.floatOutputEnabled) ?? false,
+        aaudioOutputEnabled:
+            prefs.getBool(PrefsKeys.aaudioOutputEnabled) ?? false,
+        aaudioPreferExclusive:
+            prefs.getBool(PrefsKeys.aaudioPreferExclusive) ?? true,
+        aaudioTargetBufferMs:
+            prefs.getInt(PrefsKeys.aaudioTargetBufferMs) ?? 150,
+        sincResamplerQuality:
+            prefs.getInt(PrefsKeys.sincResamplerQuality) ?? 3,
+        bpmSyncCrossfadeEnabled:
+            prefs.getBool(PrefsKeys.bpmSyncCrossfadeEnabled) ?? false,
       );
 
       // A proxy edit made while this load was in flight must win over the
@@ -1559,7 +1569,76 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     await prefs.setBool(PrefsKeys.outputFormatNegotiationEnabled, enabled);
   }
 
-  /// Opt-in 24/32-bit float DSP path. Off by default: with the flag off the
+  /// Opt-in AAudio Direct output (bit-perfect; the DSP processor chain is
+  /// bypassed). Persisted here and pushed to every player by the player
+  /// layer; takes effect for newly built sinks.
+  Future<void> setAaudioOutputEnabled(bool enabled) async {
+    safeEmit(state.copyWith(aaudioOutputEnabled: enabled));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(PrefsKeys.aaudioOutputEnabled, enabled);
+    try {
+      if (getIt.isRegistered<PulsrAudioHandler>()) {
+        await getIt<PulsrAudioHandler>().setAaudioOutputEnabled(
+          enabled,
+          preferExclusive: state.aaudioPreferExclusive,
+          targetBufferMs: state.aaudioTargetBufferMs,
+        );
+      }
+    } catch (_) {
+      // Player not available yet; boot/observer push covers it.
+    }
+  }
+
+  /// Resampler quality (0=Fast/linear, 1=Standard, 2=High, 3=Ultra).
+  Future<void> setSincResamplerQuality(int quality) async {
+    final clamped = quality.clamp(0, 3);
+    safeEmit(state.copyWith(sincResamplerQuality: clamped));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(PrefsKeys.sincResamplerQuality, clamped);
+    await AudioEffectsChannel().setSincResamplerQuality(clamped);
+  }
+
+  /// BPM-synced crossfade toggle. Pushed straight to the crossfade manager.
+  Future<void> setBpmSyncCrossfadeEnabled(bool enabled) async {
+    safeEmit(state.copyWith(bpmSyncCrossfadeEnabled: enabled));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(PrefsKeys.bpmSyncCrossfadeEnabled, enabled);
+    try {
+      if (getIt.isRegistered<PulsrAudioHandler>()) {
+        await getIt<PulsrAudioHandler>().setBpmSyncCrossfadeEnabled(enabled);
+      }
+    } catch (_) {
+      // Player not available yet; boot restore covers it.
+    }
+  }
+
+  /// Whether the AAudio stream should attempt EXCLUSIVE sharing first.  /// Whether the AAudio stream should attempt EXCLUSIVE sharing first.
+  Future<void> setAaudioPreferExclusive(bool value) async {
+    safeEmit(state.copyWith(aaudioPreferExclusive: value));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(PrefsKeys.aaudioPreferExclusive, value);
+    try {
+      if (getIt.isRegistered<PulsrAudioHandler>()) {
+        await getIt<PulsrAudioHandler>().setAaudioOutputEnabled(
+          state.aaudioOutputEnabled,
+          preferExclusive: value,
+          targetBufferMs: state.aaudioTargetBufferMs,
+        );
+      }
+    } catch (_) {
+      // Player not available yet; boot/observer push covers it.
+    }
+  }
+
+  /// Target stream buffer capacity for the AAudio path (20-1000 ms).
+  Future<void> setAaudioTargetBufferMs(int ms) async {
+    final clamped = ms.clamp(20, 1000);
+    safeEmit(state.copyWith(aaudioTargetBufferMs: clamped));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(PrefsKeys.aaudioTargetBufferMs, clamped);
+  }
+
+  /// Opt-in 24/32-bit float DSP path. Off by default: with the flag off the  /// Opt-in 24/32-bit float DSP path. Off by default: with the flag off the
   /// vendored Android fork builds the same 16-bit sink as before. When on, the
   /// preference is persisted here and pushed to every player by the player
   /// layer's settings observer (and restored on boot by the audio handler).
