@@ -128,6 +128,11 @@ class CloudSyncService {
     // Pulsr Pure (prod offline): cloud sync is hard-off — no Firebase traffic
     // even if prefs/account state linger from another flavor.
     if (!AppConfig.isCloudSyncAllowed) return false;
+    // User-facing Offline-only mode: never sync even in network builds.
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool('setting_offline_only_mode') == true) return false;
+    } catch (_) {}
     final user = _authService.currentUser;
     if (user == null) return false;
 

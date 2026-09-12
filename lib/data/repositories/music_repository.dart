@@ -1198,10 +1198,14 @@ class MusicRepository implements IMusicRepository {
           .where((s) => !scannedSongIds.contains(s.id))
           .toList();
 
-      // 2. Perform bounded async disk checks (max 32 concurrent) without blocking database locks
+      // 2. Bounded async disk checks without blocking the UI isolate or DB
+      // locks: 64-wide concurrency with a cooperative yield between chunks
+      // so a 10k SD-card library can't freeze scrolling while orphan
+      // cleanup runs. Each check is individually error-isolated — one
+      // unreadable file must not abort the whole sweep.
       final trulyMissingIds = <int>[];
       final reappearedIds = <int>[];
-      const chunkSize = 32;
+      const chunkSize = 64;
 
       for (var i = 0; i < unscannedSongs.length; i += chunkSize) {
         final end = (i + chunkSize < unscannedSongs.length)
@@ -1209,19 +1213,26 @@ class MusicRepository implements IMusicRepository {
             : unscannedSongs.length;
         final chunk = unscannedSongs.sublist(i, end);
         await Future.wait(chunk.map((song) async {
-          if (song.path.isEmpty) {
-            trulyMissingIds.add(song.id);
-          } else if (song.path.startsWith('content:')) {
-            reappearedIds.add(song.id);
-          } else {
-            final exists = await File(song.path).exists();
-            if (exists) {
+          try {
+            if (song.path.isEmpty) {
+              trulyMissingIds.add(song.id);
+            } else if (song.path.startsWith('content:')) {
               reappearedIds.add(song.id);
             } else {
-              trulyMissingIds.add(song.id);
+              final exists = await File(song.path).exists();
+              if (exists) {
+                reappearedIds.add(song.id);
+              } else {
+                trulyMissingIds.add(song.id);
+              }
             }
+          } catch (_) {
+            // Treat unreadable as missing (marks row, never deletes).
+            trulyMissingIds.add(song.id);
           }
         }));
+        // Yield to the event loop so UI frames interleave with SD I/O.
+        await Future<void>.delayed(Duration.zero);
       }
 
       // P0-6: Use Drift batch for atomic single-transaction execution

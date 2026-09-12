@@ -135,7 +135,7 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
                     final album = albums[index];
                     return InkWell(
                       onTap: () =>
-                          context.push('/album/${album.id}', extra: album),
+                          context.push('/album', extra: album),
                       borderRadius: BorderRadius.circular(14),
                       child: Container(
                         decoration: BoxDecoration(

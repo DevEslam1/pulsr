@@ -12,6 +12,8 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+    <!-- Set a track as system ringtone (user-initiated only, runtime-gated by Settings.System.canWrite) -->
+    <uses-permission android:name="android.permission.WRITE_SETTINGS"/>
     <!-- Required solely for the audio visualizer; requested at runtime only when the user enables it -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <!-- Bluetooth (Android 12+): A2DP codec info/switching and connected device

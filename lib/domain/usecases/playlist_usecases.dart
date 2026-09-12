@@ -130,6 +130,46 @@ class PlaylistUseCases {
           sortAscending: false,
         ),
       ),
+      (
+        // Forgotten Gems: played before but least-recently — surfaces
+        // high-play-count tracks untouched the longest.
+        name: 'Forgotten Gems',
+        criteria: const SmartCriteria(
+          rules: [
+            SmartRule(
+              field: SmartRuleField.playCount,
+              operator: SmartOperator.greaterThan,
+              value: '1',
+            ),
+            SmartRule(
+              field: SmartRuleField.lastPlayed,
+              operator: SmartOperator.greaterThan,
+              value: '0',
+            ),
+          ],
+          matchAll: true,
+          sortBy: 'lastPlayed',
+          sortAscending: true,
+          limit: 50,
+        ),
+      ),
+      (
+        // Top Rated: prefs-backed star ratings, evaluated in Dart.
+        name: 'Top Rated',
+        criteria: const SmartCriteria(
+          rules: [
+            SmartRule(
+              field: SmartRuleField.rating,
+              operator: SmartOperator.greaterThanOrEqual,
+              value: '4',
+            ),
+          ],
+          matchAll: true,
+          sortBy: 'rating',
+          sortAscending: false,
+          limit: 50,
+        ),
+      ),
     ];
 
     final existingRes = await _repository.getPlaylists();

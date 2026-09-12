@@ -59,6 +59,22 @@ class YtmAccountPlaylist {
       );
 }
 
+class YtmPlaylistDetails {
+  final String id;
+  final String title;
+  final String author;
+  final String? artworkUrl;
+  final List<YtmTrack> tracks;
+
+  const YtmPlaylistDetails({
+    required this.id,
+    required this.title,
+    required this.author,
+    this.artworkUrl,
+    required this.tracks,
+  });
+}
+
 enum SessionValidationResult {
   valid,
   invalid,
@@ -1268,6 +1284,327 @@ class YtmAccountService {
     }
 
     return [];
+  }
+
+  /// Fetches details and tracks for any YouTube / YouTube Music playlist by URL or ID.
+  /// Handles:
+  /// - User's private & unlisted playlists (when signed in with cookies)
+  /// - Public YouTube and YouTube Music playlists (with or without login)
+  /// - Curated mixes, albums, and auto-generated playlists (`RDCLAK...`, `OLAK...`, `VL...`)
+  /// - Liked Music (`LM`, `VLLM`, `FEmusic_liked_videos`)
+  Future<YtmPlaylistDetails?> fetchPlaylistDetails(
+    String urlOrId, {
+    int maxTracks = 200,
+  }) async {
+    final rawInput = urlOrId.trim();
+    if (rawInput.isEmpty) return null;
+
+    // 1. Extract playlist ID from URL if provided as URL
+    String playlistId = rawInput;
+    if (playlistId.contains('list=')) {
+      final uri = Uri.tryParse(playlistId);
+      final listParam = uri?.queryParameters['list'];
+      if (listParam != null && listParam.isNotEmpty) {
+        playlistId = listParam;
+      }
+    }
+
+    // Liked songs special handling
+    if (playlistId == 'LM' ||
+        playlistId == 'VLLM' ||
+        playlistId == 'LL' ||
+        playlistId == 'FEmusic_liked_videos' ||
+        playlistId == 'FEmusic_liked_tracks' ||
+        playlistId == 'VLSE') {
+      final likedTracks = await fetchLikedSongs(maxTracks: maxTracks);
+      return YtmPlaylistDetails(
+        id: playlistId,
+        title: 'Liked Music',
+        author: 'Auto Playlist',
+        artworkUrl: likedTracks.firstOrNull?.artworkUrl,
+        tracks: likedTracks,
+      );
+    }
+
+    // Refresh cookies from native CookieManager if needed
+    try {
+      final rawNative = await getNativeCookiesFromDomains();
+      final nativeCookies =
+          rawNative == null ? null : normalizeCookieHeader(rawNative);
+      if (nativeCookies != null &&
+          nativeCookies.isNotEmpty &&
+          looksLikeSignedInCookies(nativeCookies)) {
+        _cookies = nativeCookies;
+        unawaited(_persistCookies(nativeCookies));
+      }
+    } catch (_) {}
+
+    final headers = _buildHeaders();
+    final cleanRawId =
+        playlistId.startsWith('VL') ? playlistId.substring(2) : playlistId;
+
+    // Candidate browse IDs to try:
+    // YouTube Music browse API expects 'VL' prefix for most playlists (e.g. VLPL..., VLRDCLAK...)
+    final candidateBrowseIds = <String>[
+      if (playlistId.startsWith('VL')) playlistId else 'VL$playlistId',
+      if (!playlistId.startsWith('VL')) playlistId else playlistId.substring(2),
+    ];
+
+    String playlistTitle = 'YouTube Playlist';
+    String playlistAuthor = 'YouTube Music';
+    String? playlistArtwork;
+
+    for (final bId in candidateBrowseIds) {
+      try {
+        final body = jsonEncode({
+          'context': _buildClientContext('WEB_REMIX'),
+          'browseId': bId,
+        });
+
+        final response = await _postWithRetry(
+          Uri.parse('$_innertubeBrowseUrl&key=$_apiKey'),
+          headers: headers,
+          body: body,
+          baseTimeoutSeconds: 10,
+        );
+
+        if (response.statusCode == 200) {
+          final json = jsonDecode(response.body) as Map<String, dynamic>;
+          if (_isUnauthenticatedResponse(json) && isLoggedIn) {
+            debugPrint(
+                '[YTM_ACCOUNT] Playlist browse returned unauthenticated on $bId');
+            continue;
+          }
+
+          _harvestSessionState(json);
+          final headerInfo = _extractPlaylistHeaderInfo(json);
+          if (headerInfo['title'] != null && headerInfo['title']!.isNotEmpty) {
+            playlistTitle = headerInfo['title']!;
+          }
+          if (headerInfo['author'] != null &&
+              headerInfo['author']!.isNotEmpty) {
+            playlistAuthor = headerInfo['author']!;
+          }
+          if (headerInfo['artwork'] != null &&
+              headerInfo['artwork']!.isNotEmpty) {
+            playlistArtwork = headerInfo['artwork'];
+          }
+
+          final tracks = _parseInnertubePlaylistTracks(json);
+          debugPrint(
+              '[YTM_ACCOUNT] Playlist browse $bId parsed ${tracks.length} tracks (title: $playlistTitle)');
+
+          // Check if initial response was a header shell with continuation
+          if (tracks.isEmpty) {
+            final initToken = _extractContinuationToken(json);
+            if (initToken != null && initToken.isNotEmpty) {
+              final contBody = jsonEncode({
+                'context': _buildClientContext('WEB_REMIX'),
+                'continuation': initToken,
+              });
+              final contRes = await _postWithRetry(
+                Uri.parse('$_innertubeBrowseUrl&key=$_apiKey'),
+                headers: headers,
+                body: contBody,
+                baseTimeoutSeconds: 10,
+              );
+              if (contRes.statusCode == 200) {
+                final contJson =
+                    jsonDecode(contRes.body) as Map<String, dynamic>;
+                final contTracks = _parseInnertubePlaylistTracks(contJson);
+                if (contTracks.isNotEmpty) {
+                  tracks.addAll(contTracks);
+                }
+              }
+            }
+          }
+
+          if (tracks.isNotEmpty) {
+            final allTracks = List<YtmTrack>.from(tracks);
+            var currentJson = json;
+
+            // Follow continuation pages up to maxTracks
+            var pageCount = 0;
+            const maxPages = 30;
+            var consecutiveEmpty = 0;
+            while (allTracks.length < maxTracks && pageCount < maxPages) {
+              pageCount++;
+              final ctoken = _extractContinuationToken(currentJson);
+              if (ctoken == null || ctoken.isEmpty) break;
+
+              final contBody = jsonEncode({
+                'context': _buildClientContext('WEB_REMIX'),
+                'continuation': ctoken,
+              });
+
+              final contRes = await _postWithRetry(
+                Uri.parse('$_innertubeBrowseUrl&key=$_apiKey'),
+                headers: headers,
+                body: contBody,
+                baseTimeoutSeconds: 10,
+              );
+
+              if (contRes.statusCode == 200) {
+                currentJson = jsonDecode(contRes.body) as Map<String, dynamic>;
+                final contTracks = _parseInnertubePlaylistTracks(currentJson);
+                if (contTracks.isEmpty) {
+                  consecutiveEmpty++;
+                  if (consecutiveEmpty >= 2) break;
+                  continue;
+                }
+                consecutiveEmpty = 0;
+                allTracks.addAll(contTracks);
+              } else {
+                break;
+              }
+            }
+
+            final seenIds = <String>{};
+            final uniqueTracks = <YtmTrack>[];
+            for (final t in allTracks) {
+              if (seenIds.add(t.videoId)) {
+                uniqueTracks.add(t);
+              }
+            }
+
+            playlistArtwork ??= uniqueTracks.firstOrNull?.artworkUrl;
+
+            return YtmPlaylistDetails(
+              id: cleanRawId,
+              title: playlistTitle,
+              author: playlistAuthor,
+              artworkUrl: playlistArtwork,
+              tracks: uniqueTracks.take(maxTracks).toList(),
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('[YTM_ACCOUNT] Failed fetching playlist browse ($bId): $e');
+      }
+    }
+
+    // 2. Fallback: InnerTube /next endpoint with playlistId
+    // Resolves mixes, radios, or playlists whose browse endpoint is unavailable
+    try {
+      final nextBody = jsonEncode({
+        'context': _buildClientContext('WEB_REMIX'),
+        'playlistId': cleanRawId,
+        'enablePersistentPlaylistPanel': true,
+        'isAudioOnly': true,
+      });
+
+      final nextRes = await _postWithRetry(
+        Uri.parse(
+            'https://music.youtube.com/youtubei/v1/next?prettyPrint=false&key=$_apiKey'),
+        headers: headers,
+        body: nextBody,
+        baseTimeoutSeconds: 10,
+      );
+
+      if (nextRes.statusCode == 200) {
+        final json = jsonDecode(nextRes.body) as Map<String, dynamic>;
+        final headerInfo = _extractPlaylistHeaderInfo(json);
+        if (headerInfo['title'] != null && headerInfo['title']!.isNotEmpty) {
+          playlistTitle = headerInfo['title']!;
+        }
+        if (headerInfo['author'] != null && headerInfo['author']!.isNotEmpty) {
+          playlistAuthor = headerInfo['author']!;
+        }
+
+        final tracks = _parseInnertubePlaylistTracks(json);
+        if (tracks.isNotEmpty) {
+          final seen = <String>{};
+          final uniqueTracks =
+              tracks.where((t) => seen.add(t.videoId)).take(maxTracks).toList();
+          return YtmPlaylistDetails(
+            id: cleanRawId,
+            title: playlistTitle != 'YouTube Playlist'
+                ? playlistTitle
+                : 'Playlist ($cleanRawId)',
+            author: playlistAuthor,
+            artworkUrl:
+                playlistArtwork ?? uniqueTracks.firstOrNull?.artworkUrl,
+            tracks: uniqueTracks,
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[YTM_ACCOUNT] Next endpoint failed for $cleanRawId: $e');
+    }
+
+    return null;
+  }
+
+  /// Convenience method to fetch only tracks for a playlist by URL or ID.
+  Future<List<YtmTrack>> fetchPlaylistTracks(
+    String urlOrId, {
+    int maxTracks = 200,
+  }) async {
+    final details = await fetchPlaylistDetails(urlOrId, maxTracks: maxTracks);
+    return details?.tracks ?? const [];
+  }
+
+  Map<String, String?> _extractPlaylistHeaderInfo(Map<String, dynamic> root) {
+    String? title;
+    String? author;
+    String? artwork;
+
+    void checkHeaderNode(Map<String, dynamic> header) {
+      final titleRuns = header['title']?['runs'] as List<dynamic>?;
+      if (titleRuns != null && titleRuns.isNotEmpty && title == null) {
+        title = titleRuns.map((r) => r['text']?.toString() ?? '').join();
+      }
+
+      final subRuns = (header['subtitle']?['runs'] ??
+          header['straplineTextOne']?['runs'] ??
+          header['secondSubtitle']?['runs']) as List<dynamic>?;
+      if (subRuns != null && subRuns.isNotEmpty && author == null) {
+        final text = subRuns
+            .map((r) => r['text']?.toString().trim() ?? '')
+            .where((t) => t.isNotEmpty && t != '•' && t != '·')
+            .join(' ');
+        if (text.isNotEmpty) author = text;
+      }
+
+      final thumbRenderer =
+          header['thumbnail']?['croppedSquareThumbnailRenderer'] ??
+              header['thumbnail']?['musicThumbnailRenderer'];
+      final thumbs = (thumbRenderer?['thumbnail']?['thumbnails'] ??
+          header['thumbnail']?['thumbnails']) as List<dynamic>?;
+      if (thumbs != null && thumbs.isNotEmpty && artwork == null) {
+        artwork = thumbs.last['url'] as String?;
+      }
+    }
+
+    void traverse(dynamic node) {
+      if (node is Map<String, dynamic>) {
+        if (node.containsKey('musicDetailHeaderRenderer')) {
+          checkHeaderNode(
+              node['musicDetailHeaderRenderer'] as Map<String, dynamic>);
+        }
+        if (node.containsKey('musicResponsiveHeaderRenderer')) {
+          checkHeaderNode(
+              node['musicResponsiveHeaderRenderer'] as Map<String, dynamic>);
+        }
+        if (node.containsKey('musicEditablePlaylistDetailHeaderRenderer')) {
+          final ed = node['musicEditablePlaylistDetailHeaderRenderer']
+              as Map<String, dynamic>;
+          final inner = ed['header']?['musicResponsiveHeaderRenderer']
+              as Map<String, dynamic>?;
+          if (inner != null) checkHeaderNode(inner);
+        }
+        for (final v in node.values) {
+          traverse(v);
+        }
+      } else if (node is List) {
+        for (final item in node) {
+          traverse(item);
+        }
+      }
+    }
+
+    traverse(root);
+    return {'title': title, 'author': author, 'artwork': artwork};
   }
 
   /// Fetches personalized recommendations and home feed from YouTube Music (`FEmusic_home`).

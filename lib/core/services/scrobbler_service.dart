@@ -431,6 +431,16 @@ class ScrobblerService {
     String? artworkUrl,
   }) async {
     final prefs = await SharedPreferences.getInstance();
+    // Offline-only mode: queue locally, never hit the network.
+    if (prefs.getBool('setting_offline_only_mode') == true) {
+      await _enqueueOfflineScrobble(
+          artist: artist,
+          track: track,
+          album: album,
+          durationSec: durationSec,
+          timestamp: timestamp);
+      return;
+    }
 
     // Deduplication check
     final dedupKey = '${artist}_$track';
@@ -666,6 +676,8 @@ class ScrobblerService {
     _isFlushing = true;
     try {
       final prefs = await SharedPreferences.getInstance();
+      // Offline-only mode: keep the queue stored, never hit the network.
+      if (prefs.getBool('setting_offline_only_mode') == true) return;
       final queueJson = prefs.getString(_keyOfflineQueue);
       if (queueJson == null || queueJson.isEmpty) return;
 

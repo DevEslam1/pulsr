@@ -60,6 +60,8 @@ import 'collaborators/playback_preload_orchestrator.dart';
 import 'collaborators/stream_resolution_pipeline.dart';
 import 'ab_loop_manager.dart';
 import 'adaptive_quality_manager.dart';
+import 'bpm_override_store.dart';
+import 'per_song_volume_store.dart';
 import 'dsp_snapshot_store.dart';
 import 'ducking_controller.dart';
 import 'gapless_trim_handler.dart';
@@ -196,9 +198,9 @@ class PulsrAudioHandler extends BaseAudioHandler
   final AdaptiveQualityManager adaptiveQualityManager =
       AdaptiveQualityManager();
   final DuckingController duckingController = DuckingController();
-  final MultiOutputRouter multiOutputRouter = MultiOutputRouter();
-  final DspSnapshotStore dspSnapshotStore = DspSnapshotStore();
+  final MultiOutputRouter multiOutputRouter = MultiOutputRouter();  final DspSnapshotStore dspSnapshotStore = DspSnapshotStore();
   final SilenceSkipController silenceSkipController = SilenceSkipController();
+  final BpmOverrideStore bpmOverrideStore = BpmOverrideStore();
   final PlaybackBookmarkStore bookmarkStore = PlaybackBookmarkStore();
   bool hedgedResolutionEnabled = true;
   DateTime? _lastBookmarkSave;
@@ -541,9 +543,6 @@ class PulsrAudioHandler extends BaseAudioHandler
   static const double assumedOutputSampleRate = 48000.0;
 
   double _calculateReplayGainVolume(SongsTableData? song) {
-    // Keep native DSP pre-gain in sync (fire-and-forget): mixer stays at
-    // user volume on Android, gain applied bit-transparently in-DSP.
-    unawaited(_pushNativeReplayGain(song));
     if (song == null) return _volume;
 
     final prefs = _cachedPrefs;
@@ -554,7 +553,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         (prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true);
     if (bitPerfect) return _volume;
 
-    return ReplayGainMath.apply(
+    var scaled = ReplayGainMath.apply(
       mode: prefs.getString(PrefsKeys.replayGainMode) ?? 'track',
       volume: _volume,
       trackGainDb: song.replayGainTrack,
@@ -563,53 +562,43 @@ class PulsrAudioHandler extends BaseAudioHandler
       albumPeak: song.replayGainAlbumPeak,
       albumContext: _isConsecutiveAlbumPlayback(),
       preampWithRg: prefs.getDouble(PrefsKeys.replayGainPreampWithRg) ?? 0.0,
+      // Default 0dB: untagged tracks must not be attenuated without consent.
       preampWithoutRg:
-          prefs.getDouble(PrefsKeys.replayGainPreampWithoutRg) ?? -3.0,
+          prefs.getDouble(PrefsKeys.replayGainPreampWithoutRg) ?? 0.0,
     );
+    // Per-song volume override (dB) applied in the single mixer stage.
+    try {
+      final perSongDb = _perSongVolumeDbFor(song);
+      if (perSongDb != 0.0) {
+        final factor = math.pow(10, perSongDb / 20).toDouble();
+        scaled = (scaled * factor).clamp(0.0, 1.0);
+      }
+    } catch (_) {}
+    return scaled;
+  }
+
+  /// Reads the per-song volume override without a hard DI dependency so unit
+  /// test doubles of the handler keep working.
+  double _perSongVolumeDbFor(SongsTableData song) {
+    try {
+      final store = getIt.isRegistered<PerSongVolumeStore>()
+          ? getIt<PerSongVolumeStore>()
+          : null;
+      if (store == null) return 0.0;
+      final key = song.id.toString();
+      return store.getGainDbForTrack(key);
+    } catch (_) {
+      return 0.0;
+    }
   }
 
   /// Pushes ReplayGain tags to the native DSP pre-gain stage.
-  /// Non-Android / bit-perfect: disables native stage so the existing
-  /// volume-path semantics (unity) are preserved.
+  /// Single-stage mode: the mixer in [_calculateReplayGainVolume] is the
+  /// source of truth, so the native stage is kept disabled to avoid applying
+  /// the same gain twice. Non-Android / bit-perfect: same (disabled).
   Future<void> _pushNativeReplayGain(SongsTableData? song) async {
     try {
-      final prefs = _cachedPrefs;
-      if (prefs == null) {
-        await AudioEffectsChannel().setReplayGainEnabled(false);
-        return;
-      }
-      final bitPerfect = (prefs.getBool(PrefsKeys.bitPerfectOutput) ?? false) &&
-          (prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true);
-      if (bitPerfect) {
-        await AudioEffectsChannel().setReplayGainEnabled(false);
-        return;
-      }
-      final modeStr = prefs.getString(PrefsKeys.replayGainMode) ?? 'track';
-      final albumCtx = _isConsecutiveAlbumPlayback();
-      final mode = ReplayGainMath.nativeModeFor(modeStr, albumContext: albumCtx);
-      if (mode == 0) {
-        await AudioEffectsChannel().setReplayGainEnabled(false);
-        return;
-      }
-      final preAmp = ReplayGainMath.nativePreAmpFor(
-        mode: modeStr,
-        trackGainDb: song?.replayGainTrack,
-        albumGainDb: song?.replayGainAlbum,
-        albumContext: albumCtx,
-        preampWithRg: prefs.getDouble(PrefsKeys.replayGainPreampWithRg) ?? 0.0,
-        preampWithoutRg:
-            prefs.getDouble(PrefsKeys.replayGainPreampWithoutRg) ?? -3.0,
-      );
-      await AudioEffectsChannel().setReplayGainParams(
-        mode: mode,
-        trackGainDb: song?.replayGainTrack ?? 0.0,
-        albumGainDb: song?.replayGainAlbum ?? 0.0,
-        trackPeak: song?.replayGainTrackPeak ?? 1.0,
-        albumPeak: song?.replayGainAlbumPeak ?? 1.0,
-        preAmpDb: preAmp,
-        preventClipping: true,
-        enabled: true,
-      );
+      await AudioEffectsChannel().setReplayGainEnabled(false);
     } catch (_) {}
   }
 
@@ -618,8 +607,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     final song = currentSong;
     final target = _calculateReplayGainVolume(song);
     _volumeController.updateSettings(userVolume: _volume);
-    unawaited(_equalizerManager.updateLoudnessVolume(_volume));
+    await _equalizerManager.updateLoudnessVolume(_volume);
     await _activePlayer.setVolume(target);
+    unawaited(_pushNativeReplayGain(song));
   }
 
   bool get isEqualizerEnabled => _equalizerManager.isEnabled;
@@ -1388,7 +1378,13 @@ class PulsrAudioHandler extends BaseAudioHandler
                   }
                   _volumeController.updateSettings(
                       duckFactor: duckingController.duckFactor);
-                  unawaited(_volumeController.setDucked(false, currentSong));
+                  var perSongDb = 0.0;
+                  try {
+                    final cs = currentSong;
+                    if (cs != null) perSongDb = _perSongVolumeDbFor(cs);
+                  } catch (_) {}
+                  unawaited(_volumeController.setDucked(false, currentSong,
+                      perSongOffsetDb: perSongDb));
                   _preDuckVolume = null;
                   _preDuckInactiveVolume = null;
                 }
@@ -1553,8 +1549,12 @@ class PulsrAudioHandler extends BaseAudioHandler
   }
 
   void _notifyTrackChanged(SongsTableData song) {
-    // F1: AB loop is per-track; a new song invalidates it.
+    // F1: AB loop is per-track; a new song invalidates the live region,
+    // then the persisted loop for the new track (if any) is restored.
     abLoopManager.onSongChanged(song.id);
+    unawaited(abLoopManager.restoreForSong(song.id));
+    // D2: seed the BPM-synced crossfade map from manual per-track overrides.
+    _seedBpmOverride(song);
     // Correct DSP coefficients for the real header rate (replaces the 48kHz
     // cold-start assumption once known).
     final rate = song.sampleRate;
@@ -1680,7 +1680,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     } catch (_) {}
   }
 
-  AudioSource _createAudioSource(SongsTableData song, MediaItem tag) {
+  UriAudioSource _createAudioSource(SongsTableData song, MediaItem tag) {
     if (song.uri?.startsWith('content:') == true ||
         song.path.startsWith('content:')) {
       return AudioSource.uri(Uri.parse(song.uri ?? song.path), tag: tag);
@@ -1817,7 +1817,32 @@ class PulsrAudioHandler extends BaseAudioHandler
       );
       return source;
     }
-    return _createAudioSource(song, tag);
+    final base = _createAudioSource(song, tag);
+    // Apply codec encoder-delay/padding trims so Opus/MP3/AAC joins are
+    // truly gapless instead of carrying ~6-48ms of silence.
+    try {
+      final trim = GaplessTrimHandler.trimFor(
+        path: song.path,
+        codec: song.codec,
+      );
+      if (!trim.isEmpty) {
+        final trackLen = Duration(milliseconds: song.durationMs);
+        final clamped = trim.clampedTo(trackLen);
+        final start = GaplessTrimHandler.startOffset(clamped);
+        final end = trackLen > Duration.zero
+            ? GaplessTrimHandler.effectiveEnd(trackLen, clamped)
+            : null;
+        if (start > Duration.zero || (end != null && end < trackLen)) {
+          return ClippingAudioSource(
+            start: start == Duration.zero ? null : start,
+            end: (end == null || end >= trackLen) ? null : end,
+            child: base,
+            tag: tag,
+          );
+        }
+      }
+    } catch (_) {}
+    return base;
   }
 
   List<AudioSource> _buildAudioSources(List<SongsTableData> songs) {
@@ -2136,10 +2161,10 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   Future<void> setSkipSilenceEnabled(bool enabled) async {
     try {
+      silenceSkipController.setEnabled(enabled);
       await _playerA.setSkipSilenceEnabled(enabled);
       await _playerB.setSkipSilenceEnabled(enabled);
-      final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
-      await prefs.setBool('skip_silence_enabled', enabled);
+      await silenceSkipController.persist();
     } catch (e, st) {
       ErrorLogger.log('Failed to set skipSilence', error: e, stackTrace: st, category: 'AudioHandler');
     }
@@ -2165,7 +2190,38 @@ class PulsrAudioHandler extends BaseAudioHandler
     _crossfadeManager.bpmSyncEnabled = enabled;
   }
 
-  /// Pushes the opt-in AAudio Direct output preference to every player  /// Pushes the opt-in AAudio Direct output preference to every player
+  /// Seeds the crossfade BPM map for [song] from manual overrides.
+  /// Keeps the map bounded: entries for tracks outside the queue are dropped.
+  void _seedBpmOverride(SongsTableData song) {
+    try {
+      final trackId = song.id.toString();
+      final bpm = bpmOverrideStore.getBpmForTrack(trackKeyFor(song));
+      final mgr = _crossfadeManager;
+      if (bpm != null) {
+        mgr.bpmOverrides[trackId] = bpm;
+      } else {
+        mgr.bpmOverrides.remove(trackId);
+      }
+      if (mgr.bpmOverrides.length > 500) {
+        final keep = _songs.map((s) => s.id.toString()).toSet();
+        mgr.bpmOverrides.removeWhere((k, _) => !keep.contains(k));
+      }
+    } catch (_) {}
+  }
+
+  /// Track key shared with the per-song stores (id-based).
+  static String trackKeyFor(SongsTableData song) => song.id.toString();
+
+  /// Sets (or clears with null) the manual BPM override for [song].
+  /// Returns false when out of the 40–240 range.
+  Future<bool> setTrackBpm(SongsTableData song, double? bpm) async {
+    final ok =
+        await bpmOverrideStore.setBpmForTrack(trackKeyFor(song), bpm);
+    if (ok) _seedBpmOverride(song);
+    return ok;
+  }
+
+  /// Pushes the opt-in AAudio Direct output preference to every player
   /// (active, inactive and prefetch). Off by default; with `false` the sink
   /// stays the historical DefaultAudioSink path. Never throws.
   Future<void> setAaudioOutputEnabled(bool enabled,
@@ -2180,12 +2236,13 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   Future<void> _restoreSkipSilence() async {
     try {
-      final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
-      final enabled = prefs.getBool('skip_silence_enabled') ?? false;
+      await silenceSkipController.load();
+      final enabled = silenceSkipController.enabled;
       if (enabled) {
         await _playerA.setSkipSilenceEnabled(true);
         await _playerB.setSkipSilenceEnabled(true);
       }
+      final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
       final normEnabled = prefs.getBool('audio_normalization_enabled') ?? false;
       final savedBoost = prefs.getDouble(PrefsKeys.eqVolumeBoost);
       if (normEnabled && (savedBoost == null || savedBoost == 0.0)) {
@@ -4761,6 +4818,14 @@ class PulsrAudioHandler extends BaseAudioHandler
   void toggleAbLoop() => abLoopManager.toggle();
   void clearAbLoop() => abLoopManager.clear();
 
+  /// Re-restores the persisted AB loop for the current song. Used by the
+  /// PlayerCubit to sync loop UI after a track change completes.
+  Future<void> restoreAbLoopForCurrentSong() async {
+    final song = currentSong;
+    if (song == null) return;
+    await abLoopManager.restoreForSong(song.id);
+  }
+
   // F2: per-track delay
   String? get _currentTrackKey {
     final s = currentSong;
@@ -4912,7 +4977,10 @@ class PulsrAudioHandler extends BaseAudioHandler
     await dspSnapshotStore.persist();
   }
 
-  // F10: silence-skip sensitivity
+  // F10: silence-skip sensitivity. Native ExoPlayer stage is boolean-only,
+  // so sensitivity is persisted and exposed via thresholdDb/minSilenceDuration
+  // for UI truthfulness and future native thresholds; enabling still toggles
+  // the native boolean stage.
   Future<void> setSilenceSkipSensitivity(int v) async {
     silenceSkipController.setSensitivity(v);
     try {
@@ -4921,6 +4989,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     } catch (_) {}
     await silenceSkipController.persist();
   }
+
+  double get silenceSkipThresholdDb => silenceSkipController.thresholdDb;
+  Duration get silenceSkipMinDuration => silenceSkipController.minSilenceDuration;
 
   // F11: bookmarks
   PlaybackBookmark? recallBookmarkFor(SongsTableData song) {
@@ -5035,6 +5106,15 @@ class PulsrAudioHandler extends BaseAudioHandler
     _subscriptions.clear();
     // Dispose sleep timer before closing its subject to avoid add-after-close race
     _sleepTimerManager.dispose();
+    try {
+      abLoopManager.dispose();
+    } catch (_) {}
+    try {
+      multiOutputRouter.dispose();
+    } catch (_) {}
+    try {
+      silenceSkipController.persist();
+    } catch (_) {}
     _streamPreResolver.dispose();
     try {
       _adaptiveBufferEngine.dispose();

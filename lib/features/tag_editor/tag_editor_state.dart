@@ -14,6 +14,7 @@ class TagEditorState {
   final String genre;
   final String year;
   final String trackNumber;
+  final String discNumber;
   final String comment;
   final String lyrics;
   final Uint8List? artworkBytes;
@@ -35,6 +36,7 @@ class TagEditorState {
     this.genre = '',
     this.year = '',
     this.trackNumber = '',
+    this.discNumber = '',
     this.comment = '',
     this.lyrics = '',
     this.artworkBytes,
@@ -55,6 +57,7 @@ class TagEditorState {
     String? genre,
     String? year,
     String? trackNumber,
+    String? discNumber,
     String? comment,
     String? lyrics,
     Uint8List? artworkBytes,
@@ -78,6 +81,7 @@ class TagEditorState {
       genre: genre ?? this.genre,
       year: year ?? this.year,
       trackNumber: trackNumber ?? this.trackNumber,
+      discNumber: discNumber ?? this.discNumber,
       comment: comment ?? this.comment,
       lyrics: lyrics ?? this.lyrics,
       artworkBytes:

@@ -921,15 +921,15 @@ class _WaveformHeroStage extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final availableW = constraints.maxWidth - (isTablet ? 40.0 : 20.0);
-        final availableH = constraints.maxHeight - (isTablet ? 24.0 : 12.0);
+        final availableW = constraints.maxWidth - (isTablet ? 40.0 : 16.0);
+        final availableH = constraints.maxHeight - (isTablet ? 24.0 : 8.0);
         final maxDimension = math.min(availableW, availableH);
 
         final double artSize = isLandscape
-            ? (constraints.maxHeight * 0.82).clamp(160.0, 300.0)
+            ? (constraints.maxHeight * 0.82).clamp(160.0, 320.0)
             : math.min(
-                maxDimension * 0.98,
-                isTablet ? 540.0 : 400.0,
+                maxDimension,
+                isTablet ? 560.0 : 420.0,
               ).clamp(180.0, double.infinity);
 
         final double waveBaselineY =

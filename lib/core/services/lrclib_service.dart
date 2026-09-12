@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:injectable/injectable.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/models/lyrics_line.dart';
 import '../utils/error_logger.dart';
 import '../utils/lrc_parser.dart';
@@ -44,6 +45,10 @@ class LrclibService {
     String? albumName,
     int? durationSeconds,
   }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool('setting_offline_only_mode') == true) return null;
+    } catch (_) {}
     final candidates = _generateCandidates(
       trackName: trackName,
       artistName: artistName,

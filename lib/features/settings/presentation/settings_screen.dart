@@ -21,7 +21,6 @@ import '../../auth/presentation/ytm_web_login_sheet.dart';
 import '../../player/presentation/widgets/audio_visualizer.dart';
 import '../cubit/settings_cubit.dart';
 import '../cubit/settings_state.dart';
-import 'hidden_folders_screen.dart';
 import 'widgets/audio_sound_section.dart';
 import 'widgets/backup_section.dart';
 import 'widgets/playback_section.dart';
@@ -277,10 +276,7 @@ class SettingsScreen extends StatelessWidget {
                         state.autoHideSystemMedia
                             ? 'Auto-filtering voice memos • Custom paths'
                             : 'Manage excluded directories',
-                        onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const HiddenFoldersScreen()))),
+                        onTap: () => context.push('/hidden-folders')),
                     _divider(p),
                     _navTile(
                         context,
@@ -400,6 +396,13 @@ class SettingsScreen extends StatelessWidget {
                                 isStreaming: false,
                                 currentQuality: state.downloadQuality)),
                         _divider(p),
+                        _navTile(
+                            context,
+                            Icons.downloading_rounded,
+                            'Downloads',
+                            'View and manage offline downloads',
+                            onTap: () => context.push('/downloads')),
+                        _divider(p),
                         // Remote yt-dlp backend decommissioned: on-device only.
                         _navTile(
                           context,
@@ -471,6 +474,21 @@ class SettingsScreen extends StatelessWidget {
                       'Direct API scrobbling and Now Playing notifications',
                       onTap: () => _showScrobblerSettingsModal(context),
                     ),
+                    _divider(p),
+                    _navTile(
+                        context,
+                        Icons.bar_chart_rounded,
+                        'Scrobble Stats',
+                        'Listening history and scrobble analytics',
+                        onTap: () => context.push('/scrobble-stats')),
+                    _divider(p),
+                    _navTile(
+                        context,
+                        Icons.cloud_sync_rounded,
+                        'Cloud Backup Dashboard',
+                        'Manage synced devices and cloud backups',
+                        onTap: () =>
+                            context.push('/cloud-backup-dashboard')),
                     _divider(p),
                     _navTile(
                         context,
@@ -2292,7 +2310,7 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
 
   Future<void> _loadScrobblerPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    const secureStorage = FlutterSecureStorage();
+    final secureStorage = getIt<FlutterSecureStorage>();
     String lbToken = '';
     String lastFmKey = '';
     String lastFmSec = '';
@@ -2340,7 +2358,7 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
 
   Future<void> _saveScrobblerPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    const secureStorage = FlutterSecureStorage();
+    final secureStorage = getIt<FlutterSecureStorage>();
     await prefs.setBool(
         ScrobblerService.keyListenBrainzEnabled, _listenBrainzEnabled);
     final lbToken = _listenBrainzTokenController.text.trim();

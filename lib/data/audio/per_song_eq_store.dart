@@ -12,9 +12,10 @@ class PerSongEqStore {
   static const int maxEntries = 500;
 
   final Map<String, String> _overrides = {};
+  late final Future<void> ready;
 
   PerSongEqStore() {
-    load();
+    ready = load();
   }
 
   /// Returns the assigned EQ preset name for [trackKey] (e.g. song.id or song.path), or null if none.

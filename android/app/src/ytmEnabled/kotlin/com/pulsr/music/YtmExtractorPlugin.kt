@@ -619,71 +619,79 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
     private fun getPlaylist(urlOrId: String, limit: Int): Map<String, Any?> {
         val trimmed = urlOrId.trim()
 
-        // Detect liked-songs IDs (private playlist — NewPipe cannot handle them)
-        val isLikedSongs = trimmed == "LM" || trimmed == "VLLM" || trimmed == "LL" ||
-            trimmed == "FEmusic_liked_videos" || trimmed == "FEmusic_liked_tracks" ||
-            trimmed == "VLSE" ||
-            trimmed.contains("playlist?list=LM") ||
-            trimmed.contains("playlist?list=VLLM") ||
-            trimmed.contains("playlist?list=LL")
-
-        if (isLikedSongs) {
-            return getPlaylistViaInnertube(limit)
-        }
-
-        // ── Public playlists via NewPipe ──────────────────────────────────────
-        val cleanId = trimmed
-        val rawUrl = if (cleanId.startsWith("http://") || cleanId.startsWith("https://")) {
-            cleanId
-        } else {
-            "https://www.youtube.com/playlist?list=$cleanId"
-        }
-        // Normalise music.youtube.com → www.youtube.com for NewPipe compatibility
-        val url = rawUrl.replace("music.youtube.com", "www.youtube.com")
-
-        val extractor = ServiceList.YouTube.getPlaylistExtractor(url)
-        extractor.fetchPage()
-        val playlistInfo = PlaylistInfo.getInfo(extractor)
-
-        val allItems = mutableListOf<StreamInfoItem>()
-        allItems.addAll(playlistInfo.relatedItems.filterIsInstance<StreamInfoItem>())
-
-        // Follow continuation pagination if available and limit not reached
-        var nextPage: Page? = playlistInfo.nextPage
-        var pageCount = 0
-        while (nextPage != null && allItems.size < limit && pageCount < 10) {
-            try {
-                val pageResult = extractor.getPage(nextPage)
-                val newItems = pageResult.items.filterIsInstance<StreamInfoItem>()
-                if (newItems.isEmpty()) break
-                allItems.addAll(newItems)
-                nextPage = pageResult.nextPage
-                pageCount++
-            } catch (e: Exception) {
-                Log.w(TAG, "Pagination fetch error: ${e.message}")
-                break
+        // 1. Try InnertubeClient first for all playlists (handles auth, cookies, mixes, private and public playlists)
+        try {
+            val result = getPlaylistViaInnertube(trimmed, limit)
+            val tracks = result["tracks"] as? List<*>
+            if (!tracks.isNullOrEmpty()) {
+                return result
             }
+        } catch (e: Throwable) {
+            Log.w(TAG, "getPlaylist: Innertube failed for $trimmed: ${e.message}")
         }
 
-        val tracks = streamItemsToMaps(allItems.asSequence(), limit)
-        val isTruncated = nextPage != null
+        // 2. Fallback to NewPipe for public playlists
+        try {
+            val cleanId = trimmed
+            val rawUrl = if (cleanId.startsWith("http://") || cleanId.startsWith("https://")) {
+                cleanId
+            } else {
+                "https://www.youtube.com/playlist?list=$cleanId"
+            }
+            // Normalise music.youtube.com → www.youtube.com for NewPipe compatibility
+            val url = rawUrl.replace("music.youtube.com", "www.youtube.com")
+
+            val extractor = ServiceList.YouTube.getPlaylistExtractor(url)
+            extractor.fetchPage()
+            val playlistInfo = PlaylistInfo.getInfo(extractor)
+
+            val allItems = mutableListOf<StreamInfoItem>()
+            allItems.addAll(playlistInfo.relatedItems.filterIsInstance<StreamInfoItem>())
+
+            // Follow continuation pagination if available and limit not reached
+            var nextPage: Page? = playlistInfo.nextPage
+            var pageCount = 0
+            while (nextPage != null && allItems.size < limit && pageCount < 10) {
+                try {
+                    val pageResult = extractor.getPage(nextPage)
+                    val newItems = pageResult.items.filterIsInstance<StreamInfoItem>()
+                    if (newItems.isEmpty()) break
+                    allItems.addAll(newItems)
+                    nextPage = pageResult.nextPage
+                    pageCount++
+                } catch (e: Exception) {
+                    Log.w(TAG, "Pagination fetch error: ${e.message}")
+                    break
+                }
+            }
+
+            val tracks = streamItemsToMaps(allItems.asSequence(), limit)
+            val isTruncated = nextPage != null
+            return mapOf(
+                "title" to playlistInfo.name,
+                "uploader" to (playlistInfo.uploaderName ?: ""),
+                "thumbnailUrl" to bestArtwork(playlistInfo.thumbnails),
+                "tracks" to tracks,
+                "isTruncated" to isTruncated,
+            )
+        } catch (e: Throwable) {
+            Log.w(TAG, "getPlaylist: NewPipe fallback failed for $trimmed: ${e.message}")
+        }
+
         return mapOf(
-            "title" to playlistInfo.name,
-            "uploader" to (playlistInfo.uploaderName ?: ""),
-            "thumbnailUrl" to bestArtwork(playlistInfo.thumbnails),
-            "tracks" to tracks,
-            "isTruncated" to isTruncated,
+            "title" to "Playlist",
+            "uploader" to "",
+            "thumbnailUrl" to null,
+            "tracks" to emptyList<Map<String, Any?>>(),
+            "isTruncated" to false,
         )
     }
 
     /**
-     * Fetches the liked-songs playlist via [InnertubeClient] browse (VLLM → LM fallback).
-     *
-     * Uses the authenticated cookie store so the request is account-scoped. Parses
-     * `musicResponsiveListItemRenderer` and `musicPlaylistShelfRenderer` containers
-     * from the JSON response and converts them to the same map format as [streamItemsToMaps].
+     * Fetches playlists via [InnertubeClient] browse with fallback browse IDs.
+     * Uses the authenticated cookie store when available so account-scoped playlists work.
      */
-    private fun getPlaylistViaInnertube(limit: Int): Map<String, Any?> {
+    private fun getPlaylistViaInnertube(urlOrId: String, limit: Int): Map<String, Any?> {
         val ctx = context?.applicationContext
             ?: throw ExtractionException("No context for InnertubeClient")
 
@@ -691,18 +699,37 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         YtmCookieStore.getInstance(ctx).readFromCookieManager()
 
         val client = InnertubeClient(ctx)
+        val trimmed = urlOrId.trim()
 
-        // Try browse IDs in priority order — VLLM is the canonical "browse as playlist" form
-        val browseIds = listOf("VLLM", "FEmusic_liked_videos", "FEmusic_liked_tracks", "LM")
+        val isLikedSongs = trimmed == "LM" || trimmed == "VLLM" || trimmed == "LL" ||
+            trimmed == "FEmusic_liked_videos" || trimmed == "FEmusic_liked_tracks" ||
+            trimmed == "VLSE" ||
+            trimmed.contains("playlist?list=LM") ||
+            trimmed.contains("playlist?list=VLLM") ||
+            trimmed.contains("playlist?list=LL")
+
+        val browseIds: List<String>
+        if (isLikedSongs) {
+            browseIds = listOf("VLLM", "FEmusic_liked_videos", "FEmusic_liked_tracks", "LM")
+        } else {
+            var cleanId = trimmed
+            if (cleanId.contains("list=")) {
+                val uri = android.net.Uri.parse(cleanId)
+                cleanId = uri.getQueryParameter("list") ?: cleanId
+            }
+            cleanId = cleanId.removePrefix("VL")
+            browseIds = listOf("VL$cleanId", cleanId)
+        }
+
         var lastError: Throwable? = null
 
         for (bId in browseIds) {
             try {
-                Log.d(TAG, "Liked songs: trying InnertubeClient browse with browseId=$bId")
+                Log.d(TAG, "Playlist: trying InnertubeClient browse with browseId=$bId")
                 val json = client.requestBrowse(bId)
                 val tracks = parseInnertubeTracksFromJson(json, limit)
                 if (tracks.isNotEmpty()) {
-                    Log.i(TAG, "Liked songs: parsed ${tracks.size} tracks via browseId=$bId")
+                    Log.i(TAG, "Playlist: parsed ${tracks.size} tracks via browseId=$bId")
 
                     // Follow continuation pages
                     val allTracks = tracks.toMutableList()
@@ -724,28 +751,31 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                             currentJson = contJson
                             pageCount++
                         } catch (e: Exception) {
-                            Log.w(TAG, "Liked songs continuation failed: ${e.message}")
+                            Log.w(TAG, "Playlist continuation failed: ${e.message}")
                             break
                         }
                     }
 
                     return mapOf(
-                        "title" to "Liked Music",
+                        "title" to if (isLikedSongs) "Liked Music" else "YouTube Playlist",
                         "uploader" to "",
-                        "thumbnailUrl" to null,
+                        "thumbnailUrl" to allTracks.firstOrNull()?.get("thumbnailUrl"),
                         "tracks" to allTracks.take(limit),
                         "isTruncated" to (allTracks.size >= limit || pageCount >= 10),
                     )
                 }
             } catch (e: Throwable) {
-                Log.w(TAG, "Liked songs InnertubeClient browse $bId failed: ${e.message}")
+                Log.w(TAG, "Playlist InnertubeClient browse $bId failed: ${e.message}")
                 lastError = e
             }
         }
 
-        throw ExtractionException(
-            "Unable to fetch liked songs via InnertubeClient",
-            lastError,
+        return mapOf(
+            "title" to "Playlist",
+            "uploader" to "",
+            "thumbnailUrl" to null,
+            "tracks" to emptyList<Map<String, Any?>>(),
+            "isTruncated" to false,
         )
     }
 

@@ -500,43 +500,126 @@ class AudioSoundSection extends StatelessWidget {
             ),
           );
         }),
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            enabled: isAndroid,
-            leading: const Icon(Icons.graphic_eq_rounded),
-            title: Text(context.l10n.rcTitle,
-                style: Theme.of(context).textTheme.bodyLarge),
-            subtitle: Text(
-                isAndroid ? context.l10n.rcSubtitle : unsupported,
-                style: Theme.of(context).textTheme.bodySmall),
-            onTap: isAndroid
-                ? () => showModalBottomSheet<void>(
-                      context: context,
-                      useRootNavigator: true,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (_) => const RoomCorrectionSheet(),
-                    )
-                : null,
+        settingsCardDivider(p),
+        // Room Correction Wizard
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: isAndroid ? () => RoomCorrectionSheet.show(context) : null,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.graphic_eq_rounded,
+                    size: 20,
+                    color: isAndroid ? p.accent : p.textTertiary,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                context.l10n.rcTitle,
+                                style: TextStyle(
+                                  color: isAndroid
+                                      ? p.textPrimary
+                                      : p.textTertiary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.info_outline_rounded,
+                                  size: 18, color: p.textTertiary),
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              onPressed: () => showAudioFeatureInfoDialog(
+                                context,
+                                AudioFeatureRegistry.roomCorrection,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          isAndroid ? context.l10n.rcSubtitle : unsupported,
+                          style: TextStyle(
+                            color: p.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: p.textTertiary,
+                    size: 20,
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            enabled: isAndroid,
-            leading: const Icon(Icons.sensors_rounded),
-            title: const Text('DSP Signal Inspector & Debug',
-                style: TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: Text(
-                isAndroid
-                    ? 'Inspect live active DSP stages, HAL effects & engine state'
-                    : unsupported,
-                style: TextStyle(color: p.textSecondary, fontSize: 12)),
-            trailing: Icon(Icons.chevron_right_rounded, color: p.textSecondary),
+        settingsCardDivider(p),
+        // DSP Signal Inspector & Debug
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
             onTap: isAndroid ? () => DspInspectorSheet.show(context) : null,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.sensors_rounded,
+                    size: 20,
+                    color: isAndroid ? p.accent : p.textTertiary,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'DSP Signal Inspector & Debug',
+                          style: TextStyle(
+                            color:
+                                isAndroid ? p.textPrimary : p.textTertiary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          isAndroid
+                              ? 'Inspect live active DSP stages, HAL effects & engine state'
+                              : unsupported,
+                          style: TextStyle(
+                            color: p.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: p.textTertiary,
+                    size: 20,
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
         settingsCardDivider(p),
@@ -705,7 +788,8 @@ class AudioSoundSection extends StatelessWidget {
           'AAudio Direct Output (Bit-Perfect)',
           'Bypasses the system mixer with a native AAudio stream opened at '
               'each track rate (EXCLUSIVE attempt, SHARED fallback). The DSP '
-              'chain is bypassed in this mode; applies to newly built players',
+              'chain and speed/pitch controls are inactive in this mode; '
+              'applies to newly built players',
           value: isAndroid && state.aaudioOutputEnabled,
           disabledReason: isAndroid ? null : unsupported,
           onChanged:
@@ -758,8 +842,8 @@ class AudioSoundSection extends StatelessWidget {
           Icons.music_note_rounded,
           'BPM-Synced Crossfade',
           'Aligns the crossfade duration to the nearest 2/4/8/16/32 beats of '
-              'the incoming track when its BPM is known; otherwise the '
-              'configured duration is used',
+              'the incoming track when its BPM is known (set per track in '
+              'Song Info); otherwise the configured duration is used',
           value: state.bpmSyncCrossfadeEnabled,
           onChanged: cubit.setBpmSyncCrossfadeEnabled,
         ),

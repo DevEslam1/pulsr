@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../utils/error_logger.dart';
 import '../config/app_config.dart';
@@ -12,9 +13,9 @@ import '../config/app_config.dart';
 ///
 /// Scope is deliberate: ping + search + stream-url building only. Playback,
 /// caching and offline logic stay in [MusicRepository]/download pipeline —
-/// this service only proves reachability and resolves playable URLs, which is
-/// the 80% Symfonium-killer (NAS streaming through Pulsr's DSP chain).
-/// No persistence here; credentials live in SharedPreferences via caller.
+/// this service only proves reachability and resolves playable URLs.
+/// Callers MUST persist credentials in [FlutterSecureStorage], never in
+/// plaintext SharedPreferences.
 class SubsonicSong {
   final String id;
   final String title;
@@ -62,6 +63,7 @@ class SubsonicService {
   }
 
   /// True when server answers ping with ok status. Pure builds always false.
+  /// Also false when offline-only mode is enabled.
   Future<bool> ping({
     required String baseUrl,
     required String user,
@@ -69,6 +71,10 @@ class SubsonicService {
     Duration timeout = const Duration(seconds: 8),
   }) async {
     if (!isAllowed) return false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool('setting_offline_only_mode') == true) return false;
+    } catch (_) {}
     try {
       final res = await http
           .get(_uri(baseUrl, 'ping', _authParams(user, password)))
@@ -93,6 +99,10 @@ class SubsonicService {
     Duration timeout = const Duration(seconds: 12),
   }) async {
     if (!isAllowed || query.trim().isEmpty) return [];
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool('setting_offline_only_mode') == true) return [];
+    } catch (_) {}
     try {
       final auth = _authParams(user, password);
       final uri = _uri(baseUrl, 'search3', '$auth&query=${Uri.encodeComponent(query)}&songCount=$count');

@@ -108,6 +108,13 @@ class YtmOnlineSection extends StatelessWidget {
                 isStreaming: false, currentQuality: state.downloadQuality),
           ),
           settingsCardDivider(p),
+          SettingsNavTile(
+            Icons.downloading_rounded,
+            'Downloads',
+            'View and manage offline downloads',
+            onTap: () => context.push('/downloads'),
+          ),
+          settingsCardDivider(p),
           // Remote yt-dlp backend decommissioned: on-device extractor only,
           // no engine picker or server config.
           SettingsNavTile(

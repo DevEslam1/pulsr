@@ -21,6 +21,8 @@ class TagEditorCubit extends Cubit<TagEditorState> {
   bool _batchAlbumEdited = false;
   bool _batchGenreEdited = false;
   bool _batchYearEdited = false;
+  bool _batchTrackEdited = false;
+  bool _batchDiscEdited = false;
 
   // Fields the user already edited; an in-flight [loadTags] must not
   // overwrite them.
@@ -68,6 +70,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       trackNumber: isBatch
           ? ''
           : (song.trackNumber != null ? song.trackNumber.toString() : ''),
+      discNumber: isBatch ? '' : '',
     );
   }
 
@@ -89,9 +92,11 @@ class TagEditorCubit extends Cubit<TagEditorState> {
         final genre = (tags['genre'] as String?)?.trim();
         final year = (tags['year'] as String?)?.trim();
         final trackNumber = (tags['trackNumber'] as String?)?.trim();
+        final discNumber = (tags['discNumber'] as String?)?.trim();
         final comment = (tags['comment'] as String?)?.trim();
         final lyrics = (tags['lyrics'] as String?)?.trim();
-        final artworkData = tags['artwork'] as Uint8List?;
+        final artworkData = (tags['artworkBytes'] as Uint8List?) ??
+            (tags['artwork'] as Uint8List?);
         bool edited(String field) => _userEditedFields.contains(field);
 
         emit(state.copyWith(
@@ -110,6 +115,9 @@ class TagEditorCubit extends Cubit<TagEditorState> {
           trackNumber: edited('trackNumber')
               ? state.trackNumber
               : (trackNumber ?? state.trackNumber),
+          discNumber: edited('discNumber')
+              ? state.discNumber
+              : (discNumber ?? state.discNumber),
           comment: edited('comment') ? state.comment : (comment ?? ''),
           lyrics: edited('lyrics') ? state.lyrics : (lyrics ?? ''),
           artworkBytes: edited('artwork') ? state.artworkBytes : artworkData,
@@ -162,13 +170,19 @@ class TagEditorCubit extends Cubit<TagEditorState> {
     emit(state.copyWith(year: val));
   }
 
-  bool _batchTrackEdited = false;
   bool _batchCommentEdited = false;
   void updateTrackNumber(String val) {
     if (isClosed) return;
     _userEditedFields.add('trackNumber');
     if (state.isBatchMode) _batchTrackEdited = true;
     emit(state.copyWith(trackNumber: val));
+  }
+
+  void updateDiscNumber(String val) {
+    if (isClosed) return;
+    _userEditedFields.add('discNumber');
+    if (state.isBatchMode) _batchDiscEdited = true;
+    emit(state.copyWith(discNumber: val));
   }
 
   void updateComment(String val) {
@@ -393,6 +407,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
               'trackNumber': _batchTrackEdited
                   ? state.trackNumber
                   : (s.trackNumber?.toString() ?? ''),
+              'discNumber': _batchDiscEdited ? state.discNumber : '',
               'artworkPath': state.newArtworkPath,
               'removeArtwork': state.removeArtwork,
             };
@@ -418,7 +433,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
                 ? TagEditorStatus.failure
                 : TagEditorStatus.success,
             errorMessage:
-                'Failed to tag ${failedFiles.length} file${failedFiles.length > 1 ? "s" : ""}',
+                'Failed to tag ${failedFiles.length} file${failedFiles.length > 1 ? "s" : ""}: ${failedFiles.take(3).join(", ")}${failedFiles.length > 3 ? "…" : ""}',
             clearBatchProgress: true,
           ));
         } else {
@@ -427,6 +442,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
           _batchGenreEdited = false;
           _batchYearEdited = false;
           _batchTrackEdited = false;
+          _batchDiscEdited = false;
           _batchCommentEdited = false;
           emit(state.copyWith(
               status: TagEditorStatus.success, clearBatchProgress: true));
@@ -449,6 +465,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
         'genre': state.genre,
         'year': state.year,
         'trackNumber': state.trackNumber,
+        'discNumber': state.discNumber,
         'comment': state.comment,
         'lyrics': lyrics,
         'artworkPath': state.newArtworkPath,
@@ -461,13 +478,14 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       await _scannerService.rescanSingleFile(state.song.path);
       if (isClosed) return;
 
-      emit(state.copyWith(status: TagEditorStatus.success));
       if (lyricsTruncated && !isClosed) {
         emit(state.copyWith(
           status: TagEditorStatus.success,
           errorMessage:
               'Note: lyrics truncated to 8192 chars (device tag limit).',
         ));
+      } else {
+        emit(state.copyWith(status: TagEditorStatus.success));
       }
     } on PlatformException catch (e) {
       if (isClosed) return;

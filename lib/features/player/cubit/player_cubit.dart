@@ -671,17 +671,33 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
           currentSongEqOverride: songEq,
           currentSongVolumeOverrideDb: songVol,
         ));
+        // Restore any persisted AB loop for the new track.
+        unawaited(_syncAbLoopUi(song));
         try {
           checkBookmarkOffer();
         } catch (_) {}
 
-        // Auto-apply per-song EQ if assigned
+        // Auto-apply per-song EQ if assigned: match default presets,
+        // custom presets, and headphone/AutoEQ profiles by name.
         if (songEq != null) {
+          final lower = songEq.toLowerCase();
           final match = EqPreset.defaultPresets
-              .where((p) => p.name.toLowerCase() == songEq.toLowerCase())
+              .where((p) => p.name.toLowerCase() == lower)
               .firstOrNull;
           if (match != null) {
             unawaited(applyPreset(match));
+          } else {
+            try {
+              final custom = _equalizerCustomPresets()
+                  .where((p) => p.name.toLowerCase() == lower)
+                  .firstOrNull;
+              if (custom != null) {
+                unawaited(applyPreset(custom));
+              } else {
+                final hp = _headphoneProfileByName(songEq);
+                if (hp != null) unawaited(applyHeadphoneProfile(hp));
+              }
+            } catch (_) {}
           }
         }
       }
@@ -899,8 +915,17 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       }
     });
 
+    // Latency-compensated positions keep lyric highlights in sync with
+    // audible DSP output. Older handler doubles (tests) may not implement
+    // compensatedPositionStream — fall back to the raw position stream.
+    Stream<Duration> positionUpdates;
+    try {
+      positionUpdates = _audioHandler.compensatedPositionStream;
+    } catch (_) {
+      positionUpdates = _audioHandler.positionStream;
+    }
     autoSub(
-      _audioHandler.positionStream
+      positionUpdates
           .throttleTime(const Duration(milliseconds: 200), trailing: true),
       (pos) {
         _checkSponsorBlockSkip(pos);
@@ -941,6 +966,13 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   }
 
   Future<void> _loadSponsorBlockSegments(SongsTableData song, int gen) async {
+    // Offline-only mode disables all network lookups including SponsorBlock.
+    if (_settingsCubit?.state.offlineOnlyMode == true) {
+      _currentSponsorSegments = const [];
+      _sponsorSegmentsVideoId = null;
+      _lastSkippedSegmentEnd = null;
+      return;
+    }
     final videoId = (song.remoteId != null && song.remoteId!.isNotEmpty)
         ? song.remoteId!
         : (song.path.startsWith('ytmusic://')
@@ -1980,8 +2012,25 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     }
   }
 
-  Future<void> setBandGain(int bandIndex, double gain) async {
-    if (gain.abs() > 0.1 && !_guardDsp('EQ Band')) return;
+  List<EqPreset> _equalizerCustomPresets() {
+    // Custom user curves live as HeadphoneProfile entries; plain EqPreset
+    // customs are not stored separately, so only defaults apply here.
+    return const [];
+  }
+
+  HeadphoneProfile? _headphoneProfileByName(String name) {
+    try {
+      final lower = name.toLowerCase();
+      for (final p in HeadphoneProfilesRepository().profiles) {
+        if (p.name.toLowerCase() == lower) return p;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> setBandGain(int bandIndex, double gain) async {    if (gain.abs() > 0.1 && !_guardDsp('EQ Band')) return;
     final clamped = gain.clamp(-15.0, 15.0);
     final gains = List<double>.from(state.eqPreset.gains);
     if (bandIndex >= 0 && bandIndex < gains.length) {
@@ -2861,6 +2910,24 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
         abLoopEnabled: false, abPointA: null, abPointB: null));
   }
 
+  /// Syncs AB-loop UI with the (possibly restored) handler state after a
+  /// track change. Guarded for handler test doubles without F1 members.
+  Future<void> _syncAbLoopUi(SongsTableData song) async {
+    try {
+      await _audioHandler.restoreAbLoopForCurrentSong();
+    } catch (_) {}
+    if (isClosed || state.currentSong?.id != song.id) return;
+    try {
+      final mgr = _audioHandler.abLoopManager;
+      if (mgr.pointA == null && mgr.pointB == null) return;
+      safeEmit(state.copyWith(
+        abPointA: mgr.pointA,
+        abPointB: mgr.pointB,
+        abLoopEnabled: mgr.isEnabled,
+      ));
+    } catch (_) {}
+  }
+
   // ── F2: per-track delay ──────────────────────────────────────────────
   Future<void> setTrackDelayMs(int ms) async {
     await _audioHandler.setCurrentTrackDelay(ms);
@@ -2870,6 +2937,17 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   void syncTrackDelay() {
     safeEmit(
         state.copyWith(trackDelayMs: _audioHandler.currentTrackDelayMs));
+  }
+
+  // ── BPM override (feeds BPM-synced crossfade) ──────────────────────
+  /// Sets (or clears with null) the manual BPM override for [song].
+  /// Returns false when out of range or the handler lacks the API.
+  Future<bool> setTrackBpm(SongsTableData song, double? bpm) async {
+    try {
+      return await _audioHandler.setTrackBpm(song, bpm);
+    } catch (_) {
+      return false;
+    }
   }
 
   // ── F10: silence-skip sensitivity ────────────────────────────────────

@@ -121,10 +121,14 @@ class PlaybackVolumeController {
   }
 
   /// Sets ducked state for transient notifications / speech.
-  Future<void> setDucked(bool ducked, SongsTableData? currentSong) async {
+  /// [perSongOffsetDb] keeps per-track volume overrides applied across the
+  /// duck ramp; without it the restore target would drop the override.
+  Future<void> setDucked(bool ducked, SongsTableData? currentSong,
+      {double perSongOffsetDb = 0.0}) async {
     _isDucked = ducked;
     final active = getActivePlayer();
-    final target = calculateTargetVolume(currentSong);
+    final target = calculateTargetVolume(currentSong,
+        perSongOffsetDb: perSongOffsetDb);
     await applyVolume(active, target, smoothTransition: true);
   }
 }

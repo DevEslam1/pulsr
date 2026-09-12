@@ -1,6 +1,8 @@
 // lib/features/settings/presentation/widgets/privacy_data_section.dart
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/scrobbler_service.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -30,6 +32,20 @@ class PrivacyDataSection extends StatelessWidget {
           'Scrobbling (Last.fm & ListenBrainz)',
           'Direct API scrobbling and Now Playing notifications',
           onTap: () => _showScrobblerSettingsModal(context),
+        ),
+        settingsCardDivider(p),
+        SettingsNavTile(
+          Icons.bar_chart_rounded,
+          'Scrobble Stats',
+          'View listening history and scrobble analytics',
+          onTap: () => context.push('/scrobble-stats'),
+        ),
+        settingsCardDivider(p),
+        SettingsNavTile(
+          Icons.cloud_sync_rounded,
+          'Cloud Backup Dashboard',
+          'Manage synced devices and cloud backups',
+          onTap: () => context.push('/cloud-backup-dashboard'),
         ),
         settingsCardDivider(p),
         SettingsNavTile(
@@ -82,7 +98,7 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
 
   Future<void> _loadScrobblerPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    const secureStorage = FlutterSecureStorage();
+    final secureStorage = GetIt.instance<FlutterSecureStorage>();
     String lbToken = '';
     String lastFmKey = '';
     String lastFmSec = '';
@@ -130,7 +146,7 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
 
   Future<void> _saveScrobblerPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    const secureStorage = FlutterSecureStorage();
+    final secureStorage = GetIt.instance<FlutterSecureStorage>();
     await prefs.setBool(
         ScrobblerService.keyListenBrainzEnabled, _listenBrainzEnabled);
     final lbToken = _listenBrainzTokenController.text.trim();

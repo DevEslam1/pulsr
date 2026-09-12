@@ -118,7 +118,7 @@ class ArtworkPicker extends StatelessWidget {
                   foregroundColor: p.accent,
                 ),
               ),
-              if (hasCustomNewImage || hasBytesImage || !removeArtwork) ...[
+              if ((hasCustomNewImage || hasBytesImage) && !removeArtwork) ...[
                 const SizedBox(width: 8),
                 TextButton.icon(
                   onPressed: onRemove,

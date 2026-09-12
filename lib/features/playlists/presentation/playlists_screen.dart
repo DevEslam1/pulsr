@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/services/ytm_service.dart';
@@ -9,14 +10,16 @@ import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/empty_state_widget.dart';
+import '../../../domain/models/smart_playlist_criteria.dart';
 import '../../../domain/models/ytm_track.dart';
-import '../../../domain/usecases/get_favorites_usecase.dart';
 import '../../../domain/usecases/get_songs_usecase.dart';
 import '../../../domain/usecases/playlist_io_usecases.dart';
+import '../../../domain/usecases/playlist_usecases.dart';
 import '../../../data/db/app_database.dart';
 import '../../auth/presentation/ytm_web_login_sheet.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../playlist_detail/presentation/playlist_detail_screen.dart';
+import '../../playlist_detail/presentation/online_playlist_detail_screen.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../cubit/playlist_cubit.dart';
@@ -43,8 +46,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     }
   }
 
-  void _showCreateDialog(BuildContext context, PlaylistCubit cubit) {
-    final controller = TextEditingController();
+  void _showCreateDialog(BuildContext context, PlaylistCubit cubit) {    final controller = TextEditingController();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -68,6 +70,115 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               }
             },
             child: Text(context.l10n.save),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRenameDialog(
+      BuildContext context, PlaylistCubit cubit, PlaylistsTableData pl) {
+    final controller = TextEditingController(text: pl.name);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Rename playlist',
+            style: TextStyle(fontWeight: FontWeight.w800)),
+        content: TextField(controller: controller, autofocus: true),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final name = controller.text.trim();
+              if (name.isNotEmpty) {
+                await cubit.renamePlaylist(pl.id, name);
+                if (context.mounted) Navigator.pop(ctx);
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Exports (or shares) a playlist as M3U from the list cards. Smart
+  /// playlists resolve through their live criteria query.
+  Future<void> _exportPlaylistSongs(
+    BuildContext context,
+    PlaylistsTableData pl, {
+    bool share = false,
+  }) async {
+    try {
+      final useCases = getIt<PlaylistUseCases>();
+      final List<SongsTableData> songs;
+      if (pl.isSmart && pl.smartCriteria != null) {
+        songs = await useCases.watchSmartPlaylistSongs(
+                SmartCriteria.fromJsonString(pl.smartCriteria!))
+            .first;
+      } else {
+        final res = await useCases.watchPlaylistSongs(pl.id).first;
+        songs = res.fold((l) => <SongsTableData>[], (r) => r);
+      }
+      if (!context.mounted) return;
+      if (songs.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cannot export an empty playlist.')),
+        );
+        return;
+      }
+      final file =
+          await getIt<PlaylistExportUseCase>().exportToFile(pl.name, songs);
+      if (!context.mounted) return;
+      if (share) {
+        try {
+          await SharePlus.instance.share(
+            ShareParams(
+              files: [XFile(file.path, mimeType: 'audio/x-mpegurl')],
+              text: 'Playlist: ${pl.name}',
+            ),
+          );
+        } finally {
+          try {
+            if (await file.exists()) await file.delete();
+          } catch (_) {}
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(
+                  'Playlist exported successfully (${songs.length} tracks).')),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Export failed. Please try again.')),
+        );
+      }
+    }
+  }
+
+  void _confirmDelete(
+      BuildContext context, PlaylistCubit cubit, PlaylistsTableData pl) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete "${pl.name}"?'),
+        content: const Text('This cannot be undone.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () async {
+              await cubit.deletePlaylist(pl.id);
+              if (context.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Delete'),
           ),
         ],
       ),
@@ -145,6 +256,10 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               if (url.isNotEmpty) {
                 Navigator.pop(ctx);
                 cubit.fetchOnlinePlaylistByUrl(url);
+                context.push(
+                  '/online-playlist',
+                  extra: OnlinePlaylistDetailArgs(playlistId: url),
+                );
               }
             },
             child: Text(context.l10n.confirm),
@@ -307,15 +422,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               subtitle: context.l10n.likedTracks,
               icon: Icons.favorite_rounded,
               colors: [p.favorite, const Color(0xFFB0316B)],
-              onTap: () async {
-                final favoritesRes =
-                    await getIt<GetFavoritesUseCase>().getFavorites();
-                favoritesRes.fold((l) => null, (favs) {
-                  if (favs.isNotEmpty) {
-                    playerCubit.playSong(favs.first, queue: favs);
-                  }
-                });
-              },
+              onTap: () => context.push('/favorites'),
             ),
           ),
 
@@ -395,6 +502,28 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                     ],
                     isSelected: isTabletLandscape && _selectedPlaylist?.id == pl.id,
                     onTap: () => _onSelectPlaylist(pl),
+                    onLongPress: () => _onSelectPlaylist(pl),
+                    menuItems: (_) => const [
+                      PopupMenuItem(
+                          value: 'edit-smart',
+                          child: Text('Edit smart rules')),
+                      PopupMenuItem(value: 'share', child: Text('Share')),
+                      PopupMenuItem(
+                          value: 'rename', child: Text('Rename')),
+                      PopupMenuItem(
+                          value: 'delete', child: Text('Delete')),
+                    ],
+                    onMenuSelected: (v) {
+                      if (v == 'edit-smart') {
+                        context.push('/smart-playlist-builder', extra: pl);
+                      } else if (v == 'share') {
+                        _exportPlaylistSongs(context, pl, share: true);
+                      } else if (v == 'rename') {
+                        _showRenameDialog(context, cubit, pl);
+                      } else if (v == 'delete') {
+                        _confirmDelete(context, cubit, pl);
+                      }
+                    },
                   );
                 },
               ),
@@ -508,6 +637,27 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                       muted: true,
                       isSelected: isTabletLandscape && _selectedPlaylist?.id == pl.id,
                       onTap: () => _onSelectPlaylist(pl),
+                      onLongPress: () => _onSelectPlaylist(pl),
+                      menuItems: (_) => const [
+                        PopupMenuItem(
+                            value: 'export', child: Text('Export M3U')),
+                        PopupMenuItem(value: 'share', child: Text('Share')),
+                        PopupMenuItem(
+                            value: 'rename', child: Text('Rename')),
+                        PopupMenuItem(
+                            value: 'delete', child: Text('Delete')),
+                      ],
+                      onMenuSelected: (v) {
+                        if (v == 'export') {
+                          _exportPlaylistSongs(context, pl);
+                        } else if (v == 'share') {
+                          _exportPlaylistSongs(context, pl, share: true);
+                        } else if (v == 'rename') {
+                          _showRenameDialog(context, cubit, pl);
+                        } else if (v == 'delete') {
+                          _confirmDelete(context, cubit, pl);
+                        }
+                      },
                     );
                   },
                 ),
@@ -541,38 +691,6 @@ class _OnlinePlaylistsContent extends StatelessWidget {
     required this.playerCubit,
     required this.onAddPlaylist,
   });
-
-  Future<void> _playAccountPlaylist(
-    BuildContext context,
-    YtmAccountPlaylist playlist,
-  ) async {
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    scaffoldMessenger.showSnackBar(
-      SnackBar(
-        content: Text('Loading "${playlist.title}"…'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-
-    try {
-      final ytmService = getIt<YtmService>();
-      final tracks =
-          await ytmService.getPlaylistTracks(playlist.playlistId, limit: 200);
-      if (tracks.isNotEmpty) {
-        final songs = tracks.map((t) => t.toSongData()).toList();
-        playerCubit.playSong(songs.first, queue: songs);
-      } else {
-        scaffoldMessenger.showSnackBar(
-          const SnackBar(
-              content: Text('Could not load tracks for this playlist.')),
-        );
-      }
-    } catch (e) {
-      scaffoldMessenger.showSnackBar(
-        SnackBar(content: Text('Failed to load playlist: $e')),
-      );
-    }
-  }
 
   Future<void> _downloadAccountPlaylist(
     BuildContext context,
@@ -678,75 +796,6 @@ class _OnlinePlaylistsContent extends StatelessWidget {
     return ValueListenableBuilder<bool>(
       valueListenable: ytmAccount.loginState,
       builder: (context, isLoggedIn, _) {
-        if (!isLoggedIn) {
-          return Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: Adaptive.pagePadding(context),
-                vertical: 24,
-              ),
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: p.surfaceContainer,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: p.hairline),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: p.accent.withValues(alpha: 0.12),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(Icons.cloud_sync_rounded,
-                          size: 40, color: p.accent),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Connect YouTube Music',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: p.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Sign in to auto-fetch your Liked Music library and all your online account playlists.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: p.textSecondary,
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    FilledButton.icon(
-                      onPressed: () async {
-                        final ok = await YtmWebLoginSheet.show(context);
-                        if (ok == true) {
-                          cubit.autoFetchOnlineLibrary(force: true);
-                        }
-                      },
-                      icon: const Icon(Icons.login_rounded, size: 18),
-                      label: const Text('Sign in to YouTube Music'),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }
-
         return ValueListenableBuilder<YtmOnlineState>(
           valueListenable: cubit.ytmOnline,
           builder: (context, online, _) {
@@ -755,168 +804,242 @@ class _OnlinePlaylistsContent extends StatelessWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Liked Music Online Hero Card
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: Adaptive.pagePadding(context)),
-                  child: _LikedMusicOnlineCard(
-                    status: online.likedStatus,
-                    trackCount: online.likedTracks.length,
-                    error: online.likedError,
-                    onFetch: () => cubit.fetchLikedSongsPlaylist(),
-                    onDownload: () =>
-                        _downloadLikedSongs(context, online.likedTracks),
-                    onPlay: () {
-                      if (online.likedTracks.isNotEmpty) {
-                        final songs = online.likedTracks
-                            .map((t) => t.toSongData())
-                            .toList();
-                        playerCubit.playSong(songs.first, queue: songs);
-                      }
-                    },
+                if (!isLoggedIn)
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: Adaptive.pagePadding(context),
+                      vertical: 12,
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: p.surfaceContainer,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: p.hairline),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: p.accent.withValues(alpha: 0.12),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(Icons.cloud_sync_rounded,
+                                size: 28, color: p.accent),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Connect YouTube Music',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                    color: p.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Sign in to sync your Liked Music library and account playlists.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: p.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          FilledButton(
+                            onPressed: () async {
+                              final ok = await YtmWebLoginSheet.show(context);
+                              if (ok == true) {
+                                cubit.autoFetchOnlineLibrary(force: true);
+                              }
+                            },
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 8),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: const Text('Sign in',
+                                style: TextStyle(fontSize: 12.5)),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
 
-                // ── ACCOUNT PLAYLISTS SECTION ─────────────────────────
-                Padding(
-                  padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context),
-                      24, Adaptive.pagePadding(context), 10),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'ACCOUNT PLAYLISTS',
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelSmall
-                              ?.copyWith(color: p.textTertiary),
+                if (isLoggedIn) ...[
+                  // Liked Music Online Hero Card
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                        horizontal: Adaptive.pagePadding(context)),
+                    child: _LikedMusicOnlineCard(
+                      status: online.likedStatus,
+                      trackCount: online.likedTracks.length,
+                      error: online.likedError,
+                      onFetch: () => cubit.fetchLikedSongsPlaylist(),
+                      onDownload: () =>
+                          _downloadLikedSongs(context, online.likedTracks),
+                      onPlay: () => context.push(
+                        '/online-playlist',
+                        extra: OnlinePlaylistDetailArgs(
+                          playlistId: 'VLLM',
+                          title: 'Liked Music',
+                          subtitle: 'YouTube Music',
+                          initialTracks: online.likedTracks,
                         ),
                       ),
-                      if (online.accountStatus == YtmFetchStatus.loading)
-                        SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: p.accent),
-                        )
-                      else if (online.accountPlaylists.isNotEmpty)
-                        Text(
-                          '${online.accountPlaylists.length} playlists',
-                          style: TextStyle(
-                              color: p.textTertiary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600),
-                        ),
-                    ],
+                    ),
                   ),
-                ),
 
-                if (online.accountStatus == YtmFetchStatus.loading &&
-                    online.accountPlaylists.isEmpty)
+                  // ── ACCOUNT PLAYLISTS SECTION ─────────────────────────
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 24),
-                    child: Center(
-                      child: Column(
-                        children: [
+                    padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context),
+                        24, Adaptive.pagePadding(context), 10),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'ACCOUNT PLAYLISTS',
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(color: p.textTertiary),
+                          ),
+                        ),
+                        if (online.accountStatus == YtmFetchStatus.loading)
                           SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2.5, color: p.accent)),
-                          const SizedBox(height: 12),
-                          Text('Fetching account playlists…',
-                              style: TextStyle(
-                                  color: p.textSecondary, fontSize: 13)),
-                        ],
-                      ),
-                    ),
-                  )
-                else if (online.accountStatus == YtmFetchStatus.error &&
-                    online.accountPlaylists.isEmpty)
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: Adaptive.pagePadding(context),
-                        vertical: 10),
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: p.surfaceContainer,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: p.hairline),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.error_outline_rounded,
-                              color: p.error, size: 22),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              online.accountError ??
-                                  'Failed to load account playlists',
-                              style: TextStyle(
-                                  color: p.textSecondary, fontSize: 12.5),
-                            ),
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: p.accent),
+                          )
+                        else if (online.accountPlaylists.isNotEmpty)
+                          Text(
+                            '${online.accountPlaylists.length} playlists',
+                            style: TextStyle(
+                                color: p.textTertiary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600),
                           ),
-                          TextButton(
-                            onPressed: () => cubit.fetchAccountPlaylists(),
-                            child: const Text('Retry'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                else if (online.accountPlaylists.isEmpty)
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: Adaptive.pagePadding(context)),
-                    child: Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: p.surfaceContainer,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: p.hairline),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.playlist_remove_rounded,
-                              color: p.textTertiary, size: 26),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'No playlists found in your YouTube Music library.',
-                              style: TextStyle(
-                                  color: p.textSecondary, fontSize: 13),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                else
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: Adaptive.pagePadding(context)),
-                    child: GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: columns,
-                        crossAxisSpacing: 14,
-                        mainAxisSpacing: 14,
-                        childAspectRatio: 1.0,
-                      ),
-                      itemCount: online.accountPlaylists.length,
-                      itemBuilder: (context, i) {
-                        final pl = online.accountPlaylists[i];
-                        return _AccountPlaylistCard(
-                          playlist: pl,
-                          onTap: () => _playAccountPlaylist(context, pl),
-                          onDownload: () =>
-                              _downloadAccountPlaylist(context, pl),
-                        );
-                      },
+                      ],
                     ),
                   ),
+
+                  if (online.accountStatus == YtmFetchStatus.loading &&
+                      online.accountPlaylists.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Center(
+                        child: Column(
+                          children: [
+                            SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2.5, color: p.accent)),
+                            const SizedBox(height: 12),
+                            Text('Fetching account playlists…',
+                                style: TextStyle(
+                                    color: p.textSecondary, fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                    )
+                  else if (online.accountStatus == YtmFetchStatus.error &&
+                      online.accountPlaylists.isEmpty)
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: Adaptive.pagePadding(context),
+                          vertical: 10),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: p.surfaceContainer,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: p.hairline),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.error_outline_rounded,
+                                color: p.error, size: 22),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                online.accountError ??
+                                    'Failed to load account playlists',
+                                style: TextStyle(
+                                    color: p.textSecondary, fontSize: 12.5),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () => cubit.fetchAccountPlaylists(),
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else if (online.accountPlaylists.isEmpty)
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: Adaptive.pagePadding(context)),
+                      child: Container(
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: p.surfaceContainer,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: p.hairline),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.playlist_remove_rounded,
+                                color: p.textTertiary, size: 26),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'No playlists found in your YouTube Music library.',
+                                style: TextStyle(
+                                    color: p.textSecondary, fontSize: 13),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: Adaptive.pagePadding(context)),
+                      child: GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: columns,
+                          crossAxisSpacing: 14,
+                          mainAxisSpacing: 14,
+                          childAspectRatio: 1.0,
+                        ),
+                        itemCount: online.accountPlaylists.length,
+                        itemBuilder: (context, i) {
+                          final pl = online.accountPlaylists[i];
+                          return _AccountPlaylistCard(
+                            playlist: pl,
+                            onTap: () =>
+                                context.push('/online-playlist', extra: pl),
+                            onDownload: () =>
+                                _downloadAccountPlaylist(context, pl),
+                          );
+                        },
+                      ),
+                    ),
+                ],
 
                 // ── ADDED PLAYLISTS SECTION ─────────────────────────────
                 if (online.customPlaylists.isNotEmpty) ...[
@@ -948,13 +1071,8 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                         final pl = online.customPlaylists[i];
                         return _OnlinePlaylistCard(
                           entry: pl,
-                          onTap: () {
-                            if (pl.tracks.isNotEmpty) {
-                              final songs =
-                                  pl.tracks.map((t) => t.toSongData()).toList();
-                              playerCubit.playSong(songs.first, queue: songs);
-                            }
-                          },
+                          onTap: () =>
+                              context.push('/online-playlist', extra: pl),
                           onDownload: () =>
                               _downloadCustomPlaylist(context, pl),
                           onRemove: () => cubit.removeCustomPlaylist(pl.id),
@@ -1500,6 +1618,9 @@ class _PlaylistCard extends StatelessWidget {
   final bool muted;
   final bool isSelected;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+  final List<PopupMenuEntry<String>> Function(BuildContext)? menuItems;
+  final void Function(String)? onMenuSelected;
 
   const _PlaylistCard({
     required this.name,
@@ -1509,13 +1630,17 @@ class _PlaylistCard extends StatelessWidget {
     required this.onTap,
     this.muted = false,
     this.isSelected = false,
+    this.onLongPress,
+    this.menuItems,
+    this.onMenuSelected,
   });
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return InkWell(
+    final card = InkWell(
       onTap: onTap,
+      onLongPress: onLongPress,
       borderRadius: BorderRadius.circular(20),
       child: Container(
         decoration: BoxDecoration(
@@ -1556,21 +1681,36 @@ class _PlaylistCard extends StatelessWidget {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-              child: Column(
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        color: p.textPrimary,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: p.textPrimary,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(subtitle,
+                            style: TextStyle(
+                                color: p.textSecondary, fontSize: 11.5)),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(subtitle,
-                      style: TextStyle(color: p.textSecondary, fontSize: 11.5)),
+                  if (menuItems != null)
+                    PopupMenuButton<String>(
+                      icon: Icon(Icons.more_vert_rounded,
+                          size: 18, color: p.textTertiary),
+                      onSelected: onMenuSelected,
+                      itemBuilder: menuItems!,
+                    ),
                 ],
               ),
             ),
@@ -1578,6 +1718,8 @@ class _PlaylistCard extends StatelessWidget {
         ),
       ),
     );
+    if (onLongPress == null && menuItems == null) return card;
+    return card;
   }
 }
 

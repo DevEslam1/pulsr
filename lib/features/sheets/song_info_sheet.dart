@@ -16,6 +16,8 @@ import '../../core/utils/formatters.dart';
 import '../../core/utils/l10n_extensions.dart';
 import '../../core/utils/platform_capabilities.dart';
 import '../../core/widgets/cached_artwork.dart';
+import '../../data/audio/bpm_override_store.dart';
+import '../../data/audio/headphone_profiles_repository.dart';
 import '../../data/audio/per_song_eq_store.dart';
 import '../../data/audio/per_song_volume_store.dart';
 import '../../data/audio/song_rating_store.dart';
@@ -422,6 +424,9 @@ class SongInfoSheet extends StatelessWidget {
     final volStore = getIt.isRegistered<PerSongVolumeStore>()
         ? getIt<PerSongVolumeStore>()
         : PerSongVolumeStore();
+    // BPM store has no DI registration (avoids graph regen); a local
+    // instance shares the same SharedPreferences backing.
+    final bpmStore = BpmOverrideStore();
 
     double currentSliderVol = volStore.getGainDbForTrack(trackKey);
 
@@ -429,6 +434,7 @@ class SongInfoSheet extends StatelessWidget {
       builder: (context, setLocalState) {
         final currentRating = ratingStore.getRating(trackKey);
         final currentEq = eqStore.getPresetForTrack(trackKey);
+        final currentBpm = bpmStore.getBpmForTrack(trackKey);
 
         return Container(
           margin: const EdgeInsets.symmetric(vertical: 10),
@@ -498,7 +504,7 @@ class SongInfoSheet extends StatelessWidget {
                     ),
                   ),
                   DropdownButton<String?>(
-                    value: currentEq,
+                    value: _eqDropdownValue(currentEq),
                     underline: const SizedBox(),
                     dropdownColor: p.surfaceContainer,
                     icon: Icon(Icons.arrow_drop_down, color: p.accent),
@@ -518,6 +524,20 @@ class SongInfoSheet extends StatelessWidget {
                           child: Text(preset.name),
                         ),
                       ),
+                      // Custom + AutoEQ headphone profiles (resolved by name
+                      // on auto-apply, same as built-in presets).
+                      ...HeadphoneProfilesRepository()
+                          .profiles
+                          .where((hp) => EqPreset.defaultPresets.every(
+                              (d) =>
+                                  d.name.toLowerCase() !=
+                                  hp.name.toLowerCase()))
+                          .map(
+                            (hp) => DropdownMenuItem<String?>(
+                              value: hp.name,
+                              child: Text('${hp.name} • AutoEQ'),
+                            ),
+                          ),
                     ],
                     onChanged: (newPreset) async {
                       await eqStore.setPresetForTrack(trackKey, newPreset);
@@ -580,11 +600,186 @@ class SongInfoSheet extends StatelessWidget {
                   },
                 ),
               ),
+              const SizedBox(height: 8),
+              Divider(color: p.hairline, height: 1),
+              const SizedBox(height: 8),
+
+              // Per-Track BPM (feeds BPM-synced crossfade)
+              InkWell(
+                onTap: () => _showBpmDialog(
+                    context, bpmStore, playerCubit, currentBpm,
+                    onSaved: setLocalState),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Track BPM',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: p.textSecondary,
+                        ),
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            currentBpm == null
+                                ? 'Not set'
+                                : '${currentBpm.toStringAsFixed(0)} BPM',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: currentBpm == null
+                                  ? p.textSecondary
+                                  : p.accent,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(Icons.edit_rounded,
+                              size: 14, color: p.textTertiary),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         );
       },
     );
+  }
+
+  Future<void> _showBpmDialog(
+    BuildContext context,
+    BpmOverrideStore bpmStore,
+    PlayerCubit? playerCubit,
+    double? currentBpm, {
+    required void Function(VoidCallback) onSaved,
+  }) async {
+    final controller =
+        TextEditingController(text: currentBpm?.toStringAsFixed(0) ?? '');
+    String? error;
+    // null = cancel, '' = clear override, otherwise the BPM text to save.
+    final result = await showDialog<String?>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Track BPM'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                  'Used by BPM-synced crossfade to align fades to the beat. '
+                  'Range 40–240.'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  hintText: 'e.g. 128',
+                  errorText: error,
+                ),
+                onChanged: (_) {
+                  if (error != null) {
+                    setDialogState(() => error = null);
+                  }
+                },
+              ),
+            ],
+          ),
+          actions: [
+            if (currentBpm != null)
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, ''),
+                child: const Text('Clear'),
+              ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, null),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final raw = controller.text.trim();
+                if (raw.isEmpty) {
+                  Navigator.pop(ctx, currentBpm != null ? '' : null);
+                  return;
+                }
+                final bpm = double.tryParse(raw);
+                if (bpm == null ||
+                    !bpm.isFinite ||
+                    bpm < BpmOverrideStore.minBpm ||
+                    bpm > BpmOverrideStore.maxBpm) {
+                  setDialogState(
+                      () => error = 'Enter a BPM between 40 and 240.');
+                  return;
+                }
+                Navigator.pop(ctx, raw);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    controller.dispose();
+    if (result == null || !context.mounted) return;
+    // Clear, or save the validated text returned by the dialog.
+    await _persistBpmChoice(
+        context, bpmStore, playerCubit, result.isEmpty ? null : result);
+    onSaved(() {});
+  }
+
+  Future<void> _persistBpmChoice(
+    BuildContext context,
+    BpmOverrideStore bpmStore,
+    PlayerCubit? playerCubit,
+    String? raw,
+  ) async {
+    double? bpm;
+    if (raw != null) {
+      bpm = double.tryParse(raw);
+      if (bpm == null ||
+          !bpm.isFinite ||
+          bpm < BpmOverrideStore.minBpm ||
+          bpm > BpmOverrideStore.maxBpm) {
+        return;
+      }
+    }
+    await bpmStore.setBpmForTrack(song.id.toString(), bpm);
+    await playerCubit?.setTrackBpm(song, bpm);
+    if (context.mounted && bpm == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('BPM override cleared.')),
+      );
+    }
+  }
+
+  /// Resolves the stored override to a dropdown value. Returns null
+  /// ("Default") when the named preset no longer exists, since
+  /// DropdownButton throws on unmatched values.
+  String? _eqDropdownValue(String? stored) {
+    if (stored == null || stored.isEmpty) return null;
+    final lower = stored.toLowerCase();
+    if (EqPreset.defaultPresets
+        .any((d) => d.name.toLowerCase() == lower)) {
+      return stored;
+    }
+    try {
+      if (HeadphoneProfilesRepository()
+          .profiles
+          .any((hp) => hp.name.toLowerCase() == lower)) {
+        return stored;
+      }
+    } catch (_) {}
+    return null;
   }
 
   Widget _buildInfoRow(String label, String value, PulsrPalette p) {

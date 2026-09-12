@@ -1631,14 +1631,26 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
   }
 
   /// Target stream buffer capacity for the AAudio path (20-1000 ms).
+  /// Re-pushed to running players so it applies without toggling output.
   Future<void> setAaudioTargetBufferMs(int ms) async {
     final clamped = ms.clamp(20, 1000);
     safeEmit(state.copyWith(aaudioTargetBufferMs: clamped));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(PrefsKeys.aaudioTargetBufferMs, clamped);
+    try {
+      if (getIt.isRegistered<PulsrAudioHandler>()) {
+        await getIt<PulsrAudioHandler>().setAaudioOutputEnabled(
+          state.aaudioOutputEnabled,
+          preferExclusive: state.aaudioPreferExclusive,
+          targetBufferMs: clamped,
+        );
+      }
+    } catch (_) {
+      // Player not available yet; boot/observer push covers it.
+    }
   }
 
-  /// Opt-in 24/32-bit float DSP path. Off by default: with the flag off the  /// Opt-in 24/32-bit float DSP path. Off by default: with the flag off the
+  /// Opt-in 24/32-bit float DSP path. Off by default: with the flag off the
   /// vendored Android fork builds the same 16-bit sink as before. When on, the
   /// preference is persisted here and pushed to every player by the player
   /// layer's settings observer (and restored on boot by the audio handler).

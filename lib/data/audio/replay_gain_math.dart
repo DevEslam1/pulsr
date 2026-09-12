@@ -63,12 +63,16 @@ class ReplayGainMath {
     final totalGainDb = (gainDb) + preampDb;
     var multiplier = math.pow(10.0, totalGainDb / 20.0).toDouble();
 
-    // Clipping prevention: limit gain so output <= 1.0 with 0.5 dB
-    // inter-sample peak headroom.
+    // Clipping prevention: limit OUTPUT (volume x gain x peak) to 1.0 with
+    // 0.5 dB inter-sample peak headroom. The ceiling is expressed as a gain
+    // cap relative to the current volume, so quiet slider positions are not
+    // needlessly attenuated: unity in always means unity out.
     final effectivePeak = (peak != null && peak.isFinite && peak > 0.0) ? peak : 1.0;
     final interSampleHeadroom =
         math.pow(10.0, -0.5 / 20.0).toDouble(); // ~0.944 (-0.5 dB)
-    final maxGain = interSampleHeadroom / effectivePeak;
+    final maxGain = (volume > 0.0)
+        ? interSampleHeadroom / (effectivePeak * volume)
+        : interSampleHeadroom / effectivePeak;
     if (multiplier > maxGain) {
       multiplier = maxGain;
     }

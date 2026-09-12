@@ -53,6 +53,7 @@ void main() {
     when(() => mockGetSongs.watchSongs(
           sortBy: any(named: 'sortBy'),
           ascending: any(named: 'ascending'),
+          limit: any(named: 'limit'),
           excludedFolders: any(named: 'excludedFolders'),
         )).thenAnswer((_) => Stream.value(const Right([])));
     when(() => mockGetAlbums.watchAlbums())
@@ -174,6 +175,7 @@ void main() {
       when(() => mockGetSongs.watchSongs(
             sortBy: any(named: 'sortBy'),
             ascending: any(named: 'ascending'),
+            limit: any(named: 'limit'),
             excludedFolders: any(named: 'excludedFolders'),
           )).thenAnswer((_) => Stream.value(const Right([song])));
       when(() => mockGetAlbums.watchAlbums())
@@ -205,6 +207,41 @@ void main() {
 
       expect(cubit.state.songs.length, equals(1));
       expect(cubit.state.songs.first.title, equals('Streamed Song'));
+
+      await cubit.close();
+    });
+
+    test('songs watch is paginated and loadMoreSongs grows the window',
+        () async {
+      final cubit = LibraryCubit(
+        getSongsUseCase: mockGetSongs,
+        getAlbumsUseCase: mockGetAlbums,
+        getArtistsUseCase: mockGetArtists,
+        getGenresUseCase: mockGetGenres,
+        getYearsUseCase: mockGetYears,
+        getFavoritesUseCase: mockGetFavorites,
+        toggleFavoriteUseCase: mockToggleFavorite,
+        folderUseCases: mockFolderUseCases,
+      );
+      await Future.delayed(const Duration(milliseconds: 50));
+
+      // Initial window is one page.
+      verify(() => mockGetSongs.watchSongs(
+            sortBy: any(named: 'sortBy'),
+            ascending: any(named: 'ascending'),
+            limit: LibraryCubit.songsPageSize,
+            excludedFolders: any(named: 'excludedFolders'),
+          )).called(1);
+      // Empty emission: cap not hit, nothing more to load.
+      expect(cubit.hasMoreSongs, isFalse);
+      cubit.loadMoreSongs();
+      await Future.delayed(const Duration(milliseconds: 20));
+      verifyNever(() => mockGetSongs.watchSongs(
+            sortBy: any(named: 'sortBy'),
+            ascending: any(named: 'ascending'),
+            limit: LibraryCubit.songsPageSize * 2,
+            excludedFolders: any(named: 'excludedFolders'),
+          ));
 
       await cubit.close();
     });

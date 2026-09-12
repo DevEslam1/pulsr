@@ -160,7 +160,7 @@ class GenreHierarchyView extends StatelessWidget {
                         fontWeight: FontWeight.w600),
                   ),
                   onPressed: () =>
-                      context.push('/genre/${Uri.encodeComponent(g.name)}'),
+                      context.push('/genre', extra: g),
                 );
               }).toList(),
             ),
@@ -227,7 +227,7 @@ class GenreHierarchyView extends StatelessWidget {
                         fontWeight: FontWeight.w600),
                   ),
                   onPressed: () =>
-                      context.push('/genre/${Uri.encodeComponent(g.name)}'),
+                      context.push('/genre', extra: g),
                 );
               }).toList(),
             ),

@@ -14,9 +14,10 @@ class PerSongVolumeStore {
   static const double maxGainDb = 6.0;
 
   final Map<String, double> _overrides = {};
+  late final Future<void> ready;
 
   PerSongVolumeStore() {
-    load();
+    ready = load();
   }
 
   /// Returns the volume gain in dB for [trackKey] (defaults to 0.0 dB / no change).

@@ -342,8 +342,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     );
   }
 
-  Future<void> deletePlaylist(int playlistId) async {
-    final removedSub = _smartSubscriptions.remove(playlistId);
+  Future<void> deletePlaylist(int playlistId) async {    final removedSub = _smartSubscriptions.remove(playlistId);
     removedSub?.cancel();
     removeFromComposite(removedSub);
     _smartCriteriaJson.remove(playlistId);
@@ -359,6 +358,25 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
         }
       },
       (_) => safeEmit(state.copyWith(errorMessage: null)),
+    );
+  }
+
+  /// Updates a smart playlist's name and/or rule criteria. The live
+  /// playlists watch picks up the change and [_updateSmartCounts]
+  /// re-subscribes the count query for the new criteria automatically.
+  Future<bool> updateSmartPlaylist(
+      int playlistId, String name, String smartCriteria) async {
+    final result = await _playlistUseCases.updateSmartPlaylist(
+        playlistId, name, smartCriteria);
+    return result.fold(
+      (failure) {
+        safeEmit(state.copyWith(errorMessage: failure.message));
+        return false;
+      },
+      (_) {
+        safeEmit(state.copyWith(errorMessage: null));
+        return true;
+      },
     );
   }
 
@@ -535,8 +553,17 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     );
 
     try {
-      final ytmService = getIt<YtmService>();
-      final tracks = await ytmService.getPlaylistTracks(input, limit: 200);
+      final accountService = getIt.isRegistered<YtmAccountService>()
+          ? getIt<YtmAccountService>()
+          : null;
+      final details = await accountService?.fetchPlaylistDetails(input, maxTracks: 200);
+
+      List<YtmTrack> tracks = details?.tracks ?? const [];
+      if (tracks.isEmpty) {
+        final ytmService = getIt<YtmService>();
+        tracks = await ytmService.getPlaylistTracks(input, limit: 200);
+      }
+
       if (tracks.isEmpty) {
         ytmOnline.value = ytmOnline.value.copyWith(
           customStatus: YtmFetchStatus.error,
@@ -545,23 +572,26 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
         return;
       }
 
-      // Build a display name: try to extract playlist ID from URL
-      String title = 'YouTube Playlist';
-      if (input.contains('list=')) {
-        final listId = Uri.tryParse(input)?.queryParameters['list'];
-        if (listId != null && listId.isNotEmpty) {
-          // Shorten long IDs to keep the label readable
-          title = listId.length > 16 ? '${listId.substring(0, 16)}…' : listId;
+      // Build display name from rich details or fallback to URL extraction
+      String title = details?.title ?? 'YouTube Playlist';
+      if (title == 'YouTube Playlist') {
+        if (input.contains('list=')) {
+          final listId = Uri.tryParse(input)?.queryParameters['list'];
+          if (listId != null && listId.isNotEmpty) {
+            title = listId.length > 16 ? '${listId.substring(0, 16)}…' : listId;
+          }
+        } else if (!input.startsWith('http')) {
+          final short = input.length > 16 ? '${input.substring(0, 16)}…' : input;
+          title = 'Playlist ($short)';
         }
-      } else if (!input.startsWith('http')) {
-        final short = input.length > 16 ? '${input.substring(0, 16)}…' : input;
-        title = 'Playlist ($short)';
       }
 
       final entry = OnlinePlaylistEntry(
         id: input,
         title: title,
-        uploader: tracks.first.artist,
+        uploader: details?.author.isNotEmpty == true
+            ? details!.author
+            : tracks.first.artist,
         tracks: tracks,
       );
 

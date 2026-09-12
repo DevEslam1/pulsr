@@ -128,6 +128,60 @@ class MediaScannerService {
     return false;
   }
 
+  /// Returns true when any parent directory of [filePath] contains a
+  /// `.nomedia` marker. Results are cached per directory; call
+  /// [clearNomediaCache] after the user edits exclusions.
+  static final Map<String, bool> _nomediaDirCache = {};
+  static const int _nomediaCacheMax = 2000;
+
+  static bool isInNomediaDirectory(String filePath) {
+    try {
+      final normalized = filePath.replaceAll('\\', '/');
+      final idx = normalized.lastIndexOf('/');
+      if (idx <= 0) return false;
+      var dir = normalized.substring(0, idx);
+      // Walk up a bounded number of levels (covers nested albums).
+      for (var depth = 0; depth < 12; depth++) {
+        final cached = _nomediaDirCache[dir];
+        if (cached != null) {
+          if (cached) return true;
+        } else {
+          var hasMarker = false;
+          try {
+            // dart:io is available here (scanner is Android-only path);
+            // guard with File.existsSync inside try for isolate safety.
+            // ignore: avoid_dynamic_calls
+            hasMarker = _nomediaMarkerExists(dir);
+          } catch (_) {
+            hasMarker = false;
+          }
+          if (_nomediaDirCache.length >= _nomediaCacheMax) {
+            _nomediaDirCache.clear();
+          }
+          _nomediaDirCache[dir] = hasMarker;
+          if (hasMarker) return true;
+        }
+        final parent = dir.lastIndexOf('/');
+        if (parent <= 0) break;
+        dir = dir.substring(0, parent);
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  static bool _nomediaMarkerExists(String dir) {
+    try {
+      // Local import to keep web builds compiling (dart:io unavailable).
+      // ignore: avoid_dynamic_calls
+      final file = File('$dir/.nomedia');
+      return file.existsSync();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static void clearNomediaCache() => _nomediaDirCache.clear();
+
   Future<int> scanDeviceLibrary({
     bool ignoreShortFiles = true,
     int minDurationSec = 30,
@@ -483,6 +537,12 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
     // Auto-hide system media / messenger voice notes
     if (input.autoHideSystemMedia &&
         MediaScannerService.isSystemIgnoredPath(path)) {
+      continue;
+    }
+
+    // Honor .nomedia markers: MediaStore usually excludes these, but
+    // direct file scans and some OEM ROMs leak them through.
+    if (MediaScannerService.isInNomediaDirectory(path)) {
       continue;
     }
 

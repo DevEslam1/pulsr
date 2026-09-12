@@ -27,6 +27,7 @@ class SortFilterSheet extends StatelessWidget {
       {'key': 'dateAdded', 'label': context.l10n.recentlyAdded},
       {'key': 'duration', 'label': context.l10n.duration},
       {'key': 'playCount', 'label': 'Most Played'},
+      {'key': 'rating', 'label': 'Top Rated'},
       {'key': 'lastPlayed', 'label': 'Recently Played'},
       {'key': 'fileSize', 'label': 'File Size'},
       {'key': 'year', 'label': 'Release Year'},

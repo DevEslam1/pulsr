@@ -1,7 +1,9 @@
 import 'package:drift/drift.dart';
 import 'package:injectable/injectable.dart';
 import 'package:rxdart/rxdart.dart';
+import '../../core/di/injection.dart';
 import '../../core/utils/error_logger.dart';
+import '../../data/audio/song_rating_store.dart';
 import '../../domain/models/smart_playlist_criteria.dart';
 import '../../domain/repositories/smart_playlist_engine_interface.dart';
 import '../db/app_database.dart';
@@ -24,6 +26,9 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
       query.where((t) {
         Expression<bool>? combined;
         for (final rule in criteria.rules) {
+          // Rating lives in SharedPreferences, not Drift: skipped here
+          // without noise and applied as a Dart post-filter below.
+          if (rule.field == SmartRuleField.rating) continue;
           final expr = _buildRuleExpression(t, rule);
           if (expr == null) {
             ErrorLogger.log(
@@ -47,7 +52,12 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     if (criteria.sortBy != null) {
       final mode =
           criteria.sortAscending ? OrderingMode.asc : OrderingMode.desc;
+      // 'rating' is prefs-backed: SQL keeps a stable base order and the
+      // Dart post-step re-sorts. Anything unknown falls back to title.
       switch (criteria.sortBy) {
+        case 'rating':
+          query.orderBy([(t) => OrderingTerm(expression: t.title)]);
+          break;
         case 'dateAdded':
           query.orderBy(
               [(t) => OrderingTerm(expression: t.dateAdded, mode: mode)]);
@@ -74,7 +84,13 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
       }
     }
 
-    if (criteria.limit != null && criteria.limit! > 0) {
+    // When rating rules exist (or rating sort is requested) the limit is
+    // applied in Dart AFTER the prefs-backed filter/sort; a SQL limit first
+    // would truncate candidates before ratings are even considered.
+    final hasRatingRules =
+        criteria.rules.any((r) => r.field == SmartRuleField.rating);
+    final needsDartPost = hasRatingRules || criteria.sortBy == 'rating';
+    if (!needsDartPost && criteria.limit != null && criteria.limit! > 0) {
       query.limit(criteria.limit!);
     }
 
@@ -138,7 +154,7 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
         }
 
       case SmartRuleField.isLossless:
-        return t.codec.isIn(
+        final losslessExpr = t.codec.isIn(
                 const ['FLAC', 'ALAC', 'WAV', 'AIFF', 'PCM', 'DSF', 'DFF']) |
             (t.bitDepth.isNotNull() & t.bitDepth.isBiggerOrEqualValue(24)) |
             t.path.lower().like('%.flac') |
@@ -147,6 +163,10 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
             t.path.lower().like('%.aiff') |
             t.path.lower().like('%.dsf') |
             t.path.lower().like('%.dff');
+        final wantLossless = valStr.toLowerCase() != 'false' &&
+            valStr != '0' &&
+            valStr.toLowerCase() != 'no';
+        return wantLossless ? losslessExpr : losslessExpr.not();
 
       case SmartRuleField.decade:
         if (rule.operator == SmartOperator.between) {
@@ -248,6 +268,11 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
       case SmartRuleField.isFavorite:
         final boolVal = valStr.toLowerCase() == 'true' || valStr == '1';
         return t.isFavorite.equals(boolVal);
+
+      case SmartRuleField.rating:
+        // Prefs-backed star ratings are invisible to SQL: skipped here and
+        // applied as a Dart post-filter in evaluateCriteria/watchCriteria.
+        return null;
 
       case SmartRuleField.lastPlayed:
         if (rule.operator == SmartOperator.withinDays) {
@@ -366,14 +391,176 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
 
   @override
   Future<List<SongsTableData>> evaluateCriteria(SmartCriteria criteria) async {
-    final query = _buildQuery(criteria);
-    return await query.get();
+    final ratingRules = criteria.rules
+        .where((r) => r.field == SmartRuleField.rating)
+        .toList();
+    if (ratingRules.isEmpty) {
+      var list = await _buildQuery(criteria).get();
+      return _postProcess(list, criteria, const []);
+    }
+    if (criteria.matchAll) {
+      final base = await _buildQuery(criteria).get();
+      return _postProcess(base, criteria, ratingRules);
+    }
+    // matchAny: union of SQL matches and rating matches.
+    final sqlRules = criteria.rules
+        .where((r) => r.field != SmartRuleField.rating)
+        .toList();
+    final base = sqlRules.isEmpty
+        ? <SongsTableData>[]
+        : await _buildQuery(_withoutRating(criteria)).get();
+    final all = await _buildQuery(_allLocal(criteria)).get();
+    final baseIds = base.map((s) => s.id).toSet();
+    final merged = List<SongsTableData>.from(base)
+      ..addAll(all.where((s) => !baseIds.contains(s.id)));
+    return _postProcessAny(merged, baseIds, criteria, ratingRules);
   }
 
   @override
   Stream<List<SongsTableData>> watchCriteria(SmartCriteria criteria) {
-    final query = _buildQuery(criteria);
-    return query.watch().debounceTime(const Duration(milliseconds: 500));
+    final ratingRules = criteria.rules
+        .where((r) => r.field == SmartRuleField.rating)
+        .toList();
+    if (ratingRules.isEmpty) {
+      final stream =
+          _buildQuery(criteria).watch().debounceTime(const Duration(milliseconds: 500));
+      if (criteria.sortBy == 'rating') {
+        return stream.map((list) => _postProcess(list, criteria, const []));
+      }
+      return stream;
+    }
+    if (criteria.matchAll) {
+      return _buildQuery(criteria)
+          .watch()
+          .debounceTime(const Duration(milliseconds: 500))
+          .map((list) => _postProcess(list, criteria, ratingRules));
+    }
+    final sqlRules = criteria.rules
+        .where((r) => r.field != SmartRuleField.rating)
+        .toList();
+    final baseStream = sqlRules.isEmpty
+        ? Stream.value(<SongsTableData>[])
+        : _buildQuery(_withoutRating(criteria)).watch();
+    return Rx.combineLatest2(
+      baseStream,
+      _buildQuery(_allLocal(criteria)).watch(),
+      (List<SongsTableData> base, List<SongsTableData> all) {
+        final baseIds = base.map((s) => s.id).toSet();
+        final merged = List<SongsTableData>.from(base)
+          ..addAll(all.where((s) => !baseIds.contains(s.id)));
+        return (merged, baseIds);
+      },
+    )
+        .debounceTime(const Duration(milliseconds: 500))
+        .map((parts) =>
+            _postProcessAny(parts.$1, parts.$2, criteria, ratingRules));
+  }
+
+  /// [criteria] with rating rules removed (SQL shape only).
+  SmartCriteria _withoutRating(SmartCriteria criteria) => SmartCriteria(
+        rules: criteria.rules
+            .where((r) => r.field != SmartRuleField.rating)
+            .toList(),
+        matchAll: criteria.matchAll,
+        sortAscending: criteria.sortAscending,
+      );
+
+  /// Bare local-songs shape used to resolve rating matches under matchAny.
+  SmartCriteria _allLocal(SmartCriteria criteria) =>
+      SmartCriteria(matchAll: criteria.matchAll);
+
+  /// matchAll post-step: AND-filter by every rating rule, then rating sort
+  /// and limit.
+  List<SongsTableData> _postProcess(
+    List<SongsTableData> songs,
+    SmartCriteria criteria,
+    List<SmartRule> ratingRules,
+  ) {
+    var list = songs;
+    if (ratingRules.isNotEmpty) {
+      list = list
+          .where((s) => ratingRules.every((r) => _matchesRating(s, r)))
+          .toList();
+    }
+    if (criteria.sortBy == 'rating') {
+      list = _sortByRating(list, ascending: criteria.sortAscending);
+    }
+    if (criteria.limit != null && criteria.limit! > 0) {
+      list = list.take(criteria.limit!).toList();
+    }
+    return list;
+  }
+
+  /// matchAny post-step over the union of SQL and full-table candidates:
+  /// a song is kept when the SQL half already matched it (tracked via
+  /// [baseIds]) or when it matches any rating rule.
+  List<SongsTableData> _postProcessAny(
+    List<SongsTableData> merged,
+    Set<int> baseIds,
+    SmartCriteria criteria,
+    List<SmartRule> ratingRules,
+  ) {
+    var list = merged
+        .where((s) =>
+            baseIds.contains(s.id) ||
+            ratingRules.any((r) => _matchesRating(s, r)))
+        .toList();
+    if (criteria.sortBy == 'rating') {
+      list = _sortByRating(list, ascending: criteria.sortAscending);
+    }
+    if (criteria.limit != null && criteria.limit! > 0) {
+      list = list.take(criteria.limit!).toList();
+    }
+    return list;
+  }
+
+  /// Star rating (0–5, prefs-backed) for [song].
+  int _ratingOf(SongsTableData song) {
+    try {
+      if (getIt.isRegistered<SongRatingStore>()) {
+        return getIt<SongRatingStore>().getRating(song.id.toString());
+      }
+    } catch (_) {}
+    return 0;
+  }
+
+  /// Evaluates one rating rule (numeric operators + between) in Dart.
+  bool _matchesRating(SongsTableData song, SmartRule rule) {
+    final rating = _ratingOf(song);
+    final valStr = rule.value.trim();
+    if (rule.operator == SmartOperator.between) {
+      final b = _parseIntBetween(valStr);
+      if (b == null) return false;
+      return rating >= b.$1 && rating <= b.$2;
+    }
+    final valInt = int.tryParse(valStr);
+    if (valInt == null) return false;
+    switch (rule.operator) {
+      case SmartOperator.equals:
+        return rating == valInt;
+      case SmartOperator.greaterThan:
+        return rating > valInt;
+      case SmartOperator.lessThan:
+        return rating < valInt;
+      case SmartOperator.greaterThanOrEqual:
+        return rating >= valInt;
+      case SmartOperator.lessThanOrEqual:
+        return rating <= valInt;
+      default:
+        return rating == valInt;
+    }
+  }
+
+  /// Sorts by rating (title tiebreak for stability).
+  List<SongsTableData> _sortByRating(List<SongsTableData> songs,
+      {bool ascending = false}) {
+    final sorted = List<SongsTableData>.from(songs);
+    sorted.sort((a, b) {
+      final cmp = _ratingOf(a).compareTo(_ratingOf(b));
+      if (cmp != 0) return ascending ? cmp : -cmp;
+      return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+    });
+    return sorted;
   }
 
   @override

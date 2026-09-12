@@ -12,9 +12,10 @@ class SongRatingStore {
   static const int maxEntries = 2000;
 
   final Map<String, int> _ratings = {};
+  late final Future<void> ready;
 
   SongRatingStore() {
-    load();
+    ready = load();
   }
 
   /// Returns rating 0..5 for [trackKey] (defaults to 0 / unrated).

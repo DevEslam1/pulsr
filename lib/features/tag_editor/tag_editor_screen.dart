@@ -409,6 +409,15 @@ class _TagEditorView extends StatelessWidget {
                                   ],
                                 ],
                               ),
+                              if (!state.isBatchMode)
+                                TagFieldWidget(
+                                  label: 'Disc Number',
+                                  initialValue: state.discNumber,
+                                  icon: Icons.album_outlined,
+                                  keyboardType: TextInputType.number,
+                                  hintText: 'e.g. 1',
+                                  onChanged: cubit.updateDiscNumber,
+                                ),
                               TagFieldWidget(
                                 label: 'Comment',
                                 initialValue: state.comment,

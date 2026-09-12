@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/db/app_database.dart';
 import '../utils/error_logger.dart';
 
@@ -51,8 +52,13 @@ class MissingArtworkService {
   }
 
   /// Searches iTunes Cover Art API for missing album artwork with rate limiting & exponential backoff.
+  /// Returns null immediately when offline-only mode is enabled.
   Future<String?> fetchArtworkForAlbum(
       String albumTitle, String artistName, {int maxRetries = 2}) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool('setting_offline_only_mode') == true) return null;
+    } catch (_) {}
     for (int attempt = 0; attempt <= maxRetries; attempt++) {
       await _rateLimiter.acquire();
       try {

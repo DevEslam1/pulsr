@@ -5,6 +5,7 @@ class PrefsKeys {
   static const String eqPresetName = 'eq_preset_name';
   static const String eqGains = 'eq_gains';
   static const String eqBassBoost = 'eq_bass_boost';
+  static const String eqPreamp = 'eq_preamp_db';
   static const String eqVolumeBoost = 'eq_volume_boost';
   static const String eqVirtualizerEnabled = 'eq_virtualizer_enabled';
   static const String eqVirtualizerStrength = 'eq_virtualizer_strength';

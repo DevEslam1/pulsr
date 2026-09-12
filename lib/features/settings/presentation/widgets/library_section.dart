@@ -1,11 +1,11 @@
 // lib/features/settings/presentation/widgets/library_section.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
-import '../hidden_folders_screen.dart';
 import 'settings_section.dart';
 import 'settings_slider_row.dart';
 import 'settings_tiles.dart';
@@ -30,9 +30,7 @@ class LibrarySection extends StatelessWidget {
             state.autoHideSystemMedia
                 ? 'Auto-filtering voice memos • Custom paths'
                 : 'Manage excluded directories',
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute<void>(
-                    builder: (_) => const HiddenFoldersScreen()))),
+            onTap: () => context.push('/hidden-folders')),
         settingsCardDivider(p),
         SettingsNavTile(
             Icons.refresh_rounded,

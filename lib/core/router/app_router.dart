@@ -35,9 +35,14 @@ import '../../features/library/presentation/artwork_grid_screen.dart';
 import '../../features/library/presentation/duplicate_finder_screen.dart';
 import '../../features/library/presentation/library_stats_screen.dart';
 import '../../features/player/presentation/themes/custom_theme_builder_screen.dart';
+import '../../features/settings/presentation/hidden_folders_screen.dart';
 import '../../features/settings/presentation/scrobble_stats_screen.dart';
 import '../../features/settings/presentation/cloud_backup_dashboard_screen.dart';
 import '../../features/downloads/presentation/downloads_screen.dart';
+import '../../features/library/presentation/favorites_screen.dart';
+import '../../features/playlist_detail/presentation/online_playlist_detail_screen.dart';
+import '../../features/playlists/cubit/playlist_cubit.dart';
+import '../services/ytm_account_service.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -260,6 +265,42 @@ GoRouter createRouter(MediaScannerService scannerService) {
         },
       ),
       GoRoute(
+        path: '/online-playlist',
+        name: 'online-playlist',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is OnlinePlaylistDetailArgs) {
+            return OnlinePlaylistDetailScreen(args: extra);
+          }
+          if (extra is YtmAccountPlaylist) {
+            return OnlinePlaylistDetailScreen(
+              args: OnlinePlaylistDetailArgs(
+                playlistId: extra.playlistId,
+                title: extra.title,
+                subtitle: extra.subtitle,
+                artworkUrl: extra.artworkUrl,
+              ),
+            );
+          }
+          if (extra is OnlinePlaylistEntry) {
+            return OnlinePlaylistDetailScreen(
+              args: OnlinePlaylistDetailArgs(
+                playlistId: extra.id,
+                title: extra.title,
+                subtitle: extra.uploader,
+                initialTracks: extra.tracks,
+              ),
+            );
+          }
+          final id = state.uri.queryParameters['id'] ??
+              (extra is String ? extra : '');
+          return OnlinePlaylistDetailScreen(
+            args: OnlinePlaylistDetailArgs(playlistId: id),
+          );
+        },
+      ),
+      GoRoute(
         path: '/recents',
         name: 'recents',
         parentNavigatorKey: rootNavigatorKey,
@@ -376,6 +417,18 @@ GoRouter createRouter(MediaScannerService scannerService) {
         name: 'cloud-backup-dashboard',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const CloudBackupDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/favorites',
+        name: 'favorites',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const FavoritesScreen(),
+      ),
+      GoRoute(
+        path: '/hidden-folders',
+        name: 'hidden-folders',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const HiddenFoldersScreen(),
       ),
     ],
   );

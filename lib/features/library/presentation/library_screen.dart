@@ -46,28 +46,53 @@ class _LibraryScreenState extends State<LibraryScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 8, vsync: this);
+    _songsScrollController.addListener(_onSongsScrollNearBottom);
   }
 
   @override
   void dispose() {
+    _songsScrollController.removeListener(_onSongsScrollNearBottom);
     _tabController.dispose();
     _songsScrollController.dispose();
     super.dispose();
   }
 
+  void _onSongsScrollNearBottom() {
+    if (!_songsScrollController.hasClients) return;
+    final pos = _songsScrollController.position;
+    if (pos.pixels >= pos.maxScrollExtent - 800) {
+      try {
+        context.read<LibraryCubit>().loadMoreSongs();
+      } catch (_) {}
+    }
+  }
+
+  static const double _songRowExtent = 58.0;
+
   void _scrollToLetter(String letter, List<SongsTableData> songs) {
     final index =
         songs.indexWhere((s) => s.title.toUpperCase().startsWith(letter));
-    if (index != -1 && _songsScrollController.hasClients) {
+    if (index == -1 || !_songsScrollController.hasClients) return;
+    final trackCols = context.trackGridColumns;
+    final double target;
+    if (trackCols > 1) {
+      // Grid rows are fixed mainAxisExtent 72 + 4 spacing.
+      final row = index ~/ trackCols;
+      target = row * 76.0;
+    } else if (songs.length > 500) {
+      // Fixed itemExtent path: exact offset, no proportional estimate.
+      target = index * _songRowExtent;
+    } else {
       final maxScroll = _songsScrollController.position.maxScrollExtent;
-      final target =
+      target =
           songs.length > 1 ? (index / (songs.length - 1)) * maxScroll : 0.0;
-      _songsScrollController.animateTo(
-        target.clamp(0.0, maxScroll),
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOut,
-      );
     }
+    final maxScroll = _songsScrollController.position.maxScrollExtent;
+    _songsScrollController.animateTo(
+      target.clamp(0.0, maxScroll),
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+    );
   }
 
   @override
@@ -103,7 +128,10 @@ class _LibraryScreenState extends State<LibraryScreen>
                             isScrollControlled: true,
                             backgroundColor: Colors.transparent,
                             builder: (_) =>
-                                AddToPlaylistSheet(song: selected.first),
+                                AddToPlaylistSheet(
+                                  song: selected.first,
+                                  songs: selected,
+                                ),
                           );
                         }
                       },
@@ -405,6 +433,24 @@ class _LibraryScreenState extends State<LibraryScreen>
     final alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ#'.split('');
 
     final trackCols = context.trackGridColumns;
+    final hasMore = cubit.hasMoreSongs;
+
+    Widget buildLoadMoreTile() {
+      return SizedBox(
+        height: trackCols > 1 ? 72 : _songRowExtent,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: p.accent),
+            ),
+          ),
+        ),
+      );
+    }
 
     Widget buildSongItem(SongsTableData song, int index) {
       return Dismissible(
@@ -482,21 +528,25 @@ class _LibraryScreenState extends State<LibraryScreen>
                     crossAxisSpacing: 10,
                     mainAxisSpacing: 4,
                   ),
-                  itemCount: songs.length,
-                  itemBuilder: (context, index) =>
-                      buildSongItem(songs[index], index),
+                  itemCount: songs.length + (hasMore ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (index >= songs.length) return buildLoadMoreTile();
+                    return buildSongItem(songs[index], index);
+                  },
                 )
               : ListView.builder(
                   physics: const AlwaysScrollableScrollPhysics(),
                   controller: _songsScrollController,
-                  itemExtent: songs.length > 500 ? 58.0 : null,
+                  itemExtent: songs.length > 500 ? _songRowExtent : null,
                   addAutomaticKeepAlives: false,
                   addRepaintBoundaries: true,
                   padding: const EdgeInsets.only(
                       bottom: 160, top: 8, left: 4, right: 4),
-                  itemCount: songs.length,
-                  itemBuilder: (context, index) =>
-                      buildSongItem(songs[index], index),
+                  itemCount: songs.length + (hasMore ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (index >= songs.length) return buildLoadMoreTile();
+                    return buildSongItem(songs[index], index);
+                  },
                 ),
           if (showAlphabet)
             PositionedDirectional(

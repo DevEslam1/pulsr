@@ -63,8 +63,12 @@ class SleepTimerManager {
     _lastPlayerGetter = getActivePlayer;
     final currentToken = ++_sleepFadeToken;
 
-    _sleepTimerRemainingSubject.add(_remainingDuration);
-    _sleepTimerRemainingTracksSubject.add(null);
+    if (!_sleepTimerRemainingSubject.isClosed) {
+      _sleepTimerRemainingSubject.add(_remainingDuration);
+    }
+    if (!_sleepTimerRemainingTracksSubject.isClosed) {
+      _sleepTimerRemainingTracksSubject.add(null);
+    }
     _persistTimerState(duration);
 
     if (duration < const Duration(seconds: 1)) {
@@ -73,7 +77,9 @@ class SleepTimerManager {
       _oneShotTimer = Timer(duration, () async {
         if (_isArmed && _sleepFadeToken == currentToken) {
           _remainingDuration = Duration.zero;
-          _sleepTimerRemainingSubject.add(null);
+          if (!_sleepTimerRemainingSubject.isClosed) {
+            _sleepTimerRemainingSubject.add(null);
+          }
           await _executeExpiration(currentToken);
         }
       });
@@ -92,7 +98,9 @@ class SleepTimerManager {
 
       if (_remainingDuration > const Duration(seconds: 1)) {
         _remainingDuration -= const Duration(seconds: 1);
-        _sleepTimerRemainingSubject.add(_remainingDuration);
+        if (!_sleepTimerRemainingSubject.isClosed) {
+          _sleepTimerRemainingSubject.add(_remainingDuration);
+        }
 
         // Trigger smooth fade-out during the final 15 seconds (or remaining duration if smaller)
         if (_isFadeOutEnabled &&
@@ -101,7 +109,9 @@ class SleepTimerManager {
         }
       } else {
         _remainingDuration = Duration.zero;
-        _sleepTimerRemainingSubject.add(null);
+        if (!_sleepTimerRemainingSubject.isClosed) {
+          _sleepTimerRemainingSubject.add(null);
+        }
         timer.cancel();
         await _executeExpiration(currentToken);
       }
@@ -122,9 +132,13 @@ class SleepTimerManager {
     _onTimerExpiredCallback = onTimerExpired;
     _lastPlayerGetter = getActivePlayer;
     _sleepFadeToken++;
-    _sleepTimerRemainingSubject
-        .add(const Duration(minutes: 1)); // Symbolic active state
-    _sleepTimerRemainingTracksSubject.add(1);
+    if (!_sleepTimerRemainingSubject.isClosed) {
+      _sleepTimerRemainingSubject
+          .add(const Duration(minutes: 1)); // Symbolic active state
+    }
+    if (!_sleepTimerRemainingTracksSubject.isClosed) {
+      _sleepTimerRemainingTracksSubject.add(1);
+    }
     _persistTimerState();
   }
 
@@ -145,9 +159,45 @@ class SleepTimerManager {
     _onTimerExpiredCallback = onTimerExpired;
     _lastPlayerGetter = getActivePlayer;
     _sleepFadeToken++;
-    _sleepTimerRemainingSubject.add(Duration(minutes: trackCount * 3));
-    _sleepTimerRemainingTracksSubject.add(trackCount);
+    if (!_sleepTimerRemainingSubject.isClosed) {
+      _sleepTimerRemainingSubject.add(Duration(minutes: trackCount * 3));
+    }
+    if (!_sleepTimerRemainingTracksSubject.isClosed) {
+      _sleepTimerRemainingTracksSubject.add(trackCount);
+    }
     _persistTimerState();
+  }
+
+  /// Configures sleep timer to fire at the end of the playback queue.
+  /// The host must call [onQueueCompleted] when the queue is exhausted
+  /// (or [onTrackCompleted] with [isLastInQueue] info via [notifyQueueEnd]).
+  void startEndOfQueueTimer({
+    bool fadeOut = true,
+    required Future<void> Function() onTimerExpired,
+    required AudioPlayer Function() getActivePlayer,
+  }) {
+    cancelSleepTimer();
+    _isArmed = true;
+    _mode = SleepTimerMode.endOfQueue;
+    _remainingTracks = -1; // unknown until queue end
+    _isFadeOutEnabled = fadeOut;
+    _onTimerExpiredCallback = onTimerExpired;
+    _lastPlayerGetter = getActivePlayer;
+    _sleepFadeToken++;
+    if (!_sleepTimerRemainingSubject.isClosed) {
+      _sleepTimerRemainingSubject.add(const Duration(minutes: 1));
+    }
+    if (!_sleepTimerRemainingTracksSubject.isClosed) {
+      _sleepTimerRemainingTracksSubject.add(null);
+    }
+    _persistTimerState();
+  }
+
+  /// Call when the queue is exhausted (last track completed with no repeat).
+  Future<void> onQueueCompleted() async {
+    if (!_isArmed || _mode != SleepTimerMode.endOfQueue) return;
+    final token = _sleepFadeToken;
+    await _executeExpiration(token);
   }
 
   /// Notifies the sleep timer of a track completion event.
@@ -163,8 +213,12 @@ class SleepTimerManager {
         final token = _sleepFadeToken;
         await _executeExpiration(token);
       } else {
-        _sleepTimerRemainingSubject.add(Duration(minutes: _remainingTracks * 3));
-        _sleepTimerRemainingTracksSubject.add(_remainingTracks);
+        if (!_sleepTimerRemainingSubject.isClosed) {
+          _sleepTimerRemainingSubject.add(Duration(minutes: _remainingTracks * 3));
+        }
+        if (!_sleepTimerRemainingTracksSubject.isClosed) {
+          _sleepTimerRemainingTracksSubject.add(_remainingTracks);
+        }
       }
     }
   }
@@ -248,8 +302,12 @@ class SleepTimerManager {
     _countdownTicker = null;
     _oneShotTimer?.cancel();
     _oneShotTimer = null;
-    _sleepTimerRemainingSubject.add(null);
-    _sleepTimerRemainingTracksSubject.add(null);
+    if (!_sleepTimerRemainingSubject.isClosed) {
+      _sleepTimerRemainingSubject.add(null);
+    }
+    if (!_sleepTimerRemainingTracksSubject.isClosed) {
+      _sleepTimerRemainingTracksSubject.add(null);
+    }
   }
 
   void cancelSleepTimer() {
@@ -325,8 +383,15 @@ class SleepTimerManager {
   }
 
   void dispose() {
-    cancelSleepTimer();
-    _sleepTimerRemainingSubject.close();
-    _sleepTimerRemainingTracksSubject.close();
+    _sleepFadeToken++;
+    _isArmed = false;
+    _countdownTicker?.cancel();
+    _oneShotTimer?.cancel();
+    if (!_sleepTimerRemainingSubject.isClosed) {
+      _sleepTimerRemainingSubject.close();
+    }
+    if (!_sleepTimerRemainingTracksSubject.isClosed) {
+      _sleepTimerRemainingTracksSubject.close();
+    }
   }
 }

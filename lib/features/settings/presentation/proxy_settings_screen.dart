@@ -1265,7 +1265,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                   child: Text(
                     _type == AppProxyType.http
                         ? 'Routes standard HTTP & HTTPS web and stream extraction traffic.'
-                        : 'Routes network packets via SOCKS5 (recommended for Tor, Clash, Shadowsocks).',
+                        : 'Routes network packets via SOCKS5 (recommended for Tor, Clash, Shadowsocks). Note: SOCKS5 applies on the native stream layer; in-app Dart API calls (search, artwork, lyrics) fall back to DIRECT when SOCKS5 is active.',
                     style: TextStyle(color: p.textTertiary, fontSize: 12),
                   ),
                 ),

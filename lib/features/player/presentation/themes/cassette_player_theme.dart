@@ -132,8 +132,8 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
         final cassetteBody = Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxHeight: isLandscape ? 220 : 260,
-              maxWidth: isLandscape ? 340 : 390,
+              maxHeight: isLandscape ? 260 : (isTablet ? 360 : 300),
+              maxWidth: isLandscape ? 390 : (isTablet ? 540 : 440),
             ),
             child: AspectRatio(
               aspectRatio: 1.5,
@@ -625,18 +625,35 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
 
               // Center: Cassette / Lyrics / Queue
               Expanded(
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: (state.isLyricsVisible || state.isQueueVisible)
-                          ? (isTablet ? 560.0 : double.infinity)
-                          : 420.0,
-                      maxHeight: (state.isLyricsVisible || state.isQueueVisible)
-                          ? double.infinity
-                          : 270.0,
-                    ),
-                    child: centerDisplay,
-                  ),
+                child: LayoutBuilder(
+                  builder: (context, artConstraints) {
+                    final double availableWidth =
+                        artConstraints.maxWidth - (isTablet ? 64.0 : 28.0);
+                    final double availableHeight =
+                        artConstraints.maxHeight - (isTablet ? 24.0 : 12.0);
+                    final double maxW = isTablet ? 560.0 : 440.0;
+                    final double maxH = isTablet ? 360.0 : 300.0;
+                    final double cassetteW =
+                        math.min(availableWidth, maxW).clamp(240.0, double.infinity);
+                    final double cassetteH =
+                        math.min(availableHeight, maxH).clamp(160.0, double.infinity);
+
+                    return Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: (state.isLyricsVisible ||
+                                  state.isQueueVisible)
+                              ? (isTablet ? 560.0 : double.infinity)
+                              : cassetteW,
+                          maxHeight: (state.isLyricsVisible ||
+                                  state.isQueueVisible)
+                              ? double.infinity
+                              : cassetteH,
+                        ),
+                        child: centerDisplay,
+                      ),
+                    );
+                  },
                 ),
               ),
 

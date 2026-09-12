@@ -8,6 +8,7 @@ import '../../../core/errors/failures.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/utils/error_logger.dart';
+import '../../../data/audio/song_rating_store.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/models/ytm_track.dart';
 import '../../../domain/repositories/music_repository_interface.dart';
@@ -40,6 +41,17 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
   StreamSubscription? _yearsSub;
   StreamSubscription? _favoritesSub;
   int _songsToken = 0;
+
+  /// DB-level pagination window for the songs watch. The full 10k-row list
+  /// is never held in state; [loadMoreSongs] grows the window by one page.
+  static const int songsPageSize = 500;
+  int _songsLimit = songsPageSize;
+  bool _hasMoreSongs = false;
+  bool _isLoadingMoreSongs = false;
+
+  /// True when the last songs emission hit the current limit window, i.e.
+  /// more rows may exist in the database.
+  bool get hasMoreSongs => _hasMoreSongs;
 
   LibraryCubit({
     required GetSongsUseCase getSongsUseCase,
@@ -105,27 +117,85 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     safeEmit(state.copyWith(errorMessage: null));
   }
 
-  Future<void> _subscribeSongs() async {
+  Future<void> _subscribeSongs({bool resetLimit = false}) async {
     final t = ++_songsToken;
     _songsSub?.cancel();
     removeFromComposite(_songsSub);
     _songsSub = null;
+    if (resetLimit) {
+      _songsLimit = songsPageSize;
+      _hasMoreSongs = false;
+    }
     final excludedRes = await _folderUseCases.getExcludedFolders();
     if (isClosed || t != _songsToken) return;
     final excluded = excludedRes.fold((l) => <String>[], (r) => r);
+    // Top-rated sort is prefs-backed: SQL has no rating column, so watch
+    // the full window and sort in Dart (no pagination in this mode).
+    final isRatingSort = state.sortBy == 'rating';
+    final window = isRatingSort ? null : _songsLimit;
     _songsSub = autoSub(
       _getSongsUseCase.watchSongs(
-        sortBy: state.sortBy,
+        sortBy: isRatingSort ? 'title' : state.sortBy,
         ascending: state.ascending,
+        limit: window,
         excludedFolders: excluded,
       ),
       (result) {
         result.fold(
-          (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
-          (songs) => safeEmit(state.copyWith(songs: songs, errorMessage: null)),
+          (failure) {
+            _isLoadingMoreSongs = false;
+            safeEmit(state.copyWith(errorMessage: failure.message));
+          },
+          (songs) {
+            if (isRatingSort) {
+              _hasMoreSongs = false;
+              _isLoadingMoreSongs = false;
+              safeEmit(state.copyWith(
+                  songs: _sortByRating(songs, ascending: state.ascending),
+                  errorMessage: null));
+              return;
+            }
+            // Hitting the cap means the DB may hold more rows.
+            _hasMoreSongs = songs.length >= window!;
+            _isLoadingMoreSongs = false;
+            safeEmit(state.copyWith(songs: songs, errorMessage: null));
+          },
         );
       },
     );
+  }
+
+  /// Dart-side top-rated sort (ratings live in SharedPreferences).
+  List<SongsTableData> _sortByRating(List<SongsTableData> songs,
+      {bool ascending = false}) {
+    int ratingOf(SongsTableData s) {
+      try {
+        // Ratings are keyed by song id string (see SongRatingStore).
+        final store = getIt.isRegistered<SongRatingStore>()
+            ? getIt<SongRatingStore>()
+            : null;
+        return store?.getRating(s.id.toString()) ?? 0;
+      } catch (_) {
+        return 0;
+      }
+    }
+
+    final sorted = List<SongsTableData>.from(songs);
+    sorted.sort((a, b) {
+      final cmp = ratingOf(a).compareTo(ratingOf(b));
+      if (cmp != 0) return ascending ? cmp : -cmp;
+      return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+    });
+    return sorted;
+  }
+
+  /// Grows the songs window by one page. Called from the songs list scroll
+  /// listener; no-ops while a page load is in flight or the cap wasn't hit.
+  void loadMoreSongs() {
+    if (_isLoadingMoreSongs || !_hasMoreSongs || isClosed) return;
+    _isLoadingMoreSongs = true;
+    _songsLimit += songsPageSize;
+    _subscribeSongs();
   }
 
   void _subscribeAlbums() {
@@ -229,7 +299,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
 
   void updateSort(String sortBy, bool ascending) {
     safeEmit(state.copyWith(sortBy: sortBy, ascending: ascending));
-    _subscribeSongs();
+    _subscribeSongs(resetLimit: true);
     SharedPreferences.getInstance().then((prefs) async {
       try {
         await prefs.setString('library_sort_by', sortBy);
@@ -373,6 +443,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     ));
   }
 
+  /// Selects all currently loaded songs. With DB pagination this is the
+  /// visible window, not the entire 10k library — scroll to load more first.
   void selectAllSongs() {
     final allIds = state.songs.map((s) => s.id).toSet();
     safeEmit(state.copyWith(selectedSongIds: allIds, isMultiSelectMode: true));

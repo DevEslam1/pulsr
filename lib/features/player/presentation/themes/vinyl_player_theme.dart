@@ -158,8 +158,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
         final turntableDeck = Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxHeight: isLandscape ? 280 : 300,
-              maxWidth: isLandscape ? 280 : 320,
+              maxHeight: isLandscape ? 300 : (isTablet ? 480 : 390),
+              maxWidth: isLandscape ? 320 : (isTablet ? 500 : 410),
             ),
             child: AspectRatio(
               aspectRatio: 1.04,
@@ -284,8 +284,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                                   child: Center(
                                     // Center Album Artwork
                                     child: Container(
-                                      width: vinylSize * 0.36,
-                                      height: vinylSize * 0.36,
+                                      width: vinylSize * 0.44,
+                                      height: vinylSize * 0.44,
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
                                         border: Border.all(
@@ -302,7 +302,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                                               id: song.id,
                                               remoteUrl: song.remoteArtworkUrl,
                                               type: ArtworkType.AUDIO,
-                                              size: vinylSize * 0.36,
+                                              size: vinylSize * 0.44,
                                               borderRadius: 999,
                                               highQuality: true,
                                               fallbackIcon:
@@ -813,18 +813,34 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
 
               // Center: Turntable / Lyrics / Queue
               Expanded(
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: (state.isLyricsVisible || state.isQueueVisible)
-                          ? (isTablet ? 560.0 : double.infinity)
-                          : 350.0,
-                      maxHeight: (state.isLyricsVisible || state.isQueueVisible)
-                          ? double.infinity
-                          : 310.0,
-                    ),
-                    child: centerDisplay,
-                  ),
+                child: LayoutBuilder(
+                  builder: (context, artConstraints) {
+                    final double availableWidth =
+                        artConstraints.maxWidth - (isTablet ? 64.0 : 28.0);
+                    final double availableHeight =
+                        artConstraints.maxHeight - (isTablet ? 24.0 : 12.0);
+                    final double maxAllowed = isTablet ? 560.0 : 420.0;
+                    final double deckSize = math.min(
+                      math.min(availableWidth, availableHeight),
+                      maxAllowed,
+                    ).clamp(200.0, double.infinity);
+
+                    return Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: (state.isLyricsVisible ||
+                                  state.isQueueVisible)
+                              ? (isTablet ? 560.0 : double.infinity)
+                              : deckSize,
+                          maxHeight: (state.isLyricsVisible ||
+                                  state.isQueueVisible)
+                              ? double.infinity
+                              : deckSize,
+                        ),
+                        child: centerDisplay,
+                      ),
+                    );
+                  },
                 ),
               ),
 

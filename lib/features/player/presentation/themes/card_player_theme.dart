@@ -187,8 +187,8 @@ class CardPlayerTheme extends StatelessWidget {
                               key: const ValueKey('artwork_card'),
                               child: ConstrainedBox(
                                 constraints: BoxConstraints(
-                                  maxHeight: isLandscape ? 260 : 310,
-                                  maxWidth: isLandscape ? 260 : 310,
+                                  maxHeight: isLandscape ? 320 : double.infinity,
+                                  maxWidth: isLandscape ? 320 : double.infinity,
                                 ),
                                 child: AspectRatio(
                                   aspectRatio: 1.0,
@@ -219,7 +219,7 @@ class CardPlayerTheme extends StatelessWidget {
                                               id: song.id,
                                               remoteUrl: song.remoteArtworkUrl,
                                               type: ArtworkType.AUDIO,
-                                              size: 310,
+                                              size: double.infinity,
                                               borderRadius: 28,
                                               highQuality: true,
                                             )
@@ -615,20 +615,35 @@ class CardPlayerTheme extends StatelessWidget {
                     child: viewSwitcher,
                   ),
 
-                  // Center Artwork Card / Lyrics / Queue
                   Expanded(
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: (state.isLyricsVisible || state.isQueueVisible)
-                              ? (isTablet ? 560.0 : double.infinity)
-                              : 340.0,
-                          maxHeight: (state.isLyricsVisible || state.isQueueVisible)
-                              ? double.infinity
-                              : 310.0,
-                        ),
-                        child: centerDisplay,
-                      ),
+                    child: LayoutBuilder(
+                      builder: (context, artConstraints) {
+                        final double availableWidth =
+                            artConstraints.maxWidth - (isTablet ? 64.0 : 36.0);
+                        final double availableHeight =
+                            artConstraints.maxHeight - (isTablet ? 24.0 : 12.0);
+                        final double maxAllowed = isTablet ? 560.0 : 420.0;
+                        final double cardArtSize = math.min(
+                          math.min(availableWidth, availableHeight),
+                          maxAllowed,
+                        ).clamp(180.0, double.infinity);
+
+                        return Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: (state.isLyricsVisible ||
+                                      state.isQueueVisible)
+                                  ? (isTablet ? 560.0 : double.infinity)
+                                  : cardArtSize,
+                              maxHeight: (state.isLyricsVisible ||
+                                      state.isQueueVisible)
+                                  ? double.infinity
+                                  : cardArtSize,
+                            ),
+                            child: centerDisplay,
+                          ),
+                        );
+                      },
                     ),
                   ),
 

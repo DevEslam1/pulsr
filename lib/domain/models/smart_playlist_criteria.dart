@@ -13,6 +13,7 @@ enum SmartRuleField {
   dateAdded('dateAdded', 'Date Added'),
   durationMs('durationMs', 'Duration'),
   isFavorite('isFavorite', 'Is Favorite'),
+  rating('rating', 'Rating (Stars)'),
   lastPlayed('lastPlayed', 'Last Played'),
   bpm('bpm', 'BPM / Tempo'),
   loudnessRange('loudnessRange', 'LRA Dynamic Range'),
@@ -232,6 +233,17 @@ class SmartCriteria {
             value: '10'),
       ],
       sortBy: 'playCount',
+      sortAscending: false,
+      limit: 50,
+    ),
+    'Top Rated': SmartCriteria(
+      rules: [
+        SmartRule(
+            field: SmartRuleField.rating,
+            operator: SmartOperator.greaterThanOrEqual,
+            value: '4'),
+      ],
+      sortBy: 'rating',
       sortAscending: false,
       limit: 50,
     ),

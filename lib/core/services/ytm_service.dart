@@ -165,7 +165,7 @@ class YtmService {
 
   // FIX-C01: Record a failure for a specific videoId
   void recordFailure(String videoId, [YtmException? error]) {
-    _noteBotChallenge(error ?? const YtmException('BOT_CHALLENGE'), videoId: videoId);
+    _noteBotChallenge(error ?? const YtmException('VIDEO_FAILED'), videoId: videoId);
   }
 
   bool get isBotCoolingDown => DateTime.now().isBefore(_botChallengeUntil);
@@ -182,11 +182,11 @@ class YtmService {
       failures.removeWhere((t) => now.difference(t).inSeconds > 60);
       failures.add(now);
 
-      if (failures.length >= 3) {
+      if (failures.length >= 3 || e.isBotBlocked || e.isIpBlocked) {
         final cooldown = e.isIpBlocked ? _ipBlockCooldown : _botCooldown;
         _videoCooldownUntil[videoId] = now.add(cooldown);
-        if (e.isIpBlocked) {
-          _botChallengeUntil = now.add(_ipBlockCooldown);
+        if (e.isIpBlocked || e.isBotBlocked) {
+          _botChallengeUntil = now.add(cooldown);
         }
       }
     } else {
@@ -660,18 +660,38 @@ class YtmService {
 
   Future<List<YtmTrack>> getPlaylistTracks(String urlOrId,
       {int limit = 100}) async {
-    final cleanUrlOrId = switch (urlOrId.trim()) {
-      'LM' ||
-      'VLLM' ||
-      'FEmusic_liked_videos' ||
-      'FEmusic_liked_tracks' ||
-      'VLSE' =>
-        'LL',
-      _ => urlOrId.trim(),
-    };
+    final cleanInput = urlOrId.trim();
+    if (cleanInput.isEmpty) return const [];
 
-    // 1. Native Extractor (only engine; remote backend decommissioned)
+    // 1. Direct Dart InnerTube API via YtmAccountService
+    // Primary engine: authenticated cookies, private playlists, mixes, pagination, works on all platforms.
     try {
+      final accountService = getIt.isRegistered<YtmAccountService>()
+          ? getIt<YtmAccountService>()
+          : null;
+      if (accountService != null) {
+        final tracks = await accountService.fetchPlaylistTracks(cleanInput,
+            maxTracks: limit);
+        if (tracks.isNotEmpty) {
+          return tracks;
+        }
+      }
+    } catch (e) {
+      debugPrint('[YTM_SERVICE] Dart InnerTube fetchPlaylistTracks error: $e');
+    }
+
+    // 2. Native Multi-Tier Extractor (Android method channel)
+    try {
+      final cleanUrlOrId = switch (cleanInput) {
+        'LM' ||
+        'VLLM' ||
+        'FEmusic_liked_videos' ||
+        'FEmusic_liked_tracks' ||
+        'VLSE' =>
+          'LL',
+        _ => cleanInput,
+      };
+
       final raw = await _guard(
         () => _channel.invokeMethod<Map<Object?, Object?>>('getPlaylist', {
           'url': cleanUrlOrId,

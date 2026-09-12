@@ -193,11 +193,11 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                               child: LayoutBuilder(
                                 builder: (context, vinylConstraints) {
                                   final maxDimension =
-                                      isLandscape ? 280.0 : 320.0;
+                                      isLandscape ? 300.0 : (isTablet ? 540.0 : 420.0);
                                   final vinylSize = math.min(
                                     math.min(vinylConstraints.maxWidth,
                                             vinylConstraints.maxHeight) *
-                                        0.88,
+                                        0.95,
                                     maxDimension,
                                   );
                                   return Container(
@@ -228,8 +228,8 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                                         ),
                                         // Center circular artwork
                                         Container(
-                                          width: vinylSize * 0.52,
-                                          height: vinylSize * 0.52,
+                                          width: vinylSize * 0.58,
+                                          height: vinylSize * 0.58,
                                           decoration: BoxDecoration(
                                             shape: BoxShape.circle,
                                             border: Border.all(
@@ -243,7 +243,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                                                   id: song.id,
                                                   remoteUrl: song.remoteArtworkUrl,
                                                   type: ArtworkType.AUDIO,
-                                                  size: vinylSize * 0.52,
+                                                  size: vinylSize * 0.58,
                                                   borderRadius: 999,
                                                   highQuality: true,
                                                 )
@@ -633,18 +633,34 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
 
                 // Center: Spinning Circle / Lyrics / Queue
                 Expanded(
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: (state.isLyricsVisible || state.isQueueVisible)
-                            ? (isTablet ? 560.0 : double.infinity)
-                            : 340.0,
-                        maxHeight: (state.isLyricsVisible || state.isQueueVisible)
-                            ? double.infinity
-                            : 310.0,
-                      ),
-                      child: centerDisplay,
-                    ),
+                  child: LayoutBuilder(
+                    builder: (context, artConstraints) {
+                      final double availableWidth =
+                          artConstraints.maxWidth - (isTablet ? 64.0 : 36.0);
+                      final double availableHeight =
+                          artConstraints.maxHeight - (isTablet ? 24.0 : 12.0);
+                      final double maxAllowed = isTablet ? 560.0 : 420.0;
+                      final double circleArtSize = math.min(
+                        math.min(availableWidth, availableHeight),
+                        maxAllowed,
+                      ).clamp(180.0, double.infinity);
+
+                      return Center(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: (state.isLyricsVisible ||
+                                    state.isQueueVisible)
+                                ? (isTablet ? 560.0 : double.infinity)
+                                : circleArtSize,
+                            maxHeight: (state.isLyricsVisible ||
+                                    state.isQueueVisible)
+                                ? double.infinity
+                                : circleArtSize,
+                          ),
+                          child: centerDisplay,
+                        ),
+                      );
+                    },
                   ),
                 ),
 

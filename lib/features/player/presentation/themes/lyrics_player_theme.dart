@@ -153,18 +153,32 @@ class LyricsPlayerTheme extends StatelessWidget {
                           )
                         : Center(
                             key: const ValueKey('track_art_lyrics_focus'),
-                            child: ConstrainedBox(
-                              constraints: BoxConstraints(
-                                maxHeight: isLandscape
-                                    ? 220
-                                    : (isTablet ? 340 : 280),
-                                maxWidth: isLandscape
-                                    ? 220
-                                    : (isTablet ? 340 : 280),
-                              ),
-                              child: AspectRatio(
-                                aspectRatio: 1.0,
-                                child: Container(
+                            child: LayoutBuilder(
+                              builder: (context, artConstraints) {
+                                final double availableWidth =
+                                    artConstraints.maxWidth -
+                                        (isTablet ? 64.0 : 36.0);
+                                final double availableHeight =
+                                    artConstraints.maxHeight -
+                                        (isTablet ? 24.0 : 12.0);
+                                final double maxAllowed =
+                                    isTablet ? 560.0 : 420.0;
+                                final double artSize = isLandscape
+                                    ? 280.0
+                                    : math.min(
+                                        math.min(availableWidth,
+                                            availableHeight),
+                                        maxAllowed,
+                                      ).clamp(180.0, double.infinity);
+
+                                return ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    maxHeight: artSize,
+                                    maxWidth: artSize,
+                                  ),
+                                  child: AspectRatio(
+                                    aspectRatio: 1.0,
+                                    child: Container(
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(20),
                                     boxShadow: [
@@ -187,10 +201,12 @@ class LyricsPlayerTheme extends StatelessWidget {
                                           highQuality: true,
                                         )
                                       : const SizedBox.shrink(),
-                                ),
-                              ),
-                            ),
-                          ),
+                                 ),
+                               ),
+                             );
+                           },
+                         ),
+                       ),
               ),
             );
 

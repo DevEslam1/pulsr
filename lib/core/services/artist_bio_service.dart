@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/error_logger.dart';
 
 class ArtistInfo {
@@ -29,6 +30,7 @@ class ArtistBioService {
   ArtistBioService([http.Client? client]) : _client = client ?? http.Client();
 
   /// Fetches artist info and picture from Deezer and Wikipedia APIs.
+  /// Returns null immediately when offline-only mode is enabled.
   Future<ArtistInfo?> getArtistInfo(String artistName) async {
     final cleanName = artistName.trim();
     if (cleanName.isEmpty || cleanName.toLowerCase() == 'unknown artist') {
@@ -38,6 +40,11 @@ class ArtistBioService {
     if (_cache.containsKey(cleanName.toLowerCase())) {
       return _cache[cleanName.toLowerCase()];
     }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool('setting_offline_only_mode') == true) return null;
+    } catch (_) {}
 
     try {
       // 1. Search Deezer for HD Artist Picture and Top Tracks

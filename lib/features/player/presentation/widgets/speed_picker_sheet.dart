@@ -1,4 +1,5 @@
 // lib/features/player/presentation/widgets/speed_picker_sheet.dart
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_radii.dart';
@@ -70,11 +71,15 @@ class SpeedPickerSheet extends StatelessWidget {
                       final currentSpeed = state.playbackSpeed;
                       final currentPitch = state.playbackPitch;
 
-                      // Convert pitch multiplier to approximate semitones:
+                      // Convert pitch multiplier to semitones:
                       // pitch = 2^(semitones / 12)  =>  semitones = 12 * log2(pitch)
                       final semitones = currentPitch == 1.0
                           ? 0
-                          : (12.0 * (currentPitch > 0 ? (currentPitch - 1.0) * 1.442695 : 0.0)).round();
+                          : (12.0 *
+                                  (currentPitch > 0
+                                      ? math.log(currentPitch) / math.ln2
+                                      : 0.0))
+                              .round();
 
                       return Column(
                         mainAxisSize: MainAxisSize.min,

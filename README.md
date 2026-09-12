@@ -6,7 +6,7 @@
   ### Premium Offline-First Local Music Player for Android & Beyond
 
   <p align="center">
-    <strong>Studio-grade DSP • 10-Band AutoEQ • Synced LRC Lyrics • Dynamic Aura Theming • 100% Offline & Private</strong>
+    <strong>Studio-grade DSP • 10-Band AutoEQ • Synced LRC Lyrics • Dynamic Aura Theming • Offline-First & Private (Pulsr Pure)</strong>
   </p>
 
   <p align="center">
@@ -98,9 +98,10 @@ Pulsr comes with an interactive landing website located in [`website/`](website/
 - **Hardware & Headset Events**: Auto-pause on headphone disconnection, Bluetooth AVRCP metadata sync, and audio ducking during GPS navigation/calls.
 - **Audio File Intent Handler**: Instantly opens and plays `.mp3`, `.flac`, `.wav`, `.m4a` files opened from file managers or chat apps.
 
-### 🛡️ 7. Absolute Privacy & Zero Telemetry
-- **100% Offline Operation**: No account creation, no internet permission required for playback, no trackers, and no ad SDKs.
-- **Data Safety**: All library indexes, ratings, and playlists remain strictly on your device.
+### 🛡️ 7. Privacy-First & Offline-Capable
+- **Pulsr Pure (prod flavor): 100% Offline Operation**: No account creation, no `INTERNET` permission, no trackers, and no ad SDKs.
+- **Standard builds** optionally use network for YouTube Music streaming/downloads, artwork/lyrics metadata, scrobbling, and cloud backup — all gated behind `Offline-only mode` in Settings.
+- **Data Safety**: All library indexes, ratings, and playlists remain strictly on your device unless you opt into cloud sync.
 
 ---
 
@@ -282,8 +283,11 @@ Pulsr adheres strictly to Google Play Store data safety and permission guideline
 | `POST_NOTIFICATIONS` | API 33+ | Notifications| Display MediaStyle playback controls and scrub bars. |
 | `RECORD_AUDIO` | All | Optional | Live audio visualizer DSP analysis *(Denied fallback: synthetic waveforms)*. |
 | `MODIFY_AUDIO_SETTINGS` | All | Playback | Configure the equalizer and audio output session. |
-| `WRITE_SETTINGS` | All | Optional | Set a track as the system ringtone *(user-initiated only)*. |
+| `WRITE_SETTINGS` | All | Optional | Set a track as the system ringtone *(user-initiated only, runtime-gated)*. |
 | `WAKE_LOCK` | All | Playback | Prevents CPU sleep while streaming local audio. |
+| `INTERNET` | All (removed in Pure/prod) | Network | YTM streaming, artwork/lyrics metadata, scrobbling, cloud sync. Not present in Pulsr Pure. |
+| `FOREGROUND_SERVICE_DATA_SYNC` | API 34+ | Background | Keeps YTM downloads alive (removed in Pure/prod). |
+| `BLUETOOTH_CONNECT` / `BLUETOOTH` | API 31+ / ≤30 | Playback | A2DP device names and codec info for Hi-Res output. |
 
 ---
 

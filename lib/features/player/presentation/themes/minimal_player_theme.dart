@@ -151,11 +151,11 @@ class MinimalPlayerTheme extends StatelessWidget {
                                 child: ConstrainedBox(
                                   constraints: BoxConstraints(
                                     maxHeight: isLandscape
-                                        ? 220
-                                        : (isTablet ? 340 : 280),
+                                        ? 280
+                                        : double.infinity,
                                     maxWidth: isLandscape
-                                        ? 220
-                                        : (isTablet ? 340 : 280),
+                                        ? 280
+                                        : double.infinity,
                                   ),
                                   child: AspectRatio(
                                     aspectRatio: 1.0,
@@ -569,18 +569,34 @@ class MinimalPlayerTheme extends StatelessWidget {
 
                 // Center: Artwork / Lyrics / Queue
                 Expanded(
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: (state.isLyricsVisible || state.isQueueVisible)
-                            ? (isTablet ? 560.0 : double.infinity)
-                            : 380.0,
-                        maxHeight: (state.isLyricsVisible || state.isQueueVisible)
-                            ? double.infinity
-                            : 360.0,
-                      ),
-                      child: centerDisplay,
-                    ),
+                  child: LayoutBuilder(
+                    builder: (context, artConstraints) {
+                      final double availableWidth =
+                          artConstraints.maxWidth - (isTablet ? 64.0 : 36.0);
+                      final double availableHeight =
+                          artConstraints.maxHeight - (isTablet ? 24.0 : 12.0);
+                      final double maxAllowed = isTablet ? 560.0 : 420.0;
+                      final double minArtSize = math.min(
+                        math.min(availableWidth, availableHeight),
+                        maxAllowed,
+                      ).clamp(180.0, double.infinity);
+
+                      return Center(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: (state.isLyricsVisible ||
+                                    state.isQueueVisible)
+                                ? (isTablet ? 560.0 : double.infinity)
+                                : minArtSize,
+                            maxHeight: (state.isLyricsVisible ||
+                                    state.isQueueVisible)
+                                ? double.infinity
+                                : minArtSize,
+                          ),
+                          child: centerDisplay,
+                        ),
+                      );
+                    },
                   ),
                 ),
 

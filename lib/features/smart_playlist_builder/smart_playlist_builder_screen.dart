@@ -634,6 +634,7 @@ class _RuleCardState extends State<_RuleCard> {
                       widget.rule.field == SmartRuleField.year ||
                       widget.rule.field == SmartRuleField.decade ||
                       widget.rule.field == SmartRuleField.durationMs ||
+                      widget.rule.field == SmartRuleField.rating ||
                       widget.rule.operator == SmartOperator.withinDays)
                   ? TextInputType.number
                   : TextInputType.text,
@@ -680,6 +681,8 @@ class _RuleCardState extends State<_RuleCard> {
         return 'e.g. 300000 (ms = 5 mins)';
       case SmartRuleField.lastPlayed:
         return 'e.g. 7';
+      case SmartRuleField.rating:
+        return 'e.g. 4 (stars 0–5)';
       default:
         return 'Value...';
     }

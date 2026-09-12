@@ -11,7 +11,6 @@ import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
 import '../../../data/scanner/media_scanner_service.dart';
-import '../../../domain/usecases/get_favorites_usecase.dart';
 import '../../../domain/usecases/get_songs_usecase.dart';
 import '../../../core/errors/failures.dart';
 import '../../player/cubit/player_cubit.dart';
@@ -374,6 +373,22 @@ class _HomeScreenState extends State<HomeScreen> {
                           iconColor: Colors.pinkAccent,
                           onTap: () => context.push('/theme-studio'),
                         ),
+                        const SizedBox(width: 8),
+                        _DiscoveryChip(
+                          icon: Icons.queue_music_rounded,
+                          label: 'Queue',
+                          iconColor: Colors.lightBlueAccent,
+                          onTap: () => context.push('/queue'),
+                        ),
+                        if (AppConfig.ytmEnabled) ...[
+                          const SizedBox(width: 8),
+                          _DiscoveryChip(
+                            icon: Icons.downloading_rounded,
+                            label: 'Downloads',
+                            iconColor: Colors.greenAccent,
+                            onTap: () => context.push('/downloads'),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -463,15 +478,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 subtitle: context.l10n.likedTracks,
                 icon: Icons.favorite_rounded,
                 color: p.favorite,
-                onTap: () async {
-                  final favoritesRes =
-                      await getIt<GetFavoritesUseCase>().getFavorites();
-                  favoritesRes.fold((l) => null, (favs) {
-                    if (favs.isNotEmpty) {
-                      playerCubit.playSong(favs.first, queue: favs);
-                    }
-                  });
-                },
+                onTap: () => context.push('/favorites'),
               ),
               const SizedBox(width: 10),
               _QuickCard(

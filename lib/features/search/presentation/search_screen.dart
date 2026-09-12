@@ -363,6 +363,51 @@ class _SearchScreenState extends State<SearchScreen> {
                   style: TextStyle(color: p.textSecondary, fontSize: 13),
                 ),
                 const SizedBox(height: 24),
+                if (state.history.isNotEmpty) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'RECENT SEARCHES',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: p.textTertiary,
+                            letterSpacing: 1.2),
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () =>
+                            context.read<SearchCubit>().clearHistory(),
+                        child: Icon(Icons.clear_all_rounded,
+                            size: 16, color: p.textTertiary),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      for (final h in state.history)
+                        ActionChip(
+                          label: Text(h),
+                          backgroundColor: p.surfaceContainer,
+                          side: BorderSide(color: p.hairline),
+                          labelStyle: TextStyle(
+                              color: p.textPrimary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600),
+                          onPressed: () {
+                            _searchController.text = h;
+                            context.read<SearchCubit>().useHistoryQuery(h);
+                          },
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                ],
                 Text(
                   'QUICK DISCOVERY',
                   style: TextStyle(

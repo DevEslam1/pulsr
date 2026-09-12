@@ -958,7 +958,7 @@ class AudioEffectsChannel {
     }
   }
 
-  // --- PHASE 1 DSP EXPANSION: HARMONIC SATURATION / EXCITER ---  // --- PHASE 1 DSP EXPANSION: HARMONIC SATURATION / EXCITER ---
+  // --- PHASE 1 DSP EXPANSION: HARMONIC SATURATION / EXCITER ---
 
   Future<void> setSaturationEnabled(bool enabled) async {
     if (!_isAndroid) return;

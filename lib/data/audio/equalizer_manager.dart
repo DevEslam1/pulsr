@@ -76,6 +76,7 @@ class EqualizerManager {
   EqPreset currentPreset = EqPreset.defaultPresets.first;
   bool isEnabled = false;
   bool is32BandMode = false;
+  double preampDb = 0.0;
 
   double volumeBoost = 0.0; // 0.0 -> 1.0, maps to 0-1000 mB
 
@@ -192,6 +193,7 @@ class EqualizerManager {
   EqualizerManager({this.loudnessEnhancerA, this.loudnessEnhancerB});
 
   void _debouncedSavePreferences() {
+    if (_isDegradedForPower) return; // battery degrade must not clobber saved ON prefs
     _saveDebounce?.cancel();
     _saveDebounce = Timer(const Duration(milliseconds: 350), () {
       _savePreferences();
@@ -299,6 +301,8 @@ class EqualizerManager {
 
       currentPreset = EqPreset(name: presetName, gains: gains, bassBoost: bass);
       comparisonSlots[ComparisonSlot.slotA] = currentPreset;
+      preampDb =
+          (prefs.getDouble(PrefsKeys.eqPreamp) ?? 0.0).clamp(-15.0, 15.0);
 
       isVirtualizerEnabled =
           prefs.getBool(PrefsKeys.eqVirtualizerEnabled) ?? false;
@@ -629,6 +633,7 @@ class EqualizerManager {
         PrefsKeys.eqCustomFrequencies: json.encode(customFrequencies),
         PrefsKeys.eqCustom32Frequencies: json.encode(custom32Frequencies),
         PrefsKeys.eqBassBoost: currentPreset.bassBoost,
+        PrefsKeys.eqPreamp: preampDb,
         PrefsKeys.eqVolumeBoost: volumeBoost,
         PrefsKeys.eqVirtualizerEnabled: isVirtualizerEnabled,
         PrefsKeys.eqVirtualizerStrength: virtualizerStrength,
@@ -869,8 +874,9 @@ class EqualizerManager {
   }
 
   Future<void> setPreamp(double preampDb) async {
+    this.preampDb = preampDb.clamp(-15.0, 15.0);
     if (PlatformCapabilities.isAndroid) {
-      await _effectsChannel.setEqPreamp(preampDb.clamp(-15.0, 15.0));
+      await _effectsChannel.setEqPreamp(this.preampDb);
     }
     _debouncedSavePreferences();
   }
@@ -1961,11 +1967,15 @@ class EqualizerManager {
 
       await _effectsChannel.setEqEnabled(isEnabled);
       await _effectsChannel.setNativeEqEnabled(isEnabled);
-      // Native eqPreampDb resets to 0 whenever the plugin is re-created, and
-      // no other push carries it, so a re-attach would silently drop the
-      // headphone profile's preamp.
-      await _effectsChannel
-          .setEqPreamp(selectedHeadphoneProfile?.preampGain ?? 0.0);
+      // Native eqPreampDb resets to 0 whenever the plugin is re-created.
+      // Restore the persisted manual preamp, falling back to the headphone
+      // profile preamp only when no manual value was stored.
+      final storedPreamp = preampDb;
+      final effectivePreamp = storedPreamp != 0.0
+          ? storedPreamp
+          : (selectedHeadphoneProfile?.preampGain ?? 0.0);
+      await _effectsChannel.setEqPreamp(effectivePreamp);
+      if (storedPreamp == 0.0) preampDb = effectivePreamp;
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to initialize EQ chain',
@@ -2115,5 +2125,8 @@ class EqualizerManager {
     _bandGainDebounce?.cancel();
     _bandGainDebounce = null;
     unawaited(_savePreferences());
+    try {
+      effectStatusNotifier.dispose();
+    } catch (_) {}
   }
 }

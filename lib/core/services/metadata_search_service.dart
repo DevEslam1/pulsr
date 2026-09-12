@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/error_logger.dart';
 
 class OnlineTrackMetadata {
@@ -35,11 +36,16 @@ class MetadataSearchService {
       : _httpClient = httpClient ?? http.Client();
 
   /// Searches iTunes and MusicBrainz APIs for track metadata matching [query] or [artist] & [title].
+  /// Returns empty when offline-only mode is enabled.
   Future<List<OnlineTrackMetadata>> searchMetadata({
     required String title,
     String? artist,
     String? album,
   }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool('setting_offline_only_mode') == true) return const [];
+    } catch (_) {}
     final results = <OnlineTrackMetadata>[];
 
     // 1. Search iTunes Search API (fast, reliable, high-res artwork)

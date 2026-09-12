@@ -303,19 +303,8 @@ class ClassicPlayerTheme extends StatelessWidget {
                     final double switcherBottomPad =
                         (isTablet ? 10.0 : 6.0) * heightRatio;
 
-                    // Prominent, modern artwork sizing filling the upper viewport harmoniously
-                    final double maxArtWidth =
-                        constraints.maxWidth - (isTablet ? 64 : 36);
-                    final double maxArtHeight = constraints.maxHeight -
-                        (isTablet ? 360 : (285.0 * heightRatio));
-                    final double portraitArtSize =
-                        math.min(maxArtWidth, maxArtHeight).clamp(
-                              isTablet ? 320.0 : 260.0,
-                              isTablet ? 540.0 : 400.0,
-                            );
-
                     final double landscapeArtSize =
-                        (constraints.maxHeight - 80).clamp(280.0, 480.0);
+                        (constraints.maxHeight - 36).clamp(280.0, 520.0);
 
                     // Symmetrical twin pill capsule dimensions for top (view switcher) & bottom (eq dock)
                     final double pillBarWidth = math.min(
@@ -717,20 +706,37 @@ class ClassicPlayerTheme extends StatelessWidget {
                           child: viewSwitcher,
                         ),
                         Expanded(
-                          child: Center(
-                            child: ConstrainedBox(
-                              constraints: BoxConstraints(
-                                maxWidth: (state.isLyricsVisible ||
-                                        state.isQueueVisible)
-                                    ? (isTablet ? 560.0 : double.infinity)
-                                    : portraitArtSize,
-                                maxHeight: (state.isLyricsVisible ||
-                                        state.isQueueVisible)
-                                    ? double.infinity
-                                    : portraitArtSize,
-                              ),
-                              child: centerDisplay,
-                            ),
+                          child: LayoutBuilder(
+                            builder: (context, artConstraints) {
+                              final double availableWidth =
+                                  artConstraints.maxWidth -
+                                      (isTablet ? 64.0 : 32.0);
+                              final double availableHeight =
+                                  artConstraints.maxHeight -
+                                      (isTablet ? 24.0 : 12.0);
+                              final double maxAllowed =
+                                  isTablet ? 560.0 : 420.0;
+                              final double dynamicArtSize = math.min(
+                                math.min(availableWidth, availableHeight),
+                                maxAllowed,
+                              ).clamp(180.0, double.infinity);
+
+                              return Center(
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    maxWidth: (state.isLyricsVisible ||
+                                            state.isQueueVisible)
+                                        ? (isTablet ? 560.0 : double.infinity)
+                                        : dynamicArtSize,
+                                    maxHeight: (state.isLyricsVisible ||
+                                            state.isQueueVisible)
+                                        ? double.infinity
+                                        : dynamicArtSize,
+                                  ),
+                                  child: centerDisplay,
+                                ),
+                              );
+                            },
                           ),
                         ),
                         if (showVisualizer) visualizer,

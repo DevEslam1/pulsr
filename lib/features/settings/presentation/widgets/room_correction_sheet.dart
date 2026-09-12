@@ -11,6 +11,8 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../core/di/injection.dart';
 import '../../../../core/services/room_correction_service.dart';
+import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
@@ -45,6 +47,16 @@ enum _RcPhase { idle, measuring, analyzing, result }
 /// the same guarded path as every other preset, so conflict rules hold.
 class RoomCorrectionSheet extends StatefulWidget {
   const RoomCorrectionSheet({super.key});
+
+  static Future<void> show(BuildContext context) {
+    return showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const RoomCorrectionSheet(),
+    );
+  }
 
   @override
   State<RoomCorrectionSheet> createState() => _RoomCorrectionSheetState();
@@ -166,7 +178,9 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final l10n = context.l10n;
+
     return BlocListener<PlayerCubit, PlayerState>(
       listenWhen: (a, b) =>
           a.errorMessage != b.errorMessage && b.errorMessage != null,
@@ -180,87 +194,297 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
           ctx.read<PlayerCubit>().clearError();
         }
       },
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
-          bottom: 20 + MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(l10n.rcTitle,
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w800)),
-            const SizedBox(height: 4),
-            Text(l10n.rcSubtitle, style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 14),
-            if (_phase == _RcPhase.idle) ...[
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Text(_error!,
-                      style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                          fontSize: 12)),
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: Adaptive.sheetConstraints(context).maxWidth,
+          ),
+          child: Material(
+            color: p.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            clipBehavior: Clip.antiAlias,
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  top: 12,
+                  bottom: 20 + MediaQuery.of(context).viewInsets.bottom,
                 ),
-              Text(l10n.rcQuietHint,
-                  style: Theme.of(context).textTheme.bodySmall),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  icon: const Icon(Icons.graphic_eq_rounded),
-                  label: Text(l10n.rcStart),
-                  onPressed: _start,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Top drag handle
+                    Center(
+                      child: Container(
+                        width: 38,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: p.hairline,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Header
+                    Row(
+                      children: [
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: p.accentContainer,
+                            borderRadius: BorderRadius.circular(11),
+                          ),
+                          child: Icon(Icons.graphic_eq_rounded,
+                              color: p.accent, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                l10n.rcTitle,
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w800,
+                                  color: p.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                l10n.rcSubtitle,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: p.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.close_rounded,
+                              color: p.textSecondary),
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+
+                    if (_phase == _RcPhase.idle) ...[
+                      if (_error != null)
+                        Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: p.error.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: p.error.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.error_outline_rounded,
+                                  color: p.error, size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(_error!,
+                                    style: TextStyle(
+                                        color: p.error, fontSize: 12)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.04),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: p.hairline),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.volume_off_rounded,
+                                color: p.accent, size: 18),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                l10n.rcQuietHint,
+                                style: TextStyle(
+                                  color: p.textSecondary,
+                                  fontSize: 12,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: p.accent,
+                            foregroundColor: p.onAccent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          icon: const Icon(Icons.graphic_eq_rounded, size: 20),
+                          label: Text(
+                            l10n.rcStart,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700, fontSize: 15),
+                          ),
+                          onPressed: _start,
+                        ),
+                      ),
+                    ] else if (_phase == _RcPhase.measuring ||
+                        _phase == _RcPhase.analyzing) ...[
+                      Center(
+                        child: Column(
+                          children: [
+                            const SizedBox(height: 8),
+                            Text(
+                              l10n.rcMeasuring,
+                              style: TextStyle(
+                                color: p.textPrimary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              child: LinearProgressIndicator(
+                                value: _phase == _RcPhase.measuring
+                                    ? _progress
+                                    : null,
+                                backgroundColor: p.hairline,
+                                color: p.accent,
+                                minHeight: 8,
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+                          ],
+                        ),
+                      ),
+                    ] else ...[
+                      Text(
+                        l10n.rcResult,
+                        style: TextStyle(
+                          color: p.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        height: 130,
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.03),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: p.hairline),
+                        ),
+                        child: CustomPaint(
+                          size: Size.infinite,
+                          painter: _ResponsePainter(
+                            response: _responseDb ?? const [],
+                            gains: _gains ?? const [],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                              width: 10,
+                              height: 10,
+                              color: const Color(0xFF7C4DFF)),
+                          const SizedBox(width: 6),
+                          Text('Measured Response',
+                              style: TextStyle(
+                                  color: p.textSecondary, fontSize: 11)),
+                          const SizedBox(width: 16),
+                          Container(
+                              width: 10,
+                              height: 10,
+                              color: const Color(0xFF2BB673)),
+                          const SizedBox(width: 6),
+                          Text('Fitted EQ Gain',
+                              style: TextStyle(
+                                  color: p.textSecondary, fontSize: 11)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        l10n.rcKeepPlayerPaused,
+                        style: TextStyle(color: p.textTertiary, fontSize: 11),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: 46,
+                              child: OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: p.textSecondary,
+                                  side: BorderSide(color: p.hairline),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                onPressed: () => Navigator.of(context).pop(),
+                                child: Text(l10n.rcDiscard),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: SizedBox(
+                              height: 46,
+                              child: FilledButton.icon(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: p.accent,
+                                  foregroundColor: p.onAccent,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                icon:
+                                    const Icon(Icons.check_rounded, size: 18),
+                                label: Text(
+                                  l10n.rcApply,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700),
+                                ),
+                                onPressed: _apply,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                  ],
                 ),
               ),
-            ] else if (_phase == _RcPhase.measuring ||
-                _phase == _RcPhase.analyzing) ...[
-              Text(l10n.rcMeasuring,
-                  style: Theme.of(context).textTheme.bodyMedium),
-              const SizedBox(height: 10),
-              LinearProgressIndicator(value: _phase == _RcPhase.measuring ? _progress : null),
-              const SizedBox(height: 14),
-            ] else ...[
-              Text(l10n.rcResult,
-                  style: Theme.of(context).textTheme.bodyMedium),
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 120,
-                child: CustomPaint(
-                  size: Size.infinite,
-                  painter: _ResponsePainter(
-                      response: _responseDb ?? const [], gains: _gains ?? const []),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(l10n.rcKeepPlayerPaused,
-                  style: Theme.of(context).textTheme.bodySmall),
-              const SizedBox(height: 12),
-              Row(children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: Text(l10n.rcDiscard),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: FilledButton.icon(
-                    icon: const Icon(Icons.check_rounded),
-                    label: Text(l10n.rcApply),
-                    onPressed: _apply,
-                  ),
-                ),
-              ]),
-            ],
-            const SizedBox(height: 8),
-          ],
+            ),
+          ),
         ),
       ),
     );

@@ -20,7 +20,7 @@ void main() {
       expect(
           Formatters.formatDuration(
               const Duration(hours: 1, minutes: 2, seconds: 3)),
-          '62:03');
+          '1:02:03');
     });
 
     test('formatDurationMs handles null, negative, and positive ms', () {
