@@ -1,7 +1,11 @@
 // lib/core/services/ytm_url_cache.dart
+import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../domain/models/ytm_track.dart';
 import '../telemetry/clock.dart';
 
@@ -78,6 +82,16 @@ class YtmUrlCache {
   final LinkedHashMap<String, YtmUrlCacheEntry> _cache =
       LinkedHashMap<String, YtmUrlCacheEntry>();
 
+  static const String _diskFileName = 'ytm_url_cache_v1.json';
+  /// Restored entries are only worth keeping if they have meaningful life left;
+  /// a URL that expires moments after launch would just 403 on first play.
+  static const Duration _restoreMinTtl = Duration(minutes: 10);
+  static const Duration _persistDebounce = Duration(seconds: 3);
+
+  File? _diskFile;
+  bool _restored = false;
+  Timer? _persistTimer;
+
   @factoryMethod
   YtmUrlCache()
       : _clock = const SystemClock(),
@@ -88,6 +102,76 @@ class YtmUrlCache {
   YtmUrlCache.withClock(this._clock, {int capacity = defaultCapacity, Duration ttl = defaultTtl})
       : _capacity = capacity,
         _ttl = ttl;
+
+  /// Loads guest stream URLs persisted by a previous run so a replay or a
+  /// skip-back after a restart is instant instead of a full resolve.
+  ///
+  /// Only entries **without cookies** are persisted: account-bound URLs carry
+  /// credentials that must not land in a plaintext file, and their signed URLs
+  /// are far more likely to be invalidated (IP/account binding) between runs.
+  /// Guest URLs for public tracks are the overwhelmingly common case and the
+  /// one worth caching across launches.
+  Future<void> restore() async {
+    if (_restored) return;
+    _restored = true;
+    try {
+      final dir = await getApplicationSupportDirectory();
+      final file = File('${dir.path}/$_diskFileName');
+      _diskFile = file;
+      if (!await file.exists()) return;
+      final raw = await file.readAsString();
+      if (raw.trim().isEmpty) return;
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return;
+      final now = _clock.now();
+      for (final item in decoded) {
+        if (item is! Map) continue;
+        final videoId = item['videoId'] as String?;
+        final url = item['url'] as String?;
+        final quality = item['quality'] as String? ?? 'high';
+        final expiryRaw = item['expiresAt'];
+        if (videoId == null || url == null || expiryRaw is! int) continue;
+        final expiresAt = DateTime.fromMillisecondsSinceEpoch(expiryRaw);
+        if (expiresAt.difference(now) < _restoreMinTtl) continue;
+        final userAgent = item['userAgent'] as String?;
+        // Reuse put() so URL stamp parsing / safety margins stay authoritative.
+        put(videoId, url,
+            quality: quality, explicitExpiry: expiresAt, userAgent: userAgent);
+      }
+      debugPrint('[YtmUrlCache] Restored ${_cache.length} cached stream URL(s)');
+    } catch (e) {
+      debugPrint('[YtmUrlCache] restore failed: $e');
+    }
+  }
+
+  void _schedulePersist() {
+    final file = _diskFile;
+    if (file == null) return;
+    _persistTimer?.cancel();
+    _persistTimer = Timer(_persistDebounce, () {
+      unawaited(_persistNow(file));
+    });
+  }
+
+  Future<void> _persistNow(File file) async {
+    try {
+      final list = <Map<String, dynamic>>[];
+      for (final e in _cache.entries) {
+        final entry = e.value;
+        if (entry.cookies != null && entry.cookies!.isNotEmpty) continue;
+        final sep = e.key.lastIndexOf(':');
+        final quality = sep >= 0 ? e.key.substring(sep + 1) : 'high';
+        list.add({
+          'videoId': entry.videoId,
+          'url': entry.url,
+          'quality': quality,
+          'expiresAt': entry.expiresAt.millisecondsSinceEpoch,
+          if (entry.userAgent != null) 'userAgent': entry.userAgent,
+        });
+      }
+      await file.writeAsString(jsonEncode(list), flush: false);
+    } catch (_) {}
+  }
 
   String _buildKey(String videoId, String quality) => '$videoId:${quality.toLowerCase()}';
 
@@ -179,6 +263,7 @@ class YtmUrlCache {
     }
 
     _cache[key] = entry;
+    _schedulePersist();
   }
 
   /// Stores a resolved [YtmStream] into the LRU cache.
@@ -209,11 +294,13 @@ class YtmUrlCache {
         _cache.remove(k);
       }
     }
+    _schedulePersist();
   }
 
   /// Clears entire in-memory URL cache.
   void clear() {
     _cache.clear();
+    _schedulePersist();
   }
 
   /// Current number of entries in the cache.

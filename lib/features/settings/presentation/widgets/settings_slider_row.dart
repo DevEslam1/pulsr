@@ -1,6 +1,7 @@
 // lib/features/settings/presentation/widgets/settings_slider_row.dart
 import 'package:flutter/material.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/widgets/pulsr_slider.dart';
 
 /// A labeled settings slider with a trailing "restore default" affordance.
 ///
@@ -112,12 +113,12 @@ class SettingSliderRow extends StatelessWidget {
                       fontWeight: FontWeight.w600)),
             ),
           ],
-          Slider(
+          PulsrSlider(
             value: value.clamp(min, max),
             min: min,
             max: max,
             divisions: divisions,
-            onChanged: enabled ? onChanged : null,
+            onChanged: enabled ? onChanged : (_) {},
           ),
         ],
       ),

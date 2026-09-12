@@ -11,6 +11,7 @@ import 'package:injectable/injectable.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/services/ytm_client_version_resolver.dart';
+import 'package:pulsr/core/services/ytm_oauth_service.dart';
 import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/core/services/ytm_url_cache.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -135,10 +136,23 @@ class YtmAccountService {
   /// `visitorData` harvested from an authenticated response; sent in the WEB_REMIX player context.
   String? _sessionVisitorData;
 
+  /// Bearer token from the Google TV OAuth device flow (captcha-free login).
+  /// Mutually exclusive with [_cookies] in practice: OAuth sessions carry no
+  /// cookie jar, and cookie sessions carry no bearer.
+  String? _oauthAccessToken;
+
   /// Notifies listeners whenever the YTM login state changes (login/logout).
   final loginState = ValueNotifier<bool>(false);
 
-  bool get isLoggedIn => _cookies != null && _cookies!.isNotEmpty;
+  bool get isLoggedIn =>
+      (_cookies != null && _cookies!.isNotEmpty) ||
+      (_oauthAccessToken != null && _oauthAccessToken!.isNotEmpty);
+
+  /// True when the active session is an OAuth bearer rather than a cookie jar.
+  bool get isOAuthSession =>
+      (_cookies == null || _cookies!.isEmpty) &&
+      _oauthAccessToken != null &&
+      _oauthAccessToken!.isNotEmpty;
   String? get cookies => _cookies;
   String? get accountName => _accountName;
   String? get accountAvatar => _accountAvatar;
@@ -195,6 +209,25 @@ class YtmAccountService {
       // on a first run — leaving Dart and native disagreeing about which account
       // the poToken is bound to.
       _dataSyncId ??= prefs.getString(_dataSyncIdPrefKey);
+
+      // Adopt a Google TV OAuth session when no cookie jar is present. This is
+      // the captcha-free login path: library/browse/playlist calls use the
+      // bearer, while playback still rides the guest engine chain (it needs a
+      // datasync-bound poToken, which OAuth does not provide).
+      if (_cookies == null || _cookies!.isEmpty) {
+        try {
+          final oauth = YtmOAuthService.shared;
+          await oauth.init();
+          if (oauth.isSignedIn) {
+            _oauthAccessToken = oauth.accessToken;
+            _accountName ??= 'Google TV';
+            unawaited(oauth.ensureFresh());
+          }
+        } catch (e) {
+          debugPrint('[YTM_ACCOUNT] OAuth session restore failed: $e');
+        }
+      }
+
       _isInitialized = true;
       loginState.value = isLoggedIn;
     } catch (e, st) {
@@ -448,13 +481,40 @@ class YtmAccountService {
     return true;
   }
 
+  /// Adopts a freshly-completed Google TV OAuth device-flow session and
+  /// notifies listeners. Called by the OAuth login sheet on success.
+  ///
+  /// No cookie jar exists for this session, so playback continues through the
+  /// guest engine chain; the bearer unlocks library, browse and playlists.
+  Future<void> adoptOAuthSession() async {
+    final oauth = YtmOAuthService.shared;
+    await oauth.init();
+    if (!await oauth.ensureFresh()) return;
+    _oauthAccessToken = oauth.accessToken;
+    _accountName ??= 'Google TV';
+    _accountAvatar = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_accountNamePrefKey, _accountName!);
+    loginState.value = isLoggedIn;
+    // Warm session state (visitorData) off the critical path.
+    unawaited(() async {
+      try {
+        await _warmSession();
+      } catch (_) {}
+    }());
+  }
+
   Future<void> logout() async {
     _cookies = null;
+    _oauthAccessToken = null;
     _accountName = null;
     _accountAvatar = null;
     _dataSyncId = null;
     _sessionVisitorData = null;
     await _deleteStoredCookies();
+    try {
+      await YtmOAuthService.shared.signOut();
+    } catch (_) {}
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_accountNamePrefKey);
     await prefs.remove(_accountAvatarPrefKey);
@@ -703,6 +763,10 @@ class YtmAccountService {
       if (authHeader != null) {
         headers['Authorization'] = authHeader;
       }
+    } else if (_oauthAccessToken != null && _oauthAccessToken!.isNotEmpty) {
+      // Google TV OAuth session: InnerTube accepts an OAuth bearer on the
+      // WEB_REMIX client (same as `ytmusicapi`), and no cookie jar is involved.
+      headers['Authorization'] = 'Bearer $_oauthAccessToken';
     }
 
     // Innertube hands back a `visitorData` on the first response and expects it
@@ -733,6 +797,15 @@ class YtmAccountService {
   /// here rather than at each call site means no request can forget.
   Map<String, String>? _resignHeaders(Map<String, String>? headers) {
     if (headers == null) return null;
+    // OAuth sessions re-read the (possibly just refreshed) bearer so a retry
+    // after a 401 never replays the stale token.
+    if (isOAuthSession) {
+      final token = YtmOAuthService.shared.accessToken;
+      if (token != null && token.isNotEmpty) {
+        return {...headers, 'Authorization': 'Bearer $token'};
+      }
+      return headers;
+    }
     // Only requests we signed in the first place: an anonymous call must stay
     // anonymous no matter what happens to be in the jar.
     if (!headers.containsKey('Authorization')) return headers;
@@ -914,6 +987,14 @@ class YtmAccountService {
     int maxAttempts = 3,
     int baseTimeoutSeconds = 15,
   }) async {
+    // Keep the OAuth bearer fresh before the first request of a paging walk.
+    if (isOAuthSession) {
+      try {
+        if (await YtmOAuthService.shared.ensureFresh()) {
+          _oauthAccessToken = YtmOAuthService.shared.accessToken;
+        }
+      } catch (_) {}
+    }
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
       try {
         await YtmRateLimiter.shared.acquirePermit();
@@ -921,6 +1002,16 @@ class YtmAccountService {
         final res = await _innertubeClient
             .post(uri, headers: _resignHeaders(headers), body: body)
             .timeout(timeout);
+        // A 401 on an OAuth session is an expired bearer: refresh and retry.
+        if (res.statusCode == 401 &&
+            isOAuthSession &&
+            attempt < maxAttempts - 1) {
+          final refreshed = await YtmOAuthService.shared.refresh();
+          if (refreshed) {
+            _oauthAccessToken = YtmOAuthService.shared.accessToken;
+            continue;
+          }
+        }
         if (res.statusCode == 429 || res.statusCode >= 500) {
           if (res.statusCode == 429) {
             YtmRateLimiter.shared.onRateLimited();
@@ -946,7 +1037,7 @@ class YtmAccountService {
           // was valid at login quietly aged out. Gated on `isLoggedIn` so a
           // response to an anonymous call cannot conjure a session out of
           // whatever cookies the edge server happened to set.
-          if (isLoggedIn) {
+          if (isLoggedIn && _cookies != null && _cookies!.isNotEmpty) {
             final setCookie = res.headers['set-cookie'];
             if (setCookie != null && setCookie.isNotEmpty) {
               try {

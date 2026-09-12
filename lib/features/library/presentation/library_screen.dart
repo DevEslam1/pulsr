@@ -17,6 +17,7 @@ import '../../../core/utils/song_classification.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/song_tile.dart';
+import '../../../core/widgets/pulsr_dismissible.dart';
 import '../../../data/db/app_database.dart';
 import '../../../core/utils/formatters.dart';
 import '../../player/cubit/player_cubit.dart';
@@ -499,6 +500,8 @@ class _LibraryScreenState extends State<LibraryScreen>
     Widget buildSongItem(SongsTableData song, int index) {
       return Dismissible(
         key: ValueKey('song_${song.id}'),
+        direction: PulsrDismissible.direction,
+        dismissThresholds: PulsrDismissible.thresholds,
         background: Container(
           color: p.accentContainer,
           alignment: AlignmentDirectional.centerStart,
@@ -755,6 +758,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                       final song = downloaded[index];
                       return Dismissible(
                         key: ValueKey('dl_${song.id}'),
+                        direction: PulsrDismissible.direction,
+                        dismissThresholds: PulsrDismissible.thresholds,
                         background: Container(
                           color: p.accentContainer,
                           alignment: Alignment.centerLeft,
@@ -822,6 +827,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                       final song = downloaded[index];
                       return Dismissible(
                         key: ValueKey('dl_${song.id}'),
+                        direction: PulsrDismissible.direction,
+                        dismissThresholds: PulsrDismissible.thresholds,
                         background: Container(
                           color: p.accentContainer,
                           alignment: Alignment.centerLeft,
@@ -1435,6 +1442,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                           final song = currentFavorites[index];
                           return Dismissible(
                             key: ValueKey('fav_${song.id}'),
+                            direction: PulsrDismissible.direction,
+                            dismissThresholds: PulsrDismissible.thresholds,
                             background: Container(
                               color: p.accentContainer,
                               alignment: AlignmentDirectional.centerStart,

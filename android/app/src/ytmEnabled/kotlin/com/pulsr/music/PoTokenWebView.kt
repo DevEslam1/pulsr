@@ -376,7 +376,7 @@ internal class PoTokenWebView private constructor(
         var GOOGLE_API_KEY: String = YtmConfig.getGoogleApiKey()
         private const val REQUEST_KEY = "O43z0dpjhgX20SCx4KAo"
         private const val USER_AGENT =
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0"
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:154.0) Gecko/20100101 Firefox/154.0"
         private const val JS_INTERFACE = "PoTokenWebView"
 
         // Initialization is two network round-trips plus a JS handshake that upstream

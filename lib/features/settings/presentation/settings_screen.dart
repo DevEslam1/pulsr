@@ -1,566 +1,101 @@
 // lib/features/settings/presentation/settings_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../../core/config/app_config.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_radii.dart';
 import '../../../core/di/injection.dart';
-import '../../../core/services/artwork_cache_manager.dart';
-import '../../../core/services/automation_rules_service.dart';
-import '../../../core/services/automation_trigger_service.dart';
-import '../../../core/services/scrobbler_service.dart';
-import '../../../core/services/settings_profiles_service.dart';
 import '../../../core/services/ytm_account_service.dart';
-import '../../../core/services/ytm_cache_manager.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
-import '../../auth/cubit/auth_cubit.dart';
-import '../../auth/cubit/auth_state.dart';
-import '../../auth/presentation/auth_sheet.dart';
+import '../../../core/widgets/pulsr_dialog.dart';
+import '../../../core/widgets/pulsr_slider.dart';
 import '../../auth/presentation/ytm_web_login_sheet.dart';
-import '../../player/presentation/widgets/audio_visualizer.dart';
 import '../cubit/settings_cubit.dart';
 import '../cubit/settings_state.dart';
 import 'widgets/audio_sound_section.dart';
+import 'widgets/automation_rules_sheet.dart';
 import 'widgets/backup_section.dart';
 import 'widgets/device_profiles_section.dart';
 import 'widgets/playback_section.dart';
+import 'widgets/scrobbler_settings_modal.dart';
+import 'widgets/settings_hero_card.dart';
+import 'widgets/settings_picker_sheets.dart';
+import 'widgets/storage_cache_section.dart';
 import 'widgets/ytm_account_disconnect_dialog.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
 
+class _Category {
+  final String id;
+  final IconData icon;
+  String title = '';
+  final GlobalKey key;
+
+  _Category(this.id, this.icon) : key = GlobalKey();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
+  final List<_Category> _categories = [];
+
+  String _selectedCategoryId = 'all';
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      final q = _searchController.text.trim().toLowerCase();
+      if (q != _searchQuery) {
+        setState(() => _searchQuery = q);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return BlocBuilder<SettingsCubit, SettingsState>(
       builder: (context, state) {
         final cubit = context.read<SettingsCubit>();
+        _assignCategoryTitles(context);
 
         return Scaffold(
-          appBar: AppBar(title: Text(context.l10n.settings)),
-          body: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                  maxWidth: context.isTabletLandscape ? 1040 : 760),
-              child: ListView(
-                padding: EdgeInsets.only(
-                    bottom: 160,
-                    top: 8,
-                    left: Adaptive.pagePadding(context),
-                    right: Adaptive.pagePadding(context)),
-                children: [
-                  _buildCloudSyncCard(context),
-                  AudioSoundSection(state: state),
-                  PlaybackSection(state: state),
-                  _section(context, context.l10n.themeAndAppearance, [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: SegmentedButton<AppThemeMode>(
-                          showSelectedIcon: false,
-                          style: const ButtonStyle(
-                            visualDensity: VisualDensity.compact,
-                            padding: WidgetStatePropertyAll(
-                              EdgeInsets.symmetric(horizontal: 2),
-                            ),
-                          ),
-                          segments: [
-                            ButtonSegment(
-                              value: AppThemeMode.system,
-                              label: Text(
-                                context.l10n.systemDefault,
-                                maxLines: 1,
-                                softWrap: false,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelSmall
-                                    ?.copyWith(fontWeight: FontWeight.w700),
-                              ),
-                              icon: const Icon(Icons.brightness_auto_rounded,
-                                  size: 15),
-                            ),
-                            ButtonSegment(
-                              value: AppThemeMode.light,
-                              label: Text(
-                                context.l10n.themeLight,
-                                maxLines: 1,
-                                softWrap: false,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelSmall
-                                    ?.copyWith(fontWeight: FontWeight.w700),
-                              ),
-                              icon: const Icon(Icons.light_mode_rounded,
-                                  size: 15),
-                            ),
-                            ButtonSegment(
-                              value: AppThemeMode.dark,
-                              label: Text(
-                                context.l10n.themeDark,
-                                maxLines: 1,
-                                softWrap: false,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelSmall
-                                    ?.copyWith(fontWeight: FontWeight.w700),
-                              ),
-                              icon:
-                                  const Icon(Icons.dark_mode_rounded, size: 15),
-                            ),
-                            ButtonSegment(
-                              value: AppThemeMode.amoled,
-                              label: Text(
-                                'AMOLED',
-                                maxLines: 1,
-                                softWrap: false,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelSmall
-                                    ?.copyWith(fontWeight: FontWeight.w700),
-                              ),
-                              icon:
-                                  const Icon(Icons.contrast_rounded, size: 15),
-                            ),
-                          ],
-                          selected: {state.themeMode},
-                          onSelectionChanged: (sel) =>
-                              cubit.setThemeMode(sel.first),
-                        ),
-                      ),
+          body: SafeArea(
+            bottom: false,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: context.isTabletLandscape ? 1040 : 760,
+                ),
+                child: Column(
+                  children: [
+                    _buildTopHeader(context),
+                    if (_searchQuery.isEmpty) _buildCategoryFilterBar(context),
+                    const SizedBox(height: 6),
+                    Expanded(
+                      child: _searchQuery.isNotEmpty
+                          ? _buildSearchResultsList(context, state, cubit)
+                          : _buildSettingsBody(context, state, cubit),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(context.l10n.accentColor,
-                              style: TextStyle(
-                                  color: p.textPrimary,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 14)),
-                          const SizedBox(height: 12),
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            physics: const BouncingScrollPhysics(),
-                            child: Row(
-                              children: AppColors.customAccents.map((color) {
-                                final isSelected =
-                                    state.customAccentColorValue ==
-                                        color.toARGB32();
-                                return Padding(
-                                  padding: const EdgeInsets.only(right: 12),
-                                  child: GestureDetector(
-                                    onTap: () =>
-                                        cubit.setCustomAccentColor(color),
-                                    child: AnimatedContainer(
-                                      duration:
-                                          const Duration(milliseconds: 200),
-                                      width: 42,
-                                      height: 42,
-                                      decoration: BoxDecoration(
-                                        color: color,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: isSelected
-                                              ? p.textPrimary
-                                              : Colors.transparent,
-                                          width: 2.5,
-                                        ),
-                                        boxShadow: isSelected
-                                            ? [
-                                                BoxShadow(
-                                                    color: color.withValues(
-                                                        alpha: 0.5),
-                                                    blurRadius: 12,
-                                                    spreadRadius: 1)
-                                              ]
-                                            : null,
-                                      ),
-                                      child: isSelected
-                                          ? Icon(
-                                              Icons.check_rounded,
-                                              size: 20,
-                                              color:
-                                                  color.computeLuminance() > 0.5
-                                                      ? Colors.black
-                                                      : Colors.white,
-                                            )
-                                          : null,
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    _divider(p),
-                    _switchTile(
-                        context,
-                        Icons.nightlight_round,
-                        'Auto Dark Mode by Time',
-                        'Follow a 7 PM – 6 AM day/night schedule',
-                        value: state.autoThemeByTime,
-                        onChanged: cubit.setAutoThemeByTime),
-                    _divider(p),
-                    _switchTile(
-                        context,
-                        Icons.contrast_rounded,
-                        'High Contrast',
-                        'Boost contrast with an AMOLED-friendly palette',
-                        value: state.highContrast,
-                        onChanged: cubit.setHighContrast),
-                    _divider(p),
-                    _navTile(
-                        context,
-                        Icons.art_track_rounded,
-                        context.l10n.nowPlayingTheme,
-                        _getThemeModeTitle(state.playerThemeMode),
-                        onTap: () => _showThemePickerSheet(
-                            context, cubit, state.playerThemeMode)),
-                    _divider(p),
-                    _navTile(
-                        context,
-                        Icons.graphic_eq_rounded,
-                        context.l10n.visualizerStyle,
-                        _getVisualizerStyleTitle(state.visualizerStyle),
-                        onTap: () => _showVisualizerStylePickerSheet(
-                            context, cubit, state.visualizerStyle)),
-                    _divider(p),
-                    _navTile(
-                        context,
-                        Icons.palette_outlined,
-                        context.l10n.colorSource,
-                        _getColorSourceTitle(state.themeColorSource),
-                        onTap: () => _showColorSourcePickerSheet(
-                            context, cubit, state.themeColorSource)),
-                    _divider(p),
-                    _navTile(
-                        context,
-                        Icons.language_rounded,
-                        context.l10n.language,
-                        _getLanguageTitle(state.languageCode, context.l10n),
-                        onTap: () => _showLanguagePickerSheet(
-                            context, cubit, state.languageCode)),
-                  ]),
-                  _section(context, context.l10n.gestures, [
-                    _navTile(
-                        context,
-                        Icons.swipe_left_rounded,
-                        context.l10n.miniPlayerSwipeLeft,
-                        _getMiniPlayerSwipeTitle(state.miniPlayerSwipeLeft),
-                        onTap: () => _showMiniPlayerSwipePickerSheet(
-                            context, cubit,
-                            isLeft: true,
-                            currentAction: state.miniPlayerSwipeLeft)),
-                    _divider(p),
-                    _navTile(
-                        context,
-                        Icons.swipe_right_rounded,
-                        context.l10n.miniPlayerSwipeRight,
-                        _getMiniPlayerSwipeTitle(state.miniPlayerSwipeRight),
-                        onTap: () => _showMiniPlayerSwipePickerSheet(
-                            context, cubit,
-                            isLeft: false,
-                            currentAction: state.miniPlayerSwipeRight)),
-                    _divider(p),
-                    _navTile(
-                        context,
-                        Icons.touch_app_rounded,
-                        context.l10n.nowPlayingDoubleTap,
-                        _getNowPlayingDoubleTapTitle(state.nowPlayingDoubleTap),
-                        onTap: () => _showNowPlayingDoubleTapPickerSheet(
-                            context, cubit, state.nowPlayingDoubleTap)),
-                    _divider(p),
-                    _navTile(
-                        context,
-                        Icons.gesture_rounded,
-                        context.l10n.artworkSwipe,
-                        _getNowPlayingArtworkSwipeTitle(
-                            state.nowPlayingArtworkSwipe),
-                        onTap: () => _showNowPlayingArtworkSwipePickerSheet(
-                            context, cubit, state.nowPlayingArtworkSwipe)),
-                  ]),
-                  _section(context, 'Device Profiles', [
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
-                      child: DeviceProfilesSection(),
-                    ),
-                  ]),
-                  _section(context, 'Automation', [
-                    _navTile(
-                        context,
-                        Icons.auto_awesome_rounded,
-                        'Automation Rules',
-                        'Apply profiles automatically on device events',
-                        onTap: () => _showAutomationRulesSheet(context)),
-                  ]),
-                  _section(context, context.l10n.libraryAndScanning, [
-                    _navTile(
-                        context,
-                        Icons.folder_off_rounded,
-                        context.l10n.hiddenAndExcludedFolders,
-                        state.autoHideSystemMedia
-                            ? context.l10n.autoFilteringVoiceMemos
-                            : context.l10n.manageExcludedDirectories,
-                        onTap: () => context.push('/hidden-folders')),
-                    _divider(p),
-                    _navTile(
-                        context,
-                        Icons.refresh_rounded,
-                        state.isScanning
-                            ? context.l10n.scanningStorage
-                            : context.l10n.rescanLibrary,
-                        state.scanResultCount != null
-                            ? context.l10n
-                                .lastScanTracks(state.scanResultCount!)
-                            : context.l10n.scanDeviceStorageForAudio,
-                        trailing: state.isScanning
-                            ? StreamBuilder<double>(
-                                stream: cubit.scanProgress,
-                                initialData: 0.0,
-                                builder: (context, snapshot) {
-                                  final progress =
-                                      (snapshot.data ?? 0.0).clamp(0.0, 1.0);
-                                  return SizedBox(
-                                    width: 40,
-                                    height: 40,
-                                    child: Center(
-                                      child: Text(
-                                        '${(progress * 100).round()}%',
-                                        style: TextStyle(
-                                            color: p.accent,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 12),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              )
-                            : null,
-                        onTap: state.isScanning
-                            ? () {}
-                            : () => cubit.rescanLibrary()),
-                    _divider(p),
-                    _navTile(
-                        context,
-                        Icons.filter_list_rounded,
-                        context.l10n.shortAudioFilter,
-                        context.l10n.ignoreFilesUnder(state.minDurationSec),
-                        onTap: () => _showDurationFilterDialog(
-                            context, cubit, state.minDurationSec)),
-                    _divider(p),
-                    _navTile(
-                        context,
-                        Icons.cleaning_services_rounded,
-                        context.l10n.removeMissingFiles,
-                        context.l10n.removeMissingFilesSubtitle,
-                        onTap: () => _removeMissingFiles(context, cubit)),
-                  ]),
-                  if (AppConfig.ytmEnabled)
-                    _section(context, context.l10n.youtubeMusicAndOnline, [
-                      () {
-                        final ytmAccount = getIt<YtmAccountService>();
-                        return ValueListenableBuilder<bool>(
-                          valueListenable: ytmAccount.loginState,
-                          builder: (context, isLoggedIn, _) {
-                            if (!isLoggedIn) {
-                              return _navTile(
-                                context,
-                                Icons.account_circle_outlined,
-                                context.l10n.connectYtmAccount,
-                                context.l10n.connectYtmSubtitle,
-                                onTap: () async {
-                                  final ok =
-                                      await YtmWebLoginSheet.show(context);
-                                  if (ok == true && context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content:
-                                            Text(context.l10n.ytmConnected),
-                                      ),
-                                    );
-                                  }
-                                },
-                              );
-                            } else {
-                              return _navTile(
-                                context,
-                                Icons.account_circle_rounded,
-                                context.l10n.ytmConnected,
-                                '${ytmAccount.accountName ?? "Connected"} • Tap to manage',
-                                onTap: () =>
-                                    showYtmAccountDisconnectDialog(context),
-                              );
-                            }
-                          },
-                        );
-                      }(),
-                      _divider(p),
-                      _navTile(
-                        context,
-                        Icons.language_rounded,
-                        context.l10n.openYtmWeb,
-                        context.l10n.openYtmWebSubtitle,
-                        onTap: () => _showYtmWebOptionsSheet(context),
-                      ),
-                      _divider(p),
-                      _switchTile(
-                          context,
-                          Icons.cloud_off_rounded,
-                          context.l10n.offlineOnlyMode,
-                          context.l10n.offlineOnlySubtitle,
-                          value: state.offlineOnlyMode,
-                          onChanged: cubit.setOfflineOnlyMode),
-                      if (!state.offlineOnlyMode) ...[
-                        _divider(p),
-                        _switchTile(
-                            context,
-                            Icons.wifi_rounded,
-                            context.l10n.wifiOnlyMode,
-                            context.l10n.wifiOnlySubtitle,
-                            value: state.wifiOnlyMode,
-                            onChanged: cubit.setWifiOnlyMode),
-                        _divider(p),
-                        _navTile(
-                            context,
-                            Icons.travel_explore_rounded,
-                            context.l10n.searchYtm,
-                            context.l10n.searchYtmSubtitle,
-                            onTap: () => context.push('/ytm-search')),
-                        _divider(p),
-                        _navTile(
-                            context,
-                            Icons.wifi_tethering_rounded,
-                            context.l10n.streamingQuality,
-                            _getQualityTitle(state.streamingQuality),
-                            onTap: () => _showQualityPickerSheet(context, cubit,
-                                isStreaming: true,
-                                currentQuality: state.streamingQuality)),
-                        _divider(p),
-                        _navTile(
-                            context,
-                            Icons.downloading_rounded,
-                            context.l10n.downloadQuality,
-                            _getQualityTitle(state.downloadQuality),
-                            onTap: () => _showQualityPickerSheet(context, cubit,
-                                isStreaming: false,
-                                currentQuality: state.downloadQuality)),
-                        _divider(p),
-                        _navTile(
-                            context,
-                            Icons.downloading_rounded,
-                            'Downloads',
-                            'View and manage offline downloads',
-                            onTap: () => context.push('/downloads')),
-                        _divider(p),
-                        // Remote yt-dlp backend decommissioned: on-device only.
-                        _navTile(
-                          context,
-                          Icons.vpn_lock_rounded,
-                          context.l10n.proxySettings,
-                          state.proxyEnabled
-                              ? '${state.proxyType.displayName} • ${state.proxyHost.isNotEmpty ? "${state.proxyHost}:${state.proxyPort}" : "Enabled"}'
-                              : 'Disabled • Tap to configure HTTP / SOCKS5',
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (state.proxyEnabled)
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  margin: const EdgeInsets.only(right: 8),
-                                  decoration: BoxDecoration(
-                                    color: p.success,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                              Icon(Icons.chevron_right_rounded,
-                                  color: p.textTertiary, size: 20),
-                            ],
-                          ),
-                          onTap: () => context.push('/proxy-settings'),
-                        ),
-                      ],
-                    ]),
-                  if (!AppConfig.ytmEnabled)
-                    _section(context, context.l10n.networkAndProxy, [
-                      _navTile(
-                        context,
-                        Icons.vpn_lock_rounded,
-                        context.l10n.proxySettings,
-                        state.proxyEnabled
-                            ? '${state.proxyType.displayName} • ${state.proxyHost.isNotEmpty ? "${state.proxyHost}:${state.proxyPort}" : "Enabled"}'
-                            : 'Disabled • Tap to configure HTTP / SOCKS5',
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (state.proxyEnabled)
-                              Container(
-                                width: 8,
-                                height: 8,
-                                margin: const EdgeInsets.only(right: 8),
-                                decoration: BoxDecoration(
-                                  color: p.success,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            Icon(Icons.chevron_right_rounded,
-                                color: p.textTertiary, size: 20),
-                          ],
-                        ),
-                        onTap: () => context.push('/proxy-settings'),
-                      ),
-                    ]),
-                  _section(context, context.l10n.storageAndCache, [
-                    const _CacheSection(),
-                  ]),
-                  _section(context, context.l10n.privacyAndData, [
-                    const BackupSection(),
-                    _divider(p),
-                    _navTile(
-                      context,
-                      Icons.equalizer_outlined,
-                      'Scrobbling (Last.fm & ListenBrainz)',
-                      'Direct API scrobbling and Now Playing notifications',
-                      onTap: () => _showScrobblerSettingsModal(context),
-                    ),
-                    _divider(p),
-                    _navTile(
-                        context,
-                        Icons.bar_chart_rounded,
-                        'Scrobble Stats',
-                        'Listening history and scrobble analytics',
-                        onTap: () => context.push('/scrobble-stats')),
-                    _divider(p),
-                    _navTile(
-                        context,
-                        Icons.cloud_sync_rounded,
-                        'Cloud Backup Dashboard',
-                        'Manage synced devices and cloud backups',
-                        onTap: () =>
-                            context.push('/cloud-backup-dashboard')),
-                    _divider(p),
-                    _navTile(
-                        context,
-                        Icons.security_rounded,
-                        context.l10n.privacyGuarantee,
-                        context.l10n.privacyGuaranteeSubtitle,
-                        onTap: () => _showPrivacyGuaranteeSheet(context)),
-                  ]),
-                  _section(context, context.l10n.about, [
-                    _navTile(context, Icons.info_outline_rounded,
-                        context.l10n.appTitle, context.l10n.aboutAppSubtitle,
-                        onTap: () => _showAboutSheet(context)),
-                  ]),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -569,32 +104,1446 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  // ---------- premium section + tile helpers ----------
-  Widget _section(BuildContext context, String title, List<Widget> children) {
+  // ==========================================================================
+  // Header & Search Bar
+  // ==========================================================================
+
+  Widget _buildTopHeader(BuildContext context) {
     final p = context.palette;
+    final horizontalPad = Adaptive.pagePadding(context);
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 22),
+      padding: EdgeInsets.fromLTRB(horizontalPad, 14, horizontalPad, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(6, 0, 0, 10),
-            child: Text(title.toUpperCase(),
-                style: Theme.of(context)
-                    .textTheme
-                    .labelSmall
-                    ?.copyWith(color: p.textTertiary)),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.l10n.settings,
+                      style: TextStyle(
+                        color: p.textPrimary,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Pulsr v${AppConfig.appVersion} • Audiophile Music Experience',
+                      style: TextStyle(
+                        color: p.textTertiary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          Material(
+          const SizedBox(height: 14),
+          // Search Box
+          Container(
+            height: 46,
+            decoration: BoxDecoration(
+              color: p.surfaceContainer,
+              borderRadius: BorderRadius.circular(AppRadii.card),
+              border: Border.all(
+                color: _searchQuery.isNotEmpty
+                    ? p.accent.withValues(alpha: 0.5)
+                    : p.hairline,
+              ),
+            ),
+            child: TextField(
+              controller: _searchController,
+              style: TextStyle(
+                color: p.textPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Search settings, sound, appearance...',
+                hintStyle: TextStyle(
+                  color: p.textTertiary,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w400,
+                ),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: _searchQuery.isNotEmpty ? p.accent : p.textTertiary,
+                  size: 20,
+                ),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: Icon(Icons.clear_rounded,
+                            color: p.textSecondary, size: 18),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      )
+                    : null,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================================================
+  // Category Filter Bar (Pills)
+  // ==========================================================================
+
+  Widget _buildCategoryFilterBar(BuildContext context) {
+    final p = context.palette;
+    final items = [
+      (id: 'all', title: 'All', icon: Icons.tune_rounded),
+      (id: 'audio', title: 'Audio & Sound', icon: Icons.equalizer_rounded),
+      (id: 'playback', title: 'Playback', icon: Icons.play_circle_outline_rounded),
+      (id: 'appearance', title: 'Appearance', icon: Icons.palette_outlined),
+      (id: 'gestures', title: 'Gestures', icon: Icons.swipe_rounded),
+      (id: 'profiles', title: 'Profiles & Rules', icon: Icons.devices_other_rounded),
+      (id: 'library', title: 'Library', icon: Icons.library_music_outlined),
+      (id: 'online', title: 'Network & YTM', icon: Icons.cloud_outlined),
+      (id: 'storage', title: 'Storage & Cache', icon: Icons.storage_rounded),
+      (id: 'privacy', title: 'Privacy & Backup', icon: Icons.shield_outlined),
+      (id: 'about', title: 'About', icon: Icons.info_outline_rounded),
+    ];
+
+    return SizedBox(
+      height: 42,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: EdgeInsets.symmetric(
+            horizontal: Adaptive.pagePadding(context)),
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final item = items[i];
+          final isSelected = _selectedCategoryId == item.id;
+
+          return GestureDetector(
+            onTap: () {
+              setState(() => _selectedCategoryId = item.id);
+              if (item.id != 'all') {
+                final ctx = _catById(item.id).key.currentContext;
+                if (ctx != null) {
+                  Scrollable.ensureVisible(
+                    ctx,
+                    duration: const Duration(milliseconds: 350),
+                    curve: Curves.easeOutCubic,
+                    alignment: 0.04,
+                  );
+                }
+              } else {
+                if (_scrollController.hasClients) {
+                  _scrollController.animateTo(
+                    0,
+                    duration: const Duration(milliseconds: 350),
+                    curve: Curves.easeOutCubic,
+                  );
+                }
+              }
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? p.accent.withValues(alpha: 0.16)
+                    : p.surfaceContainer,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected ? p.accent : p.hairline,
+                  width: isSelected ? 1.5 : 1.0,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    item.icon,
+                    size: 15,
+                    color: isSelected ? p.accent : p.textSecondary,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    item.title,
+                    style: TextStyle(
+                      color: isSelected ? p.accent : p.textPrimary,
+                      fontSize: 12.5,
+                      fontWeight:
+                          isSelected ? FontWeight.w800 : FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ==========================================================================
+  // Main Settings Body
+  // ==========================================================================
+
+  Widget _buildSettingsBody(
+    BuildContext context,
+    SettingsState state,
+    SettingsCubit cubit,
+  ) {
+    final showAll = _selectedCategoryId == 'all';
+
+    return ListView(
+      controller: _scrollController,
+      physics: const BouncingScrollPhysics(),
+      padding: EdgeInsets.only(
+        bottom: 160,
+        top: 10,
+        left: Adaptive.pagePadding(context),
+        right: Adaptive.pagePadding(context),
+      ),
+      children: [
+        // Top Hero Account Card
+        if (showAll || _selectedCategoryId == 'privacy')
+          const SettingsHeroCard(),
+
+        // Audio & Sound
+        if (showAll || _selectedCategoryId == 'audio')
+          _catSection(context, 'audio', AudioSoundSection(state: state)),
+
+        // Playback
+        if (showAll || _selectedCategoryId == 'playback')
+          _catSection(context, 'playback', PlaybackSection(state: state)),
+
+        // Appearance
+        if (showAll || _selectedCategoryId == 'appearance')
+          _buildAppearanceSection(context, state, cubit),
+
+        // Gestures
+        if (showAll || _selectedCategoryId == 'gestures')
+          _buildGesturesSection(context, state, cubit),
+
+        // Device Profiles & Automation
+        if (showAll || _selectedCategoryId == 'profiles') ...[
+          _section(
+            context,
+            'DEVICE PROFILES',
+            'Per-output DAC and Bluetooth profile mappings',
+            [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: DeviceProfilesSection(),
+              ),
+            ],
+            key: _catById('profiles').key,
+          ),
+          _section(
+            context,
+            'AUTOMATION RULES',
+            'Trigger profiles automatically on hardware events',
+            [
+              _navTile(
+                context,
+                Icons.auto_awesome_rounded,
+                'Automation Rules',
+                'Apply profiles on headphone plug, Bluetooth or charge events',
+                onTap: () => showAutomationRulesSheet(context),
+              ),
+            ],
+            key: _catById('automation').key,
+          ),
+        ],
+
+        // Library & Scanning
+        if (showAll || _selectedCategoryId == 'library')
+          _buildLibrarySection(context, state, cubit),
+
+        // Online / YouTube Music / Proxy
+        if (showAll || _selectedCategoryId == 'online')
+          _buildOnlineSection(context, state, cubit),
+
+        // Storage & Cache
+        if (showAll || _selectedCategoryId == 'storage')
+          _section(
+            context,
+            context.l10n.storageAndCache,
+            'Manage disk usage and audio cache',
+            [const StorageCacheSection()],
+            key: _catById('storage').key,
+          ),
+
+        // Privacy & Backup
+        if (showAll || _selectedCategoryId == 'privacy')
+          _buildPrivacyBackupSection(context),
+
+        // About
+        if (showAll || _selectedCategoryId == 'about')
+          _section(
+            context,
+            context.l10n.about,
+            'Version info, licenses and architecture',
+            [
+              _navTile(
+                context,
+                Icons.info_outline_rounded,
+                context.l10n.appTitle,
+                'Version ${AppConfig.appVersion} • Open-source Audiophile Engine',
+                onTap: () => showAboutSheet(context),
+              ),
+            ],
+            key: _catById('about').key,
+          ),
+      ],
+    );
+  }
+
+  // ==========================================================================
+  // Appearance Section
+  // ==========================================================================
+
+  Widget _buildAppearanceSection(
+    BuildContext context,
+    SettingsState state,
+    SettingsCubit cubit,
+  ) {
+    final p = context.palette;
+
+    return _section(
+      context,
+      context.l10n.themeAndAppearance,
+      'Theme, accent colors, visualizer and player UI style',
+      [
+        // Theme selector segment
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'THEME MODE',
+                style: TextStyle(
+                  color: p.textSecondary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.6,
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<AppThemeMode>(
+                  showSelectedIcon: false,
+                  style: ButtonStyle(
+                    visualDensity: VisualDensity.compact,
+                    backgroundColor: WidgetStateProperty.resolveWith((states) {
+                      if (states.contains(WidgetState.selected)) {
+                        return p.accent.withValues(alpha: 0.18);
+                      }
+                      return Colors.transparent;
+                    }),
+                    side: WidgetStatePropertyAll(
+                      BorderSide(color: p.hairline),
+                    ),
+                    shape: WidgetStatePropertyAll(
+                      RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                  segments: [
+                    ButtonSegment(
+                      value: AppThemeMode.system,
+                      label: Text(
+                        context.l10n.systemDefault,
+                        maxLines: 1,
+                        softWrap: false,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: state.themeMode == AppThemeMode.system
+                              ? FontWeight.w800
+                              : FontWeight.w600,
+                        ),
+                      ),
+                      icon: const Icon(Icons.brightness_auto_rounded, size: 15),
+                    ),
+                    ButtonSegment(
+                      value: AppThemeMode.light,
+                      label: Text(
+                        context.l10n.themeLight,
+                        maxLines: 1,
+                        softWrap: false,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: state.themeMode == AppThemeMode.light
+                              ? FontWeight.w800
+                              : FontWeight.w600,
+                        ),
+                      ),
+                      icon: const Icon(Icons.light_mode_rounded, size: 15),
+                    ),
+                    ButtonSegment(
+                      value: AppThemeMode.dark,
+                      label: Text(
+                        context.l10n.themeDark,
+                        maxLines: 1,
+                        softWrap: false,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: state.themeMode == AppThemeMode.dark
+                              ? FontWeight.w800
+                              : FontWeight.w600,
+                        ),
+                      ),
+                      icon: const Icon(Icons.dark_mode_rounded, size: 15),
+                    ),
+                    ButtonSegment(
+                      value: AppThemeMode.amoled,
+                      label: Text(
+                        'AMOLED',
+                        maxLines: 1,
+                        softWrap: false,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: state.themeMode == AppThemeMode.amoled
+                              ? FontWeight.w800
+                              : FontWeight.w600,
+                        ),
+                      ),
+                      icon: const Icon(Icons.contrast_rounded, size: 15),
+                    ),
+                  ],
+                  selected: {state.themeMode},
+                  onSelectionChanged: (sel) => cubit.setThemeMode(sel.first),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Accent Color Palette
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    context.l10n.accentColor,
+                    style: TextStyle(
+                      color: p.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13.5,
+                    ),
+                  ),
+                  Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: p.accent,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: p.hairline),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  children: AppColors.customAccents.map((color) {
+                    final isSelected =
+                        state.customAccentColorValue == color.toARGB32();
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: GestureDetector(
+                        onTap: () => cubit.setCustomAccentColor(color),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isSelected ? p.textPrimary : Colors.transparent,
+                              width: 2.5,
+                            ),
+                            boxShadow: isSelected
+                                ? [
+                                    BoxShadow(
+                                      color: color.withValues(alpha: 0.5),
+                                      blurRadius: 12,
+                                      spreadRadius: 2,
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: isSelected
+                              ? Icon(
+                                  Icons.check_rounded,
+                                  size: 22,
+                                  color: color.computeLuminance() > 0.5
+                                      ? Colors.black
+                                      : Colors.white,
+                                )
+                              : null,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        _divider(p),
+        _switchTile(
+          context,
+          Icons.nightlight_round,
+          'Auto Dark Mode by Time',
+          'Follow a 7 PM – 6 AM day/night schedule',
+          value: state.autoThemeByTime,
+          onChanged: cubit.setAutoThemeByTime,
+        ),
+        _divider(p),
+        _switchTile(
+          context,
+          Icons.contrast_rounded,
+          'High Contrast',
+          'Boost contrast with an AMOLED-friendly palette',
+          value: state.highContrast,
+          onChanged: cubit.setHighContrast,
+        ),
+        _divider(p),
+        _navTile(
+          context,
+          Icons.art_track_rounded,
+          context.l10n.nowPlayingTheme,
+          getThemeModeTitle(state.playerThemeMode),
+          trailingBadge: 'STYLE',
+          onTap: () => showThemePickerSheet(context, cubit, state.playerThemeMode),
+        ),
+        _divider(p),
+        _navTile(
+          context,
+          Icons.graphic_eq_rounded,
+          context.l10n.visualizerStyle,
+          getVisualizerStyleTitle(state.visualizerStyle),
+          trailingBadge: 'DSP',
+          onTap: () =>
+              showVisualizerStylePickerSheet(context, cubit, state.visualizerStyle),
+        ),
+        _divider(p),
+        _navTile(
+          context,
+          Icons.palette_outlined,
+          context.l10n.colorSource,
+          getColorSourceTitle(state.themeColorSource),
+          trailingBadge: 'PALETTE',
+          onTap: () =>
+              showColorSourcePickerSheet(context, cubit, state.themeColorSource),
+        ),
+        _divider(p),
+        _navTile(
+          context,
+          Icons.language_rounded,
+          context.l10n.language,
+          getLanguageTitle(state.languageCode, context.l10n),
+          trailingBadge: state.languageCode.toUpperCase(),
+          onTap: () =>
+              showLanguagePickerSheet(context, cubit, state.languageCode),
+        ),
+      ],
+      key: _catById('appearance').key,
+    );
+  }
+
+  // ==========================================================================
+  // Gestures Section
+  // ==========================================================================
+
+  Widget _buildGesturesSection(
+    BuildContext context,
+    SettingsState state,
+    SettingsCubit cubit,
+  ) {
+    final p = context.palette;
+
+    return _section(
+      context,
+      context.l10n.gestures,
+      'Configure swipe and double-tap gestures across mini-player and artwork',
+      [
+        _navTile(
+          context,
+          Icons.swipe_left_rounded,
+          context.l10n.miniPlayerSwipeLeft,
+          getMiniPlayerSwipeTitle(state.miniPlayerSwipeLeft),
+          onTap: () => showMiniPlayerSwipePickerSheet(
+            context,
+            cubit,
+            isLeft: true,
+            currentAction: state.miniPlayerSwipeLeft,
+          ),
+        ),
+        _divider(p),
+        _navTile(
+          context,
+          Icons.swipe_right_rounded,
+          context.l10n.miniPlayerSwipeRight,
+          getMiniPlayerSwipeTitle(state.miniPlayerSwipeRight),
+          onTap: () => showMiniPlayerSwipePickerSheet(
+            context,
+            cubit,
+            isLeft: false,
+            currentAction: state.miniPlayerSwipeRight,
+          ),
+        ),
+        _divider(p),
+        _navTile(
+          context,
+          Icons.touch_app_rounded,
+          context.l10n.nowPlayingDoubleTap,
+          getNowPlayingDoubleTapTitle(state.nowPlayingDoubleTap),
+          onTap: () => showNowPlayingDoubleTapPickerSheet(
+            context,
+            cubit,
+            state.nowPlayingDoubleTap,
+          ),
+        ),
+        _divider(p),
+        _navTile(
+          context,
+          Icons.gesture_rounded,
+          context.l10n.artworkSwipe,
+          getNowPlayingArtworkSwipeTitle(state.nowPlayingArtworkSwipe),
+          onTap: () => showNowPlayingArtworkSwipePickerSheet(
+            context,
+            cubit,
+            state.nowPlayingArtworkSwipe,
+          ),
+        ),
+      ],
+      key: _catById('gestures').key,
+    );
+  }
+
+  // ==========================================================================
+  // Library & Scanning Section
+  // ==========================================================================
+
+  Widget _buildLibrarySection(
+    BuildContext context,
+    SettingsState state,
+    SettingsCubit cubit,
+  ) {
+    final p = context.palette;
+
+    return _section(
+      context,
+      context.l10n.libraryAndScanning,
+      'Device media indexing, exclusion rules and cleanup',
+      [
+        _navTile(
+          context,
+          Icons.folder_off_rounded,
+          context.l10n.hiddenAndExcludedFolders,
+          state.autoHideSystemMedia
+              ? context.l10n.autoFilteringVoiceMemos
+              : context.l10n.manageExcludedDirectories,
+          onTap: () => context.push('/hidden-folders'),
+        ),
+        _divider(p),
+        _navTile(
+          context,
+          Icons.refresh_rounded,
+          state.isScanning
+              ? context.l10n.scanningStorage
+              : context.l10n.rescanLibrary,
+          state.scanResultCount != null
+              ? context.l10n.lastScanTracks(state.scanResultCount!)
+              : context.l10n.scanDeviceStorageForAudio,
+          trailing: state.isScanning
+              ? StreamBuilder<double>(
+                  stream: cubit.scanProgress,
+                  initialData: 0.0,
+                  builder: (context, snapshot) {
+                    final progress = (snapshot.data ?? 0.0).clamp(0.0, 1.0);
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '${(progress * 100).round()}%',
+                        style: TextStyle(
+                          color: p.accent,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                        ),
+                      ),
+                    );
+                  },
+                )
+              : null,
+          onTap: state.isScanning ? () {} : () => cubit.rescanLibrary(),
+        ),
+        _divider(p),
+        _navTile(
+          context,
+          Icons.filter_list_rounded,
+          context.l10n.shortAudioFilter,
+          context.l10n.ignoreFilesUnder(state.minDurationSec),
+          trailingBadge: '${state.minDurationSec}s',
+          onTap: () =>
+              _showDurationFilterDialog(context, cubit, state.minDurationSec),
+        ),
+        _divider(p),
+        _navTile(
+          context,
+          Icons.cleaning_services_rounded,
+          context.l10n.removeMissingFiles,
+          context.l10n.removeMissingFilesSubtitle,
+          onTap: () => _removeMissingFiles(context, cubit),
+        ),
+      ],
+      key: _catById('library').key,
+    );
+  }
+
+  // ==========================================================================
+  // Online / Streaming Section
+  // ==========================================================================
+
+  Widget _buildOnlineSection(
+    BuildContext context,
+    SettingsState state,
+    SettingsCubit cubit,
+  ) {
+    final p = context.palette;
+
+    return _section(
+      context,
+      AppConfig.ytmEnabled
+          ? context.l10n.youtubeMusicAndOnline
+          : context.l10n.networkAndProxy,
+      'Online streams, downloads, proxy routing and quality settings',
+      [
+        if (AppConfig.ytmEnabled) ...[
+          () {
+            final ytmAccount = getIt<YtmAccountService>();
+            return ValueListenableBuilder<bool>(
+              valueListenable: ytmAccount.loginState,
+              builder: (context, isLoggedIn, _) {
+                if (!isLoggedIn) {
+                  return _navTile(
+                    context,
+                    Icons.account_circle_outlined,
+                    context.l10n.connectYtmAccount,
+                    context.l10n.connectYtmSubtitle,
+                    onTap: () async {
+                      final ok = await YtmWebLoginSheet.show(context);
+                      if (ok == true && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(context.l10n.ytmConnected),
+                          ),
+                        );
+                      }
+                    },
+                  );
+                } else {
+                  return _navTile(
+                    context,
+                    Icons.account_circle_rounded,
+                    context.l10n.ytmConnected,
+                    '${ytmAccount.accountName ?? "Connected"} • Tap to manage',
+                    trailingBadge: 'CONNECTED',
+                    onTap: () => showYtmAccountDisconnectDialog(context),
+                  );
+                }
+              },
+            );
+          }(),
+          _divider(p),
+          _navTile(
+            context,
+            Icons.language_rounded,
+            context.l10n.openYtmWeb,
+            context.l10n.openYtmWebSubtitle,
+            onTap: () => showYtmWebOptionsSheet(context),
+          ),
+          _divider(p),
+          _switchTile(
+            context,
+            Icons.cloud_off_rounded,
+            context.l10n.offlineOnlyMode,
+            context.l10n.offlineOnlySubtitle,
+            value: state.offlineOnlyMode,
+            onChanged: cubit.setOfflineOnlyMode,
+          ),
+          if (!state.offlineOnlyMode) ...[
+            _divider(p),
+            _switchTile(
+              context,
+              Icons.wifi_rounded,
+              context.l10n.wifiOnlyMode,
+              context.l10n.wifiOnlySubtitle,
+              value: state.wifiOnlyMode,
+              onChanged: cubit.setWifiOnlyMode,
+            ),
+            _divider(p),
+            _navTile(
+              context,
+              Icons.travel_explore_rounded,
+              context.l10n.searchYtm,
+              context.l10n.searchYtmSubtitle,
+              onTap: () => context.push('/ytm-search'),
+            ),
+            _divider(p),
+            _navTile(
+              context,
+              Icons.wifi_tethering_rounded,
+              context.l10n.streamingQuality,
+              getQualityTitle(state.streamingQuality),
+              trailingBadge: state.streamingQuality.name.toUpperCase(),
+              onTap: () => showQualityPickerSheet(
+                context,
+                cubit,
+                isStreaming: true,
+                currentQuality: state.streamingQuality,
+              ),
+            ),
+            _divider(p),
+            _navTile(
+              context,
+              Icons.downloading_rounded,
+              context.l10n.downloadQuality,
+              getQualityTitle(state.downloadQuality),
+              trailingBadge: state.downloadQuality.name.toUpperCase(),
+              onTap: () => showQualityPickerSheet(
+                context,
+                cubit,
+                isStreaming: false,
+                currentQuality: state.downloadQuality,
+              ),
+            ),
+            _divider(p),
+            _navTile(
+              context,
+              Icons.folder_zip_rounded,
+              'Downloads',
+              'View and manage offline tracks and downloads',
+              onTap: () => context.push('/downloads'),
+            ),
+          ],
+          _divider(p),
+        ],
+        _navTile(
+          context,
+          Icons.vpn_lock_rounded,
+          context.l10n.proxySettings,
+          state.proxyEnabled
+              ? '${state.proxyType.displayName} • ${state.proxyHost.isNotEmpty ? "${state.proxyHost}:${state.proxyPort}" : "Enabled"}'
+              : 'Disabled • Tap to configure HTTP / SOCKS5',
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (state.proxyEnabled)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: p.success.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'ACTIVE',
+                    style: TextStyle(
+                      color: p.success,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              Icon(Icons.chevron_right_rounded,
+                  color: p.textTertiary, size: 20),
+            ],
+          ),
+          onTap: () => context.push('/proxy-settings'),
+        ),
+      ],
+      key: _catById('online').key,
+    );
+  }
+
+  // ==========================================================================
+  // Privacy & Backup Section
+  // ==========================================================================
+
+  Widget _buildPrivacyBackupSection(BuildContext context) {
+    final p = context.palette;
+
+    return _section(
+      context,
+      context.l10n.privacyAndData,
+      'Data sovereignty, database backups and scrobbler integrations',
+      [
+        const BackupSection(),
+        _divider(p),
+        _navTile(
+          context,
+          Icons.equalizer_outlined,
+          'Scrobbling (Last.fm & ListenBrainz)',
+          'Direct API scrobbling and Now Playing metadata broadcast',
+          onTap: () => showScrobblerSettingsModal(context),
+        ),
+        _divider(p),
+        _navTile(
+          context,
+          Icons.bar_chart_rounded,
+          'Scrobble Stats',
+          'Listening history and scrobble analytics overview',
+          onTap: () => context.push('/scrobble-stats'),
+        ),
+        _divider(p),
+        _navTile(
+          context,
+          Icons.cloud_sync_rounded,
+          'Cloud Backup Dashboard',
+          'Manage synchronized devices and cloud backup snapshots',
+          onTap: () => context.push('/cloud-backup-dashboard'),
+        ),
+        _divider(p),
+        _navTile(
+          context,
+          Icons.security_rounded,
+          context.l10n.privacyGuarantee,
+          context.l10n.privacyGuaranteeSubtitle,
+          onTap: () => showPrivacyGuaranteeSheet(context),
+        ),
+      ],
+      key: _catById('privacy').key,
+    );
+  }
+
+  // ==========================================================================
+  // Live Instant Search Mode
+  // ==========================================================================
+
+  Widget _buildSearchResultsList(
+    BuildContext context,
+    SettingsState state,
+    SettingsCubit cubit,
+  ) {
+    final p = context.palette;
+    final query = _searchQuery.trim().toLowerCase();
+
+    // Collect all searchable setting entries
+    final entries = _getSearchableEntries(context, state, cubit);
+    final results = entries.where((e) {
+      return e.title.toLowerCase().contains(query) ||
+          e.subtitle.toLowerCase().contains(query) ||
+          e.category.toLowerCase().contains(query) ||
+          e.keywords.any((k) => k.toLowerCase().contains(query));
+    }).toList();
+
+    if (results.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: p.surfaceContainer,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: p.hairline),
+                ),
+                child: Icon(Icons.search_off_rounded,
+                    color: p.textTertiary, size: 28),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No settings found for "$_searchQuery"',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: p.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Try searching for "equalizer", "dark mode", "crossfade", "proxy", "cache", or "scrobble".',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: p.textSecondary, fontSize: 12.5),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: EdgeInsets.only(
+        bottom: 160,
+        top: 8,
+        left: Adaptive.pagePadding(context),
+        right: Adaptive.pagePadding(context),
+      ),
+      itemCount: results.length,
+      itemBuilder: (context, i) {
+        final r = results[i];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Material(
             color: p.surfaceContainer,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(AppRadii.tile),
               side: BorderSide(color: p.hairline),
             ),
             clipBehavior: Clip.antiAlias,
-            child: Column(children: children),
+            child: ListTile(
+            leading: _iconBox(context, r.icon),
+            title: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    r.title,
+                    style: TextStyle(
+                      color: p.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: p.accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    r.category.toUpperCase(),
+                    style: TextStyle(
+                      color: p.accent,
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            subtitle: Text(
+              r.subtitle,
+              style: TextStyle(color: p.textSecondary, fontSize: 12),
+            ),
+            trailing: r.trailing ??
+                Icon(Icons.chevron_right_rounded,
+                    color: p.textTertiary, size: 20),
+            onTap: r.onTap,
           ),
-        ],
+        ),
+      );
+      },
+    );
+  }
+
+  List<_SearchItem> _getSearchableEntries(
+    BuildContext context,
+    SettingsState state,
+    SettingsCubit cubit,
+  ) {
+    return [
+      _SearchItem(
+        category: 'Appearance',
+        title: 'Theme Mode',
+        subtitle: 'System Default, Light, Dark, or AMOLED high contrast',
+        icon: Icons.brightness_auto_rounded,
+        keywords: ['theme', 'dark', 'light', 'amoled', 'black', 'mode'],
+        onTap: () {
+          _searchController.clear();
+          setState(() => _selectedCategoryId = 'appearance');
+        },
+      ),
+      _SearchItem(
+        category: 'Appearance',
+        title: 'Accent Color',
+        subtitle: 'Custom color accent palette for buttons and active highlights',
+        icon: Icons.color_lens_rounded,
+        keywords: ['color', 'accent', 'palette', 'tint', 'pink', 'blue', 'orange'],
+        onTap: () {
+          _searchController.clear();
+          setState(() => _selectedCategoryId = 'appearance');
+        },
+      ),
+      _SearchItem(
+        category: 'Appearance',
+        title: 'Auto Dark Mode by Time',
+        subtitle: 'Follow a 7 PM – 6 AM day/night schedule',
+        icon: Icons.nightlight_round,
+        keywords: ['auto', 'night', 'schedule', 'dark'],
+        trailing: Switch.adaptive(
+          value: state.autoThemeByTime,
+          onChanged: cubit.setAutoThemeByTime,
+        ),
+      ),
+      _SearchItem(
+        category: 'Appearance',
+        title: 'High Contrast Mode',
+        subtitle: 'Boost contrast with an AMOLED-friendly palette',
+        icon: Icons.contrast_rounded,
+        keywords: ['contrast', 'amoled', 'pure black'],
+        trailing: Switch.adaptive(
+          value: state.highContrast,
+          onChanged: cubit.setHighContrast,
+        ),
+      ),
+      _SearchItem(
+        category: 'Appearance',
+        title: 'Now Playing Theme Style',
+        subtitle: getThemeModeTitle(state.playerThemeMode),
+        icon: Icons.art_track_rounded,
+        keywords: ['player', 'vinyl', 'cassette', 'waveform', 'card', 'lyrics', 'theme'],
+        onTap: () => showThemePickerSheet(context, cubit, state.playerThemeMode),
+      ),
+      _SearchItem(
+        category: 'Appearance',
+        title: 'Visualizer Style',
+        subtitle: getVisualizerStyleTitle(state.visualizerStyle),
+        icon: Icons.graphic_eq_rounded,
+        keywords: ['visualizer', 'spectrum', 'waveform', 'bars', 'frequency'],
+        onTap: () => showVisualizerStylePickerSheet(
+            context, cubit, state.visualizerStyle),
+      ),
+      _SearchItem(
+        category: 'Appearance',
+        title: 'Color Source',
+        subtitle: getColorSourceTitle(state.themeColorSource),
+        icon: Icons.palette_outlined,
+        keywords: ['material you', 'dynamic', 'wallpaper', 'artwork'],
+        onTap: () => showColorSourcePickerSheet(
+            context, cubit, state.themeColorSource),
+      ),
+      _SearchItem(
+        category: 'Appearance',
+        title: 'Language',
+        subtitle: getLanguageTitle(state.languageCode, context.l10n),
+        icon: Icons.language_rounded,
+        keywords: ['language', 'locale', 'arabic', 'english', 'spanish'],
+        onTap: () =>
+            showLanguagePickerSheet(context, cubit, state.languageCode),
+      ),
+      _SearchItem(
+        category: 'Audio',
+        title: 'Equalizer & Sound Effects',
+        subtitle: '10-band equalizer, bass boost, virtualizer, reverb',
+        icon: Icons.equalizer_rounded,
+        keywords: ['eq', 'equalizer', 'bass', 'treble', 'sound', 'dsp', 'reverb'],
+        onTap: () {
+          _searchController.clear();
+          setState(() => _selectedCategoryId = 'audio');
+        },
+      ),
+      _SearchItem(
+        category: 'Audio',
+        title: 'Bit-Perfect & Hi-Res Output',
+        subtitle: 'Direct USB DAC hardware sample-rate matching',
+        icon: Icons.album_rounded,
+        keywords: ['dac', 'hires', 'bit-perfect', 'sample rate', 'khz', 'usb'],
+        onTap: () {
+          _searchController.clear();
+          setState(() => _selectedCategoryId = 'audio');
+        },
+      ),
+      _SearchItem(
+        category: 'Playback',
+        title: 'Crossfade & Gapless',
+        subtitle: 'Seamless transitions and crossfade seconds slider',
+        icon: Icons.play_circle_outline_rounded,
+        keywords: ['crossfade', 'gapless', 'transition', 'seconds', 'fade'],
+        onTap: () {
+          _searchController.clear();
+          setState(() => _selectedCategoryId = 'playback');
+        },
+      ),
+      _SearchItem(
+        category: 'Playback',
+        title: 'Sleep Timer',
+        subtitle: 'Automatically stop playback after duration or end of track',
+        icon: Icons.timer_outlined,
+        keywords: ['sleep', 'timer', 'stop', 'night'],
+        onTap: () {
+          _searchController.clear();
+          setState(() => _selectedCategoryId = 'playback');
+        },
+      ),
+      _SearchItem(
+        category: 'Gestures',
+        title: 'Mini-Player Swipe Gestures',
+        subtitle: 'Left & Right swipe actions (Skip, Previous, Volume)',
+        icon: Icons.swipe_rounded,
+        keywords: ['swipe', 'miniplayer', 'gesture', 'left', 'right', 'volume'],
+        onTap: () {
+          _searchController.clear();
+          setState(() => _selectedCategoryId = 'gestures');
+        },
+      ),
+      _SearchItem(
+        category: 'Library',
+        title: 'Rescan Device Storage',
+        subtitle: 'Discover newly downloaded songs and update metadata',
+        icon: Icons.refresh_rounded,
+        keywords: ['scan', 'refresh', 'library', 'songs', 'tracks', 'storage'],
+        onTap: () => cubit.rescanLibrary(),
+      ),
+      _SearchItem(
+        category: 'Library',
+        title: 'Hidden & Excluded Folders',
+        subtitle: 'Exclude voice memos, ringtones, and specific directories',
+        icon: Icons.folder_off_rounded,
+        keywords: ['hidden', 'folders', 'exclude', 'voice memos', 'ringtones'],
+        onTap: () => context.push('/hidden-folders'),
+      ),
+      _SearchItem(
+        category: 'Library',
+        title: 'Short Audio Filter',
+        subtitle: 'Ignore files under ${state.minDurationSec} seconds',
+        icon: Icons.filter_list_rounded,
+        keywords: ['filter', 'short', 'duration', 'seconds'],
+        onTap: () =>
+            _showDurationFilterDialog(context, cubit, state.minDurationSec),
+      ),
+      _SearchItem(
+        category: 'Network',
+        title: 'Proxy Settings',
+        subtitle: 'HTTP & SOCKS5 proxy routing with latency checks',
+        icon: Icons.vpn_lock_rounded,
+        keywords: ['proxy', 'socks5', 'http', 'ip', 'port', 'vpn'],
+        onTap: () => context.push('/proxy-settings'),
+      ),
+      _SearchItem(
+        category: 'Network',
+        title: 'Streaming & Download Audio Quality',
+        subtitle: 'Bitrate preferences for online streaming and saved files',
+        icon: Icons.wifi_tethering_rounded,
+        keywords: ['quality', 'bitrate', 'streaming', 'download', 'kbps'],
+        onTap: () => showQualityPickerSheet(
+          context,
+          cubit,
+          isStreaming: true,
+          currentQuality: state.streamingQuality,
+        ),
+      ),
+      _SearchItem(
+        category: 'Storage',
+        title: 'Artwork & Audio Cache',
+        subtitle: 'Clear cached cover artwork and stream chunks',
+        icon: Icons.storage_rounded,
+        keywords: ['cache', 'storage', 'clear', 'artwork', 'mb', 'disk'],
+        onTap: () {
+          _searchController.clear();
+          setState(() => _selectedCategoryId = 'storage');
+        },
+      ),
+      _SearchItem(
+        category: 'Privacy',
+        title: 'Scrobbling (Last.fm & ListenBrainz)',
+        subtitle: 'Track listening history and broadcast Now Playing status',
+        icon: Icons.equalizer_outlined,
+        keywords: ['scrobble', 'lastfm', 'listenbrainz', 'stats', 'history'],
+        onTap: () => showScrobblerSettingsModal(context),
+      ),
+      _SearchItem(
+        category: 'Privacy',
+        title: 'Privacy Guarantee',
+        subtitle: 'Offline-first principles and permissions explanations',
+        icon: Icons.security_rounded,
+        keywords: ['privacy', 'guarantee', 'offline', 'trackers', 'security'],
+        onTap: () => showPrivacyGuaranteeSheet(context),
+      ),
+      _SearchItem(
+        category: 'About',
+        title: 'About Pulsr',
+        subtitle: 'Version ${AppConfig.appVersion}, build details and licenses',
+        icon: Icons.info_outline_rounded,
+        keywords: ['about', 'version', 'license', 'developer'],
+        onTap: () => showAboutSheet(context),
+      ),
+    ];
+  }
+
+  // ==========================================================================
+  // Category IDs & Helper Navigation
+  // ==========================================================================
+
+  static const _categoryIds = [
+    'audio',
+    'playback',
+    'appearance',
+    'gestures',
+    'profiles',
+    'automation',
+    'library',
+    'online',
+    'storage',
+    'privacy',
+    'about',
+  ];
+
+  void _assignCategoryTitles(BuildContext context) {
+    for (final id in _categoryIds) {
+      final c = _catById(id);
+      switch (id) {
+        case 'audio':
+          c.title = 'Audio & Sound';
+          break;
+        case 'playback':
+          c.title = 'Playback';
+          break;
+        case 'appearance':
+          c.title = context.l10n.themeAndAppearance;
+          break;
+        case 'gestures':
+          c.title = context.l10n.gestures;
+          break;
+        case 'profiles':
+          c.title = 'Device Profiles';
+          break;
+        case 'automation':
+          c.title = 'Automation';
+          break;
+        case 'library':
+          c.title = context.l10n.libraryAndScanning;
+          break;
+        case 'online':
+          c.title = AppConfig.ytmEnabled
+              ? context.l10n.youtubeMusicAndOnline
+              : context.l10n.networkAndProxy;
+          break;
+        case 'storage':
+          c.title = context.l10n.storageAndCache;
+          break;
+        case 'privacy':
+          c.title = context.l10n.privacyAndData;
+          break;
+        case 'about':
+          c.title = context.l10n.about;
+          break;
+      }
+    }
+  }
+
+  _Category _catById(String id) =>
+      _categories.firstWhere((c) => c.id == id, orElse: () {
+        final c = _Category(id, _iconFor(id));
+        _categories.add(c);
+        return c;
+      });
+
+  Widget _catSection(BuildContext context, String id, Widget child) =>
+      KeyedSubtree(key: _catById(id).key, child: child);
+
+  IconData _iconFor(String id) => switch (id) {
+        'audio' => Icons.equalizer_rounded,
+        'playback' => Icons.play_circle_outline_rounded,
+        'appearance' => Icons.palette_outlined,
+        'gestures' => Icons.swipe_rounded,
+        'profiles' => Icons.phone_android_rounded,
+        'automation' => Icons.auto_awesome_rounded,
+        'library' => Icons.library_music_outlined,
+        'online' => Icons.cloud_outlined,
+        'storage' => Icons.storage_rounded,
+        'privacy' => Icons.privacy_tip_outlined,
+        'about' => Icons.info_outline_rounded,
+        _ => Icons.circle_outlined,
+      };
+
+  // ==========================================================================
+  // Section & Tile UI Builders
+  // ==========================================================================
+
+  Widget _section(
+    BuildContext context,
+    String title,
+    String subtitle,
+    List<Widget> children, {
+    GlobalKey? key,
+  }) {
+    final p = context.palette;
+    return KeyedSubtree(
+      key: key,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(6, 0, 6, 8),
+              child: Row(
+                children: [
+                  Text(
+                    title.toUpperCase(),
+                    style: TextStyle(
+                      color: p.textSecondary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                  if (subtitle.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '• $subtitle',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: p.textTertiary,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Material(
+              color: p.surfaceContainer,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadii.card),
+                side: BorderSide(color: p.hairline),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Column(children: children),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -616,124 +1565,171 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Widget _navTile(
-      BuildContext context, IconData icon, String title, String subtitle,
-      {Widget? trailing, VoidCallback? onTap}) {
+    BuildContext context,
+    IconData icon,
+    String title,
+    String subtitle, {
+    Widget? trailing,
+    String? trailingBadge,
+    VoidCallback? onTap,
+  }) {
     final p = context.palette;
     return ListTile(
       leading: _iconBox(context, icon),
-      title: Text(title,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-      subtitle: Text(subtitle,
-          style: TextStyle(color: p.textSecondary, fontSize: 12)),
+      title: Text(
+        title,
+        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(color: p.textSecondary, fontSize: 12),
+      ),
       trailing: trailing ??
-          Icon(Icons.chevron_right_rounded, color: p.textTertiary, size: 20),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (trailingBadge != null)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                  margin: const EdgeInsets.only(right: 6),
+                  decoration: BoxDecoration(
+                    color: p.accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    trailingBadge,
+                    style: TextStyle(
+                      color: p.accent,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+              Icon(Icons.chevron_right_rounded,
+                  color: p.textTertiary, size: 20),
+            ],
+          ),
       onTap: onTap,
     );
   }
 
   Widget _switchTile(
-      BuildContext context, IconData icon, String title, String subtitle,
-      {required bool value, required ValueChanged<bool> onChanged}) {
+    BuildContext context,
+    IconData icon,
+    String title,
+    String subtitle, {
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
     final p = context.palette;
     return ListTile(
       leading: _iconBox(context, icon),
-      title: Text(title,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-      subtitle: Text(subtitle,
-          style: TextStyle(color: p.textSecondary, fontSize: 12)),
+      title: Text(
+        title,
+        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(color: p.textSecondary, fontSize: 12),
+      ),
       trailing: Switch.adaptive(
-          value: value,
-          activeTrackColor: p.accent,
-          activeThumbColor: Colors.white,
-          onChanged: onChanged),
+        value: value,
+        activeTrackColor: p.accent,
+        activeThumbColor: Colors.white,
+        onChanged: onChanged,
+      ),
     );
   }
 
+  // ==========================================================================
+  // Dialogs
+  // ==========================================================================
+
   void _showDurationFilterDialog(
-      BuildContext context, SettingsCubit cubit, int currentSec) {
+    BuildContext context,
+    SettingsCubit cubit,
+    int currentSec,
+  ) {
     int selected = currentSec;
-    final primaryColor = Theme.of(context).colorScheme.primary;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        title: Text(context.l10n.minDuration),
-        content: StatefulBuilder(
-          builder: (context, setDialogState) => Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      context.l10n.excludeTracksUnder(selected),
-                    ),
+    PulsrDialogHelper.showPulsrDialog<void>(
+      context,
+      title: Text(context.l10n.minDuration),
+      content: StatefulBuilder(
+        builder: (context, setDialogState) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    context.l10n.excludeTracksUnder(selected),
                   ),
-                  IconButton(
-                    icon: Icon(Icons.settings_backup_restore,
-                        size: 20,
-                        color: selected == 30
-                            ? Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.38)
-                            : primaryColor),
-                    tooltip: context.l10n.resetToDefault30s,
-                    visualDensity: VisualDensity.compact,
-                    onPressed: selected == 30
-                        ? null
-                        : () => setDialogState(() => selected = 30),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Slider(
-                value: selected.toDouble(),
-                min: 0,
-                max: 120,
-                divisions: 12,
-                activeColor: primaryColor,
-                onChanged: (val) {
-                  setDialogState(() => selected = val.toInt());
-                },
-              ),
-            ],
-          ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.settings_backup_restore,
+                      size: 20,
+                      color: selected == 30
+                          ? Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.38)
+                          : context.palette.accent),
+                  tooltip: context.l10n.resetToDefault30s,
+                  visualDensity: VisualDensity.compact,
+                  onPressed: selected == 30
+                      ? null
+                      : () => setDialogState(() => selected = 30),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            PulsrSlider(
+              value: selected.toDouble(),
+              min: 0,
+              max: 120,
+              divisions: 12,
+              onChanged: (val) {
+                setDialogState(() => selected = val.toInt());
+              },
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(context.l10n.cancel)),
-          ElevatedButton(
-            onPressed: () {
-              cubit.setMinDuration(selected);
-              Navigator.pop(ctx);
-            },
-            child: Text(context.l10n.save),
-          ),
-        ],
       ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(context.l10n.cancel)),
+        ElevatedButton(
+          onPressed: () {
+            cubit.setMinDuration(selected);
+            Navigator.pop(context);
+          },
+          child: Text(context.l10n.save),
+        ),
+      ],
     );
   }
 
   Future<void> _removeMissingFiles(
-      BuildContext context, SettingsCubit cubit) async {
+    BuildContext context,
+    SettingsCubit cubit,
+  ) async {
     final l10n = context.l10n;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.removeMissingFilesConfirmTitle),
-        content: Text(l10n.removeMissingFilesConfirmBody),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(context.l10n.cancel)),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(l10n.remove),
-          ),
-        ],
-      ),
+    final confirmed = await PulsrDialogHelper.showPulsrDialog<bool>(
+      context,
+      title: Text(l10n.removeMissingFilesConfirmTitle),
+      content: Text(l10n.removeMissingFilesConfirmBody),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(context.l10n.cancel)),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: Text(l10n.remove),
+        ),
+      ],
     );
     if (confirmed != true) return;
     final removed = await cubit.removeMissingFiles();
@@ -744,2259 +1740,24 @@ class SettingsScreen extends StatelessWidget {
       ),
     );
   }
-
-  String _getThemeModeTitle(PlayerThemeMode mode) {
-    switch (mode) {
-      case PlayerThemeMode.classic:
-        return 'Classic Standard';
-      case PlayerThemeMode.card:
-        return 'Card Glass Overlay';
-      case PlayerThemeMode.circle:
-        return 'Vinyl Circle (Spinning)';
-      case PlayerThemeMode.minimal:
-        return 'Minimalist Waveform';
-      case PlayerThemeMode.vinyl:
-        return 'Vinyl Turntable Studio';
-      case PlayerThemeMode.cassette:
-        return 'Retro Cassette Deck';
-      case PlayerThemeMode.waveform:
-        return 'Full-Bleed Waveform';
-      case PlayerThemeMode.lyricsFocus:
-        return 'Karaoke Lyrics Immersion';
-    }
-  }
-
-  String _getVisualizerStyleTitle(VisualizerStyle style) {
-    switch (style) {
-      case VisualizerStyle.off:
-        return 'Disabled';
-      case VisualizerStyle.bar:
-        return 'Bar (Classic Frequency Spectrum)';
-      case VisualizerStyle.wave:
-        return 'Wave (Smooth Line Spectrum)';
-      case VisualizerStyle.circular:
-        return 'Circular (Radial Spectrum)';
-      case VisualizerStyle.particles:
-        return 'Particles (Audio Field)';
-      case VisualizerStyle.terrain3D:
-        return '3D Terrain (Wireframe Mountain)';
-      case VisualizerStyle.albumArtReactive:
-        return 'Album Art Reactive Glow';
-      case VisualizerStyle.custom:
-        return 'Custom JSON Visualizer';
-    }
-  }
-
-  void _showThemePickerSheet(
-    BuildContext context,
-    SettingsCubit cubit,
-    PlayerThemeMode currentMode,
-  ) {
-    final primaryColor = Theme.of(context).colorScheme.primary;
-    final surfaceColor = Theme.of(context).colorScheme.surface;
-    final cardColor =
-        Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
-    final outlineColor = Theme.of(context).colorScheme.outline;
-    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ??
-        context.palette.textPrimary;
-    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
-        context.palette.textSecondary;
-
-    final themes = [
-      (
-        mode: PlayerThemeMode.classic,
-        title: 'Classic Standard',
-        subtitle: 'Traditional high-definition layout with ambient glow',
-        icon: Icons.square_outlined,
-      ),
-      (
-        mode: PlayerThemeMode.card,
-        title: 'Card Glass Overlay',
-        subtitle: 'Full-bleed background artwork with frosted glass controls',
-        icon: Icons.layers_rounded,
-      ),
-      (
-        mode: PlayerThemeMode.circle,
-        title: 'Vinyl Circle',
-        subtitle:
-            'Centered circular artwork with continuous spinning animation',
-        icon: Icons.album_rounded,
-      ),
-      (
-        mode: PlayerThemeMode.minimal,
-        title: 'Minimalist Waveform',
-        subtitle: 'Spacious studio focus on dynamic audio waveform visualizer',
-        icon: Icons.graphic_eq_rounded,
-      ),
-      (
-        mode: PlayerThemeMode.vinyl,
-        title: 'Vinyl Turntable Studio',
-        subtitle:
-            'True vinyl record with realistic grooves, center label & tonearm',
-        icon: Icons.album_rounded,
-      ),
-      (
-        mode: PlayerThemeMode.cassette,
-        title: 'Retro Cassette Deck',
-        subtitle:
-            'Vintage cassette tape with spinning spools & magnetic tape counter',
-        icon: Icons.radio_rounded,
-      ),
-      (
-        mode: PlayerThemeMode.waveform,
-        title: 'Full-Bleed Waveform',
-        subtitle:
-            'Full screen audio-reactive glowing waveform visualizer backdrop',
-        icon: Icons.waves_rounded,
-      ),
-      (
-        mode: PlayerThemeMode.lyricsFocus,
-        title: 'Karaoke Lyrics Immersion',
-        subtitle:
-            'Magnified synchronized lyrics-first karaoke player interface',
-        icon: Icons.mic_rounded,
-      ),
-    ];
-
-    showModalBottomSheet(
-      context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      backgroundColor: surfaceColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(ctx).size.height * 0.8,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 12),
-              Center(
-                child: Container(
-                  width: 38,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: outlineColor.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                child: Text(
-                  'Select Player Theme',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: textPrimary,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: themes.length,
-                  itemBuilder: (context, index) {
-                    final t = themes[index];
-                    final isSelected = t.mode == currentMode;
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: Material(
-                        color: isSelected
-                            ? primaryColor.withValues(alpha: 0.12)
-                            : cardColor,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          side: BorderSide(
-                            color: isSelected ? primaryColor : outlineColor,
-                            width: isSelected ? 1.5 : 1.0,
-                          ),
-                        ),
-                        child: ListTile(
-                          leading: Icon(
-                            t.icon,
-                            color: isSelected ? primaryColor : textSecondary,
-                          ),
-                          title: Text(
-                            t.title,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: isSelected ? primaryColor : textPrimary,
-                            ),
-                          ),
-                          subtitle: Text(
-                            t.subtitle,
-                            style: TextStyle(fontSize: 12, color: textSecondary),
-                          ),
-                          trailing: isSelected
-                              ? Icon(Icons.check_circle_rounded, color: primaryColor)
-                              : null,
-                          onTap: () {
-                            cubit.setPlayerThemeMode(t.mode);
-                            Navigator.pop(ctx);
-                          },
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _getLanguageTitle(String code, dynamic l10n) {
-    switch (code) {
-      case 'ar':
-        return 'العربية (Arabic)';
-      case 'es':
-        return 'Español (Spanish)';
-      case 'en':
-        return 'English';
-      default:
-        return 'System Default';
-    }
-  }
-
-  void _showLanguagePickerSheet(
-    BuildContext context,
-    SettingsCubit cubit,
-    String currentCode,
-  ) {
-    final primaryColor = Theme.of(context).colorScheme.primary;
-    final surfaceColor = Theme.of(context).colorScheme.surface;
-    final cardColor =
-        Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
-    final outlineColor = Theme.of(context).colorScheme.outline;
-    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ??
-        context.palette.textPrimary;
-    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
-        context.palette.textSecondary;
-
-    final languages = [
-      (
-        code: 'system',
-        name: 'System Default',
-        nativeName: 'الافتراضي للنظام / Predeterminado',
-        flag: Icons.settings_suggest_rounded
-      ),
-      (
-        code: 'en',
-        name: 'English',
-        nativeName: 'English (US/UK)',
-        flag: Icons.language_rounded
-      ),
-      (
-        code: 'ar',
-        name: 'العربية',
-        nativeName: 'Arabic (RTL)',
-        flag: Icons.translate_rounded
-      ),
-      (
-        code: 'es',
-        name: 'Español',
-        nativeName: 'Spanish',
-        flag: Icons.public_rounded
-      ),
-    ];
-
-    showModalBottomSheet(
-      context: context,
-      useRootNavigator: true,
-      backgroundColor: surfaceColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Text(
-                context.l10n.appLanguage,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            ...languages.map((lang) {
-              final isSelected = lang.code == currentCode;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: Material(
-                  color: isSelected
-                      ? primaryColor.withValues(alpha: 0.12)
-                      : cardColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(
-                      color: isSelected ? primaryColor : outlineColor,
-                      width: isSelected ? 1.5 : 1.0,
-                    ),
-                  ),
-                  child: ListTile(
-                    leading: Icon(
-                      lang.flag,
-                      color: isSelected ? primaryColor : textSecondary,
-                    ),
-                    title: Text(
-                      lang.name,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: isSelected ? primaryColor : textPrimary,
-                      ),
-                    ),
-                    subtitle: Text(
-                      lang.nativeName,
-                      style: TextStyle(fontSize: 12, color: textSecondary),
-                    ),
-                    trailing: isSelected
-                        ? Icon(Icons.check_circle_rounded, color: primaryColor)
-                        : null,
-                    onTap: () {
-                      cubit.setLanguage(lang.code);
-                      Navigator.pop(ctx);
-                    },
-                  ),
-                ),
-              );
-            }),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _getColorSourceTitle(ThemeColorSource source) {
-    switch (source) {
-      case ThemeColorSource.system:
-        return 'Material You (Wallpaper)';
-      case ThemeColorSource.artwork:
-        return 'Album Artwork';
-      case ThemeColorSource.custom:
-        return 'Custom Accent';
-    }
-  }
-
-  void _showColorSourcePickerSheet(
-    BuildContext context,
-    SettingsCubit cubit,
-    ThemeColorSource currentSource,
-  ) {
-    final primaryColor = Theme.of(context).colorScheme.primary;
-    final surfaceColor = Theme.of(context).colorScheme.surface;
-    final cardColor =
-        Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
-    final outlineColor = Theme.of(context).colorScheme.outline;
-    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ??
-        context.palette.textPrimary;
-    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
-        context.palette.textSecondary;
-
-    final sources = [
-      (
-        source: ThemeColorSource.system,
-        title: 'Material You (Wallpaper)',
-        subtitle:
-            'Follow the system wallpaper palette on Android 12+ • falls back to album art on older devices',
-        icon: Icons.wallpaper_rounded,
-      ),
-      (
-        source: ThemeColorSource.artwork,
-        title: 'Album Artwork',
-        subtitle:
-            'Adapt colors from the current track\'s album art (changes per song)',
-        icon: Icons.album_rounded,
-      ),
-      (
-        source: ThemeColorSource.custom,
-        title: 'Custom Accent',
-        subtitle: 'Use the fixed accent color you pick above',
-        icon: Icons.color_lens_rounded,
-      ),
-    ];
-
-    showModalBottomSheet(
-      context: context,
-      useRootNavigator: true,
-      backgroundColor: surfaceColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Text(
-                'App Color Source',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            ...sources.map((s) {
-              final isSelected = s.source == currentSource;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: Material(
-                  color: isSelected
-                      ? primaryColor.withValues(alpha: 0.12)
-                      : cardColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(
-                      color: isSelected ? primaryColor : outlineColor,
-                      width: isSelected ? 1.5 : 1.0,
-                    ),
-                  ),
-                  child: ListTile(
-                    leading: Icon(
-                      s.icon,
-                      color: isSelected ? primaryColor : textSecondary,
-                    ),
-                    title: Text(
-                      s.title,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: isSelected ? primaryColor : textPrimary,
-                      ),
-                    ),
-                    subtitle: Text(
-                      s.subtitle,
-                      style: TextStyle(fontSize: 12, color: textSecondary),
-                    ),
-                    trailing: isSelected
-                        ? Icon(Icons.check_circle_rounded, color: primaryColor)
-                        : null,
-                    onTap: () {
-                      cubit.setThemeColorSource(s.source);
-                      Navigator.pop(ctx);
-                    },
-                  ),
-                ),
-              );
-            }),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showVisualizerStylePickerSheet(
-    BuildContext context,
-    SettingsCubit cubit,
-    VisualizerStyle currentStyle,
-  ) {
-    final primaryColor = Theme.of(context).colorScheme.primary;
-    final surfaceColor = Theme.of(context).colorScheme.surface;
-    final cardColor =
-        Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
-    final outlineColor = Theme.of(context).colorScheme.outline;
-    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ??
-        context.palette.textPrimary;
-    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
-        context.palette.textSecondary;
-
-    final styles = [
-      (
-        style: VisualizerStyle.bar,
-        title: 'BAR',
-        subtitle:
-            'Classic vertical frequency bars with smooth height animation',
-        icon: Icons.bar_chart_rounded,
-      ),
-      (
-        style: VisualizerStyle.wave,
-        title: 'WAVE',
-        subtitle:
-            'Smooth continuous Bézier waveform line with ambient gradient fill',
-        icon: Icons.waves_rounded,
-      ),
-      (
-        style: VisualizerStyle.circular,
-        title: 'CIRCULAR',
-        subtitle:
-            'Futuristic radial frequency bars surrounding album centerpiece',
-        icon: Icons.motion_photos_on_rounded,
-      ),
-      (
-        style: VisualizerStyle.off,
-        title: 'OFF',
-        subtitle: 'Disable audio visualizer spectrum animation',
-        icon: Icons.align_vertical_bottom_rounded,
-      ),
-    ];
-
-    showModalBottomSheet(
-      context: context,
-      useRootNavigator: true,
-      backgroundColor: surfaceColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Text(
-                'Audio Visualizer Style',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            ...styles.map((s) {
-              final isSelected = s.style == currentStyle;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: Material(
-                  color: isSelected
-                      ? primaryColor.withValues(alpha: 0.12)
-                      : cardColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(
-                      color: isSelected ? primaryColor : outlineColor,
-                      width: isSelected ? 1.5 : 1.0,
-                    ),
-                  ),
-                  child: ListTile(
-                    leading: Icon(
-                      s.icon,
-                      color: isSelected ? primaryColor : textSecondary,
-                    ),
-                    title: Text(
-                      s.title,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: isSelected ? primaryColor : textPrimary,
-                      ),
-                    ),
-                    subtitle: Text(
-                      s.subtitle,
-                      style: TextStyle(fontSize: 12, color: textSecondary),
-                    ),
-                    trailing: isSelected
-                        ? Icon(Icons.check_circle_rounded, color: primaryColor)
-                        : null,
-                    onTap: () {
-                      cubit.setVisualizerStyle(s.style);
-                      Navigator.pop(ctx);
-                    },
-                  ),
-                ),
-              );
-            }),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _getMiniPlayerSwipeTitle(MiniPlayerSwipeAction action) {
-    switch (action) {
-      case MiniPlayerSwipeAction.next:
-        return 'Next Track';
-      case MiniPlayerSwipeAction.prev:
-        return 'Previous Track';
-      case MiniPlayerSwipeAction.volume:
-        return 'Adjust Volume';
-      case MiniPlayerSwipeAction.none:
-        return 'Disabled';
-    }
-  }
-
-  String _getNowPlayingDoubleTapTitle(NowPlayingDoubleTapAction action) {
-    switch (action) {
-      case NowPlayingDoubleTapAction.toggleFavorite:
-        return 'Toggle Favorite';
-      case NowPlayingDoubleTapAction.toggleLyrics:
-        return 'Toggle Lyrics';
-      case NowPlayingDoubleTapAction.none:
-        return 'Disabled';
-    }
-  }
-
-  String _getNowPlayingArtworkSwipeTitle(NowPlayingArtworkSwipeAction action) {
-    switch (action) {
-      case NowPlayingArtworkSwipeAction.nextPrev:
-        return 'Next / Previous Track';
-      case NowPlayingArtworkSwipeAction.none:
-        return 'Disabled';
-    }
-  }
-
-  void _showMiniPlayerSwipePickerSheet(
-    BuildContext context,
-    SettingsCubit cubit, {
-    required bool isLeft,
-    required MiniPlayerSwipeAction currentAction,
-  }) {
-    final primaryColor = Theme.of(context).colorScheme.primary;
-    final surfaceColor = Theme.of(context).colorScheme.surface;
-    final cardColor =
-        Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
-    final outlineColor = Theme.of(context).colorScheme.outline;
-    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ??
-        context.palette.textPrimary;
-    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
-        context.palette.textSecondary;
-
-    final options = [
-      (
-        action: MiniPlayerSwipeAction.next,
-        title: 'Next Track',
-        subtitle: 'Skip to the next song in the queue',
-        icon: Icons.skip_next_rounded,
-      ),
-      (
-        action: MiniPlayerSwipeAction.prev,
-        title: 'Previous Track',
-        subtitle: 'Skip to the previous song or restart track',
-        icon: Icons.skip_previous_rounded,
-      ),
-      (
-        action: MiniPlayerSwipeAction.volume,
-        title: 'Adjust Volume',
-        subtitle: isLeft ? 'Lower playback volume' : 'Raise playback volume',
-        icon: isLeft ? Icons.volume_down_rounded : Icons.volume_up_rounded,
-      ),
-      (
-        action: MiniPlayerSwipeAction.none,
-        title: 'Disabled',
-        subtitle: 'Ignore swipe gesture',
-        icon: Icons.block_rounded,
-      ),
-    ];
-
-    showModalBottomSheet(
-      context: context,
-      useRootNavigator: true,
-      backgroundColor: surfaceColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Text(
-                isLeft
-                    ? 'MiniPlayer Swipe Left Action'
-                    : 'MiniPlayer Swipe Right Action',
-                style:
-                    const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-              ),
-            ),
-            const SizedBox(height: 12),
-            ...options.map((opt) {
-              final isSelected = opt.action == currentAction;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: Material(
-                  color: isSelected
-                      ? primaryColor.withValues(alpha: 0.12)
-                      : cardColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(
-                      color: isSelected ? primaryColor : outlineColor,
-                      width: isSelected ? 1.5 : 1.0,
-                    ),
-                  ),
-                  child: ListTile(
-                    leading: Icon(opt.icon,
-                        color: isSelected ? primaryColor : textSecondary),
-                    title: Text(opt.title,
-                        style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: isSelected ? primaryColor : textPrimary)),
-                    subtitle: Text(opt.subtitle,
-                        style: TextStyle(fontSize: 12, color: textSecondary)),
-                    trailing: isSelected
-                        ? Icon(Icons.check_circle_rounded, color: primaryColor)
-                        : null,
-                    onTap: () {
-                      if (isLeft) {
-                        cubit.setMiniPlayerSwipeLeft(opt.action);
-                      } else {
-                        cubit.setMiniPlayerSwipeRight(opt.action);
-                      }
-                      Navigator.pop(ctx);
-                    },
-                  ),
-                ),
-              );
-            }),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showNowPlayingDoubleTapPickerSheet(
-    BuildContext context,
-    SettingsCubit cubit,
-    NowPlayingDoubleTapAction currentAction,
-  ) {
-    final primaryColor = Theme.of(context).colorScheme.primary;
-    final surfaceColor = Theme.of(context).colorScheme.surface;
-    final cardColor =
-        Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
-    final outlineColor = Theme.of(context).colorScheme.outline;
-    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ??
-        context.palette.textPrimary;
-    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
-        context.palette.textSecondary;
-
-    final options = [
-      (
-        action: NowPlayingDoubleTapAction.toggleFavorite,
-        title: 'Toggle Favorite',
-        subtitle: 'Add or remove active song from favorites',
-        icon: Icons.favorite_rounded,
-      ),
-      (
-        action: NowPlayingDoubleTapAction.toggleLyrics,
-        title: 'Toggle Lyrics',
-        subtitle: 'Show or hide synchronized lyrics overlay',
-        icon: Icons.lyrics_rounded,
-      ),
-      (
-        action: NowPlayingDoubleTapAction.none,
-        title: 'Disabled',
-        subtitle: 'Ignore double-tap gesture',
-        icon: Icons.block_rounded,
-      ),
-    ];
-
-    showModalBottomSheet(
-      context: context,
-      useRootNavigator: true,
-      backgroundColor: surfaceColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Text(
-                'Now Playing Double-Tap Action',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-              ),
-            ),
-            const SizedBox(height: 12),
-            ...options.map((opt) {
-              final isSelected = opt.action == currentAction;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: Material(
-                  color: isSelected
-                      ? primaryColor.withValues(alpha: 0.12)
-                      : cardColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(
-                      color: isSelected ? primaryColor : outlineColor,
-                      width: isSelected ? 1.5 : 1.0,
-                    ),
-                  ),
-                  child: ListTile(
-                    leading: Icon(opt.icon,
-                        color: isSelected ? primaryColor : textSecondary),
-                    title: Text(opt.title,
-                        style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: isSelected ? primaryColor : textPrimary)),
-                    subtitle: Text(opt.subtitle,
-                        style: TextStyle(fontSize: 12, color: textSecondary)),
-                    trailing: isSelected
-                        ? Icon(Icons.check_circle_rounded, color: primaryColor)
-                        : null,
-                    onTap: () {
-                      cubit.setNowPlayingDoubleTap(opt.action);
-                      Navigator.pop(ctx);
-                    },
-                  ),
-                ),
-              );
-            }),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showNowPlayingArtworkSwipePickerSheet(
-    BuildContext context,
-    SettingsCubit cubit,
-    NowPlayingArtworkSwipeAction currentAction,
-  ) {
-    final primaryColor = Theme.of(context).colorScheme.primary;
-    final surfaceColor = Theme.of(context).colorScheme.surface;
-    final cardColor =
-        Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
-    final outlineColor = Theme.of(context).colorScheme.outline;
-    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ??
-        context.palette.textPrimary;
-    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
-        context.palette.textSecondary;
-
-    final options = [
-      (
-        action: NowPlayingArtworkSwipeAction.nextPrev,
-        title: 'Next / Previous Track',
-        subtitle: 'Swipe left for next track, swipe right for previous track',
-        icon: Icons.swipe_rounded,
-      ),
-      (
-        action: NowPlayingArtworkSwipeAction.none,
-        title: 'Disabled',
-        subtitle: 'Ignore horizontal swipe on album artwork',
-        icon: Icons.block_rounded,
-      ),
-    ];
-
-    showModalBottomSheet(
-      context: context,
-      useRootNavigator: true,
-      backgroundColor: surfaceColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Text(
-                'Now Playing Artwork Swipe',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-              ),
-            ),
-            const SizedBox(height: 12),
-            ...options.map((opt) {
-              final isSelected = opt.action == currentAction;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: Material(
-                  color: isSelected
-                      ? primaryColor.withValues(alpha: 0.12)
-                      : cardColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(
-                      color: isSelected ? primaryColor : outlineColor,
-                      width: isSelected ? 1.5 : 1.0,
-                    ),
-                  ),
-                  child: ListTile(
-                    leading: Icon(opt.icon,
-                        color: isSelected ? primaryColor : textSecondary),
-                    title: Text(opt.title,
-                        style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: isSelected ? primaryColor : textPrimary)),
-                    subtitle: Text(opt.subtitle,
-                        style: TextStyle(fontSize: 12, color: textSecondary)),
-                    trailing: isSelected
-                        ? Icon(Icons.check_circle_rounded, color: primaryColor)
-                        : null,
-                    onTap: () {
-                      cubit.setNowPlayingArtworkSwipe(opt.action);
-                      Navigator.pop(ctx);
-                    },
-                  ),
-                ),
-              );
-            }),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _getQualityTitle(YtmAudioQuality quality) {
-    switch (quality) {
-      case YtmAudioQuality.high:
-        return 'High (~160+ kbps • Best)';
-      case YtmAudioQuality.medium:
-        return 'Medium (~128 kbps)';
-      case YtmAudioQuality.low:
-        return 'Low (~64 kbps • Data Saver)';
-    }
-  }
-
-  void _showQualityPickerSheet(
-    BuildContext context,
-    SettingsCubit cubit, {
-    required bool isStreaming,
-    required YtmAudioQuality currentQuality,
-  }) {
-    final primaryColor = Theme.of(context).colorScheme.primary;
-    final surfaceColor = Theme.of(context).colorScheme.surface;
-    final cardColor =
-        Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
-    final outlineColor = Theme.of(context).colorScheme.outline;
-    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ??
-        context.palette.textPrimary;
-    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
-        context.palette.textSecondary;
-
-    final options = [
-      (
-        quality: YtmAudioQuality.high,
-        title: 'High Quality',
-        subtitle: isStreaming
-            ? 'Highest available bitrate (~160+ kbps) for crystal clear sound'
-            : 'Highest quality audio files (~160+ kbps M4A)',
-        icon: Icons.high_quality_rounded,
-      ),
-      (
-        quality: YtmAudioQuality.medium,
-        title: 'Medium Quality',
-        subtitle: isStreaming
-            ? 'Standard bitrate (~128 kbps) with balanced data usage'
-            : 'Standard file size and quality (~128 kbps M4A)',
-        icon: Icons.graphic_eq_rounded,
-      ),
-      (
-        quality: YtmAudioQuality.low,
-        title: 'Low / Data Saver',
-        subtitle: isStreaming
-            ? 'Reduced data usage (~64 kbps) for slow connections'
-            : 'Smallest file size (~64 kbps)',
-        icon: Icons.data_saver_on_rounded,
-      ),
-    ];
-
-    showModalBottomSheet(
-      context: context,
-      useRootNavigator: true,
-      backgroundColor: surfaceColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Text(
-                isStreaming
-                    ? 'Streaming Audio Quality'
-                    : 'Download Audio Quality',
-                style:
-                    const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-              ),
-            ),
-            const SizedBox(height: 12),
-            ...options.map((opt) {
-              final isSelected = opt.quality == currentQuality;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: Material(
-                  color: isSelected
-                      ? primaryColor.withValues(alpha: 0.12)
-                      : cardColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(
-                      color: isSelected ? primaryColor : outlineColor,
-                      width: isSelected ? 1.5 : 1.0,
-                    ),
-                  ),
-                  child: ListTile(
-                    leading: Icon(opt.icon,
-                        color: isSelected ? primaryColor : textSecondary),
-                    title: Text(opt.title,
-                        style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: isSelected ? primaryColor : textPrimary)),
-                    subtitle: Text(opt.subtitle,
-                        style: TextStyle(fontSize: 12, color: textSecondary)),
-                    trailing: isSelected
-                        ? Icon(Icons.check_circle_rounded, color: primaryColor)
-                        : null,
-                    onTap: () {
-                      if (isStreaming) {
-                        cubit.setStreamingQuality(opt.quality);
-                      } else {
-                        cubit.setDownloadQuality(opt.quality);
-                      }
-                      Navigator.pop(ctx);
-                    },
-                  ),
-                ),
-              );
-            }),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCloudSyncCard(BuildContext context) {
-    final p = context.palette;
-
-    return BlocBuilder<AuthCubit, AuthState>(
-      builder: (context, state) {
-        final authCubit = context.read<AuthCubit>();
-        final user = state.user;
-        final isSyncing = state.syncStatus == SyncStatus.syncing;
-
-        String syncSubtitle = context.l10n.cloudSyncSubtitle;
-        if (user != null) {
-          if (state.lastSyncedAt != null) {
-            final diff = DateTime.now().difference(state.lastSyncedAt!);
-            if (diff.inMinutes < 1) {
-              syncSubtitle = context.l10n.lastSyncedJustNow;
-            } else if (diff.inHours < 1) {
-              syncSubtitle = context.l10n.lastSyncedMinutesAgo(diff.inMinutes);
-            } else {
-              syncSubtitle = context.l10n.lastSyncedHoursAgo(diff.inHours);
-            }
-          } else {
-            syncSubtitle = context.l10n.connectedReadyToSync;
-          }
-        }
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 20, top: 4),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: p.surfaceContainer,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: p.hairline),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 46,
-                    height: 46,
-                    decoration: BoxDecoration(
-                      color: user != null
-                          ? p.accent.withValues(alpha: 0.15)
-                          : p.surface,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: p.hairline),
-                    ),
-                    child: user?.photoURL != null
-                        ? ClipOval(
-                            child: Image.network(
-                              user!.photoURL!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
-                                  Icon(Icons.person_rounded, color: p.accent),
-                            ),
-                          )
-                        : Icon(
-                            user != null
-                                ? Icons.person_rounded
-                                : Icons.cloud_outlined,
-                            color: p.accent),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user?.displayName ??
-                              user?.email ??
-                              context.l10n.cloudSync,
-                          style: TextStyle(
-                            color: p.textPrimary,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          syncSubtitle,
-                          style: TextStyle(
-                            color: p.textSecondary,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (user == null) ...[
-                    FilledButton(
-                      onPressed: () => AuthSheet.show(context),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: p.accent,
-                        foregroundColor: p.onAccent,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: Text(context.l10n.signIn,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 13)),
-                    ),
-                  ] else ...[
-                    IconButton(
-                      tooltip: context.l10n.syncNow,
-                      icon: isSyncing
-                          ? SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: p.accent))
-                          : Icon(Icons.sync_rounded, color: p.accent),
-                      onPressed: isSyncing ? null : () => authCubit.syncNow(),
-                    ),
-                    IconButton(
-                      tooltip: context.l10n.signOut,
-                      icon: Icon(Icons.logout_rounded,
-                          color: p.textTertiary, size: 20),
-                      onPressed: () => authCubit.signOut(),
-                    ),
-                  ],
-                ],
-              ),
-              if (state.syncError != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  state.syncError!,
-                  style: TextStyle(color: p.error, fontSize: 11),
-                ),
-              ],
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showYtmWebOptionsSheet(BuildContext context) {
-    final p = context.palette;
-    showModalBottomSheet(
-      context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return Align(
-          alignment: Alignment.bottomCenter,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: Adaptive.sheetConstraints(ctx).maxWidth,
-              maxHeight: MediaQuery.of(ctx).size.height * 0.85,
-            ),
-            child: Material(
-              color: p.surfaceContainerHigh,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-              clipBehavior: Clip.antiAlias,
-              child: SafeArea(
-                top: false,
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 36,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: p.textTertiary.withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: p.accentContainer,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(Icons.language_rounded,
-                                color: p.accent, size: 22),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  ctx.l10n.youtubeMusicWeb,
-                                  style: TextStyle(
-                                    color: p.textPrimary,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 17,
-                                  ),
-                                ),
-                                Text(
-                                  ctx.l10n.selectPageToOpen,
-                                  style: TextStyle(
-                                      color: p.textSecondary, fontSize: 12),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      _ytmWebOptionTile(
-                        ctx,
-                        icon: Icons.home_rounded,
-                        title: ctx.l10n.homePage,
-                        subtitle: ctx.l10n.homePageSubtitle,
-                        url: 'https://music.youtube.com/?gl=EG&hl=en',
-                        p: p,
-                      ),
-                      _ytmWebOptionTile(
-                        ctx,
-                        icon: Icons.video_library_rounded,
-                        title: ctx.l10n.youtubeWeb,
-                        subtitle: ctx.l10n.youtubeWebSubtitle,
-                        url: 'https://www.youtube.com',
-                        p: p,
-                      ),
-                      _ytmWebOptionTile(
-                        ctx,
-                        icon: Icons.explore_rounded,
-                        title: ctx.l10n.exploreAndCharts,
-                        subtitle: ctx.l10n.exploreAndChartsSubtitle,
-                        url: 'https://music.youtube.com/explore?gl=EG&hl=en',
-                        p: p,
-                      ),
-                      _ytmWebOptionTile(
-                        ctx,
-                        icon: Icons.library_music_rounded,
-                        title: ctx.l10n.yourLibrary,
-                        subtitle: ctx.l10n.yourLibrarySubtitle,
-                        url: 'https://music.youtube.com/library?gl=EG&hl=en',
-                        p: p,
-                      ),
-                      _ytmWebOptionTile(
-                        ctx,
-                        icon: Icons.favorite_rounded,
-                        title: ctx.l10n.likedMusic,
-                        subtitle: ctx.l10n.likedMusicSubtitle,
-                        url: 'https://music.youtube.com/playlist?list=LM&gl=EG&hl=en',
-                        p: p,
-                      ),
-                      _ytmWebOptionTile(
-                        ctx,
-                        icon: Icons.fiber_new_rounded,
-                        title: ctx.l10n.newReleases,
-                        subtitle: ctx.l10n.newReleasesSubtitle,
-                        url: 'https://music.youtube.com/new_releases?gl=EG&hl=en',
-                        p: p,
-                      ),
-                      _ytmWebOptionTile(
-                        ctx,
-                        icon: Icons.history_rounded,
-                        title: ctx.l10n.listeningHistory,
-                        subtitle: ctx.l10n.listeningHistorySubtitle,
-                        url: 'https://music.youtube.com/history?gl=EG&hl=en',
-                        p: p,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _ytmWebOptionTile(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required String url,
-    required PulsrPalette p,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        leading: Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: p.surface,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: p.hairline),
-          ),
-          child: Icon(icon, color: p.accent, size: 20),
-        ),
-        title: Text(
-          title,
-          style: TextStyle(
-              color: p.textPrimary, fontWeight: FontWeight.w600, fontSize: 14),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: TextStyle(color: p.textSecondary, fontSize: 11.5),
-        ),
-        trailing: Icon(Icons.arrow_forward_ios_rounded,
-            size: 14, color: p.textTertiary),
-        onTap: () {
-          Navigator.pop(context);
-          YtmWebLoginSheet.show(
-            context,
-            initialUrl: url,
-            title: title,
-            isBrowseMode: true,
-          );
-        },
-      ),
-    );
-  }
-
-  void _showPrivacyGuaranteeSheet(BuildContext context) {
-    final p = context.palette;
-    showModalBottomSheet(
-      context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      backgroundColor: p.surfaceContainer,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(ctx).size.height * 0.8,
-          ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.security_rounded, color: p.accent, size: 24),
-                    const SizedBox(width: 10),
-                    Text(
-                      'Privacy Guarantee',
-                      style: TextStyle(
-                        color: p.textPrimary,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 18,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                _privacyPoint(
-                  context,
-                  Icons.offline_bolt_rounded,
-                  'Offline-first',
-                  'Your library, playback and settings live on this device. Nothing is uploaded unless you explicitly sign in for cloud sync.',
-                ),
-                _privacyPoint(
-                  context,
-                  Icons.visibility_off_rounded,
-                  'No trackers in Pure',
-                  'Pure (Play Store) builds ship without the INTERNET permission, analytics SDKs or advertising identifiers.',
-                ),
-                _privacyPoint(
-                  context,
-                  Icons.folder_shared_rounded,
-                  'Permissions are purposeful',
-                  'Storage/media access is used only to scan and play your local audio. Bluetooth and notification access are requested only for connected-audio features and playback controls.',
-                ),
-                _privacyPoint(
-                  context,
-                  Icons.cloud_off_rounded,
-                  'You stay in control',
-                  'Cloud sync and remote metadata can be disabled. Automation rules and device profiles are stored locally.',
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _privacyPoint(
-      BuildContext context, IconData icon, String title, String body) {
-    final p = context.palette;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: p.accent, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: p.textPrimary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  body,
-                  style: TextStyle(
-                    color: p.textSecondary,
-                    fontSize: 12.5,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAboutSheet(BuildContext context) {
-    final p = context.palette;
-    showModalBottomSheet(
-      context: context,
-      useRootNavigator: true,
-      backgroundColor: p.surfaceContainer,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: p.accentContainer,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Icon(Icons.graphic_eq_rounded, color: p.accent, size: 34),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                AppConfig.appTitle,
-                style: TextStyle(
-                  color: p.textPrimary,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 20,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Version ${AppConfig.appVersion}',
-                style: TextStyle(color: p.textSecondary, fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'An audiophile-grade local music player with bit-perfect output, a full DSP chain, per-device profiles and automation.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: p.textSecondary,
-                  fontSize: 13,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: p.accent,
-                    foregroundColor: p.onAccent,
-                  ),
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Close'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showAutomationRulesSheet(BuildContext context) {
-    final p = context.palette;
-    showModalBottomSheet(
-      context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      backgroundColor: p.surfaceContainer,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => const _AutomationRulesSheet(),
-    );
-  }
 }
 
-class _AutomationRulesSheet extends StatefulWidget {
-  const _AutomationRulesSheet();
+class _SearchItem {
+  final String category;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final List<String> keywords;
+  final Widget? trailing;
+  final VoidCallback? onTap;
 
-  @override
-  State<_AutomationRulesSheet> createState() => _AutomationRulesSheetState();
-}
-
-class _AutomationRulesSheetState extends State<_AutomationRulesSheet> {
-  final AutomationRulesService _rulesService = getIt<AutomationRulesService>();
-  final SettingsProfilesService _profilesService =
-      getIt<SettingsProfilesService>();
-
-  List<AutomationRule> _rules = const [];
-  Map<String, String> _profileNames = const {};
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    try {
-      final rules = await _rulesService.getRules();
-      final profiles = await _profilesService.getProfiles();
-      if (!mounted) return;
-      setState(() {
-        _rules = rules;
-        _profileNames = {for (final p in profiles) p.id: p.name};
-        _loading = false;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _toggle(AutomationRule rule, bool value) async {
-    final updated = rule.copyWith(enabled: value);
-    setState(() {
-      _rules = [
-        for (final r in _rules) if (r.id == rule.id) updated else r,
-      ];
-    });
-    await _rulesService.saveRule(updated);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    return SafeArea(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.8,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.auto_awesome_rounded, color: p.accent, size: 24),
-                  const SizedBox(width: 10),
-                  Text(
-                    'Automation Rules',
-                    style: TextStyle(
-                      color: p.textPrimary,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 18,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Apply a settings profile automatically when a device event fires.',
-                style: TextStyle(color: p.textSecondary, fontSize: 12.5),
-              ),
-              const SizedBox(height: 16),
-              if (_loading)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Center(
-                      child: CircularProgressIndicator(strokeWidth: 2)),
-                )
-              else if (_rules.isEmpty)
-                Text(
-                  'No automation rules configured.',
-                  style: TextStyle(color: p.textSecondary, fontSize: 13),
-                )
-              else
-                Flexible(
-                  child: ListView(
-                    shrinkWrap: true,
-                    children: [
-                      for (final rule in _rules) _ruleTile(p, rule),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _ruleTile(PulsrPalette p, AutomationRule rule) {
-    final supported = AutomationTriggerService.supportsTrigger(rule.trigger);
-    final profileName =
-        _profileNames[rule.targetProfileId] ?? rule.targetProfileId;
-    final IconData icon;
-    switch (rule.trigger) {
-      case AutomationTrigger.bluetoothConnected:
-        icon = Icons.bluetooth_rounded;
-        break;
-      case AutomationTrigger.headphonesPlugged:
-        icon = Icons.headphones_rounded;
-        break;
-      case AutomationTrigger.deviceCharging:
-        icon = Icons.battery_charging_full_rounded;
-        break;
-    }
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: p.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: p.hairline),
-      ),
-      child: SwitchListTile(
-        value: rule.enabled && supported,
-        onChanged: supported ? (v) => _toggle(rule, v) : null,
-        secondary: Icon(
-          icon,
-          color: supported ? p.accent : p.textTertiary,
-        ),
-        title: Text(
-          rule.trigger.label,
-          style: TextStyle(
-            color: p.textPrimary,
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
-          ),
-        ),
-        subtitle: Text(
-          supported ? 'Apply: $profileName' : 'Not detectable on this platform',
-          style: TextStyle(
-            color: supported ? p.textSecondary : p.error,
-            fontSize: 12,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _CacheSection extends StatefulWidget {
-  const _CacheSection();
-
-  @override
-  State<_CacheSection> createState() => _CacheSectionState();
-}
-
-class _CacheSectionState extends State<_CacheSection>
-    with WidgetsBindingObserver {
-  int _artCacheSizeBytes = 0;
-  int _streamCacheSizeBytes = 0;
-  bool _isLoading = true;
-
-  /// YTM is only present in ENABLE_YTM builds; keep Pure builds from touching
-  /// the stream-cache directory entirely (no directory creation/reads).
-  YtmCacheManager? get _ytmCacheManager =>
-      AppConfig.ytmEnabled && getIt.isRegistered<YtmCacheManager>()
-          ? getIt<YtmCacheManager>()
-          : null;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _refreshCacheSize();
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _refreshCacheSize();
-    }
-  }
-
-  Future<void> _refreshCacheSize() async {
-    final artSize = await ArtworkCacheManager().getDiskCacheSizeBytes();
-    final cacheManager = _ytmCacheManager;
-    final streamSize =
-        cacheManager == null ? 0 : await cacheManager.getCacheSizeBytes();
-    if (mounted) {
-      setState(() {
-        _artCacheSizeBytes = artSize;
-        _streamCacheSizeBytes = streamSize;
-        _isLoading = false;
-      });
-    }
-  }
-
-  String _formatSize(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    final manager = ArtworkCacheManager();
-    final maxMb = manager.maxCacheSizeMb;
-
-    return Column(
-      children: [
-        ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          leading: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: p.accent.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(Icons.photo_size_select_actual_rounded,
-                color: p.accent, size: 22),
-          ),
-          title: Text(
-            context.l10n.artworkCache,
-            style: TextStyle(
-                color: p.textPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: 14.5),
-          ),
-          subtitle: Text(
-            _isLoading
-                ? context.l10n.calculating
-                : context.l10n.cacheUsedOfMax(
-                    _formatSize(_artCacheSizeBytes), maxMb),
-            style: TextStyle(color: p.textSecondary, fontSize: 12.5),
-          ),
-          trailing: TextButton.icon(
-            style: TextButton.styleFrom(
-              foregroundColor: p.error,
-              visualDensity: VisualDensity.compact,
-            ),
-            icon: const Icon(Icons.delete_outline_rounded, size: 18),
-            label: Text(context.l10n.clear),
-            onPressed: () async {
-              await manager.clearAllCache();
-              await _refreshCacheSize();
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text(context.l10n.artworkCacheCleared)),
-                );
-              }
-            },
-          ),
-        ),
-        Divider(height: 1, color: p.hairline),
-        if (AppConfig.ytmEnabled) ...[
-          ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            leading: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.redAccent.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.cloud_download_rounded,
-                  color: Colors.redAccent, size: 22),
-            ),
-            title: Text(
-              context.l10n.youtubeStreamDiskCache,
-              style: TextStyle(
-                  color: p.textPrimary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14.5),
-            ),
-            subtitle: Text(
-              _isLoading
-                  ? context.l10n.calculating
-                  : context.l10n.streamCacheCachedForReplay(
-                      _formatSize(_streamCacheSizeBytes)),
-              style: TextStyle(color: p.textSecondary, fontSize: 12.5),
-            ),
-            trailing: TextButton.icon(
-              style: TextButton.styleFrom(
-                foregroundColor: p.error,
-                visualDensity: VisualDensity.compact,
-              ),
-              icon: const Icon(Icons.delete_outline_rounded, size: 18),
-              label: Text(context.l10n.clear),
-              onPressed: () async {
-                final cacheManager = _ytmCacheManager;
-                if (cacheManager == null) return;
-                await cacheManager.clearCache();
-                await _refreshCacheSize();
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        content: Text(context.l10n.streamCacheCleared)),
-                  );
-                }
-              },
-            ),
-          ),
-          Divider(height: 1, color: p.hairline),
-        ],
-        ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          leading: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: p.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child:
-                Icon(Icons.disc_full_rounded, color: p.textSecondary, size: 22),
-          ),
-          title: Text(
-            context.l10n.maximumArtworkCacheLimit,
-            style: TextStyle(
-                color: p.textPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: 14.5),
-          ),
-          subtitle: Text(
-            context.l10n.maxMbAutoEvicts(maxMb),
-            style: TextStyle(color: p.textSecondary, fontSize: 12.5),
-          ),
-          trailing: Icon(Icons.arrow_forward_ios_rounded,
-              size: 14, color: p.textTertiary),
-          onTap: () => _showMaxCacheLimitPicker(context, manager),
-        ),
-      ],
-    );
-  }
-
-  void _showMaxCacheLimitPicker(
-      BuildContext context, ArtworkCacheManager manager) {
-    final p = context.palette;
-    final options = [50, 100, 250, 500];
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: p.surfaceContainer,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                context.l10n.maximumCacheSize,
-                style: TextStyle(
-                    color: p.textPrimary,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16),
-              ),
-              const SizedBox(height: 12),
-              for (final mb in options)
-                ListTile(
-                  leading: Icon(
-                    manager.maxCacheSizeMb == mb
-                        ? Icons.radio_button_checked_rounded
-                        : Icons.radio_button_off_rounded,
-                    color: manager.maxCacheSizeMb == mb
-                        ? p.accent
-                        : p.textTertiary,
-                  ),
-                  title: Text(
-                    context.l10n.mbValue(mb),
-                    style: TextStyle(
-                      color: manager.maxCacheSizeMb == mb
-                          ? p.accent
-                          : p.textPrimary,
-                      fontWeight: manager.maxCacheSizeMb == mb
-                          ? FontWeight.w700
-                          : FontWeight.w500,
-                    ),
-                  ),
-                  onTap: () async {
-                    await manager.setMaxCacheSizeMb(mb);
-                    if (ctx.mounted) Navigator.pop(ctx);
-                    if (mounted) setState(() {});
-                  },
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-void _showScrobblerSettingsModal(BuildContext context) {
-  final p = context.palette;
-
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: p.surfaceContainer,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
-    builder: (ctx) => const _ScrobblerConfigSheet(),
-  );
-}
-
-class _ScrobblerConfigSheet extends StatefulWidget {
-  const _ScrobblerConfigSheet();
-
-  @override
-  State<_ScrobblerConfigSheet> createState() => _ScrobblerConfigSheetState();
-}
-
-class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
-  bool _listenBrainzEnabled = false;
-  final _listenBrainzTokenController = TextEditingController();
-
-  bool _lastFmEnabled = false;
-  final _lastFmApiKeyController = TextEditingController();
-  final _lastFmSecretController = TextEditingController();
-  final _lastFmSessionKeyController = TextEditingController();
-
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadScrobblerPrefs();
-  }
-
-  Future<void> _loadScrobblerPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    final secureStorage = getIt<FlutterSecureStorage>();
-    String lbToken = '';
-    String lastFmKey = '';
-    String lastFmSec = '';
-    String lastFmSession = '';
-    try {
-      lbToken = await secureStorage.read(
-              key: ScrobblerService.keyListenBrainzTokenSecure) ??
-          '';
-      lastFmKey = await secureStorage.read(
-              key: ScrobblerService.keyLastFmApiKeySecure) ??
-          '';
-      lastFmSec = await secureStorage.read(
-              key: ScrobblerService.keyLastFmSecretSecure) ??
-          '';
-      lastFmSession = await secureStorage.read(
-              key: ScrobblerService.keyLastFmSessionKeySecure) ??
-          '';
-    } catch (_) {}
-    if (lbToken.isEmpty) {
-      lbToken = prefs.getString(ScrobblerService.keyListenBrainzToken) ?? '';
-    }
-    if (lastFmKey.isEmpty) {
-      lastFmKey = prefs.getString(ScrobblerService.keyLastFmApiKey) ?? '';
-    }
-    if (lastFmSec.isEmpty) {
-      lastFmSec = prefs.getString(ScrobblerService.keyLastFmSecret) ?? '';
-    }
-    if (lastFmSession.isEmpty) {
-      lastFmSession =
-          prefs.getString(ScrobblerService.keyLastFmSessionKey) ?? '';
-    }
-    setState(() {
-      _listenBrainzEnabled =
-          prefs.getBool(ScrobblerService.keyListenBrainzEnabled) ?? false;
-      _listenBrainzTokenController.text = lbToken;
-
-      _lastFmEnabled =
-          prefs.getBool(ScrobblerService.keyLastFmEnabled) ?? false;
-      _lastFmApiKeyController.text = lastFmKey;
-      _lastFmSecretController.text = lastFmSec;
-      _lastFmSessionKeyController.text = lastFmSession;
-      _isLoading = false;
-    });
-  }
-
-  Future<void> _saveScrobblerPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    final secureStorage = getIt<FlutterSecureStorage>();
-    await prefs.setBool(
-        ScrobblerService.keyListenBrainzEnabled, _listenBrainzEnabled);
-    final lbToken = _listenBrainzTokenController.text.trim();
-    if (lbToken.isNotEmpty) {
-      await secureStorage.write(
-          key: ScrobblerService.keyListenBrainzTokenSecure, value: lbToken);
-    } else {
-      await secureStorage.delete(
-          key: ScrobblerService.keyListenBrainzTokenSecure);
-    }
-    await prefs.remove(ScrobblerService.keyListenBrainzToken);
-
-    await prefs.setBool(ScrobblerService.keyLastFmEnabled, _lastFmEnabled);
-    final lastFmKey = _lastFmApiKeyController.text.trim();
-    final lastFmSec = _lastFmSecretController.text.trim();
-    final lastFmSession = _lastFmSessionKeyController.text.trim();
-
-    if (lastFmKey.isNotEmpty) {
-      await secureStorage.write(
-          key: ScrobblerService.keyLastFmApiKeySecure, value: lastFmKey);
-    } else {
-      await secureStorage.delete(key: ScrobblerService.keyLastFmApiKeySecure);
-    }
-    if (lastFmSec.isNotEmpty) {
-      await secureStorage.write(
-          key: ScrobblerService.keyLastFmSecretSecure, value: lastFmSec);
-    } else {
-      await secureStorage.delete(key: ScrobblerService.keyLastFmSecretSecure);
-    }
-    if (lastFmSession.isNotEmpty) {
-      await secureStorage.write(
-          key: ScrobblerService.keyLastFmSessionKeySecure,
-          value: lastFmSession);
-    } else {
-      await secureStorage.delete(
-          key: ScrobblerService.keyLastFmSessionKeySecure);
-    }
-    await prefs.remove(ScrobblerService.keyLastFmApiKey);
-    await prefs.remove(ScrobblerService.keyLastFmSecret);
-    await prefs.remove(ScrobblerService.keyLastFmSessionKey);
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.scrobblerConfigSaved)),
-      );
-      Navigator.pop(context);
-    }
-  }
-
-  @override
-  void dispose() {
-    _listenBrainzTokenController.dispose();
-    _lastFmApiKeyController.dispose();
-    _lastFmSecretController.dispose();
-    _lastFmSessionKeyController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-
-    if (_isLoading) {
-      return const SizedBox(
-        height: 200,
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-        top: 20,
-        left: 20,
-        right: 20,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.equalizer_rounded, color: p.accent, size: 24),
-                const SizedBox(width: 10),
-                Text(
-                  context.l10n.scrobblerSettings,
-                  style: TextStyle(
-                    color: p.textPrimary,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 18,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              context.l10n.listenBrainzRestScrobbler,
-              style: TextStyle(
-                  color: p.textPrimary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14),
-            ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(context.l10n.enableListenBrainz,
-                  style: TextStyle(color: p.textPrimary, fontSize: 14)),
-              value: _listenBrainzEnabled,
-              activeThumbColor: p.accent,
-              onChanged: (val) => setState(() => _listenBrainzEnabled = val),
-            ),
-            if (_listenBrainzEnabled)
-              TextField(
-                controller: _listenBrainzTokenController,
-                style: TextStyle(color: p.textPrimary, fontSize: 13),
-                decoration: InputDecoration(
-                  labelText: context.l10n.userToken,
-                  hintText: context.l10n.enterListenBrainzUserToken,
-                  labelStyle: TextStyle(color: p.textSecondary),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  isDense: true,
-                ),
-              ),
-            const SizedBox(height: 20),
-            Divider(color: p.hairline),
-            const SizedBox(height: 8),
-            Text(
-              context.l10n.lastFmRestScrobbler,
-              style: TextStyle(
-                  color: p.textPrimary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14),
-            ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(context.l10n.enableLastFmDirectScrobbling,
-                  style: TextStyle(color: p.textPrimary, fontSize: 14)),
-              value: _lastFmEnabled,
-              activeThumbColor: p.accent,
-              onChanged: (val) => setState(() => _lastFmEnabled = val),
-            ),
-            if (_lastFmEnabled) ...[
-              TextField(
-                controller: _lastFmApiKeyController,
-                style: TextStyle(color: p.textPrimary, fontSize: 13),
-                decoration: InputDecoration(
-                  labelText: context.l10n.lastFmApiKey,
-                  labelStyle: TextStyle(color: p.textSecondary),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  isDense: true,
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _lastFmSecretController,
-                style: TextStyle(color: p.textPrimary, fontSize: 13),
-                decoration: InputDecoration(
-                  labelText: context.l10n.lastFmSharedSecret,
-                  labelStyle: TextStyle(color: p.textSecondary),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  isDense: true,
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _lastFmSessionKeyController,
-                style: TextStyle(color: p.textPrimary, fontSize: 13),
-                decoration: InputDecoration(
-                  labelText: context.l10n.lastFmSessionKey,
-                  labelStyle: TextStyle(color: p.textSecondary),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  isDense: true,
-                ),
-              ),
-            ],
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: p.accent,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                ),
-                onPressed: _saveScrobblerPrefs,
-                child: Text(context.l10n.saveSettings,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700, color: Colors.black)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  _SearchItem({
+    required this.category,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.keywords,
+    this.trailing,
+    this.onTap,
+  });
 }

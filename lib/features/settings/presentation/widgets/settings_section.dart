@@ -33,11 +33,17 @@ class SettingsSection extends StatelessWidget {
               children: [
                 Icon(icon, size: 14, color: p.accent),
                 const SizedBox(width: 6),
-                Text(title.toUpperCase(),
+                Expanded(
+                  child: Text(
+                    title.toUpperCase(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: p.textSecondary,
                         fontWeight: FontWeight.w700,
-                        letterSpacing: 0.6)),
+                        letterSpacing: 0.6),
+                  ),
+                ),
               ],
             ),
           ),

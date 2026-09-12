@@ -24,6 +24,7 @@ import 'core/services/file_intent_handler.dart';
 import 'core/services/restore_detection_service.dart';
 import 'core/services/ytm_account_service.dart';
 import 'core/services/ytm_service.dart';
+import 'core/services/ytm_url_cache.dart';
 import 'core/utils/error_logger.dart';
 import 'core/utils/ytm_rate_limiter.dart';
 import 'data/audio/audio_handler.dart';
@@ -110,6 +111,13 @@ Future<void> main() async {
           if (AppConfig.ytmEnabled)
             getIt<YtmAccountService>().init().timeout(const Duration(seconds: 8)).catchError((e, st) {
               ErrorLogger.log('YtmAccountService init failed or timed out',
+                  error: e, stackTrace: st, category: 'Startup');
+            }),
+          // Rehydrate guest stream URLs saved by the previous run so a replay
+          // or skip-back after launch resolves instantly.
+          if (AppConfig.ytmEnabled && getIt.isRegistered<YtmUrlCache>())
+            getIt<YtmUrlCache>().restore().timeout(const Duration(seconds: 8)).catchError((e, st) {
+              ErrorLogger.log('YtmUrlCache restore failed or timed out',
                   error: e, stackTrace: st, category: 'Startup');
             }),
         ]);

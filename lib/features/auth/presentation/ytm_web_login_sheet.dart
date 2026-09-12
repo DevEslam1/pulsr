@@ -12,6 +12,7 @@ import '../../../core/services/ytm_account_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../utils/google_login_recovery.dart';
+import 'ytm_oauth_login_sheet.dart';
 
 import '../../../core/utils/error_logger.dart';
 class YtmWebLoginSheet extends StatefulWidget {
@@ -62,6 +63,12 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   InAppWebViewController? _webViewController;
   InAppWebViewSettings? _settings;
   bool _isLoading = true;
+
+  /// The UA actually pushed onto the live WebView. On Android it is derived
+  /// from the device's real System WebView (see [_resolveUserAgent]) so the UA
+  /// string and the engine-reported Client Hints cannot disagree; elsewhere it
+  /// falls back to the packaged constant.
+  String _resolvedUserAgent = EmbeddedBrowserUa.mobile;
 
   /// Set once the native WebView behind [_webViewController] has been torn down.
   ///
@@ -175,8 +182,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
   // --- Google "This browser or app may not be secure" block recovery ---
   // UAs live in EmbeddedBrowserUa (single source; keep bumped — see file).
-  // Default to Firefox Mobile (bypasses Google's Chromium WebView checks on Android).
-  static String get mobileUserAgent => EmbeddedBrowserUa.mobile;
+  // On Android the default identity is derived from the real System WebView at
+  // runtime so the UA string matches the engine's Client Hints exactly.
+  String get mobileUserAgent => _resolvedUserAgent;
 
   static const String _ytmBrowseGuardJs = r'''
 (function () {
@@ -366,7 +374,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       case BrowserIdentity.desktop:
         return EmbeddedBrowserUa.desktop;
       case BrowserIdentity.mobile:
-        return EmbeddedBrowserUa.mobile;
+        // The "mobile" identity is the runtime-derived, coherent one — use the
+        // resolved WebView UA rather than the stale packaged constant.
+        return _resolvedUserAgent;
     }
   }
 
@@ -468,16 +478,29 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       });
     }
 
+    unawaited(_bootstrapSettings());
+  }
+
+  /// Resolves the coherent runtime identity, then builds the WebView settings.
+  ///
+  /// Kept out of [initState] because the real Android System WebView UA is only
+  /// available asynchronously. The WebView is not built until this completes
+  /// (see the `_settings == null` gate in [build]), so the very first navigation
+  /// — the sign-in page — already carries the coherent UA.
+  Future<void> _bootstrapSettings() async {
+    _resolvedUserAgent = await _resolveUserAgent();
+    if (!mounted) return;
+
     final initialUa = _uaIdentityOverride != null
         ? _uaFor(_uaIdentityOverride!)
-        : mobileUserAgent;
+        : _resolvedUserAgent;
 
     _settings = InAppWebViewSettings(
       userAgent: initialUa,
       preferredContentMode: UserPreferredContentMode.MOBILE,
       useHybridComposition: true,
       javaScriptEnabled: true,
-      javaScriptCanOpenWindowsAutomatically: true,
+      javaScriptCanOpenWindowsAutomatically: false,
       supportMultipleWindows: true,
       mediaPlaybackRequiresUserGesture: false,
       isInspectable: kDebugMode,
@@ -490,6 +513,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       sharedCookiesEnabled: true,
       allowFileAccess: false,
       allowContentAccess: false,
+      allowFileAccessFromFileURLs: false,
+      allowUniversalAccessFromFileURLs: false,
+      geolocationEnabled: false,
       useWideViewPort: true,
       loadWithOverviewMode: true,
       supportZoom: true,
@@ -513,6 +539,32 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
     _pollIntervalSeconds = 2;
     _scheduleNextAuthPoll();
+    if (mounted) setState(() {});
+  }
+
+  /// Derives a coherent Chrome-on-Android UA from the device's real System
+  /// WebView.
+  ///
+  /// The old code hardcoded a browser version, so the UA string inevitably
+  /// drifted from the installed engine and disagreed with the engine's
+  /// `navigator.userAgentData` / Client Hints — one of the strongest
+  /// embedded-WebView signals Google screens for. Deriving the string from the
+  /// live engine keeps the two in lock-step. Non-Android (desktop) keeps the
+  /// packaged constant.
+  Future<String> _resolveUserAgent() async {
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      return EmbeddedBrowserUa.mobile;
+    }
+    try {
+      final raw = await InAppWebViewController.getDefaultUserAgent()
+          .timeout(const Duration(seconds: 4));
+      final normalized = EmbeddedBrowserUa.normalizeAndroidWebViewUa(raw);
+      debugPrint('[YtmWebLogin] Runtime WebView UA: $normalized');
+      return normalized;
+    } catch (e) {
+      debugPrint('[YtmWebLogin] getDefaultUserAgent failed, using fallback: $e');
+      return EmbeddedBrowserUa.mobile;
+    }
   }
 
   int _pollIntervalSeconds = 2;
@@ -1700,9 +1752,16 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                   // WebView Body — replaced by the recovery card once the
                   // automatic retries against Google's block page are spent.
                   Expanded(
-                    child: (!isBrowse && _blockExhausted)
-                        ? _buildBlockRecoveryCard(p)
-                        : ClipRRect(
+                    child: _settings == null
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(24),
+                              child: CircularProgressIndicator(),
+                            ),
+                          )
+                        : (!isBrowse && _blockExhausted)
+                            ? _buildBlockRecoveryCard(p)
+                            : ClipRRect(
                       child: InAppWebView(
                         initialUrlRequest: URLRequest(
                           url: WebUri(_currentUrl),
@@ -1960,10 +2019,10 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                   "Google blocks sign-in inside embedded browsers for some "
                   "accounts, and the automatic retries (clearing cookies and "
                   "switching the browser identity) didn't get past it.\n\n"
-                  "Pulsr captures your YouTube Music session from this "
-                  "embedded browser's cookies, so the sign-in has to happen "
-                  "here — signing in inside the app is required for the "
-                  "connection to be detected.",
+                  "The reliable fix is to sign in with Google TV below: you "
+                  "approve on your own browser and Google never sees an "
+                  "embedded WebView, so there is no captcha. Pulsr will sync "
+                  "your library and playlists; playback keeps working as usual.",
                   style: TextStyle(
                       color: p.textSecondary, fontSize: 12.5, height: 1.4),
                 ),
@@ -1980,13 +2039,30 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           ),
           const SizedBox(height: 14),
           FilledButton.icon(
+            onPressed: () async {
+              final ok = await YtmOAuthLoginSheet.show(context);
+              if (ok == true && mounted) Navigator.of(context).pop(true);
+            },
+            icon: const Icon(Icons.tv_rounded, size: 18),
+            label: const Text('Sign in with Google TV (no captcha)',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+            style: FilledButton.styleFrom(
+              backgroundColor: p.accent,
+              foregroundColor: p.onAccent,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 8),
+          FilledButton.icon(
             onPressed: _manualRetryFromBlock,
             icon: const Icon(Icons.refresh_rounded, size: 18),
             label: const Text('Retry',
                 style: TextStyle(fontWeight: FontWeight.w700)),
             style: FilledButton.styleFrom(
-              backgroundColor: p.accent,
-              foregroundColor: p.onAccent,
+              backgroundColor: p.surfaceContainerHigh,
+              foregroundColor: p.textPrimary,
               padding: const EdgeInsets.symmetric(vertical: 12),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),

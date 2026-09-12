@@ -11,6 +11,7 @@ import '../../cubit/player_state.dart';
 import 'audio_quality_badge.dart';
 import 'audio_quality_sheet.dart';
 import 'equalizer_sheet.dart';
+import '../../../../core/widgets/pulsr_modal_tracker.dart';
 
 class TabletPlayerBar extends StatefulWidget {
   final VoidCallback onOpenNowPlaying;
@@ -39,25 +40,29 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
     final p = context.palette;
     final settingsState = context.watch<SettingsCubit>().state;
 
-    return BlocBuilder<PlayerCubit, PlayerState>(
-      buildWhen: (prev, curr) =>
-          prev.currentSong?.id != curr.currentSong?.id ||
-          prev.currentSong?.title != curr.currentSong?.title ||
-          prev.currentSong?.artist != curr.currentSong?.artist ||
-          prev.isPlaying != curr.isPlaying ||
-          prev.duration != curr.duration ||
-          prev.isShuffle != curr.isShuffle ||
-          prev.repeatMode != curr.repeatMode ||
-          prev.isLyricsVisible != curr.isLyricsVisible ||
-          prev.isQueueVisible != curr.isQueueVisible,
-      builder: (context, state) {
-        final song = state.currentSong;
-        if (song == null) return const SizedBox.shrink();
+    return ValueListenableBuilder<bool>(
+      valueListenable: PulsrModalTracker.isModalOpen,
+      builder: (context, modalOpen, _) {
+        if (modalOpen) return const SizedBox.shrink();
+        return BlocBuilder<PlayerCubit, PlayerState>(
+          buildWhen: (prev, curr) =>
+              prev.currentSong?.id != curr.currentSong?.id ||
+              prev.currentSong?.title != curr.currentSong?.title ||
+              prev.currentSong?.artist != curr.currentSong?.artist ||
+              prev.isPlaying != curr.isPlaying ||
+              prev.duration != curr.duration ||
+              prev.isShuffle != curr.isShuffle ||
+              prev.repeatMode != curr.repeatMode ||
+              prev.isLyricsVisible != curr.isLyricsVisible ||
+              prev.isQueueVisible != curr.isQueueVisible,
+          builder: (context, state) {
+            final song = state.currentSong;
+            if (song == null) return const SizedBox.shrink();
 
-        final cubit = context.read<PlayerCubit>();
-        final activeColor = p.accent;
+            final cubit = context.read<PlayerCubit>();
+            final activeColor = p.accent;
 
-        return Container(
+            return Container(
           height: 90,
           decoration: BoxDecoration(
             color: p.surface,
@@ -500,10 +505,12 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                       ],
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
+                   ),
+               ],
+             ),
+           ),
+         );
+          },
         );
       },
     );

@@ -13,6 +13,11 @@ class GlassContainer extends StatelessWidget {
   final EdgeInsetsGeometry? padding;
   final Color? color;
 
+  /// When false, no [BackdropFilter] is used — the container renders a
+  /// tinted translucent surface, avoiding a GPU-expensive blur pass on
+  /// low-end devices.
+  final bool enableBlur;
+
   const GlassContainer({
     super.key,
     required this.child,
@@ -22,6 +27,7 @@ class GlassContainer extends StatelessWidget {
     this.border,
     this.padding,
     this.color,
+    this.enableBlur = true,
   });
 
   @override
@@ -30,23 +36,29 @@ class GlassContainer extends StatelessWidget {
     final effectiveRadius = borderRadius ?? AppRadii.cardRadius;
     final baseColor = (color ?? p.surface).withValues(alpha: opacity);
 
+    Widget content = Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: baseColor,
+        borderRadius: effectiveRadius,
+        border: border ??
+            Border.all(
+              color: p.hairline.withValues(alpha: 0.5),
+              width: 1.0,
+            ),
+      ),
+      child: child,
+    );
+
+    if (!enableBlur) {
+      return ClipRRect(borderRadius: effectiveRadius, child: content);
+    }
+
     return ClipRRect(
       borderRadius: effectiveRadius,
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-        child: Container(
-          padding: padding,
-          decoration: BoxDecoration(
-            color: baseColor,
-            borderRadius: effectiveRadius,
-            border: border ??
-                Border.all(
-                  color: p.hairline.withValues(alpha: 0.5),
-                  width: 1.0,
-                ),
-          ),
-          child: child,
-        ),
+        child: content,
       ),
     );
   }

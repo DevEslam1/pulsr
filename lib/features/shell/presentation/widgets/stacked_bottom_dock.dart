@@ -6,6 +6,7 @@ import '../../../../core/utils/adaptive.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
 import '../../../player/presentation/mini_player.dart';
+import '../../../../core/widgets/pulsr_modal_tracker.dart';
 import '../bottom_nav_bar.dart';
 
 enum DockStackMode {
@@ -17,6 +18,27 @@ enum DockStackMode {
 
   /// Stacked: BottomNavBar is in front, MiniPlayer is stacked behind it.
   navBarOnTop,
+}
+
+/// Hides the dock (mini player + nav bar) while any dialog or bottom sheet
+/// is open, so nothing renders on top of the modal layer.
+class _ModalGate extends StatelessWidget {
+  final Widget child;
+
+  const _ModalGate({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: PulsrModalTracker.isModalOpen,
+      builder: (context, modalOpen, _) => AnimatedOpacity(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+        opacity: modalOpen ? 0.0 : 1.0,
+        child: IgnorePointer(ignoring: modalOpen, child: child),
+      ),
+    );
+  }
 }
 
 class StackedBottomDock extends StatefulWidget {
@@ -83,10 +105,11 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
     final double navBarPaddingVertical = isTablet ? 14.0 : 10.0;
     final double navBarTotalHeight = barHeight + navBarPaddingVertical;
 
-    return BlocBuilder<PlayerCubit, PlayerState>(
-      buildWhen: (prev, curr) =>
-          (prev.currentSong != null) != (curr.currentSong != null),
-      builder: (context, state) {
+    return _ModalGate(
+      child: BlocBuilder<PlayerCubit, PlayerState>(
+        buildWhen: (prev, curr) =>
+            (prev.currentSong != null) != (curr.currentSong != null),
+        builder: (context, state) {
         final hasSong = state.currentSong != null;
 
         // If no song is active, render only the standalone navigation bar
@@ -319,7 +342,8 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
             ),
           ),
         );
-      },
+        },
+      ),
     );
   }
 }

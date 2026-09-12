@@ -7,34 +7,41 @@
 // of current real browser releases. Stale versions are an additional signal
 // that the request comes from an embedded WebView.
 //
-// Last bumped: 2026-09-05 — Firefox 136.0 (latest stable) / Chrome 138.0.7204.93 / Safari 18.5
+// Last bumped: 2026-09-12 — Chrome 153.0.8010.36 / Firefox 154.0 / Safari 18.6
+//
+// IMPORTANT: These are *fallback* identities only. On Android the sign-in
+// WebView derives its UA at runtime from the device's real System WebView via
+// [normalizeAndroidWebViewUa] so the UA string and the engine-reported Client
+// Hints (`navigator.userAgentData`) can never disagree. A hardcoded version
+// that drifts from the installed engine is one of the strongest embedded-
+// WebView signals Google has, so prefer the runtime value everywhere.
 
 class EmbeddedBrowserUa {
   EmbeddedBrowserUa._();
 
-  /// Firefox 136.0 Mobile User-Agent on Android (latest stable release).
+  /// Firefox 154.0 Mobile User-Agent on Android.
   static const String firefoxMobile =
-      'Mozilla/5.0 (Android 15; Mobile; rv:136.0) Gecko/136.0 Firefox/136.0';
+      'Mozilla/5.0 (Android 15; Mobile; rv:154.0) Gecko/154.0 Firefox/154.0';
 
-  /// Firefox 136.0 Desktop User-Agent (Windows 10/11 x64, latest stable release).
+  /// Firefox 154.0 Desktop User-Agent (Windows 10/11 x64).
   static const String firefoxDesktop =
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0';
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:154.0) Gecko/20100101 Firefox/154.0';
 
-  /// Safari 18.5 Mobile User-Agent on iOS.
+  /// Safari 18.6 Mobile User-Agent on iOS.
   static const String safariMobile =
-      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1';
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1';
 
-  /// Safari 18.5 Desktop User-Agent (macOS Sequoia 15.5).
+  /// Safari 18.6 Desktop User-Agent (macOS Sequoia 15.6).
   static const String safariDesktop =
-      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15';
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Safari/605.1.15';
 
-  /// Chrome 138 Desktop User-Agent (Windows 11).
+  /// Chrome 153 Desktop User-Agent (Windows 11).
   static const String chromeDesktop =
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.7204.93 Safari/537.36';
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.8010.36 Safari/537.36';
 
-  /// Chrome 138 Mobile User-Agent on Android — no wv/Version-4.0 tokens.
+  /// Chrome 153 Mobile User-Agent on Android — no wv/Version-4.0 tokens.
   static const String chromeMobile =
-      'Mozilla/5.0 (Linux; Android 15; Pixel 9 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.7204.93 Mobile Safari/537.36';
+      'Mozilla/5.0 (Linux; Android 15; Pixel 9 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.8010.36 Mobile Safari/537.36';
 
   /// Default mobile sign-in UA: Authentic Chrome Mobile on Android.
   /// Matches the underlying Chromium WebView engine and avoids BotGuard Gecko/Blink mismatches.
@@ -42,6 +49,34 @@ class EmbeddedBrowserUa {
 
   /// Default desktop browsing UA: Firefox Desktop on Windows.
   static const String desktop = firefoxDesktop;
+
+  /// Turns the device's real Android System WebView UA (as returned by
+  /// `InAppWebViewController.getDefaultUserAgent()`) into a Chrome-on-Android
+  /// UA that hides the embedded markers Google screens for.
+  ///
+  /// Two markers give an embedded WebView away in the raw string:
+  ///   • `; wv`              — literal "WebView" token
+  ///   • `Version/4.0 `       — the legacy WebView version token
+  ///
+  /// Crucially, the *engine version* (`Chrome/…`) is left untouched. Chromium
+  /// derives `navigator.userAgentData` / Client Hints from the engine, not from
+  /// a UA override, so keeping the real version here means the string and the
+  /// JS-visible hints agree. Rewriting the version to a hardcoded one (as the
+  /// old constants did) produced exactly the mismatch that lands on the
+  /// "This browser or app may not be secure" page.
+  ///
+  /// Falls back to [chromeMobile] when the input is empty or unrecognisable.
+  static String normalizeAndroidWebViewUa(String defaultUa) {
+    var ua = defaultUa.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (ua.isEmpty || !ua.contains('Chrome/')) return chromeMobile;
+    ua = ua
+        .replaceAll(RegExp(r';\s*wv\b'), '')
+        .replaceAll(RegExp(r'\bVersion/[\d.]+(?:\.\d+)*\s*'), '')
+        .replaceAll(RegExp(r'\)\s+'), ') ')
+        .replaceAll(RegExp(r'\s{2,}'), ' ')
+        .trim();
+    return ua.contains('Chrome/') ? ua : chromeMobile;
+  }
 
   /// JavaScript injected at AT_DOCUMENT_START to normalize browser environment.
   ///
@@ -310,8 +345,13 @@ class EmbeddedBrowserUa {
     def(navigator, 'platform', isMobile ? 'iPhone' : 'MacIntel');
     def(navigator, 'maxTouchPoints', isMobile ? 5 : 0);
   } else if (isChrome) {
-    var chromeMatch = ua.match(/Chrome\/(\d+)/);
-    var chromeMajor = chromeMatch ? chromeMatch[1] : '138';
+    // Read the *full* engine version from the UA so the Client Hints below
+    // stay in lock-step with whatever identity is actually installed. A
+    // hardcoded build here is itself a fingerprint mismatch.
+    var chromeFullMatch = ua.match(/Chrome\/(\d+(?:\.\d+)+)/);
+    var chromeMajorMatch = ua.match(/Chrome\/(\d+)/);
+    var chromeFull = chromeFullMatch ? chromeFullMatch[1] : (chromeMajorMatch ? chromeMajorMatch[1] + '.0.0.0' : '153.0.0.0');
+    var chromeMajor = chromeMajorMatch ? chromeMajorMatch[1] : '153';
 
     var brandList = [
       { brand: 'Chromium',      version: chromeMajor },
@@ -333,9 +373,9 @@ class EmbeddedBrowserUa {
           architecture:    isMobile ? 'arm' : 'x86',
           bitness:         '64',
           model:           isMobile ? 'Pixel 9 Pro' : '',
-          uaFullVersion:   chromeMajor + '.0.7204.93',
+          uaFullVersion:   chromeFull,
           fullVersionList: brandList.map(function (b) {
-            return { brand: b.brand, version: b.version + '.0.7204.93' };
+            return { brand: b.brand, version: chromeFull };
           })
         };
         var result = {};

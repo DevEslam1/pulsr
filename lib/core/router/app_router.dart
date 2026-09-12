@@ -44,6 +44,7 @@ import '../../features/library/presentation/favorites_screen.dart';
 import '../../features/playlist_detail/presentation/online_playlist_detail_screen.dart';
 import '../../features/playlists/cubit/playlist_cubit.dart';
 import '../services/ytm_account_service.dart';
+import '../widgets/pulsr_modal_tracker.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -51,6 +52,7 @@ final GlobalKey<NavigatorState> rootNavigatorKey =
 GoRouter createRouter(MediaScannerService scannerService) {
   return GoRouter(
     navigatorKey: rootNavigatorKey,
+    observers: [PulsrModalObserver()],
     initialLocation: '/splash',
     redirect: (context, state) {
       if (!AppConfig.ytmEnabled) {
