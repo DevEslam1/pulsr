@@ -4,6 +4,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../../core/utils/list_content_diff.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/models/audio_effects_config.dart';
+import '../../../domain/models/chapter_info.dart';
 import '../../../domain/models/eq_preset.dart';
 import '../../../domain/models/headphone_profile.dart';
 import '../../../domain/models/lyrics_line.dart';
@@ -97,6 +98,9 @@ abstract class PlayerState with _$PlayerState {
     @Default(0) int currentSongRating,
     String? currentSongEqOverride,
     @Default(0.0) double currentSongVolumeOverrideDb,
+    // T10: chapters of the CUE image backing the current song, if any.
+    @Default([]) List<ChapterInfo> cueChapters,
+    @Default(0) int currentCueIndex,
   }) = _PlayerState;
 
   /// True when every field other than [position] is equal to [other]'s, i.e.
@@ -185,7 +189,9 @@ abstract class PlayerState with _$PlayerState {
         playbackPitch != other.playbackPitch ||
         currentSongRating != other.currentSongRating ||
         currentSongEqOverride != other.currentSongEqOverride ||
-        currentSongVolumeOverrideDb != other.currentSongVolumeOverrideDb;
+        currentSongVolumeOverrideDb != other.currentSongVolumeOverrideDb ||
+        listContentDiffers(cueChapters, other.cueChapters) ||
+        currentCueIndex != other.currentCueIndex;
   }
 
   bool get isDspActive =>

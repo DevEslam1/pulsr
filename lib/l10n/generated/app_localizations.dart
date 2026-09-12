@@ -3370,6 +3370,198 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{minutes} min'**
   String sleepTimerMinutes(int minutes);
+
+  /// No description provided for @radioTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Radio'**
+  String get radioTitle;
+
+  /// No description provided for @radioSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Internet radio & live streams'**
+  String get radioSubtitle;
+
+  /// No description provided for @radioAddStation.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Station'**
+  String get radioAddStation;
+
+  /// No description provided for @radioImportPlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'Import .m3u'**
+  String get radioImportPlaylist;
+
+  /// No description provided for @radioEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No radio stations yet'**
+  String get radioEmptyTitle;
+
+  /// No description provided for @radioEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a stream URL or import an .m3u playlist to start listening.'**
+  String get radioEmptySubtitle;
+
+  /// No description provided for @radioStationName.
+  ///
+  /// In en, this message translates to:
+  /// **'Station name'**
+  String get radioStationName;
+
+  /// No description provided for @radioStationUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Stream URL'**
+  String get radioStationUrl;
+
+  /// No description provided for @radioAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get radioAdd;
+
+  /// No description provided for @radioCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get radioCancel;
+
+  /// No description provided for @radioDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get radioDelete;
+
+  /// No description provided for @radioDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete station?'**
+  String get radioDeleteTitle;
+
+  /// No description provided for @radioDeleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove \"{name}\" from your stations?'**
+  String radioDeleteMessage(String name);
+
+  /// No description provided for @radioInvalidUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid http(s) stream URL'**
+  String get radioInvalidUrl;
+
+  /// No description provided for @radioImportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Import .m3u'**
+  String get radioImportTitle;
+
+  /// No description provided for @radioImportHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste .m3u playlist content'**
+  String get radioImportHint;
+
+  /// No description provided for @radioImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get radioImport;
+
+  /// No description provided for @radioImportedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} stations imported'**
+  String radioImportedCount(int count);
+
+  /// No description provided for @radioNoStreamsFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No http(s) stream URLs found'**
+  String get radioNoStreamsFound;
+
+  /// No description provided for @radioPlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Play'**
+  String get radioPlay;
+
+  /// No description provided for @followTrackSampleRateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow track sample rate'**
+  String get followTrackSampleRateTitle;
+
+  /// No description provided for @followTrackSampleRateSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconfigure the output to each track\'s native rate; de-duplicated and skipped on Bluetooth'**
+  String get followTrackSampleRateSubtitle;
+
+  /// No description provided for @followTrackSampleRateBluetooth.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped on Bluetooth — the codec/AVRCP link owns the sample rate'**
+  String get followTrackSampleRateBluetooth;
+
+  /// No description provided for @strictBitPerfectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Strict bit-perfect (no resample)'**
+  String get strictBitPerfectTitle;
+
+  /// No description provided for @strictBitPerfectSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Forces Bit-Perfect + DSP bypass and follows each track\'s rate so the DAC gets the exact source samples'**
+  String get strictBitPerfectSubtitle;
+
+  /// No description provided for @strictBitPerfectBluetooth.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable: Bluetooth transcodes — strict bit-perfect needs a USB DAC'**
+  String get strictBitPerfectBluetooth;
+
+  /// No description provided for @strictBitPerfectActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Strict bit-perfect is ON: EQ, ReplayGain, effects and crossfade are muted so the exact source samples reach the DAC'**
+  String get strictBitPerfectActive;
+
+  /// No description provided for @dsdOutputModeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'DSD output'**
+  String get dsdOutputModeTitle;
+
+  /// No description provided for @dsdOutputModeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How DSF/DFF files reach the DAC: PCM decode, or native DSD streamed as DSD over PCM'**
+  String get dsdOutputModeSubtitle;
+
+  /// No description provided for @dsdDopRequiresUsbDac.
+  ///
+  /// In en, this message translates to:
+  /// **'Requires a connected USB DAC that supports DSD over PCM (DoP)'**
+  String get dsdDopRequiresUsbDac;
+
+  /// No description provided for @dsdOutputPcm.
+  ///
+  /// In en, this message translates to:
+  /// **'PCM'**
+  String get dsdOutputPcm;
+
+  /// No description provided for @dsdOutputDop.
+  ///
+  /// In en, this message translates to:
+  /// **'DoP'**
+  String get dsdOutputDop;
 }
 
 class _AppLocalizationsDelegate

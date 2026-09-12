@@ -188,21 +188,23 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     }
   }
 
-  /// F-32: active band plan length (10 or 32). The manager is the source of
+  /// F-32: active band plan length (10, 32 or 64). The manager is the source of
   /// truth; fall back to the emitted preset length when DI is not registered.
   int _activeBandCount(PlayerState state) {
     final manager = _equalizerManagerOrNull();
     if (manager != null) return manager.activeFrequencies.length;
-    return state.eqPreset.gains.length == 32 ? 32 : 10;
+    final n = state.eqPreset.gains.length;
+    return (n == 32 || n == 64) ? n : 10;
   }
 
   /// F-32: center frequencies matching [_activeBandCount].
   List<double> _activeFrequencies(PlayerState state) {
     final manager = _equalizerManagerOrNull();
     if (manager != null) return manager.activeFrequencies;
-    return state.eqPreset.gains.length == 32
-        ? EqPreset.iso32Frequencies
-        : EqPreset.centerFrequencies;
+    final n = state.eqPreset.gains.length;
+    if (n == 64) return EqPreset.iso64Frequencies;
+    if (n == 32) return EqPreset.iso32Frequencies;
+    return EqPreset.centerFrequencies;
   }
 
   String _formatHz(double hz) {
@@ -455,7 +457,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   /// re-pushes to the engine (the center-frequency setters only persist).
   Future<void> _showCustomFrequencyEditor(
       PlayerCubit cubit, PlayerState state) async {
-    final is32 = _activeBandCount(state) == 32;
+    final bandCount = _activeBandCount(state);
     final initial = List<double>.from(_activeFrequencies(state));
     final controllers = [
       for (final f in initial)
@@ -559,7 +561,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
       ];
       final manager = _equalizerManagerOrNull();
       if (manager != null) {
-        if (is32) {
+        if (bandCount == 64) {
+          await manager.setCustom64Frequencies(parsed);
+        } else if (bandCount == 32) {
           await manager.setCustom32Frequencies(parsed);
         } else {
           await manager.setCustomFrequencies(parsed);
@@ -567,7 +571,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
       }
       // The center-frequency setters only persist; re-push the active plan so
       // the native parametric EQ picks up the new centers immediately.
-      await cubit.set32BandMode(is32);
+      await cubit.setBandMode(bandCount);
       if (mounted) {
         setState(() {});
         ScaffoldMessenger.maybeOf(context)?.showSnackBar(
@@ -1742,7 +1746,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           ),
           const SizedBox(height: 14),
 
-          // F-32: 10-band / 32-band mode toggle + custom frequency editor.
+          // F-32: 10 / 32 / 64-band mode toggle + custom frequency editor.
           Row(
             children: [
               Text(
@@ -1762,7 +1766,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 ),
                 child: Row(
                   children: [
-                    for (final bandCount in const [10, 32])
+                    for (final bandCount in const [10, 32, 64])
                       InkWell(
                         borderRadius: BorderRadius.circular(7),
                         onTap: dspBlocked != null
@@ -1773,8 +1777,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                 }
                                 _mutedBands.clear();
                                 _soloedBands.clear();
-                                await cubit
-                                    .set32BandMode(bandCount == 32);
+                                await cubit.setBandMode(bandCount);
                                 if (mounted) setState(() {});
                               },
                         child: Container(
@@ -1821,7 +1824,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           ),
           const SizedBox(height: 8),
 
-          // Equalizer band sliders — 10-band ISO or 32-band 1/3-octave.
+          // Equalizer band sliders — 10-band ISO, 32-band 1/3-octave or
+          // 64-band log-spaced. Non-10 plans render in a horizontal scroll.
           Container(
             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 6),
             decoration: BoxDecoration(

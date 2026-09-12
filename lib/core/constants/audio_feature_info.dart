@@ -42,6 +42,23 @@ class AudioFeatureRegistry {
         'When ON, entering Bit-Perfect immediately disables EQ, Virtualizer, Dynamics, Crossfeed, Limiter, Reverb, Stereo Panner and Sinc Resampler (native mask = 0). Volume is locked to hardware DAC. Turn OFF if you want EQ + bit-perfect (not true bit-perfect, but some DACs tolerate it).',
   );
 
+  static const followTrackSampleRate = AudioFeatureInfo(
+    id: 'followTrackSampleRate',
+    title: 'Follow Track Sample Rate',
+    subtitle: 'Reconfigure the output to each track\'s native rate',
+    description:
+        'On every track change, requests the track\'s own sample rate from the output device so no software resampling is needed. De-duplicated so tracks that share a rate do not trigger redundant native reconfiguration. Skipped on Bluetooth, where the AVRCP/codec link owns the rate. The device may still cap the rate; the negotiated format is shown in Output Path Diagnostics.',
+  );
+
+  static const strictBitPerfect = AudioFeatureInfo(
+    id: 'strictBitPerfect',
+    title: 'Strict Bit-Perfect (No Resample)',
+    subtitle: 'Exact source bits, no resampler — DSP stages off',
+    description:
+        'Forces Bit-Perfect output and the DSP bypass, then follows each track\'s native sample rate so the DAC receives the exact source samples without resampling. Because it is strict, EQ, ReplayGain, Virtualizer/Dynamics and Crossfade cannot run: they would alter the bitstream. Requires a path that reports exclusive bit-perfect support (USB DAC on Android 14+); otherwise the toggle is disabled with the platform reason.',
+    conflictsWith: 'EQ / ReplayGain / Effects / Crossfade',
+  );
+
   static const equalizer = AudioFeatureInfo(
     id: 'equalizer',
     title: '10 / 32-Band Parametric EQ',
@@ -141,10 +158,10 @@ class AudioFeatureRegistry {
 
   static const dsdNative = AudioFeatureInfo(
     id: 'dsdNative',
-    title: 'DSD (Native PCM Decode)',
-    subtitle: 'PCM decode only — DoP output unavailable',
+    title: 'DSD (PCM Decode / DoP Output)',
+    subtitle: 'PCM by default — DoP only with a compatible USB DAC',
     description:
-        'DSD files (DSF/DFF) decode to PCM through the native DSD decoder and then follow the normal DSP pipeline. There is no user-selectable DoP (DSD over PCM) output mode: native-DSD / DoP USB streaming is not implemented in this build and the DoP encoder is intentionally dormant, so DoP framing is not exposed in the UI. This feature only reports DAC class diagnostics (UAC1/UAC2/UAC3) without claiming native-DSD capability.',
+        'DSD files (DSF/DFF) decode to PCM through the native DSD decoder by default and follow the normal DSP pipeline. When the user selects DoP output and a USB DAC that can carry it is connected, the raw DSD bitstream is framed as DSD over PCM (alternating 0x05/0xFA markers) at DSD rate / 16 (DSD64 → 176.4 kHz, DSD128 → 352.8 kHz, DSD256 → 705.6 kHz) so the DAC streams native DSD. DoP is never enabled automatically and stays unavailable when no compatible USB DAC is detected. Direct native-DSD streaming that bypasses DoP is not implemented in this build, so native-DSD capability is never claimed beyond the detected USB DAC.',
   );
 
   static const mqa = AudioFeatureInfo(
@@ -300,6 +317,45 @@ class AudioConflicts {
           bitPerfectOutput: bitPerfectOutput,
           bypassDspOnBitPerfect: bypassDspOnBitPerfect,
           device: device);
+
+  /// Strict bit-perfect can only be enabled on a path that actually exposes
+  /// exclusive bit-perfect output. Reuses [bitPerfectBlockedReason] for the
+  /// transport/OS blockers and adds the "no exclusive mixer attributes" case.
+  static String? strictBitPerfectBlockedReason(AudioOutputInfo? device) {
+    final base = bitPerfectBlockedReason(device);
+    if (base != null) return base;
+    if (device == null) {
+      return 'Cannot enable: no output device detected yet. Connect a USB DAC and retry.';
+    }
+    if (!device.isBitPerfectSupported) {
+      return 'Cannot enable: this output path does not expose exclusive bit-perfect mixer attributes.';
+    }
+    return null;
+  }
+
+  /// Reason shown while strict bit-perfect is active (or armed with the DSP
+  /// bypass): the stages below are intentionally muted.
+  static String? strictBitPerfectActiveReason({
+    required bool bitPerfectOutput,
+    required bool bypassDspOnBitPerfect,
+    required AudioOutputInfo? device,
+  }) {
+    if (!bitPerfectOutput || !bypassDspOnBitPerfect) return null;
+    if (device?.isBluetooth == true) return null;
+    return 'Strict bit-perfect is ON: EQ, ReplayGain, Virtualizer/Dynamics and Crossfade are muted so the exact source samples reach the DAC. Turn Strict bit-perfect off to re-enable them.';
+  }
+
+  /// Crossfade is software overlap and cannot run while the DSP bypass is
+  /// keeping the bitstream bit-exact.
+  static String? crossfadeBlockedByBitPerfect({
+    required bool bitPerfectOutput,
+    required bool bypassDspOnBitPerfect,
+    required AudioOutputInfo? device,
+  }) {
+    if (!bitPerfectOutput || !bypassDspOnBitPerfect) return null;
+    if (device?.isBluetooth == true) return null;
+    return 'Disabled: Bit-Perfect bypass is ON — crossfade overlaps two tracks and would alter the bitstream. Turn off Bit-Perfect (or its DSP bypass) to use crossfade.';
+  }
 
   static String? oemDoubleProcessingWarning(
       {required bool hasOemAudio, required bool anyDspEnabled}) {

@@ -6,7 +6,9 @@ import 'package:flutter/foundation.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 import '../../core/errors/failures.dart';
+import '../../core/utils/cue_parser.dart';
 import '../../core/utils/error_logger.dart';
+import '../../domain/models/chapter_info.dart';
 import '../../domain/models/genre_item.dart';
 import '../../domain/models/year_item.dart';
 import '../../domain/models/ytm_track.dart';
@@ -34,7 +36,8 @@ class MusicRepository implements IMusicRepository {
         ..where((t) =>
             t.isMissing.equals(false) &
             t.source.equals(SongSource.local) &
-            t.path.like('ytmusic://%').not());
+            t.path.like('ytmusic://%').not() &
+            (t.cueFile.isNull() | t.cueStartMs.isNotNull()));
 
       if (searchQuery != null && searchQuery.trim().isNotEmpty) {
         final ftsQuery = _toFtsQuery(searchQuery);
@@ -190,7 +193,8 @@ class MusicRepository implements IMusicRepository {
       final buffer = StringBuffer(
         'SELECT s.* FROM songs s '
         'JOIN songs_fts f ON s.id = f.rowid '
-        'WHERE songs_fts MATCH ? AND s.is_missing = 0 ',
+        'WHERE songs_fts MATCH ? AND s.is_missing = 0 '
+        'AND (s.cue_file IS NULL OR s.cue_start_ms IS NOT NULL) ',
       );
       final vars = <Variable>[Variable.withString(ftsQuery)];
       for (final folder in excludedFolders.where((f) => f.trim().isNotEmpty)) {
@@ -233,7 +237,8 @@ class MusicRepository implements IMusicRepository {
         ..where((t) =>
             t.isMissing.equals(false) &
             t.source.equals(SongSource.local) &
-            t.path.like('ytmusic://%').not());
+            t.path.like('ytmusic://%').not() &
+            (t.cueFile.isNull() | t.cueStartMs.isNotNull()));
       if (sortBy == 'title') {
         query.orderBy([
           (t) => OrderingTerm(
@@ -306,7 +311,8 @@ class MusicRepository implements IMusicRepository {
         ..addColumns([_db.songsTable.path])
         ..where(_db.songsTable.isMissing.equals(false) &
             _db.songsTable.source.equals(SongSource.local) &
-            _db.songsTable.path.like('ytmusic://%').not());
+            _db.songsTable.path.like('ytmusic://%').not() &
+            _db.songsTable.cueStartMs.isNull());
       final rows = await query.get();
       final paths = rows
           .map((r) => r.read(_db.songsTable.path))
@@ -326,7 +332,8 @@ class MusicRepository implements IMusicRepository {
         ..where((t) =>
             t.isMissing.equals(false) &
             t.source.equals(SongSource.local) &
-            t.path.like('$folderPath%'));
+            t.path.like('$folderPath%') &
+            (t.cueFile.isNull() | t.cueStartMs.isNotNull()));
       return query.watch().map((songs) {
         final filtered = songs
             .where((s) => _normalizeDirPath(_parentDirPath(s.path)) == target)
@@ -356,7 +363,12 @@ class MusicRepository implements IMusicRepository {
   Future<Result<SongsTableData?>> getSongByPath(String path) async {
     try {
       final song = await (_db.select(_db.songsTable)
-            ..where((t) => t.path.equals(path)))
+            ..where((t) => t.path.equals(path))
+            ..orderBy([
+              (t) => OrderingTerm(
+                  expression: t.cueStartMs, nulls: NullsOrder.first)
+            ])
+            ..limit(1))
           .getSingleOrNull();
       return Right(song);
     } catch (e) {
@@ -368,7 +380,12 @@ class MusicRepository implements IMusicRepository {
   Future<Result<SongsTableData?>> getSongByUri(String uri) async {
     try {
       final song = await (_db.select(_db.songsTable)
-            ..where((t) => t.uri.equals(uri) | t.path.equals(uri)))
+            ..where((t) => t.uri.equals(uri) | t.path.equals(uri))
+            ..orderBy([
+              (t) => OrderingTerm(
+                  expression: t.cueStartMs, nulls: NullsOrder.first)
+            ])
+            ..limit(1))
           .getSingleOrNull();
       return Right(song);
     } catch (e) {
@@ -450,6 +467,7 @@ class MusicRepository implements IMusicRepository {
       return (_db.select(_db.songsTable)
             ..where((t) =>
                 t.isFavorite.equals(true) &
+                (t.cueFile.isNull() | t.cueStartMs.isNotNull()) &
                 (t.isMissing.equals(false) |
                     t.source.equals(SongSource.youtube) |
                     t.remoteId.isNotNull()))
@@ -470,6 +488,7 @@ class MusicRepository implements IMusicRepository {
       final songs = await (_db.select(_db.songsTable)
             ..where((t) =>
                 t.isFavorite.equals(true) &
+                (t.cueFile.isNull() | t.cueStartMs.isNotNull()) &
                 (t.isMissing.equals(false) |
                     t.source.equals(SongSource.youtube) |
                     t.remoteId.isNotNull()))
@@ -537,7 +556,8 @@ class MusicRepository implements IMusicRepository {
                 t.lastPlayed.isNotNull() &
                 t.isMissing.equals(false) &
                 t.source.equals(SongSource.local) &
-                t.path.like('ytmusic://%').not())
+                t.path.like('ytmusic://%').not() &
+                (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
             ..orderBy([
               (t) => OrderingTerm(
                   expression: t.lastPlayed, mode: OrderingMode.desc)
@@ -562,7 +582,8 @@ class MusicRepository implements IMusicRepository {
                 t.lastPlayed.isNotNull() &
                 t.isMissing.equals(false) &
                 t.source.equals(SongSource.local) &
-                t.path.like('ytmusic://%').not())
+                t.path.like('ytmusic://%').not() &
+                (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
             ..orderBy([
               (t) => OrderingTerm(
                   expression: t.lastPlayed, mode: OrderingMode.desc)
@@ -594,7 +615,8 @@ class MusicRepository implements IMusicRepository {
             ..where((t) =>
                 t.isMissing.equals(false) &
                 t.source.equals(SongSource.local) &
-                t.path.like('ytmusic://%').not())
+                t.path.like('ytmusic://%').not() &
+                (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
             ..orderBy([
               (t) =>
                   OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc)
@@ -618,7 +640,8 @@ class MusicRepository implements IMusicRepository {
                 t.playCount.isBiggerThanValue(0) &
                 t.isMissing.equals(false) &
                 t.source.equals(SongSource.local) &
-                t.path.like('ytmusic://%').not())
+                t.path.like('ytmusic://%').not() &
+                (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
             ..orderBy([
               (t) =>
                   OrderingTerm(expression: t.playCount, mode: OrderingMode.desc)
@@ -742,7 +765,8 @@ class MusicRepository implements IMusicRepository {
                 t.albumId.equals(albumId) &
                 t.isMissing.equals(false) &
                 t.source.equals(SongSource.local) &
-                t.path.like('ytmusic://%').not())
+                t.path.like('ytmusic://%').not() &
+                (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
             ..orderBy([
               (t) => OrderingTerm(
                   expression: t.discNumber, mode: OrderingMode.asc),
@@ -780,7 +804,8 @@ class MusicRepository implements IMusicRepository {
                 t.albumId.equals(albumId) &
                 t.isMissing.equals(false) &
                 t.source.equals(SongSource.local) &
-                t.path.like('ytmusic://%').not())
+                t.path.like('ytmusic://%').not() &
+                (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
             ..orderBy([
               (t) => OrderingTerm(
                   expression: t.discNumber, mode: OrderingMode.asc),
@@ -830,7 +855,8 @@ class MusicRepository implements IMusicRepository {
                 t.artistId.equals(artistId) &
                 t.isMissing.equals(false) &
                 t.source.equals(SongSource.local) &
-                t.path.like('ytmusic://%').not()))
+                t.path.like('ytmusic://%').not() &
+                (t.cueFile.isNull() | t.cueStartMs.isNotNull())))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
           .handleError((e) => Left<AppFailure, List<SongsTableData>>(
@@ -862,7 +888,8 @@ class MusicRepository implements IMusicRepository {
                 t.artistId.equals(artistId) &
                 t.isMissing.equals(false) &
                 t.source.equals(SongSource.local) &
-                t.path.like('ytmusic://%').not()))
+                t.path.like('ytmusic://%').not() &
+                (t.cueFile.isNull() | t.cueStartMs.isNotNull())))
           .get();
       return Right(songs);
     } catch (e) {
@@ -1224,12 +1251,193 @@ class MusicRepository implements IMusicRepository {
       // inserts a new row for a path already owned by a reconciled YTM row. Keep the downloaded/isDownloaded or lowest id.
       try {
         await _db.customStatement(
-          "DELETE FROM songs WHERE id NOT IN (SELECT MIN(id) FROM songs WHERE path != '' AND path NOT LIKE 'ytmusic://%' GROUP BY lower(path)) AND path != '' AND path NOT LIKE 'ytmusic://%' AND lower(path) IN (SELECT lower(path) FROM songs WHERE path != '' AND path NOT LIKE 'ytmusic://%' GROUP BY lower(path) HAVING COUNT(*) > 1);",
+          "DELETE FROM songs WHERE id NOT IN (SELECT MIN(id) FROM songs WHERE path != '' AND path NOT LIKE 'ytmusic://%' AND cue_start_ms IS NULL GROUP BY lower(path)) AND path != '' AND path NOT LIKE 'ytmusic://%' AND cue_start_ms IS NULL AND lower(path) IN (SELECT lower(path) FROM songs WHERE path != '' AND path NOT LIKE 'ytmusic://%' AND cue_start_ms IS NULL GROUP BY lower(path) HAVING COUNT(*) > 1);",
         );
       } catch (_) {}
       return const Right(null);
     } catch (e) {
       return Left(DatabaseFailure('Failed to sync scanned music', e));
+    }
+  }
+
+  /// Deterministic negative primary key for a virtual track expanded from a
+  /// CUE sheet. MediaStore ids are positive, so the two id spaces cannot
+  /// overlap; the same `path` + track index always maps to the same row, which
+  /// keeps repeat scans idempotent (upsert, never a fresh id).
+  @visibleForTesting
+  static int cueVirtualSongId(String path, int trackIndex) {
+    var hash = 0xcbf29ce484222325; // FNV-1a 64-bit offset basis
+    for (final unit in '${path.toLowerCase()}#$trackIndex'.codeUnits) {
+      hash ^= unit;
+      hash *= 0x100000001b3; // Dart wraps on overflow
+    }
+    final magnitude = hash & 0x3FFFFFFFFFFFFFFF;
+    return -(magnitude == 0 ? 1 : magnitude);
+  }
+
+  static String _siblingCuePath(String audioPath) {
+    final lastDot = audioPath.lastIndexOf('.');
+    if (lastDot <= 0) return '';
+    return '${audioPath.substring(0, lastDot)}.cue';
+  }
+
+  /// Pure mapping: one container row + its parsed [chapters] -> virtual song
+  /// companions. Carries the real file's codec/rate/depth/duration so the UI
+  /// position (which is absolute inside the file) always fits the reported
+  /// duration; the sub-track window lives in `cueStartMs`/`cueEndMs`. Play
+  /// stats stay absent so an upsert never clobbers them.
+  @visibleForTesting
+  static List<SongsTableCompanion> buildCueExpansion({
+    required SongsTableData container,
+    required List<ChapterInfo> chapters,
+    required String cuePath,
+  }) {
+    final companions = <SongsTableCompanion>[];
+    final totalMs = container.durationMs;
+    for (final chapter in chapters) {
+      final startMs = chapter.start.inMilliseconds;
+      // A window that reaches the end of the file is left open so natural
+      // file completion advances the queue; forcing a boundary at/after EOF
+      // would race the gapless completed handler into a double skip.
+      final chapterEndMs = chapter.end?.inMilliseconds;
+      final int? cueEndMs = (chapterEndMs != null &&
+              chapterEndMs > startMs &&
+              (totalMs <= 0 || chapterEndMs < totalMs))
+          ? chapterEndMs
+          : null;
+      final id = cueVirtualSongId(container.path, chapter.index);
+      companions.add(SongsTableCompanion(
+        id: Value(id),
+        title: Value(chapter.title),
+        artist: Value(container.artist),
+        artistId: Value(container.artistId),
+        album: Value(container.album),
+        albumId: Value(container.albumId),
+        durationMs: Value(totalMs),
+        path: Value(container.path),
+        trackNumber: Value(chapter.index),
+        discNumber: Value(container.discNumber),
+        year: Value(container.year),
+        dateAdded: Value(container.dateAdded),
+        genre: Value(container.genre),
+        fileSize: Value(container.fileSize),
+        artworkUri: Value(container.artworkUri),
+        sampleRate: Value(container.sampleRate),
+        bitDepth: Value(container.bitDepth),
+        bitrateKbps: Value(container.bitrateKbps),
+        codec: Value(container.codec),
+        source: const Value(SongSource.local),
+        cueStartMs: Value(startMs),
+        cueEndMs: Value(cueEndMs),
+        cueFile: Value(cuePath),
+      ));
+    }
+    return companions;
+  }
+
+  @override
+  Future<Result<int>> expandCueSheets() async {
+    try {
+      final containers = await (_db.select(_db.songsTable)
+            ..where((t) =>
+                t.id.isBiggerThanValue(0) &
+                t.source.equals(SongSource.local) &
+                t.isMissing.equals(false) &
+                t.path.equals('').not() &
+                t.path.like('ytmusic://%').not()))
+          .get();
+
+      final companions = <SongsTableCompanion>[];
+      final newIdsByPath = <String, List<int>>{};
+      final coverByContainerId = <int, String>{};
+      final coveredPaths = <String>{};
+      var expanded = 0;
+
+      for (final container in containers) {
+        final cuePath = _siblingCuePath(container.path);
+        if (cuePath.isEmpty) continue;
+        final cueFile = File(cuePath);
+        if (!await cueFile.exists()) continue;
+        final chapters = await CueParser.findAndParseCue(container.path);
+        if (chapters.isEmpty) continue;
+        // Only whole-file album sheets are expanded. Multi-file sheets map
+        // chapters onto several source files; expanding the wrong window on
+        // this one file would fabricate playback, so skip them.
+        final fileNames = chapters
+            .map((c) => (c.fileName ?? '').toLowerCase())
+            .where((f) => f.isNotEmpty)
+            .toSet();
+        if (fileNames.length > 1) continue;
+        // The cue must reference this audio file, not an unrelated sibling.
+        if (fileNames.isNotEmpty) {
+          final referenced = fileNames.first;
+          final audioName =
+              container.path.replaceAll('\\', '/').split('/').last.toLowerCase();
+          if (referenced != audioName) continue;
+        }
+        final virtual = buildCueExpansion(
+          container: container,
+          chapters: chapters,
+          cuePath: cuePath,
+        );
+        if (virtual.isEmpty) continue;
+        companions.addAll(virtual);
+        newIdsByPath[container.path] =
+            virtual.map((c) => c.id.value).toList();
+        coverByContainerId[container.id] = cuePath;
+        coveredPaths.add(container.path);
+        expanded += virtual.length;
+      }
+
+      await _db.transaction(() async {
+        if (companions.isNotEmpty) {
+          await _db.batch((batch) {
+            batch.insertAllOnConflictUpdate(_db.songsTable, companions);
+          });
+        }
+        for (final entry in coverByContainerId.entries) {
+          await (_db.update(_db.songsTable)
+                ..where((t) => t.id.equals(entry.key)))
+              .write(SongsTableCompanion(cueFile: Value(entry.value)));
+        }
+        // Clear the marker on containers whose cue disappeared so they return
+        // to the normal library instead of being hidden forever.
+        final markers = await (_db.select(_db.songsTable)
+              ..where((t) =>
+                  t.cueFile.isNotNull() &
+                  t.cueStartMs.isNull() &
+                  t.id.isBiggerThanValue(0)))
+            .get();
+        for (final marker in markers) {
+          if (coveredPaths.contains(marker.path)) continue;
+          await (_db.update(_db.songsTable)
+                ..where((t) => t.id.equals(marker.id)))
+              .write(const SongsTableCompanion(cueFile: Value(null)));
+        }
+        // Drop virtual rows that no longer belong to a live expansion.
+        final virtualRows = await (_db.select(_db.songsTable)
+              ..where((t) => t.cueStartMs.isNotNull()))
+            .get();
+        for (final row in virtualRows) {
+          final keep = newIdsByPath[row.path];
+          if (keep != null && keep.contains(row.id)) continue;
+          await (_db.delete(_db.songsTable)..where((t) => t.id.equals(row.id)))
+              .go();
+        }
+      });
+
+      // Keep album/artist counts in step with the virtual tracks now that the
+      // container rows are hidden from listings.
+      await _db.customStatement(
+        "UPDATE albums SET song_count = (SELECT COUNT(*) FROM songs WHERE songs.album_id = albums.id AND songs.is_missing = 0 AND songs.source = '${SongSource.local}' AND songs.path NOT LIKE 'ytmusic://%' AND (songs.cue_file IS NULL OR songs.cue_start_ms IS NOT NULL));",
+      );
+      await _db.customStatement(
+        "UPDATE artists SET song_count = (SELECT COUNT(*) FROM songs WHERE songs.artist_id = artists.id AND songs.is_missing = 0 AND songs.source = '${SongSource.local}' AND songs.path NOT LIKE 'ytmusic://%' AND (songs.cue_file IS NULL OR songs.cue_start_ms IS NOT NULL));",
+      );
+
+      return Right(expanded);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to expand cue sheets', e));
     }
   }
 
@@ -1330,7 +1538,9 @@ class MusicRepository implements IMusicRepository {
             ..where(_db.songsTable.albumId.isNotNull() &
                 _db.songsTable.isMissing.equals(false) &
                 _db.songsTable.source.equals(SongSource.local) &
-                _db.songsTable.path.like('ytmusic://%').not())
+                _db.songsTable.path.like('ytmusic://%').not() &
+                (_db.songsTable.cueFile.isNull() |
+                    _db.songsTable.cueStartMs.isNotNull()))
             ..groupBy([_db.songsTable.albumId]))
           .get();
 
@@ -1339,7 +1549,9 @@ class MusicRepository implements IMusicRepository {
               ..where(_db.songsTable.artistId.isNotNull() &
                   _db.songsTable.isMissing.equals(false) &
                   _db.songsTable.source.equals(SongSource.local) &
-                  _db.songsTable.path.like('ytmusic://%').not())
+                  _db.songsTable.path.like('ytmusic://%').not() &
+                  (_db.songsTable.cueFile.isNull() |
+                      _db.songsTable.cueStartMs.isNotNull()))
               ..groupBy([_db.songsTable.artistId]))
             .get();
 
@@ -1415,6 +1627,7 @@ class MusicRepository implements IMusicRepository {
 
       for (final song in songs) {
         if (song.source != SongSource.local) continue;
+        if (song.cueStartMs != null) continue;
         final path = song.path;
         if (path.isEmpty || path.startsWith('ytmusic://')) continue;
         try {
@@ -1699,8 +1912,10 @@ class MusicRepository implements IMusicRepository {
   }) async {
     try {
       final existing = await (_db.select(_db.songsTable)
-            ..where(
-                (t) => t.path.equals(path) & t.source.equals(SongSource.local)))
+            ..where((t) =>
+                t.path.equals(path) &
+                t.source.equals(SongSource.local) &
+                t.cueStartMs.isNull()))
           .getSingleOrNull();
       if (existing != null) {
         await (_db.update(_db.songsTable)
@@ -1732,8 +1947,15 @@ class MusicRepository implements IMusicRepository {
     double? loudnessRange,
   }) async {
     try {
-      await (_db.update(_db.songsTable)..where((t) => t.id.equals(songId)))
-          .write(
+      final song = await (_db.select(_db.songsTable)
+            ..where((t) => t.id.equals(songId)))
+          .getSingleOrNull();
+      // A CUE image's virtual tracks all share the container's path, so push
+      // the header fields to every row backed by the same file.
+      final target = song != null && song.path.isNotEmpty
+          ? (_db.update(_db.songsTable)..where((t) => t.path.equals(song.path)))
+          : (_db.update(_db.songsTable)..where((t) => t.id.equals(songId)));
+      await target.write(
         SongsTableCompanion(
           sampleRate: Value(sampleRate),
           bitDepth: Value(bitDepth),
@@ -1758,7 +1980,9 @@ class MusicRepository implements IMusicRepository {
         ..where(_db.songsTable.genre.isNotNull() &
             _db.songsTable.genre.equals('').not() &
             _db.songsTable.isMissing.equals(false) &
-            _db.songsTable.path.like('ytmusic://%').not())
+            _db.songsTable.path.like('ytmusic://%').not() &
+            (_db.songsTable.cueFile.isNull() |
+                _db.songsTable.cueStartMs.isNotNull()))
         ..groupBy([_db.songsTable.genre])
         ..orderBy([OrderingTerm(expression: _db.songsTable.genre)]);
 
@@ -1788,7 +2012,9 @@ class MusicRepository implements IMusicRepository {
         ..where(_db.songsTable.genre.isNotNull() &
             _db.songsTable.genre.equals('').not() &
             _db.songsTable.isMissing.equals(false) &
-            _db.songsTable.path.like('ytmusic://%').not())
+            _db.songsTable.path.like('ytmusic://%').not() &
+            (_db.songsTable.cueFile.isNull() |
+                _db.songsTable.cueStartMs.isNotNull()))
         ..groupBy([_db.songsTable.genre])
         ..orderBy([OrderingTerm(expression: _db.songsTable.genre)]);
 
@@ -1814,7 +2040,8 @@ class MusicRepository implements IMusicRepository {
             ..where((t) =>
                 t.genre.equals(genre) &
                 t.isMissing.equals(false) &
-                t.path.like('ytmusic://%').not())
+                t.path.like('ytmusic://%').not() &
+                (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
@@ -1833,7 +2060,8 @@ class MusicRepository implements IMusicRepository {
             ..where((t) =>
                 t.genre.equals(genre) &
                 t.isMissing.equals(false) &
-                t.path.like('ytmusic://%').not())
+                t.path.like('ytmusic://%').not() &
+                (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .get();
       return Right(songs);
@@ -1852,7 +2080,9 @@ class MusicRepository implements IMusicRepository {
         ..where(_db.songsTable.year.isNotNull() &
             _db.songsTable.year.isBiggerThanValue(0) &
             _db.songsTable.isMissing.equals(false) &
-            _db.songsTable.path.like('ytmusic://%').not())
+            _db.songsTable.path.like('ytmusic://%').not() &
+            (_db.songsTable.cueFile.isNull() |
+                _db.songsTable.cueStartMs.isNotNull()))
         ..groupBy([_db.songsTable.year])
         ..orderBy([
             OrderingTerm(expression: _db.songsTable.year, mode: OrderingMode.desc)
@@ -1882,7 +2112,8 @@ class MusicRepository implements IMusicRepository {
             ..where((t) =>
                 t.year.equals(year) &
                 t.isMissing.equals(false) &
-                t.path.like('ytmusic://%').not())
+                t.path.like('ytmusic://%').not() &
+                (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))

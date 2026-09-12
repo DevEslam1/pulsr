@@ -380,6 +380,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           iconColor: Colors.lightBlueAccent,
                           onTap: () => context.push('/queue'),
                         ),
+                        const SizedBox(width: 8),
+                        _DiscoveryChip(
+                          icon: Icons.radio_rounded,
+                          label: context.l10n.radioTitle,
+                          iconColor: Colors.deepOrangeAccent,
+                          onTap: () => context.push('/radio'),
+                        ),
                         if (AppConfig.ytmEnabled) ...[
                           const SizedBox(width: 8),
                           _DiscoveryChip(

@@ -9,6 +9,33 @@ import '../../core/errors/failures.dart';
 import '../../data/db/app_database.dart';
 import '../repositories/music_repository_interface.dart';
 
+/// Supported playlist file formats for import/export.
+enum PlaylistFormat {
+  m3u,
+  pls,
+  wpl;
+
+  String get extension => name;
+}
+
+String _escapeXml(String input) {
+  return input
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&apos;');
+}
+
+String _decodeXmlEntities(String input) {
+  return input
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&apos;', "'")
+      .replaceAll('&amp;', '&');
+}
+
 @singleton
 class PlaylistExportUseCase {
   /// Generates #EXTM3U formatted string for a list of songs.
@@ -29,18 +56,63 @@ class PlaylistExportUseCase {
     return buffer.toString();
   }
 
-  /// Writes M3U content to a temp file and returns the file object.
+  /// Generates a `[playlist]` PLS string for a list of songs.
+  String generatePlsContent(List<SongsTableData> songs) {
+    final buffer = StringBuffer();
+    buffer.writeln('[playlist]');
+    var index = 0;
+    for (final song in songs) {
+      if (song.source != SongSource.local) continue;
+      index++;
+      final artist =
+          song.artist.trim().isNotEmpty ? song.artist.trim() : 'Unknown Artist';
+      final title =
+          song.title.trim().isNotEmpty ? song.title.trim() : 'Unknown Track';
+      buffer.writeln('File$index=${song.path}');
+      buffer.writeln('Title$index=$artist - $title');
+    }
+    buffer.writeln('NumberOfEntries=$index');
+    buffer.writeln('Version=2');
+    return buffer.toString();
+  }
+
+  /// Generates a Windows Media Playlist (SMIL) string for a list of songs.
+  String generateWplContent(List<SongsTableData> songs) {
+    final buffer = StringBuffer();
+    buffer.writeln('<?wpl version="1.0"?>');
+    buffer.writeln('<smil>');
+    buffer.writeln('  <body>');
+    buffer.writeln('    <seq>');
+    for (final song in songs) {
+      if (song.source != SongSource.local) continue;
+      buffer.writeln('      <media src="${_escapeXml(song.path)}"/>');
+    }
+    buffer.writeln('    </seq>');
+    buffer.writeln('  </body>');
+    buffer.writeln('</smil>');
+    return buffer.toString();
+  }
+
+  /// Writes playlist content to a temp file and returns the file object.
   Future<File> exportToFile(
-      String playlistName, List<SongsTableData> songs) async {
-    final content = generateM3uContent(songs);
+    String playlistName,
+    List<SongsTableData> songs, {
+    PlaylistFormat format = PlaylistFormat.m3u,
+  }) async {
+    final content = switch (format) {
+      PlaylistFormat.m3u => generateM3uContent(songs),
+      PlaylistFormat.pls => generatePlsContent(songs),
+      PlaylistFormat.wpl => generateWplContent(songs),
+    };
     final tempDir = await getTemporaryDirectory();
     final sanitizedName = playlistName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-    final file = File('${tempDir.path}/$sanitizedName.m3u');
+    final file = File('${tempDir.path}/$sanitizedName.${format.extension}');
     await file.writeAsString(content);
     return file;
   }
 }
 
+/// Result of importing a playlist file (M3U/M3U8/PLS/WPL).
 class M3uImportResult {
   final String playlistName;
   final int totalExtractedPaths;
@@ -79,7 +151,75 @@ class PlaylistImportUseCase {
     return paths;
   }
 
-  /// Reads M3U file with UTF-8 BOM, Latin-1 fallback, and relative path resolution.
+  /// Parses a `[playlist]` INI string and extracts the `FileN=` paths.
+  List<String> parsePlsContent(String content) {
+    final entries = <int, String>{};
+
+    for (final line in content.split(RegExp(r'\r?\n'))) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty || trimmed.startsWith('#')) continue;
+
+      final equalsIndex = trimmed.indexOf('=');
+      if (equalsIndex <= 0) continue;
+
+      final key = trimmed.substring(0, equalsIndex).trim().toLowerCase();
+      if (!key.startsWith('file')) continue;
+
+      final index = int.tryParse(key.substring('file'.length));
+      if (index == null) continue;
+
+      var value = trimmed.substring(equalsIndex + 1).trim();
+      if (value.length >= 2 &&
+          ((value.startsWith('"') && value.endsWith('"')) ||
+              (value.startsWith("'") && value.endsWith("'")))) {
+        value = value.substring(1, value.length - 1);
+      }
+      if (value.isNotEmpty) entries[index] = value;
+    }
+
+    final orderedIndexes = entries.keys.toList()..sort();
+    return orderedIndexes.map((index) => entries[index]!).toList();
+  }
+
+  /// Parses a Windows Media Playlist (SMIL) string and extracts `<media src>`.
+  List<String> parseWplContent(String content) {
+    final paths = <String>[];
+    final mediaRegex = RegExp(
+      r'''<media\b[^>]*?\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)')''',
+      caseSensitive: false,
+    );
+
+    for (final match in mediaRegex.allMatches(content)) {
+      final raw = match.group(1) ?? match.group(2) ?? '';
+      final decoded = _decodeXmlEntities(raw).trim();
+      if (decoded.isNotEmpty) paths.add(decoded);
+    }
+
+    return paths;
+  }
+
+  List<String> _parseByContent(String content, String filePath) {
+    final dotIndex = filePath.lastIndexOf('.');
+    final extension = dotIndex >= 0 && dotIndex < filePath.length - 1
+        ? filePath.substring(dotIndex + 1).toLowerCase()
+        : '';
+
+    if (extension == 'pls') return parsePlsContent(content);
+    if (extension == 'wpl') return parseWplContent(content);
+    if (extension == 'm3u' || extension == 'm3u8') {
+      return parseM3uContent(content);
+    }
+
+    final lower = content.toLowerCase();
+    if (lower.contains('[playlist]')) return parsePlsContent(content);
+    if (lower.contains('<smil') || lower.contains('<media')) {
+      return parseWplContent(content);
+    }
+    return parseM3uContent(content);
+  }
+
+  /// Reads a playlist file (M3U/M3U8/PLS/WPL) with UTF-8 BOM, Latin-1 fallback,
+  /// and relative path resolution.
   Future<Result<M3uImportResult>> importPlaylistFromFile({
     required String filePath,
     required String playlistName,
@@ -103,7 +243,7 @@ class PlaylistImportUseCase {
         content = content.substring(1);
       }
 
-      final rawPaths = parseM3uContent(content);
+      final rawPaths = _parseByContent(content, filePath);
       final playlistDir = file.parent.path;
 
       final songsResult = await _repository.getAllSongs();

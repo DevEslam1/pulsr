@@ -6,9 +6,12 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import '../db/app_database.dart';
+import '../../core/constants/channels.dart';
 import '../../core/utils/platform_capabilities.dart';
+import '../../domain/models/audio_quality_info.dart';
 import 'audio_effects_channel.dart';
 import 'dop_encoder.dart';
 
@@ -34,6 +37,57 @@ typedef DsdDecodeFunction = Future<List<double>?> Function(
   int targetSampleRate,
   int bitOrder,
 });
+
+/// What the output device can accept for DSD playback, probed natively.
+///
+/// [dop] is the single gate for framing DSD as DSD-over-PCM. Android exposes no
+/// true "supports native DSD" flag, so the native side reports [dop] only when a
+/// USB DAC is physically connected (UAC2 devices may accept DoP); otherwise
+/// every flag is false and playback stays on the PCM path.
+class DsdDacCapabilities {
+  final bool dsd64;
+  final bool dsd128;
+  final bool dsd256;
+  final bool dop;
+  final bool nativeDac;
+
+  const DsdDacCapabilities({
+    required this.dsd64,
+    required this.dsd128,
+    required this.dsd256,
+    required this.dop,
+    required this.nativeDac,
+  });
+
+  static const DsdDacCapabilities none = DsdDacCapabilities(
+    dsd64: false,
+    dsd128: false,
+    dsd256: false,
+    dop: false,
+    nativeDac: false,
+  );
+
+  /// True when DoP is possible on this output path: a USB DAC is present and it
+  /// advertises at least one carrier rate DoP can use. A DAC that exposes none
+  /// of the carrier rates cannot carry DoP, so the UI must not enable it.
+  bool get canUseDop => dop && (dsd64 || dsd128 || dsd256);
+
+  /// Whether this device advertises the DoP carrier rate for [dsdRate]
+  /// (the DSD multiple of 44.1 kHz: 64, 128 or 256). Rates above DSD256 have no
+  /// standard DoP carrier and always report false.
+  bool supportsRate(int dsdRate) {
+    if (dsdRate <= 0) return false;
+    if (dsdRate <= 64) return dsd64;
+    if (dsdRate <= 128) return dsd128;
+    if (dsdRate <= 256) return dsd256;
+    return false;
+  }
+
+  @override
+  String toString() =>
+      'DsdDacCapabilities(dsd64: $dsd64, dsd128: $dsd128, dsd256: $dsd256, '
+      'dop: $dop, nativeDac: $nativeDac)';
+}
 
 /// Streams in-memory WAV data produced by decoding DSD (DSF/DFF) files.
 class DsdPcmStreamAudioSource extends StreamAudioSource {
@@ -62,16 +116,47 @@ class DsdDecoderHelper {
   /// Injected decoder for tests when running outside of the Android runtime.
   static DsdDecodeFunction? testDecoder;
 
-  /// Parses DSF or DFF file, decodes DSD frames via the native C++ decoder or wraps
-  /// into DoP (DSD over PCM) frames, and packages the resulting audio into an [AudioSource].
+  static const MethodChannel _hiresChannel = MethodChannel(PulsrChannels.hiresDac);
+
+  /// Probes the native output path for DSD-over-PCM capability.
   ///
-  /// [forceDop] is only meaningful for programmatic/explicit requests; there is
-  /// no user-facing DoP output mode — raw native-DSD / DoP USB transport is not
-  /// implemented, so normal playback always uses the PCM decode path.
+  /// Calls the `HiResDacPlugin.getDopCapabilities` channel method directly (the
+  /// facade lives here so `HiResAudioService` stays untouched). Any error — no
+  /// plugin, non-Android platform, timeout — reports [DsdDacCapabilities.none],
+  /// so DoP can never be claimed when the probe is unavailable.
+  static Future<DsdDacCapabilities> probeDopCapabilities() async {
+    if (!PlatformCapabilities.isAndroid) return DsdDacCapabilities.none;
+    try {
+      final map = await _hiresChannel
+          .invokeMapMethod<String, dynamic>('getDopCapabilities')
+          .timeout(const Duration(seconds: 2));
+      if (map == null) return DsdDacCapabilities.none;
+      return DsdDacCapabilities(
+        dsd64: map['dsd64'] == true,
+        dsd128: map['dsd128'] == true,
+        dsd256: map['dsd256'] == true,
+        dop: map['dop'] == true,
+        nativeDac: map['nativeDac'] == true,
+      );
+    } catch (_) {
+      return DsdDacCapabilities.none;
+    }
+  }
+
+  /// Parses a DSF or DFF file, decodes DSD frames via the native C++ decoder or
+  /// wraps the raw bitstream into DoP (DSD over PCM) frames, and packages the
+  /// resulting audio into an [AudioSource].
+  ///
+  /// [forceDop] is set by the router only when the user selected DoP output and
+  /// the native probe confirmed a compatible USB DAC. Even then it is honored
+  /// only when the file's DSD rate has a standard DoP carrier and
+  /// [dopCapabilities] (when supplied) advertises it; otherwise playback falls
+  /// back to the PCM decode path and [AudioQualityInfo.dsdDopActive] stays false.
   static Future<AudioSource> decodeDsdFile(
     SongsTableData song,
     MediaItem tag, {
     bool forceDop = false,
+    DsdDacCapabilities? dopCapabilities,
   }) async {
     final file = File(song.path);
     if (!await file.exists()) {
@@ -99,7 +184,11 @@ class DsdDecoderHelper {
       bitOrder = 1; // LSB first (DFF)
     }
 
-    final bool useDop = forceDop;
+    final int dopSampleRate = DopEncoder.dopPcmSampleRate(dsdRate);
+    final bool useDop = forceDop &&
+        dopSampleRate > 0 &&
+        (dopCapabilities == null || dopCapabilities.supportsRate(dsdRate));
+    AudioQualityInfo.dsdDopActive = useDop;
     if (useDop) {
       // DoP framing (DSD over PCM v1.1): pack 16-bit DSD chunks with alternating 0x05/0xFA markers
       var left = dsdL;
@@ -115,11 +204,6 @@ class DsdDecoderHelper {
       }
 
       final dopBytes = DopEncoder.encodeToDopPcm24(dsdLeft: left, dsdRight: right);
-      final dopSampleRate = switch (dsdRate) {
-        >= 256 || >= 11289600 => 705600,  // DSD256
-        >= 128 || >= 5644800  => 352800,  // DSD128
-        _                     => 176400,  // DSD64
-      };
 
       final wavBytes = buildDopWavContainer(
         dopPcmBytes: dopBytes,

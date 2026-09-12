@@ -233,6 +233,24 @@ class $SongsTableTable extends SongsTable
       defaultConstraints: GeneratedColumn.constraintIsAlways(
           'CHECK ("is_downloaded" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _cueStartMsMeta =
+      const VerificationMeta('cueStartMs');
+  @override
+  late final GeneratedColumn<int> cueStartMs = GeneratedColumn<int>(
+      'cue_start_ms', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _cueEndMsMeta =
+      const VerificationMeta('cueEndMs');
+  @override
+  late final GeneratedColumn<int> cueEndMs = GeneratedColumn<int>(
+      'cue_end_ms', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _cueFileMeta =
+      const VerificationMeta('cueFile');
+  @override
+  late final GeneratedColumn<String> cueFile = GeneratedColumn<String>(
+      'cue_file', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -269,7 +287,10 @@ class $SongsTableTable extends SongsTable
         remoteId,
         remoteArtworkUrl,
         pendingDownloadPath,
-        isDownloaded
+        isDownloaded,
+        cueStartMs,
+        cueEndMs,
+        cueFile
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -458,6 +479,20 @@ class $SongsTableTable extends SongsTable
           isDownloaded.isAcceptableOrUnknown(
               data['is_downloaded']!, _isDownloadedMeta));
     }
+    if (data.containsKey('cue_start_ms')) {
+      context.handle(
+          _cueStartMsMeta,
+          cueStartMs.isAcceptableOrUnknown(
+              data['cue_start_ms']!, _cueStartMsMeta));
+    }
+    if (data.containsKey('cue_end_ms')) {
+      context.handle(_cueEndMsMeta,
+          cueEndMs.isAcceptableOrUnknown(data['cue_end_ms']!, _cueEndMsMeta));
+    }
+    if (data.containsKey('cue_file')) {
+      context.handle(_cueFileMeta,
+          cueFile.isAcceptableOrUnknown(data['cue_file']!, _cueFileMeta));
+    }
     return context;
   }
 
@@ -539,6 +574,12 @@ class $SongsTableTable extends SongsTable
           DriftSqlType.string, data['${effectivePrefix}pending_download_path']),
       isDownloaded: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_downloaded'])!,
+      cueStartMs: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}cue_start_ms']),
+      cueEndMs: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}cue_end_ms']),
+      cueFile: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}cue_file']),
     );
   }
 
@@ -606,6 +647,19 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
 
   /// Explicit flag indicating whether this song was downloaded from YouTube Music / Online.
   final bool isDownloaded;
+
+  /// Start of this song's window inside its backing file, set only on virtual
+  /// rows expanded from a single-file CUE sheet. Null on real file rows.
+  final int? cueStartMs;
+
+  /// End of this song's window inside its backing file. Null when the track
+  /// runs to the end of the file, or when this is a real file row.
+  final int? cueEndMs;
+
+  /// The sibling `.cue` file this row was derived from. A container (real
+  /// file) row carries this with a null [cueStartMs] so library queries can
+  /// hide it once its virtual tracks exist.
+  final String? cueFile;
   const SongsTableData(
       {required this.id,
       required this.title,
@@ -641,7 +695,10 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       this.remoteId,
       this.remoteArtworkUrl,
       this.pendingDownloadPath,
-      required this.isDownloaded});
+      required this.isDownloaded,
+      this.cueStartMs,
+      this.cueEndMs,
+      this.cueFile});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -726,6 +783,15 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       map['pending_download_path'] = Variable<String>(pendingDownloadPath);
     }
     map['is_downloaded'] = Variable<bool>(isDownloaded);
+    if (!nullToAbsent || cueStartMs != null) {
+      map['cue_start_ms'] = Variable<int>(cueStartMs);
+    }
+    if (!nullToAbsent || cueEndMs != null) {
+      map['cue_end_ms'] = Variable<int>(cueEndMs);
+    }
+    if (!nullToAbsent || cueFile != null) {
+      map['cue_file'] = Variable<String>(cueFile);
+    }
     return map;
   }
 
@@ -806,6 +872,15 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
           ? const Value.absent()
           : Value(pendingDownloadPath),
       isDownloaded: Value(isDownloaded),
+      cueStartMs: cueStartMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cueStartMs),
+      cueEndMs: cueEndMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cueEndMs),
+      cueFile: cueFile == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cueFile),
     );
   }
 
@@ -851,6 +926,9 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       pendingDownloadPath:
           serializer.fromJson<String?>(json['pendingDownloadPath']),
       isDownloaded: serializer.fromJson<bool>(json['isDownloaded']),
+      cueStartMs: serializer.fromJson<int?>(json['cueStartMs']),
+      cueEndMs: serializer.fromJson<int?>(json['cueEndMs']),
+      cueFile: serializer.fromJson<String?>(json['cueFile']),
     );
   }
   @override
@@ -892,6 +970,9 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       'remoteArtworkUrl': serializer.toJson<String?>(remoteArtworkUrl),
       'pendingDownloadPath': serializer.toJson<String?>(pendingDownloadPath),
       'isDownloaded': serializer.toJson<bool>(isDownloaded),
+      'cueStartMs': serializer.toJson<int?>(cueStartMs),
+      'cueEndMs': serializer.toJson<int?>(cueEndMs),
+      'cueFile': serializer.toJson<String?>(cueFile),
     };
   }
 
@@ -930,7 +1011,10 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
           Value<String?> remoteId = const Value.absent(),
           Value<String?> remoteArtworkUrl = const Value.absent(),
           Value<String?> pendingDownloadPath = const Value.absent(),
-          bool? isDownloaded}) =>
+          bool? isDownloaded,
+          Value<int?> cueStartMs = const Value.absent(),
+          Value<int?> cueEndMs = const Value.absent(),
+          Value<String?> cueFile = const Value.absent()}) =>
       SongsTableData(
         id: id ?? this.id,
         title: title ?? this.title,
@@ -980,6 +1064,9 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
             ? pendingDownloadPath.value
             : this.pendingDownloadPath,
         isDownloaded: isDownloaded ?? this.isDownloaded,
+        cueStartMs: cueStartMs.present ? cueStartMs.value : this.cueStartMs,
+        cueEndMs: cueEndMs.present ? cueEndMs.value : this.cueEndMs,
+        cueFile: cueFile.present ? cueFile.value : this.cueFile,
       );
   SongsTableData copyWithCompanion(SongsTableCompanion data) {
     return SongsTableData(
@@ -1044,6 +1131,10 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       isDownloaded: data.isDownloaded.present
           ? data.isDownloaded.value
           : this.isDownloaded,
+      cueStartMs:
+          data.cueStartMs.present ? data.cueStartMs.value : this.cueStartMs,
+      cueEndMs: data.cueEndMs.present ? data.cueEndMs.value : this.cueEndMs,
+      cueFile: data.cueFile.present ? data.cueFile.value : this.cueFile,
     );
   }
 
@@ -1084,7 +1175,10 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
           ..write('remoteId: $remoteId, ')
           ..write('remoteArtworkUrl: $remoteArtworkUrl, ')
           ..write('pendingDownloadPath: $pendingDownloadPath, ')
-          ..write('isDownloaded: $isDownloaded')
+          ..write('isDownloaded: $isDownloaded, ')
+          ..write('cueStartMs: $cueStartMs, ')
+          ..write('cueEndMs: $cueEndMs, ')
+          ..write('cueFile: $cueFile')
           ..write(')'))
         .toString();
   }
@@ -1125,7 +1219,10 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
         remoteId,
         remoteArtworkUrl,
         pendingDownloadPath,
-        isDownloaded
+        isDownloaded,
+        cueStartMs,
+        cueEndMs,
+        cueFile
       ]);
   @override
   bool operator ==(Object other) =>
@@ -1165,7 +1262,10 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
           other.remoteId == this.remoteId &&
           other.remoteArtworkUrl == this.remoteArtworkUrl &&
           other.pendingDownloadPath == this.pendingDownloadPath &&
-          other.isDownloaded == this.isDownloaded);
+          other.isDownloaded == this.isDownloaded &&
+          other.cueStartMs == this.cueStartMs &&
+          other.cueEndMs == this.cueEndMs &&
+          other.cueFile == this.cueFile);
 }
 
 class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
@@ -1204,6 +1304,9 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
   final Value<String?> remoteArtworkUrl;
   final Value<String?> pendingDownloadPath;
   final Value<bool> isDownloaded;
+  final Value<int?> cueStartMs;
+  final Value<int?> cueEndMs;
+  final Value<String?> cueFile;
   const SongsTableCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
@@ -1240,6 +1343,9 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     this.remoteArtworkUrl = const Value.absent(),
     this.pendingDownloadPath = const Value.absent(),
     this.isDownloaded = const Value.absent(),
+    this.cueStartMs = const Value.absent(),
+    this.cueEndMs = const Value.absent(),
+    this.cueFile = const Value.absent(),
   });
   SongsTableCompanion.insert({
     this.id = const Value.absent(),
@@ -1277,6 +1383,9 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     this.remoteArtworkUrl = const Value.absent(),
     this.pendingDownloadPath = const Value.absent(),
     this.isDownloaded = const Value.absent(),
+    this.cueStartMs = const Value.absent(),
+    this.cueEndMs = const Value.absent(),
+    this.cueFile = const Value.absent(),
   })  : title = Value(title),
         path = Value(path);
   static Insertable<SongsTableData> custom({
@@ -1315,6 +1424,9 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     Expression<String>? remoteArtworkUrl,
     Expression<String>? pendingDownloadPath,
     Expression<bool>? isDownloaded,
+    Expression<int>? cueStartMs,
+    Expression<int>? cueEndMs,
+    Expression<String>? cueFile,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1355,6 +1467,9 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
       if (pendingDownloadPath != null)
         'pending_download_path': pendingDownloadPath,
       if (isDownloaded != null) 'is_downloaded': isDownloaded,
+      if (cueStartMs != null) 'cue_start_ms': cueStartMs,
+      if (cueEndMs != null) 'cue_end_ms': cueEndMs,
+      if (cueFile != null) 'cue_file': cueFile,
     });
   }
 
@@ -1393,7 +1508,10 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
       Value<String?>? remoteId,
       Value<String?>? remoteArtworkUrl,
       Value<String?>? pendingDownloadPath,
-      Value<bool>? isDownloaded}) {
+      Value<bool>? isDownloaded,
+      Value<int?>? cueStartMs,
+      Value<int?>? cueEndMs,
+      Value<String?>? cueFile}) {
     return SongsTableCompanion(
       id: id ?? this.id,
       title: title ?? this.title,
@@ -1430,6 +1548,9 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
       remoteArtworkUrl: remoteArtworkUrl ?? this.remoteArtworkUrl,
       pendingDownloadPath: pendingDownloadPath ?? this.pendingDownloadPath,
       isDownloaded: isDownloaded ?? this.isDownloaded,
+      cueStartMs: cueStartMs ?? this.cueStartMs,
+      cueEndMs: cueEndMs ?? this.cueEndMs,
+      cueFile: cueFile ?? this.cueFile,
     );
   }
 
@@ -1544,6 +1665,15 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     if (isDownloaded.present) {
       map['is_downloaded'] = Variable<bool>(isDownloaded.value);
     }
+    if (cueStartMs.present) {
+      map['cue_start_ms'] = Variable<int>(cueStartMs.value);
+    }
+    if (cueEndMs.present) {
+      map['cue_end_ms'] = Variable<int>(cueEndMs.value);
+    }
+    if (cueFile.present) {
+      map['cue_file'] = Variable<String>(cueFile.value);
+    }
     return map;
   }
 
@@ -1584,7 +1714,10 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
           ..write('remoteId: $remoteId, ')
           ..write('remoteArtworkUrl: $remoteArtworkUrl, ')
           ..write('pendingDownloadPath: $pendingDownloadPath, ')
-          ..write('isDownloaded: $isDownloaded')
+          ..write('isDownloaded: $isDownloaded, ')
+          ..write('cueStartMs: $cueStartMs, ')
+          ..write('cueEndMs: $cueEndMs, ')
+          ..write('cueFile: $cueFile')
           ..write(')'))
         .toString();
   }
@@ -3814,6 +3947,9 @@ typedef $$SongsTableTableCreateCompanionBuilder = SongsTableCompanion Function({
   Value<String?> remoteArtworkUrl,
   Value<String?> pendingDownloadPath,
   Value<bool> isDownloaded,
+  Value<int?> cueStartMs,
+  Value<int?> cueEndMs,
+  Value<String?> cueFile,
 });
 typedef $$SongsTableTableUpdateCompanionBuilder = SongsTableCompanion Function({
   Value<int> id,
@@ -3851,6 +3987,9 @@ typedef $$SongsTableTableUpdateCompanionBuilder = SongsTableCompanion Function({
   Value<String?> remoteArtworkUrl,
   Value<String?> pendingDownloadPath,
   Value<bool> isDownloaded,
+  Value<int?> cueStartMs,
+  Value<int?> cueEndMs,
+  Value<String?> cueFile,
 });
 
 final class $$SongsTableTableReferences
@@ -4028,6 +4167,15 @@ class $$SongsTableTableFilterComposer
 
   ColumnFilters<bool> get isDownloaded => $composableBuilder(
       column: $table.isDownloaded, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get cueStartMs => $composableBuilder(
+      column: $table.cueStartMs, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get cueEndMs => $composableBuilder(
+      column: $table.cueEndMs, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get cueFile => $composableBuilder(
+      column: $table.cueFile, builder: (column) => ColumnFilters(column));
 
   Expression<bool> playlistEntriesTableRefs(
       Expression<bool> Function($$PlaylistEntriesTableTableFilterComposer f)
@@ -4216,6 +4364,15 @@ class $$SongsTableTableOrderingComposer
   ColumnOrderings<bool> get isDownloaded => $composableBuilder(
       column: $table.isDownloaded,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get cueStartMs => $composableBuilder(
+      column: $table.cueStartMs, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get cueEndMs => $composableBuilder(
+      column: $table.cueEndMs, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get cueFile => $composableBuilder(
+      column: $table.cueFile, builder: (column) => ColumnOrderings(column));
 }
 
 class $$SongsTableTableAnnotationComposer
@@ -4331,6 +4488,15 @@ class $$SongsTableTableAnnotationComposer
 
   GeneratedColumn<bool> get isDownloaded => $composableBuilder(
       column: $table.isDownloaded, builder: (column) => column);
+
+  GeneratedColumn<int> get cueStartMs => $composableBuilder(
+      column: $table.cueStartMs, builder: (column) => column);
+
+  GeneratedColumn<int> get cueEndMs =>
+      $composableBuilder(column: $table.cueEndMs, builder: (column) => column);
+
+  GeneratedColumn<String> get cueFile =>
+      $composableBuilder(column: $table.cueFile, builder: (column) => column);
 
   Expression<T> playlistEntriesTableRefs<T extends Object>(
       Expression<T> Function($$PlaylistEntriesTableTableAnnotationComposer a)
@@ -4459,6 +4625,9 @@ class $$SongsTableTableTableManager extends RootTableManager<
             Value<String?> remoteArtworkUrl = const Value.absent(),
             Value<String?> pendingDownloadPath = const Value.absent(),
             Value<bool> isDownloaded = const Value.absent(),
+            Value<int?> cueStartMs = const Value.absent(),
+            Value<int?> cueEndMs = const Value.absent(),
+            Value<String?> cueFile = const Value.absent(),
           }) =>
               SongsTableCompanion(
             id: id,
@@ -4496,6 +4665,9 @@ class $$SongsTableTableTableManager extends RootTableManager<
             remoteArtworkUrl: remoteArtworkUrl,
             pendingDownloadPath: pendingDownloadPath,
             isDownloaded: isDownloaded,
+            cueStartMs: cueStartMs,
+            cueEndMs: cueEndMs,
+            cueFile: cueFile,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -4533,6 +4705,9 @@ class $$SongsTableTableTableManager extends RootTableManager<
             Value<String?> remoteArtworkUrl = const Value.absent(),
             Value<String?> pendingDownloadPath = const Value.absent(),
             Value<bool> isDownloaded = const Value.absent(),
+            Value<int?> cueStartMs = const Value.absent(),
+            Value<int?> cueEndMs = const Value.absent(),
+            Value<String?> cueFile = const Value.absent(),
           }) =>
               SongsTableCompanion.insert(
             id: id,
@@ -4570,6 +4745,9 @@ class $$SongsTableTableTableManager extends RootTableManager<
             remoteArtworkUrl: remoteArtworkUrl,
             pendingDownloadPath: pendingDownloadPath,
             isDownloaded: isDownloaded,
+            cueStartMs: cueStartMs,
+            cueEndMs: cueEndMs,
+            cueFile: cueFile,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (

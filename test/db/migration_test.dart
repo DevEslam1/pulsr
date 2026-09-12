@@ -17,9 +17,9 @@ void main() {
       await db.close();
     });
 
-    test('Fresh database opens at schemaVersion 9 and has all indexes',
+    test('Fresh database opens at schemaVersion 10 and has all indexes',
         () async {
-      expect(db.schemaVersion, equals(9));
+      expect(db.schemaVersion, equals(10));
 
       // Test inserting a song with schema v4 fields
       final songId = await db.into(db.songsTable).insert(
@@ -47,6 +47,10 @@ void main() {
       expect(song.bitrateKbps, equals(null));
       expect(song.codec, equals(null));
       expect(song.loudnessRange, equals(null));
+      // v10 CUE columns default to null for non-CUE tracks.
+      expect(song.cueStartMs, equals(null));
+      expect(song.cueEndMs, equals(null));
+      expect(song.cueFile, equals(null));
     });
 
     test('YouTube rows coexist with local rows and remote_id is unique',
@@ -156,7 +160,7 @@ void main() {
 
       final version =
           await upgraded.customSelect('PRAGMA user_version;').getSingle();
-      expect(version.data['user_version'], equals(9));
+      expect(version.data['user_version'], equals(10));
 
       // The upgraded schema must accept remote rows, not just the fresh one.
       await upgraded.into(upgraded.songsTable).insert(

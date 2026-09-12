@@ -268,10 +268,15 @@ class MediaScannerService {
 
       // Clean up orphaned entries
       await _repository.cleanupOrphanedSongs(parseResult.validSongIds);
+
+      // Expand sibling CUE sheets into virtual per-track rows. Runs after
+      // cleanup so it only touches live files and is idempotent on rescans.
+      await _repository.expandCueSheets();
       _progressController.add(1.0);
 
       ErrorLogger.addBreadcrumb(
-          'Scanner completed: ${parseResult.songs.length} valid songs indexed',
+          'Scanner completed: ${parseResult.songs.length} valid songs indexed'
+          '${parseResult.nativeDecoderRequiredCount > 0 ? ', ${parseResult.nativeDecoderRequiredCount} file(s) need a native decoder (not indexed)' : ''}',
           category: 'scanner');
 
       return parseResult.songs.length;
@@ -412,12 +417,14 @@ class _ScanMediaResult {
   final List<AlbumsTableCompanion> albums;
   final List<ArtistsTableCompanion> artists;
   final Set<int> validSongIds;
+  final int nativeDecoderRequiredCount;
 
   _ScanMediaResult({
     required this.songs,
     required this.albums,
     required this.artists,
     required this.validSongIds,
+    this.nativeDecoderRequiredCount = 0,
   });
 }
 
@@ -428,6 +435,7 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
   final Map<int, int> albumSongCounts = {};
   final Map<int, int> artistSongCounts = {};
   final Set<int> validSongIds = {};
+  int nativeDecoderRequiredCount = 0;
 
   int? parseInt(Object? val) {
     if (val is int) return val;
@@ -452,7 +460,15 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
     if (input.minSizeBytes > 0 && fileSize < input.minSizeBytes) continue;
 
     final path = parseString(raw['_data']) ?? parseString(raw['data']) ?? '';
-    if (path.isEmpty || !AudioFormats.isSupportedExtension(path)) {
+    if (path.isEmpty) {
+      continue;
+    }
+    if (!AudioFormats.isSupportedExtension(path)) {
+      // Recognized native-tier formats are counted for an honest diagnostics
+      // surface but never indexed as playable songs.
+      if (AudioFormats.requiresNativeDecoder(path)) {
+        nativeDecoderRequiredCount++;
+      }
       continue;
     }
 
@@ -572,5 +588,6 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
     albums: finalAlbums,
     artists: finalArtists,
     validSongIds: validSongIds,
+    nativeDecoderRequiredCount: nativeDecoderRequiredCount,
   );
 }

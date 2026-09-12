@@ -1852,4 +1852,115 @@ class AppLocalizationsEs extends AppLocalizations {
   String sleepTimerMinutes(int minutes) {
     return '$minutes min';
   }
+
+  @override
+  String get radioTitle => 'Radio';
+
+  @override
+  String get radioSubtitle => 'Radio por internet y transmisiones en vivo';
+
+  @override
+  String get radioAddStation => 'Añadir emisora';
+
+  @override
+  String get radioImportPlaylist => 'Importar .m3u';
+
+  @override
+  String get radioEmptyTitle => 'Aún no hay emisoras';
+
+  @override
+  String get radioEmptySubtitle =>
+      'Añade una URL de transmisión o importa una lista .m3u para empezar a escuchar.';
+
+  @override
+  String get radioStationName => 'Nombre de la emisora';
+
+  @override
+  String get radioStationUrl => 'URL de transmisión';
+
+  @override
+  String get radioAdd => 'Añadir';
+
+  @override
+  String get radioCancel => 'Cancelar';
+
+  @override
+  String get radioDelete => 'Eliminar';
+
+  @override
+  String get radioDeleteTitle => '¿Eliminar emisora?';
+
+  @override
+  String radioDeleteMessage(String name) {
+    return '¿Quitar \"$name\" de tus emisoras?';
+  }
+
+  @override
+  String get radioInvalidUrl =>
+      'Introduce una URL de transmisión http(s) válida';
+
+  @override
+  String get radioImportTitle => 'Importar .m3u';
+
+  @override
+  String get radioImportHint => 'Pega el contenido de la lista .m3u';
+
+  @override
+  String get radioImport => 'Importar';
+
+  @override
+  String radioImportedCount(int count) {
+    return '$count emisoras importadas';
+  }
+
+  @override
+  String get radioNoStreamsFound =>
+      'No se encontraron URL de transmisión http(s)';
+
+  @override
+  String get radioPlay => 'Reproducir';
+
+  @override
+  String get followTrackSampleRateTitle =>
+      'Seguir la frecuencia de muestreo de la pista';
+
+  @override
+  String get followTrackSampleRateSubtitle =>
+      'Reconfigura la salida a la frecuencia nativa de cada pista; se omite en Bluetooth y no repite cambios';
+
+  @override
+  String get followTrackSampleRateBluetooth =>
+      'Se omite en Bluetooth: el enlace del códec/AVRCP controla la frecuencia';
+
+  @override
+  String get strictBitPerfectTitle => 'Bit-perfect estricto (sin remuestreo)';
+
+  @override
+  String get strictBitPerfectSubtitle =>
+      'Fuerza Bit-Perfect + omisión del DSP y sigue la frecuencia de cada pista para que el DAC reciba las muestras exactas';
+
+  @override
+  String get strictBitPerfectBluetooth =>
+      'No disponible: Bluetooth transcodifica — el bit-perfect estricto necesita un DAC USB';
+
+  @override
+  String get strictBitPerfectActive =>
+      'Bit-perfect estricto ACTIVADO: EQ, ReplayGain, efectos y crossfade están silenciados para que las muestras exactas lleguen al DAC';
+
+  @override
+  String get dsdOutputModeTitle => 'Salida DSD';
+
+  @override
+  String get dsdOutputModeSubtitle =>
+      'Cómo llegan los archivos DSF/DFF al DAC: decodificación a PCM, o DSD nativo transmitido como DSD sobre PCM';
+
+  @override
+  String get dsdDopRequiresUsbDac =>
+      'Requiere un DAC USB conectado compatible con DSD sobre PCM (DoP)';
+
+  @override
+  String get dsdOutputPcm => 'PCM';
+
+  @override
+  String get dsdOutputDop => 'DoP';
 }

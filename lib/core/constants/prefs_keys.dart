@@ -16,7 +16,9 @@ class PrefsKeys {
   static const String eqHeadphoneProfileId = 'eq_headphone_profile_id';
   static const String eqCustomFrequencies = 'eq_custom_frequencies';
   static const String eq32BandMode = 'eq_32_band_mode';
+  static const String eqBandCount = 'eq_band_count';
   static const String eqCustom32Frequencies = 'eq_custom_32_frequencies';
+  static const String eqCustom64Frequencies = 'eq_custom_64_frequencies';
   static const String customEqProfiles = 'custom_eq_profiles';
   static const String resumeAfterInterruption =
       'setting_resume_after_interruption';
@@ -191,4 +193,19 @@ class PrefsKeys {
   // 2/4/8/16/32 beats of the incoming track when a BPM value is known.
   static const String bpmSyncCrossfadeEnabled =
       'setting_bpm_sync_crossfade_enabled';
+
+  // T2: reconfigure the output device to each track's native sample rate
+  // (skipped on Bluetooth, where the AVRCP/codec link owns the rate).
+  static const String followTrackSampleRate =
+      'setting_follow_track_sample_rate';
+
+  // T3: strict bit-perfect / no-resample. Forces the Bit-Perfect output and
+  // the DSP bypass, then follows each track's exact rate. Enabled only on a
+  // path that reports exclusive bit-perfect support.
+  static const String strictBitPerfect = 'setting_strict_bit_perfect';
+
+  // T4: DSD (DSF/DFF) output transport. 'pcm' (default, safe: decode to PCM)
+  // or 'dop' (frame as DSD over PCM for a compatible USB DAC). Never
+  // auto-enabled — DoP requires an explicit user choice plus a detected DAC.
+  static const String dsdOutputMode = 'setting_dsd_output_mode';
 }

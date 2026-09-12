@@ -1834,4 +1834,112 @@ class AppLocalizationsEn extends AppLocalizations {
   String sleepTimerMinutes(int minutes) {
     return '$minutes min';
   }
+
+  @override
+  String get radioTitle => 'Radio';
+
+  @override
+  String get radioSubtitle => 'Internet radio & live streams';
+
+  @override
+  String get radioAddStation => 'Add Station';
+
+  @override
+  String get radioImportPlaylist => 'Import .m3u';
+
+  @override
+  String get radioEmptyTitle => 'No radio stations yet';
+
+  @override
+  String get radioEmptySubtitle =>
+      'Add a stream URL or import an .m3u playlist to start listening.';
+
+  @override
+  String get radioStationName => 'Station name';
+
+  @override
+  String get radioStationUrl => 'Stream URL';
+
+  @override
+  String get radioAdd => 'Add';
+
+  @override
+  String get radioCancel => 'Cancel';
+
+  @override
+  String get radioDelete => 'Delete';
+
+  @override
+  String get radioDeleteTitle => 'Delete station?';
+
+  @override
+  String radioDeleteMessage(String name) {
+    return 'Remove \"$name\" from your stations?';
+  }
+
+  @override
+  String get radioInvalidUrl => 'Enter a valid http(s) stream URL';
+
+  @override
+  String get radioImportTitle => 'Import .m3u';
+
+  @override
+  String get radioImportHint => 'Paste .m3u playlist content';
+
+  @override
+  String get radioImport => 'Import';
+
+  @override
+  String radioImportedCount(int count) {
+    return '$count stations imported';
+  }
+
+  @override
+  String get radioNoStreamsFound => 'No http(s) stream URLs found';
+
+  @override
+  String get radioPlay => 'Play';
+
+  @override
+  String get followTrackSampleRateTitle => 'Follow track sample rate';
+
+  @override
+  String get followTrackSampleRateSubtitle =>
+      'Reconfigure the output to each track\'s native rate; de-duplicated and skipped on Bluetooth';
+
+  @override
+  String get followTrackSampleRateBluetooth =>
+      'Skipped on Bluetooth — the codec/AVRCP link owns the sample rate';
+
+  @override
+  String get strictBitPerfectTitle => 'Strict bit-perfect (no resample)';
+
+  @override
+  String get strictBitPerfectSubtitle =>
+      'Forces Bit-Perfect + DSP bypass and follows each track\'s rate so the DAC gets the exact source samples';
+
+  @override
+  String get strictBitPerfectBluetooth =>
+      'Unavailable: Bluetooth transcodes — strict bit-perfect needs a USB DAC';
+
+  @override
+  String get strictBitPerfectActive =>
+      'Strict bit-perfect is ON: EQ, ReplayGain, effects and crossfade are muted so the exact source samples reach the DAC';
+
+  @override
+  String get dsdOutputModeTitle => 'DSD output';
+
+  @override
+  String get dsdOutputModeSubtitle =>
+      'How DSF/DFF files reach the DAC: PCM decode, or native DSD streamed as DSD over PCM';
+
+  @override
+  String get dsdDopRequiresUsbDac =>
+      'Requires a connected USB DAC that supports DSD over PCM (DoP)';
+
+  @override
+  String get dsdOutputPcm => 'PCM';
+
+  @override
+  String get dsdOutputDop => 'DoP';
 }

@@ -8,6 +8,7 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/audio_output_info.dart';
 import '../../../../domain/models/audio_quality_info.dart';
+import '../../../../domain/services/hires_audio_service.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
@@ -699,14 +700,17 @@ class AudioQualitySheet extends StatelessWidget {
     final currentTarget =
         isBitPerfectActive ? 0 : (outputDevice?.targetSampleRate ?? 0);
 
-    final options = [
+    // T5: only surface rates the current output actually reports. Both the
+    // AudioOutputInfo rate list and Android's direct-playback probe feed the
+    // filter, so a hi-res tier the device cannot honour is never advertised.
+    final supportedRates = HiResAudioService.supportedSampleRateOptions(
+      deviceSampleRates: outputDevice?.supportedSampleRates ?? const [],
+      directFormats: outputDevice?.directFormats ?? const [],
+    );
+    final options = <(int, String, String)>[
       (0, 'Auto', 'Native'),
-      (44100, '44.1 kHz', 'CD'),
-      (48000, '48 kHz', 'Std'),
-      (88200, '88.2 kHz', '2x'),
-      (96000, '96 kHz', 'Studio'),
-      (192000, '192 kHz', 'Master'),
-      (384000, '384 kHz', 'Ultra'),
+      for (final rate in supportedRates)
+        (rate, _sampleRateLabel(rate), _sampleRateTag(rate)),
     ];
 
     const goldAccent = Color(0xFFFFD700);
@@ -1427,6 +1431,60 @@ class _OptionPill extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+String _sampleRateLabel(int rate) {
+  switch (rate) {
+    case 44100:
+      return '44.1 kHz';
+    case 48000:
+      return '48 kHz';
+    case 88200:
+      return '88.2 kHz';
+    case 96000:
+      return '96 kHz';
+    case 176400:
+      return '176.4 kHz';
+    case 192000:
+      return '192 kHz';
+    case 352800:
+      return '352.8 kHz';
+    case 384000:
+      return '384 kHz';
+    case 705600:
+      return '705.6 kHz';
+    case 768000:
+      return '768 kHz';
+    default:
+      return '${(rate / 1000).toStringAsFixed(rate % 1000 == 0 ? 0 : 1)} kHz';
+  }
+}
+
+String _sampleRateTag(int rate) {
+  switch (rate) {
+    case 44100:
+      return 'CD';
+    case 48000:
+      return 'Std';
+    case 88200:
+      return '2x';
+    case 96000:
+      return 'Studio';
+    case 176400:
+      return '4x';
+    case 192000:
+      return 'Master';
+    case 352800:
+      return '8x';
+    case 384000:
+      return 'Ultra';
+    case 705600:
+      return '16x';
+    case 768000:
+      return 'Max';
+    default:
+      return 'Hi-Res';
   }
 }
 

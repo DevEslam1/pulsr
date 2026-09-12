@@ -161,6 +161,11 @@ class EqPreset {
     24000,
   ];
 
+  /// 64-band log-spaced centers (Hz) spanning 20 Hz to 20 kHz. PowerAmp-parity
+  /// high-resolution graphic EQ; log-spacing keeps the bands perceptually even.
+  static final List<double> iso64Frequencies =
+      _logSpread(64, const [20.0, 20000.0]);
+
   /// The 5-band centers used before 10-band migration.
   static const List<double> legacyFrequencies = [60, 230, 910, 3600, 14000];
 
@@ -180,7 +185,9 @@ class EqPreset {
             ? centerFrequencies
             : (source.length == iso32Frequencies.length
                 ? iso32Frequencies
-                : _logSpread(source.length, targetFrequencies)));
+                : (source.length == iso64Frequencies.length
+                    ? iso64Frequencies
+                    : _logSpread(source.length, targetFrequencies))));
 
     return [
       for (final f in targetFrequencies) _interpAtLogFreq(f, srcFreqs, source)

@@ -38,6 +38,81 @@ class HiResAudioService {
 
   AudioOutputInfo? get currentOutputInfo => _cachedOutputInfo;
 
+  /// Sample rates accepted by the native `setTargetOutputFormat` (0 = auto).
+  /// The native side performs no validation of its own, so this set is the
+  /// single gate that keeps an unsupported rate from being requested silently.
+  static const Set<int> validTargetSampleRates = <int>{
+    0,
+    44100,
+    48000,
+    88200,
+    96000,
+    176400,
+    192000,
+    352800,
+    384000,
+    705600,
+    768000,
+  };
+
+  /// Bit depths accepted by the native `setTargetOutputFormat` (0 = auto).
+  /// 8.24 packed is deliberately absent: the native layer does not report it,
+  /// so it is not offered rather than faked.
+  static const Set<int> validTargetBitDepths = <int>{0, 16, 24, 32};
+
+  /// The widest first-class sample-rate envelope Pulsr can request (T5).
+  static const List<int> envelopeSampleRateLadder = <int>[
+    44100,
+    48000,
+    88200,
+    96000,
+    176400,
+    192000,
+    352800,
+    384000,
+    705600,
+    768000,
+  ];
+
+  /// T5 pure filter: only rates the current output actually reports as
+  /// supported survive. [deviceSampleRates] comes from [AudioOutputInfo] while
+  /// [directFormats] comes from Android's `isDirectPlaybackSupported` probe;
+  /// either can carry a rate the other misses. No rate is ever invented.
+  static List<int> supportedSampleRateOptions({
+    required List<int> deviceSampleRates,
+    required List<AudioDirectFormat> directFormats,
+    List<int> ladder = envelopeSampleRateLadder,
+  }) {
+    final reported = <int>{
+      ...deviceSampleRates.where((r) => r > 0),
+      ...directFormats.where((f) => f.supported).map((f) => f.sampleRate),
+    };
+    final supported =
+        ladder.where((rate) => reported.contains(rate)).toList()..sort();
+    if (supported.isNotEmpty) return supported;
+    // No capability report at all: fall back to the only universally safe rates
+    // rather than presenting unsupported hi-res tiers.
+    return ladder.where((r) => r == 44100 || r == 48000).toList();
+  }
+
+  /// T2 pure decision: the track rate that should be pushed to the native
+  /// output, or null when nothing should be sent. De-dupes against the last
+  /// requested rate and never fights AVRCP on a Bluetooth route.
+  static int? followTrackRateToApply({
+    required int? trackSampleRate,
+    required int? lastRequestedSampleRate,
+    required bool isBluetooth,
+    required bool followTrackEnabled,
+  }) {
+    if (!followTrackEnabled) return null;
+    if (isBluetooth) return null;
+    final rate = trackSampleRate;
+    if (rate == null || rate <= 0) return null;
+    if (rate == lastRequestedSampleRate) return null;
+    if (!validTargetSampleRates.contains(rate)) return null;
+    return rate;
+  }
+
   HiResAudioService() {
     _init();
   }
@@ -276,15 +351,12 @@ class HiResAudioService {
     if (!PlatformCapabilities.isAndroid) return false;
     // Validate before hitting native: 0 = auto, otherwise must be a sane
     // rate; bit depth must be 0 (auto), 16, 24 or 32.
-    const validRates = <int>{
-      0, 44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 768000
-    };
-    if (!validRates.contains(sampleRate)) {
+    if (!validTargetSampleRates.contains(sampleRate)) {
       ErrorLogger.log(
           'Rejected invalid sample rate $sampleRate', category: 'HiResAudio');
       return false;
     }
-    if (bitDepth != 0 && bitDepth != 16 && bitDepth != 24 && bitDepth != 32) {
+    if (!validTargetBitDepths.contains(bitDepth)) {
       ErrorLogger.log('Rejected invalid bit depth $bitDepth',
           category: 'HiResAudio');
       return false;

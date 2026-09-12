@@ -57,12 +57,12 @@ Pulsr comes with an interactive landing website located in [`website/`](website/
 ## ✨ Key Features
 
 ### 🎧 1. Audiophile Audio Engine & DSP
-- **10 & 32-Band Parametric Equalizer**: Switch between the classic 10-band graphic curve (±12 dB, 31 Hz–16 kHz) and a 32-band parametric engine with a custom frequency editor, A/B flat compare, and four recallable A/B/C/D slots.
+- **10 / 32 / 64-Band Parametric Equalizer**: Switch between the classic 10-band graphic curve (±12 dB, 31 Hz–16 kHz), a 32-band, or a 64-band parametric engine with a custom frequency editor, A/B flat compare, and four recallable A/B/C/D slots.
 - **AutoEQ Headphone Calibration**: Bundled compensation curves for industry-leading headphones (*Harman Target 2019/2018, Apple AirPods Pro, Sony WH-1000XM4/XM5, Sennheiser HD600, Beyerdynamic*), an online AutoEQ search, and per-song auto-apply by name.
 - **Full Effects Chain**: Bass boost, per-band mute/solo, manual preamp, 3D spatial virtualizer, multiband dynamics, studio compressor, lookahead brickwall limiter, crossfeed, convolution reverb with custom WAV impulse responses, harmonic saturation/exciter, mid/side stereo width, Fletcher–Munson loudness contour, subwoofer crossover, dynamic EQ, high-quality sinc resampler, and TPDF dither.
 - **Room Correction Wizard**: Stepped-sine sweep measurement with mic capture, auto-fitted correction curve, optional stacking with a headphone AutoEQ profile, and linear-phase FIR export.
 - **ReplayGain & Per-Song Overrides**: Track/album ReplayGain with preamp, plus per-song EQ, volume and BPM overrides and per-album DSP memory.
-- **Bit-Perfect Hi-Res Badging & Output**: Detection for sample rates (44.1 kHz–192 kHz) and bit depths (16/24/32-bit float), bit-perfect mode, float DSP path, AAudio direct output, USB-DAC negotiation, and Bluetooth codec control (LDAC/aptX).
+- **Bit-Perfect Hi-Res Badging & Output**: Detection for sample rates (44.1 kHz–192 kHz) and bit depths (16/24/32-bit float), bit-perfect mode, **strict no-resample mode**, **follow-track sample-rate switching**, float DSP path, AAudio direct output, USB-DAC negotiation, **DSD over PCM (DoP)** output, and Bluetooth codec control (LDAC/aptX).
 - **DSP Inspector & Conflict Guards**: A live view of every active/degraded stage, with protection against mutually exclusive effects (e.g. ReplayGain vs bit-perfect).
 - **Audiophile Playback Controls**: Gapless playback with encoder-delay trims, crossfade transitions (curves + BPM sync), variable pitch/playback speed, A-B loop, per-track delay, long-form bookmarks, silence skip, SponsorBlock auto-skip, and sleep timer (duration / end of track / after N tracks / end of queue).
 
@@ -87,8 +87,9 @@ Pulsr comes with an interactive landing website located in [`website/`](website/
 - **Advanced Folder Browser**: Flat or hierarchical folder tree with breadcrumbs, `.nomedia` compliance and custom blacklist folder exclusions.
 - **Intelligent Search**: FTS5 full-text search with Arabic diacritic/Latin accent normalization plus whole-library fuzzy fallback.
 - **Smart Auto-Playlists**: *Most Played, Recently Added, Recently Played, Forgotten Gems, Top Rated, Long Tracks* — plus a rule builder with combined criteria including BPM.
-- **Library Power Tools**: Duplicate finder with keep/delete resolution, missing-artwork online backfill, full-library statistics, and an artwork wall.
+- **Library Power Tools**: Duplicate finder with keep/delete resolution, missing-artwork online backfill, full-library statistics, an artwork wall, and **CUE sheet playback** (single-file album images expand into virtual tracks).
 - **Three Independent Queues**: Persisted queue slots with drag reorder, add-next/add-last, and YTM session position restore.
+- **Internet Radio**: Add HTTP/HTTPS stream URLs (with `.m3u` stream-list import) and play them with a dedicated radio management screen.
 
 ### 🎤 4. Millisecond Synced LRC Lyrics
 - **Kinetic Karaoke Autoscroll**: Millisecond-precision scrolling that tracks the active vocal line, with a dedicated full-screen karaoke view.
@@ -244,6 +245,8 @@ pulsr/
 | Document | Purpose |
 |---|---|
 | [`docs/PULSR_FEATURES_SPEC.md`](docs/PULSR_FEATURES_SPEC.md) | Master spec for every feature, its functions and wiring, plus the prioritized gap audit and remediation status. |
+| [`docs/POWERAMP_COMPARISON.md`](docs/POWERAMP_COMPARISON.md) | Feature-by-feature comparison against Poweramp v3. |
+| [`docs/POWERAMP_PARITY_PLAN.md`](docs/POWERAMP_PARITY_PLAN.md) | Execution-ready plan to close the Poweramp gaps (workstreams, native contracts, tests). |
 | [`docs/AUDIO_INTERRUPT_MATRIX.md`](docs/AUDIO_INTERRUPT_MATRIX.md) | Audio focus, interruption and ducking test matrix. |
 | [`docs/PLAY_CONSOLE_READINESS.md`](docs/PLAY_CONSOLE_READINESS.md) | Google Play data-safety and permission compliance audit. |
 | [`RUNBOOK.md`](RUNBOOK.md) | Build, release and troubleshooting runbook. |

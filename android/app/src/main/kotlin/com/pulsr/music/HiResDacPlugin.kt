@@ -283,6 +283,9 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         "getDirectCapabilities" -> {
             result.success(mapOf("directFormats" to probeDirectFormats()))
         }
+        "getDopCapabilities" -> {
+            result.success(getDopCapabilities())
+        }
         "setTargetOutputFormat", "configureTargetAudio" -> {
                 val sampleRate = call.argument<Int>("sampleRate") ?: 0
                 val bitDepth = call.argument<Int>("bitDepth") ?: 0
@@ -1043,6 +1046,48 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 }
             }
         }
+    }
+
+    /**
+     * T4: DoP (DSD over PCM) capability probe.
+     *
+     * Android exposes no "native DSD" flag, so this is deliberately
+     * conservative: with no connected USB DAC (TYPE_USB_DEVICE / TYPE_USB_HEADSET)
+     * every flag is false and playback stays on the PCM path. With a USB DAC
+     * present, DoP is reported possible (UAC2 devices commonly accept it) and
+     * the per-rate flags additionally require the DAC to advertise the carrier
+     * PCM rate DoP needs — DSD64 → 176.4 kHz, DSD128 → 352.8 kHz, DSD256 →
+     * 705.6 kHz. Carrier rates are never fabricated.
+     */
+    private fun getDopCapabilities(): Map<String, Any?> {
+        val usbDac = try {
+            audioManager
+                ?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+                ?.firstOrNull { isUsbOutputType(it.type) }
+        } catch (_: Exception) {
+            null
+        }
+        if (usbDac == null) {
+            return mapOf(
+                "dsd64" to false,
+                "dsd128" to false,
+                "dsd256" to false,
+                "dop" to false,
+                "nativeDac" to false,
+            )
+        }
+
+        val rates = usbDac.sampleRates.toSet()
+        return mapOf(
+            "dsd64" to rates.contains(176400),
+            "dsd128" to rates.contains(352800),
+            "dsd256" to rates.contains(705600),
+            // A USB DAC is present; DoP may be accepted even when Android does
+            // not surface the carrier rate, so dop is reported and the per-rate
+            // flags above gate which DSD rate is actually attempted.
+            "dop" to true,
+            "nativeDac" to true,
+        )
     }
 
     private fun getAudioOutputDetails(): Map<String, Any?> {

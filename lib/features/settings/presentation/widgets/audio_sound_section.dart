@@ -260,6 +260,161 @@ class AudioSoundSection extends StatelessWidget {
               : cubit.setBypassDspOnBitPerfect,
         ),
         settingsCardDivider(p),
+        // T2: follow the current track's native sample rate. De-duplicated in
+        // PlayerCubit and skipped on Bluetooth, where AVRCP owns the rate.
+        SettingsSwitchTile(
+          Icons.sync_rounded,
+          context.l10n.followTrackSampleRateTitle,
+          !isAndroid
+              ? unsupported
+              : state.currentOutputDevice?.isBluetooth == true
+                  ? context.l10n.followTrackSampleRateBluetooth
+                  : context.l10n.followTrackSampleRateSubtitle,
+          value: isAndroid && state.followTrackSampleRate,
+          featureInfo: AudioFeatureRegistry.followTrackSampleRate,
+          disabledReason: isAndroid ? null : unsupported,
+          onChanged: isAndroid ? cubit.setFollowTrackSampleRate : (v) {},
+        ),
+        settingsCardDivider(p),
+        // T3: strict bit-perfect. Enabled only on a path that reports exclusive
+        // bit-perfect support; otherwise the platform reason is shown instead
+        // of pretending the toggle works.
+        Builder(builder: (ctx) {
+          final strictBlock = !isAndroid
+              ? unsupported
+              : AudioConflicts.strictBitPerfectBlockedReason(
+                  state.currentOutputDevice);
+          return Column(
+            children: [
+              SettingsSwitchTile(
+                Icons.verified_rounded,
+                context.l10n.strictBitPerfectTitle,
+                !isAndroid
+                    ? unsupported
+                    : state.currentOutputDevice?.isBluetooth == true
+                        ? context.l10n.strictBitPerfectBluetooth
+                        : context.l10n.strictBitPerfectSubtitle,
+                value: isAndroid && state.strictBitPerfect,
+                featureInfo: AudioFeatureRegistry.strictBitPerfect,
+                // Once enabled the switch stays operable so the user can always
+                // turn strict mode back off, even if the device later stops
+                // reporting bit-perfect support.
+                disabledReason: state.strictBitPerfect ? null : strictBlock,
+                onChanged: cubit.setStrictBitPerfect,
+              ),
+              if (state.strictBitPerfect)
+                SettingsConflictCard(
+                  reason: AudioConflicts.strictBitPerfectActiveReason(
+                        bitPerfectOutput: state.bitPerfectOutput,
+                        bypassDspOnBitPerfect: state.bypassDspOnBitPerfect,
+                        device: state.currentOutputDevice,
+                      ) ??
+                      context.l10n.strictBitPerfectActive,
+                ),
+            ],
+          );
+        }),
+        settingsCardDivider(p),
+        // T4: DSD (DSF/DFF) output mode. Disabled with a truthful reason
+        // whenever the native probe has not confirmed a DoP-capable USB DAC.
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.album_rounded,
+                    size: 20,
+                    color: (!isAndroid || !state.dsdDopSupported)
+                        ? p.textTertiary
+                        : p.accent,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      context.l10n.dsdOutputModeTitle,
+                      style: TextStyle(
+                        color: p.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.info_outline_rounded,
+                        size: 18, color: p.textTertiary),
+                    tooltip: 'About ${context.l10n.dsdOutputModeTitle}',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => showAudioFeatureInfoDialog(
+                      context,
+                      AudioFeatureRegistry.dsdNative,
+                      conflictReason: !isAndroid
+                          ? unsupported
+                          : state.dsdDopSupported
+                              ? null
+                              : context.l10n.dsdDopRequiresUsbDac,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                !isAndroid
+                    ? unsupported
+                    : state.dsdDopSupported
+                        ? context.l10n.dsdOutputModeSubtitle
+                        : context.l10n.dsdDopRequiresUsbDac,
+                style: TextStyle(color: p.textSecondary, fontSize: 12),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<DsdOutputMode>(
+                  showSelectedIcon: false,
+                  style: const ButtonStyle(
+                    visualDensity: VisualDensity.compact,
+                    padding: WidgetStatePropertyAll(
+                      EdgeInsets.symmetric(horizontal: 4),
+                    ),
+                  ),
+                  segments: [
+                    ButtonSegment(
+                      value: DsdOutputMode.pcm,
+                      label: Text(
+                        context.l10n.dsdOutputPcm,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    ButtonSegment(
+                      value: DsdOutputMode.dop,
+                      label: Text(
+                        context.l10n.dsdOutputDop,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                  selected: {state.dsdOutputMode},
+                  onSelectionChanged: (!isAndroid || !state.dsdDopSupported)
+                      ? null
+                      : (selected) {
+                          if (selected.isNotEmpty) {
+                            cubit.setDsdOutputMode(selected.first);
+                          }
+                        },
+                ),
+              ),
+            ],
+          ),
+        ),
+        settingsCardDivider(p),
         // ReplayGain / Loudness Normalization Suite
         Builder(builder: (cntx) {
           final rgBlocked = AudioConflicts.replayGainBlockedByBitPerfect(

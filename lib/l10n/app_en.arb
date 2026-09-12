@@ -1053,5 +1053,51 @@
         "type": "int"
       }
     }
-  }
+  },
+  "radioTitle": "Radio",
+  "radioSubtitle": "Internet radio & live streams",
+  "radioAddStation": "Add Station",
+  "radioImportPlaylist": "Import .m3u",
+  "radioEmptyTitle": "No radio stations yet",
+  "radioEmptySubtitle": "Add a stream URL or import an .m3u playlist to start listening.",
+  "radioStationName": "Station name",
+  "radioStationUrl": "Stream URL",
+  "radioAdd": "Add",
+  "radioCancel": "Cancel",
+  "radioDelete": "Delete",
+  "radioDeleteTitle": "Delete station?",
+  "radioDeleteMessage": "Remove \"{name}\" from your stations?",
+  "@radioDeleteMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "radioInvalidUrl": "Enter a valid http(s) stream URL",
+  "radioImportTitle": "Import .m3u",
+  "radioImportHint": "Paste .m3u playlist content",
+  "radioImport": "Import",
+  "radioImportedCount": "{count} stations imported",
+  "@radioImportedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "radioNoStreamsFound": "No http(s) stream URLs found",
+  "radioPlay": "Play",
+  "followTrackSampleRateTitle": "Follow track sample rate",
+  "followTrackSampleRateSubtitle": "Reconfigure the output to each track's native rate; de-duplicated and skipped on Bluetooth",
+  "followTrackSampleRateBluetooth": "Skipped on Bluetooth — the codec/AVRCP link owns the sample rate",
+  "strictBitPerfectTitle": "Strict bit-perfect (no resample)",
+  "strictBitPerfectSubtitle": "Forces Bit-Perfect + DSP bypass and follows each track's rate so the DAC gets the exact source samples",
+  "strictBitPerfectBluetooth": "Unavailable: Bluetooth transcodes — strict bit-perfect needs a USB DAC",
+  "strictBitPerfectActive": "Strict bit-perfect is ON: EQ, ReplayGain, effects and crossfade are muted so the exact source samples reach the DAC",
+  "dsdOutputModeTitle": "DSD output",
+  "dsdOutputModeSubtitle": "How DSF/DFF files reach the DAC: PCM decode, or native DSD streamed as DSD over PCM",
+  "dsdDopRequiresUsbDac": "Requires a connected USB DAC that supports DSD over PCM (DoP)",
+  "dsdOutputPcm": "PCM",
+  "dsdOutputDop": "DoP"
 }

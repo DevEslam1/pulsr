@@ -9,6 +9,21 @@ class DopEncoder {
   static const int dopMarkerA = 0x05;
   static const int dopMarkerB = 0xFA;
 
+  /// The PCM carrier rate for a DSD file expressed as a multiple of 44.1 kHz
+  /// (DSD64 = 64, DSD128 = 128, DSD256 = 256). DoP packs 16 DSD bits into one
+  /// 24-bit PCM sample, so the carrier runs at `dsdRate * 44100 / 16`:
+  /// DSD64 (2.8224 MHz) → 176.4 kHz, DSD128 → 352.8 kHz, DSD256 → 705.6 kHz.
+  ///
+  /// Returns 0 for rates DoP cannot carry (anything above DSD256), so callers
+  /// fall back to PCM instead of inventing an unsupported carrier rate.
+  static int dopPcmSampleRate(int dsdRate) {
+    if (dsdRate <= 0) return 0;
+    if (dsdRate <= 64) return 176400;
+    if (dsdRate <= 128) return 352800;
+    if (dsdRate <= 256) return 705600;
+    return 0;
+  }
+
   /// Encodes 1-bit DSD stereo stream (left & right byte channels) into 24-bit packed PCM or 32-bit aligned PCM.
   /// [dsdLeft] and [dsdRight] must have equal length (in bytes).
   /// Every 2 bytes of DSD (16 bits) are combined with an 8-bit alternating marker to form one 24-bit PCM sample per channel.

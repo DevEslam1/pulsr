@@ -21,6 +21,7 @@ import '../../features/playlist_detail/presentation/manage_playlist_screen.dart'
 import '../../features/library/presentation/recents_screen.dart';
 import '../../features/playlists/presentation/playlists_screen.dart';
 import '../../features/queue/presentation/queue_screen.dart';
+import '../../features/radio/presentation/radio_screen.dart';
 import '../../features/search/presentation/search_screen.dart';
 import '../../features/settings/presentation/proxy_settings_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
@@ -323,6 +324,12 @@ GoRouter createRouter(MediaScannerService scannerService) {
         name: 'queue',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const QueueScreen(),
+      ),
+      GoRoute(
+        path: '/radio',
+        name: 'radio',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const RadioScreen(),
       ),
       GoRoute(
         path: '/folder',

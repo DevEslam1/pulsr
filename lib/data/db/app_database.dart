@@ -26,7 +26,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   static Future<void> _createFtsTable(
       Future<void> Function(String) executeSql) async {
@@ -163,6 +163,17 @@ class AppDatabase extends _$AppDatabase {
               await customStatement(
                   "INSERT INTO songs_fts(songs_fts) VALUES('rebuild');");
             } catch (_) {}
+          }
+          if (from < 10) {
+            if (!await hasColumn('songs', 'cue_start_ms')) {
+              await m.addColumn(songsTable, songsTable.cueStartMs);
+            }
+            if (!await hasColumn('songs', 'cue_end_ms')) {
+              await m.addColumn(songsTable, songsTable.cueEndMs);
+            }
+            if (!await hasColumn('songs', 'cue_file')) {
+              await m.addColumn(songsTable, songsTable.cueFile);
+            }
           }
           // Must run after every addColumn above: several indexes cover columns a
           // later branch introduces, so creating them mid-ladder fails on an older

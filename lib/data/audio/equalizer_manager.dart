@@ -75,7 +75,12 @@ class EqualizerManager {
 
   EqPreset currentPreset = EqPreset.defaultPresets.first;
   bool isEnabled = false;
-  bool is32BandMode = false;
+
+  /// Active EQ band count: 10, 32 or 64. Single source of truth for the band
+  /// plan. [is32BandMode] is kept as a derived alias so older call sites (the
+  /// audio handler, tests) keep compiling; it means "not the 10-band plan".
+  int eqBandCount = 10;
+  bool get is32BandMode => eqBandCount != 10;
   double preampDb = 0.0;
 
   double volumeBoost = 0.0; // 0.0 -> 1.0, maps to 0-1000 mB
@@ -180,6 +185,7 @@ class EqualizerManager {
 
   List<double> customFrequencies = List.from(EqPreset.centerFrequencies);
   List<double> custom32Frequencies = List.from(EqPreset.iso32Frequencies);
+  List<double> custom64Frequencies = List.from(EqPreset.iso64Frequencies);
 
   // A/B/C/D Comparison Slots
   ComparisonSlot activeComparisonSlot = ComparisonSlot.slotA;
@@ -205,15 +211,28 @@ class EqualizerManager {
     await _effectsLock.lock(() => _restorePreferences());
   }
 
-  List<double> get activeFrequencies =>
-      is32BandMode ? custom32Frequencies : customFrequencies;
+  List<double> get activeFrequencies => eqBandCount == 64
+      ? custom64Frequencies
+      : (eqBandCount == 32 ? custom32Frequencies : customFrequencies);
 
   Future<void> _restorePreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       isEnabled = prefs.getBool(PrefsKeys.eqEnabled) ?? false;
-      is32BandMode = prefs.getBool(PrefsKeys.eq32BandMode) ??
-          (prefs.getBool('eq_32_band_mode') ?? false);
+      // Band-count migration: prefer the explicit count key; fall back to the
+      // legacy boolean (true => 32) so existing installs keep their mode.
+      final storedBandCount = prefs.getInt(PrefsKeys.eqBandCount);
+      if (storedBandCount != null &&
+          (storedBandCount == 10 ||
+              storedBandCount == 32 ||
+              storedBandCount == 64)) {
+        eqBandCount = storedBandCount;
+      } else if (prefs.getBool(PrefsKeys.eq32BandMode) ??
+          (prefs.getBool('eq_32_band_mode') ?? false)) {
+        eqBandCount = 32;
+      } else {
+        eqBandCount = 10;
+      }
       final presetName = prefs.getString(PrefsKeys.eqPresetName) ?? 'Flat';
       final gainsJson = prefs.getString(PrefsKeys.eqGains);
       final bass = prefs.getDouble(PrefsKeys.eqBassBoost) ?? 0.0;
@@ -258,9 +277,27 @@ class EqualizerManager {
           );
         }
       }
+      final custom64Json = prefs.getString(PrefsKeys.eqCustom64Frequencies);
+      if (custom64Json != null) {
+        try {
+          final decoded64 = (json.decode(custom64Json) as List<dynamic>)
+              .map((e) => (e as num).toDouble())
+              .toList();
+          if (decoded64.length == 64 &&
+              decoded64.every((f) => f.isFinite && f > 0)) {
+            custom64Frequencies = decoded64;
+          }
+        } catch (e, st) {
+          ErrorLogger.log(
+            'Failed to decode custom 64-band EQ frequencies',
+            error: e,
+            stackTrace: st,
+            category: 'EqualizerManager',
+          );
+        }
+      }
 
-      final targetFreqs =
-          is32BandMode ? custom32Frequencies : customFrequencies;
+      final targetFreqs = activeFrequencies;
       List<double> gains = List<double>.filled(targetFreqs.length, 0.0);
       bool gainsLoaded = false;
       if (gainsJson != null) {
@@ -628,10 +665,12 @@ class EqualizerManager {
       final batch = <String, dynamic>{
         PrefsKeys.eqEnabled: isEnabled,
         PrefsKeys.eq32BandMode: is32BandMode,
+        PrefsKeys.eqBandCount: eqBandCount,
         PrefsKeys.eqPresetName: currentPreset.name,
         PrefsKeys.eqGains: json.encode(currentPreset.gains),
         PrefsKeys.eqCustomFrequencies: json.encode(customFrequencies),
         PrefsKeys.eqCustom32Frequencies: json.encode(custom32Frequencies),
+        PrefsKeys.eqCustom64Frequencies: json.encode(custom64Frequencies),
         PrefsKeys.eqBassBoost: currentPreset.bassBoost,
         PrefsKeys.eqPreamp: preampDb,
         PrefsKeys.eqVolumeBoost: volumeBoost,
@@ -713,9 +752,19 @@ class EqualizerManager {
     }
   }
 
-  Future<void> set32BandMode(bool enabled) async {
-    is32BandMode = enabled;
-    final targetFreqs = enabled ? custom32Frequencies : customFrequencies;
+  /// Switches the active band plan to [count] bands (10, 32 or 64),
+  /// interpolating the current curve onto the new centers and re-pushing the
+  /// whole plan to the native parametric EQ in a single bulk hop.
+  Future<void> setBandMode(int count) async {
+    if (count != 10 && count != 32 && count != 64) {
+      ErrorLogger.log(
+        'Rejected unsupported EQ band count $count (need 10, 32 or 64)',
+        category: 'EqualizerManager',
+      );
+      return;
+    }
+    eqBandCount = count;
+    final targetFreqs = activeFrequencies;
     final interpolated = EqPreset.interpolateGains(
       currentPreset.gains,
       targetFrequencies: targetFreqs,
@@ -748,7 +797,7 @@ class EqualizerManager {
         }
         if (futures.isNotEmpty) await Future.wait(futures);
       }
-      if (!enabled) {
+      if (count == 10) {
         await _effectsChannel.setEqBands(targetFreqs);
         await _effectsChannel.setEqBandGains(currentPreset.gains);
       } else {
@@ -762,6 +811,11 @@ class EqualizerManager {
     }
     _debouncedSavePreferences();
   }
+
+  /// Backwards-compatible alias: `true` selects the 32-band plan, `false` the
+  /// 10-band plan. New code should call [setBandMode] directly.
+  Future<void> set32BandMode(bool enabled) =>
+      setBandMode(enabled ? 32 : 10);
 
   Future<void> setEnabled(bool enabled) async {
     final previous = isEnabled;
@@ -793,7 +847,7 @@ class EqualizerManager {
 
   Future<void> setPreset(EqPreset preset) async {
     selectedHeadphoneProfile = null;
-    final targetFreqs = is32BandMode ? custom32Frequencies : customFrequencies;
+    final targetFreqs = activeFrequencies;
     final gains = EqPreset.interpolateGains(
       preset.gains,
       targetFrequencies: targetFreqs,
@@ -829,7 +883,7 @@ class EqualizerManager {
 
   Future<void> _flushBandGains(Map<int, double> pending) async {
     if (pending.isEmpty) return;
-    final targetFreqs = is32BandMode ? custom32Frequencies : customFrequencies;
+    final targetFreqs = activeFrequencies;
     // Guard against mode-switch race: drop stale indices instead of RangeError.
     final valid = Map<int, double>.fromEntries(
       pending.entries.where((e) => e.key >= 0 && e.key < targetFreqs.length),
@@ -837,7 +891,7 @@ class EqualizerManager {
     if (valid.isEmpty) return;
     try {
       if (PlatformCapabilities.isAndroid && isEnabled) {
-        if (is32BandMode) {
+        if (eqBandCount != 10) {
           for (final entry in valid.entries) {
             await _effectsChannel.setNativeEqBand(
               entry.key,
@@ -883,7 +937,7 @@ class EqualizerManager {
 
   Future<void> applyCurrentPreset() async {
     if (!isEnabled) return;
-    final targetFreqs = is32BandMode ? custom32Frequencies : customFrequencies;
+    final targetFreqs = activeFrequencies;
     if (PlatformCapabilities.isAndroid) {
       // Prefer bulk path — single generation publish, zero per-band JNI overhead
       try {
@@ -891,12 +945,12 @@ class EqualizerManager {
           frequencies: targetFreqs,
           gains: currentPreset.gains,
         );
-        if (!is32BandMode) {
+        if (eqBandCount == 10) {
           // Keep legacy 10-band DynamicsProcessing in sync only for 10-band mode
           await _effectsChannel.setEqBands(targetFreqs);
           await _effectsChannel.setEqBandGains(currentPreset.gains);
         } else {
-          // In 32-band mode, interpolate to 10 bands so the audible DynamicsProcessing postEq
+          // In 32/64-band mode, interpolate to 10 bands so the audible DynamicsProcessing postEq
           // reflects the EQ curve instead of remaining silent/flat!
           final tenBandGains = EqPreset.interpolateGains(
             currentPreset.gains,
@@ -908,7 +962,7 @@ class EqualizerManager {
         return;
       } catch (_) {}
       // Fallback to legacy per-band if bulk unavailable (old APK)
-      if (is32BandMode) {
+      if (eqBandCount != 10) {
         await _effectsChannel.setNativeEqBandCount(targetFreqs.length);
         final futures = <Future<void>>[];
         for (int i = 0; i < targetFreqs.length; i++) {
@@ -1017,7 +1071,7 @@ class EqualizerManager {
   Future<void> startAbComparison() async {
     isAbComparisonActive = true;
     _abComparisonGains = List.from(currentPreset.gains);
-    final targetFreqs = is32BandMode ? custom32Frequencies : customFrequencies;
+    final targetFreqs = activeFrequencies;
     if (PlatformCapabilities.isAndroid) {
       // Flatten BOTH EQ paths, mirroring applyCurrentPreset's dual push:
       // the native parametric EQ and the HAL DynamicsProcessing postEq.
@@ -1042,8 +1096,7 @@ class EqualizerManager {
   Future<void> endAbComparison() async {
     isAbComparisonActive = false;
     if (_abComparisonGains.isNotEmpty) {
-      final targetFreqs =
-          is32BandMode ? custom32Frequencies : customFrequencies;
+      final targetFreqs = activeFrequencies;
       if (PlatformCapabilities.isAndroid) {
         // Restore BOTH EQ paths (mirrors applyCurrentPreset's dual push).
         final futures = <Future<void>>[];
@@ -1060,8 +1113,8 @@ class EqualizerManager {
           );
         }
         await Future.wait(futures);
-        if (is32BandMode) {
-          // HAL postEq holds the interpolated 10-band curve in 32-band mode.
+        if (eqBandCount != 10) {
+          // HAL postEq holds the interpolated 10-band curve in 32/64-band mode.
           await _effectsChannel.setEqBandGains(
             EqPreset.interpolateGains(
               _abComparisonGains,
@@ -1100,6 +1153,19 @@ class EqualizerManager {
       return;
     }
     custom32Frequencies = List.from(frequencies);
+    await _savePreferences();
+  }
+
+  Future<void> setCustom64Frequencies(List<double> frequencies) async {
+    if (frequencies.length != 64 ||
+        frequencies.any((f) => !f.isFinite || f <= 0)) {
+      ErrorLogger.log(
+        'Rejected invalid custom 64-band frequencies (need 64 finite >0)',
+        category: 'EqualizerManager',
+      );
+      return;
+    }
+    custom64Frequencies = List.from(frequencies);
     await _savePreferences();
   }
 
@@ -1142,8 +1208,7 @@ class EqualizerManager {
           );
           return;
         }
-        final targetFreqs =
-            is32BandMode ? custom32Frequencies : customFrequencies;
+        final targetFreqs = activeFrequencies;
         final gains = EqPreset.interpolateGains(
           profile.gains,
           targetFrequencies: targetFreqs,
@@ -1903,7 +1968,7 @@ class EqualizerManager {
 
     // Initialize EQ chain with current band configuration and enable state
     try {
-      final freqs = is32BandMode ? custom32Frequencies : customFrequencies;
+      final freqs = activeFrequencies;
       await _effectsChannel.setNativeEqBandCount(freqs.length);
 
       if (isEnabled) {

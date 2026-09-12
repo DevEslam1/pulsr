@@ -134,6 +134,12 @@ abstract class IMusicRepository {
 
   Future<Result<int>> cleanupOrphanedSongs(Set<int> scannedSongIds);
 
+  /// Expands single-file CUE sheets into virtual song rows that share the
+  /// backing audio file's `path`. Real file rows covered by a cue keep their
+  /// row but are tagged with `cueFile` and hidden from the standard library
+  /// queries. Idempotent: repeat scans upsert the same deterministic ids.
+  Future<Result<int>> expandCueSheets();
+
   // --- TAG UPDATES ---
   Future<Result<void>> updateSongTags({
     required String path,

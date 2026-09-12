@@ -75,6 +75,19 @@ class SongsTable extends Table {
   /// Explicit flag indicating whether this song was downloaded from YouTube Music / Online.
   BoolColumn get isDownloaded => boolean().withDefault(const Constant(false))();
 
+  /// Start of this song's window inside its backing file, set only on virtual
+  /// rows expanded from a single-file CUE sheet. Null on real file rows.
+  IntColumn get cueStartMs => integer().nullable()();
+
+  /// End of this song's window inside its backing file. Null when the track
+  /// runs to the end of the file, or when this is a real file row.
+  IntColumn get cueEndMs => integer().nullable()();
+
+  /// The sibling `.cue` file this row was derived from. A container (real
+  /// file) row carries this with a null [cueStartMs] so library queries can
+  /// hide it once its virtual tracks exist.
+  TextColumn get cueFile => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

@@ -230,6 +230,11 @@ class PulsrAudioHandler extends BaseAudioHandler
   Stream<SongsTableData> get onTrackChanged => _onTrackChangedSubject.stream;
   SongsTableData? _lastPlayedSong;
 
+  // T10: CUE sub-track boundaries. Both flags reset on track change so each
+  // virtual track seeks once to its start and advances once at its end.
+  bool _cueStartSeeked = false;
+  bool _cueAdvanceTriggered = false;
+
   bool _positionDirty = false;
   Timer? _positionSaveTimer;
   Timer? _fadeInGuardTimer; // FIX-#12: tracked for disposal
@@ -1133,6 +1138,30 @@ class PulsrAudioHandler extends BaseAudioHandler
                 if (wrap != null) {
                   unawaited(_activePlayer.seek(wrap));
                 }
+                // T10: enter the CUE window once decodable, then advance at
+                // its end. Guards prevent a seek/advance storm on position
+                // ticks before the native transition lands.
+                if (player.processingState == ProcessingState.ready) {
+                  final cueSong = currentSong;
+                  final cueStartMs = cueSong?.cueStartMs;
+                  final cueEndMs = cueSong?.cueEndMs;
+                  if (cueStartMs != null &&
+                      !_cueStartSeeked &&
+                      pos < Duration(milliseconds: cueStartMs)) {
+                    _cueStartSeeked = true;
+                    unawaited(
+                        _activePlayer.seek(Duration(milliseconds: cueStartMs)));
+                  }
+                  if (cueEndMs != null) {
+                    if (!_cueAdvanceTriggered &&
+                        pos >= Duration(milliseconds: cueEndMs)) {
+                      _cueAdvanceTriggered = true;
+                      unawaited(skipToNext());
+                    } else if (pos < Duration(milliseconds: cueEndMs)) {
+                      _cueAdvanceTriggered = false;
+                    }
+                  }
+                }
                 // F11: autosave bookmark for long-form tracks (throttled 5s).
                 final song = currentSong;
                 if (song != null &&
@@ -1510,6 +1539,10 @@ class PulsrAudioHandler extends BaseAudioHandler
     // then the persisted loop for the new track (if any) is restored.
     abLoopManager.onSongChanged(song.id);
     unawaited(abLoopManager.restoreForSong(song.id));
+    // T10: a new track re-arms its start seek. The advance guard is re-armed
+    // by the position listener once it observes a position inside the window,
+    // which prevents a stale post-advance tick from skipping the new track.
+    _cueStartSeeked = false;
     // D2: seed the BPM-synced crossfade map from manual per-track overrides.
     _seedBpmOverride(song);
     // Correct DSP coefficients for the real header rate (replaces the 48kHz
@@ -1647,7 +1680,15 @@ class PulsrAudioHandler extends BaseAudioHandler
     } catch (_) {}
   }
 
+  /// True for absolute HTTP(S) stream URLs (internet radio / Icecast /
+  /// Shoutcast / HLS). These bypass the file/format-aware path entirely.
+  static bool _isStreamUrl(String path) =>
+      path.startsWith('http://') || path.startsWith('https://');
+
   UriAudioSource _createAudioSource(SongsTableData song, MediaItem tag) {
+    if (_isStreamUrl(song.path)) {
+      return AudioSource.uri(Uri.parse(song.path), tag: tag);
+    }
     if (song.uri?.startsWith('content:') == true ||
         song.path.startsWith('content:')) {
       return AudioSource.uri(Uri.parse(song.uri ?? song.path), tag: tag);
@@ -1749,6 +1790,11 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   AudioSource _buildGaplessChild(SongsTableData song) {
     final tag = _songToMediaItem(song);
+    // HTTP streams are not files: skip the disk/format/trim paths and hand
+    // the URL to just_audio directly (HLS auto-detected).
+    if (_isStreamUrl(song.path)) {
+      return _createAudioSource(song, tag);
+    }
     final isRemoteYtm = song.source == SongSource.youtube &&
         (song.path.startsWith('ytmusic://') || song.path.isEmpty) &&
         song.isDownloaded != true;
@@ -1824,12 +1870,33 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// backward seek does not re-hit an already-expired URL.)
   Future<AudioSource> _resolveAudioSource(
       SongsTableData song, MediaItem tag) async {
+    // A pseudo-song whose path is a stream URL: no local match, no MQA/DSD
+    // decode, no cache — just build a URI source.
+    if (_isStreamUrl(song.path)) {
+      return _createAudioSource(song, tag);
+    }
     if (song.source != SongSource.youtube) {
       final cleanPath = song.path.split('?').first;
       final dot = cleanPath.lastIndexOf('.');
       final ext = dot >= 0 ? cleanPath.substring(dot + 1).toLowerCase() : '';
       if (ext == 'dsf' || ext == 'dff') {
-        return DsdDecoderHelper.decodeDsdFile(song, tag);
+        // T4: honor the user's DSD output mode, but only after the native probe
+        // confirms a DoP-capable USB DAC. Default is PCM; DoP is never implied
+        // by the file format or by an absent/failed probe.
+        final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
+        final wantDop =
+            (prefs.getString(PrefsKeys.dsdOutputMode) ?? 'pcm') == 'dop';
+        DsdDacCapabilities? caps;
+        if (wantDop) {
+          caps = await DsdDecoderHelper.probeDopCapabilities();
+        }
+        final forceDop = wantDop && (caps?.canUseDop ?? false);
+        return DsdDecoderHelper.decodeDsdFile(
+          song,
+          tag,
+          forceDop: forceDop,
+          dopCapabilities: caps,
+        );
       }
       // Route lossless containers through the format-aware decoder so MQA files
       // are detected (and unfolded when the helper is enabled) instead of
@@ -2872,6 +2939,18 @@ class PulsrAudioHandler extends BaseAudioHandler
     final isCompleted =
         _activePlayer.processingState == ProcessingState.completed;
     final isPlaying = _activePlayer.playing && !isCompleted;
+    final activeSong = currentSong;
+    final isStream =
+        activeSong != null && _isStreamUrl(activeSong.path);
+    final controls = isStream
+        ? <MediaControl>[
+            if (isPlaying) MediaControl.pause else MediaControl.play,
+          ]
+        : <MediaControl>[
+            MediaControl.skipToPrevious,
+            if (isPlaying) MediaControl.pause else MediaControl.play,
+            MediaControl.skipToNext,
+          ];
     final processingState = const {
       ProcessingState.idle: AudioProcessingState.idle,
       ProcessingState.loading: AudioProcessingState.loading,
@@ -2882,19 +2961,20 @@ class PulsrAudioHandler extends BaseAudioHandler
 
     playbackState.add(
       playbackState.value.copyWith(
-        controls: [
-          MediaControl.skipToPrevious,
-          if (isPlaying) MediaControl.pause else MediaControl.play,
-          MediaControl.skipToNext,
-        ],
-        systemActions: const {
-          MediaAction.seek,
-          MediaAction.seekForward,
-          MediaAction.seekBackward,
+        controls: controls,
+        // Streams may never expose a duration: seek/shuffle/repeat are
+        // meaningless for a live source, so don't advertise them.
+        systemActions: {
+          if (!isStream) ...[
+            MediaAction.seek,
+            MediaAction.seekForward,
+            MediaAction.seekBackward,
+          ],
           MediaAction.setShuffleMode,
           MediaAction.setRepeatMode,
         },
-        androidCompactActionIndices: const [0, 1, 2],
+        androidCompactActionIndices:
+            isStream ? const [0] : const [0, 1, 2],
         processingState: processingState,
         playing: isPlaying,
         updatePosition: _activePlayer.position,

@@ -18,6 +18,7 @@ import '../../../core/services/theme_scheduler_service.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../data/audio/audio_effects_channel.dart';
 import '../../../data/audio/audio_handler.dart';
+import '../../../data/audio/dsd_decoder_helper.dart';
 import '../../../data/audio/equalizer_manager.dart';
 import '../../../data/scanner/media_scanner_service.dart';
 import '../../../domain/repositories/music_repository_interface.dart';
@@ -133,6 +134,9 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
           ),
         ),
       );
+      // A DAC may have just been plugged/unplugged: re-probe DoP support so the
+      // DSD output control enables/disables truthfully without a manual refresh.
+      unawaited(_refreshDopSupport());
     });
     _initThemeScheduler();
     _loadPreferences();
@@ -445,6 +449,17 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
           ? getIt<EqualizerManager>()
           : null;
 
+      final strictBitPerfectLoaded =
+          prefs.getBool(PrefsKeys.strictBitPerfect) ?? false;
+      final followTrackSampleRateLoaded =
+          prefs.getBool(PrefsKeys.followTrackSampleRate) ?? false;
+      // Default to PCM when unset or unrecognized. DoP is never auto-enabled.
+      final dsdOutputModeLoaded = DsdOutputMode.values.firstWhere(
+        (e) =>
+            e.name == (prefs.getString(PrefsKeys.dsdOutputMode) ?? 'pcm'),
+        orElse: () => DsdOutputMode.pcm,
+      );
+
       final newState = state.copyWith(
         // Crossfade > 0 forces gapless OFF (they are mutually exclusive), even
         // if legacy prefs stored both on.
@@ -496,10 +511,19 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
             prefs.getString(PrefsKeys.ytdlpBackendUrl) ?? state.ytdlpBackendUrl,
         ytdlpBackendToken: '',
         syncCookiesToBackend: false,
-        bitPerfectOutput:
-            prefs.getBool(PrefsKeys.bitPerfectOutput) ?? state.bitPerfectOutput,
-        bypassDspOnBitPerfect: prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ??
-            state.bypassDspOnBitPerfect,
+        bitPerfectOutput: strictBitPerfectLoaded
+            ? true
+            : (prefs.getBool(PrefsKeys.bitPerfectOutput) ??
+                state.bitPerfectOutput),
+        bypassDspOnBitPerfect: strictBitPerfectLoaded
+            ? true
+            : (prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ??
+                state.bypassDspOnBitPerfect),
+        strictBitPerfect: strictBitPerfectLoaded,
+        followTrackSampleRate: strictBitPerfectLoaded
+            ? true
+            : followTrackSampleRateLoaded,
+        dsdOutputMode: dsdOutputModeLoaded,
         currentOutputDevice:
             _hiResAudioService.currentOutputInfo ?? state.currentOutputDevice,
         crossfeedEnabled: effectManager?.isCrossfeedEnabled ??
@@ -681,6 +705,15 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
 
   Future<void> setCrossfade(double seconds) async {
     final clamped = seconds.clamp(0.0, 12.0);
+    final bitPerfectBlock = AudioConflicts.crossfadeBlockedByBitPerfect(
+      bitPerfectOutput: state.bitPerfectOutput,
+      bypassDspOnBitPerfect: state.bypassDspOnBitPerfect,
+      device: state.currentOutputDevice,
+    );
+    if (clamped > 0.01 && bitPerfectBlock != null) {
+      safeEmit(state.copyWith(errorMessage: bitPerfectBlock));
+      return;
+    }
     if (clamped > 0.01 && state.gaplessPlayback) {
       // Crossfade needs gapless OFF — auto-disable gapless
       safeEmit(
@@ -1387,6 +1420,80 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     }
   }
 
+  /// T2: follow the current track's native sample rate on every track change.
+  /// The actual native call happens in PlayerCubit (it owns the track-change
+  /// stream and the de-dupe state); this only persists the preference.
+  Future<void> setFollowTrackSampleRate(bool value) async {
+    safeEmit(state.copyWith(followTrackSampleRate: value));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(PrefsKeys.followTrackSampleRate, value);
+  }
+
+  /// T4: select the DSD (DSF/DFF) output transport.
+  ///
+  /// Refuses DoP unless the native probe has confirmed a compatible USB DAC, so
+  /// the persisted preference can never claim native DSD on a path that cannot
+  /// carry it. PCM is always allowed and is the default.
+  Future<void> setDsdOutputMode(DsdOutputMode mode) async {
+    if (mode == DsdOutputMode.dop && !state.dsdDopSupported) {
+      safeEmit(state.copyWith(
+        errorMessage:
+            'DoP output requires a connected USB DAC that supports DSD over PCM.',
+      ));
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(PrefsKeys.dsdOutputMode, mode.name);
+    safeEmit(state.copyWith(dsdOutputMode: mode, errorMessage: null));
+  }
+
+  /// T3: strict bit-perfect (no resample). Enabling forces Bit-Perfect output,
+  /// the DSP bypass and follow-track, then surfaces the conflict reason rather
+  /// than silently muting stages. Disabled when the path cannot do bit-perfect.
+  Future<void> setStrictBitPerfect(bool enabled) async {
+    if (enabled) {
+      final block = AudioConflicts.strictBitPerfectBlockedReason(
+          state.currentOutputDevice);
+      if (block != null) {
+        safeEmit(state.copyWith(errorMessage: block));
+        return;
+      }
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(PrefsKeys.strictBitPerfect, enabled);
+    if (!enabled) {
+      safeEmit(state.copyWith(strictBitPerfect: false, errorMessage: null));
+      return;
+    }
+    safeEmit(state.copyWith(
+      strictBitPerfect: true,
+      bitPerfectOutput: true,
+      bypassDspOnBitPerfect: true,
+      followTrackSampleRate: true,
+      errorMessage: null,
+    ));
+    await prefs.setBool(PrefsKeys.bitPerfectOutput, true);
+    await prefs.setBool(PrefsKeys.bypassDspOnBitPerfect, true);
+    await prefs.setBool(PrefsKeys.followTrackSampleRate, true);
+    await _hiResAudioService.setBitPerfectMode(true);
+    try {
+      if (getIt.isRegistered<EqualizerManager>()) {
+        await getIt<EqualizerManager>().setBypassDspForBitPerfect(true);
+      } else {
+        await AudioEffectsChannel().setBypassDspForBitPerfect(true);
+      }
+    } catch (_) {}
+    // Software gain would alter the bitstream; turn it off like the normal
+    // Bit-Perfect path does.
+    if (state.replayGainMode != ReplayGainMode.off) {
+      await prefs.setString(_keyReplayGainMode, ReplayGainMode.off.name);
+      if (!isClosed) {
+        safeEmit(state.copyWith(replayGainMode: ReplayGainMode.off));
+      }
+    }
+    await refreshOutputDevice();
+  }
+
   /// Requests the media route move to [deviceId]. Returns true only when the
   /// platform actually accepted it; otherwise the system output panel is opened
   /// so the user can switch, since an unprivileged app cannot force the route.
@@ -1518,8 +1625,20 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     await _hiResAudioService.openBluetoothDevOptions();
   }
 
+  /// Probes the native DoP capability and stores the single [dop] gate in state.
+  /// Used by the device-change listener; [refreshOutputDevice] folds the same
+  /// probe into its emit.
+  Future<void> _refreshDopSupport() async {
+    final caps = await DsdDecoderHelper.probeDopCapabilities();
+    if (isClosed) return;
+    if (state.dsdDopSupported != caps.canUseDop) {
+      safeEmit(state.copyWith(dsdDopSupported: caps.canUseDop));
+    }
+  }
+
   Future<void> refreshOutputDevice() async {
     final info = await _hiResAudioService.getAudioOutputInfo();
+    final caps = await DsdDecoderHelper.probeDopCapabilities();
     final previous = state.currentOutputDevice;
     final savedSampleRate =
         (previous?.targetSampleRate != null && previous!.targetSampleRate > 0)
@@ -1540,6 +1659,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
           targetBitDepth:
               info.targetBitDepth != 0 ? info.targetBitDepth : savedBitDepth,
         ),
+        dsdDopSupported: caps.canUseDop,
       ),
     );
   }

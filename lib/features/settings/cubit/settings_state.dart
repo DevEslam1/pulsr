@@ -40,6 +40,12 @@ enum ReplayGainMode { off, track, album, auto }
 
 enum ExtractorEngine { auto, remoteYtdlp, onDevice }
 
+/// How DSD (DSF/DFF) files are handed to the output device.
+/// - [pcm]: decode DSD to PCM (default, always available).
+/// - [dop]: frame DSD as DSD-over-PCM for a compatible USB DAC. Never enabled
+///   automatically; requires an explicit choice plus a detected USB DAC.
+enum DsdOutputMode { pcm, dop }
+
 @freezed
 abstract class SettingsState with _$SettingsState {
   const SettingsState._();
@@ -100,6 +106,16 @@ abstract class SettingsState with _$SettingsState {
     // Audiophile & Hi-Res Output
     @Default(false) bool bitPerfectOutput,
     @Default(true) bool bypassDspOnBitPerfect,
+    // T2: reconfigure the output to each track's native sample rate.
+    @Default(false) bool followTrackSampleRate,
+    // T3: strict bit-perfect (no resample). Forces Bit-Perfect + DSP bypass and
+    // surfaces the EQ/ReplayGain/effects/crossfade conflict card.
+    @Default(false) bool strictBitPerfect,
+    // T4: DSD output transport (default PCM; DoP only with a detected USB DAC).
+    @Default(DsdOutputMode.pcm) DsdOutputMode dsdOutputMode,
+    // Result of the native DoP capability probe: true only when a USB DAC is
+    // connected and advertises a carrier rate DoP can use. Drives the UI.
+    @Default(false) bool dsdDopSupported,
     AudioOutputInfo? currentOutputDevice,
     int? scanResultCount,
     String? errorMessage,

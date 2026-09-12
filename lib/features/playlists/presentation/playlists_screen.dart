@@ -164,12 +164,13 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     );
   }
 
-  /// Exports (or shares) a playlist as M3U from the list cards. Smart
-  /// playlists resolve through their live criteria query.
+  /// Exports (or shares) a playlist from the list cards. Smart playlists
+  /// resolve through their live criteria query. Defaults to M3U export.
   Future<void> _exportPlaylistSongs(
     BuildContext context,
     PlaylistsTableData pl, {
     bool share = false,
+    PlaylistFormat format = PlaylistFormat.m3u,
   }) async {
     try {
       final useCases = getIt<PlaylistUseCases>();
@@ -190,7 +191,8 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
         return;
       }
       final file =
-          await getIt<PlaylistExportUseCase>().exportToFile(pl.name, songs);
+          await getIt<PlaylistExportUseCase>()
+              .exportToFile(pl.name, songs, format: format);
       if (!context.mounted) return;
       if (share) {
         final sharedBundle = await _sharePlaylistBundle(pl.name, songs);
@@ -226,6 +228,42 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
         );
       }
     }
+  }
+
+  /// Presents a small format picker, then exports the playlist in the chosen
+  /// M3U / PLS / WPL format.
+  Future<void> _showExportFormatSheet(
+      BuildContext context, PlaylistsTableData pl) async {
+    final format = await showModalBottomSheet<PlaylistFormat>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.playlist_play_rounded),
+              title: const Text('M3U'),
+              subtitle: const Text('Most compatible'),
+              onTap: () => Navigator.pop(ctx, PlaylistFormat.m3u),
+            ),
+            ListTile(
+              leading: const Icon(Icons.list_alt_rounded),
+              title: const Text('PLS'),
+              subtitle: const Text('Winamp / Poweramp'),
+              onTap: () => Navigator.pop(ctx, PlaylistFormat.pls),
+            ),
+            ListTile(
+              leading: const Icon(Icons.queue_music_rounded),
+              title: const Text('WPL'),
+              subtitle: const Text('Windows Media Player'),
+              onTap: () => Navigator.pop(ctx, PlaylistFormat.wpl),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (format == null || !context.mounted) return;
+    await _exportPlaylistSongs(context, pl, format: format);
   }
 
   /// Routes sharing through [PlaylistShareService] so the portable JSON bundle
@@ -289,13 +327,13 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
   Future<void> _importPlaylist(BuildContext context) async {
     final result = await FilePicker.pickFile(
       type: FileType.custom,
-      allowedExtensions: ['m3u', 'm3u8'],
+      allowedExtensions: ['m3u', 'm3u8', 'pls', 'wpl'],
     );
     if (result == null || result.path == null) return;
 
     final filePath = result.path!;
     final playlistName = result.name.replaceAll(
-      RegExp(r'\.m3u8?$', caseSensitive: false),
+      RegExp(r'\.(m3u8?|pls|wpl)$', caseSensitive: false),
       '',
     );
     final importUseCase = getIt<PlaylistImportUseCase>();
@@ -778,7 +816,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                       onLongPress: () => _onSelectPlaylist(pl),
                       menuItems: (_) => const [
                         PopupMenuItem(
-                            value: 'export', child: Text('Export M3U')),
+                            value: 'export', child: Text('Export')),
                         PopupMenuItem(value: 'share', child: Text('Share')),
                         PopupMenuItem(
                             value: 'rename', child: Text('Rename')),
@@ -787,7 +825,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                       ],
                       onMenuSelected: (v) {
                         if (v == 'export') {
-                          _exportPlaylistSongs(context, pl);
+                          _showExportFormatSheet(context, pl);
                         } else if (v == 'share') {
                           _exportPlaylistSongs(context, pl, share: true);
                         } else if (v == 'rename') {

@@ -1,7 +1,8 @@
 // lib/core/constants/audio_formats.dart
 
 class AudioFormats {
-  /// Audio file extensions reliably supported and playable on Android via ExoPlayer & Native DSD Decoder.
+  /// Platform-decodable extensions: playable on Android via ExoPlayer/MediaCodec
+  /// plus the bundled native DSD decoder. Safe to index into the playable library.
   static const Set<String> supportedExtensions = {
     'mp3',
     'm4a',
@@ -13,16 +14,47 @@ class AudioFormats {
     'mka',
     'dsf',
     'dff',
+    'webm',
+    'aiff',
+    'aif',
   };
 
-  /// Extensions excluded from library scanning due to lack of standard Android decoding support.
-  static const Set<String> unsupportedExtensions = {
+  /// Recognized extensions that require a native decoder this build does not
+  /// bundle. They are classified (and may be counted) but must never be scanned
+  /// into the playable library.
+  static const Set<String> nativeDecodableExtensions = {
+    'ape',
     'wma',
+    'tta',
+    'tak',
+    'wv',
+    'mpc',
+    'mod',
+    'it',
+    'xm',
+    's3m',
+  };
+
+  /// Extensions excluded from playable library scanning. The native tier is
+  /// folded in here because those formats are not decodable in this build.
+  static const Set<String> unsupportedExtensions = {
+    ...nativeDecodableExtensions,
   };
 
   static bool isSupportedExtension(String pathOrExt) {
     final ext = extractExtension(pathOrExt);
     return supportedExtensions.contains(ext);
+  }
+
+  static bool isRecognizedExtension(String pathOrExt) {
+    final ext = extractExtension(pathOrExt);
+    return supportedExtensions.contains(ext) ||
+        nativeDecodableExtensions.contains(ext);
+  }
+
+  static bool requiresNativeDecoder(String pathOrExt) {
+    final ext = extractExtension(pathOrExt);
+    return nativeDecodableExtensions.contains(ext);
   }
 
   static String extractExtension(String pathOrExt) {
@@ -51,7 +83,7 @@ class AudioFormats {
     if (filename.startsWith('.')) {
       final sub = filename.substring(1);
       if (supportedExtensions.contains(sub) ||
-          unsupportedExtensions.contains(sub)) {
+          nativeDecodableExtensions.contains(sub)) {
         return sub;
       }
       return '';
@@ -65,7 +97,7 @@ class AudioFormats {
         !clean.contains(r'\') &&
         !clean.contains('.') &&
         (supportedExtensions.contains(clean) ||
-            unsupportedExtensions.contains(clean))) {
+            nativeDecodableExtensions.contains(clean))) {
       return clean;
     }
     return '';

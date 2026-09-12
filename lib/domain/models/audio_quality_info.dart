@@ -1,5 +1,6 @@
 // lib/domain/models/audio_quality_info.dart
 import 'package:flutter/material.dart';
+import '../../core/constants/audio_formats.dart';
 import '../../data/audio/mqa_decoder_helper.dart';
 import '../../data/db/app_database.dart';
 import 'ytm_audio_quality.dart';
@@ -13,6 +14,12 @@ enum AudioQualityTier {
 }
 
 class AudioQualityInfo {
+  /// Whether the most recent DSD (DSF/DFF) track was routed through the DoP
+  /// (DSD over PCM) encoder rather than decoded to PCM. Written by
+  /// [DsdDecoderHelper] only after it has confirmed a compatible USB DAC, so
+  /// the quality sheet reports the transport that is actually in use.
+  static bool dsdDopActive = false;
+
   final String format;
   final String codecName;
   final int? bitrateKbps;
@@ -43,6 +50,9 @@ class AudioQualityInfo {
 
   /// The audio rendering pipeline configuration based on source format and bit-depth.
   String get renderEngineDescription {
+    if (AudioFormats.requiresNativeDecoder(format)) {
+      return 'Unavailable • native decoder not bundled in this build';
+    }
     if (tier == AudioQualityTier.hiResLossless ||
         tier == AudioQualityTier.lossless) {
       return 'ExoPlayer Media3 • 32-bit Float PCM';
@@ -231,9 +241,12 @@ class AudioQualityInfo {
       codecName = 'Direct Stream Digital';
       tier = AudioQualityTier.hiResLossless;
       tierLabel = 'Ultra Hi-Res DSD';
-      shortBadgeLabel = 'DSD • HI-RES';
-      description =
-          '1-bit High Density Studio Master, decoded to PCM (native DSD/DoP output is not supported in this build)';
+      shortBadgeLabel = dsdDopActive ? 'DSD → DoP' : 'DSD • HI-RES';
+      description = dsdDopActive
+          ? 'DSD → DoP: 1-bit High Density Studio Master framed as DSD over PCM '
+              '(0x05/0xFA markers) for a compatible USB DAC — no PCM conversion.'
+          : 'DSD → PCM: 1-bit High Density Studio Master decoded to PCM. '
+              'DoP output is off, or no compatible USB DAC is connected.';
       badgeColor = const Color(0xFFFFB800);
       icon = Icons.stars_rounded;
       sampleRate =
@@ -306,6 +319,19 @@ class AudioQualityInfo {
       icon = Icons.graphic_eq_rounded;
       sampleRate = '48.0 kHz';
       bitDepth = '16-bit equivalent';
+    } else if (AudioFormats.requiresNativeDecoder(ext)) {
+      formatLabel = ext.toUpperCase();
+      codecName = '$formatLabel (decoder required)';
+      tier = AudioQualityTier.standardQuality;
+      tierLabel = 'Decoder Required';
+      shortBadgeLabel = '$formatLabel • DECODER';
+      description =
+          'Recognized $formatLabel file. Playback requires a native decoder '
+          'that is not bundled in this build, so it is not playable.';
+      badgeColor = const Color(0xFF64748B);
+      icon = Icons.extension_off_rounded;
+      sampleRate = 'Unavailable';
+      bitDepth = 'Unavailable';
     } else {
       // Default to MP3 / general audio
       formatLabel = 'MP3';

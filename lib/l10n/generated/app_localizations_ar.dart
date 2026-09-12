@@ -1857,4 +1857,112 @@ class AppLocalizationsAr extends AppLocalizations {
   String sleepTimerMinutes(int minutes) {
     return '$minutes د';
   }
+
+  @override
+  String get radioTitle => 'الراديو';
+
+  @override
+  String get radioSubtitle => 'راديو الإنترنت والبث المباشر';
+
+  @override
+  String get radioAddStation => 'إضافة محطة';
+
+  @override
+  String get radioImportPlaylist => 'استيراد .m3u';
+
+  @override
+  String get radioEmptyTitle => 'لا توجد محطات بعد';
+
+  @override
+  String get radioEmptySubtitle =>
+      'أضف رابط بث أو استورد قائمة .m3u لبدء الاستماع.';
+
+  @override
+  String get radioStationName => 'اسم المحطة';
+
+  @override
+  String get radioStationUrl => 'رابط البث';
+
+  @override
+  String get radioAdd => 'إضافة';
+
+  @override
+  String get radioCancel => 'إلغاء';
+
+  @override
+  String get radioDelete => 'حذف';
+
+  @override
+  String get radioDeleteTitle => 'حذف المحطة؟';
+
+  @override
+  String radioDeleteMessage(String name) {
+    return 'إزالة \"$name\" من محطاتك؟';
+  }
+
+  @override
+  String get radioInvalidUrl => 'أدخل رابط بث http(s) صالحًا';
+
+  @override
+  String get radioImportTitle => 'استيراد .m3u';
+
+  @override
+  String get radioImportHint => 'الصق محتوى قائمة .m3u';
+
+  @override
+  String get radioImport => 'استيراد';
+
+  @override
+  String radioImportedCount(int count) {
+    return 'تم استيراد $count محطة';
+  }
+
+  @override
+  String get radioNoStreamsFound => 'لم يتم العثور على روابط بث http(s)';
+
+  @override
+  String get radioPlay => 'تشغيل';
+
+  @override
+  String get followTrackSampleRateTitle => 'متابعة معدل عينات المسار';
+
+  @override
+  String get followTrackSampleRateSubtitle =>
+      'إعادة ضبط الإخراج إلى المعدل الأصلي لكل مسار؛ يتم تخطيه في البلوتوث وبدون تكرار';
+
+  @override
+  String get followTrackSampleRateBluetooth =>
+      'يتم تخطيه في البلوتوث — رابط الترميز/AVRCP يتحكم في معدل العينات';
+
+  @override
+  String get strictBitPerfectTitle => 'بت-بيرفكت صارم (بدون إعادة عينات)';
+
+  @override
+  String get strictBitPerfectSubtitle =>
+      'يفرض بت-بيرفكت + تجاوز DSP ويتابع معدل كل مسار ليصل إلى DAC العينات الأصلية';
+
+  @override
+  String get strictBitPerfectBluetooth =>
+      'غير متاح: البلوتوث يعيد الترميز — يحتاج بت-بيرفكت الصارم إلى DAC USB';
+
+  @override
+  String get strictBitPerfectActive =>
+      'بت-بيرفكت الصارم مفعّل: تم كتم EQ و ReplayGain والتأثيرات و crossfade لتصل العينات الأصلية إلى DAC';
+
+  @override
+  String get dsdOutputModeTitle => 'إخراج DSD';
+
+  @override
+  String get dsdOutputModeSubtitle =>
+      'كيفية وصول ملفات DSF/DFF إلى DAC: فك ترميز إلى PCM أو بث DSD الأصلي كـ DSD فوق PCM';
+
+  @override
+  String get dsdDopRequiresUsbDac =>
+      'يتطلب توصيل DAC USB يدعم DSD فوق PCM (DoP)';
+
+  @override
+  String get dsdOutputPcm => 'PCM';
+
+  @override
+  String get dsdOutputDop => 'DoP';
 }

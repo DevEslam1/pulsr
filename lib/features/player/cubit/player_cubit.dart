@@ -12,12 +12,14 @@ import '../../../core/bloc/base_cubit.dart';
 import '../../../core/constants/prefs_keys.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/lrclib_service.dart';
+import '../../../core/services/radio_station_store.dart';
 import '../../../core/services/scrobbler_service.dart';
 import '../../../core/services/sponsorblock_service.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/telemetry/playback_latency_tracker.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/lrc_parser.dart';
+import '../../../core/utils/cue_parser.dart';
 import '../../../core/constants/audio_feature_info.dart';
 import '../../../data/audio/audio_handler.dart';
 import '../../../data/audio/equalizer_manager.dart';
@@ -34,6 +36,7 @@ import '../../../domain/models/headphone_profile.dart';
 import '../../../domain/models/reverb_preset.dart';
 import '../../../data/audio/headphone_profiles_repository.dart';
 import '../../../domain/models/lyrics_line.dart';
+import '../../../domain/models/radio_station.dart';
 import '../../../domain/repositories/music_repository_interface.dart';
 import '../../../domain/usecases/toggle_favorite_usecase.dart';
 import '../../../core/services/device_profile_service.dart';
@@ -114,6 +117,10 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   int? _cachedQueueLength;
   int? _cachedCurrentSongId;
   int? _cachedQueueVersion;
+
+  /// T2: last sample rate successfully pushed for follow-track. Used to
+  /// de-dupe so tracks sharing a rate do not trigger redundant native churn.
+  int? _lastFollowedSampleRate;
 
   /// Bumped on every queue mutation. [_getNextTitles]'s cache is keyed by
   /// index/length/current song, none of which changes when songs AFTER the
@@ -275,7 +282,40 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
         _audioHandler.setGaplessEnabled(settingsState.gaplessPlayback);
         // Re-apply gain when ReplayGain settings change
         _audioHandler.setVolume(_audioHandler.volume);
+        // T2: when follow-track is toggled on mid-track, (re)apply it now. The
+        // de-dupe inside the helper keeps repeated settings emissions cheap.
+        if (settingsState.followTrackSampleRate) {
+          final song = state.currentSong;
+          if (song != null) unawaited(_maybeFollowTrackSampleRate(song));
+        }
       });
+    }
+  }
+
+  /// T2: request the current track's native sample rate when the preference is
+  /// on. Pure decision (de-dupe + Bluetooth skip) lives in
+  /// [HiResAudioService.followTrackRateToApply]; this method owns the side
+  /// effect and the last-requested bookkeeping.
+  Future<void> _maybeFollowTrackSampleRate(SongsTableData song) async {
+    final service = _hiResAudioService;
+    final settings = _settingsCubit?.state;
+    if (service == null || settings == null) return;
+    final rate = HiResAudioService.followTrackRateToApply(
+      trackSampleRate: song.sampleRate,
+      lastRequestedSampleRate: _lastFollowedSampleRate,
+      isBluetooth: settings.currentOutputDevice?.isBluetooth == true,
+      followTrackEnabled:
+          settings.followTrackSampleRate || settings.strictBitPerfect,
+    );
+    if (rate == null) return;
+    _lastFollowedSampleRate = rate;
+    try {
+      await service.setTargetOutputFormat(sampleRate: rate, bitDepth: 0);
+      if (isClosed) return;
+      await _settingsCubit?.refreshOutputDevice();
+    } catch (e, st) {
+      ErrorLogger.log('Follow-track sample rate failed ($rate)',
+          error: e, stackTrace: st, category: 'PlayerCubit');
     }
   }
 
@@ -651,6 +691,8 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
         // Gapless advances fire onTrackChanged without a fresh mediaItem;
         // without this the previous track's SponsorBlock segments stay armed.
         unawaited(_loadSponsorBlockSegments(song, gen));
+        unawaited(_loadCueChapters(song));
+        unawaited(_maybeFollowTrackSampleRate(song));
       }
       _updateWidgetThrottled(force: true);
       _debouncedScrobble(song, state.position, state.isPlaying);
@@ -808,6 +850,8 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
             position: Duration.zero,
             lyrics: [],
             isLoadingLyrics: false,
+            cueChapters: const [],
+            currentCueIndex: 0,
           ));
         }
         return;
@@ -1019,6 +1063,28 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       _sponsorSegmentsVideoId = videoId;
       _lastSkippedSegmentEnd = null;
     } catch (_) {}
+  }
+
+  /// Loads the chapter list for a song expanded from a CUE sheet, so the
+  /// advanced bar / song info can render and tap-to-seek the image's tracks.
+  Future<void> _loadCueChapters(SongsTableData song) async {
+    if (song.cueFile == null || song.cueStartMs == null) {
+      if (state.cueChapters.isEmpty && state.currentCueIndex == 0) return;
+      safeEmit(state.copyWith(cueChapters: const [], currentCueIndex: 0));
+      return;
+    }
+    try {
+      final chapters = await CueParser.findAndParseCue(song.path);
+      if (isClosed || !_isSameTrack(state.currentSong, song)) return;
+      final index = chapters.indexWhere((c) => c.index == song.trackNumber);
+      safeEmit(state.copyWith(
+        cueChapters: chapters,
+        currentCueIndex: index < 0 ? 0 : index,
+      ));
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load cue chapters for ${song.path}',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+    }
   }
 
   void _checkSponsorBlockSkip(Duration pos) {
@@ -1506,6 +1572,40 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     unawaited(_loadLyricsForSong(song));
     unawaited(_loadSponsorBlockSegments(song, capturedGen));
     _updateWidgetThrottled(force: true);
+  }
+
+  /// Plays an internet radio [station] by projecting it onto the normal queue
+  /// as a synthetic pseudo-song whose `path` is the stream URL and whose id is
+  /// a negative hash. The negative id keeps repository cleanup and
+  /// play-history from ever treating it as a real local file; the absolute
+  /// `http(s)` path is what routes it through the handler's URL source path.
+  Future<void> playRadioStation(RadioStation station) async {
+    if (!RadioStation.isHttpUrl(station.url)) {
+      safeEmit(state.copyWith(errorMessage: 'Invalid stream URL'));
+      return;
+    }
+    final song = SongsTableData(
+      id: station.songId,
+      title: station.name,
+      artist: (station.genre != null && station.genre!.isNotEmpty)
+          ? station.genre!
+          : station.name,
+      album: '',
+      durationMs: 0,
+      path: station.url,
+      source: SongSource.local,
+      remoteArtworkUrl: station.artworkUrl,
+      isFavorite: false,
+      isMissing: false,
+      isDownloaded: false,
+      playCount: 0,
+      lastPositionMs: 0,
+    );
+    unawaited(RadioStationStore().markPlayed(
+      station.id,
+      DateTime.now().millisecondsSinceEpoch,
+    ));
+    await playSong(song);
   }
 
   Future<void> playNext(SongsTableData song) async {
@@ -2164,6 +2264,22 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       _syncAudioEffects();
       safeEmit(state.copyWith(errorMessage: 'Failed to set bass boost: $e'));
     }
+  }
+
+  /// Switches the active EQ band plan to [count] (10, 32 or 64). 10/32 keep the
+  /// legacy handler passthrough; 64 goes straight to the manager (the handler's
+  /// passthrough only speaks the legacy 10/32 split).
+  Future<void> setBandMode(int count) async {
+    if (count == 10 || count == 32) {
+      await _audioHandler.set32BandMode(count == 32);
+    } else if (count == 64) {
+      await _audioHandler.equalizerManager.setBandMode(64);
+    } else {
+      return;
+    }
+    safeEmit(state.copyWith(
+      eqPreset: _audioHandler.currentPreset,
+    ));
   }
 
   Future<void> set32BandMode(bool enabled) async {

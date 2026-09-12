@@ -1,6 +1,7 @@
 // lib/data/audio/format_aware_decoder.dart
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
+import '../../core/constants/audio_formats.dart';
 import '../db/app_database.dart';
 import 'dsd_decoder_helper.dart';
 import 'mqa_decoder_helper.dart';
@@ -28,6 +29,16 @@ class FormatAwareDecoder {
     final dot = cleanPath.lastIndexOf('.');
     final ext =
         dot >= 0 ? cleanPath.substring(dot + 1).toLowerCase() : '';
+
+    // Formats recognized in the native tier have no platform decoder in this
+    // build. Fail honestly instead of handing a bogus file URI to ExoPlayer.
+    if (AudioFormats.requiresNativeDecoder(ext)) {
+      throw PlayerException(
+        9002,
+        'Format .$ext requires a native decoder that is not bundled in this build',
+        null,
+      );
+    }
 
     switch (ext) {
       // 1. High-Res Lossless & MQA
