@@ -1399,50 +1399,74 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       _buildHardwareDeviceProfileBar(context, cubit, state, p),
                       const SizedBox(height: 8),
 
-                      // Tabs Navigation
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Container(
-                          height: 38,
-                          decoration: BoxDecoration(
-                            color: p.surfaceContainer,
-                            borderRadius: BorderRadius.circular(19),
-                            border: Border.all(color: p.hairline),
-                          ),
-                          child: TabBar(
-                            controller: _tabController,
-                            tabAlignment: TabAlignment.fill,
-                            indicator: BoxDecoration(
-                              color: p.accent,
-                              borderRadius: BorderRadius.circular(19),
-                            ),
-                            indicatorSize: TabBarIndicatorSize.tab,
-                            labelColor: p.onAccent,
-                            unselectedLabelColor: p.textSecondary,
-                            labelStyle: const TextStyle(
-                                fontWeight: FontWeight.w700, fontSize: 12),
-                            dividerColor: Colors.transparent,
-                            tabs: const [
-                              Tab(text: 'Equalizer'),
-                              Tab(text: 'AutoEq'),
-                              Tab(text: 'Spatial & DSP'),
+                      // Tabs Navigation + Content. In Normal experience mode only
+                      // the core Equalizer is shown; AutoEq and Spatial & DSP are
+                      // Professional surfaces.
+                      Builder(builder: (ctx) {
+                        var isPro = true;
+                        try {
+                          isPro = ctx.select<SettingsCubit, bool>(
+                              (c) => c.state.isProfessional);
+                        } catch (_) {
+                          isPro = true;
+                        }
+                        return Expanded(
+                          child: Column(
+                            children: [
+                              if (isPro)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16),
+                                  child: Container(
+                                    height: 38,
+                                    decoration: BoxDecoration(
+                                      color: p.surfaceContainer,
+                                      borderRadius: BorderRadius.circular(19),
+                                      border: Border.all(color: p.hairline),
+                                    ),
+                                    child: TabBar(
+                                      controller: _tabController,
+                                      tabAlignment: TabAlignment.fill,
+                                      indicator: BoxDecoration(
+                                        color: p.accent,
+                                        borderRadius: BorderRadius.circular(19),
+                                      ),
+                                      indicatorSize: TabBarIndicatorSize.tab,
+                                      labelColor: p.onAccent,
+                                      unselectedLabelColor: p.textSecondary,
+                                      labelStyle: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 12),
+                                      dividerColor: Colors.transparent,
+                                      tabs: const [
+                                        Tab(text: 'Equalizer'),
+                                        Tab(text: 'AutoEq'),
+                                        Tab(text: 'Spatial & DSP'),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              const SizedBox(height: 8),
+                              Expanded(
+                                child: isPro
+                                    ? TabBarView(
+                                        controller: _tabController,
+                                        children: [
+                                          _buildEqualizerTab(
+                                              context, cubit, state, p),
+                                          _buildAutoEqTab(
+                                              context, cubit, state, p),
+                                          _buildSpatialDynamicsTab(
+                                              context, cubit, state, p),
+                                        ],
+                                      )
+                                    : _buildEqualizerTab(
+                                        context, cubit, state, p),
+                              ),
                             ],
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Tab Content
-                      Expanded(
-                        child: TabBarView(
-                          controller: _tabController,
-                          children: [
-                            _buildEqualizerTab(context, cubit, state, p),
-                            _buildAutoEqTab(context, cubit, state, p),
-                            _buildSpatialDynamicsTab(context, cubit, state, p),
-                          ],
-                        ),
-                      ),
+                        );
+                      }),
                     ],
                   ),
                 ),

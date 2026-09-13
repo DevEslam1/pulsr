@@ -46,6 +46,20 @@ enum ExtractorEngine { auto, remoteYtdlp, onDevice }
 ///   automatically; requires an explicit choice plus a detected USB DAC.
 enum DsdOutputMode { pcm, dop }
 
+/// The app's overall complexity level.
+///
+/// - [normal] (default): a curated, smart experience. Advanced DSP/output
+///   controls are hidden; Smart Audio and sensible defaults run automatically so
+///   a non-technical user gets the full benefit without any tuning.
+/// - [professional]: the complete control surface, unchanged from before.
+enum ExperienceMode {
+  normal,
+  professional;
+
+  static ExperienceMode fromName(String? name) => ExperienceMode.values
+      .firstWhere((m) => m.name == name, orElse: () => ExperienceMode.normal);
+}
+
 @freezed
 abstract class SettingsState with _$SettingsState {
   const SettingsState._();
@@ -113,6 +127,9 @@ abstract class SettingsState with _$SettingsState {
     @Default(false) bool strictBitPerfect,
     // T4: DSD output transport (default PCM; DoP only with a detected USB DAC).
     @Default(DsdOutputMode.pcm) DsdOutputMode dsdOutputMode,
+    // Overall complexity level. Defaults to Normal so first-time users get the
+    // curated, smart experience; advanced controls are revealed in Professional.
+    @Default(ExperienceMode.normal) ExperienceMode experienceMode,
     // Result of the native DoP capability probe: true only when a USB DAC is
     // connected and advertises a carrier rate DoP can use. Drives the UI.
     @Default(false) bool dsdDopSupported,
@@ -150,12 +167,13 @@ abstract class SettingsState with _$SettingsState {
     @Default(0) int silenceSkipSensitivity,
     // Per-session audio telemetry (route/codec/negotiated format/dropouts).
     @Default(true) bool sessionLogEnabled,
-    // Opt-in per-track output-format negotiation (default OFF: the output
-    // format stays the manual, device-global setting unless enabled).
-    @Default(false) bool outputFormatNegotiationEnabled,
-    // Opt-in 24/32-bit float DSP path (default OFF: the native DSP chain keeps
-    // today's 16-bit sink path byte-identical).
-    @Default(false) bool floatOutputEnabled,
+    // Per-track output-format negotiation (default ON: always request the
+    // track's native rate/depth so hi-res output is automatic).
+    @Default(true) bool outputFormatNegotiationEnabled,
+    // 24/32-bit float DSP path (default ON: hi-res sources are no longer
+    // truncated to 16-bit. 16-bit sources are unaffected because Media3 only
+    // takes the float branch for >16-bit PCM; unsupported devices fall back).
+    @Default(true) bool floatOutputEnabled,
     // Opt-in AAudio Direct output (bit-perfect; DSP chain bypassed).
     @Default(false) bool aaudioOutputEnabled,
     @Default(true) bool aaudioPreferExclusive,
@@ -167,6 +185,9 @@ abstract class SettingsState with _$SettingsState {
   }) = _SettingsState;
 
   Color get customAccentColor => Color(customAccentColorValue);
+
+  /// True when the full professional control surface should be shown.
+  bool get isProfessional => experienceMode == ExperienceMode.professional;
 
   /// True when the accent should track album artwork. Kept for call sites that
   /// only care about the per-song artwork behavior (e.g. Now Playing).

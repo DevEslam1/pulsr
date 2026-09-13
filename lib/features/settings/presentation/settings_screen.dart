@@ -20,6 +20,7 @@ import 'widgets/audio_sound_section.dart';
 import 'widgets/automation_rules_sheet.dart';
 import 'widgets/backup_section.dart';
 import 'widgets/device_profiles_section.dart';
+import 'widgets/experience_mode_section.dart';
 import 'widgets/smart_audio_section.dart';
 import 'widgets/playback_section.dart';
 import 'widgets/scrobbler_settings_modal.dart';
@@ -212,8 +213,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // Category Metadata & Definitions
   // ==========================================================================
 
-  List<_SettingsCategoryItem> _getCategories(BuildContext context) {
-    return [
+  List<_SettingsCategoryItem> _getCategories(BuildContext context,
+      {bool pro = true}) {
+    final categories = <_SettingsCategoryItem>[
       _SettingsCategoryItem(
         id: 'audio',
         title: 'Audio & Sound',
@@ -285,15 +287,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
         tintColor: const Color(0xFF8E8E93),
       ),
     ];
+    // Normal mode hides the advanced "Profiles & Rules" surface (device-profile
+    // mappings and automation triggers). Smart Audio lives in Audio & Sound.
+    if (!pro) {
+      categories.removeWhere((c) => c.id == 'profiles');
+    }
+    return categories;
   }
 
   // ==========================================================================
   // Category Filter Bar (Pills for Phone)
   // ==========================================================================
 
-  Widget _buildCategoryFilterBar(BuildContext context) {
+  Widget _buildCategoryFilterBar(BuildContext context, SettingsState state) {
     final p = context.palette;
-    final categories = _getCategories(context);
+    final categories = _getCategories(context, pro: state.isProfessional);
     final items = [
       (id: 'all', title: 'All', icon: Icons.tune_rounded, color: p.accent),
       ...categories.map((c) => (id: c.id, title: c.title, icon: c.icon, color: c.tintColor)),
@@ -369,7 +377,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     String activeCatId,
   ) {
     final p = context.palette;
-    final categories = _getCategories(context);
+    final categories = _getCategories(context, pro: state.isProfessional);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -591,7 +599,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     SettingsCubit cubit,
     String activeCatId,
   ) {
-    final categories = _getCategories(context);
+    final categories = _getCategories(context, pro: state.isProfessional);
     final currentCat = categories.firstWhere(
       (c) => c.id == activeCatId,
       orElse: () => categories.first,
@@ -627,6 +635,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 _buildCategoryHeroHeader(context, currentCat),
                 const SizedBox(height: 16),
+                _experienceModeCard(context),
                 ..._buildCategoryWidgets(context, activeCatId, state, cubit),
               ],
             ),
@@ -647,7 +656,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Column(
           children: [
             _buildTopHeader(context),
-            if (_searchQuery.isEmpty) _buildCategoryFilterBar(context),
+            if (_searchQuery.isEmpty) _buildCategoryFilterBar(context, state),
             const SizedBox(height: 6),
             Expanded(
               child: _searchQuery.isNotEmpty
@@ -677,11 +686,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         children: [
           if (AppConfig.isCloudSyncAllowed) const SettingsHeroCard(),
+          _experienceModeCard(context),
           ..._buildCategoryWidgets(context, 'audio', state, cubit),
           ..._buildCategoryWidgets(context, 'playback', state, cubit),
           ..._buildCategoryWidgets(context, 'appearance', state, cubit),
           ..._buildCategoryWidgets(context, 'gestures', state, cubit),
-          ..._buildCategoryWidgets(context, 'profiles', state, cubit),
+          if (state.isProfessional)
+            ..._buildCategoryWidgets(context, 'profiles', state, cubit),
           ..._buildCategoryWidgets(context, 'library', state, cubit),
           ..._buildCategoryWidgets(context, 'online', state, cubit),
           ..._buildCategoryWidgets(context, 'storage', state, cubit),
@@ -691,7 +702,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
     }
 
-    final categories = _getCategories(context);
+    final categories = _getCategories(context, pro: state.isProfessional);
     final currentCat = categories.firstWhere(
       (c) => c.id == _selectedCategoryId,
       orElse: () => categories.first,
@@ -784,6 +795,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Always-visible Normal/Professional switch shown at the top of Settings.
+  Widget _experienceModeCard(BuildContext context) => _section(
+        context,
+        context.l10n.experienceModeTitle,
+        context.l10n.experienceModeSubtitle,
+        [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: ExperienceModeSection(),
+          ),
+        ],
+      );
+
   List<Widget> _buildCategoryWidgets(
     BuildContext context,
     String catId,
@@ -792,7 +816,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   ) {
     switch (catId) {
       case 'audio':
-        return [_catSection(context, 'audio', AudioSoundSection(state: state))];
+        return [
+          _section(
+            context,
+            'SMART AUDIO',
+            'Automatic headphone correction and best-quality output',
+            [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: SmartAudioSection(),
+              ),
+            ],
+          ),
+          _catSection(context, 'audio', AudioSoundSection(state: state)),
+        ];
       case 'playback':
         return [
           _catSection(context, 'playback', PlaybackSection(state: state)),
@@ -816,18 +853,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       case 'gestures':
         return [_buildGesturesSection(context, state, cubit)];
       case 'profiles':
+        // Professional-only surface; Smart Audio now lives in Audio & Sound.
+        if (!state.isProfessional) return const [];
         return [
-          _section(
-            context,
-            'SMART AUDIO',
-            'Automatic headphone correction and best-quality output',
-            [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
-                child: SmartAudioSection(),
-              ),
-            ],
-          ),
           _section(
             context,
             'DEVICE PROFILES',
@@ -1553,8 +1581,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final p = context.palette;
     final query = _searchQuery.trim().toLowerCase();
 
-    // Collect all searchable setting entries
-    final entries = _getSearchableEntries(context, state, cubit);
+    // Collect all searchable setting entries (Professional-only entries are
+    // hidden while in Normal mode so advanced features don't leak via search).
+    final entries = _getSearchableEntries(context, state, cubit)
+        .where((e) => state.isProfessional || !e.pro)
+        .toList();
     final results = entries.where((e) {
       return e.title.toLowerCase().contains(query) ||
           e.subtitle.toLowerCase().contains(query) ||
@@ -1771,6 +1802,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         subtitle: 'Direct USB DAC hardware sample-rate matching',
         icon: Icons.album_rounded,
         keywords: ['dac', 'hires', 'bit-perfect', 'sample rate', 'khz', 'usb'],
+        pro: true,
         onTap: () {
           _searchController.clear();
           setState(() => _selectedCategoryId = 'audio');
@@ -1840,6 +1872,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         subtitle: 'HTTP & SOCKS5 proxy routing with latency checks',
         icon: Icons.vpn_lock_rounded,
         keywords: ['proxy', 'socks5', 'http', 'ip', 'port', 'vpn'],
+        pro: true,
         onTap: () => context.push('/proxy-settings'),
       ),
       _SearchItem(
@@ -2246,6 +2279,9 @@ class _SearchItem {
   final Widget? trailing;
   final VoidCallback? onTap;
 
+  /// Professional-only setting; hidden from Normal-mode search.
+  final bool pro;
+
   _SearchItem({
     required this.category,
     required this.title,
@@ -2254,5 +2290,6 @@ class _SearchItem {
     required this.keywords,
     this.trailing,
     this.onTap,
+    this.pro = false,
   });
 }

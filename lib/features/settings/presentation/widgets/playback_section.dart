@@ -38,8 +38,96 @@ class PlaybackSection extends StatelessWidget {
     ));
   }
 
+  /// Curated playback section for Normal mode.
+  Widget _buildNormal(BuildContext context) {
+    final p = context.palette;
+    final cubit = context.read<SettingsCubit>();
+    return SettingsSection(
+      icon: Icons.play_circle_outline_rounded,
+      title: context.l10n.playback,
+      children: [
+        _navTile(
+          context,
+          Icons.timer_outlined,
+          context.l10n.sleepTimer,
+          context.l10n.sleepTimerSubtitle,
+          onTap: () => showModalBottomSheet<void>(
+              context: context,
+              useRootNavigator: true,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (_) => const SleepTimerSheet()),
+        ),
+        settingsCardDivider(p),
+        _switchTile(
+          context,
+          Icons.graphic_eq_rounded,
+          context.l10n.gaplessPlayback,
+          context.l10n.gaplessSubtitle,
+          value: state.gaplessPlayback,
+          disabledReason: state.crossfadeSeconds > 0.01
+              ? AudioConflicts.gaplessBlockedByCrossfade(state.crossfadeSeconds)
+              : null,
+          onChanged: cubit.setGapless,
+        ),
+        settingsCardDivider(p),
+        _switchTile(
+          context,
+          Icons.play_circle_outline_rounded,
+          context.l10n.resumeAfterInterruption,
+          context.l10n.resumeAfterInterruptionSubtitle,
+          value: state.resumeAfterInterruption,
+          onChanged: cubit.setResumeAfterInterruption,
+        ),
+        settingsCardDivider(p),
+        _switchTile(
+          context,
+          Icons.waves_rounded,
+          context.l10n.waveformSeekBar,
+          context.l10n.waveformSeekBarSubtitle,
+          value: state.waveformSeekBarEnabled,
+          onChanged: cubit.setWaveformSeekBar,
+        ),
+        settingsCardDivider(p),
+        SettingSliderRow(
+          label: context.l10n.crossfade,
+          value: state.crossfadeSeconds,
+          min: 0,
+          max: 12,
+          divisions: 24,
+          defaultValue: 0.0,
+          formatValue: (v) => '${v.toStringAsFixed(1)}s',
+          onChanged: cubit.setCrossfade,
+        ),
+        if (state.gaplessPlayback)
+          SettingsConflictCard(
+            reason: AudioConflicts.crossfadeBlockedByGapless(true)!,
+            resolveLabel: state.crossfadeSeconds > 0.01
+                ? 'Turn off Gapless & enable Crossfade'
+                : 'Turn off Gapless',
+            onResolve: () => _resolveCrossfadeConflict(
+                context, cubit, state.crossfadeSeconds),
+          ),
+        settingsCardDivider(p),
+        _switchTile(
+          context,
+          Icons.volume_down_outlined,
+          'Duck on navigation',
+          'Lower music instead of pausing for prompts',
+          value: state.duckingMode == 'duck',
+          onChanged: (v) => cubit.setDuckingMode(v ? 'duck' : 'pause'),
+        ),
+        settingsCardDivider(p),
+        const _AudioNormalizationSettingTile(),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Normal mode: the playback essentials only. Streaming-engine tuning,
+    // SponsorBlock, multi-output and calibration stay in Professional mode.
+    if (!state.isProfessional) return _buildNormal(context);
     final p = context.palette;
     final cubit = context.read<SettingsCubit>();
     return SettingsSection(

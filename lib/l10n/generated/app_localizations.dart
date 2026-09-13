@@ -2806,6 +2806,42 @@ abstract class AppLocalizations {
   /// **'Auto only adjusts sound when it recognises your headphones or a manual device profile; your choices are never overwritten in Manual mode'**
   String get smartAudioAutoCatchAllHint;
 
+  /// No description provided for @experienceModeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Experience Mode'**
+  String get experienceModeTitle;
+
+  /// No description provided for @experienceModeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose how much control you want'**
+  String get experienceModeSubtitle;
+
+  /// No description provided for @experienceModeNormal.
+  ///
+  /// In en, this message translates to:
+  /// **'Normal'**
+  String get experienceModeNormal;
+
+  /// No description provided for @experienceModeProfessional.
+  ///
+  /// In en, this message translates to:
+  /// **'Professional'**
+  String get experienceModeProfessional;
+
+  /// No description provided for @experienceModeNormalDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Smart and simple — Pulsr tunes the sound to your headphones and picks the best quality automatically'**
+  String get experienceModeNormalDesc;
+
+  /// No description provided for @experienceModeProfessionalDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Full control over every DSP stage, output format and diagnostic option'**
+  String get experienceModeProfessionalDesc;
+
   /// No description provided for @undo.
   ///
   /// In en, this message translates to:

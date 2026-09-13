@@ -60,8 +60,72 @@ class AudioSoundSection extends StatelessWidget {
     ));
   }
 
+  /// Curated sound section for Normal mode: what a non-technical listener needs
+  /// and nothing else. Smart Audio (in Settings → Sound) runs the advanced
+  /// pipeline automatically.
+  Widget _buildNormal(BuildContext context) {
+    final p = context.palette;
+    final device = state.currentOutputDevice;
+    final deviceLabel = device == null
+        ? 'Connected device & audio quality'
+        : '${device.deviceName}  •  '
+            '${(device.sampleRate ~/ 1000)} kHz / ${device.bitDepth}-bit'
+            '${device.isBluetooth ? '  •  Bluetooth' : ''}';
+    return SettingsSection(
+      icon: Icons.graphic_eq_rounded,
+      title: context.l10n.audioAndSound,
+      children: [
+        SettingsNavTile(
+          Icons.equalizer_rounded,
+          context.l10n.equalizerAndSoundEffects,
+          PlatformCapabilities.hasEqualizer
+              ? context.l10n.equalizerSubtitle
+              : 'Not available on this platform',
+          onTap: PlatformCapabilities.hasEqualizer
+              ? () => showModalBottomSheet<void>(
+                  context: context,
+                  useRootNavigator: true,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => const EqualizerSheet())
+              : null,
+        ),
+        settingsCardDivider(p),
+        SettingsNavTile(
+          Icons.speaker_rounded,
+          'Output & Audio Quality',
+          deviceLabel,
+          onTap: () {
+            final currentSong = context.read<PlayerCubit>().state.currentSong ??
+                const SongsTableData(
+                  id: 0,
+                  title: 'Hardware Audio Output',
+                  artist: 'Master Audio Engine',
+                  album: 'Internal / USB DAC',
+                  durationMs: 0,
+                  path: '',
+                  source: SongSource.local,
+                  isFavorite: false,
+                  isMissing: false,
+                  isDownloaded: false,
+                  playCount: 0,
+                  lastPositionMs: 0,
+                );
+            AudioQualitySheet.show(context, currentSong, p.accent);
+          },
+        ),
+        settingsCardDivider(p),
+        const BatteryOptimizationCard(),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Normal mode: a curated, smart sound section. The full audiophile control
+    // surface (bit-perfect, DSD, AAudio, resampler, DSP engine, diagnostics)
+    // stays available in Professional mode.
+    if (!state.isProfessional) return _buildNormal(context);
     final p = context.palette;
     final cubit = context.read<SettingsCubit>();
     // Native DSP / HAL / Hi-Res output are Android-only. On other platforms the

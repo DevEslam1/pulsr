@@ -459,6 +459,9 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
             e.name == (prefs.getString(PrefsKeys.dsdOutputMode) ?? 'pcm'),
         orElse: () => DsdOutputMode.pcm,
       );
+      // Default to Normal so existing users land on the curated experience.
+      final experienceModeLoaded = ExperienceMode.fromName(
+          prefs.getString(PrefsKeys.experienceMode));
 
       final newState = state.copyWith(
         // Crossfade > 0 forces gapless OFF (they are mutually exclusive), even
@@ -524,6 +527,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
             ? true
             : followTrackSampleRateLoaded,
         dsdOutputMode: dsdOutputModeLoaded,
+        experienceMode: experienceModeLoaded,
         currentOutputDevice:
             _hiResAudioService.currentOutputInfo ?? state.currentOutputDevice,
         crossfeedEnabled: effectManager?.isCrossfeedEnabled ??
@@ -780,6 +784,15 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     safeEmit(state.copyWith(waveformSeekBarEnabled: value));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyWaveformSeekBar, value);
+  }
+
+  /// Switches between the curated Normal experience and the full Professional
+  /// control surface. Emitting rebuilds every settings/player surface that
+  /// watches [SettingsState.isProfessional].
+  Future<void> setExperienceMode(ExperienceMode mode) async {
+    safeEmit(state.copyWith(experienceMode: mode));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(PrefsKeys.experienceMode, mode.name);
   }
 
   Future<void> setThemeMode(AppThemeMode mode) async {

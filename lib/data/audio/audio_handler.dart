@@ -916,10 +916,11 @@ class PulsrAudioHandler extends BaseAudioHandler
     _initSaveTimer();
     AudioMemoryManager.adaptBudgetToSystemRam();
     await _initPrefs();
-    // Restore the opt-in float DSP path before any other player call so the
-    // native sink is built with the persisted preference. Off by default.
+    // Restore the 24/32-bit float DSP path before any other player call so the
+    // native sink is built with the persisted preference. Defaults ON so hi-res
+    // sources are never truncated to 16-bit; 16-bit content is unaffected.
     await setFloatOutputEnabled(
-      _cachedPrefs?.getBool(PrefsKeys.floatOutputEnabled) ?? false,
+      _cachedPrefs?.getBool(PrefsKeys.floatOutputEnabled) ?? true,
     );
     // Restore the opt-in AAudio Direct output before any other player call
     // so the sink is built with the persisted preference. Off by default.
@@ -1629,16 +1630,15 @@ class PulsrAudioHandler extends BaseAudioHandler
     unawaited(_maybeNegotiateOutputFormat(song));
   }
 
-  /// Opt-in per-track output-format negotiation. When enabled (and not in the
-  /// bit-perfect exclusive path, which negotiates its own mixer attributes), the
-  /// pure [negotiateOutputFormat] decision picks the format and pushes it
-  /// through the existing target-format channel. No-op when disabled, so the
-  /// default manual, device-global output format is untouched.
+  /// Per-track output-format negotiation. Hi-res-first by default: the pure
+  /// [negotiateOutputFormat] decision picks the best format the device supports
+  /// and pushes it through the existing target-format channel (bit-perfect
+  /// keeps its own exclusive mixer attributes). Smart Audio also forces this on.
   Future<void> _maybeNegotiateOutputFormat(SongsTableData song) async {
     try {
       final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
       var negotiate =
-          prefs.getBool(PrefsKeys.outputFormatNegotiationEnabled) ?? false;
+          prefs.getBool(PrefsKeys.outputFormatNegotiationEnabled) ?? true;
       // Smart Audio (Auto) opts into best-quality output negotiation without
       // changing the user's explicit manual setting.
       if (!negotiate && getIt.isRegistered<SmartAudioService>()) {

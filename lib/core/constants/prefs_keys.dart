@@ -259,4 +259,7 @@ class PrefsKeys {
   static const String smartAudioMode = 'setting_smart_audio_mode';
   // Per-device AutoEQ matches remembered by device key (see DeviceProfileService).
   static const String smartAudioAutoEqLinks = 'setting_smart_audio_autoeq_links';
+
+  // UI complexity: 'normal' (default, curated) | 'professional' (full controls).
+  static const String experienceMode = 'setting_experience_mode';
 }

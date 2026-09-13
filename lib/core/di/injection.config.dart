@@ -36,6 +36,7 @@ import 'package:pulsr/core/services/playlist_suggestions_service.dart' as _i179;
 import 'package:pulsr/core/services/quran_mode_service.dart' as _i322;
 import 'package:pulsr/core/services/scrobbler_service.dart' as _i629;
 import 'package:pulsr/core/services/settings_profiles_service.dart' as _i461;
+import 'package:pulsr/core/services/smart_audio_service.dart' as _i197;
 import 'package:pulsr/core/services/sponsorblock_service.dart' as _i912;
 import 'package:pulsr/core/services/theme_scheduler_service.dart' as _i991;
 import 'package:pulsr/core/services/xdm_backend_service.dart' as _i1031;
@@ -229,7 +230,9 @@ extension GetItInjectableX on _i174.GetIt {
     gh.singleton<_i912.SponsorBlockService>(
         () => _i912.SponsorBlockService(gh<_i519.Client>()));
     gh.singleton<_i631.YtmAccountService>(
-        () => _i631.YtmAccountService(gh<_i169.YtmClientVersionResolver>()));
+      () => _i631.YtmAccountService(gh<_i169.YtmClientVersionResolver>()),
+      dispose: (i) => i.dispose(),
+    );
     gh.lazySingleton<_i742.YtDownloadService>(() => _i742.YtDownloadService(
           gh<_i497.HttpClient>(),
           gh<_i391.YtmService>(),
@@ -273,26 +276,6 @@ extension GetItInjectableX on _i174.GetIt {
           hiResAudioService: gh<_i722.HiResAudioService>(),
           secureStorage: gh<_i558.FlutterSecureStorage>(),
         ));
-    gh.singletonAsync<_i147.PlayerCubit>(() async => _i147.PlayerCubit(
-          audioHandler: await getAsync<_i366.PulsrAudioHandler>(),
-          repository: gh<_i320.IMusicRepository>(),
-          toggleFavoriteUseCase: gh<_i800.ToggleFavoriteUseCase>(),
-          settingsCubit: gh<_i41.SettingsCubit>(),
-          widgetService: gh<_i42.WidgetService>(),
-          scrobblerService: gh<_i629.ScrobblerService>(),
-          settingsProfilesService: gh<_i461.SettingsProfilesService>(),
-          deviceProfileService: gh<_i971.DeviceProfileService>(),
-          hiResAudioService: gh<_i722.HiResAudioService>(),
-          latencyTracker: gh<_i626.PlaybackLatencyTracker>(),
-          perSongEqStore: gh<_i1054.PerSongEqStore>(),
-          perSongVolumeStore: gh<_i866.PerSongVolumeStore>(),
-          songRatingStore: gh<_i227.SongRatingStore>(),
-          quranModeService: gh<_i322.QuranModeService>(),
-          earbudOptimizationService: gh<_i260.EarbudOptimizationService>(),
-          lrclibService: gh<_i622.LrclibService>(),
-          ytmAccountService: gh<_i631.YtmAccountService>(),
-          mediaScannerService: gh<_i483.MediaScannerService>(),
-        ));
     gh.factory<_i790.SmartPlaylistBuilderCubit>(
         () => _i790.SmartPlaylistBuilderCubit(
               gh<_i632.ISmartPlaylistEngine>(),
@@ -312,6 +295,28 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i902.ResumeDownloadUseCase(gh<_i783.IDownloadRepository>()));
     gh.singleton<_i19.RetryDownloadUseCase>(
         () => _i19.RetryDownloadUseCase(gh<_i783.IDownloadRepository>()));
+    gh.singletonAsync<_i147.PlayerCubit>(() async => _i147.PlayerCubit(
+          audioHandler: await getAsync<_i366.PulsrAudioHandler>(),
+          repository: gh<_i320.IMusicRepository>(),
+          toggleFavoriteUseCase: gh<_i800.ToggleFavoriteUseCase>(),
+          settingsCubit: gh<_i41.SettingsCubit>(),
+          widgetService: gh<_i42.WidgetService>(),
+          scrobblerService: gh<_i629.ScrobblerService>(),
+          settingsProfilesService: gh<_i461.SettingsProfilesService>(),
+          deviceProfileService: gh<_i971.DeviceProfileService>(),
+          hiResAudioService: gh<_i722.HiResAudioService>(),
+          smartAudioService: gh<_i197.SmartAudioService>(),
+          latencyTracker: gh<_i626.PlaybackLatencyTracker>(),
+          perSongEqStore: gh<_i1054.PerSongEqStore>(),
+          perSongVolumeStore: gh<_i866.PerSongVolumeStore>(),
+          songRatingStore: gh<_i227.SongRatingStore>(),
+          sponsorBlockService: gh<_i912.SponsorBlockService>(),
+          quranModeService: gh<_i322.QuranModeService>(),
+          earbudOptimizationService: gh<_i260.EarbudOptimizationService>(),
+          lrclibService: gh<_i622.LrclibService>(),
+          ytmAccountService: gh<_i631.YtmAccountService>(),
+          mediaScannerService: gh<_i483.MediaScannerService>(),
+        ));
     gh.singletonAsync<_i873.YtmDownloadCubit>(
         () async => _i873.YtmDownloadCubit(
               gh<_i742.YtDownloadService>(),

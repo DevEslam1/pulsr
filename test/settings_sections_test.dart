@@ -152,6 +152,7 @@ void main() {
       when(() => playerCubit.state).thenReturn(const PlayerState());
       when(() => playerCubit.stream).thenAnswer((_) => const Stream.empty());
       const state = SettingsState(
+        experienceMode: ExperienceMode.professional,
         bitPerfectOutput: true,
         bypassDspOnBitPerfect: true,
         replayGainMode: ReplayGainMode.track,
@@ -294,7 +295,9 @@ void main() {
               home: Scaffold(
                 body: ListView(
                   children: const [
-                    AudioSoundSection(state: SettingsState()),
+                    AudioSoundSection(
+                        state: SettingsState(
+                            experienceMode: ExperienceMode.professional)),
                   ],
                 ),
               ),
@@ -325,7 +328,9 @@ void main() {
           value: cubit,
           child: BlocProvider<PlayerCubit>.value(
             value: playerCubit,
-            child: const AudioSoundSection(state: SettingsState()),
+            child: const AudioSoundSection(
+                state: SettingsState(
+                    experienceMode: ExperienceMode.professional)),
           ),
         ),
       ));
@@ -367,7 +372,9 @@ void main() {
           value: cubit,
           child: BlocProvider<PlayerCubit>.value(
             value: playerCubit,
-            child: const AudioSoundSection(state: SettingsState()),
+            child: const AudioSoundSection(
+                state: SettingsState(
+                    experienceMode: ExperienceMode.professional)),
           ),
         ),
       ));

@@ -19,10 +19,12 @@ enum DynamicsPreset {
   const DynamicsPreset(this.label, this.description);
 }
 
-// TODO(H-6): CustomDynamicsPreset was removed because thresholdOverride / ratioOverride /
-// postGainOverride were never transmitted to native — only the preset name was sent.
-// To implement custom dynamics, extend the setDynamicsPreset MethodChannel call to accept
-// per-band threshold, ratio, and postGain, and handle them in AudioEffectsPlugin.kt.
+// Note (H-6): the legacy HAL CustomDynamicsPreset was removed because its
+// thresholdOverride / ratioOverride / postGainOverride were never transmitted to
+// native — only the preset name was sent. Custom (user-tuned) dynamics are now
+// owned by the native 4-band Multiband Compressor via setMultibandCompressorBand,
+// which carries threshold/ratio/attack/release/knee/makeup per band and is the
+// single source of truth for user-edited dynamics.
 
 
 class AudioEffectsConfig {

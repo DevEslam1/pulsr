@@ -797,6 +797,12 @@
   },
   "smartAudioNoMatch": "No headphone correction matched for this device",
   "smartAudioAutoCatchAllHint": "Auto only adjusts sound when it recognises your headphones or a manual device profile; your choices are never overwritten in Manual mode",
+  "experienceModeTitle": "Experience Mode",
+  "experienceModeSubtitle": "Choose how much control you want",
+  "experienceModeNormal": "Normal",
+  "experienceModeProfessional": "Professional",
+  "experienceModeNormalDesc": "Smart and simple — Pulsr tunes the sound to your headphones and picks the best quality automatically",
+  "experienceModeProfessionalDesc": "Full control over every DSP stage, output format and diagnostic option",
   "undo": "Undo",
   "downloadDeletedSnackbar": "Deleted \"{title}\"",
   "@downloadDeletedSnackbar": {

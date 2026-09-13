@@ -1474,6 +1474,26 @@ class AppLocalizationsEn extends AppLocalizations {
       'Auto only adjusts sound when it recognises your headphones or a manual device profile; your choices are never overwritten in Manual mode';
 
   @override
+  String get experienceModeTitle => 'Experience Mode';
+
+  @override
+  String get experienceModeSubtitle => 'Choose how much control you want';
+
+  @override
+  String get experienceModeNormal => 'Normal';
+
+  @override
+  String get experienceModeProfessional => 'Professional';
+
+  @override
+  String get experienceModeNormalDesc =>
+      'Smart and simple — Pulsr tunes the sound to your headphones and picks the best quality automatically';
+
+  @override
+  String get experienceModeProfessionalDesc =>
+      'Full control over every DSP stage, output format and diagnostic option';
+
+  @override
   String get undo => 'Undo';
 
   @override
