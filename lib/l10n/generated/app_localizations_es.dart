@@ -1440,6 +1440,48 @@ class AppLocalizationsEs extends AppLocalizations {
   String get profileDropdownLabel => 'Perfil';
 
   @override
+  String get smartAudioTitle => 'Smart Audio';
+
+  @override
+  String get smartAudioSubtitle =>
+      'Automatically tune the sound to your headphones and track';
+
+  @override
+  String get smartAudioModeLabel => 'Mode';
+
+  @override
+  String get smartAudioAuto => 'Auto';
+
+  @override
+  String get smartAudioManual => 'Manual';
+
+  @override
+  String get smartAudioAutoDesc =>
+      'Detect the connected headphones, apply the matching AutoEQ correction, and use the highest output quality the device supports';
+
+  @override
+  String get smartAudioManualDesc =>
+      'Keep your EQ, effects and output quality exactly as you set them';
+
+  @override
+  String smartAudioDetectedDevice(String device) {
+    return 'Current output: $device';
+  }
+
+  @override
+  String smartAudioMatchedProfile(String profile) {
+    return 'Matched correction: $profile';
+  }
+
+  @override
+  String get smartAudioNoMatch =>
+      'No headphone correction matched for this device';
+
+  @override
+  String get smartAudioAutoCatchAllHint =>
+      'Auto only adjusts sound when it recognises your headphones or a manual device profile; your choices are never overwritten in Manual mode';
+
+  @override
   String get undo => 'Deshacer';
 
   @override

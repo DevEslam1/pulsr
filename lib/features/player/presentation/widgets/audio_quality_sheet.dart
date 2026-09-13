@@ -1683,9 +1683,9 @@ extension _BluetoothCodecSection on AudioQualitySheet {
         if (connected) ...[
           const SizedBox(height: 14),
 
-          // ── Read-only codec chips (what earbuds support) ───────────────
+          // ── Codec chips: tap a supported codec to request it natively ──
           Text(
-            'SUPPORTED CODECS',
+            'SUPPORTED CODECS (TAP TO SWITCH)',
             style: TextStyle(
               fontSize: 10,
               letterSpacing: 1.2,
@@ -1706,7 +1706,14 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                   final accent = isLdacOpt ? _ldacAccent : _btAccent;
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
-                    child: Container(
+                    child: GestureDetector(
+                      onTap: isActive
+                          ? null
+                          : () {
+                              HapticFeedback.selectionClick();
+                              unawaited(cubit?.setBluetoothCodec(c));
+                            },
+                      child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 14,
                         vertical: 8,
@@ -1743,6 +1750,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                             ),
                           ),
                         ],
+                      ),
                       ),
                     ),
                   );
@@ -1898,12 +1906,24 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                       4,
                       (i) => Padding(
                         padding: const EdgeInsets.only(left: 3),
-                        child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: i <= ldacMode ? _ldacAccent : p.hairline,
+                        child: GestureDetector(
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            unawaited(cubit?.setBluetoothLdacQuality(i));
+                          },
+                          child: Container(
+                            width: 20,
+                            height: 20,
+                            alignment: Alignment.center,
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color:
+                                    i <= ldacMode ? _ldacAccent : p.hairline,
+                              ),
+                            ),
                           ),
                         ),
                       ),

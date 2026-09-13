@@ -1,9 +1,12 @@
 // lib/features/player/presentation/widgets/lyrics_editor_sheet.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/lyrics_line.dart';
+import '../../cubit/player_cubit.dart';
 
 class LyricsEditorSheet extends StatefulWidget {
   final SongsTableData song;
@@ -25,10 +28,16 @@ class LyricsEditorSheet extends StatefulWidget {
 
 class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
   late List<LyricsLine> _lines;
+  // Live playback position. The sheet used to stamp `widget.currentPosition`,
+  // captured when it opened, so every "stamp" and the "Now at" header were
+  // frozen at open time while playback kept running underneath.
+  final ValueNotifier<Duration> _livePosition = ValueNotifier(Duration.zero);
+  StreamSubscription<Duration>? _positionSub;
 
   @override
   void initState() {
     super.initState();
+    _livePosition.value = widget.currentPosition;
     _lines = List.from(widget.initialLyrics);
     if (_lines.isEmpty) {
       _lines = [
@@ -36,13 +45,26 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
             timestamp: const Duration(seconds: 0), text: 'First lyric line...'),
       ];
     }
+    try {
+      _positionSub =
+          context.read<PlayerCubit>().rawPositionStream.listen((pos) {
+        _livePosition.value = pos;
+      });
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _positionSub?.cancel();
+    _livePosition.dispose();
+    super.dispose();
   }
 
   void _stampCurrentPosition(int index) {
     setState(() {
       final old = _lines[index];
       _lines[index] =
-          LyricsLine(timestamp: widget.currentPosition, text: old.text);
+          LyricsLine(timestamp: _livePosition.value, text: old.text);
     });
   }
 
@@ -58,7 +80,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
   void _addNewLine() {
     setState(() {
       _lines.add(
-          LyricsLine(timestamp: widget.currentPosition, text: 'New line...'));
+          LyricsLine(timestamp: _livePosition.value, text: 'New line...'));
     });
   }
 
@@ -114,11 +136,22 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                     ),
                   ),
                   Text(
-                    'Now at: ${Formatters.formatDuration(widget.currentPosition)}',
+                    'Now at: ',
                     style: TextStyle(
-                        color: p.primary,
+                        color: p.textSecondary,
                         fontSize: 12,
                         fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 6),
+                  ValueListenableBuilder<Duration>(
+                    valueListenable: _livePosition,
+                    builder: (context, pos, _) => Text(
+                      Formatters.formatDuration(pos),
+                      style: TextStyle(
+                          color: p.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600),
+                    ),
                   ),
                 ],
               ),

@@ -26,7 +26,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   static Future<void> _createFtsTable(
       Future<void> Function(String) executeSql) async {
@@ -91,17 +91,106 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
+  /// Integrity + hot-path indexes (v11). All IF NOT EXISTS so re-runs are
+  /// free. UNIQUEs enforce at the DB level what was previously only an
+  /// app-side read-then-insert race (dup paths, dup playlist members).
+  static Future<void> _createV11Constraints(
+      Future<void> Function(String) executeSql) async {
+    // The UNIQUE index below cannot be created over pre-existing duplicate
+    // local rows (the very duplicates the scanner's dedup SQL removes) and a
+    // failure here aborts the whole upgrade, leaving the DB unopenable. Sweep
+    // duplicates — and any rows left dangling — before indexing.
+    try {
+      // Collapse duplicate local rows for the exact (path, cue window) the
+      // UNIQUE index below covers. Grouping by lower(path) also dedups
+      // case-variant paths. Runs before the index so a legacy duplicate can
+      // never abort the upgrade and leave the database unopenable. Re-point
+      // child rows to the surviving id first so no membership/history is lost.
+      await executeSql(
+        "UPDATE playlist_entries SET song_id = (SELECT MIN(s2.id) FROM songs s2 "
+        "WHERE s2.source = 'local' AND s2.path != '' "
+        "AND lower(s2.path) = lower((SELECT s.path FROM songs s WHERE s.id = playlist_entries.song_id)) "
+        "AND ifnull(s2.cue_start_ms, -1) = ifnull((SELECT s.cue_start_ms FROM songs s WHERE s.id = playlist_entries.song_id), -1)) "
+        "WHERE song_id IN (SELECT id FROM songs WHERE source = 'local' AND path != '') "
+        "AND song_id NOT IN (SELECT MIN(id) FROM songs WHERE source = 'local' AND path != '' "
+        "GROUP BY lower(path), ifnull(cue_start_ms, -1));",
+      );
+      await executeSql(
+        "UPDATE queue_items SET song_id = (SELECT MIN(s2.id) FROM songs s2 "
+        "WHERE s2.source = 'local' AND s2.path != '' "
+        "AND lower(s2.path) = lower((SELECT s.path FROM songs s WHERE s.id = queue_items.song_id)) "
+        "AND ifnull(s2.cue_start_ms, -1) = ifnull((SELECT s.cue_start_ms FROM songs s WHERE s.id = queue_items.song_id), -1)) "
+        "WHERE song_id IN (SELECT id FROM songs WHERE source = 'local' AND path != '') "
+        "AND song_id NOT IN (SELECT MIN(id) FROM songs WHERE source = 'local' AND path != '' "
+        "GROUP BY lower(path), ifnull(cue_start_ms, -1));",
+      );
+      await executeSql(
+        "UPDATE play_history SET song_id = (SELECT MIN(s2.id) FROM songs s2 "
+        "WHERE s2.source = 'local' AND s2.path != '' "
+        "AND lower(s2.path) = lower((SELECT s.path FROM songs s WHERE s.id = play_history.song_id)) "
+        "AND ifnull(s2.cue_start_ms, -1) = ifnull((SELECT s.cue_start_ms FROM songs s WHERE s.id = play_history.song_id), -1)) "
+        "WHERE song_id IN (SELECT id FROM songs WHERE source = 'local' AND path != '') "
+        "AND song_id NOT IN (SELECT MIN(id) FROM songs WHERE source = 'local' AND path != '' "
+        "GROUP BY lower(path), ifnull(cue_start_ms, -1));",
+      );
+      await executeSql(
+        "DELETE FROM songs WHERE source = 'local' AND path != '' "
+        "AND id NOT IN (SELECT MIN(id) FROM songs WHERE source = 'local' AND path != '' "
+        "GROUP BY lower(path), ifnull(cue_start_ms, -1));",
+      );
+      // Duplicate memberships are the pre-v11 read-then-insert race; keep the
+      // lowest id so the UNIQUE index can be created.
+      await executeSql(
+          'DELETE FROM playlist_entries WHERE id NOT IN ('
+          'SELECT MIN(id) FROM playlist_entries GROUP BY playlist_id, song_id);');
+      await executeSql(
+          'DELETE FROM playlist_entries WHERE song_id NOT IN (SELECT id FROM songs);');
+      await executeSql(
+          'DELETE FROM queue_items WHERE song_id NOT IN (SELECT id FROM songs);');
+      await executeSql(
+          'DELETE FROM play_history WHERE song_id NOT IN (SELECT id FROM songs);');
+    } catch (_) {}
+    // Local file rows: one row per (lowercased path, cue window). YouTube
+    // sentinel rows (ytmusic://) are excluded — many share a path prefix.
+    await executeSql(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_songs_path_cue ON songs (path, ifnull(cue_start_ms, -1)) WHERE source = 'local';",
+    );
+    // One membership per (playlist, song); insertOrIgnore turns a race into
+    // a no-op instead of a duplicate row.
+    await executeSql(
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_playlist_entries_unique ON playlist_entries (playlist_id, song_id);',
+    );
+    await executeSql(
+        'CREATE INDEX IF NOT EXISTS idx_songs_uri ON songs (uri);');
+    await executeSql(
+        'CREATE INDEX IF NOT EXISTS idx_songs_cue ON songs (cue_file, cue_start_ms);');
+    await executeSql(
+        'CREATE INDEX IF NOT EXISTS idx_songs_pending_dl ON songs (pending_download_path);');
+    await executeSql(
+        'CREATE INDEX IF NOT EXISTS idx_playlists_name ON playlists (name);');
+    await executeSql(
+        'CREATE INDEX IF NOT EXISTS idx_songs_title_nocase ON songs (title COLLATE NOCASE);');
+    await executeSql(
+        'CREATE INDEX IF NOT EXISTS idx_songs_artist_nocase ON songs (artist COLLATE NOCASE);');
+  }
+
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (Migrator m) async {
           await m.createAll();
           await _createIndexes(customStatement);
           await _createRemoteSourceIndexes(customStatement);
+          await _createV11Constraints(customStatement);
           await _createFtsTable(customStatement);
         },
         onUpgrade: (Migrator m, int from, int to) async {
           if (from < 2) {
             await m.createTable(excludedFoldersTable);
+          }
+          // v3 shipped no schema change; explicit step so a future v3
+          // column is never silently skipped by the ladder below.
+          if (from < 3) {
+            // No-op: reserved.
           }
           if (from < 4) {
             await m.addColumn(songsTable, songsTable.isMissing);
@@ -162,7 +251,12 @@ class AppDatabase extends _$AppDatabase {
             try {
               await customStatement(
                   "INSERT INTO songs_fts(songs_fts) VALUES('rebuild');");
-            } catch (_) {}
+            } catch (e, st) {
+              // Migration must not fail the open, but silence hides an
+              // empty search index. Logged for diagnostics.
+              // ignore: avoid_print
+              print('songs_fts rebuild failed: $e\n$st');
+            }
           }
           if (from < 10) {
             if (!await hasColumn('songs', 'cue_start_ms')) {
@@ -174,6 +268,21 @@ class AppDatabase extends _$AppDatabase {
             if (!await hasColumn('songs', 'cue_file')) {
               await m.addColumn(songsTable, songsTable.cueFile);
             }
+          }
+          if (from < 11) {
+            await _createV11Constraints(customStatement);
+            // Legacy seeds/clients wrote epoch 0 into DateTime columns;
+            // cloud sync compares these against server timestamps, so
+            // backfill 1970 rows to now rather than syncing bogus dates.
+            try {
+              final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+              await customStatement(
+                  'UPDATE playlists SET created_at = $now WHERE created_at <= 0;');
+              await customStatement(
+                  'UPDATE playlists SET updated_at = $now WHERE updated_at <= 0;');
+              await customStatement(
+                  'UPDATE playlist_entries SET added_at = $now WHERE added_at <= 0;');
+            } catch (_) {}
           }
           // Must run after every addColumn above: several indexes cover columns a
           // later branch introduces, so creating them mid-ladder fails on an older

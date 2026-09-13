@@ -234,9 +234,17 @@ GoRouter createRouter(MediaScannerService scannerService) {
               ? state.extra as AlbumsTableData
               : null;
           if (album == null) {
+            final id = state.uri.queryParameters['id'];
             return _buildPulsrPageRoute(
               key: state.pageKey,
-              child: const Scaffold(body: Center(child: Text('Album not found'))),
+              child: Scaffold(
+                appBar: AppBar(),
+                body: Center(
+                  child: Text(id == null
+                      ? 'Album not found — open it from the library (deep links need ?id=).'
+                      : 'Album $id not found — open it from the library.'),
+                ),
+              ),
             );
           }
           return _buildPulsrPageRoute(
@@ -256,7 +264,13 @@ GoRouter createRouter(MediaScannerService scannerService) {
           if (artist == null) {
             return _buildPulsrPageRoute(
               key: state.pageKey,
-              child: const Scaffold(body: Center(child: Text('Artist not found'))),
+              child: Scaffold(
+                appBar: AppBar(),
+                body: const Center(
+                  child: Text(
+                      'Artist not found — open it from the library (deep links need ?id=).'),
+                ),
+              ),
             );
           }
           return _buildPulsrPageRoute(
@@ -275,7 +289,13 @@ GoRouter createRouter(MediaScannerService scannerService) {
           if (genre == null) {
             return _buildPulsrPageRoute(
               key: state.pageKey,
-              child: const Scaffold(body: Center(child: Text('Genre not found'))),
+              child: Scaffold(
+                appBar: AppBar(),
+                body: const Center(
+                  child: Text(
+                      'Genre not found — open it from the library (deep links need ?id=).'),
+                ),
+              ),
             );
           }
           return _buildPulsrPageRoute(
@@ -293,7 +313,13 @@ GoRouter createRouter(MediaScannerService scannerService) {
           if (year == null) {
             return _buildPulsrPageRoute(
               key: state.pageKey,
-              child: const Scaffold(body: Center(child: Text('Year not found'))),
+              child: Scaffold(
+                appBar: AppBar(),
+                body: const Center(
+                  child: Text(
+                      'Year not found — open it from the library (deep links need ?id=).'),
+                ),
+              ),
             );
           }
           return _buildPulsrPageRoute(
@@ -313,7 +339,13 @@ GoRouter createRouter(MediaScannerService scannerService) {
           if (playlist == null) {
             return _buildPulsrPageRoute(
               key: state.pageKey,
-              child: const Scaffold(body: Center(child: Text('Playlist not found'))),
+              child: Scaffold(
+                appBar: AppBar(),
+                body: const Center(
+                  child: Text(
+                      'Playlist not found — open it from the library (deep links need ?id=).'),
+                ),
+              ),
             );
           }
           return _buildPulsrPageRoute(

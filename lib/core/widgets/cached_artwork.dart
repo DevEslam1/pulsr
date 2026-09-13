@@ -39,6 +39,12 @@ class ArtworkLruCache {
       remove(key);
       return;
     }
+    // A single image larger than the whole byte budget can never fit; adding it
+    // after the eviction loop would leave the cache permanently over cap.
+    if (bytes.length > maxBytes) {
+      remove(key);
+      return;
+    }
 
     final existing = _cache.remove(key);
     if (existing != null) {

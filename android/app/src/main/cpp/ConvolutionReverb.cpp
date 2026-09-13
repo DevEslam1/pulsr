@@ -621,6 +621,15 @@ void ConvolutionReverb::preparePartitions() {
     std::fill(accumFreqR_.begin(), accumFreqR_.end(), FftUtil::Complex(0.0f, 0.0f));
     inputBlockPos_ = 0;
     historyHead_ = 0;
+
+    // FIX M-8: Also clear predelay ring buffers and wet resamplers so old reverb
+    // tail from the previous preset does not bleed into the new acoustic space.
+    std::fill(predelayRingL_.begin(), predelayRingL_.end(), 0.0f);
+    std::fill(predelayRingR_.begin(), predelayRingR_.end(), 0.0f);
+    predelayWritePos_ = 0;
+    smoothedPredelaySamples_ = targetPredelaySamples_;
+    wetInResampler_.reset();
+    wetOutResampler_.reset();
 }
 
 void ConvolutionReverb::reset() {

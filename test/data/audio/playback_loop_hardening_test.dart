@@ -32,6 +32,10 @@ class StubPulsrAudioHandler extends BaseAudioHandler
 
   double _vol = 1.0;
   @override
+  double get minPlaybackSpeed => 0.5;
+  @override
+  double get maxPlaybackSpeed => 3.0;
+  @override
   double get volume => _vol;
   @override
   SongsTableData? get currentSong => null;
@@ -153,6 +157,24 @@ class StubPulsrAudioHandler extends BaseAudioHandler
   @override
   String get liveProgCode => '';
   @override
+  bool get isDynamicBassEnabled => false;
+  @override
+  double get dynamicBassStrength => 1.0;
+  @override
+  int get dynamicBassPreset => 0;
+  @override
+  Future<void> setDynamicBass({
+    required bool enabled,
+    double? strength,
+    int? preset,
+    int? xLow,
+    int? xHigh,
+    int? yLow,
+    int? yHigh,
+    double? sideGainLow,
+    double? sideGainHigh,
+  }) async {}
+  @override
   Duration get crossfadeDuration => Duration.zero;
   @override
   Stream<Duration> get positionStream => _positionController.stream;
@@ -254,9 +276,9 @@ class StubPulsrAudioHandler extends BaseAudioHandler
   @override
   Future<void> validatePlayerState() async {}
   @override
-  void dispose() {
-    _positionController.close();
-    _errorController.close();
+  Future<void> dispose() async {
+    await _positionController.close();
+    await _errorController.close();
   }
 }
 

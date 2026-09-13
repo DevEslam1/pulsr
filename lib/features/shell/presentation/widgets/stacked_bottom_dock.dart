@@ -130,9 +130,15 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
         final isStacked = mode != DockStackMode.defaultLayout;
         final isNavBarOnTop = mode == DockStackMode.navBarOnTop;
 
-        final double dockHeight = isStacked
-            ? (navBarTotalHeight + _peekOffset)
-            : (navBarTotalHeight + _miniPlayerHeight);
+        // Size the stack to whichever card sits highest. In navBarOnTop the
+        // mini player peeks above the nav bar, so its top is
+        // _peekOffset + _miniPlayerHeight (not navBarTotalHeight + _peekOffset,
+        // which clipped it).
+        final double dockHeight = !isStacked
+            ? (navBarTotalHeight + _miniPlayerHeight)
+            : (isNavBarOnTop
+                ? (_peekOffset + _miniPlayerHeight)
+                : (navBarTotalHeight + _peekOffset));
 
         // Calculate card bottom offsets, scales, and opacities
         final double miniPlayerBottom;

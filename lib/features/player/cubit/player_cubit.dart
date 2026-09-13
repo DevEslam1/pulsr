@@ -45,6 +45,9 @@ import '../../../core/services/hires_audio_service.dart';
 import '../../../core/services/quran_mode_service.dart';
 import '../../../core/services/room_correction_service.dart';
 import '../../../core/services/settings_profiles_service.dart';
+import '../../../core/services/smart_audio_service.dart';
+import '../../../domain/services/headphone_device_matcher.dart';
+import '../../../domain/services/smart_audio_plan.dart';
 import '../../../domain/models/audio_output_info.dart';
 import '../../../domain/models/quran_mode_profile.dart';
 import '../../settings/cubit/settings_cubit.dart';
@@ -101,6 +104,51 @@ class _QuranRestoreSnapshot {
     required this.isShuffle,
     required this.preampDb,
   });
+
+  Map<String, dynamic> toJson() => {
+        'eqPreset': eqPreset.toJson(),
+        'isEqEnabled': isEqEnabled,
+        'headphoneProfile': headphoneProfile?.toJson(),
+        'isReverbEnabled': isReverbEnabled,
+        'reverbPreset': reverbPreset,
+        'reverbWetDry': reverbWetDry,
+        'isDynamicsEnabled': isDynamicsEnabled,
+        'dynamicsPreset': dynamicsPreset.name,
+        'isSaturationEnabled': isSaturationEnabled,
+        'saturationDrive': saturationDrive,
+        'saturationMix': saturationMix,
+        'saturationTilt': saturationTilt,
+        'playbackSpeed': playbackSpeed,
+        'isShuffle': isShuffle,
+        'preampDb': preampDb,
+      };
+
+  factory _QuranRestoreSnapshot.fromJson(Map<String, dynamic> json) {
+    final rawEq = json['eqPreset'];
+    final rawProfile = json['headphoneProfile'];
+    return _QuranRestoreSnapshot(
+      eqPreset: EqPreset.fromJson(
+          rawEq is Map ? Map<String, dynamic>.from(rawEq) : const {}),
+      isEqEnabled: json['isEqEnabled'] as bool? ?? false,
+      headphoneProfile: rawProfile is Map
+          ? HeadphoneProfile.fromJson(Map<String, dynamic>.from(rawProfile))
+          : null,
+      isReverbEnabled: json['isReverbEnabled'] as bool? ?? false,
+      reverbPreset: (json['reverbPreset'] as num?)?.toInt() ?? 0,
+      reverbWetDry: (json['reverbWetDry'] as num?)?.toDouble() ?? 0.20,
+      isDynamicsEnabled: json['isDynamicsEnabled'] as bool? ?? false,
+      dynamicsPreset: DynamicsPreset.values.firstWhere(
+          (e) => e.name == json['dynamicsPreset'],
+          orElse: () => DynamicsPreset.off),
+      isSaturationEnabled: json['isSaturationEnabled'] as bool? ?? false,
+      saturationDrive: (json['saturationDrive'] as num?)?.toDouble() ?? 0.3,
+      saturationMix: (json['saturationMix'] as num?)?.toDouble() ?? 0.5,
+      saturationTilt: (json['saturationTilt'] as num?)?.toDouble() ?? 0.3,
+      playbackSpeed: (json['playbackSpeed'] as num?)?.toDouble() ?? 1.0,
+      isShuffle: json['isShuffle'] as bool? ?? false,
+      preampDb: (json['preampDb'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
 }
 
 @singleton
@@ -118,26 +166,32 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   final SettingsProfilesService? _settingsProfilesService;
   final DeviceProfileService? _deviceProfileService;
   final HiResAudioService? _hiResAudioService;
+  final SmartAudioService? _smartAudioService;
   final PerSongEqStore _perSongEqStore;
   final PerSongVolumeStore _perSongVolumeStore;
   final SongRatingStore _songRatingStore;
+  final SponsorBlockService _sponsorBlockService;
   final QuranModeService? _quranModeService;
   final EarbudOptimizationService? _earbudOptimizationService;
+  final LrclibService? _lrclibService;
+  final YtmAccountService? _ytmAccountService;
+  final MediaScannerService? _mediaScannerService;
   _QuranRestoreSnapshot? _quranRestore;
   String? _lastAutoAppliedDeviceKey;
+  /// True when Smart Auto itself enabled bit-perfect output, so it only ever
+  /// turns off what it turned on (a manual bit-perfect choice is respected).
+  bool _smartAutoBitPerfectApplied = false;
 
   // FIX(BUG-14): Expose unthrottled position stream for high-fps UI components like MiniPlayer
   Stream<Duration> get rawPositionStream => _audioHandler.positionStream;
 
-  SponsorBlockService get _sponsorBlock =>
-      getIt.isRegistered<SponsorBlockService>()
-          ? getIt<SponsorBlockService>()
-          : SponsorBlockService.instance;
+  SponsorBlockService get _sponsorBlock => _sponsorBlockService;
 
   StreamSubscription<void>? _widgetClickSub;
   DateTime? _lastWidgetUpdateTime;
   DateTime? _lastSlotPersistAt;
   int _mediaItemResolutionGen = 0;
+  int _localMatchSwapGen = 0;
   List<SponsorBlockSegment> _currentSponsorSegments = const [];
   String? _sponsorSegmentsVideoId;
   Duration? _lastSkippedSegmentEnd;
@@ -166,6 +220,33 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   /// de-dupe so tracks sharing a rate do not trigger redundant native churn.
   int? _lastFollowedSampleRate;
 
+  /// Per-song EQ override backup: the global preset active before a per-song
+  /// override is applied. Restored when a track without an override starts,
+  /// so a per-song curve never leaks into the rest of the queue.
+  EqPreset? _globalEqBackup;
+  HeadphoneProfile? _globalHeadphoneProfileBackup;
+  bool _perSongOverrideActive = false;
+
+  /// Idempotence key for per-track sync (AB loop, bookmark, rating, per-song
+  /// EQ/volume). Both onTrackChanged and mediaItem can fire for one change
+  /// and in either order — without this the second path would double-apply
+  /// (or, worse, the first path wins the race and the second skips the reset
+  /// entirely, leaving the previous song's AB/EQ on the new song).
+  ///
+  /// The guard is time-bounded rather than id-only: two listeners for the SAME
+  /// change fire within milliseconds and are deduped, while a genuine replay of
+  /// the same song id (repeat-one / duplicate queue entry) happens well after
+  /// the window and re-runs the reset.
+  int? _lastPerTrackSyncSongId;
+  DateTime? _lastPerTrackSyncAt;
+
+  /// Guards playbackState echoes against optimistic UI:
+  /// - a transient loading/buffering `playing:false` must not regress an
+  ///   optimistic `isPlaying:true` from playSong (flash paused);
+  /// - a stale speed echo must not clobber a just-set speed.
+  double? _lastSpeedPushed;
+  DateTime? _lastSpeedPushAt;
+
   /// Bumped on every queue mutation. [_getNextTitles]'s cache is keyed by
   /// index/length/current song, none of which changes when songs AFTER the
   /// current one are reordered - the version counter is what actually
@@ -192,12 +273,17 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     SettingsProfilesService? settingsProfilesService,
     DeviceProfileService? deviceProfileService,
     HiResAudioService? hiResAudioService,
+    SmartAudioService? smartAudioService,
     PlaybackLatencyTracker? latencyTracker,
     PerSongEqStore? perSongEqStore,
     PerSongVolumeStore? perSongVolumeStore,
     SongRatingStore? songRatingStore,
+    SponsorBlockService? sponsorBlockService,
     QuranModeService? quranModeService,
     EarbudOptimizationService? earbudOptimizationService,
+    LrclibService? lrclibService,
+    YtmAccountService? ytmAccountService,
+    MediaScannerService? mediaScannerService,
   })  : _audioHandler = audioHandler,
         _repository = repository,
         _toggleFavoriteUseCase = toggleFavoriteUseCase,
@@ -216,6 +302,10 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
             (getIt.isRegistered<HiResAudioService>()
                 ? getIt<HiResAudioService>()
                 : null),
+        _smartAudioService = smartAudioService ??
+            (getIt.isRegistered<SmartAudioService>()
+                ? getIt<SmartAudioService>()
+                : SmartAudioService()),
         _latencyTracker = latencyTracker ??
             (getIt.isRegistered<PlaybackLatencyTracker>()
                 ? getIt<PlaybackLatencyTracker>()
@@ -232,6 +322,10 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
             (getIt.isRegistered<SongRatingStore>()
                 ? getIt<SongRatingStore>()
                 : SongRatingStore()),
+        _sponsorBlockService = sponsorBlockService ??
+            (getIt.isRegistered<SponsorBlockService>()
+                ? getIt<SponsorBlockService>()
+                : SponsorBlockService.instance),
         _quranModeService = quranModeService ??
             (getIt.isRegistered<QuranModeService>()
                 ? getIt<QuranModeService>()
@@ -240,7 +334,42 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
             (getIt.isRegistered<EarbudOptimizationService>()
                 ? getIt<EarbudOptimizationService>()
                 : null),
+        _lrclibService = lrclibService ??
+            (getIt.isRegistered<LrclibService>()
+                ? getIt<LrclibService>()
+                : null),
+        _ytmAccountService = ytmAccountService ??
+            (getIt.isRegistered<YtmAccountService>()
+                ? getIt<YtmAccountService>()
+                : null),
+        _mediaScannerService = mediaScannerService ??
+            (getIt.isRegistered<MediaScannerService>()
+                ? getIt<MediaScannerService>()
+                : null),
         super(const PlayerState()) {
+    // Share fallback instances process-wide so the handler (which resolves
+    // the same types via getIt) never operates on a divergent throwaway
+    // copy when DI isn't set up (tests / manual construction).
+    if (!getIt.isRegistered<PerSongEqStore>()) {
+      try {
+        getIt.registerSingleton<PerSongEqStore>(_perSongEqStore);
+      } catch (_) {}
+    }
+    if (!getIt.isRegistered<PerSongVolumeStore>()) {
+      try {
+        getIt.registerSingleton<PerSongVolumeStore>(_perSongVolumeStore);
+      } catch (_) {}
+    }
+    if (!getIt.isRegistered<SongRatingStore>()) {
+      try {
+        getIt.registerSingleton<SongRatingStore>(_songRatingStore);
+      } catch (_) {}
+    }
+    if (!getIt.isRegistered<SponsorBlockService>()) {
+      try {
+        getIt.registerSingleton<SponsorBlockService>(_sponsorBlockService);
+      } catch (_) {}
+    }
     _listenToAudioService();
     _loadPlaybackSpeed();
     _loadPlaybackPitch();
@@ -258,7 +387,10 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       // cached prefs) a restored 'on' gain mode must be actually audible,
       // not just displayed as enabled.
       await _audioHandler.setVolume(_audioHandler.volume);
-    }).ignore();
+    }).catchError((Object e, StackTrace st) {
+      ErrorLogger.log('Post-init effects re-sync failed',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+    });
     _restoreQueueSlots();
     _startDeviceProfileWatcher();
     _updateWidgetThrottled(force: true);
@@ -318,6 +450,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       arbitraryEqString: _audioHandler.arbitraryEqString,
       isLiveProgEnabled: _audioHandler.isLiveProgEnabled,
       liveProgCode: _audioHandler.liveProgCode,
+      isDynamicBassEnabled: _audioHandler.isDynamicBassEnabled,
+      dynamicBassStrength: _audioHandler.dynamicBassStrength,
+      dynamicBassPreset: _audioHandler.dynamicBassPreset,
       hasOemAudio: _audioHandler.hasOemAudio,
       detectedOemEngines: _audioHandler.detectedOemEngines,
     ));
@@ -373,7 +508,8 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     if (rate == null) return;
     _lastFollowedSampleRate = rate;
     try {
-      await service.setTargetOutputFormat(sampleRate: rate, bitDepth: 0);
+      final depth = song.bitDepth ?? 0;
+      await service.setTargetOutputFormat(sampleRate: rate, bitDepth: depth);
       if (isClosed) return;
       await _settingsCubit?.refreshOutputDevice();
     } catch (e, st) {
@@ -416,6 +552,10 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
           'speed': entry.value.speed,
         };
       }
+      // Which slot is active is part of the session: without it a restart
+      // labels the restored queue as slot 0, and the next queue edit writes
+      // over slot 0's saved contents.
+      data['activeSlot'] = state.activeQueueSlot;
       final encoded = await compute(jsonEncode, data);
       await prefs.setString(PrefsKeys.queueSlots, encoded);
     } catch (e, st) {
@@ -437,8 +577,8 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       final decoded = await compute(jsonDecode, raw);
       if (decoded is! Map<String, dynamic>) return;
       final data = decoded;
-      // Validate: reject oversized slots (DoS)
-      if (data.length > 3) return;
+      // Validate: reject oversized slots (DoS). Three slots + activeSlot key.
+      if (data.length > 4) return;
       for (final key in data.keys) {
         if (_queueRestorationDone) return;
         final slotIndex = int.tryParse(key);
@@ -503,8 +643,14 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
               .clamp(0, songs.length - 1),
           position:
               Duration(milliseconds: restoredPosMs.clamp(0, 24 * 3600 * 1000)),
-          speed: restoredSpeed.isFinite ? restoredSpeed.clamp(0.5, 3.0) : 1.0,
+          speed: restoredSpeed.isFinite ? restoredSpeed.clamp(0.1, 8.0) : 1.0,
         );
+      }
+      if (!_queueRestorationDone && !isClosed) {
+        final activeRaw = data['activeSlot'];
+        if (activeRaw is int && activeRaw >= 0 && activeRaw <= 2) {
+          safeEmit(state.copyWith(activeQueueSlot: activeRaw));
+        }
       }
       _queueRestorationDone = true;
     } catch (e, st) {
@@ -708,7 +854,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   int _resolvePlaybackStateIndex(PlaybackState playbackState) {
     final handlerIndex = playbackState.queueIndex;
     if (state.queue.isEmpty) {
-      return handlerIndex ?? state.currentIndex;
+      return 0;
     }
     if (handlerIndex != null &&
         handlerIndex >= 0 &&
@@ -760,57 +906,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       _updateWidgetThrottled(force: true);
       _debouncedScrobble(song, state.position, state.isPlaying);
       if (!isSameSong) {
-        final trackKey = song.id.toString();
-        final songRating = _songRatingStore.getRating(trackKey);
-        final songEq = _perSongEqStore.getPresetForTrack(trackKey);
-        final songVol = _perSongVolumeStore.getGainDbForTrack(trackKey);
-
-        // F1/F2/F11: reset per-track UI state on song change.
-        // Guarded: test doubles of the handler may not implement the
-        // newer F1–F11 members (noSuchMethod throws).
-        var delayMs = state.trackDelayMs;
-        try {
-          delayMs = _audioHandler.currentTrackDelayMs;
-        } catch (_) {}
-        safeEmit(state.copyWith(
-          abPointA: null,
-          abPointB: null,
-          abLoopEnabled: false,
-          trackDelayMs: delayMs,
-          bookmarkPosition: null,
-          currentSongRating: songRating,
-          currentSongEqOverride: songEq,
-          currentSongVolumeOverrideDb: songVol,
-        ));
-        // Restore any persisted AB loop for the new track.
-        unawaited(_syncAbLoopUi(song));
-        try {
-          checkBookmarkOffer();
-        } catch (_) {}
-
-        // Auto-apply per-song EQ if assigned: match default presets,
-        // custom presets, and headphone/AutoEQ profiles by name.
-        if (songEq != null) {
-          final lower = songEq.toLowerCase();
-          final match = EqPreset.defaultPresets
-              .where((p) => p.name.toLowerCase() == lower)
-              .firstOrNull;
-          if (match != null) {
-            unawaited(applyPreset(match));
-          } else {
-            try {
-              final custom = _equalizerCustomPresets()
-                  .where((p) => p.name.toLowerCase() == lower)
-                  .firstOrNull;
-              if (custom != null) {
-                unawaited(applyPreset(custom));
-              } else {
-                final hp = _headphoneProfileByName(songEq);
-                if (hp != null) unawaited(applyHeadphoneProfile(hp));
-              }
-            } catch (_) {}
-          }
-        }
+        unawaited(_syncPerTrackState(song));
       }
     });
 
@@ -886,6 +982,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
               unawaited(_loadLyricsForSong(resolvedSong!));
               unawaited(_enrichAudioQuality(resolvedSong!, gen));
               unawaited(_loadSponsorBlockSegments(resolvedSong!, gen));
+              unawaited(_loadCueChapters(resolvedSong!));
+              unawaited(_maybeFollowTrackSampleRate(resolvedSong!));
+              unawaited(_syncPerTrackState(resolvedSong!));
             }
             if (gen != _mediaItemResolutionGen || isClosed) return;
             _updateWidgetThrottled(force: true);
@@ -1007,17 +1106,49 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       final wasPlaying = state.isPlaying;
       final wasRepeat = state.repeatMode;
 
+      // Transient loading/buffering echoes report playing:false while the
+      // engine is actually spinning up after an optimistic playSong(true).
+      // Regressing here flashes the UI to paused for one frame.
+      var resolvedPlaying = isPlaying;
+      if (!isPlaying &&
+          state.isPlaying &&
+          (playbackState.processingState == AudioProcessingState.loading ||
+              playbackState.processingState ==
+                  AudioProcessingState.buffering)) {
+        resolvedPlaying = true;
+      }
+      // Stale speed echo guard: within 500ms of a local setPlaybackSpeed,
+      // only accept the echo if it matches what was pushed.
+      var resolvedSpeed = playbackState.speed;
+      if (_lastSpeedPushAt != null &&
+          _lastSpeedPushed != null &&
+          DateTime.now().difference(_lastSpeedPushAt!) <
+              const Duration(milliseconds: 500) &&
+          (resolvedSpeed - _lastSpeedPushed!).abs() > 1e-9) {
+        resolvedSpeed = state.playbackSpeed;
+      }
+      final resolvedShuffle =
+          playbackState.shuffleMode == AudioServiceShuffleMode.all;
+      final resolvedIndex = _resolvePlaybackStateIndex(playbackState);
+      if (resolvedPlaying == state.isPlaying &&
+          effectivePos == state.position &&
+          resolvedShuffle == state.isShuffle &&
+          repeat == state.repeatMode &&
+          resolvedIndex == state.currentIndex &&
+          (resolvedSpeed - state.playbackSpeed).abs() < 1e-9) {
+        return;
+      }
       safeEmit(
         state.copyWith(
-          isPlaying: isPlaying,
+          isPlaying: resolvedPlaying,
           position: effectivePos,
-          isShuffle: playbackState.shuffleMode == AudioServiceShuffleMode.all,
+          isShuffle: resolvedShuffle,
           repeatMode: repeat,
-          currentIndex: _resolvePlaybackStateIndex(playbackState),
-          playbackSpeed: playbackState.speed,
+          currentIndex: resolvedIndex,
+          playbackSpeed: resolvedSpeed,
         ),
       );
-      if (isPlaying != wasPlaying || repeat != wasRepeat) {
+      if (resolvedPlaying != wasPlaying || repeat != wasRepeat) {
         _updateWidgetThrottled(force: true);
       } else {
         _updateWidgetProgressThrottled();
@@ -1038,8 +1169,8 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       positionUpdates = _audioHandler.positionStream;
     }
     autoSub(
-      positionUpdates
-          .throttleTime(const Duration(milliseconds: 200), trailing: true),
+      positionUpdates.throttleTime(const Duration(milliseconds: 200),
+          trailing: true),
       (pos) {
         _checkSponsorBlockSkip(pos);
         safeEmit(state.copyWith(position: pos));
@@ -1211,8 +1342,10 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
         path.startsWith('ytmusic://')) {
       return;
     }
+    final scanner = _mediaScannerService;
+    if (scanner == null) return;
     try {
-      await getIt<MediaScannerService>().enrichAudioQuality(song.id, path);
+      await scanner.enrichAudioQuality(song.id, path);
       if (isClosed || gen != _mediaItemResolutionGen) return;
       final refreshed = await _repository.getSongById(song.id);
       final updated = refreshed.fold((_) => null, (s) => s);
@@ -1233,17 +1366,19 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   Future<void> _loadLyricsForSong(SongsTableData song) async {
     if (isClosed) return;
 
-    // Check central in-memory cache first. Bump the generation so any
-    // in-flight slower fetch for a previous request can never overwrite
-    // this (correct) cached result when it finally completes.
-    final cached = LrcParser.getCachedLyrics(songId: song.id, path: song.path);
-    if (cached != null) {
+    // Check central in-memory cache first, including a valid negative entry
+    // (a recently-proven miss) so a local track with no lyrics does not re-run
+    // embedded reads plus a 5s LRCLIB round-trip on every play. `refreshLyrics`
+    // invalidates explicitly; the negative-cache TTL bounds the rest.
+    if (LrcParser.hasCachedLyrics(songId: song.id, path: song.path)) {
+      final cached =
+          LrcParser.getCachedLyrics(songId: song.id, path: song.path);
       ++_lyricsLoadGen;
       if (_isSameTrack(state.currentSong, song)) {
         safeEmit(state.copyWith(
           isLoadingLyrics: false,
-          lyrics: cached.lines,
-          lyricsSource: cached.source,
+          lyrics: cached?.lines ?? const [],
+          lyricsSource: cached?.source ?? LyricsSource.none,
         ));
       }
       return;
@@ -1255,6 +1390,12 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       lyrics: [],
       lyricsSource: LyricsSource.none,
     ));
+
+    // Offline-only mode disables every network lyrics lookup (LRCLIB, YTM).
+    // It also means any miss below is non-authoritative, so it must not be
+    // negative-cached — otherwise going back online would keep reporting
+    // "no lyrics" for the TTL.
+    final offlineOnly = _settingsCubit?.state.offlineOnlyMode == true;
 
     LyricsResult? lyricsResult;
 
@@ -1281,31 +1422,33 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
           lyricsResult.lines.isNotEmpty &&
           lyricsResult.isSynced;
 
-      if (!hasSynced) {
+      if (!hasSynced && !offlineOnly) {
         final plainFallback = lyricsResult;
-        try {
-          final lrclib = getIt<LrclibService>();
-          final onlineResult = await lrclib
-              .fetchLyrics(
-                trackName: song.title,
-                artistName: song.artist,
-                albumName: song.album,
-                durationSeconds:
-                    song.durationMs > 0 ? song.durationMs ~/ 1000 : null,
-              )
-              .timeout(const Duration(seconds: 5), onTimeout: () => null);
+        final lrclib = _lrclibService;
+        if (lrclib != null) {
+          try {
+            final onlineResult = await lrclib
+                .fetchLyrics(
+                  trackName: song.title,
+                  artistName: song.artist,
+                  albumName: song.album,
+                  durationSeconds:
+                      song.durationMs > 0 ? song.durationMs ~/ 1000 : null,
+                )
+                .timeout(const Duration(seconds: 5), onTimeout: () => null);
 
-          if (onlineResult != null && onlineResult.lines.isNotEmpty) {
-            // Prefer synced online lyrics; if unsynced, only prefer if we had nothing
-            if (onlineResult.isSynced ||
-                plainFallback == null ||
-                plainFallback.lines.isEmpty) {
-              lyricsResult = onlineResult;
+            if (onlineResult != null && onlineResult.lines.isNotEmpty) {
+              // Prefer synced online lyrics; if unsynced, only prefer if we had nothing
+              if (onlineResult.isSynced ||
+                  plainFallback == null ||
+                  plainFallback.lines.isEmpty) {
+                lyricsResult = onlineResult;
+              }
             }
+          } catch (e, st) {
+            ErrorLogger.log('LRCLIB fetch error for ${song.title}',
+                error: e, stackTrace: st, category: 'Lyrics');
           }
-        } catch (e, st) {
-          ErrorLogger.log('LRCLIB fetch error for ${song.title}',
-              error: e, stackTrace: st, category: 'Lyrics');
         }
       }
 
@@ -1317,22 +1460,28 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
 
       // 3. For YouTube Music tracks without LRCLIB matches, fetch native YTM lyrics
       final videoId = song.remoteId;
-      if ((lyricsResult == null || lyricsResult.lines.isEmpty) &&
+      if (!offlineOnly &&
+          (lyricsResult == null || lyricsResult.lines.isEmpty) &&
           videoId != null &&
           videoId.isNotEmpty) {
-        try {
-          final ytmAccount = getIt<YtmAccountService>();
-          lyricsResult = await ytmAccount
-              .fetchYtmLyrics(videoId)
-              .timeout(const Duration(seconds: 5), onTimeout: () => null);
-        } catch (e, st) {
-          ErrorLogger.log('YTM lyrics fetch error for $videoId',
-              error: e, stackTrace: st, category: 'Lyrics');
+        final ytmAccount = _ytmAccountService;
+        if (ytmAccount != null) {
+          try {
+            lyricsResult = await ytmAccount
+                .fetchYtmLyrics(videoId)
+                .timeout(const Duration(seconds: 5), onTimeout: () => null);
+          } catch (e, st) {
+            ErrorLogger.log('YTM lyrics fetch error for $videoId',
+                error: e, stackTrace: st, category: 'Lyrics');
+          }
         }
       }
 
-      // Cache the resolved result (including null for negative caching)
-      if (lyricsResult != null || song.source == SongSource.youtube) {
+      // Cache the resolved result, including null for negative caching, so a
+      // miss on any source (local or online) is not re-resolved on every play.
+      // Skip negative caching while offline: the miss reflects "could not
+      // check", not "no lyrics exist".
+      if (lyricsResult != null || !offlineOnly) {
         LrcParser.cacheLyricsResult(
           lyricsResult,
           songId: song.id,
@@ -1409,8 +1558,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       final baseName = path.split(RegExp(r'[\\/]')).last;
       final dot = baseName.lastIndexOf('.');
       final stem = dot > 0 ? baseName.substring(0, dot) : baseName;
-      final sidecar =
-          File('${dir.path}${Platform.pathSeparator}$stem.lrc');
+      final sidecar = File('${dir.path}${Platform.pathSeparator}$stem.lrc');
       await sidecar.writeAsString(LrcParser.formatToLrc(lines), flush: true);
       LrcParser.cacheLyricsResult(
         LyricsResult(lines: lines, source: source),
@@ -1462,6 +1610,11 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     } catch (_) {}
     ++_mediaItemResolutionGen;
     final capturedGen = _mediaItemResolutionGen;
+    // Dedicated token for the async downloaded-twin swap. It must NOT share
+    // _mediaItemResolutionGen: the handler's own onTrackChanged bump for the
+    // navigation that started this playSong would otherwise cancel every swap.
+    ++_localMatchSwapGen;
+    final capturedSwapGen = _localMatchSwapGen;
     // Mark restoration as done: any in-flight _restoreQueueSlots must abort
     _queueRestorationDone = true;
     var rawQueue = queue != null ? List<SongsTableData>.from(queue) : [song];
@@ -1543,12 +1696,20 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
             title: song.title,
             artist: song.artist,
           );
-          if (_mediaItemResolutionGen != capturedGen) return;
+          if (_localMatchSwapGen != capturedSwapGen ||
+              isClosed ||
+              !_isSameTrack(state.currentSong, song)) {
+            return;
+          }
           final local = match.fold((_) => null, (s) => s);
           if (local != null &&
               (local.path.startsWith('content:') ||
                   await File(local.path).exists())) {
-            if (_mediaItemResolutionGen != capturedGen) return;
+            if (_localMatchSwapGen != capturedSwapGen ||
+                isClosed ||
+                !_isSameTrack(state.currentSong, song)) {
+              return;
+            }
             if (local.id != song.id) {
               _audioHandler.swapReconciledSong(song.id, local);
               final swappedQueue = effectiveQueue
@@ -1574,7 +1735,16 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
               unawaited(_loadLyricsForSong(local));
             }
           }
-        } catch (_) {}
+        } catch (e, st) {
+          // Local-match swap failed: queue would claim a local file while
+          // the handler still streams YouTube. Log + surface, don't swallow.
+          ErrorLogger.log('Local-match swap failed for ${song.title}',
+              error: e, stackTrace: st, category: 'PlayerCubit');
+          if (!isClosed && _localMatchSwapGen == capturedSwapGen) {
+            safeEmit(state.copyWith(
+                errorMessage: 'Local match unavailable, streaming online'));
+          }
+        }
       }());
     }
 
@@ -2042,8 +2212,12 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
 
   Future<void> seek(Duration position) {
     if (isClosed) return Future.value();
-    // Clamp to a sane range; negative seeks crash some backends.
-    final target = position.isNegative ? Duration.zero : position;
+    // Clamp to a sane range; negative seeks crash some backends and
+    // beyond-duration seeks leave UI/engine diverged.
+    var target = position.isNegative ? Duration.zero : position;
+    if (state.duration > Duration.zero && target > state.duration) {
+      target = state.duration;
+    }
     // Optimistic UI: don't wait up to 100ms / round-trip for the position
     // stream to reflect a discrete user intent.
     safeEmit(state.copyWith(position: target));
@@ -2120,29 +2294,42 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   }
 
   Future<void> toggleShuffle() async {
-    final next = !state.isShuffle;
+    final prev = state.isShuffle;
+    final next = !prev;
+    safeEmit(state.copyWith(isShuffle: next, errorMessage: null));
     try {
       await _audioHandler.setShuffleMode(
           next ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none);
     } catch (e, st) {
       ErrorLogger.log('Toggle shuffle failed',
           error: e, stackTrace: st, category: 'PlayerCubit');
-      if (!isClosed) safeEmit(state.copyWith(errorMessage: 'Shuffle failed'));
+      if (!isClosed) {
+        safeEmit(state.copyWith(isShuffle: prev, errorMessage: 'Shuffle failed'));
+      }
     }
   }
 
   Future<void> toggleRepeat() async {
-    final nextMode = switch (state.repeatMode) {
-      PlayerRepeatMode.off => AudioServiceRepeatMode.all,
-      PlayerRepeatMode.all => AudioServiceRepeatMode.one,
-      PlayerRepeatMode.one => AudioServiceRepeatMode.none,
+    final prev = state.repeatMode;
+    final next = switch (prev) {
+      PlayerRepeatMode.off => PlayerRepeatMode.all,
+      PlayerRepeatMode.all => PlayerRepeatMode.one,
+      PlayerRepeatMode.one => PlayerRepeatMode.off,
     };
+    final nextMode = switch (next) {
+      PlayerRepeatMode.off => AudioServiceRepeatMode.none,
+      PlayerRepeatMode.all => AudioServiceRepeatMode.all,
+      PlayerRepeatMode.one => AudioServiceRepeatMode.one,
+    };
+    safeEmit(state.copyWith(repeatMode: next, errorMessage: null));
     try {
       await _audioHandler.setRepeatMode(nextMode);
     } catch (e, st) {
       ErrorLogger.log('Toggle repeat failed',
           error: e, stackTrace: st, category: 'PlayerCubit');
-      if (!isClosed) safeEmit(state.copyWith(errorMessage: 'Repeat failed'));
+      if (!isClosed) {
+        safeEmit(state.copyWith(repeatMode: prev, errorMessage: 'Repeat failed'));
+      }
     }
   }
 
@@ -2209,8 +2396,14 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     await _audioHandler.setEqualizerEnabled(enabled);
   }
 
-  Future<void> applyPreset(EqPreset preset) async {
+  Future<void> applyPreset(EqPreset preset, {bool isPerSongRestore = false}) async {
     if (!_guardDsp('Preset')) return;
+    // Manual edits during an active per-song override must not be lost when
+    // the override restores: track the user's latest choice as the backup.
+    if (_perSongOverrideActive && !isPerSongRestore) {
+      _globalEqBackup = preset;
+      _globalHeadphoneProfileBackup = null;
+    }
     safeEmit(state.copyWith(
       isEqEnabled: true,
       eqPreset: preset,
@@ -2221,9 +2414,18 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     await _audioHandler.applyPreset(preset);
   }
 
-  Future<void> applyHeadphoneProfile(HeadphoneProfile? profile) async {
+  Future<void> applyHeadphoneProfile(HeadphoneProfile? profile,
+      {bool isPerSongRestore = false}) async {
     if (profile != null && !_guardDsp('AutoEQ')) return;
     if (profile != null) {
+      if (_perSongOverrideActive && !isPerSongRestore) {
+        _globalEqBackup = EqPreset(
+          name: profile.name,
+          gains: profile.gains,
+          bassBoost: profile.bassBoost,
+        );
+        _globalHeadphoneProfileBackup = profile;
+      }
       safeEmit(state.copyWith(
         isEqEnabled: true,
         eqPreset: EqPreset(
@@ -2256,19 +2458,23 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     return const [];
   }
 
-  HeadphoneProfile? _headphoneProfileByName(String name) {
+  Future<HeadphoneProfile?> _headphoneProfileByName(String name) async {
     try {
       final lower = name.toLowerCase();
-      for (final p in HeadphoneProfilesRepository().profiles) {
+      final repo = HeadphoneProfilesRepository();
+      // The repository's profiles are empty until load() runs; without this the
+      // per-song override by headphone-profile name would never resolve on a
+      // fresh process.
+      await repo.loadProfiles();
+      for (final p in repo.profiles) {
         if (p.name.toLowerCase() == lower) return p;
       }
-      return null;
-    } catch (_) {
-      return null;
-    }
+    } catch (_) {}
+    return null;
   }
 
-  Future<void> setBandGain(int bandIndex, double gain) async {    if (gain.abs() > 0.1 && !_guardDsp('EQ Band')) return;
+  Future<void> setBandGain(int bandIndex, double gain) async {
+    if (gain.abs() > 0.1 && !_guardDsp('EQ Band')) return;
     final clamped = gain.clamp(-15.0, 15.0);
     final gains = List<double>.from(state.eqPreset.gains);
     if (bandIndex >= 0 && bandIndex < gains.length) {
@@ -2459,11 +2665,13 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     if (enabled && !_guardDsp('DSP Engine')) return;
     try {
       if (!enabled) {
-        if (state.isDspActive) {
+        if (state.isDspEffectsActive) {
           _dspSnapshot = state;
         }
+        // The Equalizer master switch is intentionally NOT touched here: the
+        // DSP-effects switch owns only the spatial/dynamics/reverb stages, so
+        // the two switches stay independent.
         safeEmit(state.copyWith(
-          isEqEnabled: false,
           isSpatializerEnabled: false,
           isVirtualizerEnabled: false,
           isDynamicsEnabled: false,
@@ -2475,9 +2683,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
           isLoudnessContourEnabled: false,
           isSubCrossoverEnabled: false,
           isDynamicEqEnabled: false,
+          isDynamicBassEnabled: false,
           volumeBoost: 0.0,
         ));
-        await _audioHandler.setEqualizerEnabled(false);
         await _audioHandler.setSpatializerEnabled(false);
         await _audioHandler.setVirtualizerEnabled(false);
         await _audioHandler.setDynamicsPreset(DynamicsPreset.off,
@@ -2490,13 +2698,12 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
         await _audioHandler.setLoudnessContour(false);
         await _audioHandler.setSubCrossover(false);
         await _audioHandler.setDynamicEq(false);
+        await _audioHandler.setDynamicBass(enabled: false);
         await _audioHandler.setVolumeBoost(0.0);
       } else {
         final snap = _dspSnapshot;
-        if (snap != null && snap.isDspActive) {
+        if (snap != null && snap.isDspEffectsActive) {
           safeEmit(state.copyWith(
-            isEqEnabled: snap.isEqEnabled,
-            eqPreset: snap.eqPreset,
             isSpatializerEnabled: snap.isSpatializerEnabled,
             isVirtualizerEnabled: snap.isVirtualizerEnabled,
             virtualizerStrength: snap.virtualizerStrength,
@@ -2525,11 +2732,11 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
             subCrossoverGain: snap.subCrossoverGain,
             isDynamicEqEnabled: snap.isDynamicEqEnabled,
             dynamicEqBands: snap.dynamicEqBands,
+            isDynamicBassEnabled: snap.isDynamicBassEnabled,
+            dynamicBassStrength: snap.dynamicBassStrength,
+            dynamicBassPreset: snap.dynamicBassPreset,
             volumeBoost: snap.volumeBoost,
           ));
-          if (snap.isEqEnabled) {
-            await _audioHandler.setEqualizerEnabled(true);
-          }
           if (snap.isSpatializerEnabled) {
             await _audioHandler.setSpatializerEnabled(true);
           }
@@ -2577,6 +2784,13 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
           }
           if (snap.isDynamicEqEnabled) {
             await _audioHandler.setDynamicEq(true);
+          }
+          if (snap.isDynamicBassEnabled) {
+            await _audioHandler.setDynamicBass(
+              enabled: true,
+              strength: snap.dynamicBassStrength,
+              preset: snap.dynamicBassPreset,
+            );
           }
           if (snap.volumeBoost > 0.0) {
             await _audioHandler.setVolumeBoost(snap.volumeBoost);
@@ -2650,7 +2864,8 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       await _audioHandler.setCrossfeedMode(mode);
     } catch (e) {
       _syncAudioEffects();
-      safeEmit(state.copyWith(errorMessage: 'Failed to set crossfeed mode: $e'));
+      safeEmit(
+          state.copyWith(errorMessage: 'Failed to set crossfeed mode: $e'));
     }
   }
 
@@ -2804,7 +3019,11 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   // --- PHASE 1 DSP EXPANSION METHODS ---
 
   Future<void> setSaturation(bool enabled,
-      {double? drive, double? mix, double? tilt, int? mode, bool? multiband}) async {
+      {double? drive,
+      double? mix,
+      double? tilt,
+      int? mode,
+      bool? multiband}) async {
     if (enabled && !_guardDsp('Harmonic Saturation')) return;
     safeEmit(state.copyWith(
       isSaturationEnabled: enabled,
@@ -2829,19 +3048,42 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       await _audioHandler.setSaturationMultiband(multiband);
     } catch (e) {
       _syncAudioEffects();
-      safeEmit(state.copyWith(errorMessage: 'Failed to set saturation multiband: $e'));
+      safeEmit(state.copyWith(
+          errorMessage: 'Failed to set saturation multiband: $e'));
     }
   }
 
-  Future<void> setStereoWidth(bool enabled, {double? width}) async {
+  Future<void> setStereoWidth(bool enabled,
+      {double? width,
+      bool? multiband,
+      double? lowWidth,
+      double? midWidth,
+      double? highWidth,
+      double? lowCrossoverHz,
+      double? highCrossoverHz}) async {
     if (enabled && !_guardDsp('Stereo Width')) return;
     safeEmit(state.copyWith(
       isStereoWidthEnabled: enabled,
       stereoWidth: width ?? state.stereoWidth,
+      stereoWidthMultiband: multiband ?? state.stereoWidthMultiband,
+      stereoWidthLow: lowWidth ?? state.stereoWidthLow,
+      stereoWidthMid: midWidth ?? state.stereoWidthMid,
+      stereoWidthHigh: highWidth ?? state.stereoWidthHigh,
+      stereoWidthLowCrossoverHz:
+          lowCrossoverHz ?? state.stereoWidthLowCrossoverHz,
+      stereoWidthHighCrossoverHz:
+          highCrossoverHz ?? state.stereoWidthHighCrossoverHz,
       errorMessage: null,
     ));
     try {
-      await _audioHandler.setStereoWidth(enabled, width: width);
+      await _audioHandler.setStereoWidth(enabled,
+          width: width,
+          multiband: multiband,
+          lowWidth: lowWidth,
+          midWidth: midWidth,
+          highWidth: highWidth,
+          lowCrossoverHz: lowCrossoverHz,
+          highCrossoverHz: highCrossoverHz);
     } catch (e) {
       _syncAudioEffects();
       safeEmit(state.copyWith(errorMessage: 'Failed to set stereo width: $e'));
@@ -2865,7 +3107,11 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   }
 
   Future<void> setSubCrossover(bool enabled,
-      {double? cornerHz, double? slopeDbPerOct, double? gain}) async {
+      {double? cornerHz,
+      double? slopeDbPerOct,
+      double? gain,
+      bool? bassMono,
+      bool? antiPop}) async {
     if (enabled && !_guardDsp('Sub Crossover')) return;
     safeEmit(state.copyWith(
       isSubCrossoverEnabled: enabled,
@@ -2873,11 +3119,17 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       subCrossoverSlopeDbPerOct:
           slopeDbPerOct ?? state.subCrossoverSlopeDbPerOct,
       subCrossoverGain: gain ?? state.subCrossoverGain,
+      subCrossoverBassMono: bassMono ?? state.subCrossoverBassMono,
+      subCrossoverAntiPop: antiPop ?? state.subCrossoverAntiPop,
       errorMessage: null,
     ));
     try {
       await _audioHandler.setSubCrossover(enabled,
-          cornerHz: cornerHz, slopeDbPerOct: slopeDbPerOct, gain: gain);
+          cornerHz: cornerHz,
+          slopeDbPerOct: slopeDbPerOct,
+          gain: gain,
+          bassMono: bassMono,
+          antiPop: antiPop);
     } catch (e) {
       _syncAudioEffects();
       safeEmit(state.copyWith(errorMessage: 'Failed to set sub crossover: $e'));
@@ -2912,6 +3164,34 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       _syncAudioEffects();
       safeEmit(
           state.copyWith(errorMessage: 'Failed to set dynamic EQ band: $e'));
+    }
+  }
+
+  Future<void> addDynamicEqBand() async {
+    if (state.dynamicEqBands.length >= 8) return;
+    var bands = List<DynamicEqBandConfig>.from(state.dynamicEqBands);
+    bands.add(const DynamicEqBandConfig());
+    safeEmit(state.copyWith(dynamicEqBands: bands));
+    try {
+      await _audioHandler.addDynamicEqBand();
+    } catch (e) {
+      _syncAudioEffects();
+      safeEmit(
+          state.copyWith(errorMessage: 'Failed to add dynamic EQ band: $e'));
+    }
+  }
+
+  Future<void> removeDynamicEqBand(int index) async {
+    if (index < 0 || index >= state.dynamicEqBands.length) return;
+    var bands = List<DynamicEqBandConfig>.from(state.dynamicEqBands);
+    bands.removeAt(index);
+    safeEmit(state.copyWith(dynamicEqBands: bands));
+    try {
+      await _audioHandler.removeDynamicEqBand(index);
+    } catch (e) {
+      _syncAudioEffects();
+      safeEmit(
+          state.copyWith(errorMessage: 'Failed to remove dynamic EQ band: $e'));
     }
   }
 
@@ -2968,7 +3248,44 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     try {
       await _audioHandler.setLiveProgSlider(sliderIndex, value);
     } catch (e) {
-      safeEmit(state.copyWith(errorMessage: 'Failed to set LiveProg slider: $e'));
+      safeEmit(
+          state.copyWith(errorMessage: 'Failed to set LiveProg slider: $e'));
+    }
+  }
+
+  Future<void> setDynamicBass(
+    bool enabled, {
+    double? strength,
+    int? preset,
+    int? xLow,
+    int? xHigh,
+    int? yLow,
+    int? yHigh,
+    double? sideGainLow,
+    double? sideGainHigh,
+  }) async {
+    if (enabled && !_guardDsp('Dynamic Bass')) return;
+    safeEmit(state.copyWith(
+      isDynamicBassEnabled: enabled,
+      dynamicBassStrength: strength ?? state.dynamicBassStrength,
+      dynamicBassPreset: preset ?? state.dynamicBassPreset,
+      errorMessage: null,
+    ));
+    try {
+      await _audioHandler.setDynamicBass(
+        enabled: enabled,
+        strength: strength,
+        preset: preset,
+        xLow: xLow,
+        xHigh: xHigh,
+        yLow: yLow,
+        yHigh: yHigh,
+        sideGainLow: sideGainLow,
+        sideGainHigh: sideGainHigh,
+      );
+    } catch (e) {
+      _syncAudioEffects();
+      safeEmit(state.copyWith(errorMessage: 'Failed to set Dynamic Bass: $e'));
     }
   }
 
@@ -2993,30 +3310,131 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       // De-dup: the output stream also fires on format changes (sample rate,
       // bit depth) for the same device; only switch when the device changes.
       if (_lastAutoAppliedDeviceKey == key) return;
-      if (!await service.isAutoSwitchEnabled()) return;
-      final link = await service.linkForDeviceKey(key);
-      if (link == null) return;
-      final profiles = await profilesService.getProfiles();
-      SettingsProfile? profile;
-      for (final p in profiles) {
-        if (p.id == link.profileId) {
-          profile = p;
-          break;
+
+      final smart = _smartAudioService;
+      final smartEnabled = smart != null && await smart.isEnabled();
+
+      // 1) An explicit user device->profile link always wins over auto-match.
+      if (await service.isAutoSwitchEnabled()) {
+        final link = await service.linkForDeviceKey(key);
+        if (link != null) {
+          final profiles = await profilesService.getProfiles();
+          SettingsProfile? profile;
+          for (final p in profiles) {
+            if (p.id == link.profileId) {
+              profile = p;
+              break;
+            }
+          }
+          if (profile != null) {
+            // Claim the key before applying: applyProfile awaits a long chain,
+            // and a second stream event for the same device would otherwise
+            // pass this gate and run a concurrent apply.
+            _lastAutoAppliedDeviceKey = key;
+            final applied = await applyProfile(profile);
+            if (!applied && !isClosed) {
+              // applyProfile reports failure instead of throwing, so release
+              // the claim here or a later event for this device never retries.
+              _lastAutoAppliedDeviceKey = null;
+            }
+            return;
+          }
         }
       }
-      if (profile == null) return;
-      // Claim the key before applying: applyProfile awaits a long chain, and a
-      // second stream event for the same device would otherwise pass this gate
-      // and run a concurrent apply.
-      _lastAutoAppliedDeviceKey = key;
-      try {
-        await applyProfile(profile);
-      } catch (_) {
-        _lastAutoAppliedDeviceKey = null;
-        rethrow;
+
+      // 2) Smart Auto: match the connected headphone to an AutoEQ profile and
+      // arbitrate the best output quality for this route.
+      if (smartEnabled) {
+        final matched = await _applySmartAutoEq(smart, key, device);
+        await _applySmartQuality(device, matched?.id);
       }
     } catch (e, st) {
       ErrorLogger.log('Device profile auto-switch failed',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+    }
+  }
+
+  /// Smart Auto path: apply the remembered (or freshly detected) AutoEQ profile
+  /// for [device]. A per-device saved match wins so the same headset is always
+  /// corrected identically; otherwise a fuzzy match is computed and persisted.
+  /// Returns the applied profile (or null when nothing matched).
+  Future<HeadphoneProfile?> _applySmartAutoEq(
+    SmartAudioService smart,
+    String key,
+    AudioOutputInfo device,
+  ) async {
+    try {
+      final repo = HeadphoneProfilesRepository();
+      await repo.loadProfiles();
+      if (isClosed || repo.profiles.isEmpty) return null;
+
+      HeadphoneProfile? profile;
+      final saved = await smart.linkForDeviceKey(key);
+      if (saved != null) {
+        profile = repo.getProfileById(saved.profileId);
+      }
+      if (profile == null) {
+        final match = HeadphoneDeviceMatcher.match(
+          deviceName: device.deviceName,
+          profiles: repo.profiles,
+        );
+        profile = match?.profile;
+        if (profile == null) return null;
+        // Persist the freshly detected association so reconnects skip matching.
+        await smart.rememberAutoEqLink(
+          deviceKey: key,
+          deviceLabel: device.deviceName,
+          profileId: profile.id,
+          score: match!.score,
+        );
+      }
+
+      if (isClosed) return null;
+      _lastAutoAppliedDeviceKey = key;
+      await applyHeadphoneProfile(profile);
+      return profile;
+    } catch (e, st) {
+      ErrorLogger.log('Smart Auto AutoEQ match failed',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+      return null;
+    }
+  }
+
+  /// Smart Auto quality arbitration: hand the route to the bit-perfect/hi-res
+  /// path when it is the best available and no correction is requested, else
+  /// keep the DSP path. Only toggles bit-perfect that Smart Auto itself turned
+  /// on, so an explicit user choice is never overridden.
+  Future<void> _applySmartQuality(
+    AudioOutputInfo device,
+    String? matchedProfileId,
+  ) async {
+    final settings = _settingsCubit;
+    if (settings == null || isClosed) return;
+    final song = state.currentSong;
+    final plan = resolveSmartAudioPlan(
+      mode: SmartAudioMode.auto,
+      device: device,
+      matchedHeadphoneProfileId: matchedProfileId,
+      trackIsHiRes: smartAudioTrackIsHiRes(
+        sampleRate: song?.sampleRate ?? 0,
+        bitDepth: song?.bitDepth ?? 0,
+      ),
+      deviceSupportsBitPerfect: device.isBitPerfectSupported,
+    );
+    try {
+      if (plan.preferBitPerfect) {
+        if (!settings.state.bitPerfectOutput) {
+          _smartAutoBitPerfectApplied = true;
+          await settings.setBitPerfectOutput(true);
+        }
+      } else if (_smartAutoBitPerfectApplied) {
+        _smartAutoBitPerfectApplied = false;
+        if (settings.state.bitPerfectOutput) {
+          await settings.setBitPerfectOutput(false);
+        }
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Smart Audio quality arbitration failed',
           error: e, stackTrace: st, category: 'PlayerCubit');
     }
   }
@@ -3026,7 +3444,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   /// DSP stages are applied BEFORE bit-perfect so its bypass conflict rules
   /// evaluate against the pre-switch state, and bit-perfect is re-asserted
   /// last (its bypass then zeroes stages per the saved policy).
-  Future<void> applyProfile(SettingsProfile profile,
+  Future<bool> applyProfile(SettingsProfile profile,
       {bool manual = false}) async {
     try {
       EqPreset preset = EqPreset.defaultPresets.first;
@@ -3073,9 +3491,11 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
             profile.crossfadeEnabled ? profile.crossfadeSeconds : 0.0);
         await settings.setBitPerfectOutput(profile.bitPerfectEnabled);
       }
+      return true;
     } catch (e, st) {
       ErrorLogger.log('Failed to apply settings profile',
           error: e, stackTrace: st, category: 'PlayerCubit');
+      return false;
     }
   }
 
@@ -3119,15 +3539,25 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
 
   int? get sleepTimerRemainingTracks => _audioHandler.sleepTimerRemainingTracks;
   SleepTimerMode get sleepTimerMode => _audioHandler.sleepTimerMode;
-  bool get isEndOfQueueSleepTimer => sleepTimerMode == SleepTimerMode.endOfQueue;
+  bool get isEndOfQueueSleepTimer =>
+      sleepTimerMode == SleepTimerMode.endOfQueue;
   Stream<int?> get sleepTimerRemainingTracksStream =>
       _audioHandler.sleepTimerRemainingTracksStream;
 
   // Playback Speed
+  double get minPlaybackSpeed => _audioHandler.minPlaybackSpeed;
+  double get maxPlaybackSpeed => _audioHandler.maxPlaybackSpeed;
+
   Future<void> _loadPlaybackSpeed() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final speed = prefs.getDouble(PrefsKeys.playbackSpeed) ?? 1.0;
+      final raw = prefs.getDouble(PrefsKeys.playbackSpeed) ?? 1.0;
+      // Clamp to the engine's *current* range so a persisted extended speed
+      // (0.1–8.0) is not silently rewritten to the 0.5–3.0 default band.
+      final speed = raw.isFinite
+          ? raw.clamp(
+              _audioHandler.minPlaybackSpeed, _audioHandler.maxPlaybackSpeed)
+          : 1.0;
       await _audioHandler.setSpeed(speed);
       safeEmit(state.copyWith(playbackSpeed: speed));
     } catch (e, st) {
@@ -3137,15 +3567,31 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   }
 
   Future<void> setPlaybackSpeed(double speed) async {
-    await _audioHandler.setSpeed(speed);
-    safeEmit(state.copyWith(playbackSpeed: speed));
+    if (!speed.isFinite) return;
+    // Honour the engine's active range (0.25–4.0, or 0.1–8.0 when the
+    // advanced-speed setting is on) instead of a hardcoded band.
+    final clamped = speed
+        .clamp(_audioHandler.minPlaybackSpeed, _audioHandler.maxPlaybackSpeed);
+    _lastSpeedPushed = clamped;
+    _lastSpeedPushAt = DateTime.now();
+    try {
+      await _audioHandler.setSpeed(clamped);
+    } catch (e, st) {
+      ErrorLogger.log('Set playback speed failed',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+      if (!isClosed) {
+        safeEmit(state.copyWith(errorMessage: 'Speed change failed'));
+      }
+      return;
+    }
+    safeEmit(state.copyWith(playbackSpeed: clamped));
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(PrefsKeys.playbackSpeed, speed);
+    await prefs.setDouble(PrefsKeys.playbackSpeed, clamped);
     _queueSlots[state.activeQueueSlot] = _QueueSlotData(
       songs: state.queue,
       currentIndex: state.currentIndex,
       position: state.position,
-      speed: speed,
+      speed: clamped,
     );
     _debouncedPersistQueueSlots();
   }
@@ -3154,7 +3600,8 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   Future<void> _loadPlaybackPitch() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final pitch = prefs.getDouble(PrefsKeys.playbackPitch) ?? 1.0;
+      final raw = prefs.getDouble(PrefsKeys.playbackPitch) ?? 1.0;
+      final pitch = raw.isFinite ? raw.clamp(0.5, 2.0) : 1.0;
       await _audioHandler.setPitch(pitch);
       safeEmit(state.copyWith(playbackPitch: pitch));
     } catch (e, st) {
@@ -3164,9 +3611,19 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   }
 
   Future<void> setPlaybackPitch(double pitch) async {
+    if (!pitch.isFinite) return;
     final clamped = pitch.clamp(0.5, 2.0);
+    try {
+      await _audioHandler.setPitch(clamped);
+    } catch (e, st) {
+      ErrorLogger.log('Set playback pitch failed',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+      if (!isClosed) {
+        safeEmit(state.copyWith(errorMessage: 'Pitch change failed'));
+      }
+      return;
+    }
     safeEmit(state.copyWith(playbackPitch: clamped));
-    await _audioHandler.setPitch(clamped);
   }
 
   // Per-Song Star Rating (1 to 5 stars, 0 = unrated)
@@ -3180,15 +3637,36 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   // Per-Song EQ Preset Override
   Future<void> setSongEqOverride(int songId, String? presetName) async {
     await _perSongEqStore.setPresetForTrack(songId.toString(), presetName);
-    if (state.currentSong?.id == songId) {
-      safeEmit(state.copyWith(currentSongEqOverride: presetName));
-      if (presetName != null) {
-        final match = EqPreset.defaultPresets
-            .where((p) => p.name.toLowerCase() == presetName.toLowerCase())
-            .firstOrNull;
-        if (match != null) {
-          await applyPreset(match);
-        }
+    if (state.currentSong?.id != songId) return;
+    safeEmit(state.copyWith(currentSongEqOverride: presetName));
+
+    if (presetName != null) {
+      final match = EqPreset.defaultPresets
+          .where((p) => p.name.toLowerCase() == presetName.toLowerCase())
+          .firstOrNull;
+      if (match == null) return;
+      // Assigning an override mid-song must mark it active and snapshot the
+      // pre-override preset, otherwise clearing it (or the next song without an
+      // override) has nothing to restore and the per-song curve leaks into the
+      // rest of the queue.
+      if (!_perSongOverrideActive) {
+        _globalEqBackup = state.eqPreset;
+        _globalHeadphoneProfileBackup = state.selectedHeadphoneProfile;
+        _perSongOverrideActive = true;
+      }
+      await applyPreset(match, isPerSongRestore: true);
+    } else if (_perSongOverrideActive && _globalEqBackup != null) {
+      final restore = _globalEqBackup!;
+      final profileRestore = _globalHeadphoneProfileBackup;
+      _globalEqBackup = null;
+      _globalHeadphoneProfileBackup = null;
+      _perSongOverrideActive = false;
+      // Re-apply the AutoEQ profile as a profile (not a plain preset), so the
+      // global headphone selection is not silently deselected in the UI.
+      if (profileRestore != null) {
+        await applyHeadphoneProfile(profileRestore, isPerSongRestore: true);
+      } else {
+        await applyPreset(restore, isPerSongRestore: true);
       }
     }
   }
@@ -3215,15 +3693,31 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     return success;
   }
 
-  // Volume Control
+  // Volume Control (handler-owned; no PlayerState.volume by design)
   Future<void> setVolume(double volume) async {
-    await _audioHandler.setVolume(volume);
+    try {
+      await _audioHandler.setVolume(volume);
+    } catch (e, st) {
+      ErrorLogger.log('Set volume failed',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+      if (!isClosed) {
+        safeEmit(state.copyWith(errorMessage: 'Volume change failed'));
+      }
+    }
   }
 
   Future<void> adjustVolume(double delta) async {
-    final current = _audioHandler.volume;
-    final target = (current + delta).clamp(0.0, 1.0);
-    await _audioHandler.setVolume(target);
+    try {
+      final current = _audioHandler.volume;
+      final target = (current + delta).clamp(0.0, 1.0);
+      await _audioHandler.setVolume(target);
+    } catch (e, st) {
+      ErrorLogger.log('Adjust volume failed',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+      if (!isClosed) {
+        safeEmit(state.copyWith(errorMessage: 'Volume change failed'));
+      }
+    }
   }
 
   // Overlay toggles (Lyrics / Queue)
@@ -3254,33 +3748,137 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   void setAbPointA() {
     final pos = state.position;
     _audioHandler.setAbPointA(pos);
+    // Emit manager truth, not the requested pos: the manager rejects
+    // B<=A / pos<=A, and emitting pos would diverge UI from engine.
+    final mgr = _audioHandler.abLoopManager;
     safeEmit(state.copyWith(
-      abPointA: pos,
-      abLoopEnabled: _audioHandler.abLoopManager.isEnabled,
-      abPointB: _audioHandler.abLoopManager.pointB,
+      abPointA: mgr.pointA,
+      abLoopEnabled: mgr.isEnabled,
+      abPointB: mgr.pointB,
     ));
   }
 
   void setAbPointB() {
     final pos = state.position;
     _audioHandler.setAbPointB(pos);
+    final mgr = _audioHandler.abLoopManager;
     safeEmit(state.copyWith(
-      abPointB: pos,
-      abPointA: _audioHandler.abLoopManager.pointA,
-      abLoopEnabled: _audioHandler.abLoopManager.isEnabled,
+      abPointB: mgr.pointB,
+      abPointA: mgr.pointA,
+      abLoopEnabled: mgr.isEnabled,
     ));
   }
 
   void toggleAbLoop() {
     _audioHandler.toggleAbLoop();
-    safeEmit(state.copyWith(
-        abLoopEnabled: _audioHandler.abLoopManager.isEnabled));
+    safeEmit(
+        state.copyWith(abLoopEnabled: _audioHandler.abLoopManager.isEnabled));
   }
 
   void clearAbLoop() {
     _audioHandler.clearAbLoop();
+    safeEmit(
+        state.copyWith(abLoopEnabled: false, abPointA: null, abPointB: null));
+  }
+
+  /// Shared per-track reset used by BOTH track-change paths (onTrackChanged
+  /// and mediaItem, which can fire in either order). Deduped within a short
+  /// window so two listeners for one change apply once, while a genuine replay
+  /// of the same song id (repeat-one / duplicate queue entry) still re-runs.
+  Future<void> _syncPerTrackState(SongsTableData song) async {
+    final now = DateTime.now();
+    final sameId = _lastPerTrackSyncSongId == song.id;
+    final withinDedupeWindow = _lastPerTrackSyncAt != null &&
+        now.difference(_lastPerTrackSyncAt!) <
+            const Duration(milliseconds: 400);
+    if (sameId && withinDedupeWindow) return;
+    _lastPerTrackSyncSongId = song.id;
+    _lastPerTrackSyncAt = now;
+
+    // The stores load their SharedPreferences map asynchronously; reading
+    // before `ready` completes returns defaults (0/null) and silently drops
+    // the saved per-song overrides.
+    await Future.wait<void>([
+      _songRatingStore.ready,
+      _perSongEqStore.ready,
+      _perSongVolumeStore.ready,
+    ]);
+    if (isClosed) return;
+
+    final trackKey = song.id.toString();
+    final songRating = _songRatingStore.getRating(trackKey);
+    final songEq = _perSongEqStore.getPresetForTrack(trackKey);
+    final songVol = _perSongVolumeStore.getGainDbForTrack(trackKey);
+
+    var delayMs = state.trackDelayMs;
+    try {
+      delayMs = _audioHandler.currentTrackDelayMs;
+    } catch (_) {}
     safeEmit(state.copyWith(
-        abLoopEnabled: false, abPointA: null, abPointB: null));
+      abPointA: null,
+      abPointB: null,
+      abLoopEnabled: false,
+      trackDelayMs: delayMs,
+      bookmarkPosition: null,
+      currentSongRating: songRating,
+      currentSongEqOverride: songEq,
+      currentSongVolumeOverrideDb: songVol,
+    ));
+    unawaited(_syncAbLoopUi(song));
+    try {
+      checkBookmarkOffer();
+    } catch (e, st) {
+      ErrorLogger.log('Bookmark offer check failed',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+    }
+
+    if (songEq != null) {
+      if (!_perSongOverrideActive) {
+        _globalEqBackup = state.eqPreset;
+        _globalHeadphoneProfileBackup = state.selectedHeadphoneProfile;
+        _perSongOverrideActive = true;
+      }
+      final lower = songEq.toLowerCase();
+      final match = EqPreset.defaultPresets
+          .where((p) => p.name.toLowerCase() == lower)
+          .firstOrNull;
+      if (match != null) {
+        unawaited(applyPreset(match, isPerSongRestore: true));
+      } else {
+        try {
+          final custom = _equalizerCustomPresets()
+              .where((p) => p.name.toLowerCase() == lower)
+              .firstOrNull;
+          if (custom != null) {
+            unawaited(applyPreset(custom, isPerSongRestore: true));
+          } else {
+            unawaited(() async {
+              final hp = await _headphoneProfileByName(songEq);
+              if (hp != null && !isClosed) {
+                await applyHeadphoneProfile(hp, isPerSongRestore: true);
+              }
+            }());
+          }
+        } catch (_) {}
+      }
+    } else if (_perSongOverrideActive && _globalEqBackup != null) {
+      final restore = _globalEqBackup!;
+      final profileRestore = _globalHeadphoneProfileBackup;
+      _globalEqBackup = null;
+      _globalHeadphoneProfileBackup = null;
+      _perSongOverrideActive = false;
+      unawaited(profileRestore != null
+          ? applyHeadphoneProfile(profileRestore, isPerSongRestore: true)
+          : applyPreset(restore, isPerSongRestore: true));
+    }
+    // Push per-song volume so the emitted override is actually audible.
+    // setVolume combines master + ReplayGain + per-song gain in the handler.
+    try {
+      unawaited(_audioHandler.setVolume(_audioHandler.volume));
+    } catch (e, st) {
+      ErrorLogger.log('Per-song volume push failed',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+    }
   }
 
   /// Syncs AB-loop UI with the (possibly restored) handler state after a
@@ -3303,13 +3901,13 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
 
   // ── F2: per-track delay ──────────────────────────────────────────────
   Future<void> setTrackDelayMs(int ms) async {
-    await _audioHandler.setCurrentTrackDelay(ms);
-    safeEmit(state.copyWith(trackDelayMs: ms.clamp(-2000, 2000)));
+    final clamped = ms.clamp(-2000, 2000);
+    await _audioHandler.setCurrentTrackDelay(clamped);
+    safeEmit(state.copyWith(trackDelayMs: clamped));
   }
 
   void syncTrackDelay() {
-    safeEmit(
-        state.copyWith(trackDelayMs: _audioHandler.currentTrackDelayMs));
+    safeEmit(state.copyWith(trackDelayMs: _audioHandler.currentTrackDelayMs));
   }
 
   // ── BPM override (feeds BPM-synced crossfade) ──────────────────────
@@ -3359,11 +3957,10 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     try {
       final key = PlaybackBookmarkStore.keyFor(
           songId: song.id, remoteId: song.remoteId, path: song.path);
-      _audioHandler.bookmarkStore.save(key, posMs,
-          durationMs: state.duration.inMilliseconds);
+      _audioHandler.bookmarkStore
+          .save(key, posMs, durationMs: state.duration.inMilliseconds);
       await _audioHandler.persistBookmarks();
-      safeEmit(
-          state.copyWith(bookmarkPosition: Duration(milliseconds: posMs)));
+      safeEmit(state.copyWith(bookmarkPosition: Duration(milliseconds: posMs)));
       return true;
     } catch (_) {
       return false;
@@ -3407,6 +4004,10 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     try {
       final profile = await service.loadActiveProfile();
       if (profile == null || isClosed) return;
+      // Reload the snapshot captured when the mode was last enabled: the
+      // in-memory one did not survive the process, and without it disabling
+      // Quran Mode would leave its vocal EQ/reverb/dynamics applied.
+      _quranRestore ??= await _loadQuranSnapshot();
       safeEmit(state.copyWith(
         quranReciterStyle: profile.style,
         isQuranModeEnabled: true,
@@ -3424,19 +4025,22 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     if (enabled == state.isQuranModeEnabled) return;
     if (enabled) {
       _quranRestore = _captureQuranRestoreSnapshot();
+      await _persistQuranSnapshot(_quranRestore!);
       await _applyQuranProfile(state.quranReciterStyle);
       await _quranModeService?.setEnabled(true);
       if (!isClosed) {
-        safeEmit(
-            state.copyWith(isQuranModeEnabled: true, errorMessage: null));
+        safeEmit(state.copyWith(isQuranModeEnabled: true, errorMessage: null));
       }
     } else {
       await _quranModeService?.setEnabled(false);
+      // Fall back to the persisted snapshot when the in-memory one is gone
+      // (mode restored on launch, then disabled in this session).
+      _quranRestore ??= await _loadQuranSnapshot();
       await _restoreQuranSnapshot();
       _quranRestore = null;
+      await _clearQuranSnapshot();
       if (!isClosed) {
-        safeEmit(
-            state.copyWith(isQuranModeEnabled: false, errorMessage: null));
+        safeEmit(state.copyWith(isQuranModeEnabled: false, errorMessage: null));
       }
     }
   }
@@ -3579,30 +4183,65 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
         preset: s.reverbPreset, wetDry: s.reverbWetDry);
     await setDynamicsPreset(s.dynamicsPreset, enabled: s.isDynamicsEnabled);
     await setSaturation(s.isSaturationEnabled,
-        drive: s.saturationDrive,
-        mix: s.saturationMix,
-        tilt: s.saturationTilt);
+        drive: s.saturationDrive, mix: s.saturationMix, tilt: s.saturationTilt);
     await setPlaybackSpeed(s.playbackSpeed);
     if (state.isShuffle != s.isShuffle) {
       await toggleShuffle();
     }
   }
 
+  Future<void> _persistQuranSnapshot(_QuranRestoreSnapshot snapshot) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+          PrefsKeys.quranRestoreSnapshot, jsonEncode(snapshot.toJson()));
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist Quran Mode restore snapshot',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+    }
+  }
+
+  Future<_QuranRestoreSnapshot?> _loadQuranSnapshot() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(PrefsKeys.quranRestoreSnapshot);
+      if (raw == null || raw.isEmpty) return null;
+      return _QuranRestoreSnapshot.fromJson(
+          jsonDecode(raw) as Map<String, dynamic>);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load Quran Mode restore snapshot',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+      return null;
+    }
+  }
+
+  Future<void> _clearQuranSnapshot() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(PrefsKeys.quranRestoreSnapshot);
+    } catch (_) {}
+  }
+
   // ── F9: DSP snapshot ─────────────────────────────────────────────────
   Future<void> saveDspSnapshot() => _audioHandler.saveDspSnapshotForCurrent();
 
   @override
-  Future<void> close() {
+  Future<void> close() async {
     _persistQueueDebounce?.cancel();
     _scrobbleDebounce?.cancel();
     _seekThrottleTimer?.cancel();
     _seekThrottleTimer = null;
     _pendingSeek = null;
-    _widgetClickSub?.cancel();
+    try {
+      await _widgetClickSub?.cancel();
+    } catch (_) {}
+    _widgetClickSub = null;
     // Final persist: the cancelled debounce would otherwise lose the most
     // recent slot state (e.g. the near-live position written by the position
-    // listener).
-    unawaited(_persistQueueSlots());
+    // listener). Awaited so the write lands before the cubit is gone.
+    try {
+      await _persistQueueSlots();
+    } catch (_) {}
     return super.close();
   }
 }

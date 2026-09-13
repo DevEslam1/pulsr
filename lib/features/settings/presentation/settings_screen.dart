@@ -20,6 +20,7 @@ import 'widgets/audio_sound_section.dart';
 import 'widgets/automation_rules_sheet.dart';
 import 'widgets/backup_section.dart';
 import 'widgets/device_profiles_section.dart';
+import 'widgets/smart_audio_section.dart';
 import 'widgets/playback_section.dart';
 import 'widgets/scrobbler_settings_modal.dart';
 import 'widgets/settings_hero_card.dart';
@@ -675,7 +676,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           right: Adaptive.pagePadding(context),
         ),
         children: [
-          const SettingsHeroCard(),
+          if (AppConfig.isCloudSyncAllowed) const SettingsHeroCard(),
           ..._buildCategoryWidgets(context, 'audio', state, cubit),
           ..._buildCategoryWidgets(context, 'playback', state, cubit),
           ..._buildCategoryWidgets(context, 'appearance', state, cubit),
@@ -818,6 +819,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return [
           _section(
             context,
+            'SMART AUDIO',
+            'Automatic headphone correction and best-quality output',
+            [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: SmartAudioSection(),
+              ),
+            ],
+          ),
+          _section(
+            context,
             'DEVICE PROFILES',
             'Per-output DAC and Bluetooth profile mappings',
             [
@@ -860,7 +872,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ];
       case 'privacy':
         return [
-          const SettingsHeroCard(),
+          if (AppConfig.isCloudSyncAllowed) const SettingsHeroCard(),
           _buildPrivacyBackupSection(context),
         ];
       case 'about':
@@ -1325,6 +1337,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       'Online streams, downloads, proxy routing and quality settings',
       [
         if (AppConfig.ytmEnabled) ...[
+          // Account + web-player entries trigger network; hide them when the
+          // user has turned on offline-only mode (Home/Search already do).
+          if (!state.offlineOnlyMode) ...[
           () {
             final ytmAccount = getIt<YtmAccountService>();
             return ValueListenableBuilder<bool>(
@@ -1369,6 +1384,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () => showYtmWebOptionsSheet(context),
           ),
           _divider(p),
+          ],
           _switchTile(
             context,
             Icons.cloud_off_rounded,
@@ -1502,14 +1518,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'Listening history and scrobble analytics overview',
           onTap: () => context.push('/scrobble-stats'),
         ),
-        _divider(p),
-        _navTile(
-          context,
-          Icons.cloud_sync_rounded,
-          'Cloud Backup Dashboard',
-          'Manage synchronized devices and cloud backup snapshots',
-          onTap: () => context.push('/cloud-backup-dashboard'),
-        ),
+        if (AppConfig.isCloudSyncAllowed) ...[
+          _divider(p),
+          _navTile(
+            context,
+            Icons.cloud_sync_rounded,
+            'Cloud Backup Dashboard',
+            'Manage synchronized devices and cloud backup snapshots',
+            onTap: () => context.push('/cloud-backup-dashboard'),
+          ),
+        ],
         _divider(p),
         _navTile(
           context,

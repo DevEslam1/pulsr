@@ -282,10 +282,13 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
       case SmartRuleField.lastPlayed:
         if (rule.operator == SmartOperator.withinDays) {
           final days = valInt ?? 30;
-          final cutoffSec =
-              DateTime.now().millisecondsSinceEpoch ~/ 1000 - (days * 86400);
+          // last_played is written in milliseconds (recordPlayHistory), unlike
+          // date_added which is MediaStore seconds. Comparing it to a seconds
+          // cutoff matched every track, so use a millisecond cutoff here.
+          final cutoffMs = DateTime.now().millisecondsSinceEpoch -
+              (days * 86400 * 1000);
           return t.lastPlayed.isNotNull() &
-              t.lastPlayed.isBiggerOrEqualValue(cutoffSec);
+              t.lastPlayed.isBiggerOrEqualValue(cutoffMs);
         }
         if (rule.operator == SmartOperator.between) {
           final b = _parseIntBetween(valStr);

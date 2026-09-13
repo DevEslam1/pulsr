@@ -1640,14 +1640,23 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     final info = await _hiResAudioService.getAudioOutputInfo();
     final caps = await DsdDecoderHelper.probeDopCapabilities();
     final previous = state.currentOutputDevice;
-    final savedSampleRate =
-        (previous?.targetSampleRate != null && previous!.targetSampleRate > 0)
-            ? previous.targetSampleRate
-            : 0;
-    final savedBitDepth =
-        (previous?.targetBitDepth != null && previous!.targetBitDepth > 0)
-            ? previous.targetBitDepth
-            : 0;
+    // Drop stale DAC targets when the route changes (e.g. USB -> speaker/BT);
+    // otherwise a 192k DAC request is re-sent to the phone speaker.
+    final routeChanged = previous != null &&
+        (previous.deviceName != info.deviceName ||
+            previous.activeDeviceType != info.activeDeviceType ||
+            previous.isBluetooth != info.isBluetooth ||
+            previous.isUsbDac != info.isUsbDac);
+    final savedSampleRate = (!routeChanged &&
+            previous?.targetSampleRate != null &&
+            previous!.targetSampleRate > 0)
+        ? previous.targetSampleRate
+        : 0;
+    final savedBitDepth = (!routeChanged &&
+            previous?.targetBitDepth != null &&
+            previous!.targetBitDepth > 0)
+        ? previous.targetBitDepth
+        : 0;
 
     if (isClosed) return;
     safeEmit(

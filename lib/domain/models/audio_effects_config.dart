@@ -19,46 +19,11 @@ enum DynamicsPreset {
   const DynamicsPreset(this.label, this.description);
 }
 
-class CustomDynamicsPreset {
-  final String id;
-  final String name;
-  final DynamicsPreset basePreset;
-  final double? thresholdOverride;
-  final double? ratioOverride;
-  final double? postGainOverride;
+// TODO(H-6): CustomDynamicsPreset was removed because thresholdOverride / ratioOverride /
+// postGainOverride were never transmitted to native — only the preset name was sent.
+// To implement custom dynamics, extend the setDynamicsPreset MethodChannel call to accept
+// per-band threshold, ratio, and postGain, and handle them in AudioEffectsPlugin.kt.
 
-  const CustomDynamicsPreset({
-    required this.id,
-    required this.name,
-    required this.basePreset,
-    this.thresholdOverride,
-    this.ratioOverride,
-    this.postGainOverride,
-  });
-
-  factory CustomDynamicsPreset.fromJson(Map<String, dynamic> json) {
-    return CustomDynamicsPreset(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      basePreset: DynamicsPreset.values.firstWhere(
-        (d) => d.name == json['basePreset'],
-        orElse: () => DynamicsPreset.studioPunch,
-      ),
-      thresholdOverride: (json['thresholdOverride'] as num?)?.toDouble(),
-      ratioOverride: (json['ratioOverride'] as num?)?.toDouble(),
-      postGainOverride: (json['postGainOverride'] as num?)?.toDouble(),
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'basePreset': basePreset.name,
-        if (thresholdOverride != null) 'thresholdOverride': thresholdOverride,
-        if (ratioOverride != null) 'ratioOverride': ratioOverride,
-        if (postGainOverride != null) 'postGainOverride': postGainOverride,
-      };
-}
 
 class AudioEffectsConfig {
   final bool isVirtualizerEnabled;

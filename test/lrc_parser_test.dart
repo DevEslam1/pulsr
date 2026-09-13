@@ -88,6 +88,16 @@ Third line of plain lyric
       expect(linesNeg[0].timestamp, const Duration(seconds: 4, milliseconds: 500));
     });
 
+    test('parses colon-separated hundredths ([mm:ss:xx])', () {
+      const lrc = '[00:12:34]Colon-format lyric';
+      final lines = LrcParser.parse(lrc);
+
+      expect(lines.length, 1);
+      expect(lines[0].text, 'Colon-format lyric');
+      expect(
+          lines[0].timestamp, const Duration(seconds: 12, milliseconds: 340));
+    });
+
     test('strips word-level karaoke tags from enhanced LRC', () {
       const lrc = '[00:10.00]<00:10.00>Hello <00:10.50>world <00:11.00>!';
       final lines = LrcParser.parse(lrc);

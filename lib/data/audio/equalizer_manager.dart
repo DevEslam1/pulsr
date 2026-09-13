@@ -196,6 +196,7 @@ class EqualizerManager {
   // ViPER-DDC
   bool isViperDdcEnabled = false;
   String viperDdcProfileName = '';
+  String viperDdcContent = '';
 
   // Arbitrary Response EQ (EqualizerAPO GraphicEq)
   bool isArbitraryEqEnabled = false;
@@ -233,7 +234,7 @@ class EqualizerManager {
   HeadphoneProfile? selectedHeadphoneProfile;
 
   List<double> customFrequencies = List.from(EqPreset.centerFrequencies);
-  List<double> custom32Frequencies = List.from(EqPreset.iso32Frequencies);
+  List<double> custom32Frequencies = List.from(EqPreset.iso32BandFrequencies);
   List<double> custom64Frequencies = List.from(EqPreset.iso64Frequencies);
 
   // A/B/C/D Comparison Slots
@@ -560,6 +561,8 @@ class EqualizerManager {
           prefs.getBool(PrefsKeys.viperDdcEnabled) ?? false;
       viperDdcProfileName =
           prefs.getString(PrefsKeys.viperDdcProfileName) ?? '';
+      viperDdcContent =
+          prefs.getString(PrefsKeys.viperDdcContent) ?? '';
       isArbitraryEqEnabled =
           prefs.getBool(PrefsKeys.arbitraryEqEnabled) ?? false;
       arbitraryEqString =
@@ -647,7 +650,8 @@ class EqualizerManager {
       if (volumeBoost > 0) {
         pendingFutures.add(setVolumeBoost(volumeBoost));
       }
-      if (isVirtualizerEnabled) {
+      if (isVirtualizerEnabled && _effectsChannel.isVirtualizerSupported) {
+        // FIX M-9: skip no-op IPC when virtualizer is not supported
         pendingFutures.add(_effectsChannel.setVirtualizerEnabled(true));
         pendingFutures.add(
           _effectsChannel.setVirtualizerStrength(virtualizerStrength),
@@ -771,6 +775,12 @@ class EqualizerManager {
         );
       }
       if (isViperDdcEnabled) {
+        if (viperDdcContent.isNotEmpty) {
+          pendingFutures.add(_effectsChannel.loadViperDdc(
+            ddcContent: viperDdcContent,
+            profileName: viperDdcProfileName,
+          ));
+        }
         pendingFutures.add(_effectsChannel.setViperDdcEnabled(true));
       }
       if (isArbitraryEqEnabled && arbitraryEqString.isNotEmpty) {
@@ -822,6 +832,9 @@ class EqualizerManager {
   }
 
   Future<void> _savePreferences() async {
+    // Battery degrade must never clobber saved ON prefs — covers both the
+    // debounced path and direct await _savePreferences() call sites.
+    if (_isDegradedForPower) return;
     // Serialize concurrent preference writes to prevent torn reads/writes
     // when multiple effects are toggled rapidly.
     await _effectsLock.lock(() => _performSavePreferences());
@@ -916,6 +929,7 @@ class EqualizerManager {
         PrefsKeys.dynamicBassPreset: dynamicBassPreset,
         PrefsKeys.viperDdcEnabled: isViperDdcEnabled,
         PrefsKeys.viperDdcProfileName: viperDdcProfileName,
+        PrefsKeys.viperDdcContent: viperDdcContent,
         PrefsKeys.arbitraryEqEnabled: isArbitraryEqEnabled,
         PrefsKeys.arbitraryEqString: arbitraryEqString,
         PrefsKeys.liveProgEnabled: isLiveProgEnabled,
@@ -967,13 +981,21 @@ class EqualizerManager {
       );
       return;
     }
+    final int oldBandCount = eqBandCount;
     eqBandCount = count;
     final targetFreqs = activeFrequencies;
+    
+    final Map<int, List<double>> updatedBandsMap = Map<int, List<double>>.from(currentPreset.bandsMap);
     final interpolated = EqPreset.interpolateGains(
       currentPreset.gains,
       targetFrequencies: targetFreqs,
+      bandsMap: updatedBandsMap,
+      currentBandCount: oldBandCount,
     );
-    currentPreset = currentPreset.copyWith(gains: interpolated);
+    currentPreset = currentPreset.copyWith(
+      gains: interpolated,
+      bandsMap: updatedBandsMap,
+    );
 
     if (PlatformCapabilities.isAndroid) {
       // Single bulk JNI hop (was 32 hops, 150-300ms jank) + fallback for legacy 10-band path
@@ -1445,6 +1467,9 @@ class EqualizerManager {
   }
 
   Future<void> setVirtualizerEnabled(bool enabled) async {
+    // FIX M-9: skip no-op IPC when virtualizer is not supported
+    if (!_effectsChannel.isVirtualizerSupported) return;
+    
     final previous = isVirtualizerEnabled;
     isVirtualizerEnabled = enabled;
     try {
@@ -1470,6 +1495,9 @@ class EqualizerManager {
   }
 
   Future<void> setVirtualizerStrength(double strength) async {
+    // FIX M-9: skip no-op IPC when virtualizer is not supported
+    if (!_effectsChannel.isVirtualizerSupported) return;
+    
     virtualizerStrength = strength.clamp(0.0, 1.0);
     final applied = await _effectsChannel.setVirtualizerStrength(
       virtualizerStrength,
@@ -1669,7 +1697,8 @@ class EqualizerManager {
     if (wetDry != null) reverbWetDry = wetDry;
     if (PlatformCapabilities.isAndroid) {
       if (preset != null) await _effectsChannel.setReverbPreset(preset);
-      if (wetDry != null) await _effectsChannel.setReverbWetDry(wetDry);
+      // FIX M-7: always sync wet/dry after preset change so DSP is not stale
+      await _effectsChannel.setReverbWetDry(wetDry ?? reverbWetDry);
       await _effectsChannel.setReverbEnabled(enabled);
     }
     _debouncedSavePreferences();
@@ -1751,6 +1780,7 @@ class EqualizerManager {
   bool _savedViperDdcEnabled = false;
   bool _savedArbitraryEqEnabled = false;
   bool _savedLiveProgEnabled = false;
+  DynamicsPreset _savedDynamicsPreset = DynamicsPreset.off;
 
   bool get isDegradedForPower => _isDegradedForPower;
 
@@ -1768,6 +1798,7 @@ class EqualizerManager {
     _savedSubCrossoverEnabled = isSubCrossoverEnabled;
     _savedDynamicEqEnabled = isDynamicEqEnabled;
     _savedDynamicsEnabled = isDynamicsEnabled;
+    _savedDynamicsPreset = dynamicsPreset;
     _savedLimiterEnabled = isLimiterEnabled;
     _savedViperDdcEnabled = isViperDdcEnabled;
     _savedArbitraryEqEnabled = isArbitraryEqEnabled;
@@ -1803,7 +1834,7 @@ class EqualizerManager {
     if (_savedSubCrossoverEnabled) await setSubCrossover(true);
     if (_savedDynamicEqEnabled) await setDynamicEq(true);
     if (_savedDynamicsEnabled) {
-      await setDynamicsPreset(dynamicsPreset, enabled: true);
+      await setDynamicsPreset(_savedDynamicsPreset, enabled: true);
     }
     if (_savedLimiterEnabled) await setLookaheadLimiter(true);
     if (_savedViperDdcEnabled) await setViperDdc(true);
@@ -1857,13 +1888,24 @@ class EqualizerManager {
     bool enabled, {
     String? profileName,
     List<double>? coeffs,
+    String? ddcContent,
   }) async {
     isViperDdcEnabled = enabled;
     if (profileName != null) viperDdcProfileName = profileName;
+    final resolvedContent =
+        ddcContent ?? (coeffs != null && coeffs.isNotEmpty ? coeffs.join(' ') : null);
+    if (resolvedContent != null && resolvedContent.isNotEmpty) {
+      viperDdcContent = resolvedContent;
+    }
     if (PlatformCapabilities.isAndroid) {
-      if (coeffs != null && coeffs.isNotEmpty) {
+      if (viperDdcContent.isNotEmpty && enabled) {
         await _effectsChannel.loadViperDdc(
-          ddcContent: coeffs.join(' '),
+          ddcContent: viperDdcContent,
+          profileName: viperDdcProfileName,
+        );
+      } else if (resolvedContent != null && resolvedContent.isNotEmpty) {
+        await _effectsChannel.loadViperDdc(
+          ddcContent: resolvedContent,
           profileName: profileName ?? viperDdcProfileName,
         );
       }
@@ -2040,6 +2082,28 @@ class EqualizerManager {
         filterType: band.filterType,
         enabled: band.enabled,
       );
+    }
+    _debouncedSavePreferences();
+  }
+
+  Future<void> addDynamicEqBand() async {
+    if (dynamicEqBands.length >= 8) return;
+    final bands = List<DynamicEqBandConfig>.from(dynamicEqBands);
+    bands.add(const DynamicEqBandConfig());
+    dynamicEqBands = bands;
+    if (PlatformCapabilities.isAndroid && isDynamicEqEnabled) {
+      await _pushDynamicEqConfig();
+    }
+    _debouncedSavePreferences();
+  }
+
+  Future<void> removeDynamicEqBand(int index) async {
+    if (index < 0 || index >= dynamicEqBands.length) return;
+    final bands = List<DynamicEqBandConfig>.from(dynamicEqBands);
+    bands.removeAt(index);
+    dynamicEqBands = bands;
+    if (PlatformCapabilities.isAndroid && isDynamicEqEnabled) {
+      await _pushDynamicEqConfig();
     }
     _debouncedSavePreferences();
   }
@@ -2293,6 +2357,9 @@ class EqualizerManager {
   Future<void> _reattachChain = Future<void>.value();
   int? _pendingReattachSessionId;
   int? _lastAppliedSessionId;
+  /// Last audio session the HAL chain was successfully bound to.
+  /// Exposed for diagnostics; written on reattach success, cleared on failure.
+  int? get lastAppliedSessionId => _lastAppliedSessionId;
 
   /// Re-attaches all active effects to a new [sessionId] that ExoPlayer
   /// creates after `stop()` + `setAudioSource()`. This is called every time
@@ -2367,13 +2434,9 @@ class EqualizerManager {
       );
       return;
     }
-    if (sessionId == _lastAppliedSessionId) {
-      ErrorLogger.log(
-        'Skipping reattach: same session ID already applied ($sessionId)',
-        category: 'EqualizerManager',
-      );
-      return;
-    }
+    // FIX M-11: ExoPlayer can reuse same session ID after underrun/gapless;
+    // always reapply to ensure effects survive AudioTrack recreation.
+    // We still gate on an identical full-state fingerprint below if needed.
     try {
       ErrorLogger.log(
         'Reattaching effects to session $sessionId',
@@ -2484,7 +2547,8 @@ class EqualizerManager {
       final milliBels = (volumeBoost.clamp(0.0, 1.0) * 1000).round();
       futures.add(_effectsChannel.setVolumeBoost(milliBels));
     }
-    if (isVirtualizerEnabled) {
+    if (isVirtualizerEnabled && _effectsChannel.isVirtualizerSupported) {
+      // FIX M-9: skip no-op IPC when virtualizer is not supported
       futures.add(_effectsChannel.setVirtualizerEnabled(true));
       futures.add(_effectsChannel.setVirtualizerStrength(virtualizerStrength));
     }

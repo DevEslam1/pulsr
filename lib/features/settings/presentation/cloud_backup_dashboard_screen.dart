@@ -19,11 +19,6 @@ class _CloudBackupDashboardScreenState
     extends State<CloudBackupDashboardScreen> {
   late final CloudSyncService _syncService;
   bool _isSyncing = false;
-  bool _syncFavorites = true;
-  bool _syncPlaylists = true;
-  bool _syncHistory = true;
-  bool _syncEqPresets = true;
-  bool _syncSettings = true;
 
   @override
   void initState() {
@@ -132,48 +127,18 @@ class _CloudBackupDashboardScreenState
           const SizedBox(height: 24),
 
           Text(
-            'Selective Backup Targets',
+            'What gets synced',
             style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
                 color: p.textPrimary),
           ),
-          const SizedBox(height: 12),
-
-          CheckboxListTile(
-            title: Text('Starred & Favorite Songs',
-                style: TextStyle(color: p.textPrimary)),
-            value: _syncFavorites,
-            activeColor: p.primary,
-            onChanged: (val) => setState(() => _syncFavorites = val ?? true),
-          ),
-          CheckboxListTile(
-            title: Text('Playlists & Smart Rules',
-                style: TextStyle(color: p.textPrimary)),
-            value: _syncPlaylists,
-            activeColor: p.primary,
-            onChanged: (val) => setState(() => _syncPlaylists = val ?? true),
-          ),
-          CheckboxListTile(
-            title: Text('Play History & Track Counters',
-                style: TextStyle(color: p.textPrimary)),
-            value: _syncHistory,
-            activeColor: p.primary,
-            onChanged: (val) => setState(() => _syncHistory = val ?? true),
-          ),
-          CheckboxListTile(
-            title: Text('Custom EQ Presets & DSP',
-                style: TextStyle(color: p.textPrimary)),
-            value: _syncEqPresets,
-            activeColor: p.primary,
-            onChanged: (val) => setState(() => _syncEqPresets = val ?? true),
-          ),
-          CheckboxListTile(
-            title: Text('App Settings & Theme Profiles',
-                style: TextStyle(color: p.textPrimary)),
-            value: _syncSettings,
-            activeColor: p.primary,
-            onChanged: (val) => setState(() => _syncSettings = val ?? true),
+          const SizedBox(height: 8),
+          Text(
+            'Favorites, playlists, play history and library metadata are '
+            'synced in both directions. DSP presets and app settings stay on '
+            'this device.',
+            style: TextStyle(fontSize: 13, color: p.textSecondary),
           ),
           const SizedBox(height: 24),
 

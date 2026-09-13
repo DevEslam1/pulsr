@@ -46,7 +46,7 @@ private:
     // Per-band ballistics
     double attackCoeff_[NUM_BANDS] = {};
     double releaseCoeff_[NUM_BANDS] = {};
-    double envelopeDb_[NUM_BANDS] = {};
+    double envelopeDb_[NUM_BANDS] = {};    // linear amplitude envelope per band (attack/release smoothed)
     double smoothedGainDb_[NUM_BANDS] = {};
     double currentGainReductionDb_[NUM_BANDS] = {};
 

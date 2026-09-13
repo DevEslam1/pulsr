@@ -61,6 +61,7 @@ class EqPreset {
   final double bassBoost; // 0.0 to 1.0
   final List<double>? customFrequencies;
   final List<double>? qFactors;
+  final Map<int, List<double>> bandsMap;
 
   const EqPreset({
     required this.name,
@@ -68,6 +69,7 @@ class EqPreset {
     this.bassBoost = 0.0,
     this.customFrequencies,
     this.qFactors,
+    this.bandsMap = const {},
   });
 
   EqPreset copyWith({
@@ -76,6 +78,7 @@ class EqPreset {
     double? bassBoost,
     List<double>? customFrequencies,
     List<double>? qFactors,
+    Map<int, List<double>>? bandsMap,
   }) {
     return EqPreset(
       name: name ?? this.name,
@@ -83,6 +86,7 @@ class EqPreset {
       bassBoost: bassBoost ?? this.bassBoost,
       customFrequencies: customFrequencies ?? this.customFrequencies,
       qFactors: qFactors ?? this.qFactors,
+      bandsMap: bandsMap ?? this.bandsMap,
     );
   }
 
@@ -92,6 +96,7 @@ class EqPreset {
         'bassBoost': bassBoost,
         if (customFrequencies != null) 'customFrequencies': customFrequencies,
         if (qFactors != null) 'qFactors': qFactors,
+        if (bandsMap.isNotEmpty) 'bandsMap': bandsMap.map((k, v) => MapEntry(k.toString(), v)),
       };
 
   factory EqPreset.fromJson(Map<String, dynamic> json) {
@@ -101,6 +106,17 @@ class EqPreset {
     final customFreqs = rawFreqs?.map((e) => (e as num).toDouble()).toList();
     final rawQs = json['qFactors'] as List<dynamic>?;
     final qs = rawQs?.map((e) => (e as num).toDouble()).toList();
+    
+    final rawBandsMap = json['bandsMap'] as Map<String, dynamic>?;
+    final parsedBandsMap = <int, List<double>>{};
+    if (rawBandsMap != null) {
+      rawBandsMap.forEach((key, value) {
+        final intKey = int.tryParse(key);
+        if (intKey != null && value is List) {
+          parsedBandsMap[intKey] = value.map((e) => (e as num).toDouble()).toList();
+        }
+      });
+    }
 
     return EqPreset(
       name: json['name'] as String? ?? 'Custom',
@@ -108,6 +124,7 @@ class EqPreset {
       bassBoost: (json['bassBoost'] as num?)?.toDouble() ?? 0.0,
       customFrequencies: customFreqs,
       qFactors: qs,
+      bandsMap: parsedBandsMap,
     );
   }
 
@@ -125,7 +142,7 @@ class EqPreset {
     16000,
   ];
 
-  /// ISO 32-band 1/3-octave studio parametric EQ centers (Hz).
+  /// ISO 31-band 1/3-octave studio parametric EQ centers (Hz).
   static const List<double> iso32Frequencies = [
     20,
     25,
@@ -158,8 +175,14 @@ class EqPreset {
     12500,
     16000,
     20000,
-    24000,
   ];
+
+  /// Default centers for the UI's "32-band" mode. The ISO 1/3-octave series
+  /// ([iso32Frequencies]) is 31 bands, which made the 10/32/64 toggle unable
+  /// to ever highlight 32 and silently rejected the custom editor. This is a
+  /// true 32-entry log-spaced layout spanning 20 Hz–20 kHz.
+  static final List<double> iso32BandFrequencies =
+      _logSpread(32, const [20.0, 20000.0]);
 
   /// 64-band log-spaced centers (Hz) spanning 20 Hz to 20 kHz. PowerAmp-parity
   /// high-resolution graphic EQ; log-spacing keeps the bands perceptually even.
@@ -173,8 +196,18 @@ class EqPreset {
   static List<double> interpolateGains(
     List<double> source, {
     List<double> targetFrequencies = centerFrequencies,
+    Map<int, List<double>>? bandsMap,
+    int? currentBandCount,
   }) {
+    if (bandsMap != null && currentBandCount != null) {
+      bandsMap[currentBandCount] = List<double>.from(source);
+    }
+    
     final n = targetFrequencies.length;
+    if (bandsMap != null && bandsMap.containsKey(n)) {
+      return List<double>.from(bandsMap[n]!);
+    }
+
     if (source.length == n) return List<double>.from(source);
     if (source.isEmpty) return List<double>.filled(n, 0.0);
     if (source.length == 1) return List<double>.filled(n, source.first);

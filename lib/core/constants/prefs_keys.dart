@@ -38,6 +38,7 @@ class PrefsKeys {
       'setting_replay_gain_preamp_without_rg';
   static const String sleepTimerTarget = 'sleep_timer_target';
   static const String queueSlots = 'queue_slots_v1';
+  static const String queueActiveSlot = 'queue_active_slot_v1';
   static const String ytdlpBackendEnabled = 'setting_ytdlp_backend_enabled';
   static const String ytdlpBackendUrl = 'setting_ytdlp_backend_url';
   static const String ytdlpBackendToken = 'setting_ytdlp_backend_token';
@@ -125,6 +126,7 @@ class PrefsKeys {
   static const String saturationMultiband = 'setting_saturation_multiband';
   static const String viperDdcEnabled = 'setting_viper_ddc_enabled';
   static const String viperDdcProfileName = 'setting_viper_ddc_profile_name';
+  static const String viperDdcContent = 'setting_viper_ddc_content';
   static const String arbitraryEqEnabled = 'setting_arbitrary_eq_enabled';
   static const String arbitraryEqString = 'setting_arbitrary_eq_string';
   static const String liveProgEnabled = 'setting_live_prog_enabled';
@@ -198,6 +200,10 @@ class PrefsKeys {
   static const String ditherTargetBitDepth = 'setting_dither_target_bit_depth';
   static const String mqaDecodingEnabled = 'setting_mqa_decoding_enabled';
   static const String customReverbIrPath = 'setting_custom_reverb_ir_path';
+  // Snapshot of the user's DSP state captured when Quran Mode is enabled, so
+  // disabling it restores the pre-Quran EQ/reverb/dynamics even across a
+  // process restart (when the in-memory snapshot no longer exists).
+  static const String quranRestoreSnapshot = 'quran_restore_snapshot_v1';
   static const String spatializerEngine = 'setting_spatializer_engine'; // 'off' | 'systemHardware' | 'binauralAmbisonic'
   static const String exclusiveOffloadEnabled = 'setting_exclusive_offload_enabled';
 
@@ -247,4 +253,10 @@ class PrefsKeys {
   // or 'dop' (frame as DSD over PCM for a compatible USB DAC). Never
   // auto-enabled — DoP requires an explicit user choice plus a detected DAC.
   static const String dsdOutputMode = 'setting_dsd_output_mode';
+
+  // Smart Audio: 'auto' adapts AutoEQ + output quality to the connected device
+  // and track; 'manual' leaves the user's explicit choices untouched.
+  static const String smartAudioMode = 'setting_smart_audio_mode';
+  // Per-device AutoEQ matches remembered by device key (see DeviceProfileService).
+  static const String smartAudioAutoEqLinks = 'setting_smart_audio_autoeq_links';
 }

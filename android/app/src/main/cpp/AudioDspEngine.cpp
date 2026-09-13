@@ -243,8 +243,11 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         lastAppliedGeneration_.store(snapshot->generation);
     }
 
-    // Bit-Perfect / DoP bypass path: sample-identical to raw input, zero DSP roundtrips, volume locked to unity
-    if (snapshot->bitPerfect.enabled || snapshot->bitPerfect.isDop) {
+    // Bit-Perfect / DoP bypass path: sample-identical to raw input, zero DSP roundtrips, volume locked to unity.
+    // Gated on `enabled` only: a stale `isDop` must never keep the chain
+    // bypassed after the user disables bit-perfect. Callers must clear
+    // `enabled` (and `isDop`) together on disable.
+    if (snapshot->bitPerfect.enabled) {
         return frames;
     }
 
@@ -455,9 +458,17 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
             // Note: Limiter output protection is NEVER disabled during auto-degrade to prevent clipping.
             if (avgRtf > 0.80f) {
                 recoveryConsecutiveBlocks_ = 0;
-                // Cost order: REVERB -> SATURATION -> DYNEQ -> CROSSOVER -> WIDTH -> CROSSFEED -> PANNER -> EQ
+                // Cost order: REVERB -> MULTIBAND_COMPRESSOR -> DYNAMIC_BASS -> SATURATION -> DYNEQ -> CROSSOVER -> WIDTH -> CROSSFEED -> PANNER -> EQ
                 if ((rawStages & STAGE_REVERB) && !(currentDegraded & STAGE_REVERB)) {
                     triggerStageAutoDegrade(STAGE_REVERB);
+                    rtfCount_ = 0;
+                    rtfRingHead_ = 0;
+                } else if ((rawStages & STAGE_MULTIBAND_COMPRESSOR) && !(currentDegraded & STAGE_MULTIBAND_COMPRESSOR)) {
+                    triggerStageAutoDegrade(STAGE_MULTIBAND_COMPRESSOR);
+                    rtfCount_ = 0;
+                    rtfRingHead_ = 0;
+                } else if ((rawStages & STAGE_DYNAMIC_BASS) && !(currentDegraded & STAGE_DYNAMIC_BASS)) {
+                    triggerStageAutoDegrade(STAGE_DYNAMIC_BASS);
                     rtfCount_ = 0;
                     rtfRingHead_ = 0;
                 } else if ((rawStages & STAGE_SATURATION) && !(currentDegraded & STAGE_SATURATION)) {
@@ -494,7 +505,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
                 recoveryConsecutiveBlocks_++;
                 if (recoveryConsecutiveBlocks_ >= kRtfRecoveryWindowSize) {
                     recoveryConsecutiveBlocks_ = 0;
-                    // Reverse cost order: EQ -> PANNER -> CROSSFEED -> WIDTH -> CROSSOVER -> DYNEQ -> SATURATION -> REVERB
+                    // Reverse cost order: EQ -> PANNER -> CROSSFEED -> WIDTH -> CROSSOVER -> DYNEQ -> SATURATION -> DYNAMIC_BASS -> MULTIBAND_COMPRESSOR -> REVERB
                     if (currentDegraded & STAGE_EQ) {
                         eq_.reset();
                         recoverStageAutoDegrade(STAGE_EQ);
@@ -516,6 +527,12 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
                     } else if (currentDegraded & STAGE_SATURATION) {
                         saturation_.reset();
                         recoverStageAutoDegrade(STAGE_SATURATION);
+                    } else if (currentDegraded & STAGE_DYNAMIC_BASS) {
+                        dynamicBass_.reset();
+                        recoverStageAutoDegrade(STAGE_DYNAMIC_BASS);
+                    } else if (currentDegraded & STAGE_MULTIBAND_COMPRESSOR) {
+                        multibandCompressor_.reset();
+                        recoverStageAutoDegrade(STAGE_MULTIBAND_COMPRESSOR);
                     } else if (currentDegraded & STAGE_REVERB) {
                         reverb_.reset();
                         recoverStageAutoDegrade(STAGE_REVERB);

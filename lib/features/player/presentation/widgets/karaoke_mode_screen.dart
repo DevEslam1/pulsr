@@ -29,14 +29,19 @@ class KaraokeModeScreen extends StatelessWidget {
           prev.currentSong != curr.currentSong ||
           prev.duration != curr.duration ||
           prev.isPlaying != curr.isPlaying ||
+          prev.isLoadingLyrics != curr.isLoadingLyrics ||
           prev.lyrics != curr.lyrics,
       builder: (context, state) {
-        final pos = state.position - audibleOffset;
+        final rawPos = state.position - audibleOffset;
+        // Latency offset can exceed a near-zero position; never show/render a
+        // negative time.
+        final pos = rawPos.isNegative ? Duration.zero : rawPos;
         final song = state.currentSong;
 
-        // Prefer dynamic state.lyrics so track changes update immediately
-        final effectiveLyrics =
-            state.lyrics.isNotEmpty ? state.lyrics : lyrics;
+        // Use the live state only. Falling back to the constructor list showed
+        // the PREVIOUS song's lyrics during the window after a track change
+        // (state.lyrics is cleared while the new track's lyrics load).
+        final effectiveLyrics = state.lyrics;
 
         // Determine current active line index
         int activeIdx = -1;
@@ -110,6 +115,21 @@ class KaraokeModeScreen extends StatelessWidget {
           body: Column(
             children: [
               const Spacer(),
+              if (effectiveLyrics.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Text(
+                    state.isLoadingLyrics
+                        ? 'Loading lyrics…'
+                        : 'No lyrics found for this track',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white.withValues(alpha: 0.55),
+                    ),
+                  ),
+                ),
               // Active Lyric Line with Glow & Tap-to-Seek
               if (activeLine != null)
                 Padding(

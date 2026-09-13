@@ -33,6 +33,10 @@ class TestPulsrAudioHandler extends BaseAudioHandler
 
   double _vol = 1.0;
   @override
+  double get minPlaybackSpeed => 0.5;
+  @override
+  double get maxPlaybackSpeed => 3.0;
+  @override
   double get volume => _vol;
   @override
   SongsTableData? get currentSong => null;
@@ -194,6 +198,24 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   bool get isLiveProgEnabled => false;
   @override
   String get liveProgCode => '';
+  @override
+  bool get isDynamicBassEnabled => false;
+  @override
+  double get dynamicBassStrength => 1.0;
+  @override
+  int get dynamicBassPreset => 0;
+  @override
+  Future<void> setDynamicBass({
+    required bool enabled,
+    double? strength,
+    int? preset,
+    int? xLow,
+    int? xHigh,
+    int? yLow,
+    int? yHigh,
+    double? sideGainLow,
+    double? sideGainHigh,
+  }) async {}
 
   @override
   Future<void> setCrossfeed(bool enabled,
@@ -313,8 +335,8 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   Future<void> setDither(bool enabled, {int? targetBitDepth}) async {}
 
   @override
-  void dispose() {
-    _positionController.close();
+  Future<void> dispose() async {
+    await _positionController.close();
   }
 
   @override

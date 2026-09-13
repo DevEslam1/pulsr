@@ -7,6 +7,7 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'core/config/app_config.dart';
@@ -94,28 +95,37 @@ Future<void> main() async {
   void firePostStartupTasks() {
     // Run in next microtask so first frame draws before any I/O
     Future.microtask(() async {
+      // Respect the user's offline-only setting at cold start: it must disable
+      // every online initializer, not just the UI surfaces (mirrors
+      // CloudSyncService's runtime gate).
+      var offlineOnly = false;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        offlineOnly = prefs.getBool('setting_offline_only_mode') ?? false;
+      } catch (_) {}
+      final onlineAllowed = AppConfig.ytmEnabled && !offlineOnly;
       try {
         await Future.wait([
           // Pure builds have no INTERNET permission: skip every online
           // initializer so Pulsr Pure performs zero network work at startup.
-          if (AppConfig.ytmEnabled)
+          if (onlineAllowed)
             YtmRateLimiter.shared.restore().timeout(const Duration(seconds: 8)).catchError((e, st) {
               ErrorLogger.log('YtmRateLimiter restore failed or timed out',
                   error: e, stackTrace: st, category: 'Startup');
             }),
-          if (AppConfig.isCloudSyncAllowed)
+          if (AppConfig.isCloudSyncAllowed && !offlineOnly)
             getIt<AuthService>().initialize().timeout(const Duration(seconds: 8)).catchError((e, st) {
               ErrorLogger.log('AuthService initialize failed or timed out',
                   error: e, stackTrace: st, category: 'Startup');
             }),
-          if (AppConfig.ytmEnabled)
+          if (onlineAllowed)
             getIt<YtmAccountService>().init().timeout(const Duration(seconds: 8)).catchError((e, st) {
               ErrorLogger.log('YtmAccountService init failed or timed out',
                   error: e, stackTrace: st, category: 'Startup');
             }),
           // Rehydrate guest stream URLs saved by the previous run so a replay
           // or skip-back after launch resolves instantly.
-          if (AppConfig.ytmEnabled && getIt.isRegistered<YtmUrlCache>())
+          if (onlineAllowed && getIt.isRegistered<YtmUrlCache>())
             getIt<YtmUrlCache>().restore().timeout(const Duration(seconds: 8)).catchError((e, st) {
               ErrorLogger.log('YtmUrlCache restore failed or timed out',
                   error: e, stackTrace: st, category: 'Startup');
@@ -126,7 +136,7 @@ Future<void> main() async {
         // search/tap doesn't pay cold-start attestation (~seconds).
         // Fire-and-forget, guarded: never blocks or throws into startup.
         try {
-          if (AppConfig.ytmEnabled && getIt.isRegistered<YtmService>()) {
+          if (onlineAllowed && getIt.isRegistered<YtmService>()) {
             unawaited(getIt<YtmService>()
                 .preWarm()
                 .timeout(const Duration(seconds: 15))

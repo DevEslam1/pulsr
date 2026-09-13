@@ -34,6 +34,31 @@ class SpeedPickerSheet extends StatelessWidget {
     3.0,
   ];
 
+  /// Chips offered for the engine's active range. Falls back to the stable
+  /// 0.5-3.0 set; when the advanced 0.1-8.0 range is enabled it adds the
+  /// extended steps so the toggle is actually usable.
+  static List<double> speedOptionsFor(double min, double max) {
+    final base = <double>[
+      0.1,
+      0.25,
+      0.5,
+      0.75,
+      1.0,
+      1.25,
+      1.5,
+      2.0,
+      2.5,
+      3.0,
+      4.0,
+      5.0,
+      6.0,
+      8.0,
+    ];
+    return base
+        .where((s) => s >= min - 1e-9 && s <= max + 1e-9)
+        .toList(growable: false);
+  }
+
   static String formatSpeed(double speed) {
     if (speed == 0.75 || speed == 1.25 || speed == 2.5) {
       return '${speed}x';
@@ -71,6 +96,8 @@ class SpeedPickerSheet extends StatelessWidget {
                       final cubit = context.read<PlayerCubit>();
                       final currentSpeed = state.playbackSpeed;
                       final currentPitch = state.playbackPitch;
+                      final options = speedOptionsFor(
+                          cubit.minPlaybackSpeed, cubit.maxPlaybackSpeed);
 
                       // Convert pitch multiplier to semitones:
                       // pitch = 2^(semitones / 12)  =>  semitones = 12 * log2(pitch)
@@ -135,7 +162,7 @@ class SpeedPickerSheet extends StatelessWidget {
                             scrollDirection: Axis.horizontal,
                             physics: const BouncingScrollPhysics(),
                             child: Row(
-                              children: speedOptions.map((speed) {
+                              children: options.map((speed) {
                                 final isSelected = (currentSpeed == speed);
                                 return Padding(
                                   padding: const EdgeInsets.only(right: 8.0),

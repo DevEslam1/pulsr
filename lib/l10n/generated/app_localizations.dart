@@ -2740,6 +2740,72 @@ abstract class AppLocalizations {
   /// **'Profile'**
   String get profileDropdownLabel;
 
+  /// No description provided for @smartAudioTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Smart Audio'**
+  String get smartAudioTitle;
+
+  /// No description provided for @smartAudioSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically tune the sound to your headphones and track'**
+  String get smartAudioSubtitle;
+
+  /// No description provided for @smartAudioModeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Mode'**
+  String get smartAudioModeLabel;
+
+  /// No description provided for @smartAudioAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get smartAudioAuto;
+
+  /// No description provided for @smartAudioManual.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual'**
+  String get smartAudioManual;
+
+  /// No description provided for @smartAudioAutoDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Detect the connected headphones, apply the matching AutoEQ correction, and use the highest output quality the device supports'**
+  String get smartAudioAutoDesc;
+
+  /// No description provided for @smartAudioManualDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep your EQ, effects and output quality exactly as you set them'**
+  String get smartAudioManualDesc;
+
+  /// No description provided for @smartAudioDetectedDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Current output: {device}'**
+  String smartAudioDetectedDevice(String device);
+
+  /// No description provided for @smartAudioMatchedProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Matched correction: {profile}'**
+  String smartAudioMatchedProfile(String profile);
+
+  /// No description provided for @smartAudioNoMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'No headphone correction matched for this device'**
+  String get smartAudioNoMatch;
+
+  /// No description provided for @smartAudioAutoCatchAllHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto only adjusts sound when it recognises your headphones or a manual device profile; your choices are never overwritten in Manual mode'**
+  String get smartAudioAutoCatchAllHint;
+
   /// No description provided for @undo.
   ///
   /// In en, this message translates to:
@@ -2828,7 +2894,7 @@ abstract class AppLocalizations {
   /// No description provided for @bluetoothLatencySubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Compensates for Bluetooth audio codec buffer latency ({offset} ms). Volume deferral: AVRCP absolute volume active.'**
+  /// **'Compensates for Bluetooth audio codec buffer latency ({offset} ms). Media controls use the system notification; no AVRCP volume override.'**
   String bluetoothLatencySubtitle(int offset);
 
   /// No description provided for @pageNotFoundTitle.

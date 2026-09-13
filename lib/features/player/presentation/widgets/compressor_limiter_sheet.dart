@@ -20,6 +20,12 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
   late double _releaseMs;
   late double _makeupGainDb;
 
+  // Native 4-band multiband compressor (C++ stage).
+  late bool _mbcEnabled;
+  late double _mbcF0;
+  late double _mbcF1;
+  late double _mbcF2;
+
   /// Ratio / attack / make-up are honored only by the Android HAL
   /// DynamicsProcessing limiter; the native C++ stage is a brickwall limiter.
   late final bool _advancedSupported;
@@ -33,8 +39,21 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
     _attackMs = widget.equalizerManager.compressorAttackMs;
     _releaseMs = widget.equalizerManager.limiterReleaseMs;
     _makeupGainDb = widget.equalizerManager.compressorMakeupGainDb;
+    _mbcEnabled = widget.equalizerManager.isMultibandCompressorEnabled;
+    _mbcF0 = widget.equalizerManager.multibandCompressorF0;
+    _mbcF1 = widget.equalizerManager.multibandCompressorF1;
+    _mbcF2 = widget.equalizerManager.multibandCompressorF2;
     _advancedSupported =
         widget.equalizerManager.isCompressorAdvancedParamsSupported;
+  }
+
+  Future<void> _applyMbc() async {
+    await widget.equalizerManager.setMultibandCompressor(
+      _mbcEnabled,
+      f0: _mbcF0,
+      f1: _mbcF1,
+      f2: _mbcF2,
+    );
   }
 
   void _applyParams() {
@@ -233,6 +252,82 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                 },
                 child: const Text('Reset to Studio Defaults'),
               ),
+            ),
+            const SizedBox(height: 28),
+            Divider(color: p.hairline),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.graphic_eq_rounded, color: p.primary),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Multiband Compressor',
+                      style: TextStyle(
+                        color: p.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                Switch.adaptive(
+                  value: _mbcEnabled,
+                  activeThumbColor: p.primary,
+                  onChanged: (val) async {
+                    setState(() => _mbcEnabled = val);
+                    await _applyMbc();
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Native 4-band compressor with Linkwitz-Riley crossovers. Tames '
+              'each frequency band independently before the limiter.',
+              style: TextStyle(color: p.textSecondary, fontSize: 12.5),
+            ),
+            const SizedBox(height: 12),
+            _buildParamRow(
+              title: 'Crossover 1 (Low)',
+              valueDisplay: '${_mbcF0.toStringAsFixed(0)} Hz',
+              value: _mbcF0,
+              min: 40.0,
+              max: 500.0,
+              defaultValue: 160.0,
+              enabled: _mbcEnabled,
+              onChanged: (val) {
+                setState(() => _mbcF0 = val);
+                _applyMbc();
+              },
+            ),
+            _buildParamRow(
+              title: 'Crossover 2 (Mid)',
+              valueDisplay: '${_mbcF1.toStringAsFixed(0)} Hz',
+              value: _mbcF1,
+              min: 200.0,
+              max: 4000.0,
+              defaultValue: 1000.0,
+              enabled: _mbcEnabled,
+              onChanged: (val) {
+                setState(() => _mbcF1 = val);
+                _applyMbc();
+              },
+            ),
+            _buildParamRow(
+              title: 'Crossover 3 (High)',
+              valueDisplay: '${_mbcF2.toStringAsFixed(0)} Hz',
+              value: _mbcF2,
+              min: 1000.0,
+              max: 16000.0,
+              defaultValue: 5000.0,
+              enabled: _mbcEnabled,
+              onChanged: (val) {
+                setState(() => _mbcF2 = val);
+                _applyMbc();
+              },
             ),
           ],
         ),

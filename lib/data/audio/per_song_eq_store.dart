@@ -23,6 +23,8 @@ class PerSongEqStore {
 
   /// Sets or clears the EQ preset override for [trackKey].
   Future<void> setPresetForTrack(String trackKey, String? presetName) async {
+    // Await the initial load so a pre-load write cannot persist a partial map.
+    await ready;
     if (presetName == null || presetName.trim().isEmpty || presetName.trim().toLowerCase() == 'none') {
       _overrides.remove(trackKey);
     } else {

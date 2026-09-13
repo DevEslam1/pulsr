@@ -402,6 +402,13 @@ class AudioConflicts {
     return 'Disabled: Bit-Perfect bypass is ON — crossfade overlaps two tracks and would alter the bitstream. Turn off Bit-Perfect (or its DSP bypass) to use crossfade.';
   }
 
+  /// AAudio direct bypasses the ExoPlayer DSP chain (EQ/speed/pitch/silence
+  /// skip) by design — same class of conflict as bit-perfect bypass.
+  static String? dspBlockedByAaudioDirect({required bool aaudioEnabled}) {
+    if (!aaudioEnabled) return null;
+    return 'Disabled: AAudio Direct is ON — it bypasses the ExoPlayer DSP chain (EQ, speed/pitch, silence skip, crossfade). Turn it off to re-enable DSP.';
+  }
+
   static String? oemDoubleProcessingWarning(
       {required bool hasOemAudio, required bool anyDspEnabled}) {
     if (hasOemAudio && anyDspEnabled) {

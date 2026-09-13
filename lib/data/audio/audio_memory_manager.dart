@@ -1,5 +1,4 @@
 import 'dart:collection';
-import 'dart:io';
 import 'package:just_audio/just_audio.dart';
 
 /// Item stored in preloaded stream head cache.
@@ -28,14 +27,11 @@ class AudioMemoryManager {
   }
 
   static int computeAdaptiveBudget() {
-    try {
-      final totalRam = Platform.numberOfProcessors * 512 * 1024 * 1024;
-      return (totalRam * 0.01)
-          .clamp(16 * 1024 * 1024, 64 * 1024 * 1024)
-          .toInt();
-    } catch (_) {
-      return 32 * 1024 * 1024;
-    }
+    // dart:io exposes no cross-platform total-RAM value; the previous
+    // (CPU cores * 512 MB) heuristic was arbitrary and could mis-size the
+    // cache by an order of magnitude. Stay at the conservative default until a
+    // real platform memory channel exists.
+    return 32 * 1024 * 1024;
   }
 
   final LinkedHashMap<String, PreloadedHead> _headCache = LinkedHashMap();
@@ -105,6 +101,18 @@ class AudioMemoryManager {
     if (_headCache.containsKey(key)) {
       final entry = _headCache.remove(key)!;
       _currentPreloadBytes -= entry.sizeBytes;
+    }
+  }
+
+  /// Releases every preloaded head for [prefix], including the
+  /// `prefix:quality` keys prefetch actually registers under.
+  void evictByPrefix(String prefix) {
+    final keys = _headCache.keys
+        .where((k) => k == prefix || k.startsWith('$prefix:'))
+        .toList(growable: false);
+    for (final key in keys) {
+      final entry = _headCache.remove(key);
+      if (entry != null) _currentPreloadBytes -= entry.sizeBytes;
     }
   }
 

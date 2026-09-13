@@ -62,7 +62,7 @@ Pulsr comes with an interactive landing website located in [`website/`](website/
 - **Full Effects Chain**: Bass boost, per-band mute/solo, manual preamp, 3D spatial virtualizer, multiband dynamics, studio compressor, lookahead brickwall limiter, crossfeed, convolution reverb with custom WAV impulse responses, harmonic saturation/exciter, mid/side stereo width, Fletcher–Munson loudness contour, subwoofer crossover, dynamic EQ, high-quality sinc resampler, and TPDF dither.
 - **Room Correction Wizard**: Stepped-sine sweep measurement with mic capture, auto-fitted correction curve, optional stacking with a headphone AutoEQ profile, and linear-phase FIR export.
 - **ReplayGain & Per-Song Overrides**: Track/album ReplayGain with preamp, plus per-song EQ, volume and BPM overrides and per-album DSP memory.
-- **Bit-Perfect Hi-Res Badging & Output**: Detection for sample rates (44.1 kHz–192 kHz) and bit depths (16/24/32-bit float), bit-perfect mode, **strict no-resample mode**, **follow-track sample-rate switching**, float DSP path, AAudio direct output, USB-DAC negotiation, **DSD over PCM (DoP)** output, and Bluetooth codec control (LDAC/aptX).
+- **Bit-Perfect Hi-Res Badging & Output**: Detection for sample rates (44.1 kHz–192 kHz) and bit depths (16/24/32-bit float), bit-perfect mode, **strict no-resample mode**, **follow-track sample-rate switching**, float DSP path, AAudio direct output, USB-DAC negotiation, **DSD over PCM (DoP)** output, and Bluetooth codec monitor + in-app LDAC/aptX request (tap a codec chip; falls back to Developer Options where the platform refuses).
 - **DSP Inspector & Conflict Guards**: A live view of every active/degraded stage, with protection against mutually exclusive effects (e.g. ReplayGain vs bit-perfect).
 - **Audiophile Playback Controls**: Gapless playback with encoder-delay trims, crossfade transitions (curves + BPM sync), variable pitch/playback speed, A-B loop, per-track delay, long-form bookmarks, silence skip, SponsorBlock auto-skip, and sleep timer (duration / end of track / after N tracks / end of queue).
 
@@ -105,7 +105,7 @@ Pulsr comes with an interactive landing website located in [`website/`](website/
 ### 📱 6. Deep Android OS Integration
 - **Android Home Screen Widgets**: Interactive home screen playback widgets (`home_widget`) with live album art and transport controls.
 - **MediaStyle Notifications**: Full notification shade and lockscreen controls with real-time seekbars.
-- **Hardware & Headset Events**: Auto-pause on headphone disconnection, Bluetooth AVRCP metadata sync, and audio ducking during GPS navigation/calls.
+- **Hardware & Headset Events**: Auto-pause on headphone disconnection (wired + BT noisy route), media notification metadata, and audio ducking during GPS navigation/calls.
 - **Audio File Intent Handler**: Instantly opens and plays `.mp3`, `.flac`, `.wav`, `.m4a` files opened from file managers or chat apps.
 
 ### 🛡️ 7. Privacy-First & Offline-Capable

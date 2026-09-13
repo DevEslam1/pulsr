@@ -90,4 +90,33 @@ void main() {
     // Source badge should be present
     expect(find.text('LRCLIB Synced'), findsOneWidget);
   });
+
+  testWidgets('LyricsView labels plain LRCLIB results without "Synced"',
+      (tester) async {
+    final plainLines = [
+      LyricsLine(
+          timestamp: Duration.zero, text: 'Plain A', source: LyricsSource.lrclib),
+      LyricsLine(
+          timestamp: Duration.zero, text: 'Plain B', source: LyricsSource.lrclib),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 300,
+            height: 400,
+            child: LyricsView(
+              lyrics: plainLines,
+              source: LyricsSource.lrclib,
+              currentPosition: Duration.zero,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('LRCLIB'), findsOneWidget);
+    expect(find.text('LRCLIB Synced'), findsNothing);
+  });
 }

@@ -21,6 +21,8 @@ void DynamicBass::reset() {
     yHpMid_.reset();
     yLpMid_.reset();
     yLpSide_.reset();
+    xHpBass_.reset();
+    xLpBass_.reset();
     envelope_ = 0.0;
 }
 
@@ -79,6 +81,9 @@ void DynamicBass::updateFilters() {
     yHpMid_.setHighPass(sampleRate_, static_cast<double>(yLow_), q);
     yLpMid_.setLowPass(sampleRate_, static_cast<double>(yHigh_), q);
     yLpSide_.setLowPass(sampleRate_, static_cast<double>(yHigh_), q);
+    // FIX C-5: X-band filters define the acoustic response range for dynamic boost
+    xHpBass_.setHighPass(sampleRate_, static_cast<double>(xLow_), q);
+    xLpBass_.setLowPass(sampleRate_, static_cast<double>(xHigh_), q);
 }
 
 void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
@@ -99,8 +104,13 @@ void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
         const double M = 0.5 * (L + R);
         const double S = 0.5 * (L - R);
 
-        // 2. Extract Sub-Bass Y-band on Mid channel
-        const double midY = yLpMid_.process(yHpMid_.process(M));
+        // Y-band isolates the sub-bass that receives the dynamic boost. The X
+        // filters are preset-defined but must not be cascaded after the Y
+        // band-pass: every preset has xLow > yHigh, so the X high-pass would
+        // reject the whole Y band and silence the stage. Keep X as a low-pass
+        // shaper on the boosted tap only (transparent below xHigh).
+        const double yBand = yLpMid_.process(yHpMid_.process(M));
+        const double midY = xLpBass_.process(yBand);
 
         // 3. Peak envelope follower on sub-bass punch
         const double absY = std::abs(midY);

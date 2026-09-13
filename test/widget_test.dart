@@ -68,6 +68,10 @@ class MockPulsrAudioHandler extends BaseAudioHandler
   }
 
   @override
+  double get minPlaybackSpeed => 0.5;
+  @override
+  double get maxPlaybackSpeed => 3.0;
+  @override
   double get volume => 1.0;
   @override
   SongsTableData? get currentSong => null;
@@ -230,6 +234,24 @@ class MockPulsrAudioHandler extends BaseAudioHandler
   bool get isLiveProgEnabled => false;
   @override
   String get liveProgCode => '';
+  @override
+  bool get isDynamicBassEnabled => false;
+  @override
+  double get dynamicBassStrength => 1.0;
+  @override
+  int get dynamicBassPreset => 0;
+  @override
+  Future<void> setDynamicBass({
+    required bool enabled,
+    double? strength,
+    int? preset,
+    int? xLow,
+    int? xHigh,
+    int? yLow,
+    int? yHigh,
+    double? sideGainLow,
+    double? sideGainHigh,
+  }) async {}
 
   @override
   Future<void> setCrossfeed(bool enabled,
@@ -280,7 +302,7 @@ class MockPulsrAudioHandler extends BaseAudioHandler
   @override
   Stream<String> get errorStream => const Stream.empty();
   @override
-  void dispose() {}
+  Future<void> dispose() async {}
   @override
   Future<void> playSongAt(int index, {Duration? initialPosition}) async {}
   @override

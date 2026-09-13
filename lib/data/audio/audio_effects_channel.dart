@@ -201,7 +201,7 @@ class AudioEffectsChannel {
     try {
       final result = await _channel
           .invokeMapMethod<String, dynamic>('detectSystemEffects')
-          .timeout(const Duration(seconds: 2));
+          .timeout(const Duration(seconds: 5));
       return result ?? {
         'status': 'unsupportedDevice',
         'detectedBundles': <String>[],
@@ -232,7 +232,7 @@ class AudioEffectsChannel {
           'policy': policy,
           'isHiResOrBitPerfect': isHiResOrBitPerfect,
         },
-      ).timeout(const Duration(seconds: 2));
+      ).timeout(const Duration(seconds: 5));
       return result?['status'] as String? ?? 'unknown';
     } catch (e, st) {
       ErrorLogger.log(
@@ -253,7 +253,7 @@ class AudioEffectsChannel {
     try {
       final result = await _channel
           .invokeMapMethod<String, dynamic>('getSystemEffectsStatus')
-          .timeout(const Duration(seconds: 2));
+          .timeout(const Duration(seconds: 5));
       return result ?? {'status': 'unknown', 'detectedBundles': <String>[]};
     } catch (_) {
       return {'status': 'unknown', 'detectedBundles': <String>[]};
@@ -265,7 +265,7 @@ class AudioEffectsChannel {
     try {
       final active = await _channel
           .invokeMethod<bool>('hasActiveEffects')
-          .timeout(const Duration(seconds: 2));
+          .timeout(const Duration(seconds: 5));
       return active ?? false;
     } catch (_) {
       return false;
@@ -621,7 +621,7 @@ class AudioEffectsChannel {
             'bypass': bypass,
             if (isDop != null) 'isDop': isDop,
           })
-          .timeout(const Duration(seconds: 2));
+          .timeout(const Duration(seconds: 5));
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set bypass DSP for bit-perfect ($bypass)',
@@ -666,7 +666,7 @@ class AudioEffectsChannel {
             'preventClipping': preventClipping,
             'enabled': enabled,
           })
-          .timeout(const Duration(seconds: 2));
+          .timeout(const Duration(seconds: 5));
       return applied ?? true;
     } catch (e, st) {
       ErrorLogger.log(
@@ -685,7 +685,7 @@ class AudioEffectsChannel {
     try {
       final bool? applied = await _channel
           .invokeMethod<bool>('setReplayGainEnabled', {'enabled': enabled})
-          .timeout(const Duration(seconds: 2));
+          .timeout(const Duration(seconds: 5));
       return applied ?? true;
     } catch (e, st) {
       ErrorLogger.log(
@@ -851,7 +851,10 @@ class AudioEffectsChannel {
     try {
       final bool? result = await _channel.invokeMethod<bool>(
         'loadImpulseResponse',
-        {'irSamples': irSamples},
+        {
+          'irSamples': irSamples,
+          'channels': 1, // FIX C-1: ir_file_parser.dart always outputs mono
+        },
       );
       // Older bridges return nothing on success; only an explicit false is a
       // failure signal.

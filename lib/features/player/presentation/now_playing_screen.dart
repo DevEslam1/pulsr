@@ -57,9 +57,13 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
         final activeColor = settingsState.dynamicThemingEnabled
             ? dynamicTheme.primaryColor
             : settingsState.customAccentColor;
+        final isDark =
+            Theme.of(context).brightness == Brightness.dark;
         final bgColor = settingsState.dynamicThemingEnabled
             ? dynamicTheme.backgroundColor
-            : const Color(0xFF14172B);
+            : (isDark
+                ? const Color(0xFF14172B)
+                : Theme.of(context).colorScheme.surface);
 
         final props = PlayerThemeProps(
           state: state,

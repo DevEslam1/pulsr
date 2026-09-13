@@ -39,10 +39,13 @@ class LrcParser {
       }
     }
 
-    // Match tags like [01:23.45] or [01:23.456] or [01:23.4] or [01:23] or [120:00.00]
-    // Also handle comma decimal separator used in some editors: [01:23,45]
-    final RegExp timeExp = RegExp(r'\[(\d{1,3}):(\d{2})(?:[.,](\d{1,3}))?\]');
-    final RegExp wordTagExp = RegExp(r'<(?:\d{1,3}:)?\d{2}(?:[.,]\d{1,3})?>');
+    // Match tags like [01:23.45] / [01:23.456] / [01:23.4] / [01:23] / [120:00.00]
+    // Also handle comma and colon fraction separators used by some editors:
+    // [01:23,45] and [01:23:45].
+    final RegExp timeExp =
+        RegExp(r'\[(\d{1,3}):(\d{2})(?:[.,:](\d{1,3}))?\]');
+    final RegExp wordTagExp =
+        RegExp(r'<(?:\d{1,3}:)?\d{2}(?:[.,:]\d{1,3})?>');
     // Metadata tags to ignore (artist, title, album, etc.)
     final RegExp metaExp = RegExp(
         r'^\s*\[(ar|ti|al|by|offset|length):',

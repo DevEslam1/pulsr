@@ -43,6 +43,10 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   double _vol = 1.0;
   int setVolumeCallCount = 0;
   @override
+  double get minPlaybackSpeed => 0.5;
+  @override
+  double get maxPlaybackSpeed => 3.0;
+  @override
   double get volume => _vol;
   @override
   SongsTableData? get currentSong => null;
@@ -318,6 +322,24 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   @override
   String get liveProgCode => '';
   @override
+  bool get isDynamicBassEnabled => false;
+  @override
+  double get dynamicBassStrength => 1.0;
+  @override
+  int get dynamicBassPreset => 0;
+  @override
+  Future<void> setDynamicBass({
+    required bool enabled,
+    double? strength,
+    int? preset,
+    int? xLow,
+    int? xHigh,
+    int? yLow,
+    int? yHigh,
+    double? sideGainLow,
+    double? sideGainHigh,
+  }) async {}
+  @override
   Future<void> setSaturation(
     bool enabled, {
     double? drive,
@@ -327,7 +349,16 @@ class TestPulsrAudioHandler extends BaseAudioHandler
     bool? multiband,
   }) async {}
   @override
-  Future<void> setStereoWidth(bool enabled, {double? width}) async {}
+  Future<void> setStereoWidth(
+    bool enabled, {
+    double? width,
+    bool? multiband,
+    double? lowWidth,
+    double? midWidth,
+    double? highWidth,
+    double? lowCrossoverHz,
+    double? highCrossoverHz,
+  }) async {}
   @override
   Future<void> setLoudnessContour(bool enabled, {double? intensity}) async {}
   @override
@@ -336,6 +367,8 @@ class TestPulsrAudioHandler extends BaseAudioHandler
     double? cornerHz,
     double? slopeDbPerOct,
     double? gain,
+    bool? bassMono,
+    bool? antiPop,
   }) async {}
   @override
   Future<void> setDynamicEq(bool enabled) async {}
@@ -450,14 +483,14 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   }
 
   @override
-  void dispose() {
-    _positionController.close();
-    _mediaItemController.close();
-    _queueController.close();
-    _playbackStateController.close();
-    _errorController.close();
-    _sleepTimerController.close();
-    _audioSessionIdController.close();
+  Future<void> dispose() async {
+    await _positionController.close();
+    await _mediaItemController.close();
+    await _queueController.close();
+    await _playbackStateController.close();
+    await _errorController.close();
+    await _sleepTimerController.close();
+    await _audioSessionIdController.close();
   }
 
   @override
@@ -966,12 +999,15 @@ void main() {
         expect(cubit.state.isDspActive, isTrue);
         expect(cubit.state.activeDspStagesCount, greaterThan(0));
 
-        // Master DSP enable/disable
+        // Master DSP effects enable/disable must NOT touch the Equalizer
+        // master switch: the two are independent.
         await cubit.setDspEffectsEnabled(false);
-        expect(cubit.state.isDspActive, isFalse);
-        expect(cubit.state.activeDspStagesCount, equals(0));
-        await cubit.setDspEffectsEnabled(true);
+        expect(cubit.state.isDspEffectsActive, isFalse);
+        expect(cubit.state.isEqEnabled, isTrue);
+        // EQ still active, so overall DSP activity remains true.
         expect(cubit.state.isDspActive, isTrue);
+        await cubit.setDspEffectsEnabled(true);
+        expect(cubit.state.isDspEffectsActive, isTrue);
 
         // Volume
         await cubit.setVolume(0.8);

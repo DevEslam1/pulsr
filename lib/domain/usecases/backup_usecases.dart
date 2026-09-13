@@ -65,22 +65,8 @@ class ExportBackupUseCase {
       });
     }
 
-    // 3. Settings (gapless, crossfade, theme, eqPreset, etc.)
+    // 3. Settings (gapless, crossfade, theme, EQ, etc.)
     final prefs = await SharedPreferences.getInstance();
-    Map<String, dynamic>? eqPresetMap;
-    final eqPresetStr = prefs.getString('setting_eq_preset');
-    if (eqPresetStr != null) {
-      try {
-        final decoded = jsonDecode(eqPresetStr);
-        if (decoded is Map<String, dynamic>) {
-          eqPresetMap = decoded;
-        }
-      } catch (e, st) {
-        ErrorLogger.log('Failed to decode eqPreset from prefs',
-            error: e, stackTrace: st, category: 'Backup');
-      }
-    }
-
     final settingsMap = {
       'gaplessPlayback': prefs.getBool('setting_gapless') ?? true,
       'crossfadeSeconds': prefs.getDouble('setting_crossfade') ?? 0.0,
@@ -106,10 +92,18 @@ class ExportBackupUseCase {
       'streamingQuality': prefs.getString('setting_streaming_quality') ?? 'high',
       'downloadQuality': prefs.getString('setting_download_quality') ?? 'high',
       'isLosslessMode': prefs.getBool('setting_lossless') ?? false,
-      'eqEnabled': prefs.getBool('setting_eq_enabled') ?? false,
-      'eqGains': prefs.getString('setting_eq_gains'),
+      // EQ state lives under the EqualizerManager keys (eq_*) — the legacy
+      // setting_eq_* keys were never written by anything, so backups silently
+      // restored a flat EQ.
+      'eqEnabled': prefs.getBool(PrefsKeys.eqEnabled) ?? false,
+      'eqGains': prefs.getString(PrefsKeys.eqGains),
+      'eqPreset': prefs.getString(PrefsKeys.eqPresetName),
+      'eqPreamp': prefs.getDouble(PrefsKeys.eqPreamp),
+      'eqBandCount': prefs.getInt(PrefsKeys.eqBandCount),
+      'eqCustomFrequencies': prefs.getString(PrefsKeys.eqCustomFrequencies),
+      'eqCustom32Frequencies': prefs.getString(PrefsKeys.eqCustom32Frequencies),
+      'eqCustom64Frequencies': prefs.getString(PrefsKeys.eqCustom64Frequencies),
       'playbackSpeed': prefs.getDouble('setting_playback_speed') ?? 1.0,
-      if (eqPresetMap != null) 'eqPreset': eqPresetMap,
     };
 
     // 4. Play History (paths, count, lastPlayed)
@@ -161,8 +155,94 @@ class ExportBackupUseCase {
             })
         .toList();
 
+    // 9. Per-song data (ratings, BPM, EQ/volume overrides, bookmarks) —
+    // previously dropped on reinstall, leaving smart playlists with
+    // rating/bpm rules evaluating to empty.
+    // Keys are translated from the volatile MediaStore id to a portable
+    // path/remoteId identity so a restore on a fresh install (new ids) can
+    // re-associate them. Without this the per-song prefs pointed at ids that
+    // no longer existed after reinstall.
+    Map<String, dynamic>? ratingsData;
+    Map<String, dynamic>? bpmData;
+    Map<String, dynamic>? perSongEqData;
+    Map<String, dynamic>? perSongVolData;
+    Map<String, dynamic>? bookmarksData;
+    try {
+      final songsById = {for (final s in allSongs) s.id.toString(): s};
+      String portableKey(String rawKey) {
+        String idPart = rawKey;
+        if (rawKey.startsWith('id:')) idPart = rawKey.substring(3);
+        final song = songsById[idPart];
+        if (song == null) return rawKey; // unknown id: keep verbatim
+        if (song.remoteId != null && song.remoteId!.isNotEmpty) {
+          return 'yt:${song.remoteId}';
+        }
+        if (song.path.isNotEmpty && !song.path.startsWith('ytmusic://')) {
+          return 'path:${song.path}';
+        }
+        return 'id:$idPart';
+      }
+
+      Map<String, dynamic> portable(Map<String, dynamic> src) =>
+          {for (final e in src.entries) portableKey(e.key): e.value};
+
+      for (final entry in {
+        'song_ratings_v1': 'ratings',
+        'per_track_bpm_overrides_v1': 'bpm',
+        'per_song_eq_overrides_v1': 'eq',
+        'per_song_volume_overrides_v1': 'vol',
+        'playback_bookmarks_v1': 'bookmarks',
+      }.entries) {
+        final raw = prefs.getString(entry.key);
+        if (raw == null || raw.isEmpty) continue;
+        final decoded = jsonDecode(raw);
+        if (decoded is Map<String, dynamic>) {
+          final mapped = portable(decoded);
+          switch (entry.value) {
+            case 'ratings':
+              ratingsData = mapped;
+            case 'bpm':
+              bpmData = mapped;
+            case 'eq':
+              perSongEqData = mapped;
+            case 'vol':
+              perSongVolData = mapped;
+            case 'bookmarks':
+              bookmarksData = mapped;
+          }
+        }
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to encode per-song backup data',
+          error: e, stackTrace: st, category: 'Backup');
+    }
+
+    // 10. Saved queue (paths in order + current index + position).
+    List<String>? queuePaths;
+    int? queueIndex;
+    int? queuePositionMs;
+    try {
+      final queueRes = await _repository.getSavedQueue();
+      final items = queueRes.fold((l) => <QueueItemsTableData>[], (r) => r);
+      if (items.isNotEmpty) {
+        items.sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+        final byId = {for (final s in allSongs) s.id: s};
+        queuePaths = [
+          for (final it in items)
+            if (byId.containsKey(it.songId)) byId[it.songId]!.path
+        ];
+        final cur = items.indexWhere((e) => e.isCurrent);
+        queueIndex = cur == -1 ? 0 : cur;
+        queuePositionMs =
+            cur == -1 ? 0 : items[cur].positionMs;
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to encode queue backup data',
+          error: e, stackTrace: st, category: 'Backup');
+    }
+
     final backupPayload = {
-      'version': 2,
+      'version': 3,
       'exportedAt': DateTime.now().toIso8601String(),
       'favorites': favoritePaths,
       'playlists': playlistsData,
@@ -172,6 +252,17 @@ class ExportBackupUseCase {
       if (customEqProfilesData != null) 'customEqProfiles': customEqProfilesData,
       if (automationRulesData != null) 'automationRules': automationRulesData,
       if (downloadedTracks.isNotEmpty) 'downloads': downloadedTracks,
+      if (ratingsData != null) 'ratings': ratingsData,
+      if (bpmData != null) 'bpmOverrides': bpmData,
+      if (perSongEqData != null) 'perSongEq': perSongEqData,
+      if (perSongVolData != null) 'perSongVolume': perSongVolData,
+      if (bookmarksData != null) 'bookmarks': bookmarksData,
+      if (queuePaths != null && queuePaths.isNotEmpty)
+        'queue': {
+          'paths': queuePaths,
+          'currentIndex': queueIndex ?? 0,
+          'positionMs': queuePositionMs ?? 0,
+        },
     };
 
     return const JsonEncoder.withIndent('  ').convert(backupPayload);
@@ -348,8 +439,10 @@ class ImportBackupUseCase {
             final existingPlaylistsRes = await _repository.getPlaylists();
             final existingList = existingPlaylistsRes.fold(
                 (l) => <PlaylistsTableData>[], (r) => r);
-            final existing =
-                existingList.where((p) => p.name == name).firstOrNull;
+            final existing = existingList
+                .where((p) =>
+                    p.name.toLowerCase().trim() == name.toLowerCase().trim())
+                .firstOrNull;
 
             int? playlistId;
             if (existing != null) {
@@ -450,10 +543,6 @@ class ImportBackupUseCase {
         await prefs.setString('setting_visualizer_style',
             (settings['visualizerStyle'] as String?) ?? 'bar');
       }
-      if (settings.containsKey('eqPreset') && settings['eqPreset'] is Map) {
-        await prefs.setString(
-            'setting_eq_preset', jsonEncode(settings['eqPreset']));
-      }
       // Restore extended settings with validation
       if (settings['replayGainMode'] is String) await prefs.setString('setting_replay_gain_mode', settings['replayGainMode']);
       if (settings['replayGainPreampWithRg'] is num) await prefs.setDouble('setting_replay_gain_preamp_with_rg', (settings['replayGainPreampWithRg'] as num).toDouble());
@@ -465,8 +554,14 @@ class ImportBackupUseCase {
       if (settings['streamingQuality'] is String) await prefs.setString('setting_streaming_quality', settings['streamingQuality']);
       if (settings['downloadQuality'] is String) await prefs.setString('setting_download_quality', settings['downloadQuality']);
       if (settings['isLosslessMode'] is bool) await prefs.setBool('setting_lossless', settings['isLosslessMode']);
-      if (settings['eqEnabled'] is bool) await prefs.setBool('setting_eq_enabled', settings['eqEnabled']);
-      if (settings['eqGains'] is String) await prefs.setString('setting_eq_gains', settings['eqGains']);
+      if (settings['eqEnabled'] is bool) await prefs.setBool(PrefsKeys.eqEnabled, settings['eqEnabled']);
+      if (settings['eqGains'] is String) await prefs.setString(PrefsKeys.eqGains, settings['eqGains']);
+      if (settings['eqPreset'] is String) await prefs.setString(PrefsKeys.eqPresetName, settings['eqPreset']);
+      if (settings['eqPreamp'] is num) await prefs.setDouble(PrefsKeys.eqPreamp, (settings['eqPreamp'] as num).toDouble());
+      if (settings['eqBandCount'] is int) await prefs.setInt(PrefsKeys.eqBandCount, settings['eqBandCount']);
+      if (settings['eqCustomFrequencies'] is String) await prefs.setString(PrefsKeys.eqCustomFrequencies, settings['eqCustomFrequencies']);
+      if (settings['eqCustom32Frequencies'] is String) await prefs.setString(PrefsKeys.eqCustom32Frequencies, settings['eqCustom32Frequencies']);
+      if (settings['eqCustom64Frequencies'] is String) await prefs.setString(PrefsKeys.eqCustom64Frequencies, settings['eqCustom64Frequencies']);
       if (settings['playbackSpeed'] is num) await prefs.setDouble('setting_playback_speed', (settings['playbackSpeed'] as num).toDouble());
 
       restoredSettingsCount = settings.length;
@@ -579,6 +674,95 @@ class ImportBackupUseCase {
       });
     }
 
+    // 9. Restore per-song data (v3 keys; merged, never clobbered). Backup keys
+    // are portable (path:/yt:/id:); translate them back to this install's
+    // MediaStore id. The id-keyed stores want a bare id, bookmarks want the
+    // `id:`/`yt:`/`path:` form produced by PlaybackBookmarkStore.keyFor.
+    String remapSongKey(String key, {required bool bookmark}) {
+      if (key.startsWith('path:')) {
+        final m = matchPath(key.substring(5));
+        if (m == null) return key;
+        return bookmark ? 'id:${m.id}' : '${m.id}';
+      }
+      if (key.startsWith('yt:')) {
+        final remote = key.substring(3);
+        final m = remoteIdMap[remote];
+        if (m == null) return key;
+        return bookmark ? 'yt:$remote' : '${m.id}';
+      }
+      if (key.startsWith('id:')) {
+        final n = int.tryParse(key.substring(3));
+        if (n == null) return key;
+        return bookmark ? 'id:$n' : '$n';
+      }
+      return key;
+    }
+
+    Future<void> mergePrefsMap(String key, dynamic incoming,
+        {bool bookmark = false}) async {
+      if (incoming is! Map) return;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final existing = prefs.getString(key);
+        final base =
+            (existing != null && existing.isNotEmpty) ? jsonDecode(existing) : {};
+        final merged = <String, dynamic>{
+          if (base is Map<String, dynamic>) ...base,
+          for (final e in incoming.entries)
+            remapSongKey(e.key.toString(), bookmark: bookmark): e.value,
+        };
+        await prefs.setString(key, jsonEncode(merged));
+      } catch (e, st) {
+        ErrorLogger.log('Failed restoring $key',
+            error: e, stackTrace: st, category: 'Backup');
+      }
+    }
+
+    await mergePrefsMap('song_ratings_v1', data['ratings']);
+    await mergePrefsMap('per_track_bpm_overrides_v1', data['bpmOverrides']);
+    await mergePrefsMap('per_song_eq_overrides_v1', data['perSongEq']);
+    await mergePrefsMap('per_song_volume_overrides_v1', data['perSongVolume']);
+    await mergePrefsMap('playback_bookmarks_v1', data['bookmarks'],
+        bookmark: true);
+
+    // 10. Restore saved queue (paths resolved against the fresh library).
+    if (data['queue'] is Map<String, dynamic>) {
+      final q = data['queue'] as Map<String, dynamic>;
+      final paths = (q['paths'] is List)
+          ? (q['paths'] as List).whereType<String>().toList()
+          : <String>[];
+      final idx = (q['currentIndex'] as num?)?.toInt() ?? 0;
+      final posMs = (q['positionMs'] as num?)?.toInt() ?? 0;
+      if (paths.isNotEmpty) {
+        try {
+          await _db.transaction(() async {
+            await _db.delete(_db.queueItemsTable).go();
+            var order = 0;
+            for (var i = 0; i < paths.length; i++) {
+              final matched = matchPath(paths[i]);
+              if (matched == null) {
+                unmatchedPaths.add(paths[i]);
+                continue;
+              }
+              await _db.into(_db.queueItemsTable).insert(
+                    QueueItemsTableCompanion.insert(
+                      songId: matched.id,
+                      orderIndex: order,
+                      isCurrent: Value(i == idx.clamp(0, paths.length - 1)),
+                      positionMs:
+                          Value(i == idx.clamp(0, paths.length - 1) ? posMs : 0),
+                    ),
+                  );
+              order++;
+            }
+          });
+        } catch (e, st) {
+          ErrorLogger.log('Failed restoring queue',
+              error: e, stackTrace: st, category: 'Backup');
+        }
+      }
+    }
+
     return ImportResult(
       restoredFavoritesCount: restoredFavoritesCount,
       restoredPlaylistsCount: restoredPlaylistsCount,
@@ -601,7 +785,7 @@ class ImportBackupUseCase {
     if (version == null || version is! int || version < 1) {
       throw const FormatException('Invalid backup version: missing or malformed version field');
     }
-    if (version > 2) {
+    if (version > 3) {
       throw FormatException('Unsupported backup version: $version. Please update Pulsr.');
     }
 

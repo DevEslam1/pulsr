@@ -21,13 +21,18 @@ void main() {
         () {
       const expectedOrder = [
         DspStage.parametricEq,
+        DspStage.arbitraryEq,
+        DspStage.viperDdc,
         DspStage.dynamicEq,
+        DspStage.multibandCompressor,
         DspStage.crossfeed,
         DspStage.convolutionReverb,
         DspStage.stereoPanner,
         DspStage.harmonicSaturation,
+        DspStage.liveProg,
         DspStage.stereoWidth,
         DspStage.subCrossover,
+        DspStage.dynamicBass,
         DspStage.lookaheadLimiter,
         DspStage.loudnessContour,
         DspStage.volume,
@@ -44,13 +49,18 @@ void main() {
       // Enable every expansion stage + the classic ones.
       pipeline.updateState(
         isEqEnabled: true,
+        isArbitraryEqEnabled: true,
+        isViperDdcEnabled: true,
         isDynamicEqEnabled: true,
+        isMultibandCompressorEnabled: true,
         isCrossfeedEnabled: true,
         isReverbEnabled: true,
         stereoBalance: 0.5,
         isSaturationEnabled: true,
+        isLiveProgEnabled: true,
         isStereoWidthEnabled: true,
         isSubCrossoverEnabled: true,
+        isDynamicBassEnabled: true,
         isLoudnessContourEnabled: true,
         isLimiterEnabled: true,
       );

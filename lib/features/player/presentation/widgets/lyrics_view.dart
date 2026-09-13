@@ -149,13 +149,13 @@ class _LyricsViewState extends State<LyricsView> {
     super.dispose();
   }
 
-  Widget _buildSourceBadge(LyricsSource source) {
+  Widget _buildSourceBadge(LyricsSource source, bool synced) {
     if (source == LyricsSource.none) return const SizedBox.shrink();
 
     final String label = switch (source) {
-      LyricsSource.embedded => 'Embedded',
+      LyricsSource.embedded => synced ? 'Embedded' : 'Embedded (unsynced)',
       LyricsSource.externalLrc => 'LRC File',
-      LyricsSource.lrclib => 'LRCLIB Synced',
+      LyricsSource.lrclib => synced ? 'LRCLIB Synced' : 'LRCLIB',
       LyricsSource.ytmusic => 'YouTube Music',
       LyricsSource.none => '',
     };
@@ -360,7 +360,7 @@ class _LyricsViewState extends State<LyricsView> {
               top: 12,
               right: 12,
               child: IgnorePointer(
-                child: _buildSourceBadge(source),
+                child: _buildSourceBadge(source, isSynced),
               ),
             ),
         ],
@@ -466,6 +466,10 @@ class _LyricsViewState extends State<LyricsView> {
     // When currentPosition is not explicitly passed, listen to PlayerCubit position ticks
     if (widget.currentPosition == null) {
       try {
+        // Resolve the provider inside the guard: the BlocListener only looks it
+        // up during mount (outside this try), so without this probe a missing
+        // PlayerCubit would throw ProviderNotFoundException.
+        context.read<PlayerCubit>();
         content = BlocListener<PlayerCubit, PlayerState>(
           listenWhen: (previous, current) =>
               previous.position != current.position,

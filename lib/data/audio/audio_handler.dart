@@ -16,6 +16,7 @@ import '../../core/di/injection.dart';
 import '../../core/errors/ytm_error_classifier.dart';
 import '../../core/services/battery_optimization_service.dart';
 import '../../core/services/hires_audio_service.dart';
+import '../../core/services/smart_audio_service.dart';
 import '../../core/services/ytm_service.dart';
 import '../../core/telemetry/playback_latency_tracker.dart';
 import '../../core/telemetry/audio_session_log.dart';
@@ -79,9 +80,9 @@ class PulsrAudioHandler extends BaseAudioHandler
         config: const AudioServiceConfig(
           androidNotificationChannelId: 'com.pulsr.music.audio',
           androidNotificationChannelName: 'Pulsr Audio Playback',
-          androidNotificationOngoing: false,
+          androidNotificationOngoing: true,
           androidNotificationClickStartsActivity: true,
-          androidStopForegroundOnPause: false,
+          androidStopForegroundOnPause: true,
           androidResumeOnClick: true,
           androidNotificationIcon: 'drawable/ic_notification',
         ),
@@ -1315,6 +1316,10 @@ class PulsrAudioHandler extends BaseAudioHandler
     try {
       final session = await AudioSession.instance;
       await session.configure(const AudioSessionConfiguration.music());
+      // Do NOT grab focus here: activating at construction steals audio focus
+      // from other apps on cold start (pausing their playback) before the user
+      // has played anything. just_audio activates on play()/resume and stop()
+      // releases it.
 
       _subscriptions.add(
         session.interruptionEventStream.listen((event) async {
@@ -1604,7 +1609,8 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (previousSong != null && previousSong.id != song.id) {
       _memoryManager.onTrackCompleted(previousSong.id);
       if (previousSong.remoteId != null) {
-        _memoryManager.evict(previousSong.remoteId!);
+        // Prefetch registers keys as `remoteId:quality`; evict every variant.
+        _memoryManager.evictByPrefix(previousSong.remoteId!);
       }
     }
     _lastPlayedSong = song;
@@ -1631,7 +1637,14 @@ class PulsrAudioHandler extends BaseAudioHandler
   Future<void> _maybeNegotiateOutputFormat(SongsTableData song) async {
     try {
       final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
-      if (!(prefs.getBool(PrefsKeys.outputFormatNegotiationEnabled) ?? false)) {
+      var negotiate =
+          prefs.getBool(PrefsKeys.outputFormatNegotiationEnabled) ?? false;
+      // Smart Audio (Auto) opts into best-quality output negotiation without
+      // changing the user's explicit manual setting.
+      if (!negotiate && getIt.isRegistered<SmartAudioService>()) {
+        negotiate = await getIt<SmartAudioService>().isEnabled();
+      }
+      if (!negotiate) {
         return;
       }
       if (!getIt.isRegistered<HiResAudioService>()) return;
@@ -2960,7 +2973,12 @@ class PulsrAudioHandler extends BaseAudioHandler
       return _currentIndex;
     }
     if (_activePlayer.shuffleModeEnabled && _shuffleHistory.isNotEmpty) {
-      return _shuffleHistory.removeLast();
+      // Drain any stale entries left over from a previous/shorter queue rather
+      // than returning an out-of-range index.
+      while (_shuffleHistory.isNotEmpty) {
+        final previous = _shuffleHistory.removeLast();
+        if (previous >= 0 && previous < _songs.length) return previous;
+      }
     }
     if (_currentIndex - 1 >= 0) {
       return _currentIndex - 1;
@@ -2971,10 +2989,10 @@ class PulsrAudioHandler extends BaseAudioHandler
   }
 
   void _broadcastState(PlaybackEvent event) {
-    // GUARD: Only broadcast from the ACTIVE player
-    if (!identical(_activePlayer, _isPlayerAActive ? _playerA : _playerB)) {
-      return;
-    }
+    // Player events are already filtered to the active player by
+    // setupPlayerListeners' isTargetActive(); the previous identical() guard
+    // here compared _activePlayer against its own definition and was always
+    // false (dead code).
     // If a gapless load is actively preparing a new track for user playback,
     // ignore transient idle/stop events emitted by stop() before setAudioSources.
     if (_gaplessMode &&
@@ -3244,6 +3262,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     _songs = List.from(songs);
     _currentIndex =
         initialIndex.clamp(0, _songs.isEmpty ? 0 : _songs.length - 1);
+    // A new queue invalidates shuffle navigation history; stale indices would
+    // otherwise point at unrelated tracks (or out of range) on Previous.
+    _shuffleHistory.clear();
     _queueDirty = true;
     _consecutiveFailures = 0;
     _rapidGaplessChangeCount = 0;
@@ -3833,6 +3854,12 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   Future<void> play() {
     _userPlaybackInitiated = true;
+    unawaited(() async {
+      try {
+        final s = await AudioSession.instance;
+        await s.setActive(true);
+      } catch (_) {}
+    }());
     ErrorLogger.addBreadcrumb('Playback started', category: 'player');
     // A restored YouTube session in the crossfade engine is left with no source
     // loaded (see restoreLastPlaybackSession); resolve and start it on the first
@@ -4837,19 +4864,15 @@ class PulsrAudioHandler extends BaseAudioHandler
   Future<List<MediaItem>> search(String query,
       [Map<String, dynamic>? extras]) async {
     if (query.trim().isEmpty) return [];
-    final cleanQ = query.trim().toLowerCase();
-    final songsRes = await _repository.getAllSongs();
-    final allSongs = songsRes.fold((l) => <SongsTableData>[], (r) => r);
-    final results = <MediaItem>[];
-
-    for (final song in allSongs) {
-      if (song.title.toLowerCase().contains(cleanQ) ||
-          song.artist.toLowerCase().contains(cleanQ) ||
-          song.album.toLowerCase().contains(cleanQ) ||
-          (song.genre?.toLowerCase().contains(cleanQ) ?? false)) {
-        results.add(_fastSongToMediaItem(song));
-      }
-    }
+    // Use the indexed FTS search instead of materializing and linear-scanning
+    // the entire library on every Android Auto query.
+    final songsRes = await _repository
+        .watchAllSongs(searchQuery: query.trim(), limit: 50)
+        .first;
+    final matches = songsRes.fold((l) => <SongsTableData>[], (r) => r);
+    final results = <MediaItem>[
+      for (final song in matches) _fastSongToMediaItem(song),
+    ];
 
     if (results.isEmpty && AppConfig.ytmEnabled) {
       try {
@@ -4871,35 +4894,11 @@ class PulsrAudioHandler extends BaseAudioHandler
       [Map<String, dynamic>? extras]) async {
     if (query.trim().isEmpty) return;
     final cleanQ = query.trim();
-    final songsRes = await _repository.getAllSongs();
-    final allSongs = songsRes.fold((l) => <SongsTableData>[], (r) => r);
-
-    final lower = cleanQ.toLowerCase();
-    // FIX-#11: Single-pass prioritized search — the previous implementation
-    // scanned allSongs 4× with redundant .toLowerCase() on every field each
-    // pass.  This does one loop with cached lowercase conversions.
-    final titleMatches = <SongsTableData>[];
-    final artistMatches = <SongsTableData>[];
-    final albumMatches = <SongsTableData>[];
-    final genreMatches = <SongsTableData>[];
-    for (final s in allSongs) {
-      if (s.title.toLowerCase().contains(lower)) {
-        titleMatches.add(s);
-      } else if (s.artist.toLowerCase().contains(lower)) {
-        artistMatches.add(s);
-      } else if (s.album.toLowerCase().contains(lower)) {
-        albumMatches.add(s);
-      } else if (s.genre?.toLowerCase().contains(lower) ?? false) {
-        genreMatches.add(s);
-      }
-    }
-    final matches = titleMatches.isNotEmpty
-        ? titleMatches
-        : artistMatches.isNotEmpty
-            ? artistMatches
-            : albumMatches.isNotEmpty
-                ? albumMatches
-                : genreMatches;
+    // Indexed FTS search (title/artist/album) instead of a full-library scan.
+    final songsRes = await _repository
+        .watchAllSongs(searchQuery: cleanQ, limit: 50)
+        .first;
+    final matches = songsRes.fold((l) => <SongsTableData>[], (r) => r);
     if (matches.isNotEmpty) {
       await loadQueue(matches);
       return;
@@ -5001,6 +5000,10 @@ class PulsrAudioHandler extends BaseAudioHandler
   }
 
   Future<void> _applyAdaptiveQuality(String newQuality) async {
+    // A quality step-down landing mid-crossfade/gapless load would clobber the
+    // player that is already transitioning; skip this cycle and let the next
+    // health tick retry.
+    if (_crossfadeManager.isCrossfading) return;
     try {
       final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
       await prefs.setString('setting_streaming_quality', newQuality);
@@ -5013,8 +5016,15 @@ class PulsrAudioHandler extends BaseAudioHandler
         // Hot-swap mid-track: re-resolve at new quality, keep position.
         final pos = _activePlayer.position;
         final wasPlaying = _activePlayer.playing;
+        final generation = ++_playGeneration;
         try {
           final resolved = await _resolveStreamUrl(song, forceRefresh: true);
+          // Bail if the track/queue changed while we re-resolved.
+          if (generation != _playGeneration ||
+              currentSong?.id != song.id ||
+              _crossfadeManager.isCrossfading) {
+            return;
+          }
           final tag = _songToMediaItem(song);
           final src = AudioSource.uri(Uri.parse(resolved.url), tag: tag);
           await _activePlayer.setAudioSource(src, initialPosition: pos);
@@ -5150,8 +5160,26 @@ class PulsrAudioHandler extends BaseAudioHandler
       _equalizerManager.setSaturationMultiband(multiband);
   bool get isStereoWidthEnabled => _equalizerManager.isStereoWidthEnabled;
   double get stereoWidth => _equalizerManager.stereoWidth;
-  Future<void> setStereoWidth(bool enabled, {double? width}) =>
-      _equalizerManager.setStereoWidth(enabled, width: width);
+  Future<void> setStereoWidth(
+    bool enabled, {
+    double? width,
+    bool? multiband,
+    double? lowWidth,
+    double? midWidth,
+    double? highWidth,
+    double? lowCrossoverHz,
+    double? highCrossoverHz,
+  }) =>
+      _equalizerManager.setStereoWidth(
+        enabled,
+        width: width,
+        multiband: multiband,
+        lowWidth: lowWidth,
+        midWidth: midWidth,
+        highWidth: highWidth,
+        lowCrossoverHz: lowCrossoverHz,
+        highCrossoverHz: highCrossoverHz,
+      );
   bool get isLoudnessContourEnabled =>
       _equalizerManager.isLoudnessContourEnabled;
   double get loudnessContourIntensity =>
@@ -5168,12 +5196,16 @@ class PulsrAudioHandler extends BaseAudioHandler
     double? cornerHz,
     double? slopeDbPerOct,
     double? gain,
+    bool? bassMono,
+    bool? antiPop,
   }) =>
       _equalizerManager.setSubCrossover(
         enabled,
         cornerHz: cornerHz,
         slopeDbPerOct: slopeDbPerOct,
         gain: gain,
+        bassMono: bassMono,
+        antiPop: antiPop,
       );
   bool get isDynamicEqEnabled => _equalizerManager.isDynamicEqEnabled;
   List<DynamicEqBandConfig> get dynamicEqBands =>
@@ -5182,11 +5214,17 @@ class PulsrAudioHandler extends BaseAudioHandler
       _equalizerManager.setDynamicEq(enabled);
   Future<void> setDynamicEqBand(int index, DynamicEqBandConfig band) =>
       _equalizerManager.setDynamicEqBand(index, band);
+      
+  Future<void> addDynamicEqBand() => _equalizerManager.addDynamicEqBand();
+  
+  Future<void> removeDynamicEqBand(int index) => _equalizerManager.removeDynamicEqBand(index);
 
   bool get isViperDdcEnabled => _equalizerManager.isViperDdcEnabled;
   String get viperDdcProfileName => _equalizerManager.viperDdcProfileName;
-  Future<void> setViperDdc(bool enabled, {String? profileName, List<double>? coeffs}) =>
-      _equalizerManager.setViperDdc(enabled, profileName: profileName, coeffs: coeffs);
+  Future<void> setViperDdc(bool enabled,
+          {String? profileName, List<double>? coeffs, String? ddcContent}) =>
+      _equalizerManager.setViperDdc(enabled,
+          profileName: profileName, coeffs: coeffs, ddcContent: ddcContent);
 
   bool get isArbitraryEqEnabled => _equalizerManager.isArbitraryEqEnabled;
   String get arbitraryEqString => _equalizerManager.arbitraryEqString;
@@ -5200,6 +5238,32 @@ class PulsrAudioHandler extends BaseAudioHandler
   Future<void> setLiveProgSlider(int sliderIndex, double value) =>
       _equalizerManager.setLiveProgSlider(sliderIndex, value);
 
+  bool get isDynamicBassEnabled => _equalizerManager.isDynamicBassEnabled;
+  double get dynamicBassStrength => _equalizerManager.dynamicBassStrength;
+  int get dynamicBassPreset => _equalizerManager.dynamicBassPreset;
+  Future<void> setDynamicBass({
+    required bool enabled,
+    double? strength,
+    int? preset,
+    int? xLow,
+    int? xHigh,
+    int? yLow,
+    int? yHigh,
+    double? sideGainLow,
+    double? sideGainHigh,
+  }) =>
+      _equalizerManager.setDynamicBass(
+        enabled: enabled,
+        strength: strength,
+        preset: preset,
+        xLow: xLow,
+        xHigh: xHigh,
+        yLow: yLow,
+        yHigh: yHigh,
+        sideGainLow: sideGainLow,
+        sideGainHigh: sideGainHigh,
+      );
+
   @override
   Future<void> stop() async {
     _sleepTimerManager.cancelSleepTimer();
@@ -5210,17 +5274,24 @@ class PulsrAudioHandler extends BaseAudioHandler
     await _playerA.stop();
     await _playerB.stop();
     await AudioEffectsChannel().releaseEffects();
+    try {
+      final session = await AudioSession.instance;
+      await session.setActive(false);
+    } catch (_) {}
     await super.stop();
   }
 
   @override
   Future<void> onTaskRemoved() async {
-    saveCurrentPositionImmediate();
+    await saveCurrentPositionImmediate();
+    try {
+      await _activePlayer.pause();
+    } catch (_) {}
     await super.onTaskRemoved();
   }
 
   @disposeMethod
-  void dispose() {
+  Future<void> dispose() async {
     if (_lifecycleObserver != null) {
       WidgetsBinding.instance.removeObserver(_lifecycleObserver!);
       _lifecycleObserver = null;
@@ -5233,8 +5304,10 @@ class PulsrAudioHandler extends BaseAudioHandler
     _fadeInGuardTimer = null;
     _crossfadeSwitchDebounce?.cancel();
     _crossfadeSwitchDebounce = null;
-    for (final sub in _subscriptions) {
-      sub.cancel();
+    for (final sub in List.of(_subscriptions)) {
+      try {
+        await sub.cancel();
+      } catch (_) {}
     }
     _subscriptions.clear();
     // Dispose sleep timer before closing its subject to avoid add-after-close race
@@ -5246,9 +5319,13 @@ class PulsrAudioHandler extends BaseAudioHandler
       multiOutputRouter.dispose();
     } catch (_) {}
     try {
-      silenceSkipController.persist();
+      await silenceSkipController.persist();
     } catch (_) {}
-    _streamPreResolver.dispose();
+    // Guarded: dispose() can run before the async _init() assigned this late
+    // field (hot restart / test teardown / early init failure).
+    try {
+      _streamPreResolver.dispose();
+    } catch (_) {}
     try {
       _preloadScheduler.clear();
     } catch (_) {}
@@ -5265,10 +5342,16 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (!_onTrackChangedSubject.isClosed) _onTrackChangedSubject.close();
     _equalizerManager.dispose();
     _crossfadeManager.dispose();
-    AudioEffectsChannel().releaseEffects();
-    _playerA.dispose();
-    _playerB.dispose();
-    _prefetchPlayer.dispose();
+    try {
+      await AudioEffectsChannel().releaseEffects();
+    } catch (_) {}
+    try {
+      final session = await AudioSession.instance;
+      await session.setActive(false);
+    } catch (_) {}
+    await _playerA.dispose();
+    await _playerB.dispose();
+    await _prefetchPlayer.dispose();
   }
 }
 

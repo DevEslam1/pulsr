@@ -68,13 +68,17 @@ void main() {
       expect(result.map((s) => s.title), isNot(contains('OldSec')));
     });
 
-    test('withinDays on lastPlayed matches second-granularity Unix timestamps',
+    test('withinDays on lastPlayed matches millisecond Unix timestamps',
         () async {
-      final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      // recordPlayHistory writes last_played in milliseconds (unlike MediaStore
+      // date_added seconds), so the rule must compare against a ms cutoff.
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
       await insertSong(
-          id: 101, title: 'PlayedRecently', lastPlayed: nowSec - 3600);
+          id: 101, title: 'PlayedRecently', lastPlayed: nowMs - 3600 * 1000);
       await insertSong(
-          id: 102, title: 'PlayedLongAgo', lastPlayed: nowSec - (60 * 86400));
+          id: 102,
+          title: 'PlayedLongAgo',
+          lastPlayed: nowMs - (60 * 86400 * 1000));
 
       final criteria = SmartCriteria(
         rules: const [

@@ -65,12 +65,19 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     private var isVirtualizerEnabled = false
     private var virtualizerStrength: Short = 0
+    // FIX C-4: tracks when Spatializer is using Virtualizer as fallback,
+    // so toggling Spatializer off doesn't silently disable user's Virtualizer
+    private var isSpatializerFallbackActive = false
 
     private var volumeBoostMilliBels: Int = 0
     private var bassBoostStrength: Short = 0
 
     private var isDynamicsEnabled = false
     private var currentDynamicsPreset = "off"
+    // True when the active dynamics preset is being rendered by the native C++
+    // Multiband Compressor (in ExoPlayer's audio sink) rather than the HAL
+    // DynamicsProcessing engine. The two must not both run the preset.
+    private var isDynamicsPresetNativeActive = false
     private var currentAudioSessionId = 0
     private val mainHandler = Handler(Looper.getMainLooper())
     private var volumeBoostRetryRunnable: Runnable? = null
@@ -431,7 +438,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         if (isLoudnessContourEnabled && loudnessIntensity > 0.001) mask = mask or STAGE_LOUDNESS
         if (isSubCrossoverEnabled) mask = mask or STAGE_CROSSOVER
         if (isDynamicEqEnabled && dynamicEqBandCount > 0) mask = mask or STAGE_DYNEQ
-        if (isMultibandCompressorEnabled) mask = mask or STAGE_MULTIBAND_COMPRESSOR
+        if (isMultibandCompressorEnabled || isDynamicsPresetNativeActive) mask = mask or STAGE_MULTIBAND_COMPRESSOR
         if (isDynamicBassEnabled && dynamicBassStrength > 0.001) mask = mask or STAGE_DYNAMIC_BASS
         if (isViperDdcEnabled) mask = mask or STAGE_VIPER_DDC
         if (isArbitraryEqEnabled) mask = mask or STAGE_ARBITRARY_EQ
@@ -497,7 +504,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         private const val CHANNEL_COUNT = 2 // Stereo
         private const val MBC_BAND_COUNT = 3
 
-        const val MAX_NATIVE_EQ_BANDS = 32
+        const val MAX_NATIVE_EQ_BANDS = 64
         const val MAX_DYNAMIC_EQ_BANDS = 8
         const val MAX_IR_SAMPLES = 2_000_000
         const val MAX_DSD_BUFFER_BYTES = 8 * 1024 * 1024 // 8 MB
@@ -899,7 +906,16 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         try { nativeSetLoudnessContourEnabled(isLoudnessContourEnabled) } catch (_: Exception) {}
         try { nativeSetSubCrossoverEnabled(isSubCrossoverEnabled) } catch (_: Exception) {}
         try { nativeSetDynamicEqEnabled(isDynamicEqEnabled) } catch (_: Exception) {}
-        try { nativeSetMultibandCompressorEnabled(isMultibandCompressorEnabled) } catch (_: Exception) {}
+        // FIX M-10: clear MBC dedup cache so all band params are re-pushed after bypass restore
+        lastNativeMultibandCompressorBands.clear()
+        lastNativeMultibandCompressorCrossovers = null
+        if (isDynamicsPresetNativeActive) {
+            // Re-apply the active dynamics preset through the native MBC so the
+            // stage is not silently left flat after a bypass restore.
+            applyNativeDynamicsPreset(currentDynamicsPreset, true)
+        } else {
+            try { nativeSetMultibandCompressorEnabled(isMultibandCompressorEnabled) } catch (_: Exception) {}
+        }
         try {
             nativeSetDynamicBassParams(
                 isDynamicBassEnabled, dynamicBassStrength,
@@ -917,7 +933,47 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     override fun onMethodCall(call: MethodCall, result: Result) {
         try {
             when (call.method) {
-                "setAudioSessionId" -> {
+                // Group 1: Core session, HAL effects & basic EQ
+                "setAudioSessionId", "setVirtualizerEnabled", "setVirtualizerStrength",
+                "setVolumeBoost", "isVolumeBoostSupported", "setBassBoost", "isBassBoostSupported",
+                "resyncForTrack", "setDynamicsPreset", "setEqEnabled", "setEqBands",
+                "setEqBandGain", "setEqBandGains", "setEqPreamp", "setNativeEqBand",
+                "setNativeEqBandsBulk", "setNativeEqBandCount", "setNativeEqEnabled",
+                "getPipelineLatencyFrames", "setBandSolo", "setBandMute" -> {
+                    handleCoreAndHalCall(call, result)
+                }
+
+                // Group 2: Native C++ DSP filters & Spatial
+                "setCrossfeedEnabled", "setCrossfeedParams", "setCrossfeedMode",
+                "setLimiterEnabled", "setLimiterParams",
+                "setReverbEnabled", "setReverbPreset", "setReverbWetDry", "setReverbParams",
+                "setReverbCrossChannel", "loadImpulseResponse", "setCacheBudgetBytes",
+                "getAutoDegradedStages", "setStereoBalance", "setMonoMix",
+                "setSincResamplerEnabled", "setSincResamplerQuality", "setSincResamplerRates",
+                "setSaturationEnabled", "setSaturationParams", "setSaturationMultiband",
+                "setStereoWidthEnabled", "setStereoWidthParams",
+                "setLoudnessContourEnabled", "setLoudnessContourParams",
+                "setSubCrossoverEnabled", "setSubCrossoverParams",
+                "setDynamicEqEnabled", "setDynamicEqBandCount", "setDynamicEqBand",
+                "setMultibandCompressorEnabled", "setMultibandCompressorBand", "setMultibandCompressorCrossovers",
+                "setDynamicBassParams" -> {
+                    handleNativeDspCall(call, result)
+                }
+
+                // Group 3: ViPER, LiveProg, DSD, System/OEM & Diagnostics
+                else -> {
+                    handleAdvancedAndDiagnosticCall(call, result)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "MethodChannel error handling ${call.method}: ${e.message}", e)
+            result.error("AUDIO_EFFECT_ERROR", e.message, null)
+        }
+    }
+
+    private fun handleCoreAndHalCall(call: MethodCall, result: Result) {
+        when (call.method) {
+            "setAudioSessionId" -> {
                     val sessionId = call.argument<Int>("audioSessionId") ?: 0
                     if (sessionId <= 0) {
                         currentAudioSessionId = 0
@@ -1111,6 +1167,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     if (isNativeDspLoaded && lastNativeEqBandCount != count) {
                         try {
                             nativeSetEqBandCount(count)
+                            // FIX M-2: clear dedup cache when band count changes to force full re-push
+                            lastNativeEqBands.clear()
                             lastNativeEqBandCount = count
                         } catch (e: Exception) {
                             Log.w(TAG, "nativeSetEqBandCount failed: ${e.message}")
@@ -1188,6 +1246,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     result.success(true)
                 }
 
+                else -> result.notImplemented()
+            }
+    }
+
+    private fun handleNativeDspCall(call: MethodCall, result: Result) {
+        when (call.method) {
                 // Headphone Crossfeed
                 "setCrossfeedEnabled" -> {
                     val enabled = call.argument<Boolean>("enabled") ?: false
@@ -1946,6 +2010,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     result.success(true)
                 }
 
+                else -> result.notImplemented()
+            }
+    }
+
+    private fun handleAdvancedAndDiagnosticCall(call: MethodCall, result: Result) {
+        when (call.method) {
                 // ---- ViPER-DDC (Digital Dynamic Correction) ----
                 "setViperDdcEnabled" -> {
                     val enabled = call.argument<Boolean>("enabled") ?: false
@@ -2083,7 +2153,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 }
 
                 "isDynamicsSupported" -> {
-                    result.success(isEffectTypeSupported(AudioEffect.EFFECT_TYPE_DYNAMICS_PROCESSING))
+                    result.success(isEffectTypeSupported(AudioEffect.EFFECT_TYPE_DYNAMICS_PROCESSING) || isNativeDspLoaded)
                 }
 
                 "isVirtualizerSupported" -> {
@@ -2136,7 +2206,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         "hasAppWidget" to true,
                         "isVolumeBoostSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_LOUDNESS_ENHANCER),
                         "isBassBoostSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_BASS_BOOST),
-                        "isDynamicsSupported" to dynamicsSupported,
+                        "isDynamicsSupported" to (dynamicsSupported || isNativeDspLoaded),
                         "isVirtualizerSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_VIRTUALIZER),
                         "isFloatOutputSupported" to (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP),
                         "isHardwareOffloadSupported" to (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
@@ -2210,307 +2280,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 }
 
                 "getDspDebugStatus" -> {
-                    val ctx = context
-                    val oemInfo = if (ctx != null) getCachedOemInfo(ctx) else mapOf("hasOemAudio" to false, "detectedEngines" to emptyList<String>())
-                    val hasOem = oemInfo["hasOemAudio"] as? Boolean ?: false
-                    @Suppress("UNCHECKED_CAST")
-                    val oemEngines = oemInfo["detectedEngines"] as? List<String> ?: emptyList()
-
-                    val autoDegraded = if (isNativeDspLoaded) {
-                        try { nativeGetAutoDegradedStages() } catch (_: Exception) { 0 }
-                    } else 0
-                    val halAttached = isEffectPipelineAttached()
-
-                    val stagesList = mutableListOf<Map<String, Any?>>()
-                    val activeNames = mutableListOf<String>()
-
-                    // 1. Equalizer (DynamicsProcessing or legacy)
-                    val halEqSuppressedForReport = isHalEqSuppressed()
-                    val eqActive = isEqEnabled && !isBitPerfectBypassActive && !halEqSuppressedForReport && halAttached
-                    if (eqActive) activeNames.add("Graphic Equalizer ($eqBandCount Bands, Preamp: ${String.format(java.util.Locale.US, "%.1f", eqPreampDb)} dB)")
-                    stagesList.add(mapOf(
-                        "name" to "Graphic Equalizer",
-                        "category" to (if (dynamicsProcessing != null) "Android HAL (DynamicsProcessing)" else if (legacyEqualizer != null) "Android HAL (Legacy Equalizer)" else "Native C++"),
-                        "isSupported" to (isEffectTypeSupported(AudioEffect.EFFECT_TYPE_DYNAMICS_PROCESSING) || isNativeDspLoaded),
-                        "isEnabled" to isEqEnabled,
-                        "isBypassed" to (isBitPerfectBypassActive || halEqSuppressedForReport),
-                        "isDegraded" to (!halAttached && isEqEnabled && !halEqSuppressedForReport || ((autoDegraded and STAGE_EQ) != 0)),
-                        "parameters" to mapOf(
-                            "bandCount" to eqBandCount,
-                            "preampDb" to eqPreampDb,
-                            "isDynamicsProcessingAttached" to (dynamicsProcessing != null),
-                            "isLegacyEqualizerAttached" to (legacyEqualizer != null),
-                            "isHalEqSuppressedForOem" to halEqSuppressedForReport
-                        ),
-                        "statusDescription" to when {
-                            isBitPerfectBypassActive -> "Bypassed by Bit-Perfect"
-                            halEqSuppressedForReport -> "Suppressed (OEM engine active — dspPreference=$dspPreference)"
-                            isEqEnabled -> "$eqBandCount Bands Active (Preamp: ${String.format(java.util.Locale.US, "%.1f", eqPreampDb)} dB)"
-                            else -> "Disabled"
-                        }
-                    ))
-
-                    // 2. Dynamics Processing / Multiband Compressor
-                    val dynActive = isDynamicsEnabled && currentDynamicsPreset != "off" && !isBitPerfectBypassActive && halAttached
-                    if (dynActive) activeNames.add("Dynamics Processing ($currentDynamicsPreset)")
-                    stagesList.add(mapOf(
-                        "name" to "Dynamics Processing",
-                        "category" to "Android HAL (DynamicsProcessing)",
-                        "isSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_DYNAMICS_PROCESSING),
-                        "isEnabled" to isDynamicsEnabled,
-                        "isBypassed" to isBitPerfectBypassActive,
-                        "isDegraded" to (!halAttached && isDynamicsEnabled),
-                        "parameters" to mapOf(
-                            "preset" to currentDynamicsPreset,
-                            "isAttached" to (dynamicsProcessing != null)
-                        ),
-                        "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isDynamicsEnabled) "Preset: $currentDynamicsPreset" else "Disabled"
-                    ))
-
-                    // 3. Virtualizer / Spatializer
-                    val virtActive = isVirtualizerEnabled && virtualizerStrength > 0 && !isBitPerfectBypassActive && halAttached
-                    if (virtActive) activeNames.add("Virtualizer (Strength: $virtualizerStrength/1000)")
-                    stagesList.add(mapOf(
-                        "name" to "Virtualizer / Surround",
-                        "category" to "Android HAL (Virtualizer)",
-                        "isSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_VIRTUALIZER),
-                        "isEnabled" to isVirtualizerEnabled,
-                        "isBypassed" to isBitPerfectBypassActive,
-                        "isDegraded" to (!halAttached && isVirtualizerEnabled),
-                        "parameters" to mapOf(
-                            "strength" to virtualizerStrength.toInt(),
-                            "isAttached" to (virtualizer != null)
-                        ),
-                        "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isVirtualizerEnabled) "Strength: ${(virtualizerStrength.toDouble() / 10).toInt()}%" else "Disabled"
-                    ))
-
-                    // 4. Bass Boost
-                    val bbActive = bassBoostStrength > 0 && !isBitPerfectBypassActive && halAttached
-                    if (bbActive) activeNames.add("Bass Boost (Strength: $bassBoostStrength/1000)")
-                    stagesList.add(mapOf(
-                        "name" to "Bass Boost",
-                        "category" to "Android HAL (BassBoost)",
-                        "isSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_BASS_BOOST),
-                        "isEnabled" to (bassBoostStrength > 0),
-                        "isBypassed" to isBitPerfectBypassActive,
-                        "isDegraded" to (!halAttached && bassBoostStrength > 0),
-                        "parameters" to mapOf(
-                            "strength" to bassBoostStrength.toInt(),
-                            "isAttached" to (bassBoost != null)
-                        ),
-                        "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (bassBoostStrength > 0) "Strength: ${(bassBoostStrength.toDouble() / 10).toInt()}%" else "Disabled"
-                    ))
-
-                    // 5. Loudness Enhancer (Volume Boost)
-                    val volActive = volumeBoostMilliBels > 0 && !isBitPerfectBypassActive && halAttached
-                    if (volActive) activeNames.add("Volume Boost (+${volumeBoostMilliBels / 100.0} dB)")
-                    stagesList.add(mapOf(
-                        "name" to "Volume Boost / Loudness Enhancer",
-                        "category" to "Android HAL (LoudnessEnhancer)",
-                        "isSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_LOUDNESS_ENHANCER),
-                        "isEnabled" to (volumeBoostMilliBels > 0),
-                        "isBypassed" to isBitPerfectBypassActive,
-                        "isDegraded" to (!halAttached && volumeBoostMilliBels > 0),
-                        "parameters" to mapOf(
-                            "targetGainMilliBels" to volumeBoostMilliBels,
-                            "gainDb" to (volumeBoostMilliBels / 100.0),
-                            "isAttached" to (loudnessEnhancer != null)
-                        ),
-                        "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (volumeBoostMilliBels > 0) "+${String.format(java.util.Locale.US, "%.1f", volumeBoostMilliBels / 100.0)} dB" else "Disabled"
-                    ))
-
-                    // 6. Lookahead Limiter (Native C++)
-                    val limActive = isLimiterEnabled && !isBitPerfectBypassActive
-                    if (limActive) activeNames.add("Lookahead Limiter (Thresh: ${limiterThresholdDb}dB, Lookahead: ${limiterLookaheadMs}ms)")
-                    stagesList.add(mapOf(
-                        "name" to "True-Peak Lookahead Limiter",
-                        "category" to "Native C++ Engine",
-                        "isSupported" to isNativeDspLoaded,
-                        "isEnabled" to isLimiterEnabled,
-                        "isBypassed" to isBitPerfectBypassActive,
-                        "isDegraded" to ((autoDegraded and STAGE_LIMITER) != 0),
-                        "parameters" to mapOf(
-                            "thresholdDb" to limiterThresholdDb,
-                            "lookaheadMs" to limiterLookaheadMs,
-                            "releaseMs" to limiterReleaseMs
-                        ),
-                        "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isLimiterEnabled) "Threshold: ${limiterThresholdDb} dB, Lookahead: ${limiterLookaheadMs} ms" else "Disabled"
-                    ))
-
-                    // 7. Convolution Reverb (Native C++)
-                    val revActive = isReverbEnabled && !isBitPerfectBypassActive && isNativeDspLoaded
-                    if (revActive) activeNames.add("Convolution Reverb (Preset #$reverbPreset, Wet: ${(reverbWetDry * 100).toInt()}%)")
-                    stagesList.add(mapOf(
-                        "name" to "Convolution Reverb",
-                        "category" to "Native C++ Engine",
-                        "isSupported" to isNativeDspLoaded,
-                        "isEnabled" to isReverbEnabled,
-                        "isBypassed" to isBitPerfectBypassActive,
-                        "isDegraded" to ((autoDegraded and STAGE_REVERB) != 0),
-                        "parameters" to mapOf(
-                            "preset" to reverbPreset,
-                            "wetDryRatio" to reverbWetDry.toDouble(),
-                            "isCustomIr" to (reverbPreset == REVERB_PRESET_CUSTOM)
-                        ),
-                        "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isReverbEnabled) "Preset #$reverbPreset (${(reverbWetDry * 100).toInt()}% Wet)" else "Disabled"
-                    ))
-
-                    // 8. Crossfeed BS2B (Native C++)
-                    val cfActive = isCrossfeedEnabled && !isBitPerfectBypassActive
-                    if (cfActive) activeNames.add("Bauer Crossfeed (${crossfeedDelayUs}µs, ${crossfeedFeedDb}dB)")
-                    stagesList.add(mapOf(
-                        "name" to "Bauer Binaural Crossfeed",
-                        "category" to "Native C++ Engine",
-                        "isSupported" to isNativeDspLoaded,
-                        "isEnabled" to isCrossfeedEnabled,
-                        "isBypassed" to isBitPerfectBypassActive,
-                        "isDegraded" to ((autoDegraded and STAGE_CROSSFEED) != 0),
-                        "parameters" to mapOf(
-                            "delayUs" to crossfeedDelayUs,
-                            "feedDb" to crossfeedFeedDb
-                        ),
-                        "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isCrossfeedEnabled) "Delay: ${crossfeedDelayUs} µs, Feed: ${crossfeedFeedDb} dB" else "Disabled"
-                    ))
-
-                    // 9. Harmonic Saturation (Native C++)
-                    val satActive = isSaturationEnabled && !isBitPerfectBypassActive
-                    if (satActive) activeNames.add("Harmonic Saturation (Drive: ${(saturationDrive * 100).toInt()}%)")
-                    stagesList.add(mapOf(
-                        "name" to "Harmonic Saturation (Tanh Exciter)",
-                        "category" to "Native C++ Engine",
-                        "isSupported" to isNativeDspLoaded,
-                        "isEnabled" to isSaturationEnabled,
-                        "isBypassed" to isBitPerfectBypassActive,
-                        "isDegraded" to ((autoDegraded and STAGE_SATURATION) != 0),
-                        "parameters" to mapOf(
-                            "drive" to saturationDrive,
-                            "mix" to saturationMix
-                        ),
-                        "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isSaturationEnabled) "Drive: ${(saturationDrive * 100).toInt()}%, Mix: ${(saturationMix * 100).toInt()}%" else "Disabled"
-                    ))
-
-                    // 10. Stereo Width (Native C++)
-                    val swActive = isStereoWidthEnabled && !isBitPerfectBypassActive
-                    if (swActive) activeNames.add("Stereo Width (M/S: ${(stereoWidth * 100).toInt()}%)")
-                    stagesList.add(mapOf(
-                        "name" to "Stereo Width (Mid/Side)",
-                        "category" to "Native C++ Engine",
-                        "isSupported" to isNativeDspLoaded,
-                        "isEnabled" to isStereoWidthEnabled,
-                        "isBypassed" to isBitPerfectBypassActive,
-                        "isDegraded" to ((autoDegraded and STAGE_WIDTH) != 0),
-                        "parameters" to mapOf(
-                            "width" to stereoWidth
-                        ),
-                        "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isStereoWidthEnabled) "Width: ${(stereoWidth * 100).toInt()}%" else "Disabled"
-                    ))
-
-                    // 11. Dynamic EQ (Native C++)
-                    val deqActive = isDynamicEqEnabled && dynamicEqBandCount > 0 && !isBitPerfectBypassActive
-                    if (deqActive) activeNames.add("Dynamic EQ ($dynamicEqBandCount Bands)")
-                    stagesList.add(mapOf(
-                        "name" to "Dynamic Parametric EQ",
-                        "category" to "Native C++ Engine",
-                        "isSupported" to isNativeDspLoaded,
-                        "isEnabled" to isDynamicEqEnabled,
-                        "isBypassed" to isBitPerfectBypassActive,
-                        "isDegraded" to ((autoDegraded and STAGE_DYNEQ) != 0),
-                        "parameters" to mapOf(
-                            "bandCount" to dynamicEqBandCount
-                        ),
-                        "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isDynamicEqEnabled) "$dynamicEqBandCount Dynamic Bands" else "Disabled"
-                    ))
-
-                    // 12. Sub Crossover (Native C++)
-                    val subActive = isSubCrossoverEnabled && !isBitPerfectBypassActive
-                    if (subActive) activeNames.add("Sub Crossover (${subCrossoverCornerHz.toInt()} Hz)")
-                    stagesList.add(mapOf(
-                        "name" to "Subwoofer Crossover",
-                        "category" to "Native C++ Engine",
-                        "isSupported" to isNativeDspLoaded,
-                        "isEnabled" to isSubCrossoverEnabled,
-                        "isBypassed" to isBitPerfectBypassActive,
-                        "isDegraded" to ((autoDegraded and STAGE_CROSSOVER) != 0),
-                        "parameters" to mapOf(
-                            "cornerHz" to subCrossoverCornerHz
-                        ),
-                        "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isSubCrossoverEnabled) "Cutoff: ${subCrossoverCornerHz.toInt()} Hz" else "Disabled"
-                    ))
-
-                    // 13. Loudness Contour (Native C++)
-                    val lcActive = isLoudnessContourEnabled && loudnessIntensity > 0.001 && !isBitPerfectBypassActive
-                    if (lcActive) activeNames.add("Loudness Contour (${(loudnessIntensity * 100).toInt()}%)")
-                    stagesList.add(mapOf(
-                        "name" to "Equal-Loudness Contour (Fletcher-Munson)",
-                        "category" to "Native C++ Engine",
-                        "isSupported" to isNativeDspLoaded,
-                        "isEnabled" to isLoudnessContourEnabled,
-                        "isBypassed" to isBitPerfectBypassActive,
-                        "isDegraded" to ((autoDegraded and STAGE_LOUDNESS) != 0),
-                        "parameters" to mapOf(
-                            "intensity" to loudnessIntensity
-                        ),
-                        "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isLoudnessContourEnabled) "Intensity: ${(loudnessIntensity * 100).toInt()}%" else "Disabled"
-                    ))
-
-                    // 14. Spatial Panner — Stereo Balance & Mono Mix (Native C++)
-                    val panActive = (abs(stereoBalance) > 0.001 || monoMix) && !isBitPerfectBypassActive
-                    if (panActive) {
-                        activeNames.add(
-                            if (monoMix) "Mono Downmix" else "Stereo Balance (${(stereoBalance * 100).toInt()}%)"
-                        )
-                    }
-                    stagesList.add(mapOf(
-                        "name" to "Stereo Balance & Mono Downmix",
-                        "category" to "Native C++ Engine",
-                        "isSupported" to isNativeDspLoaded,
-                        "isEnabled" to (abs(stereoBalance) > 0.001 || monoMix),
-                        "isBypassed" to isBitPerfectBypassActive,
-                        "isDegraded" to ((autoDegraded and STAGE_PANNER) != 0),
-                        "parameters" to mapOf(
-                            "balance" to stereoBalance,
-                            "monoMix" to monoMix
-                        ),
-                        "statusDescription" to when {
-                            isBitPerfectBypassActive -> "Bypassed by Bit-Perfect"
-                            monoMix -> "Mono downmix (L+R)"
-                            abs(stereoBalance) > 0.001 ->
-                                if (stereoBalance < 0) "Left ${(-stereoBalance * 100).toInt()}%"
-                                else "Right ${(stereoBalance * 100).toInt()}%"
-                            else -> "Centered"
-                        }
-                    ))
-
-                    val nativeAppliedSampleRate = if (isNativeDspLoaded) {
-                        try { nativeGetAppliedSampleRate() } catch (_: Exception) { 0.0 }
-                    } else 0.0
-                    val nativeLastAppliedGeneration = if (isNativeDspLoaded) {
-                        try { nativeGetLastAppliedGeneration() } catch (_: Exception) { 0 }
-                    } else 0
-                    val nativePublishedGeneration = if (isNativeDspLoaded) {
-                        try { nativeGetPublishedGeneration() } catch (_: Exception) { 0 }
-                    } else 0
-
-                    val report = mapOf(
-                        "audioSessionId" to currentAudioSessionId,
-                        // Truthful: only attached when the HAL chain for the
-                        // current stage configuration exists on a live session.
-                        "isSessionAttached" to isEffectPipelineAttached(),
-                        "dspPreference" to dspPreference,
-                        "isBitPerfectBypassActive" to isBitPerfectBypassActive,
-                        "isNativeDspLoaded" to isNativeDspLoaded,
-                        "appliedSampleRate" to nativeAppliedSampleRate,
-                        "lastAppliedGeneration" to nativeLastAppliedGeneration,
-                        "publishedGeneration" to nativePublishedGeneration,
-                        "activeDspStagesMask" to activeDspStages,
-                        "autoDegradedStagesMask" to autoDegraded,
-                        "hasOemAudio" to hasOem,
-                        "detectedOemEngines" to oemEngines,
-                        "stages" to stagesList,
-                        "activeEffectNames" to activeNames
-                    )
-                    Log.d(TAG, "[DSP_DEBUG] Live DSP snapshot requested: ${activeNames.size} active effects, session=$currentAudioSessionId, attached=${report["isSessionAttached"]}, bypass=$isBitPerfectBypassActive")
-                    result.success(report)
+                    handleGetDspDebugStatus(result)
                 }
 
                 "setReplayGainEnabled" -> {
@@ -2619,10 +2389,380 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
                 else -> result.notImplemented()
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "MethodChannel error handling ${call.method}: ${e.message}", e)
-            result.error("AUDIO_EFFECT_ERROR", e.message, null)
-        }
+    }
+
+    private fun handleGetDspDebugStatus(result: Result) {
+        val ctx = context
+        val oemInfo = if (ctx != null) getCachedOemInfo(ctx) else mapOf("hasOemAudio" to false, "detectedEngines" to emptyList<String>())
+        val hasOem = oemInfo["hasOemAudio"] as? Boolean ?: false
+        @Suppress("UNCHECKED_CAST")
+        val oemEngines = oemInfo["detectedEngines"] as? List<String> ?: emptyList()
+
+        val autoDegraded = if (isNativeDspLoaded) {
+            try { nativeGetAutoDegradedStages() } catch (_: Exception) { 0 }
+        } else 0
+        val halAttached = isEffectPipelineAttached()
+
+        val stagesList = mutableListOf<Map<String, Any?>>()
+        val activeNames = mutableListOf<String>()
+
+        // 1. Equalizer (DynamicsProcessing or legacy)
+        val halEqSuppressedForReport = isHalEqSuppressed()
+        val eqActive = isEqEnabled && !isBitPerfectBypassActive && !halEqSuppressedForReport && halAttached
+        if (eqActive) activeNames.add("Graphic Equalizer ($eqBandCount Bands, Preamp: ${String.format(java.util.Locale.US, "%.1f", eqPreampDb)} dB)")
+        stagesList.add(mapOf(
+            "name" to "Graphic Equalizer",
+            "category" to (if (dynamicsProcessing != null) "Android HAL (DynamicsProcessing)" else if (legacyEqualizer != null) "Android HAL (Legacy Equalizer)" else "Native C++"),
+            "isSupported" to (isEffectTypeSupported(AudioEffect.EFFECT_TYPE_DYNAMICS_PROCESSING) || isNativeDspLoaded),
+            "isEnabled" to isEqEnabled,
+            "isBypassed" to (isBitPerfectBypassActive || halEqSuppressedForReport),
+            "isDegraded" to (!halAttached && isEqEnabled && !halEqSuppressedForReport || ((autoDegraded and STAGE_EQ) != 0)),
+            "parameters" to mapOf(
+                "bandCount" to eqBandCount,
+                "preampDb" to eqPreampDb,
+                "isDynamicsProcessingAttached" to (dynamicsProcessing != null),
+                "isLegacyEqualizerAttached" to (legacyEqualizer != null),
+                "isHalEqSuppressedForOem" to halEqSuppressedForReport
+            ),
+            "statusDescription" to when {
+                isBitPerfectBypassActive -> "Bypassed by Bit-Perfect"
+                halEqSuppressedForReport -> "Suppressed (OEM engine active — dspPreference=$dspPreference)"
+                isEqEnabled -> "$eqBandCount Bands Active (Preamp: ${String.format(java.util.Locale.US, "%.1f", eqPreampDb)} dB)"
+                else -> "Disabled"
+            }
+        ))
+
+        // 2. Dynamics Processing / Native Multiband Compressor
+        val dynNative = isDynamicsEnabled && currentDynamicsPreset != "off" && isDynamicsPresetNativeActive
+        val dynHal = isDynamicsEnabled && currentDynamicsPreset != "off" && !isDynamicsPresetNativeActive
+        val dynActive = isDynamicsEnabled && currentDynamicsPreset != "off" && !isBitPerfectBypassActive && (dynNative || halAttached)
+        if (dynActive) activeNames.add(if (dynNative) "Native Multiband Dynamics ($currentDynamicsPreset)" else "Dynamics Processing ($currentDynamicsPreset)")
+        stagesList.add(mapOf(
+            "name" to "Dynamics Processing",
+            "category" to (if (dynNative) "Native C++ Engine" else "Android HAL (DynamicsProcessing)"),
+            "isSupported" to (isNativeDspLoaded || isEffectTypeSupported(AudioEffect.EFFECT_TYPE_DYNAMICS_PROCESSING)),
+            "isEnabled" to isDynamicsEnabled,
+            "isBypassed" to isBitPerfectBypassActive,
+            "isDegraded" to (dynHal && !halAttached),
+            "parameters" to mapOf(
+                "preset" to currentDynamicsPreset,
+                "isAttached" to (dynNative || dynamicsProcessing != null)
+            ),
+            "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isDynamicsEnabled) "Preset: $currentDynamicsPreset" else "Disabled"
+        ))
+
+        // 3. Virtualizer / Spatializer
+        val virtActive = isVirtualizerEnabled && !isBitPerfectBypassActive && (halAttached || (virtualizer != null))
+        if (virtActive) activeNames.add("Virtualizer (Strength: $virtualizerStrength/1000)")
+        stagesList.add(mapOf(
+            "name" to "Spatializer / Virtualizer",
+            "category" to "Android HAL (Virtualizer)",
+            "isSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_VIRTUALIZER),
+            "isEnabled" to isVirtualizerEnabled,
+            "isBypassed" to isBitPerfectBypassActive,
+            "isDegraded" to (!halAttached && isVirtualizerEnabled),
+            "parameters" to mapOf(
+                "strength" to virtualizerStrength.toInt(),
+                "isAttached" to (virtualizer != null)
+            ),
+            "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isVirtualizerEnabled) "Strength: ${(virtualizerStrength.toDouble() / 10).toInt()}%" else "Disabled"
+        ))
+
+        // 4. Bass Boost
+        val bbActive = bassBoostStrength > 0 && !isBitPerfectBypassActive && halAttached
+        if (bbActive) activeNames.add("Bass Boost (Strength: $bassBoostStrength/1000)")
+        stagesList.add(mapOf(
+            "name" to "Bass Boost",
+            "category" to "Android HAL (BassBoost)",
+            "isSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_BASS_BOOST),
+            "isEnabled" to (bassBoostStrength > 0),
+            "isBypassed" to isBitPerfectBypassActive,
+            "isDegraded" to (!halAttached && bassBoostStrength > 0),
+            "parameters" to mapOf(
+                "strength" to bassBoostStrength.toInt(),
+                "isAttached" to (bassBoost != null)
+            ),
+            "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (bassBoostStrength > 0) "Strength: ${(bassBoostStrength.toDouble() / 10).toInt()}%" else "Disabled"
+        ))
+
+        // 5. Loudness Enhancer (Volume Boost)
+        val volActive = volumeBoostMilliBels > 0 && !isBitPerfectBypassActive && halAttached
+        if (volActive) activeNames.add("Volume Boost (+${volumeBoostMilliBels / 100.0} dB)")
+        stagesList.add(mapOf(
+            "name" to "Volume Boost / Loudness Enhancer",
+            "category" to "Android HAL (LoudnessEnhancer)",
+            "isSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_LOUDNESS_ENHANCER),
+            "isEnabled" to (volumeBoostMilliBels > 0),
+            "isBypassed" to isBitPerfectBypassActive,
+            "isDegraded" to (!halAttached && volumeBoostMilliBels > 0),
+            "parameters" to mapOf(
+                "targetGainMilliBels" to volumeBoostMilliBels,
+                "gainDb" to (volumeBoostMilliBels / 100.0),
+                "isAttached" to (loudnessEnhancer != null)
+            ),
+            "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (volumeBoostMilliBels > 0) "+${String.format(java.util.Locale.US, "%.1f", volumeBoostMilliBels / 100.0)} dB" else "Disabled"
+        ))
+
+        // 6. Lookahead Limiter (Native C++)
+        val limActive = isLimiterEnabled && !isBitPerfectBypassActive
+        if (limActive) activeNames.add("Lookahead Limiter (Thresh: ${limiterThresholdDb}dB, Lookahead: ${limiterLookaheadMs}ms)")
+        stagesList.add(mapOf(
+            "name" to "True-Peak Lookahead Limiter",
+            "category" to "Native C++ Engine",
+            "isSupported" to isNativeDspLoaded,
+            "isEnabled" to isLimiterEnabled,
+            "isBypassed" to isBitPerfectBypassActive,
+            "isDegraded" to ((autoDegraded and STAGE_LIMITER) != 0),
+            "parameters" to mapOf(
+                "thresholdDb" to limiterThresholdDb,
+                "lookaheadMs" to limiterLookaheadMs,
+                "releaseMs" to limiterReleaseMs
+            ),
+            "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isLimiterEnabled) "Threshold: ${limiterThresholdDb} dB, Lookahead: ${limiterLookaheadMs} ms" else "Disabled"
+        ))
+
+        // 7. Convolution Reverb (Native C++)
+        val revActive = isReverbEnabled && !isBitPerfectBypassActive && isNativeDspLoaded
+        if (revActive) activeNames.add("Convolution Reverb (Preset #$reverbPreset, Wet: ${(reverbWetDry * 100).toInt()}%)")
+        stagesList.add(mapOf(
+            "name" to "Convolution Reverb",
+            "category" to "Native C++ Engine",
+            "isSupported" to isNativeDspLoaded,
+            "isEnabled" to isReverbEnabled,
+            "isBypassed" to isBitPerfectBypassActive,
+            "isDegraded" to ((autoDegraded and STAGE_REVERB) != 0),
+            "parameters" to mapOf(
+                "preset" to reverbPreset,
+                "wetDryRatio" to reverbWetDry.toDouble(),
+                "isCustomIr" to (reverbPreset == REVERB_PRESET_CUSTOM)
+            ),
+            "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isReverbEnabled) "Preset #$reverbPreset (${(reverbWetDry * 100).toInt()}% Wet)" else "Disabled"
+        ))
+
+        // 8. Crossfeed BS2B (Native C++)
+        val cfActive = isCrossfeedEnabled && !isBitPerfectBypassActive
+        if (cfActive) activeNames.add("Bauer Crossfeed (${crossfeedDelayUs}µs, ${crossfeedFeedDb}dB)")
+        stagesList.add(mapOf(
+            "name" to "Bauer Binaural Crossfeed",
+            "category" to "Native C++ Engine",
+            "isSupported" to isNativeDspLoaded,
+            "isEnabled" to isCrossfeedEnabled,
+            "isBypassed" to isBitPerfectBypassActive,
+            "isDegraded" to ((autoDegraded and STAGE_CROSSFEED) != 0),
+            "parameters" to mapOf(
+                "delayUs" to crossfeedDelayUs,
+                "feedDb" to crossfeedFeedDb
+            ),
+            "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isCrossfeedEnabled) "Delay: ${crossfeedDelayUs} µs, Feed: ${crossfeedFeedDb} dB" else "Disabled"
+        ))
+
+        // 9. Harmonic Saturation (Native C++)
+        val satActive = isSaturationEnabled && !isBitPerfectBypassActive
+        if (satActive) activeNames.add("Harmonic Saturation (Drive: ${(saturationDrive * 100).toInt()}%)")
+        stagesList.add(mapOf(
+            "name" to "Harmonic Saturation (Tanh Exciter)",
+            "category" to "Native C++ Engine",
+            "isSupported" to isNativeDspLoaded,
+            "isEnabled" to isSaturationEnabled,
+            "isBypassed" to isBitPerfectBypassActive,
+            "isDegraded" to ((autoDegraded and STAGE_SATURATION) != 0),
+            "parameters" to mapOf(
+                "drive" to saturationDrive,
+                "mix" to saturationMix
+            ),
+            "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isSaturationEnabled) "Drive: ${(saturationDrive * 100).toInt()}%, Mix: ${(saturationMix * 100).toInt()}%" else "Disabled"
+        ))
+
+        // 10. Stereo Width (Native C++)
+        val swActive = isStereoWidthEnabled && !isBitPerfectBypassActive
+        if (swActive) activeNames.add("Stereo Width (M/S: ${(stereoWidth * 100).toInt()}%)")
+        stagesList.add(mapOf(
+            "name" to "Stereo Width (Mid/Side)",
+            "category" to "Native C++ Engine",
+            "isSupported" to isNativeDspLoaded,
+            "isEnabled" to isStereoWidthEnabled,
+            "isBypassed" to isBitPerfectBypassActive,
+            "isDegraded" to ((autoDegraded and STAGE_WIDTH) != 0),
+            "parameters" to mapOf(
+                "width" to stereoWidth
+            ),
+            "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isStereoWidthEnabled) "Width: ${(stereoWidth * 100).toInt()}%" else "Disabled"
+        ))
+
+        // 11. Loudness Contour (Native C++)
+        val lcActive = isLoudnessContourEnabled && !isBitPerfectBypassActive
+        if (lcActive) activeNames.add("Loudness Contour (ISO 226: ${(loudnessIntensity * 100).toInt()}%)")
+        stagesList.add(mapOf(
+            "name" to "Loudness Contour (ISO 226)",
+            "category" to "Native C++ Engine",
+            "isSupported" to isNativeDspLoaded,
+            "isEnabled" to isLoudnessContourEnabled,
+            "isBypassed" to isBitPerfectBypassActive,
+            "isDegraded" to ((autoDegraded and STAGE_LOUDNESS) != 0),
+            "parameters" to mapOf(
+                "intensity" to loudnessIntensity
+            ),
+            "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isLoudnessContourEnabled) "Intensity: ${(loudnessIntensity * 100).toInt()}%" else "Disabled"
+        ))
+
+        // 12. Subwoofer Crossover (Native C++)
+        val subActive = isSubCrossoverEnabled && !isBitPerfectBypassActive
+        if (subActive) activeNames.add("Sub Crossover (${subCrossoverCornerHz.toInt()}Hz, ${subCrossoverSlopeDbPerOct.toInt()}dB/oct)")
+        stagesList.add(mapOf(
+            "name" to "Subwoofer Crossover",
+            "category" to "Native C++ Engine",
+            "isSupported" to isNativeDspLoaded,
+            "isEnabled" to isSubCrossoverEnabled,
+            "isBypassed" to isBitPerfectBypassActive,
+            "isDegraded" to ((autoDegraded and STAGE_CROSSOVER) != 0),
+            "parameters" to mapOf(
+                "cornerHz" to subCrossoverCornerHz,
+                "slopeDbPerOct" to subCrossoverSlopeDbPerOct,
+                "gain" to subCrossoverGain
+            ),
+            "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isSubCrossoverEnabled) "${subCrossoverCornerHz.toInt()} Hz (${subCrossoverSlopeDbPerOct.toInt()} dB/oct)" else "Disabled"
+        ))
+
+        // 13. Dynamic EQ (Native C++)
+        val deqActive = isDynamicEqEnabled && !isBitPerfectBypassActive
+        if (deqActive) activeNames.add("Dynamic EQ (3 Bands Active)")
+        stagesList.add(mapOf(
+            "name" to "Dynamic Equalizer",
+            "category" to "Native C++ Engine",
+            "isSupported" to isNativeDspLoaded,
+            "isEnabled" to isDynamicEqEnabled,
+            "isBypassed" to isBitPerfectBypassActive,
+            "isDegraded" to ((autoDegraded and STAGE_DYNEQ) != 0),
+            "parameters" to mapOf(
+                "bands" to 3
+            ),
+            "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isDynamicEqEnabled) "Active" else "Disabled"
+        ))
+
+        // 14. Multiband Compressor (Native C++)
+        val mcActive = isMultibandCompressorEnabled && !isBitPerfectBypassActive
+        if (mcActive) activeNames.add("Multiband Compressor (4 Bands Active)")
+        stagesList.add(mapOf(
+            "name" to "Multiband Compressor",
+            "category" to "Native C++ Engine",
+            "isSupported" to isNativeDspLoaded,
+            "isEnabled" to isMultibandCompressorEnabled,
+            "isBypassed" to isBitPerfectBypassActive,
+            "isDegraded" to ((autoDegraded and STAGE_MULTIBAND_COMPRESSOR) != 0),
+            "parameters" to mapOf(
+                "bands" to 4
+            ),
+            "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isMultibandCompressorEnabled) "Active" else "Disabled"
+        ))
+
+        // 15. Dynamic Bass (Native C++)
+        val dbActive = isDynamicBassEnabled && !isBitPerfectBypassActive
+        if (dbActive) activeNames.add("Dynamic Bass (Strength: ${(dynamicBassStrength * 100).toInt()}%)")
+        stagesList.add(mapOf(
+            "name" to "Dynamic Bass (Dynamic System)",
+            "category" to "Native C++ Engine",
+            "isSupported" to isNativeDspLoaded,
+            "isEnabled" to isDynamicBassEnabled,
+            "isBypassed" to isBitPerfectBypassActive,
+            "isDegraded" to ((autoDegraded and STAGE_DYNAMIC_BASS) != 0),
+            "parameters" to mapOf(
+                "strength" to dynamicBassStrength,
+                "xLow" to dynamicBassXLow,
+                "xHigh" to dynamicBassXHigh,
+                "yLow" to dynamicBassYLow,
+                "yHigh" to dynamicBassYHigh,
+                "sideGainLow" to dynamicBassSideGainLow,
+                "sideGainHigh" to dynamicBassSideGainHigh,
+                "devicePreset" to dynamicBassDevicePreset
+            ),
+            "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isDynamicBassEnabled) "Strength: ${(dynamicBassStrength * 100).toInt()}%, Preset: #$dynamicBassDevicePreset" else "Disabled"
+        ))
+
+        // 16. TPDF Dither (Native C++)
+        val ditherActive = isDitherEnabled && !isBitPerfectBypassActive
+        if (ditherActive) activeNames.add("TPDF Dither (${ditherTargetBitDepth}-bit)")
+        stagesList.add(mapOf(
+            "name" to "TPDF Triangular Dither",
+            "category" to "Native C++ Engine",
+            "isSupported" to isNativeDspLoaded,
+            "isEnabled" to isDitherEnabled,
+            "isBypassed" to isBitPerfectBypassActive,
+            "isDegraded" to ((autoDegraded and STAGE_DITHER) != 0),
+            "parameters" to mapOf(
+                "targetBitDepth" to ditherTargetBitDepth
+            ),
+            "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isDitherEnabled) "${ditherTargetBitDepth}-bit Target" else "Disabled"
+        ))
+
+        // 17. Sinc Resampler (Native C++)
+        val sincActive = isSincResamplerEnabled && !isBitPerfectBypassActive
+        if (sincActive) activeNames.add("Sinc Resampler (Bandlimited Interpolator)")
+        stagesList.add(mapOf(
+            "name" to "Kaiser-Windowed Sinc Resampler",
+            "category" to "Native C++ Engine",
+            "isSupported" to isNativeDspLoaded,
+            "isEnabled" to isSincResamplerEnabled,
+            "isBypassed" to isBitPerfectBypassActive,
+            "isDegraded" to ((autoDegraded and STAGE_RESAMPLER) != 0),
+            "parameters" to mapOf(
+                "quality" to resamplerQuality
+            ),
+            "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isSincResamplerEnabled) "Quality: #$resamplerQuality" else "Disabled"
+        ))
+
+        // 18. Stereo Balance (Panner / Mono Mix)
+        val balActive = (stereoBalance != 0.0 || monoMix) && !isBitPerfectBypassActive
+        if (balActive) activeNames.add("Stereo Panner / Mono ($stereoBalance, Mono: $monoMix)")
+        stagesList.add(mapOf(
+            "name" to "Stereo Panner & Mono Downmixer",
+            "category" to "Native C++ Engine",
+            "isSupported" to isNativeDspLoaded,
+            "isEnabled" to (stereoBalance != 0.0 || monoMix),
+            "isBypassed" to isBitPerfectBypassActive,
+            "isDegraded" to ((autoDegraded and STAGE_PANNER) != 0),
+            "parameters" to mapOf(
+                "balance" to stereoBalance,
+                "mono" to monoMix
+            ),
+            "statusDescription" to when {
+                isBitPerfectBypassActive -> "Bypassed by Bit-Perfect"
+                monoMix -> "Mono Downmix Active"
+                stereoBalance < 0 -> "Pan: ${(stereoBalance * -100).toInt()}% Left"
+                stereoBalance > 0 -> "Pan: ${(stereoBalance * 100).toInt()}% Right"
+                else -> "Centered"
+            }
+        ))
+
+        val nativeAppliedSampleRate = if (isNativeDspLoaded) {
+            try { nativeGetAppliedSampleRate() } catch (_: Exception) { 0.0 }
+        } else 0.0
+        val nativeLastAppliedGeneration = if (isNativeDspLoaded) {
+            try { nativeGetLastAppliedGeneration() } catch (_: Exception) { 0 }
+        } else 0
+        val nativePublishedGeneration = if (isNativeDspLoaded) {
+            try { nativeGetPublishedGeneration() } catch (_: Exception) { 0 }
+        } else 0
+
+        val report = mapOf(
+            "audioSessionId" to currentAudioSessionId,
+            // Truthful: only attached when the HAL chain for the
+            // current stage configuration exists on a live session.
+            "isSessionAttached" to isEffectPipelineAttached(),
+            "dspPreference" to dspPreference,
+            "isBitPerfectBypassActive" to isBitPerfectBypassActive,
+            "isNativeDspLoaded" to isNativeDspLoaded,
+            "appliedSampleRate" to nativeAppliedSampleRate,
+            "lastAppliedGeneration" to nativeLastAppliedGeneration,
+            "publishedGeneration" to nativePublishedGeneration,
+            "activeDspStagesMask" to activeDspStages,
+            "autoDegradedStagesMask" to autoDegraded,
+            "hasOemAudio" to hasOem,
+            "detectedOemEngines" to oemEngines,
+            "stages" to stagesList,
+            "activeEffectNames" to activeNames
+        )
+        Log.d(TAG, "[DSP_DEBUG] Live DSP snapshot requested: ${activeNames.size} active effects, session=$currentAudioSessionId, attached=${report["isSessionAttached"]}, bypass=$isBitPerfectBypassActive")
+        result.success(report)
     }
 
     private fun ensureVirtualizer() {
@@ -2814,16 +2954,17 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             // Preamp is applied natively when the HAL EQ is suppressed; adding
             // it here too would double it (limiter postGain path).
             val preampDb = if (isEqEnabled && !isHalEqSuppressed()) eqPreampDb.toFloat() else 0f
-            // Apply preamp to the limiter's postGain instead of inputGain
-            // to avoid driving the MBC stage into unwanted compression
-            val baseLimiterGain = if (isDynamicsEnabled && currentDynamicsPreset != "off") {
+            // Apply preamp as inputGain on the channel
+            val baseLimiterGain = if (isDynamicsEnabled && currentDynamicsPreset != "off" && !isDynamicsPresetNativeActive) {
                 DYNAMICS_PRESETS[currentDynamicsPreset]?.limiter?.postGain ?: 0f
             } else {
                 0f
             }
             for (ch in 0 until CHANNEL_COUNT) {
+                // FIX H-1: Apply preamp at the input stage
+                dp.getChannelByChannelIndex(ch).inputGain = preampDb
                 val limiter = dp.getLimiterByChannelIndex(ch)
-                limiter.postGain = baseLimiterGain + preampDb
+                limiter.postGain = baseLimiterGain
             }
         } catch (e: Exception) {
             Log.w(TAG, "Preamp update failed: ${e.message}")
@@ -2834,6 +2975,18 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         currentDynamicsPreset = preset
         isDynamicsEnabled = enabled
         val wantsDynamics = enabled && preset != "off"
+        // The native C++ engine owns the multiband dynamics whenever it is
+        // loaded: it runs inside ExoPlayer's audio sink, so the preset is
+        // audible even when the HAL DynamicsProcessing engine is unsupported,
+        // fails to build, or the output path bypasses the Android effect chain.
+        if (isNativeDspLoaded) {
+            val ok = applyNativeDynamicsPreset(preset, enabled)
+            // Stop the HAL DP from applying the same preset on top of the
+            // native MBC (double dynamics).
+            dynamicsProcessing?.let { neutralizeDynamics(it) }
+            updateDpEnabled()
+            return ok
+        }
         if (wantsDynamics && !isEffectTypeSupported(AudioEffect.EFFECT_TYPE_DYNAMICS_PROCESSING)) {
             dynamicsProcessing?.let { neutralizeDynamics(it) }
             return notApplied("DynamicsProcessing unsupported on this device")
@@ -2853,6 +3006,78 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         return true
     }
 
+    /**
+     * Renders a [DYNAMICS_PRESETS] entry through the native 4-band
+     * MultibandCompressor. The three preset bands map onto the native bands
+     * 0..2 with the preset's band edges as crossovers; native band 3 is left
+     * neutral. Returns false only when the native engine rejects the params.
+     */
+    private fun applyNativeDynamicsPreset(presetName: String, enabled: Boolean): Boolean {
+        if (!isNativeDspLoaded) return false
+        val wantsDynamics = enabled && presetName != "off"
+        val config = DYNAMICS_PRESETS[presetName]
+        isDynamicsPresetNativeActive = wantsDynamics && config != null
+
+        if (!isDynamicsPresetNativeActive) {
+            // Only turn the stage off when the standalone multiband compressor
+            // is not independently enabled by the user.
+            if (!isMultibandCompressorEnabled) {
+                try {
+                    nativeSetMultibandCompressorEnabled(false)
+                    lastNativeMultibandCompressorEnabled = false
+                } catch (e: Exception) {
+                    Log.w(TAG, "nativeSetMultibandCompressorEnabled(false) failed: ${e.message}")
+                }
+            }
+            recalculateActiveStages()
+            return true
+        }
+
+        return try {
+            val f0 = config!!.bands.getOrNull(0)?.cutoffFrequency?.toDouble() ?: 200.0
+            val f1 = config.bands.getOrNull(1)?.cutoffFrequency?.toDouble() ?: 3500.0
+            val f2 = config.bands.getOrNull(2)?.cutoffFrequency?.toDouble() ?: 20000.0
+            nativeSetMultibandCompressorCrossovers(f0, f1, f2)
+            lastNativeMultibandCompressorCrossovers =
+                String.format(java.util.Locale.US, "%.1f:%.1f:%.1f", f0, f1, f2)
+
+            for (i in 0 until 4) {
+                val b = config.bands.getOrNull(i)
+                if (b != null) {
+                    val thresholdDb = b.threshold.toDouble()
+                    val ratio = b.ratio.toDouble()
+                    val attackMs = b.attackTime.toDouble()
+                    val releaseMs = b.releaseTime.toDouble()
+                    val kneeDb = b.kneeWidth.toDouble()
+                    val makeupGainDb = b.postGain.toDouble()
+                    nativeSetMultibandCompressorBand(
+                        i, thresholdDb, ratio, attackMs, releaseMs, kneeDb, makeupGainDb, true
+                    )
+                    lastNativeMultibandCompressorBands[i] = String.format(
+                        java.util.Locale.US, "%.1f:%.1f:%.1f:%.1f:%.1f:%.1f:%b",
+                        thresholdDb, ratio, attackMs, releaseMs, kneeDb, makeupGainDb, true
+                    )
+                } else {
+                    nativeSetMultibandCompressorBand(
+                        i, -12.0, 1.0, 15.0, 100.0, 3.0, 0.0, false
+                    )
+                    lastNativeMultibandCompressorBands[i] = String.format(
+                        java.util.Locale.US, "%.1f:%.1f:%.1f:%.1f:%.1f:%.1f:%b",
+                        -12.0, 1.0, 15.0, 100.0, 3.0, 0.0, false
+                    )
+                }
+            }
+            nativeSetMultibandCompressorEnabled(true)
+            lastNativeMultibandCompressorEnabled = true
+            recalculateActiveStages()
+            true
+        } catch (e: Exception) {
+            Log.w(TAG, "applyNativeDynamicsPreset failed: ${e.message}")
+            isDynamicsPresetNativeActive = false
+            false
+        }
+    }
+
     private fun configureDynamicsInPlace(
         dp: DynamicsProcessing,
         presetName: String,
@@ -2864,8 +3089,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             return
         }
         try {
+            // Preamp is single-sourced as the channel inputGain (before the
+            // dynamics chain). Adding it to limiter.postGain as well double-
+            // applied it whenever the HAL EQ was active.
             val preampDb = if (isEqEnabled && !isHalEqSuppressed()) eqPreampDb.toFloat() else 0f
             for (ch in 0 until CHANNEL_COUNT) {
+                dp.getChannelByChannelIndex(ch).inputGain = preampDb
                 val mbc = dp.getMbcByChannelIndex(ch)
                 for (i in 0 until minOf(MBC_BAND_COUNT, config.bands.size)) {
                     val band = mbc.getBand(i)
@@ -2885,7 +3114,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 limiter.releaseTime = limCfg.releaseTime
                 limiter.ratio = limCfg.ratio
                 limiter.threshold = limCfg.threshold
-                limiter.postGain = limCfg.postGain + preampDb
+                limiter.postGain = limCfg.postGain
                 limiter.isEnabled = true
             }
         } catch (e: Exception) {
@@ -2897,8 +3126,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private fun neutralizeDynamics(dp: DynamicsProcessing) {
         try {
             val preampDb = if (isEqEnabled && !isHalEqSuppressed()) eqPreampDb.toFloat() else 0f
-            val shouldKeepLimiter = isDynamicsEnabled && currentDynamicsPreset != "off"
+            val shouldKeepLimiter = isLimiterEnabled ||
+                (isDynamicsEnabled && currentDynamicsPreset != "off" && !isDynamicsPresetNativeActive)
             for (ch in 0 until CHANNEL_COUNT) {
+                // Preamp lives on inputGain only; postGain stays at the preset's
+                // makeup value so it is never applied twice.
+                dp.getChannelByChannelIndex(ch).inputGain = preampDb
                 val mbc = dp.getMbcByChannelIndex(ch)
                 for (i in 0 until MBC_BAND_COUNT) {
                     mbc.getBand(i).isEnabled = false
@@ -2906,7 +3139,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 val limiter = dp.getLimiterByChannelIndex(ch)
                 if (!shouldKeepLimiter) {
                     limiter.isEnabled = false
-                    limiter.postGain = preampDb
+                    limiter.postGain = 0f
                 }
             }
         } catch (e: Exception) {
@@ -3041,7 +3274,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private fun isDpNeeded(): Boolean {
         if (isBitPerfectBypassActive) return false
         val effectiveEqEnabled = isEqEnabled && !isHalEqSuppressed()
-        val dynamicsActive = isDynamicsEnabled && currentDynamicsPreset != "off"
+        val dynamicsActive = isDynamicsEnabled && currentDynamicsPreset != "off" && !isDynamicsPresetNativeActive
         val needsBalanceMono = monoMix || abs(stereoBalance) > 0.001
         return effectiveEqEnabled || dynamicsActive || isLimiterEnabled || needsBalanceMono
     }
@@ -3085,7 +3318,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             return
         }
 
-        val dynamicsActive = isDynamicsEnabled && currentDynamicsPreset != "off"
+        val dynamicsActive = isDynamicsEnabled && currentDynamicsPreset != "off" && !isDynamicsPresetNativeActive
         val needsBalanceMono = monoMix || kotlin.math.abs(stereoBalance) > 0.001
         // When dspPreference is "oem" (or "auto" + OEM detected), suppress the HAL
         // graphic EQ to avoid double-processing through Dolby / Dirac / SoundAlive.
@@ -3198,6 +3431,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         val setEnabledMethod = spatializer.javaClass.getMethod("setEnabled", Boolean::class.javaPrimitiveType)
                         setEnabledMethod.invoke(spatializer, enabled)
                         Log.i(TAG, "Hardware Spatializer ${if (enabled) "enabled" else "disabled"}")
+                        // FIX C-4: hardware path succeeded — clear any fallback state
+                        isSpatializerFallbackActive = false
                         return true
                     } catch (e: Exception) {
                         Log.w(TAG, "Spatializer reflection failed: ${e.message}")
@@ -3207,17 +3442,41 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 Log.w(TAG, "Spatializer hardware check failed, falling back: ${e.message}")
             }
         }
-        // Fallback: virtualizer-only stereo field widening. If the device has
-        // neither a Spatializer API nor a Virtualizer there is no audible path.
+        // FIX C-4: Fallback path — route through virtualizer HAL without touching
+        // isVirtualizerEnabled so the user's independent Virtualizer choice is preserved.
         if (!isEffectTypeSupported(AudioEffect.EFFECT_TYPE_VIRTUALIZER)) {
             return notApplied("Spatializer unavailable and device has no Virtualizer")
         }
-        if (!setVirtualizerState(enabled)) return false
-        if (enabled && virtualizerStrength <= 0) {
-            setVirtualizerStrengthValue(800)
+        ensureVirtualizer()
+        val v = virtualizer ?: return notApplied("Spatializer fallback: no virtualizer instance")
+        return try {
+            if (enabled) {
+                // Only boost strength for spatializer if user hasn't set their own strength
+                val fallbackStrength = if (isVirtualizerEnabled && virtualizerStrength > 0)
+                    virtualizerStrength else 800
+                if (v.strengthSupported) v.setStrength(fallbackStrength.toInt().toShort())
+                v.enabled = true
+                isSpatializerFallbackActive = true
+                Log.i(TAG, "Spatializer using Virtualizer fallback (strength=$fallbackStrength)")
+            } else {
+                isSpatializerFallbackActive = false
+                // FIX C-4: only disable virtualizer if user has NOT independently enabled it
+                if (!isVirtualizerEnabled) {
+                    v.enabled = false
+                    Log.i(TAG, "Spatializer fallback disabled; restoring Virtualizer off state")
+                } else {
+                    // Restore user's own strength
+                    if (v.strengthSupported && virtualizerStrength > 0)
+                        v.setStrength(virtualizerStrength.toInt().toShort())
+                    Log.i(TAG, "Spatializer fallback disabled; keeping user Virtualizer on")
+                }
+            }
+            true
+        } catch (e: Exception) {
+            notApplied("Spatializer fallback virtualizer error: ${e.message}")
         }
-        return true
     }
+
 
     private fun recreateEffects() {
         // Release old instances BEFORE creating new ones to prevent audio session conflicts
@@ -3265,7 +3524,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private fun isEffectPipelineAttached(): Boolean {
         if (currentAudioSessionId == 0) return false
         val wantsAnyHalStage = isEqEnabled ||
-                (isDynamicsEnabled && currentDynamicsPreset != "off") ||
+                (isDynamicsEnabled && currentDynamicsPreset != "off" && !isDynamicsPresetNativeActive) ||
                 isVirtualizerEnabled ||
                 virtualizerStrength > 0 ||
                 volumeBoostMilliBels > 0 ||
@@ -3315,13 +3574,16 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             return
         }
         try {
-            // Preamp is applied natively when the HAL EQ is suppressed; adding
-            // it here too would double it (limiter postGain path).
+            // HAL preamp is only applied when the HAL EQ owns the curve; the
+            // native EQ applies its own preamp otherwise.
             val preampDb = if (isEqEnabled && !isHalEqSuppressed()) eqPreampDb.toFloat() else 0f
-            val baseGain = if (isDynamicsEnabled && currentDynamicsPreset != "off") {
+            val baseGain = if (isDynamicsEnabled && currentDynamicsPreset != "off" && !isDynamicsPresetNativeActive) {
                 DYNAMICS_PRESETS[currentDynamicsPreset]?.limiter?.postGain ?: 0f
             } else 0f
             for (ch in 0 until CHANNEL_COUNT) {
+                // Preamp is applied once, at the channel input (see
+                // configureDynamicsInPlace); postGain excludes it.
+                dp.getChannelByChannelIndex(ch).inputGain = preampDb
                 val limiter = dp.getLimiterByChannelIndex(ch)
                 if (isLimiterEnabled) {
                     // Compressor knobs when the user set them; otherwise keep the
@@ -3335,11 +3597,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     limiter.releaseTime = limiterReleaseMs.toFloat().coerceIn(10f, 2000f)
                     limiter.ratio = limiterRatio.toFloat().coerceIn(1f, 20f)
                     limiter.threshold = limiterThresholdDb.toFloat().coerceIn(-60f, 0f)
-                    limiter.postGain = baseGain + preampDb + limiterMakeupGainDb.toFloat()
+                    limiter.postGain = baseGain + limiterMakeupGainDb.toFloat()
                     limiter.isEnabled = true
                 } else {
                     limiter.isEnabled = false
-                    limiter.postGain = baseGain + preampDb + limiterMakeupGainDb.toFloat()
+                    limiter.postGain = baseGain + limiterMakeupGainDb.toFloat()
                 }
             }
             // Enabling the limiter must wake a DP instance that was disabled
@@ -3440,7 +3702,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     @Synchronized
     fun hasActiveEffects(): Boolean {
         val halActive = (isEqEnabled && !isHalEqSuppressed()) ||
-                (isDynamicsEnabled && currentDynamicsPreset != "off") ||
+                (isDynamicsEnabled && currentDynamicsPreset != "off" && !isDynamicsPresetNativeActive) ||
                 (isVirtualizerEnabled && virtualizerStrength > 0) ||
                 (volumeBoostMilliBels > 0) ||
                 (bassBoostStrength > 0) ||
@@ -3459,6 +3721,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 isSubCrossoverEnabled ||
                 isDynamicEqEnabled ||
                 isMultibandCompressorEnabled ||
+                isDynamicsPresetNativeActive ||
                 (isDynamicBassEnabled && dynamicBassStrength > 0.001) ||
                 isSincResamplerEnabled
         )
@@ -3468,9 +3731,14 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun isEffectTypeSupported(effectType: UUID): Boolean {
         return try {
-            val effects = cachedSupportedEffects ?: AudioEffect.queryEffects()?.also {
-                cachedSupportedEffects = it
-            } ?: return false
+            // Never cache an empty query: a transient empty result (framework
+            // not ready / route transition) would otherwise latch every effect
+            // as "unsupported" for the rest of the app's lifetime and produce
+            // spurious "not applied" reports.
+            val effects = cachedSupportedEffects ?: AudioEffect.queryEffects()
+                ?.takeIf { it.isNotEmpty() }
+                ?.also { cachedSupportedEffects = it }
+                ?: return false
             effects.any { it.type == effectType }
         } catch (e: Exception) {
             Log.w(TAG, "Effect support query failed: ${e.message}")

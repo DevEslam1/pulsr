@@ -25,6 +25,8 @@ class PerSongVolumeStore {
 
   /// Sets or clears the volume override for [trackKey].
   Future<void> setGainDbForTrack(String trackKey, double gainDb) async {
+    // Await the initial load so a pre-load write cannot persist a partial map.
+    await ready;
     final clamped = gainDb.clamp(minGainDb, maxGainDb);
     if (clamped.abs() < 0.1) {
       _overrides.remove(trackKey);

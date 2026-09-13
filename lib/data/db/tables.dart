@@ -19,6 +19,11 @@ class SongsTable extends Table {
   TextColumn get title => text()();
   TextColumn get artist =>
       text().withDefault(const Constant('Unknown Artist'))();
+  // Intentionally denormalized (no FK to artists/albums): the scanner
+  // reconciles orphan ids with manual SQL (see MusicRepository orphan
+  // sweeps) and album/artist rows are pruned by NOT EXISTS queries. A hard
+  // FK with cascade/setNull would fight the isMissing soft-delete flow and
+  // require a table rebuild migration for zero runtime benefit.
   IntColumn get artistId => integer().nullable()();
   TextColumn get album => text().withDefault(const Constant('Unknown Album'))();
   IntColumn get albumId => integer().nullable()();

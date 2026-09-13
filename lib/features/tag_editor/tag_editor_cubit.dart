@@ -371,6 +371,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       if (state.isBatchMode) {
         final total = state.batchSongs.length;
         final List<String> failedFiles = [];
+        final List<SongsTableData> taggedSongs = [];
         var lastEmitTime = DateTime.now();
         for (int i = 0; i < total; i++) {
           if (isClosed) return;
@@ -418,6 +419,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
             await _channel.invokeMethod('writeTags', payload);
             if (isClosed) return;
             await _scannerService.rescanSingleFile(s.path);
+            taggedSongs.add(s);
           } catch (e, st) {
             ErrorLogger.log('Failed to save tags for ${s.path}',
                 error: e, stackTrace: st, category: 'TagEditor');
@@ -425,7 +427,12 @@ class TagEditorCubit extends Cubit<TagEditorState> {
           }
           if (isClosed) return;
         }
-        if (failedFiles.isEmpty) LrcParser.clearCache();
+        // Invalidate only the lyrics caches for the tagged files; a full
+        // clearCache() also wiped every other song's cached lyrics + disk
+        // cache just for editing one album.
+        for (final tagged in taggedSongs) {
+          LrcParser.invalidateSong(songId: tagged.id, path: tagged.path);
+        }
         if (isClosed) return;
         if (failedFiles.isNotEmpty) {
           emit(state.copyWith(
@@ -473,8 +480,11 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       });
       if (isClosed) return;
 
-      // Update Drift DB and clear cached parsed lyrics
-      LrcParser.clearCache();
+      // Update Drift DB and clear cached parsed lyrics for THIS track only.
+      LrcParser.invalidateSong(
+        songId: state.song.id,
+        path: state.song.path,
+      );
       await _scannerService.rescanSingleFile(state.song.path);
       if (isClosed) return;
 

@@ -119,7 +119,10 @@ extension GetItInjectableX on _i174.GetIt {
       () => networkModule.httpClient,
       dispose: _i953.disposeHttpClient,
     );
-    gh.singleton<_i519.Client>(() => networkModule.pkgHttpClient);
+    gh.singleton<_i519.Client>(
+      () => networkModule.pkgHttpClient,
+      dispose: _i953.disposePkgHttpClient,
+    );
     gh.singleton<_i305.ArtworkCacheManager>(() => _i305.ArtworkCacheManager());
     gh.singleton<_i535.AuthService>(() => _i535.AuthService());
     gh.singleton<_i565.AutoEqService>(() => _i565.AutoEqService());
@@ -286,6 +289,9 @@ extension GetItInjectableX on _i174.GetIt {
           songRatingStore: gh<_i227.SongRatingStore>(),
           quranModeService: gh<_i322.QuranModeService>(),
           earbudOptimizationService: gh<_i260.EarbudOptimizationService>(),
+          lrclibService: gh<_i622.LrclibService>(),
+          ytmAccountService: gh<_i631.YtmAccountService>(),
+          mediaScannerService: gh<_i483.MediaScannerService>(),
         ));
     gh.factory<_i790.SmartPlaylistBuilderCubit>(
         () => _i790.SmartPlaylistBuilderCubit(

@@ -225,6 +225,10 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReverbEnabled(
     });
 }
 
+// FIX C-3: Retain last loaded custom IR so it can be restored when
+// the user switches back to the Custom preset from a synthetic one.
+static std::shared_ptr<const PreparedIr> gLastCustomIr;
+
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReverbPreset(
         JNIEnv* /* env */, jobject /* thiz */, jint preset) {
@@ -232,8 +236,14 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReverbPreset(
     auto current = AudioDspEngine::instance().getParams();
     std::shared_ptr<const PreparedIr> ir = nullptr;
     if (preset != static_cast<int>(ReverbPreset::Custom)) {
+        // Switching to a synthetic preset — create it from current damping
         ir = PreparedIr::createSynthetic(
             current->sampleRate, preset, static_cast<float>(current->reverb.damping));
+    } else {
+        // FIX C-3: Switching back to Custom — restore the last loaded custom IR
+        ir = gLastCustomIr;
+        // If no custom IR was ever loaded, ir stays nullptr;
+        // the engine will be silent on Custom until the user loads an IR file.
     }
     AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
         snap.reverb.preset = preset;
@@ -300,6 +310,7 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadImpulseResponse(
     env->ReleaseFloatArrayElements(irSamples, data, JNI_ABORT);
 
     if (customIr) {
+        gLastCustomIr = customIr; // FIX C-3: persist for Custom preset restore
         AudioDspEngine::instance().updateParams([customIr](DspParamSnapshot& snap) {
             snap.reverb.preset = static_cast<int>(ReverbPreset::Custom);
             snap.reverb.preparedIr = customIr;
@@ -738,7 +749,12 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadViperDdc(
     if (ddcStr) env->ReleaseStringUTFChars(jDdcContent, ddcStr);
     if (jProfileName && nameStr) env->ReleaseStringUTFChars(jProfileName, nameStr);
 
-    bool ok = AudioDspEngine::instance().viperDdc().loadVdcString(content);
+    // Validate on a throwaway instance and publish through the snapshot. The
+    // live engine object is mutated only on the audio thread (applyParams), so
+    // touching it here would race the audio thread (clearing/rebuilding its
+    // biquad sections while process() iterates them).
+    ViperDdc validator;
+    const bool ok = validator.loadVdcString(content);
     if (ok) {
         AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
             snap.viperDdc.ddcContent = content;
@@ -764,7 +780,9 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadArbitraryEq(
     std::string content(eqStr ? eqStr : "");
     if (eqStr) env->ReleaseStringUTFChars(jEqString, eqStr);
 
-    bool ok = AudioDspEngine::instance().arbitraryEq().loadGraphicEqString(content, linearPhase);
+    // See nativeLoadViperDdc: validate off-thread, publish via snapshot only.
+    ArbitraryResponseEq validator;
+    const bool ok = validator.loadGraphicEqString(content, linearPhase);
     if (ok) {
         AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
             snap.arbitraryEq.graphicEqString = content;
@@ -790,21 +808,25 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadLiveProgCode(
     std::string script(codeStr ? codeStr : "");
     if (codeStr) env->ReleaseStringUTFChars(jCode, codeStr);
 
-    bool ok = AudioDspEngine::instance().liveProg().loadCode(script);
+    // See nativeLoadViperDdc: compile on a throwaway instance so the live
+    // bytecode vectors are only rebuilt on the audio thread.
+    LiveProg validator;
+    const bool ok = validator.loadCode(script);
     if (ok) {
         AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
             snap.liveProg.code = script;
         });
         return env->NewStringUTF("OK");
     } else {
-        return env->NewStringUTF(AudioDspEngine::instance().liveProg().getLastError().c_str());
+        return env->NewStringUTF(validator.getLastError().c_str());
     }
 }
 
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetLiveProgSlider(
         JNIEnv* /* env */, jobject /* thiz */, jint index, jdouble value) {
-    AudioDspEngine::instance().liveProg().setSlider(index, value);
+    // Publish only; LiveProg::applyParams writes the sliders on the audio
+    // thread. Calling setSlider() here would mutate program memory mid-execution.
     AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
         if (index == 1) snap.liveProg.slider1 = value;
         else if (index == 2) snap.liveProg.slider2 = value;

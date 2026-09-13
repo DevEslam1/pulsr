@@ -30,7 +30,7 @@ struct EQBandState {
 
 class ParametricEQ {
 public:
-    static constexpr int MAX_BANDS = 32;
+    static constexpr int MAX_BANDS = 64;
     static constexpr int MAX_CHANNELS = 8;
 
     ParametricEQ();

@@ -17,9 +17,9 @@ void main() {
       await db.close();
     });
 
-    test('Fresh database opens at schemaVersion 10 and has all indexes',
+    test('Fresh database opens at schemaVersion 11 and has all indexes',
         () async {
-      expect(db.schemaVersion, equals(10));
+      expect(db.schemaVersion, equals(11));
 
       // Test inserting a song with schema v4 fields
       final songId = await db.into(db.songsTable).insert(
@@ -119,15 +119,16 @@ void main() {
   });
 
   group('Upgrade path', () {
-    late AppDatabase upgraded;
+    AppDatabase? upgraded;
 
     tearDown(() async {
-      await upgraded.close();
+      await upgraded?.close();
+      upgraded = null;
     });
 
     Future<Set<String>> songIndexNames() async {
       final rows =
-          await upgraded.customSelect('PRAGMA index_list("songs");').get();
+          await upgraded!.customSelect('PRAGMA index_list("songs");').get();
       return rows.map((row) => row.read<String>('name')).toSet();
     }
 
@@ -136,7 +137,7 @@ void main() {
       upgraded = openLegacyDatabase(4);
 
       // Opening is lazy; the first query is what triggers the migration.
-      final song = await (upgraded.select(upgraded.songsTable)
+      final song = await (upgraded!.select(upgraded!.songsTable)
             ..where((t) => t.id.equals(77)))
           .getSingle();
 
@@ -150,7 +151,7 @@ void main() {
       expect(song.pendingDownloadPath, equals(null));
 
       final entries =
-          await upgraded.select(upgraded.playlistEntriesTable).get();
+          await upgraded!.select(upgraded!.playlistEntriesTable).get();
       expect(entries.length, equals(1),
           reason: 'playlist membership must not be cascaded away');
       expect(entries.first.songId, equals(77));
@@ -159,11 +160,11 @@ void main() {
           containsAll(['idx_songs_source', 'idx_songs_remote_id']));
 
       final version =
-          await upgraded.customSelect('PRAGMA user_version;').getSingle();
-      expect(version.data['user_version'], equals(10));
+          await upgraded!.customSelect('PRAGMA user_version;').getSingle();
+      expect(version.data['user_version'], equals(11));
 
       // The upgraded schema must accept remote rows, not just the fresh one.
-      await upgraded.into(upgraded.songsTable).insert(
+      await upgraded!.into(upgraded!.songsTable).insert(
             SongsTableCompanion.insert(
               id: const Value(-77),
               title: 'Streamed After Upgrade',
@@ -179,7 +180,7 @@ void main() {
         () async {
       upgraded = openLegacyDatabase(2);
 
-      final song = await (upgraded.select(upgraded.songsTable)
+      final song = await (upgraded!.select(upgraded!.songsTable)
             ..where((t) => t.id.equals(77)))
           .getSingle();
       expect(song.isMissing, isFalse);
@@ -195,6 +196,63 @@ void main() {
             'idx_songs_source',
             'idx_songs_remote_id'
           ]));
+    });
+
+    test('v4 -> v11 creates v11 constraints and a populated FTS index',
+        () async {
+      upgraded = openLegacyDatabase(4);
+
+      // Trigger migration.
+      await (upgraded!.select(upgraded!.songsTable)
+            ..where((t) => t.id.equals(77)))
+          .getSingle();
+
+      expect(await songIndexNames(),
+          containsAll([
+            'idx_songs_path_cue',
+            'idx_songs_uri',
+            'idx_songs_cue',
+            'idx_songs_pending_dl',
+          ]));
+      final plIdx = await upgraded!
+          .customSelect('PRAGMA index_list("playlists");')
+          .get();
+      expect(plIdx.map((r) => r.read<String>('name')),
+          contains('idx_playlists_name'));
+      final peIdx = await upgraded!
+          .customSelect('PRAGMA index_list("playlist_entries");')
+          .get();
+      expect(
+          peIdx.map((r) => r.read<String>('name')),
+          contains('idx_playlist_entries_unique'));
+
+      // FTS backfill must index the legacy row.
+      final ftsCount = await upgraded!
+          .customSelect('SELECT count(*) AS c FROM songs_fts;')
+          .getSingle();
+      expect((ftsCount.data['c'] as num).toInt(), greaterThanOrEqualTo(1));
+
+      // v11 uniqueness is enforced: same local path twice fails.
+      await expectLater(
+        upgraded!.into(upgraded!.songsTable).insert(
+              SongsTableCompanion.insert(
+                id: const Value(9001),
+                title: 'Dupe A',
+                path: '/music/dupe.mp3',
+              ),
+            ),
+        completes,
+      );
+      await expectLater(
+        upgraded!.into(upgraded!.songsTable).insert(
+              SongsTableCompanion.insert(
+                id: const Value(9002),
+                title: 'Dupe B',
+                path: '/music/dupe.mp3',
+              ),
+            ),
+        throwsA(isA<Exception>()),
+      );
     });
   });
 }

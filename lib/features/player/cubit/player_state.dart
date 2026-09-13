@@ -78,6 +78,17 @@ abstract class PlayerState with _$PlayerState {
     @Default(80.0) double subCrossoverCornerHz,
     @Default(24.0) double subCrossoverSlopeDbPerOct,
     @Default(0.8) double subCrossoverGain,
+    @Default(false) bool subCrossoverBassMono,
+    @Default(true) bool subCrossoverAntiPop,
+    @Default(false) bool stereoWidthMultiband,
+    @Default(1.0) double stereoWidthLow,
+    @Default(1.0) double stereoWidthMid,
+    @Default(1.0) double stereoWidthHigh,
+    @Default(160.0) double stereoWidthLowCrossoverHz,
+    @Default(2500.0) double stereoWidthHighCrossoverHz,
+    @Default(160.0) double multibandCompressorF0,
+    @Default(1000.0) double multibandCompressorF1,
+    @Default(5000.0) double multibandCompressorF2,
     @Default(false) bool isDynamicEqEnabled,
     @Default([]) List<DynamicEqBandConfig> dynamicEqBands,
     @Default(false) bool isViperDdcEnabled,
@@ -87,6 +98,9 @@ abstract class PlayerState with _$PlayerState {
     @Default(false) bool isLiveProgEnabled,
     @Default('') String liveProgCode,
     @Default('') String liveProgStatus,
+    @Default(false) bool isDynamicBassEnabled,
+    @Default(1.0) double dynamicBassStrength,
+    @Default(0) int dynamicBassPreset,
     @Default(false) bool hasOemAudio,
     @Default([]) List<String> detectedOemEngines,
     @Default(0) int activeQueueSlot,
@@ -187,6 +201,17 @@ abstract class PlayerState with _$PlayerState {
         subCrossoverCornerHz != other.subCrossoverCornerHz ||
         subCrossoverSlopeDbPerOct != other.subCrossoverSlopeDbPerOct ||
         subCrossoverGain != other.subCrossoverGain ||
+        subCrossoverBassMono != other.subCrossoverBassMono ||
+        subCrossoverAntiPop != other.subCrossoverAntiPop ||
+        stereoWidthMultiband != other.stereoWidthMultiband ||
+        stereoWidthLow != other.stereoWidthLow ||
+        stereoWidthMid != other.stereoWidthMid ||
+        stereoWidthHigh != other.stereoWidthHigh ||
+        stereoWidthLowCrossoverHz != other.stereoWidthLowCrossoverHz ||
+        stereoWidthHighCrossoverHz != other.stereoWidthHighCrossoverHz ||
+        multibandCompressorF0 != other.multibandCompressorF0 ||
+        multibandCompressorF1 != other.multibandCompressorF1 ||
+        multibandCompressorF2 != other.multibandCompressorF2 ||
         isDynamicEqEnabled != other.isDynamicEqEnabled ||
         listContentDiffers(dynamicEqBands, other.dynamicEqBands) ||
         isViperDdcEnabled != other.isViperDdcEnabled ||
@@ -196,6 +221,9 @@ abstract class PlayerState with _$PlayerState {
         isLiveProgEnabled != other.isLiveProgEnabled ||
         liveProgCode != other.liveProgCode ||
         liveProgStatus != other.liveProgStatus ||
+        isDynamicBassEnabled != other.isDynamicBassEnabled ||
+        dynamicBassStrength != other.dynamicBassStrength ||
+        dynamicBassPreset != other.dynamicBassPreset ||
         hasOemAudio != other.hasOemAudio ||
         listContentDiffers(detectedOemEngines, other.detectedOemEngines) ||
         activeQueueSlot != other.activeQueueSlot ||
@@ -235,6 +263,29 @@ abstract class PlayerState with _$PlayerState {
       isViperDdcEnabled ||
       isArbitraryEqEnabled ||
       isLiveProgEnabled ||
+      isDynamicBassEnabled ||
+      volumeBoost > 0.01;
+
+  /// True when any non-EQ DSP stage is engaged. Deliberately excludes
+  /// [isEqEnabled] and the AutoEQ headphone profile: the Equalizer master
+  /// switch owns those, while the "DSP & Spatial Effects" master switch in the
+  /// equalizer sheet must toggle independently instead of mirroring EQ.
+  bool get isDspEffectsActive =>
+      isVirtualizerEnabled ||
+      isDynamicsEnabled ||
+      isSpatializerEnabled ||
+      isCrossfeedEnabled ||
+      isLimiterEnabled ||
+      isReverbEnabled ||
+      isSaturationEnabled ||
+      isStereoWidthEnabled ||
+      isLoudnessContourEnabled ||
+      isSubCrossoverEnabled ||
+      isDynamicEqEnabled ||
+      isViperDdcEnabled ||
+      isArbitraryEqEnabled ||
+      isLiveProgEnabled ||
+      isDynamicBassEnabled ||
       volumeBoost > 0.01;
 
   int get activeDspStagesCount {
@@ -255,7 +306,14 @@ abstract class PlayerState with _$PlayerState {
     if (isViperDdcEnabled) count++;
     if (isArbitraryEqEnabled) count++;
     if (isLiveProgEnabled) count++;
+    if (isDynamicBassEnabled) count++;
     if (volumeBoost > 0.01) count++;
     return count;
   }
+
+  /// Non-EQ DSP stages only, matching [isDspEffectsActive] for the sheet label.
+  int get activeDspEffectStagesCount =>
+      activeDspStagesCount -
+      (isEqEnabled ? 1 : 0) -
+      (selectedHeadphoneProfile != null ? 1 : 0);
 }

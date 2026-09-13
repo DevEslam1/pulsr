@@ -46,7 +46,7 @@ void MultibandCompressor::reset() {
     crossoverLow_.reset();
     crossoverHigh_.reset();
     for (int b = 0; b < NUM_BANDS; ++b) {
-        envelopeDb_[b] = -120.0;
+        envelopeDb_[b] = 0.0;        // linear amplitude envelope, starts at silence
         smoothedGainDb_[b] = 0.0;
         currentGainReductionDb_[b] = 0.0;
     }
@@ -123,10 +123,18 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
             for (int i = 0; i < chunkFrames; ++i) {
                 const float sL = bandBufferL_[b][i];
                 const float sR = bandBufferR_[b][i];
-                const double peak = std::max(std::abs(sL), std::abs(sR));
-                const double peakDb = (peak > 1e-6) ? (20.0 * std::log10(peak)) : -120.0;
 
-                const double gainDb = computeBandGain(b, peakDb);
+                // Envelope follower on linear amplitude (attack/release ballistics)
+                const double peak = std::max(std::abs(sL), std::abs(sR));
+                if (peak > envelopeDb_[b]) {  // Note: envelopeDb_ stores linear envelope here
+                    envelopeDb_[b] = attackCoeff_[b]  * envelopeDb_[b] + (1.0 - attackCoeff_[b])  * peak;
+                } else {
+                    envelopeDb_[b] = releaseCoeff_[b] * envelopeDb_[b] + (1.0 - releaseCoeff_[b]) * peak;
+                }
+
+                // Convert smoothed linear envelope to dB once per sample
+                const double envDb = (envelopeDb_[b] > 1e-6) ? (20.0 * std::log10(envelopeDb_[b])) : -120.0;
+                const double gainDb = computeBandGain(b, envDb);
                 const float linearGain = static_cast<float>(std::pow(10.0, gainDb / 20.0));
 
                 bandBufferL_[b][i] *= linearGain;

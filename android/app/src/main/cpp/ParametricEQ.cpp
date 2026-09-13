@@ -88,13 +88,26 @@ void ParametricEQ::setEnabled(bool enabled) {
 }
 
 void ParametricEQ::applyParams(const EqParamSet& params) {
+    const int newBandCount = std::clamp(params.bandCount, 1, MAX_BANDS);
+    // FIX M-3: clear filter delay registers when band count or structure changes
+    if (newBandCount != bandCount_) {
+        std::memset(s1_, 0, sizeof(s1_));
+        std::memset(s2_, 0, sizeof(s2_));
+    }
     enabled_ = params.enabled;
     targetPreampDb_ = std::clamp(params.preampDb, -30.0, 30.0);
-    bandCount_ = std::clamp(params.bandCount, 1, MAX_BANDS);
+    bandCount_ = newBandCount;
 
     for (int i = 0; i < bandCount_; ++i) {
         const auto& p = params.bands[i];
-        bands_[i].frequency = std::clamp(p.frequency, 10.0, sampleRate_ * 0.499);
+        const double newFreq = std::clamp(p.frequency, 10.0, sampleRate_ * 0.499);
+        // Also clear state if frequency changes significantly (avoids pop on freq switch)
+        if (std::abs(newFreq - bands_[i].frequency) > 1.0) {
+            for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
+                s1_[ch][i] = s2_[ch][i] = 0.0;
+            }
+        }
+        bands_[i].frequency = newFreq;
         bands_[i].targetGainDb = std::clamp(p.gainDb, -30.0, 30.0);
         bands_[i].q = std::clamp(p.q, 0.05, 30.0);
         bands_[i].type = p.type;

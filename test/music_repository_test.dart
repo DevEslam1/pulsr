@@ -1,4 +1,6 @@
 // test/music_repository_test.dart
+import 'dart:io';
+
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,9 +22,9 @@ void main() {
   });
 
   group('MusicRepository & AppDatabase Tests', () {
-    test('AppDatabase schema migration to v10 creates indexes successfully',
+    test('AppDatabase schema migration to v11 creates indexes successfully',
         () async {
-      expect(db.schemaVersion, equals(10));
+      expect(db.schemaVersion, equals(11));
 
       // Query pragma index_list for songs table
       final indexes =
@@ -360,6 +362,85 @@ void main() {
           await (db.select(db.songsTable)..where((t) => t.id.equals(-100)))
               .getSingleOrNull(),
           isNull);
+    });
+  });
+
+  group('v11 UNIQUE path index resilience', () {
+    test(
+        'syncScannedMusic remaps a changed MediaStore id onto the existing path row',
+        () async {
+      await db.into(db.songsTable).insert(
+            SongsTableCompanion.insert(
+              id: const Value(10),
+              title: 'Old Title',
+              path: '/music/same.mp3',
+              isFavorite: const Value(true),
+            ),
+          );
+
+      final res = await repository.syncScannedMusic(
+        songs: [
+          SongsTableCompanion.insert(
+            id: const Value(99), // MediaStore reassigned the id
+            title: 'New Title',
+            path: '/music/same.mp3',
+          ),
+        ],
+        albums: const [],
+        artists: const [],
+      );
+
+      expect(res.isRight(), isTrue,
+          reason: 'the path-unique index must not abort the sync');
+      final rows = await db.select(db.songsTable).get();
+      expect(rows.length, equals(1));
+      expect(rows.single.id, equals(10),
+          reason: 'the user-data-bearing row id must survive');
+      expect(rows.single.title, equals('New Title'));
+      expect(rows.single.isFavorite, isTrue);
+    });
+
+    test('distinct paths insert normally', () async {
+      final res = await repository.syncScannedMusic(
+        songs: [
+          SongsTableCompanion.insert(
+              id: const Value(1), title: 'A', path: '/a.mp3'),
+          SongsTableCompanion.insert(
+              id: const Value(2), title: 'B', path: '/b.mp3'),
+        ],
+        albums: const [],
+        artists: const [],
+      );
+      expect(res.isRight(), isTrue);
+      expect((await db.select(db.songsTable).get()).length, equals(2));
+    });
+
+    test('FTS search with excluded folders does not throw', () async {
+      await db.into(db.songsTable).insert(
+            SongsTableCompanion.insert(
+                id: const Value(1),
+                title: 'Track One',
+                path: '/music/keep/one.mp3'),
+          );
+      // Exclusion prefixes are built with the host path separator.
+      final sep = Platform.pathSeparator;
+      await db.into(db.songsTable).insert(
+            SongsTableCompanion.insert(
+                id: const Value(2),
+                title: 'Track Two',
+                path: '/music/skip${sep}two.mp3'),
+          );
+
+      final result = await repository
+          .watchAllSongs(
+              searchQuery: 'track', excludedFolders: ['/music/skip'])
+          .first;
+
+      expect(result.isRight(), isTrue,
+          reason: 'ESCAPE must be a single character or SQLite throws');
+      final songs = result.getOrElse((_) => []);
+      expect(songs.map((s) => s.title), contains('Track One'));
+      expect(songs.map((s) => s.title), isNot(contains('Track Two')));
     });
   });
 }

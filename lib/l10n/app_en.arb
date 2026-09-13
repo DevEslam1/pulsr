@@ -772,6 +772,31 @@
   "forgetDevice": "Forget",
   "currentDeviceBadge": "Current",
   "profileDropdownLabel": "Profile",
+  "smartAudioTitle": "Smart Audio",
+  "smartAudioSubtitle": "Automatically tune the sound to your headphones and track",
+  "smartAudioModeLabel": "Mode",
+  "smartAudioAuto": "Auto",
+  "smartAudioManual": "Manual",
+  "smartAudioAutoDesc": "Detect the connected headphones, apply the matching AutoEQ correction, and use the highest output quality the device supports",
+  "smartAudioManualDesc": "Keep your EQ, effects and output quality exactly as you set them",
+  "smartAudioDetectedDevice": "Current output: {device}",
+  "@smartAudioDetectedDevice": {
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
+  "smartAudioMatchedProfile": "Matched correction: {profile}",
+  "@smartAudioMatchedProfile": {
+    "placeholders": {
+      "profile": {
+        "type": "String"
+      }
+    }
+  },
+  "smartAudioNoMatch": "No headphone correction matched for this device",
+  "smartAudioAutoCatchAllHint": "Auto only adjusts sound when it recognises your headphones or a manual device profile; your choices are never overwritten in Manual mode",
   "undo": "Undo",
   "downloadDeletedSnackbar": "Deleted \"{title}\"",
   "@downloadDeletedSnackbar": {
@@ -823,7 +848,7 @@
   "systemEffectsTryDisable": "Try to disable",
   "systemEffectsLeaveOn": "Leave on",
   "bluetoothLatencyTitle": "Bluetooth Latency Sync (AVRCP / Lyrics)",
-  "bluetoothLatencySubtitle": "Compensates for Bluetooth audio codec buffer latency ({offset} ms). Volume deferral: AVRCP absolute volume active.",
+  "bluetoothLatencySubtitle": "Compensates for Bluetooth audio codec buffer latency ({offset} ms). Media controls use the system notification; no AVRCP volume override.",
   "@bluetoothLatencySubtitle": {
     "placeholders": {
       "offset": {

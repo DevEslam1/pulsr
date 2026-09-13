@@ -23,6 +23,10 @@ class SongRatingStore {
 
   /// Sets star rating (0 to 5) for [trackKey]. Setting 0 removes rating.
   Future<void> setRating(String trackKey, int rating) async {
+    // Wait for the initial load before mutating/persisting: a write that lands
+    // before load() populates the map would serialize a partial map and wipe
+    // every previously saved rating.
+    await ready;
     final clamped = rating.clamp(0, 5);
     if (clamped == 0) {
       _ratings.remove(trackKey);

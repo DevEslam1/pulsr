@@ -103,6 +103,13 @@ class YtmOAuthService {
   String? _refreshToken;
   DateTime? _expiresAt;
   bool _initialized = false;
+  Future<void>? _initFuture;
+  Future<bool>? _refreshInFlight;
+
+  /// Bumped on every sign-out. Any async token mutation that started before the
+  /// bump refuses to write, so an in-flight refresh can never resurrect a
+  /// session the user just logged out of.
+  int _authGeneration = 0;
 
   bool get isSignedIn => _accessToken != null && _accessToken!.isNotEmpty;
 
@@ -110,19 +117,28 @@ class YtmOAuthService {
   /// before a request to guarantee validity.
   String? get accessToken => _accessToken;
 
-  Future<void> init() async {
-    if (_initialized) return;
-    _initialized = true;
+  Future<void> init() {
+    if (_initialized) return Future.value();
+    // Memoize the in-flight load so concurrent callers share it, but allow a
+    // retry if secure storage throws transiently (do not latch failure).
+    return _initFuture ??= _loadTokens();
+  }
+
+  Future<void> _loadTokens() async {
     try {
-      _accessToken = await _storage.read(key: _keyAccess);
-      _refreshToken = await _storage.read(key: _keyRefresh);
+      final access = await _storage.read(key: _keyAccess);
+      final refresh = await _storage.read(key: _keyRefresh);
       final expiryRaw = await _storage.read(key: _keyExpiry);
+      _accessToken = access;
+      _refreshToken = refresh;
       final epoch = int.tryParse(expiryRaw ?? '');
       if (epoch != null && epoch > 0) {
         _expiresAt = DateTime.fromMillisecondsSinceEpoch(epoch);
       }
+      _initialized = true;
     } catch (e) {
       debugPrint('[YtmOAuth] Failed to load tokens: $e');
+      _initFuture = null;
     }
   }
 
@@ -132,9 +148,15 @@ class YtmOAuthService {
     await init();
     if (_accessToken == null || _accessToken!.isEmpty) return false;
     final exp = _expiresAt;
+    // Unknown expiry: assume valid and let the server reject if not.
     if (exp == null) return true;
     if (exp.difference(DateTime.now()) > const Duration(minutes: 2)) return true;
-    if (_refreshToken == null || _refreshToken!.isEmpty) return true;
+    // The token is (nearly) expired and cannot be refreshed: treat as signed
+    // out instead of reporting a usable session that will 401 on every call.
+    if (_refreshToken == null || _refreshToken!.isEmpty) {
+      await _clearTokens();
+      return false;
+    }
     return refresh();
   }
 
@@ -192,18 +214,27 @@ class YtmOAuthService {
       if (isCancelled?.call() ?? false) return false;
       onTick?.call();
 
-      final res = await _client
-          .post(
-            _tokenEndpoint,
-            headers: const {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'client_id': _clientId,
-              'client_secret': _clientSecret,
-              'device_code': code.deviceCode,
-              'grant_type': 'urn:ietf:params:oauth:grant-type:device_code',
-            }),
-          )
-          .timeout(const Duration(seconds: 15));
+      final http.Response res;
+      try {
+        res = await _client
+            .post(
+              _tokenEndpoint,
+              headers: const {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'client_id': _clientId,
+                'client_secret': _clientSecret,
+                'device_code': code.deviceCode,
+                'grant_type': 'urn:ietf:params:oauth:grant-type:device_code',
+              }),
+            )
+            .timeout(const Duration(seconds: 15));
+      } catch (e) {
+        // A transient blip during a long device grant must not abort the whole
+        // flow: keep polling until the code expires or the user cancels.
+        debugPrint('[YtmOAuth] device poll transport error: $e');
+        if (isCancelled?.call() ?? false) return false;
+        continue;
+      }
       final json = _decode(res.body);
       if (json == null) continue;
 
@@ -232,8 +263,17 @@ class YtmOAuthService {
     return false;
   }
 
-  /// Exchanges the refresh token for a new access token.
-  Future<bool> refresh() async {
+  /// Exchanges the refresh token for a new access token. Concurrent callers
+  /// share a single in-flight request so overlapping refreshes cannot race the
+  /// rotating refresh token.
+  Future<bool> refresh() {
+    return _refreshInFlight ??= _refreshOnce().whenComplete(() {
+      _refreshInFlight = null;
+    });
+  }
+
+  Future<bool> _refreshOnce() async {
+    final generation = _authGeneration;
     final refreshToken = _refreshToken;
     if (refreshToken == null || refreshToken.isEmpty) return false;
     try {
@@ -251,13 +291,21 @@ class YtmOAuthService {
           .timeout(const Duration(seconds: 15));
       final json = _decode(res.body);
       final access = json?['access_token'] as String?;
-      if (access == null || access.isEmpty) return false;
-      await _persistTokens(
-        accessToken: access,
-        refreshToken: json?['refresh_token'] as String?,
-        expiresInSeconds: (json?['expires_in'] as num?)?.toInt(),
-      );
-      return true;
+      if (access != null && access.isNotEmpty) {
+        await _persistTokens(
+          accessToken: access,
+          refreshToken: json?['refresh_token'] as String?,
+          expiresInSeconds: (json?['expires_in'] as num?)?.toInt(),
+        );
+        return true;
+      }
+      // A revoked/consumed refresh token is terminal: clear the dead session so
+      // the UI stops claiming the account is connected.
+      final error = json?['error'] as String?;
+      if (error == 'invalid_grant' || error == 'invalid_client') {
+        if (generation == _authGeneration) await _clearTokens();
+      }
+      return false;
     } catch (e) {
       debugPrint('[YtmOAuth] refresh failed: $e');
       return false;
@@ -265,6 +313,12 @@ class YtmOAuthService {
   }
 
   Future<void> signOut() async {
+    // Invalidate any in-flight persist/refresh before clearing memory/storage.
+    _authGeneration++;
+    await _clearTokens();
+  }
+
+  Future<void> _clearTokens() async {
     _accessToken = null;
     _refreshToken = null;
     _expiresAt = null;
@@ -280,6 +334,9 @@ class YtmOAuthService {
     String? refreshToken,
     int? expiresInSeconds,
   }) async {
+    final generation = _authGeneration;
+    // A sign-out raced this refresh: drop the result instead of writing it.
+    if (generation != _authGeneration) return;
     _accessToken = accessToken;
     if (refreshToken != null && refreshToken.isNotEmpty) {
       _refreshToken = refreshToken;
@@ -288,9 +345,11 @@ class YtmOAuthService {
     _expiresAt = DateTime.now().add(Duration(seconds: ttl));
     try {
       await _storage.write(key: _keyAccess, value: accessToken);
+      if (generation != _authGeneration) return;
       if (_refreshToken != null) {
         await _storage.write(key: _keyRefresh, value: _refreshToken!);
       }
+      if (generation != _authGeneration) return;
       await _storage.write(
         key: _keyExpiry,
         value: _expiresAt!.millisecondsSinceEpoch.toString(),

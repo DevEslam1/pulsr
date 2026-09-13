@@ -511,6 +511,9 @@ class YtmAccountService {
     _accountAvatar = null;
     _dataSyncId = null;
     _sessionVisitorData = null;
+    // Account-scoped browse cache: must not leak into the next account's
+    // library fetch after a switch.
+    _cachedLikedSongsBrowseId = null;
     await _deleteStoredCookies();
     try {
       await YtmOAuthService.shared.signOut();
@@ -992,7 +995,14 @@ class YtmAccountService {
       try {
         if (await YtmOAuthService.shared.ensureFresh()) {
           _oauthAccessToken = YtmOAuthService.shared.accessToken;
+        } else if (_oauthAccessToken != null && _oauthAccessToken!.isNotEmpty) {
+          // Expired with no usable refresh token: the session is dead. Tear it
+          // down so the UI stops advertising a connected account that 401s.
+          await logout();
+          throw const YtmException('YTM_AUTH', 'Session expired');
         }
+      } on YtmException {
+        rethrow;
       } catch (_) {}
     }
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
@@ -1011,6 +1021,10 @@ class YtmAccountService {
             _oauthAccessToken = YtmOAuthService.shared.accessToken;
             continue;
           }
+          // Refresh failed: the bearer is dead. Invalidate the session so the
+          // UI stops claiming it is connected, and hand the 401 back.
+          await logout();
+          return res;
         }
         if (res.statusCode == 429 || res.statusCode >= 500) {
           if (res.statusCode == 429) {
@@ -2925,6 +2939,7 @@ class YtmAccountService {
     return results;
   }
 
+  @disposeMethod
   void dispose() {
     _sessionHarvestDebounce?.cancel();
     loginState.dispose();

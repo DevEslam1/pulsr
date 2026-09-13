@@ -235,7 +235,13 @@ void main() {
       expect(nativeEqEnabledIdx, greaterThan(eqEnabledIdx));
     });
 
-    test('repeated same-id event does not trigger a recreate', () async {
+    test('repeated same-id event re-applies (AudioTrack recreate reuse)',
+        () async {
+      // FIX M-11: ExoPlayer can reuse the same session ID after an
+      // underrun/gapless AudioTrack recreation, which drops HAL effects.
+      // Same-id events must therefore run the full release -> set -> push
+      // cycle so effects survive; lastAppliedSessionId only records success
+      // for diagnostics/retry, it never dedupes.
       final manager = EqualizerManager();
       manager.isEnabled = true;
 
@@ -247,9 +253,10 @@ void main() {
 
       final setSessionCalls =
           channelCalls.where((c) => c.method == 'setAudioSessionId').length;
-      expect(setSessionCalls, 1);
-      expect(channelCalls.length, callsAfterFirst,
-          reason: 'same-id re-emit must be a complete no-op');
+      expect(setSessionCalls, 3);
+      expect(channelCalls.length, greaterThan(callsAfterFirst),
+          reason: 'same-id re-emit must re-push the full effect state');
+      expect(manager.lastAppliedSessionId, 5);
     });
 
     test('session id 5 -> 7 (route change) releases, re-pushes, and re-applies',

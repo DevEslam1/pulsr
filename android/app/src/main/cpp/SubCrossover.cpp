@@ -19,6 +19,7 @@ void SubCrossover::configure(double cornerHz, double slopeDbPerOct, double subGa
     slopeDbPerOct_ = (slopeDbPerOct < 18.0) ? 12.0 : 24.0;
     cascade_ = (slopeDbPerOct_ >= 24.0);
     targetSubGain_ = std::clamp(subGain, 0.0, 1.5);
+    subGain_ = targetSubGain_;   // FIX M-5: keep getter in sync
     bassMono_ = bassMono;
     antiPop_ = antiPop;
     computeCoeffs();
@@ -71,7 +72,8 @@ void SubCrossover::process(float* L, float* R, int frames) {
     smoothedSubGain_ += smoothFactor * (targetSubGain_ - smoothedSubGain_);
 
     const float gain = static_cast<float>(smoothedSubGain_);
-    const float makeup = 1.0f / (1.0f + gain * 0.5f);
+    // FIX M-6: makeup only attenuates the added sub tap, not the entire mix
+    const float subAttenuation = 1.0f / (1.0f + gain * 0.5f);
     LpStage& s1 = stage1_[0];
     LpStage& s2 = stage2_[0];
     LpStage& ss1 = stageSide1_[0];
@@ -103,22 +105,28 @@ void SubCrossover::process(float* L, float* R, int frames) {
             sub = std::tanh(sub);
         }
 
-        const float subTap = sub * gain;
-        L[i] = (l + subTap) * makeup;
-        R[i] = (r + subTap) * makeup;
+        // FIX M-6: apply sub gain + makeup attenuation only to the added sub tap
+        const float subTap = sub * gain * subAttenuation;
+        L[i] = l + subTap;
+        R[i] = r + subTap;
     }
 }
 
 void SubCrossover::processInterleaved(float* buffer, int frames, int channels) {
-    channels = std::clamp(channels, 2, MAX_CHANNELS);
-    if (!enabled_ || !buffer || frames <= 0 || channels < 2) return;
+    // Guard BEFORE any stride is used: a mono (1-channel) buffer would otherwise
+    // be reinterpreted with a stereo stride and write out of bounds.
+    if (!enabled_ || !buffer || frames <= 0 || channels < 2 ||
+        channels > MAX_CHANNELS) {
+        return;
+    }
 
     constexpr double kTau = 0.020;
     const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
     smoothedSubGain_ += smoothFactor * (targetSubGain_ - smoothedSubGain_);
 
     const float gain = static_cast<float>(smoothedSubGain_);
-    const float makeup = 1.0f / (1.0f + gain * 0.5f);
+    // FIX M-6: makeup only attenuates the added sub tap, not the entire mix
+    const float subAttenuation = 1.0f / (1.0f + gain * 0.5f);
     const bool doBassMono = bassMono_;
     const bool doAntiPop = antiPop_;
 
@@ -151,9 +159,10 @@ void SubCrossover::processInterleaved(float* buffer, int frames, int channels) {
                 sub = std::tanh(sub);
             }
 
-            const float subTap = sub * gain;
-            buffer[iL] = (l + subTap) * makeup;
-            buffer[iR] = (r + subTap) * makeup;
+            // FIX M-6: apply sub gain + makeup attenuation only to the added sub tap
+            const float subTap = sub * gain * subAttenuation;
+            buffer[iL] = l + subTap;
+            buffer[iR] = r + subTap;
         }
     }
 }

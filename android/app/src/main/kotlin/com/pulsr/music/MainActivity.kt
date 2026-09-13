@@ -77,7 +77,8 @@ class MainActivity : AudioServiceActivity() {
         val path = uri.path?.lowercase() ?: ""
         val isAudioExt = path.endsWith(".mp3") || path.endsWith(".flac") || path.endsWith(".wav") ||
             path.endsWith(".aac") || path.endsWith(".m4a") || path.endsWith(".ogg") ||
-            path.endsWith(".opus") || path.endsWith(".mka")
+            path.endsWith(".opus") || path.endsWith(".mka") || path.endsWith(".dsf") ||
+            path.endsWith(".dff") || path.endsWith(".aiff") || path.endsWith(".alac")
         val isTextExt = path.endsWith(".txt") || path.endsWith(".list") || path.endsWith(".conf") || path.endsWith(".csv")
         return isAudioExt || isTextExt || (scheme == "content" && intent.type == null)
     }
@@ -102,7 +103,40 @@ class MainActivity : AudioServiceActivity() {
     }
 
     private fun handleAudioIntent(intent: Intent?, fromColdStart: Boolean) {
+        // Assistant / voice-search entry point: bring the app forward so the
+        // Dart layer can resume or start playback. Previously dropped.
+        if (intent?.action == "android.media.action.MEDIA_PLAY_FROM_SEARCH") {
+            val q = intent.getStringExtra("query")
+            if (fromColdStart || fileOpenerChannel == null) {
+                synchronized(pendingAudioUris) {
+                    pendingAudioUris.addLast("pulsr://voice-search?query=${Uri.encode(q ?: "")}")
+                }
+            } else {
+                fileOpenerChannel?.invokeMethod("onVoiceSearch", q ?: "")
+            }
+            return
+        }
         if (intent?.action != Intent.ACTION_VIEW && intent?.action != Intent.ACTION_SEND) return
+        // Multi-share (EXTRA_STREAM as list) previously dropped all but one.
+        if (intent.action == Intent.ACTION_SEND_MULTIPLE || intent.hasExtra(Intent.EXTRA_STREAM)) {
+            try {
+                val list: ArrayList<Uri>? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)
+                }
+                if (!list.isNullOrEmpty()) {
+                    synchronized(pendingAudioUris) {
+                        for (u in list) pendingAudioUris.addLast(u.toString())
+                    }
+                    if (!fromColdStart && fileOpenerChannel != null) {
+                        fileOpenerChannel?.invokeMethod("onAudioFileOpened", list.first().toString())
+                    }
+                    return
+                }
+            } catch (_: Exception) {}
+        }
         val textExtra = intent.getStringExtra(Intent.EXTRA_TEXT)
         val streamUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)

@@ -56,7 +56,14 @@ abstract class IMusicRepository {
 
   /// Permanently removes the given song rows and, for local files, deletes the
   /// backing file from disk. Never touches `ytmusic://` sentinel rows.
+  /// NOTE: playlist_entries/play_history/queue_items cascade at the FK level,
+  /// so callers must confirm with the user first or offer mark-missing.
+  /// Use [deleteSongsWithReport] when the UI needs the affected playlist ids.
   Future<Result<void>> deleteSongs(List<int> ids);
+
+  /// Same as [deleteSongs] but returns the ids of playlists that lost at
+  /// least one member, so the UI can offer undo / show what changed.
+  Future<Result<List<int>>> deleteSongsWithReport(List<int> ids);
   Future<Result<int>> hardDeleteMissingSongs();
 
   /// Folds a downloaded YouTube row (negative [oldId]) into the positive-id

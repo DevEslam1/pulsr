@@ -29,7 +29,7 @@ struct EqBandParam {
 };
 
 struct EqParamSet {
-    static constexpr int MAX_BANDS = 32;
+    static constexpr int MAX_BANDS = 64;
     EqBandParam bands[MAX_BANDS];
     int bandCount = 10;
     double preampDb = 0.0;
@@ -86,7 +86,9 @@ struct PreparedIr {
     static uint64_t getCacheMutexLockCount();
     static void resetCacheMutexLockCount();
     size_t getEstimatedBytes() const {
-        return static_cast<size_t>(totalTaps) * 12 + static_cast<size_t>(numPartitions) * FFT_SIZE * 16;
+        // Each partition holds FFT_SIZE complex<float> bins = 8 bytes each
+        // (std::complex<float> is two floats), not 16.
+        return static_cast<size_t>(totalTaps) * 12 + static_cast<size_t>(numPartitions) * FFT_SIZE * 8;
     }
 };
 

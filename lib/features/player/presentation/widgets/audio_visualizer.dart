@@ -251,11 +251,12 @@ class _AudioVisualizerState extends State<AudioVisualizer>
     final p = context.palette;
     final activeColor = widget.color ?? p.accent;
 
-    return SizedBox(
-      width: widget.width,
-      height: widget.height,
-      child: ClipRect(
-        child: ValueListenableBuilder<List<double>>(
+    return ExcludeSemantics(
+      child: SizedBox(
+        width: widget.width,
+        height: widget.height,
+        child: ClipRect(
+          child: ValueListenableBuilder<List<double>>(
           valueListenable: _dataNotifier,
           builder: (context, data, _) {
             return CustomPaint(
@@ -279,6 +280,7 @@ class _AudioVisualizerState extends State<AudioVisualizer>
               },
             );
           },
+        ),
         ),
       ),
     );

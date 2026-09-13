@@ -50,7 +50,11 @@ void main() {
     });
 
     test('interpolateGains maps 32 bands onto the 64-band plan', () {
-      final source = List<double>.generate(32, (i) => i.toDouble());
+      // iso32Frequencies is the 31-band 1/3-octave list (misnamed); build the
+      // source from its actual centers so endpoints line up exactly.
+      final srcFreqs = EqPreset.iso32Frequencies;
+      final source =
+          List<double>.generate(srcFreqs.length, (i) => i.toDouble());
       final out = EqPreset.interpolateGains(
         source,
         targetFrequencies: EqPreset.iso64Frequencies,
@@ -58,8 +62,8 @@ void main() {
 
       expect(out.length, 64);
       expect(out.first, closeTo(source.first, 1e-9));
-      // 20 kHz is exactly iso32Frequencies[30], so the top lands on that gain.
-      expect(out.last, closeTo(source[30], 1e-9));
+      // 20 kHz is exactly iso32Frequencies.last, so the top lands on that gain.
+      expect(out.last, closeTo(source.last, 1e-9));
       for (var i = 1; i < out.length; i++) {
         expect(out[i], greaterThanOrEqualTo(out[i - 1] - 1e-9));
       }
@@ -91,7 +95,7 @@ void main() {
         source,
         targetFrequencies: EqPreset.iso32Frequencies,
       );
-      expect(thirtyTwo.length, 32);
+      expect(thirtyTwo.length, EqPreset.iso32Frequencies.length);
     });
   });
 }
