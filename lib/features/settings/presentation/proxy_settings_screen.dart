@@ -171,7 +171,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
     });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Applied preset: $name ($host:$port)'),
+        content: Text(context.l10n.proxyPresetApplied(name, host, port)),
         duration: const Duration(seconds: 1),
         behavior: SnackBarBehavior.floating,
       ),
@@ -238,8 +238,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                                   color: p.accent, size: 20),
                             ),
                             const SizedBox(width: 12),
-                            Text(
-                              'Import Proxies',
+                            Text(context.l10n.importProxies,
                               style: TextStyle(
                                 color: p.textPrimary,
                                 fontWeight: FontWeight.w700,
@@ -256,8 +255,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    Text(
-                      'Paste proxy lines or pick a text file. Lines will be parsed automatically.',
+                    Text(context.l10n.pasteOrPick,
                       style: TextStyle(color: p.textSecondary, fontSize: 13),
                     ),
                     const SizedBox(height: 12),
@@ -275,7 +273,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                           },
                           icon: Icon(Icons.content_paste_rounded,
                               size: 16, color: p.accent),
-                          label: Text('Paste Clipboard',
+                          label: Text(context.l10n.pasteClipboard,
                               style: TextStyle(
                                   color: p.textPrimary, fontSize: 12)),
                           style: OutlinedButton.styleFrom(
@@ -309,7 +307,8 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                               if (ctx.mounted) {
                                 ScaffoldMessenger.of(ctx).showSnackBar(
                                   SnackBar(
-                                    content: Text('Failed to pick file: $e'),
+                                    content: Text(ctx.l10n
+                                        .pickFileFailed(e.toString())),
                                     behavior: SnackBarBehavior.floating,
                                   ),
                                 );
@@ -318,7 +317,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                           },
                           icon: Icon(Icons.folder_open_rounded,
                               size: 16, color: p.accent),
-                          label: Text('Pick File',
+                          label: Text(context.l10n.pickFile,
                               style: TextStyle(
                                   color: p.textPrimary, fontSize: 12)),
                           style: OutlinedButton.styleFrom(
@@ -368,7 +367,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                       children: [
                         TextButton(
                           onPressed: () => Navigator.of(ctx).pop(),
-                          child: Text('Cancel',
+                          child: Text(context.l10n.cancel,
                               style: TextStyle(color: p.textSecondary)),
                         ),
                         const SizedBox(width: 8),
@@ -390,8 +389,8 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                                       Icon(Icons.check_circle_rounded,
                                           color: p.success, size: 20),
                                       const SizedBox(width: 10),
-                                      Text(
-                                          'Successfully imported $count new proxies'),
+                                      Text(context.l10n
+                                          .proxyImported(count)),
                                     ],
                                   ),
                                   backgroundColor: p.surfaceContainerHigh,
@@ -409,7 +408,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                                 horizontal: 16, vertical: 10),
                           ),
                           icon: const Icon(Icons.download_rounded, size: 18),
-                          label: const Text('Import & Parse',
+                          label: Text(context.l10n.importParse,
                               style: TextStyle(fontWeight: FontWeight.w700)),
                         ),
                       ],
@@ -596,8 +595,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                   children: [
                     Row(
                       children: [
-                        Text(
-                          'Enable Proxy',
+                        Text(context.l10n.enableProxy,
                           style: TextStyle(
                             color: p.textPrimary,
                             fontWeight: FontWeight.w700,
@@ -671,8 +669,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
             children: [
               Row(
                 children: [
-                  Text(
-                    'SAVED PROXY POOL',
+                  Text(context.l10n.savedProxyPool,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: p.textTertiary,
                           letterSpacing: 0.5,
@@ -707,23 +704,24 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                       context: context,
                       builder: (ctx) => AlertDialog(
                         backgroundColor: p.surfaceContainerHigh,
-                        title: Text('Clear Proxy Pool?',
+                        title: Text(context.l10n.clearPoolTitle,
                             style: TextStyle(color: p.textPrimary)),
                         content: Text(
-                          'Are you sure you want to delete all ${proxyList.length} saved proxies?',
+                          context.l10n
+                              .clearPoolConfirm(proxyList.length),
                           style: TextStyle(color: p.textSecondary),
                         ),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.of(ctx).pop(false),
-                            child: Text('Cancel',
+                            child: Text(context.l10n.cancel,
                                 style: TextStyle(color: p.textSecondary)),
                           ),
                           FilledButton(
                             onPressed: () => Navigator.of(ctx).pop(true),
                             style: FilledButton.styleFrom(
                                 backgroundColor: p.error),
-                            child: const Text('Clear All'),
+                            child: Text(context.l10n.clearAll),
                           ),
                         ],
                       ),
@@ -736,7 +734,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                   child: Padding(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    child: Text('Clear All',
+                    child: Text(context.l10n.clearAll,
                         style: TextStyle(
                             color: p.error,
                             fontSize: 12,
@@ -775,7 +773,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                             horizontal: 14, vertical: 9),
                       ),
                       icon: const Icon(Icons.file_upload_outlined, size: 16),
-                      label: const Text('Import / Paste',
+                      label: Text(context.l10n.importPaste,
                           style: TextStyle(
                               fontSize: 13, fontWeight: FontWeight.w700)),
                     ),
@@ -822,7 +820,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                               horizontal: 12, vertical: 9),
                         ),
                         icon: const Icon(Icons.sort_rounded, size: 16),
-                        label: const Text('Sort by Speed',
+                        label: Text(context.l10n.sortBySpeed,
                             style: TextStyle(
                                 fontSize: 12, fontWeight: FontWeight.w600)),
                       ),
@@ -854,8 +852,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                               color: p.textTertiary, size: 32),
                         ),
                         const SizedBox(height: 12),
-                        Text(
-                          'No Proxies in Pool',
+                        Text(context.l10n.noProxiesPool,
                           style: TextStyle(
                               color: p.textPrimary,
                               fontWeight: FontWeight.w700,
@@ -864,8 +861,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                         const SizedBox(height: 6),
                         ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 420),
-                          child: Text(
-                            'Import your proxy list (.txt) or paste lines in IP:PORT:USER:PASS format to test latency and switch seamlessly.',
+                          child: Text(context.l10n.importProxiesDesc,
                             textAlign: TextAlign.center,
                             style: TextStyle(
                                 color: p.textSecondary,
@@ -915,7 +911,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
           context.read<SettingsCubit>().selectProxyEntry(item);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Activated proxy: ${item.displayAddress}'),
+              content: Text(context.l10n.proxyActivated(item.displayAddress)),
               duration: const Duration(seconds: 1),
               behavior: SnackBarBehavior.floating,
             ),
@@ -972,8 +968,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                               color: p.accent,
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: Text(
-                              'ACTIVE',
+                            child: Text(context.l10n.activeLabel,
                               style: TextStyle(
                                 color: p.onAccent,
                                 fontSize: 8,
@@ -1111,7 +1106,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                   CircularProgressIndicator(strokeWidth: 1.5, color: p.accent),
             ),
             const SizedBox(width: 5),
-            Text('Testing',
+            Text(context.l10n.testingLabel,
                 style: TextStyle(
                     color: p.accent,
                     fontSize: 10,
@@ -1170,8 +1165,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
           children: [
             Icon(Icons.error_outline_rounded, color: p.error, size: 10),
             const SizedBox(width: 3),
-            Text(
-              'Failed',
+            Text(context.l10n.failedLabel,
               style: TextStyle(
                   color: p.error, fontSize: 10, fontWeight: FontWeight.w700),
             ),
@@ -1186,8 +1180,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
         color: p.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Text(
-        'Unverified',
+      child: Text(context.l10n.unverifiedLabel,
         style: TextStyle(
             color: p.textTertiary, fontSize: 10, fontWeight: FontWeight.w600),
       ),
@@ -1388,8 +1381,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
             const SizedBox(height: 16),
 
             // Quick Presets Header
-            Text(
-              'QUICK PRESETS',
+            Text(context.l10n.quickPresets,
               style: TextStyle(
                 color: p.textTertiary,
                 fontSize: 11,
@@ -1625,8 +1617,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                     size: 14, color: p.textTertiary),
                 const SizedBox(width: 6),
                 Expanded(
-                  child: Text(
-                    'Requests matching these hosts will connect directly without routing through proxy.',
+                  child: Text(context.l10n.bypassHostsDesc,
                     style: TextStyle(color: p.textTertiary, fontSize: 12),
                   ),
                 ),

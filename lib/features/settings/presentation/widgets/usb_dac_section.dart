@@ -1,6 +1,7 @@
 // lib/features/settings/presentation/widgets/usb_dac_section.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/platform_capabilities.dart';
 import '../../../../domain/services/usb_exclusive_service.dart';
@@ -61,8 +62,7 @@ class _UsbDacSectionState extends State<UsbDacSection> {
           final granted = await _service.requestPermission();
           if (!granted) {
             if (mounted) {
-              ScaffoldMessenger.maybeOf(context)?.showSnackBar(const SnackBar(
-                content: Text('USB permission denied — hardware volume unavailable'),
+              ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(context.l10n.usbPermDenied),
               ));
             }
             await _refresh();
@@ -145,7 +145,7 @@ class _UsbDacSectionState extends State<UsbDacSection> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Hardware Volume',
+                    Text(context.l10n.hwVolume,
                         style: Theme.of(context).textTheme.bodyMedium),
                     Text('${currentDb.toStringAsFixed(1)} dB',
                         style: Theme.of(context).textTheme.bodySmall),

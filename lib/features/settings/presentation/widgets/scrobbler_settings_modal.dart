@@ -151,8 +151,7 @@ class _ScrobblerConfigSheetState extends State<ScrobblerConfigSheet> {
     if (mounted) {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Scrobbler credentials saved securely.')),
+        SnackBar(content: Text(context.l10n.scrobblerSaved)),
       );
     }
   }

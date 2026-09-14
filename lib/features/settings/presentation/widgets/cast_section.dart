@@ -153,7 +153,9 @@ class _CastSectionState extends State<CastSection> {
               leading: const Icon(Icons.cast_connected_rounded),
               title: Text(_session.deviceName ?? context.l10n.castDevice),
               subtitle: Text(
-                _session.playing ? 'Playing on Cast' : 'Connected',
+                _session.playing
+                    ? context.l10n.playingOnCast
+                    : context.l10n.castConnected,
                 style: TextStyle(fontSize: 12, color: textSecondary),
               ),
             ),
@@ -173,7 +175,7 @@ class _CastSectionState extends State<CastSection> {
                     onPressed: _busy
                         ? null
                         : () async => _service.disconnect(),
-                    child: const Text('Stop'),
+                    child: Text(context.l10n.stopCast),
                   ),
                 ],
               ),
@@ -185,7 +187,7 @@ class _CastSectionState extends State<CastSection> {
                 children: [
                   Icon(Icons.search_rounded, size: 18, color: textSecondary),
                   const SizedBox(width: 12),
-                  Text('Scanning for Cast devices…',
+                  Text(context.l10n.scanningCastDevices,
                       style: TextStyle(fontSize: 13, color: textSecondary)),
                 ],
               ),
@@ -209,7 +211,7 @@ class _CastSectionState extends State<CastSection> {
                 children: [
                   Icon(Icons.search_rounded, size: 18, color: textSecondary),
                   const SizedBox(width: 12),
-                  Text('Scanning for Cast devices…',
+                  Text(context.l10n.scanningCastDevices,
                       style: TextStyle(fontSize: 13, color: textSecondary)),
                 ],
               ),

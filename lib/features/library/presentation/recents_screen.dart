@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/constants/app_radii.dart';
@@ -115,8 +116,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                   Icon(Icons.history_toggle_off_rounded,
                       size: 64, color: p.textTertiary),
                   const SizedBox(height: 16),
-                  Text(
-                    'No recently played songs',
+                  Text(context.l10n.noRecentSongs,
                     style: TextStyle(
                       color: p.textPrimary,
                       fontWeight: FontWeight.w700,
@@ -124,8 +124,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    'Play your favorite music and it will appear here.',
+                  Text(context.l10n.recentEmptyHint,
                     style: TextStyle(color: p.textSecondary, fontSize: 13),
                   ),
                 ],
@@ -207,7 +206,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                               },
                               icon: const Icon(Icons.play_arrow_rounded,
                                   size: 20),
-                              label: Text('Play All (${filtered.length})'),
+                              label: Text(context.l10n.playAllCount(filtered.length)),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: p.accent,
                                 foregroundColor: p.onAccent,
@@ -230,7 +229,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                               }
                             },
                             icon: const Icon(Icons.shuffle_rounded, size: 20),
-                            label: const Text('Shuffle'),
+                            label: Text(context.l10n.shuffle),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: p.surfaceContainerHigh,
                               foregroundColor: p.textPrimary,
@@ -254,7 +253,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                   hasScrollBody: false,
                   child: Center(
                     child: Text(
-                      'No results for "$_searchQuery"',
+                      context.l10n.noResultsFor(_searchQuery),
                       style: TextStyle(color: p.textSecondary, fontSize: 14),
                     ),
                   ),
@@ -368,7 +367,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                     child: Center(
                       child: TextButton.icon(
                         icon: const Icon(Icons.expand_more_rounded),
-                        label: const Text('Load More History'),
+                        label: Text(context.l10n.loadMoreHistory),
                         onPressed: () {
                           setState(() {
                             _historyLimit += 100;

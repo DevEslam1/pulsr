@@ -152,11 +152,11 @@ class _LibraryScreenState extends State<LibraryScreen>
                   leading: IconButton(
                       icon: const Icon(Icons.close_rounded),
                       onPressed: cubit.clearSelection),
-                  title: Text('${state.selectedSongIds.length} Selected'),
+                  title: Text(context.l10n.selectedCount(state.selectedSongIds.length)),
                   actions: [
                     IconButton(
                         icon: const Icon(Icons.select_all_rounded),
-                        tooltip: 'Select All',
+                        tooltip: context.l10n.selectAllAction,
                         onPressed: () => cubit.selectAllSongs()),
                     IconButton(
                       icon: const Icon(Icons.playlist_add_rounded),
@@ -209,8 +209,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                         }
                         cubit.clearSelection();
                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Text(
-                                'Added ${selected.length} tracks to queue')));
+                            content: Text(context.l10n
+                                .addedToQueue(selected.length))));
                       },
                     ),
                   ],
@@ -1488,7 +1488,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                                   ScaffoldMessenger.of(context).hideCurrentSnackBar();
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('Removed "${song.title}" from favorites'),
+                                      content: Text(context.l10n
+                                          .removedFavorite(song.title)),
                                       duration: const Duration(seconds: 4),
                                       action: SnackBarAction(
                                         label: 'UNDO',
@@ -1605,7 +1606,7 @@ class _LibraryScreenState extends State<LibraryScreen>
   void _downloadFavorites(BuildContext context, List<SongsTableData> songs) {
     if (songs.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No favorite songs to download.')),
+        SnackBar(content: Text(context.l10n.noFavToDownload)),
       );
       return;
     }
@@ -1618,7 +1619,7 @@ class _LibraryScreenState extends State<LibraryScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-              'Queued $queuedCount liked songs for download (3 active downloads)...'),
+              context.l10n.queuedForDownload(queuedCount)),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -1651,7 +1652,7 @@ class _LibraryScreenState extends State<LibraryScreen>
     final libraryCubit = context.read<LibraryCubit>();
 
     messenger.showSnackBar(
-      const SnackBar(
+      SnackBar(
         content: Row(
           children: [
             SizedBox(
@@ -1661,7 +1662,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                   strokeWidth: 2, color: Colors.white),
             ),
             SizedBox(width: 12),
-            Text('Syncing YouTube Music Liked Songs...'),
+            Text(context.l10n.syncingYtm),
           ],
         ),
         duration: Duration(seconds: 4),
@@ -1677,8 +1678,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         messenger.hideCurrentSnackBar();
         messenger.showSnackBar(
           SnackBar(
-            content: Text(
-                'Synced $count tracks from your YouTube Music Liked library!'),
+            content: Text(context.l10n.syncedOnline(count)),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -1696,8 +1696,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         if (isAuth) {
           messenger.showSnackBar(
             SnackBar(
-              content: const Text(
-                  'YouTube Music session expired. Please sign in again.'),
+              content: Text(context.l10n.sessionExpired),
               behavior: SnackBarBehavior.floating,
               action: SnackBarAction(
                 label: 'Sign In',
@@ -1708,7 +1707,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         } else {
           messenger.showSnackBar(
             SnackBar(
-              content: Text('Sync failed: $e'),
+              content: Text(context.l10n.syncFailed(e.toString())),
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -1771,16 +1770,14 @@ class _LibraryScreenState extends State<LibraryScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Import YouTube Music Favorites',
+                          Text(context.l10n.importYtmFav,
                             style: TextStyle(
                               color: p.textPrimary,
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          Text(
-                            'Paste a playlist link or Liked playlist from YouTube Music',
+                          Text(context.l10n.pastePlaylistLink,
                             style: TextStyle(
                               color: p.textSecondary,
                               fontSize: 12,
@@ -1885,8 +1882,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                               }
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text(
-                                      'Successfully imported $count tracks to Online Favorites!'),
+                                  content: Text(context.l10n
+                                      .importedOnline(count)),
                                   behavior: SnackBarBehavior.floating,
                                 ),
                               );
@@ -1916,8 +1913,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                           child: CircularProgressIndicator(
                               strokeWidth: 2, color: Colors.white),
                         )
-                      : const Text(
-                          'Import Tracks',
+                      : Text(context.l10n.importTracks,
                           style: TextStyle(
                               fontSize: 15, fontWeight: FontWeight.w600),
                         ),

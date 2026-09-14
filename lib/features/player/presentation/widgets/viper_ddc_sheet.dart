@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -68,7 +69,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
           );
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Loaded ViPER-DDC profile: $fileName')),
+              SnackBar(content: Text(context.l10n.vdcLoaded(fileName))),
             );
           }
         }
@@ -76,7 +77,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load .vdc file: $e')),
+          SnackBar(content: Text(context.l10n.vdcFailed(e.toString()))),
         );
       }
     }
@@ -178,8 +179,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'Active Profile',
+                            Text(context.l10n.activeProfile,
                               style: TextStyle(
                                 color: p.textTertiary,
                                 fontSize: 11,
@@ -207,7 +207,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                       ElevatedButton.icon(
                         onPressed: () => _pickVdcFile(context),
                         icon: const Icon(Icons.file_open_rounded, size: 16),
-                        label: const Text('Open .vdc'),
+                        label: Text(context.l10n.openVdc),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: p.primary,
                           foregroundColor: Colors.white,
@@ -222,8 +222,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                 ),
                 const SizedBox(height: 20),
 
-                Text(
-                  'Reference Headphone Profiles',
+                Text(context.l10n.refHpProfiles,
                   style: TextStyle(
                     color: p.textPrimary,
                     fontSize: 14,
@@ -290,8 +289,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                   color: p.primary,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Text(
-                                  'ACTIVE',
+                                child: Text(context.l10n.activeLabel,
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 10,

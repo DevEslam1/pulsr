@@ -329,7 +329,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           const SizedBox(width: 8),
                           Expanded(
                               child: Text(
-                                  'Conflicts with: ${info.conflictsWith}',
+                                  context.l10n.conflictsWith(
+                                      info.conflictsWith ?? ''),
                                   style: TextStyle(
                                       color: p.textSecondary,
                                       fontSize: 11,

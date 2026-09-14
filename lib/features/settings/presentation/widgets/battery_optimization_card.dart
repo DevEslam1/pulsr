@@ -1,5 +1,6 @@
 // lib/features/settings/presentation/widgets/battery_optimization_card.dart
 import 'package:flutter/material.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/services/battery_optimization_service.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -108,7 +109,7 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard> {
                       .requestIgnoreBatteryOptimizations();
                   await _checkStatus();
                 },
-                child: const Text('Allow Background Playback'),
+                child: Text(context.l10n.allowBackground),
               ),
               if (isAggressive) ...[
                 const SizedBox(width: 8),

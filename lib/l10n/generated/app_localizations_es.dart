@@ -2567,4 +2567,795 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get saturationBandDesc => 'Limita la saturacion a medios.';
+
+  @override
+  String get matchLogic => 'LOGICA DE COINCIDENCIA';
+
+  @override
+  String get rulesLabel => 'REGLAS';
+
+  @override
+  String get sortingLimit => 'ORDEN Y LIMITE';
+
+  @override
+  String get sortField => 'Campo de orden';
+
+  @override
+  String get titleLabel => 'Titulo';
+
+  @override
+  String get playCountLabel => 'Reproducciones';
+
+  @override
+  String get lastPlayedLabel => 'Ultima reproduccion';
+
+  @override
+  String get yearLabel => 'Ano';
+
+  @override
+  String get trackLimit => 'Limite de pistas';
+
+  @override
+  String get matchingPreview => 'VISTA PREVIA';
+
+  @override
+  String get yesBool => 'Si (verdadero)';
+
+  @override
+  String get noBool => 'No (falso)';
+
+  @override
+  String get noRuleMatch => 'Sin coincidencias.';
+
+  @override
+  String get cannotDownloadEmpty => 'Lista vacia, nada que descargar.';
+
+  @override
+  String get cannotExportEmpty => 'Lista vacia, nada que exportar.';
+
+  @override
+  String get cannotShareEmpty => 'Lista vacia, nada que compartir.';
+
+  @override
+  String get downloadAllTracks => 'Descargar todo';
+
+  @override
+  String get exportM3u => 'Exportar como M3U';
+
+  @override
+  String get manageSongs => 'Gestionar canciones';
+
+  @override
+  String get sharePlaylist => 'Compartir lista';
+
+  @override
+  String get downloadAll => 'Descargar todo';
+
+  @override
+  String get saveToPulsr => 'Guardar en Pulsr';
+
+  @override
+  String get fetchingYtmTracks => 'Obteniendo pistas...';
+
+  @override
+  String get ytmHeader => 'YOUTUBE MUSIC';
+
+  @override
+  String get importTracks => 'Importar pistas';
+
+  @override
+  String get importYtmFav => 'Importar favoritos';
+
+  @override
+  String get pastePlaylistLink => 'Pega un enlace de lista';
+
+  @override
+  String get noFavToDownload => 'Sin favoritos para descargar.';
+
+  @override
+  String get syncingYtm => 'Sincronizando...';
+
+  @override
+  String get sessionExpired => 'Sesion expirada. Inicia sesion.';
+
+  @override
+  String get libLoadFailed => 'No se pudo cargar la biblioteca.';
+
+  @override
+  String get scanPrompt => 'Escanea tu dispositivo.';
+
+  @override
+  String get noMusicYet => 'Sin musica aun';
+
+  @override
+  String get ytmPromo => 'Millones de canciones en linea';
+
+  @override
+  String get loadMoreHistory => 'Cargar mas historial';
+
+  @override
+  String get noRecentSongs => 'Sin reproducciones recientes';
+
+  @override
+  String get recentEmptyHint => 'Reproduce musica y aparecera aqui.';
+
+  @override
+  String get songInfo => 'Info de cancion';
+
+  @override
+  String get reciterStyle => 'ESTILO DE RECITADOR';
+
+  @override
+  String get learningSpeed => 'Velocidad de aprendizaje';
+
+  @override
+  String get reciterSpeedDesc => 'Ralentiza para memorizar';
+
+  @override
+  String get outputHardware => 'HARDWARE DE SALIDA';
+
+  @override
+  String get resetProfile => 'Restablecer perfil';
+
+  @override
+  String get reciterDesc => 'Perfiles optimizados para voz';
+
+  @override
+  String get sibilanceDesc => 'Sibilancia atenuada. Reduccion no disponible.';
+
+  @override
+  String get compressorTitle => 'Compresor multibanda';
+
+  @override
+  String get compressorDesc =>
+      'Compresor nativo de 4 bandas. Domina cada banda.';
+
+  @override
+  String get compressorLimitDesc =>
+      'Ratio y Attack requieren el motor del sistema.';
+
+  @override
+  String get resetStudioDefaults => 'Restablecer valores de estudio';
+
+  @override
+  String get studioCompressor => 'Compresor dinamico de estudio';
+
+  @override
+  String get studioCompressorDesc => 'Procesamiento dinamico de estudio.';
+
+  @override
+  String get bytecodeJit => 'Bytecode JIT';
+
+  @override
+  String get compileRun => 'Compilar y ejecutar';
+
+  @override
+  String get eelCompiled => 'Script compilado y cargado.';
+
+  @override
+  String get exampleScripts => 'Scripts de ejemplo';
+
+  @override
+  String get eelEditor => 'Editor EEL';
+
+  @override
+  String get liveSliders => 'Controles en vivo';
+
+  @override
+  String get liveProgDspTitle => 'DSP programable en vivo';
+
+  @override
+  String get lyricsEditorTitle => 'Editor de letras';
+
+  @override
+  String get nowAtLabel => 'Ahora en';
+
+  @override
+  String get pitchShift => 'Tono';
+
+  @override
+  String get activeProfile => 'Perfil activo';
+
+  @override
+  String get openVdc => 'Abrir .vdc';
+
+  @override
+  String get refHpProfiles => 'Perfiles de referencia';
+
+  @override
+  String get bookmarkLabel => 'Marcador';
+
+  @override
+  String get bookmarkHint => 'Marcadores para la pista actual.';
+
+  @override
+  String get defaultGlobalEq => 'Por defecto (EQ global)';
+
+  @override
+  String get dspSavedAlbum => 'Ajustes guardados.';
+
+  @override
+  String get saveDspAlbum => 'Guardar ajustes del album';
+
+  @override
+  String get playbackTools => 'Herramientas';
+
+  @override
+  String get trackEqOverride => 'EQ de pista';
+
+  @override
+  String get trackRating => 'Calificacion';
+
+  @override
+  String get trackVolumeOffset => 'Desplazamiento de volumen';
+
+  @override
+  String get bpmXfadeDesc => 'Para crossfade sincronizado. Rango 40-240.';
+
+  @override
+  String get rgOff => 'Apagado';
+
+  @override
+  String get rgTrack => 'Pista';
+
+  @override
+  String get rgAlbum => 'Album';
+
+  @override
+  String get rgAuto => 'Auto';
+
+  @override
+  String get autoCalibrate => 'Autocalibrar';
+
+  @override
+  String get noSessionLogs => 'Sin registros aun';
+
+  @override
+  String get dspInspectorDebug => 'Inspector y depuracion';
+
+  @override
+  String get bpResolved => 'Resuelto: bypass desactivado.';
+
+  @override
+  String get replayGainTitle => 'Normalizacion ReplayGain';
+
+  @override
+  String get appColorSource => 'Fuente de color';
+
+  @override
+  String get importMilk => 'Importar .milk';
+
+  @override
+  String get importJsonViz => 'Importar visualizador JSON';
+
+  @override
+  String get loadJsonVizDesc => 'Carga un preajuste .json';
+
+  @override
+  String get loadMilkDesc => 'Carga un archivo Milkdrop';
+
+  @override
+  String get npArtworkSwipe => 'Deslizar caratula';
+
+  @override
+  String get npDoubleTap => 'Doble toque';
+
+  @override
+  String get selectPlayerTheme => 'Elegir tema';
+
+  @override
+  String get aboutBlurb => 'Reproductor local de alta fidelidad.';
+
+  @override
+  String get accentPalette => 'Paleta de acento';
+
+  @override
+  String get ambientGlow => 'Resplandor ambiental';
+
+  @override
+  String get applyTheme => 'Aplicar tema';
+
+  @override
+  String get themeStudio => 'Estudio de temas';
+
+  @override
+  String get glowDesc => 'Brilla con la caratula';
+
+  @override
+  String get importThemeJson => 'Importar tema JSON';
+
+  @override
+  String get livePreview => 'Vista previa';
+
+  @override
+  String get pasteThemeJson => 'Pega un JSON valido:';
+
+  @override
+  String playAllCount(Object count) {
+    return 'Todo ($count)';
+  }
+
+  @override
+  String noResultsFor(Object query) {
+    return 'Sin resultados para \"$query\"';
+  }
+
+  @override
+  String selectedCount(Object count) {
+    return '$count seleccionados';
+  }
+
+  @override
+  String addedToQueue(Object count) {
+    return '$count anadidas a la cola';
+  }
+
+  @override
+  String savedToLocal(Object title, Object count) {
+    return '\"$title\" guardada ($count)';
+  }
+
+  @override
+  String playlistExported(Object count) {
+    return 'Lista exportada ($count).';
+  }
+
+  @override
+  String queuedForDownload(Object count) {
+    return '$count en cola de descarga...';
+  }
+
+  @override
+  String previewTrackCount(Object count) {
+    return '$count pistas';
+  }
+
+  @override
+  String btCalibrated(Object ms) {
+    return 'Latencia: $ms ms';
+  }
+
+  @override
+  String importedOnline(Object count) {
+    return 'Importados $count!';
+  }
+
+  @override
+  String syncedOnline(Object count) {
+    return 'Sincronizados $count.';
+  }
+
+  @override
+  String syncFailed(Object error) {
+    return 'Error: $error';
+  }
+
+  @override
+  String scanComplete(Object count) {
+    return 'Escaneo completo: $count.';
+  }
+
+  @override
+  String loadSongsFailed(Object title) {
+    return 'Sin canciones para $title';
+  }
+
+  @override
+  String removedFavorite(Object title) {
+    return '\"$title\" eliminada de favoritas';
+  }
+
+  @override
+  String cornerRadiusLabel(Object px) {
+    return 'Radio de esquinas (${px}px)';
+  }
+
+  @override
+  String vdcLoaded(Object name) {
+    return 'Perfil cargado: $name';
+  }
+
+  @override
+  String vdcFailed(Object error) {
+    return 'Error al cargar .vdc: $error';
+  }
+
+  @override
+  String conflictsWith(Object name) {
+    return 'Conflicto con: $name';
+  }
+
+  @override
+  String get visualizerStyleLabel => 'Estilo de visualizador';
+
+  @override
+  String get doneAction => 'Listo';
+
+  @override
+  String get scrobblerSaved => 'Credenciales guardadas.';
+
+  @override
+  String get usbPermDenied => 'Permiso USB denegado';
+
+  @override
+  String get hwVolume => 'Volumen de hardware';
+
+  @override
+  String get ytmDisconnected => 'Desconectado de YouTube Music';
+
+  @override
+  String get allowBackground => 'Permitir en segundo plano';
+
+  @override
+  String get totalScrobbles => 'Total:';
+
+  @override
+  String get lastScrobbled => 'Ultimo:';
+
+  @override
+  String get quickPresets => 'PREAJUSTES';
+
+  @override
+  String get savedProxyPool => 'LISTA GUARDADA';
+
+  @override
+  String get noProxiesPool => 'Sin proxies';
+
+  @override
+  String get importProxies => 'Importar proxies';
+
+  @override
+  String get importProxiesDesc => 'Importa tu lista (.txt) o pega lineas.';
+
+  @override
+  String get pasteOrPick => 'Pega lineas o elige archivo.';
+
+  @override
+  String get bypassHostsDesc => 'Estos hosts conectan directo.';
+
+  @override
+  String get pasteClipboard => 'Pegar portapapeles';
+
+  @override
+  String get pickFile => 'Elegir archivo';
+
+  @override
+  String get importParse => 'Importar y analizar';
+
+  @override
+  String get importPaste => 'Importar / Pegar';
+
+  @override
+  String get sortBySpeed => 'Ordenar por velocidad';
+
+  @override
+  String get testingLabel => 'Probando';
+
+  @override
+  String get failedLabel => 'Fallo';
+
+  @override
+  String get unverifiedLabel => 'Sin verificar';
+
+  @override
+  String get clearAll => 'Borrar todo';
+
+  @override
+  String get suggestCreateFailed => 'No se pudo crear.';
+
+  @override
+  String get mostCompatible => 'Mas compatible';
+
+  @override
+  String get loadTracksFailed => 'Sin pistas para esta lista.';
+
+  @override
+  String get noLikedToDownload => 'Sin Me gusta. Sincroniza.';
+
+  @override
+  String get fetchingAccount => 'Obteniendo listas...';
+
+  @override
+  String get noAccountPlaylists => 'Sin listas en tu biblioteca.';
+
+  @override
+  String get selectPlaylistHint => 'Elige una lista';
+
+  @override
+  String get signInToSync => 'Inicia sesion para sincronizar.';
+
+  @override
+  String get suggestedForYou => 'SUGERENCIAS';
+
+  @override
+  String get accountPlaylists => 'LISTAS DE CUENTA';
+
+  @override
+  String get addedPlaylists => 'LISTAS ANADIDAS';
+
+  @override
+  String get addYtmUrl => 'Anadir URL de lista';
+
+  @override
+  String get connectYtm => 'Conectar YouTube Music';
+
+  @override
+  String get exportBackup => 'Exportar copia';
+
+  @override
+  String get importBackup => 'Importar copia';
+
+  @override
+  String get backupExportDesc => 'Guarda todo en JSON';
+
+  @override
+  String get backupImportDesc => 'Restaura desde JSON';
+
+  @override
+  String get backupTooLarge => 'Archivo muy grande (max 10 MB)';
+
+  @override
+  String get backupMissing => 'El archivo no existe';
+
+  @override
+  String get backupInvalid => 'JSON invalido';
+
+  @override
+  String get clearCacheReset => 'Borrar cache';
+
+  @override
+  String get cookiesCleared => 'Cache borrada. Recargando...';
+
+  @override
+  String get forceEgypt => 'Forzar modo Egipto';
+
+  @override
+  String get googleBlockHelp => 'Si Google bloquea el login, pega tus cookies:';
+
+  @override
+  String get importCookiesToken => 'Importar cookies manual';
+
+  @override
+  String get importCookiesManual => 'Importar cookies';
+
+  @override
+  String get loginDetected => 'Login detectado! Pulsa \"Listo\".';
+
+  @override
+  String get confirmAccount => 'Usa la cuenta correcta. Pulsa \"Listo\".';
+
+  @override
+  String get openYtmWebDirect => 'Abrir web directamente';
+
+  @override
+  String get openYtWeb => 'Abrir YouTube Web';
+
+  @override
+  String get completeSignInFirst => 'Completa el login primero.';
+
+  @override
+  String get googleTvSignIn => 'Login con Google TV';
+
+  @override
+  String get googleBlockTip => 'Consejo: pega tus cookies del navegador.';
+
+  @override
+  String get ipOutsideYtm =>
+      'Tu IP esta fuera del soporte de YouTube Music Web. Fuerza el modo Egipto o cambia a YouTube Web (sin bloqueo).';
+
+  @override
+  String get ytmRestricted => 'YouTube Music restringido en tu region';
+
+  @override
+  String importedPresetTpl(Object preset, Object name) {
+    return 'Importado $preset: $name';
+  }
+
+  @override
+  String appliedProfileTpl(Object profile, Object name) {
+    return 'Aplicado $profile: $name';
+  }
+
+  @override
+  String proxyImported(Object count) {
+    return 'Importados $count';
+  }
+
+  @override
+  String proxyActivated(Object addr) {
+    return 'Proxy activado: $addr';
+  }
+
+  @override
+  String proxyPresetApplied(Object name, Object host, Object port) {
+    return 'Preajuste: $name';
+  }
+
+  @override
+  String pickFileFailed(Object error) {
+    return 'Error al elegir: $error';
+  }
+
+  @override
+  String importPlaylistFailed(Object error) {
+    return 'Error al importar: $error';
+  }
+
+  @override
+  String fetchingForDownload(Object title) {
+    return 'Obteniendo \"$title\"...';
+  }
+
+  @override
+  String suggestedCreated(Object title, Object count) {
+    return '\"$title\" creada ($count).';
+  }
+
+  @override
+  String entryAdded(Object count) {
+    return '$count - Anadidas';
+  }
+
+  @override
+  String tapToCreate(Object count) {
+    return '$count - Toca para crear';
+  }
+
+  @override
+  String importMatched(Object matched, Object total) {
+    return '$matched de $total.';
+  }
+
+  @override
+  String accountPlaylistCount(Object count) {
+    return '$count listas';
+  }
+
+  @override
+  String historyLine(Object count) {
+    return 'Historial: $count';
+  }
+
+  @override
+  String backupExportedTo(Object uri) {
+    return 'Copia exportada a $uri';
+  }
+
+  @override
+  String tryIdentity(Object name) {
+    return 'Probar $name';
+  }
+
+  @override
+  String clearPoolConfirm(Object count) {
+    return 'Borrar los $count?';
+  }
+
+  @override
+  String get playingOnCast => 'Reproduciendo en Cast';
+
+  @override
+  String get castConnected => 'Conectado';
+
+  @override
+  String get resumeAction => 'Continuar';
+
+  @override
+  String get notSetLabel => 'Sin definir';
+
+  @override
+  String get bookmarkSaved => 'Marcador guardado.';
+
+  @override
+  String get bookmarkEarly => 'Reproduce mas de 0:05.';
+
+  @override
+  String resumeAtTpl(Object time) {
+    return 'Continuar en $time';
+  }
+
+  @override
+  String get selectAllAction => 'Seleccionar todo';
+
+  @override
+  String get clearPoolTitle => 'Borrar lista?';
+
+  @override
+  String get milkRendererDesc => 'Renderizador Milkdrop';
+
+  @override
+  String get includedLabel => 'Incluido';
+
+  @override
+  String get noneLabel => 'Ninguno';
+
+  @override
+  String queuedFromTitle(Object count, Object title) {
+    return '$count de \"$title\" en cola...';
+  }
+
+  @override
+  String allDownloaded(Object title) {
+    return 'Todo de \"$title\" ya descargado.';
+  }
+
+  @override
+  String get hwOutputRouting => 'SALIDA DE HARDWARE';
+
+  @override
+  String get usbDacAttached => 'DAC USB CONECTADO';
+
+  @override
+  String get outputPathDiag => 'DIAGNOSTICO DE SALIDA';
+
+  @override
+  String get dsdPcmNote => 'DSD se decodifica a PCM.';
+
+  @override
+  String get targetSampleRate => 'FRECUENCIA OBJETIVO';
+
+  @override
+  String get targetBitPerfect => 'PROFUNDIDAD Y BIT-PERFECT';
+
+  @override
+  String get trackSourceSpecs => 'ESPECIFICACIONES DE FUENTE';
+
+  @override
+  String get liveSignalChain => 'CADENA DE SENAL';
+
+  @override
+  String get applyDone => 'Aplicar y listo';
+
+  @override
+  String get switchOutputPanel => 'Cambia la salida en el panel';
+
+  @override
+  String get directBpMode => 'Modo Bit-Perfect directo';
+
+  @override
+  String get armedLabel => 'ARMADO';
+
+  @override
+  String get bpGuardrails =>
+      'Protecciones activas: DSP omitido. Ajusta con el DAC.';
+
+  @override
+  String get btAudioCodec => 'CODEC BLUETOOTH';
+
+  @override
+  String get earbudsConnected => 'Auriculares conectados.';
+
+  @override
+  String get supportedCodecs => 'CODECS (TOCA PARA CAMBIAR)';
+
+  @override
+  String get sampleRateLabel => 'FRECUENCIA';
+
+  @override
+  String get bitDepthLabel => 'PROFUNDIDAD';
+
+  @override
+  String get ldacQuality => 'CALIDAD LDAC';
+
+  @override
+  String get changeBtCodec => 'Cambiar codec';
+
+  @override
+  String get nearbyPermDesc => 'Se necesita permiso de dispositivos.';
+
+  @override
+  String get grantBtPerm => 'Conceder permiso';
+
+  @override
+  String get leAudio => 'LE AUDIO';
+
+  @override
+  String get lc3Negotiation =>
+      'Android negocia el LC3. Codec y tasa no ajustables.';
+
+  @override
+  String get connectingBt => 'Conectando...';
+
+  @override
+  String get bitPerfectMode => 'Modo Bit-Perfect';
 }

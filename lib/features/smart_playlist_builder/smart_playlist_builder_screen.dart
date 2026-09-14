@@ -142,7 +142,7 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('PLAYLIST NAME',
+                        Text(context.l10n.playlistName,
                             style: TextStyle(
                                 color: p.textSecondary,
                                 fontSize: 11,
@@ -179,7 +179,7 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('MATCH LOGIC',
+                        Text(context.l10n.matchLogic,
                             style: TextStyle(
                                 color: p.textSecondary,
                                 fontSize: 11,
@@ -190,8 +190,8 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                           children: [
                             Expanded(
                               child: ChoiceChip(
-                                label: const Center(
-                                    child: Text('Match ALL Rules (AND)')),
+                                label: Center(
+                                    child: Text(context.l10n.matchAllRules)),
                                 selected: state.criteria.matchAll,
                                 selectedColor: p.accent.withValues(alpha: 0.25),
                                 labelStyle: TextStyle(
@@ -206,8 +206,8 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: ChoiceChip(
-                                label: const Center(
-                                    child: Text('Match ANY Rule (OR)')),
+                                label: Center(
+                                    child: Text(context.l10n.matchAnyRule)),
                                 selected: !state.criteria.matchAll,
                                 selectedColor: p.accent.withValues(alpha: 0.25),
                                 labelStyle: TextStyle(
@@ -231,7 +231,7 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('RULES',
+                      Text(context.l10n.rulesLabel,
                           style: TextStyle(
                               color: p.textSecondary,
                               fontSize: 11,
@@ -274,7 +274,7 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('SORTING & LIMIT',
+                        Text(context.l10n.sortingLimit,
                             style: TextStyle(
                                 color: p.textSecondary,
                                 fontSize: 11,
@@ -287,7 +287,7 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('Sort Field',
+                                  Text(context.l10n.sortField,
                                       style: TextStyle(
                                           fontSize: 12,
                                           color: p.textSecondary)),
@@ -305,23 +305,23 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                                               Radius.circular(10)),
                                           borderSide: BorderSide.none),
                                     ),
-                                    items: const [
+                                    items: [
                                       DropdownMenuItem(
-                                          value: 'title', child: Text('Title')),
+                                          value: 'title', child: Text(context.l10n.titleLabel)),
                                       DropdownMenuItem(
                                           value: 'dateAdded',
-                                          child: Text('Date Added')),
+                                          child: Text(context.l10n.sortDateAdded)),
                                       DropdownMenuItem(
                                           value: 'playCount',
-                                          child: Text('Play Count')),
+                                          child: Text(context.l10n.playCountLabel)),
                                       DropdownMenuItem(
                                           value: 'lastPlayed',
-                                          child: Text('Last Played')),
+                                          child: Text(context.l10n.lastPlayedLabel)),
                                       DropdownMenuItem(
                                           value: 'durationMs',
-                                          child: Text('Duration')),
+                                          child: Text(context.l10n.sortDuration)),
                                       DropdownMenuItem(
-                                          value: 'year', child: Text('Year')),
+                                          value: 'year', child: Text(context.l10n.yearLabel)),
                                     ],
                                     onChanged: (val) => cubit.setSortBy(val),
                                   ),
@@ -333,7 +333,7 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('Track Limit',
+                                  Text(context.l10n.trackLimit,
                                       style: TextStyle(
                                           fontSize: 12,
                                           color: p.textSecondary)),
@@ -372,7 +372,7 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('MATCHING TRACKS PREVIEW',
+                      Text(context.l10n.matchingPreview,
                           style: TextStyle(
                               color: p.textSecondary,
                               fontSize: 11,
@@ -386,7 +386,8 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          '${state.previewSongs.length} tracks',
+                          context.l10n
+                              .previewTrackCount(state.previewSongs.length),
                           style: TextStyle(
                               color: p.accent,
                               fontWeight: FontWeight.bold,
@@ -407,8 +408,7 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                             color: p.hairline.withValues(alpha: 0.5)),
                       ),
                       child: Center(
-                        child: Text(
-                          'No tracks match the selected rules.',
+                        child: Text(context.l10n.noRuleMatch,
                           style:
                               TextStyle(color: p.textSecondary, fontSize: 13),
                         ),
@@ -613,9 +613,9 @@ class _RuleCardState extends State<_RuleCard> {
                     borderRadius: BorderRadius.all(Radius.circular(8)),
                     borderSide: BorderSide.none),
               ),
-              items: const [
-                DropdownMenuItem(value: 'true', child: Text('Yes (True)')),
-                DropdownMenuItem(value: 'false', child: Text('No (False)')),
+              items: [
+                DropdownMenuItem(value: 'true', child: Text(context.l10n.yesBool)),
+                DropdownMenuItem(value: 'false', child: Text(context.l10n.noBool)),
               ],
               onChanged: (val) {
                 if (val != null) {

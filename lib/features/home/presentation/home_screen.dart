@@ -655,8 +655,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         const SizedBox(height: 2),
-                        Text(
-                          'Find millions of songs, artists & stream online',
+                        Text(context.l10n.ytmPromo,
                           style: TextStyle(
                             color: p.textSecondary,
                             fontSize: 12,
@@ -883,14 +882,14 @@ class _OnlineCategorySection extends StatelessWidget {
                       color: p.textTertiary, size: 38),
                   const SizedBox(height: 10),
                   Text(
-                    'Could not load songs for $title',
+                    context.l10n.loadSongsFailed(title),
                     style: TextStyle(color: p.textSecondary, fontSize: 13),
                   ),
                   const SizedBox(height: 8),
                   TextButton.icon(
                     onPressed: onRetry,
                     icon: const Icon(Icons.refresh_rounded, size: 18),
-                    label: const Text('Retry'),
+                    label: Text(context.l10n.retry),
                   ),
                 ],
               ),
@@ -1430,14 +1429,13 @@ class _SectionError extends StatelessWidget {
             Icon(Icons.error_outline_rounded, color: p.error),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                'Could not load your library.',
+              child: Text(context.l10n.libLoadFailed,
                 style: TextStyle(color: p.textSecondary, fontSize: 13),
               ),
             ),
             TextButton(
               onPressed: onRetry,
-              child: const Text('Retry'),
+              child: Text(context.l10n.retry),
             ),
           ],
         ),
@@ -1463,7 +1461,7 @@ class _EmptyLibraryState extends State<_EmptyLibrary> {
       final count = await scanner.scanDeviceLibrary();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Scan complete! $count tracks loaded.')));
+            SnackBar(content: Text(context.l10n.scanComplete(count))));
       }
     } finally {
       if (mounted) setState(() => _isScanning = false);
@@ -1495,14 +1493,13 @@ class _EmptyLibraryState extends State<_EmptyLibrary> {
                   : Icon(Icons.music_off_rounded, size: 38, color: p.accent),
             ),
             const SizedBox(height: 18),
-            Text('No Music Loaded Yet',
+            Text(context.l10n.noMusicYet,
                 style: Theme.of(context)
                     .textTheme
                     .titleLarge
                     ?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 6),
-            Text(
-              'Scan your device storage to load your audio tracks.',
+            Text(context.l10n.scanPrompt,
               textAlign: TextAlign.center,
               style: TextStyle(color: p.textSecondary, fontSize: 13),
             ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/cloud_sync_service.dart';
 import '../../../core/theme/aura_theme.dart';
@@ -112,7 +113,7 @@ class _CloudBackupDashboardScreenState
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Last Synced:',
+                    Text(context.l10n.lastSynced,
                         style: TextStyle(color: p.textSecondary, fontSize: 13)),
                     Text(lastSyncStr,
                         style: TextStyle(

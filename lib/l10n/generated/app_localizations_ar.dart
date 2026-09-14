@@ -2559,4 +2559,792 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get saturationBandDesc => 'يحد التشبع بالنطاق المتوسط';
+
+  @override
+  String get matchLogic => 'منطق المطابقة';
+
+  @override
+  String get rulesLabel => 'القواعد';
+
+  @override
+  String get sortingLimit => 'الفرز والحد';
+
+  @override
+  String get sortField => 'حقل الفرز';
+
+  @override
+  String get titleLabel => 'العنوان';
+
+  @override
+  String get playCountLabel => 'عدد التشغيل';
+
+  @override
+  String get lastPlayedLabel => 'اخر تشغيل';
+
+  @override
+  String get yearLabel => 'السنة';
+
+  @override
+  String get trackLimit => 'حد المسارات';
+
+  @override
+  String get matchingPreview => 'معاينة المسارات';
+
+  @override
+  String get yesBool => 'نعم';
+
+  @override
+  String get noBool => 'لا';
+
+  @override
+  String get noRuleMatch => 'لا توجد مسارات مطابقة';
+
+  @override
+  String get cannotDownloadEmpty => 'لا يمكن تنزيل قائمة فارغة';
+
+  @override
+  String get cannotExportEmpty => 'لا يمكن تصدير قائمة فارغة';
+
+  @override
+  String get cannotShareEmpty => 'لا يمكن مشاركة قائمة فارغة';
+
+  @override
+  String get downloadAllTracks => 'تنزيل كل المسارات';
+
+  @override
+  String get exportM3u => 'تصدير كـ M3U';
+
+  @override
+  String get manageSongs => 'ادارة الاغاني';
+
+  @override
+  String get sharePlaylist => 'مشاركة القائمة';
+
+  @override
+  String get downloadAll => 'تنزيل الكل';
+
+  @override
+  String get saveToPulsr => 'حفظ في Pulsr';
+
+  @override
+  String get fetchingYtmTracks => 'جار جلب المسارات...';
+
+  @override
+  String get ytmHeader => 'يوتيوب ميوزك';
+
+  @override
+  String get importTracks => 'استيراد المسارات';
+
+  @override
+  String get importYtmFav => 'استيراد المفضلة';
+
+  @override
+  String get pastePlaylistLink => 'الصق رابط قائمة تشغيل';
+
+  @override
+  String get noFavToDownload => 'لا توجد مفضلة للتنزيل';
+
+  @override
+  String get syncingYtm => 'جار المزامنة...';
+
+  @override
+  String get sessionExpired => 'انتهت الجلسة. سجل الدخول مجددا';
+
+  @override
+  String get libLoadFailed => 'تعذر تحميل المكتبة';
+
+  @override
+  String get scanPrompt => 'افحص جهازك لتحميل المسارات';
+
+  @override
+  String get noMusicYet => 'لا توجد موسيقى بعد';
+
+  @override
+  String get ytmPromo => 'ملايين الاغاني عبر الانترنت';
+
+  @override
+  String get loadMoreHistory => 'تحميل المزيد';
+
+  @override
+  String get noRecentSongs => 'لا توجد مسارات حديثة';
+
+  @override
+  String get recentEmptyHint => 'شغل موسيقاك وستظهر هنا';
+
+  @override
+  String get songInfo => 'معلومات الاغنية';
+
+  @override
+  String get reciterStyle => 'اسلوب القارئ';
+
+  @override
+  String get learningSpeed => 'سرعة التعلم';
+
+  @override
+  String get reciterSpeedDesc => 'ابطئ الحفظ';
+
+  @override
+  String get outputHardware => 'عتاد الاخراج';
+
+  @override
+  String get resetProfile => 'اعادة الملف';
+
+  @override
+  String get reciterDesc => 'ملفات محسنة للصوت';
+
+  @override
+  String get sibilanceDesc => 'يتم ترويض الصفير. التقليل غير متوفر';
+
+  @override
+  String get compressorTitle => 'ضاغط متعدد النطاقات';
+
+  @override
+  String get compressorDesc => 'ضاغط اصلي رباعي النطاقات يروض كل نطاق';
+
+  @override
+  String get compressorLimitDesc => 'تحتاج نسبة وهجوم محرك النظام';
+
+  @override
+  String get resetStudioDefaults => 'اعادة لضبط الاستوديو';
+
+  @override
+  String get studioCompressor => 'ضاغط ديناميكية الاستوديو';
+
+  @override
+  String get studioCompressorDesc => 'معالجة ديناميكية بمستوى الاستوديو';
+
+  @override
+  String get bytecodeJit => 'بايت كود JIT';
+
+  @override
+  String get compileRun => 'ترجمة وتشغيل';
+
+  @override
+  String get eelCompiled => 'تمت ترجمة السكربت وتحميله';
+
+  @override
+  String get exampleScripts => 'سكربتات مثال';
+
+  @override
+  String get eelEditor => 'محرر EEL';
+
+  @override
+  String get liveSliders => 'ازرار تحكم حية';
+
+  @override
+  String get liveProgDspTitle => 'DSP قابل للبرمجة';
+
+  @override
+  String get lyricsEditorTitle => 'محرر الكلمات';
+
+  @override
+  String get nowAtLabel => 'الان عند';
+
+  @override
+  String get pitchShift => 'طبقة الصوت';
+
+  @override
+  String get activeProfile => 'الملف النشط';
+
+  @override
+  String get openVdc => 'فتح .vdc';
+
+  @override
+  String get refHpProfiles => 'ملفات مرجعية';
+
+  @override
+  String get bookmarkLabel => 'علامة';
+
+  @override
+  String get bookmarkHint => 'العلامات متاحة للمسار الحالي';
+
+  @override
+  String get defaultGlobalEq => 'الافتراضي (معادل عام)';
+
+  @override
+  String get dspSavedAlbum => 'تم حفظ الاعدادات لهذا الالبوم';
+
+  @override
+  String get saveDspAlbum => 'حفظ اعدادات الالبوم';
+
+  @override
+  String get playbackTools => 'ادوات التشغيل';
+
+  @override
+  String get trackEqOverride => 'تجاوز معادل المسار';
+
+  @override
+  String get trackRating => 'تقييم المسار';
+
+  @override
+  String get trackVolumeOffset => 'ازاحة صوت المسار';
+
+  @override
+  String get bpmXfadeDesc => 'لمزامنة التلاشي. النطاق 40-240';
+
+  @override
+  String get rgOff => 'مغلق';
+
+  @override
+  String get rgTrack => 'مسار';
+
+  @override
+  String get rgAlbum => 'البوم';
+
+  @override
+  String get rgAuto => 'تلقائي';
+
+  @override
+  String get autoCalibrate => 'معايرة تلقائية';
+
+  @override
+  String get noSessionLogs => 'لا توجد سجلات بعد';
+
+  @override
+  String get dspInspectorDebug => 'الفاحص والتنقيح';
+
+  @override
+  String get bpResolved => 'تم الحل: تم تعطيل التجاوز';
+
+  @override
+  String get replayGainTitle => 'تطبيع الصوت ReplayGain';
+
+  @override
+  String get appColorSource => 'مصدر اللون';
+
+  @override
+  String get importMilk => 'استيراد .milk';
+
+  @override
+  String get importJsonViz => 'استيراد مرئي JSON';
+
+  @override
+  String get loadJsonVizDesc => 'حمّل اعداد مرئي مخصص';
+
+  @override
+  String get loadMilkDesc => 'حمّل ملف Milkdrop';
+
+  @override
+  String get npArtworkSwipe => 'تمرير الغلاف';
+
+  @override
+  String get npDoubleTap => 'النقر المزدوج';
+
+  @override
+  String get selectPlayerTheme => 'اختيار سمة المشغل';
+
+  @override
+  String get aboutBlurb => 'مشغل محلي عالي الجودة';
+
+  @override
+  String get accentPalette => 'لوحة التمييز';
+
+  @override
+  String get ambientGlow => 'توهج محيطي';
+
+  @override
+  String get applyTheme => 'تطبيق السمة';
+
+  @override
+  String get themeStudio => 'استوديو السمات';
+
+  @override
+  String get glowDesc => 'يتوهج مع الغلاف';
+
+  @override
+  String get importThemeJson => 'استيراد سمة JSON';
+
+  @override
+  String get livePreview => 'معاينة حية';
+
+  @override
+  String get pasteThemeJson => 'الصق JSON صالح:';
+
+  @override
+  String playAllCount(Object count) {
+    return 'تشغيل الكل ($count)';
+  }
+
+  @override
+  String noResultsFor(Object query) {
+    return 'لا نتائج لـ \"$query\"';
+  }
+
+  @override
+  String selectedCount(Object count) {
+    return '$count محدد';
+  }
+
+  @override
+  String addedToQueue(Object count) {
+    return 'تمت اضافة $count الى القائمة';
+  }
+
+  @override
+  String savedToLocal(Object title, Object count) {
+    return 'تم حفظ \"$title\" ($count)';
+  }
+
+  @override
+  String playlistExported(Object count) {
+    return 'تم تصدير القائمة ($count).';
+  }
+
+  @override
+  String queuedForDownload(Object count) {
+    return '$count في قائمة التنزيل...';
+  }
+
+  @override
+  String previewTrackCount(Object count) {
+    return '$count مسار';
+  }
+
+  @override
+  String btCalibrated(Object ms) {
+    return 'زمن البلوتوث ${ms}ms';
+  }
+
+  @override
+  String importedOnline(Object count) {
+    return 'تم استيراد $count!';
+  }
+
+  @override
+  String syncedOnline(Object count) {
+    return 'تمت مزامنة $count.';
+  }
+
+  @override
+  String syncFailed(Object error) {
+    return 'فشل: $error';
+  }
+
+  @override
+  String scanComplete(Object count) {
+    return 'اكتمل الفحص: $count.';
+  }
+
+  @override
+  String loadSongsFailed(Object title) {
+    return 'تعذر تحميل اغاني $title';
+  }
+
+  @override
+  String removedFavorite(Object title) {
+    return 'تمت ازالة \"$title\"';
+  }
+
+  @override
+  String cornerRadiusLabel(Object px) {
+    return 'استدارة الزوايا ($px)';
+  }
+
+  @override
+  String vdcLoaded(Object name) {
+    return 'تم تحميل الملف: $name';
+  }
+
+  @override
+  String vdcFailed(Object error) {
+    return 'فشل تحميل .vdc: $error';
+  }
+
+  @override
+  String conflictsWith(Object name) {
+    return 'تعارض مع: $name';
+  }
+
+  @override
+  String get visualizerStyleLabel => 'نمط المرئي';
+
+  @override
+  String get doneAction => 'تم';
+
+  @override
+  String get scrobblerSaved => 'تم حفظ البيانات بامان';
+
+  @override
+  String get usbPermDenied => 'تم رفض اذن USB';
+
+  @override
+  String get hwVolume => 'صوت العتاد';
+
+  @override
+  String get ytmDisconnected => 'تم قطع الاتصال';
+
+  @override
+  String get allowBackground => 'السماح بالتشغيل في الخلفية';
+
+  @override
+  String get totalScrobbles => 'الاجمالي:';
+
+  @override
+  String get lastScrobbled => 'الاخير:';
+
+  @override
+  String get quickPresets => 'اعدادات سريعة';
+
+  @override
+  String get savedProxyPool => 'قائمة محفوظة';
+
+  @override
+  String get noProxiesPool => 'لا توجد بروكسيات';
+
+  @override
+  String get importProxies => 'استيراد بروكسيات';
+
+  @override
+  String get importProxiesDesc => 'استورد قائمتك او الصق سطورا';
+
+  @override
+  String get pasteOrPick => 'الصق سطورا او اختر ملفا';
+
+  @override
+  String get bypassHostsDesc => 'هذه المضيفات تتصل مباشرة';
+
+  @override
+  String get pasteClipboard => 'لصق الحافظة';
+
+  @override
+  String get pickFile => 'اختيار ملف';
+
+  @override
+  String get importParse => 'استيراد وتحليل';
+
+  @override
+  String get importPaste => 'استيراد / لصق';
+
+  @override
+  String get sortBySpeed => 'فرز حسب السرعة';
+
+  @override
+  String get testingLabel => 'جار الاختبار';
+
+  @override
+  String get failedLabel => 'فشل';
+
+  @override
+  String get unverifiedLabel => 'غير مؤكد';
+
+  @override
+  String get clearAll => 'مسح الكل';
+
+  @override
+  String get suggestCreateFailed => 'تعذر انشاء القائمة المقترحة';
+
+  @override
+  String get mostCompatible => 'الاكثر توافقا';
+
+  @override
+  String get loadTracksFailed => 'تعذر تحميل المسارات';
+
+  @override
+  String get noLikedToDownload => 'لا توجد اغاني محببة. زامن اولا';
+
+  @override
+  String get fetchingAccount => 'جار جلب القوائم...';
+
+  @override
+  String get noAccountPlaylists => 'لا توجد قوائم في مكتبتك';
+
+  @override
+  String get selectPlaylistHint => 'اختر قائمة لعرض المسارات';
+
+  @override
+  String get signInToSync => 'سجل الدخول للمزامنة';
+
+  @override
+  String get suggestedForYou => 'مقترح لك';
+
+  @override
+  String get accountPlaylists => 'قوائم الحساب';
+
+  @override
+  String get addedPlaylists => 'قوائم مضافة';
+
+  @override
+  String get addYtmUrl => 'اضافة رابط قائمة';
+
+  @override
+  String get connectYtm => 'ربط يوتيوب ميوزك';
+
+  @override
+  String get exportBackup => 'تصدير نسخة';
+
+  @override
+  String get importBackup => 'استيراد نسخة';
+
+  @override
+  String get backupExportDesc => 'حفظ الكل في JSON';
+
+  @override
+  String get backupImportDesc => 'استعادة من ملف JSON';
+
+  @override
+  String get backupTooLarge => 'الملف كبير (اقصى 10 م.ب)';
+
+  @override
+  String get backupMissing => 'الملف غير موجود';
+
+  @override
+  String get backupInvalid => 'صيغة JSON غير صالحة';
+
+  @override
+  String get clearCacheReset => 'مسح التخزين المؤقت';
+
+  @override
+  String get cookiesCleared => 'تم المسح. جار اعادة التحميل...';
+
+  @override
+  String get forceEgypt => 'فرض وضع مصر';
+
+  @override
+  String get googleBlockHelp => 'اذا حظر جوجل الدخول الصق الكوكيز:';
+
+  @override
+  String get importCookiesToken => 'استيراد الكوكيز يدويا';
+
+  @override
+  String get importCookiesManual => 'استيراد الكوكيز';
+
+  @override
+  String get loginDetected => 'تم رصد الدخول! اضغط \"تم\".';
+
+  @override
+  String get confirmAccount => 'تاكد من الحساب الصحيح ثم اضغط \"تم\".';
+
+  @override
+  String get openYtmWebDirect => 'فتح الويب مباشرة';
+
+  @override
+  String get openYtWeb => 'فتح يوتيوب ويب';
+
+  @override
+  String get completeSignInFirst => 'اكمل الدخول اولا';
+
+  @override
+  String get googleTvSignIn => 'الدخول عبر Google TV';
+
+  @override
+  String get googleBlockTip => 'تلميح: الصق الكوكيز من متصفحك';
+
+  @override
+  String get ipOutsideYtm =>
+      'عنوان IP خارج دعم يوتيوب ميوزك ويب. افرض وضع مصر او انتقل الى يوتيوب ويب';
+
+  @override
+  String get ytmRestricted => 'يوتيوب ميوزك مقيد في منطقتك';
+
+  @override
+  String importedPresetTpl(Object preset, Object name) {
+    return 'تم استيراد $preset: $name';
+  }
+
+  @override
+  String appliedProfileTpl(Object profile, Object name) {
+    return 'تم تطبيق $profile: $name';
+  }
+
+  @override
+  String proxyImported(Object count) {
+    return 'تم استيراد $count';
+  }
+
+  @override
+  String proxyActivated(Object addr) {
+    return 'تم تفعيل: $addr';
+  }
+
+  @override
+  String proxyPresetApplied(Object name, Object host, Object port) {
+    return 'تم تطبيق: $name';
+  }
+
+  @override
+  String pickFileFailed(Object error) {
+    return 'فشل الاختيار: $error';
+  }
+
+  @override
+  String importPlaylistFailed(Object error) {
+    return 'فشل الاستيراد: $error';
+  }
+
+  @override
+  String fetchingForDownload(Object title) {
+    return 'جار جلب \"$title\"...';
+  }
+
+  @override
+  String suggestedCreated(Object title, Object count) {
+    return 'تم انشاء \"$title\" ($count).';
+  }
+
+  @override
+  String entryAdded(Object count) {
+    return '$count - مضافة';
+  }
+
+  @override
+  String tapToCreate(Object count) {
+    return '$count - اضغط للانشاء';
+  }
+
+  @override
+  String importMatched(Object matched, Object total) {
+    return '$matched من $total.';
+  }
+
+  @override
+  String accountPlaylistCount(Object count) {
+    return '$count قائمة';
+  }
+
+  @override
+  String historyLine(Object count) {
+    return 'السجل: $count';
+  }
+
+  @override
+  String backupExportedTo(Object uri) {
+    return 'تم التصدير الى $uri';
+  }
+
+  @override
+  String tryIdentity(Object name) {
+    return 'جرب $name';
+  }
+
+  @override
+  String clearPoolConfirm(Object count) {
+    return 'حذف الـ $count؟';
+  }
+
+  @override
+  String get playingOnCast => 'يتم البث';
+
+  @override
+  String get castConnected => 'متصل';
+
+  @override
+  String get resumeAction => 'استئناف';
+
+  @override
+  String get notSetLabel => 'غير محدد';
+
+  @override
+  String get bookmarkSaved => 'تم حفظ العلامة';
+
+  @override
+  String get bookmarkEarly => 'شغل بعد 0:05 للحفظ';
+
+  @override
+  String resumeAtTpl(Object time) {
+    return 'استئناف عند $time';
+  }
+
+  @override
+  String get selectAllAction => 'تحديد الكل';
+
+  @override
+  String get clearPoolTitle => 'مسح القائمة؟';
+
+  @override
+  String get milkRendererDesc => 'عارض Milkdrop';
+
+  @override
+  String get includedLabel => 'مشمول';
+
+  @override
+  String get noneLabel => 'لا شيء';
+
+  @override
+  String queuedFromTitle(Object count, Object title) {
+    return '$count من \"$title\" في القائمة...';
+  }
+
+  @override
+  String allDownloaded(Object title) {
+    return 'كل مسارات \"$title\" محملة.';
+  }
+
+  @override
+  String get hwOutputRouting => 'توجيه العتاد';
+
+  @override
+  String get usbDacAttached => 'DAC موصول';
+
+  @override
+  String get outputPathDiag => 'تشخيص مسار الاخراج';
+
+  @override
+  String get dsdPcmNote => 'ملفات DSD تفك الى PCM';
+
+  @override
+  String get targetSampleRate => 'معدل العينات المستهدف';
+
+  @override
+  String get targetBitPerfect => 'عمق البت وBit-Perfect';
+
+  @override
+  String get trackSourceSpecs => 'مواصفات المصدر';
+
+  @override
+  String get liveSignalChain => 'سلسلة الاشارة';
+
+  @override
+  String get applyDone => 'تطبيق وتم';
+
+  @override
+  String get switchOutputPanel => 'بدل الاخراج من لوحة النظام';
+
+  @override
+  String get directBpMode => 'وضع Bit-Perfect المباشر';
+
+  @override
+  String get armedLabel => 'مجهز';
+
+  @override
+  String get bpGuardrails => 'الحماية نشطة: تم تجاوز DSP. اضبط الصوت من DAC';
+
+  @override
+  String get btAudioCodec => 'كودك البلوتوث';
+
+  @override
+  String get earbudsConnected => 'السماعات متصلة';
+
+  @override
+  String get supportedCodecs => 'الكودكات المدعومة';
+
+  @override
+  String get sampleRateLabel => 'معدل العينات';
+
+  @override
+  String get bitDepthLabel => 'عمق البت';
+
+  @override
+  String get ldacQuality => 'جودة LDAC';
+
+  @override
+  String get changeBtCodec => 'تغيير الكودك';
+
+  @override
+  String get nearbyPermDesc => 'يلزم اذن الاجهزة القريبة';
+
+  @override
+  String get grantBtPerm => 'منح الاذن';
+
+  @override
+  String get leAudio => 'LE AUDIO';
+
+  @override
+  String get lc3Negotiation =>
+      'اندرويد يتفاوض على LC3. الكودك والمعدل غير قابلين للضبط';
+
+  @override
+  String get connectingBt => 'جار الاتصال...';
+
+  @override
+  String get bitPerfectMode => 'وضع Bit-Perfect';
 }

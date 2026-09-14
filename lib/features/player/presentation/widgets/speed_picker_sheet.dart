@@ -145,7 +145,7 @@ class SpeedPickerSheet extends StatelessWidget {
                                     minimumSize: Size.zero,
                                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                   ),
-                                  child: Text('Reset',
+                                  child: Text(context.l10n.reset,
                                       style: TextStyle(
                                           color: p.accent, fontSize: 13)),
                                 ),
@@ -199,8 +199,7 @@ class SpeedPickerSheet extends StatelessWidget {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                'Pitch / Tone Shift',
+                              Text(context.l10n.pitchShift,
                                 style: Theme.of(context)
                                     .textTheme
                                     .titleMedium
@@ -217,7 +216,7 @@ class SpeedPickerSheet extends StatelessWidget {
                                     minimumSize: Size.zero,
                                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                   ),
-                                  child: Text('Reset',
+                                  child: Text(context.l10n.reset,
                                       style: TextStyle(
                                           color: p.accent, fontSize: 13)),
                                 ),

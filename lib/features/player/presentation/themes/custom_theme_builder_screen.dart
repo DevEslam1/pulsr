@@ -72,16 +72,14 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: p.surface,
         shape: RoundedRectangleBorder(borderRadius: AppRadii.cardRadius),
-        title: Text(
-          'Import Theme JSON',
+        title: Text(context.l10n.importThemeJson,
           style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.bold),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Paste a valid Pulsr theme JSON string below:',
+            Text(context.l10n.pasteThemeJson,
               style: TextStyle(color: p.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 12),
@@ -109,7 +107,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel', style: TextStyle(color: p.textSecondary)),
+            child: Text(context.l10n.cancel, style: TextStyle(color: p.textSecondary)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -120,7 +118,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
               ),
             ),
             onPressed: () => Navigator.pop(ctx, controller.text),
-            child: const Text('Apply Theme'),
+            child: Text(context.l10n.applyTheme),
           ),
         ],
       ),
@@ -166,8 +164,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
           backgroundColor: p.surface,
           elevation: 0,
           leading: const PulsrBackButton(),
-          title: Text(
-            'Custom Theme Studio',
+          title: Text(context.l10n.themeStudio,
             style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.bold),
           ),
           actions: [
@@ -225,8 +222,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Live Theme Preview',
+                            Text(context.l10n.livePreview,
                               style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
@@ -277,8 +273,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
             ),
             const SizedBox(height: 24),
 
-            Text(
-              'Accent Color Palette',
+            Text(context.l10n.accentPalette,
               style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
@@ -319,7 +314,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
             const SizedBox(height: 24),
 
             Text(
-              'Card & Artwork Corner Radius (${_cornerRadius.round()}px)',
+              context.l10n.cornerRadiusLabel(_cornerRadius.round()),
               style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
@@ -335,10 +330,10 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
             const SizedBox(height: 16),
 
             SwitchListTile(
-              title: Text('Ambient Acoustic Glow',
+              title: Text(context.l10n.ambientGlow,
                   style: TextStyle(
                       color: p.textPrimary, fontWeight: FontWeight.w600)),
-              subtitle: Text('Glows with the active track artwork',
+              subtitle: Text(context.l10n.glowDesc,
                   style: TextStyle(color: p.textSecondary, fontSize: 12)),
               value: _glowEnabled,
               activeThumbColor: Color(_accentColor),

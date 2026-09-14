@@ -4,6 +4,7 @@ import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../../../core/constants/embedded_browser_ua.dart';
@@ -690,9 +691,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       unawaited(_navigateTo(target));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content:
-                Text('Cookies and cache cleared. Reloading YouTube Music...'),
+          SnackBar(content: Text(context.l10n.cookiesCleared),
             duration: Duration(seconds: 2),
           ),
         );
@@ -1156,8 +1155,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
     if (mounted) {
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        const SnackBar(
-          content: Text('Please complete sign in on YouTube Music first.'),
+        SnackBar(content: Text(context.l10n.completeSignInFirst),
           behavior: SnackBarBehavior.floating,
           duration: Duration(seconds: 2),
         ),
@@ -1427,8 +1425,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                     size: 15,
                                     color: Colors.white,
                                   ),
-                                  label: const Text(
-                                    'Done',
+                                  label: Text(context.l10n.doneAction,
                                     style: TextStyle(
                                       fontSize: 12.5,
                                       fontWeight: FontWeight.w700,
@@ -1469,8 +1466,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                       side: BorderSide(color: p.hairline),
                                     ),
                                   ),
-                                  child: Text(
-                                    'Done',
+                                  child: Text(context.l10n.doneAction,
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
@@ -1513,7 +1509,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                           Icon(Icons.music_note_rounded,
                                               size: 18, color: p.textSecondary),
                                           const SizedBox(width: 8),
-                                          const Text('Open YouTube Music Web'),
+                                          Text(context.l10n.openYtmWeb),
                                         ],
                                       ),
                                     ),
@@ -1524,7 +1520,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                           Icon(Icons.vpn_key_rounded,
                                               size: 18, color: p.textSecondary),
                                           const SizedBox(width: 8),
-                                          const Text('Import Cookies Manually'),
+                                          Text(context.l10n.importCookiesManual),
                                         ],
                                       ),
                                     ),
@@ -1535,7 +1531,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                           Icon(Icons.cleaning_services_rounded,
                                               size: 18, color: p.textSecondary),
                                           const SizedBox(width: 8),
-                                          const Text('Clear Cache & Reset'),
+                                          Text(context.l10n.clearCacheReset),
                                         ],
                                       ),
                                     ),
@@ -1576,8 +1572,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                               size: 18, color: p.success),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: Text(
-                              'Login detected! Tap the green "Done" button to complete setup.',
+                            child: Text(context.l10n.loginDetected,
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
@@ -1606,8 +1601,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                               size: 18, color: Colors.amber),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: Text(
-                              'Make sure you sign into the correct Google account. Tap "Done" once logged in.',
+                            child: Text(context.l10n.confirmAccount,
                               style:
                                   TextStyle(fontSize: 12, color: p.textPrimary),
                             ),
@@ -1672,8 +1666,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                   color: Colors.amber, size: 17),
                               const SizedBox(width: 8),
                               Expanded(
-                                child: Text(
-                                  'YouTube Music is restricted in your region',
+                                child: Text(context.l10n.ytmRestricted,
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
@@ -1684,8 +1677,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                             ],
                           ),
                           const SizedBox(height: 4),
-                          Text(
-                            'Your network IP is outside YouTube Music Web support. Force Egypt mode or switch to YouTube Web (never geo-blocked).',
+                          Text(context.l10n.ipOutsideYtm,
                             style: TextStyle(
                                 fontSize: 11, color: p.textSecondary),
                           ),
@@ -1696,7 +1688,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                 onPressed: _forceEgRegionReload,
                                 icon: const Text('🇪🇬',
                                     style: TextStyle(fontSize: 12)),
-                                label: const Text('Force Egypt Mode',
+                                label: Text(context.l10n.forceEgypt,
                                     style: TextStyle(fontSize: 11)),
                                 style: FilledButton.styleFrom(
                                   backgroundColor: p.accent,
@@ -1715,7 +1707,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                     _navigateTo('https://www.youtube.com'),
                                 icon: const Icon(Icons.video_library_rounded,
                                     size: 13),
-                                label: const Text('Open YouTube Web',
+                                label: Text(context.l10n.openYtWeb,
                                     style: TextStyle(fontSize: 11)),
                                 style: OutlinedButton.styleFrom(
                                   visualDensity: VisualDensity.compact,
@@ -2044,7 +2036,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
               if (ok == true && mounted) Navigator.of(context).pop(true);
             },
             icon: const Icon(Icons.tv_rounded, size: 18),
-            label: const Text('Sign in with Google TV (no captcha)',
+            label: Text(context.l10n.googleTvSignIn,
                 style: TextStyle(fontWeight: FontWeight.w700)),
             style: FilledButton.styleFrom(
               backgroundColor: p.accent,
@@ -2058,7 +2050,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           FilledButton.icon(
             onPressed: _manualRetryFromBlock,
             icon: const Icon(Icons.refresh_rounded, size: 18),
-            label: const Text('Retry',
+            label: Text(context.l10n.retry,
                 style: TextStyle(fontWeight: FontWeight.w700)),
             style: FilledButton.styleFrom(
               backgroundColor: p.surfaceContainerHigh,
@@ -2073,7 +2065,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
             onPressed: () => _switchIdentityManually(otherIdentity),
             icon: Icon(identityIcon(otherIdentity), size: 18),
             label: Text(
-                'Try ${identityLabel(otherIdentity)}',
+                context.l10n.tryIdentity(identityLabel(otherIdentity)),
                 style: const TextStyle(fontWeight: FontWeight.w700)),
             style: OutlinedButton.styleFrom(
               foregroundColor: p.textPrimary,
@@ -2090,7 +2082,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
               _navigateTo('https://music.youtube.com');
             },
             icon: const Icon(Icons.music_note_rounded, size: 18),
-            label: const Text('Open YouTube Music web directly',
+            label: Text(context.l10n.openYtmWebDirect,
                 style: TextStyle(fontWeight: FontWeight.w700)),
             style: OutlinedButton.styleFrom(
               foregroundColor: p.textPrimary,
@@ -2104,7 +2096,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           OutlinedButton.icon(
             onPressed: () => _showManualCookieDialog(context),
             icon: const Icon(Icons.vpn_key_rounded, size: 18),
-            label: const Text('Import Cookies / Token Manually',
+            label: Text(context.l10n.importCookiesToken,
                 style: TextStyle(fontWeight: FontWeight.w700)),
             style: OutlinedButton.styleFrom(
               foregroundColor: p.textPrimary,
@@ -2115,8 +2107,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
             ),
           ),
           const SizedBox(height: 10),
-          Text(
-            'Tip: if Google continues to block in-app sign-in on this device, paste your cookies from your browser using the button above.',
+          Text(context.l10n.googleBlockTip,
             textAlign: TextAlign.center,
             style: TextStyle(color: p.textTertiary, fontSize: 11),
           ),
@@ -2186,9 +2177,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                 child: Icon(Icons.vpn_key_rounded, color: p.accent, size: 20),
               ),
               const SizedBox(width: 10),
-              const Expanded(
-                child: Text(
-                  'Import Cookies Manually',
+              Expanded(
+                child: Text(context.l10n.importCookiesManual,
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                 ),
               ),
@@ -2199,8 +2189,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'If Google blocks embedded browser login on this device, you can paste your raw cookie string (e.g. from browser DevTools on desktop) or cURL cookie header directly:',
+                Text(context.l10n.googleBlockHelp,
                   style: TextStyle(color: p.textSecondary, fontSize: 12.5, height: 1.4),
                 ),
                 const SizedBox(height: 12),
@@ -2227,7 +2216,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           actions: [
             TextButton(
               onPressed: busy ? null : () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
+              child: Text(context.l10n.cancel),
             ),
             FilledButton(
               style: FilledButton.styleFrom(

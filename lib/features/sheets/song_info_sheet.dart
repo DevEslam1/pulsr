@@ -442,8 +442,7 @@ class SongInfoSheet extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Track Rating',
+                  Text(context.l10n.trackRating,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -486,8 +485,7 @@ class SongInfoSheet extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Track EQ Override',
+                  Text(context.l10n.trackEqOverride,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -505,9 +503,9 @@ class SongInfoSheet extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                     items: [
-                      const DropdownMenuItem<String?>(
+                      DropdownMenuItem<String?>(
                         value: null,
-                        child: Text('Default (Global EQ)'),
+                        child: Text(context.l10n.defaultGlobalEq),
                       ),
                       ...EqPreset.defaultPresets.map(
                         (preset) => DropdownMenuItem<String?>(
@@ -546,8 +544,7 @@ class SongInfoSheet extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Track Volume Offset',
+                  Text(context.l10n.trackVolumeOffset,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -657,8 +654,7 @@ class SongInfoSheet extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Playback Tools',
+          Text(context.l10n.playbackTools,
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
@@ -672,8 +668,7 @@ class SongInfoSheet extends StatelessWidget {
               await cubit.saveDspSnapshot();
               if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('DSP settings saved for this album.')),
+                SnackBar(content: Text(context.l10n.dspSavedAlbum)),
               );
             },
             borderRadius: BorderRadius.circular(8),
@@ -682,8 +677,7 @@ class SongInfoSheet extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Save DSP settings for this album',
+                  Text(context.l10n.saveDspAlbum,
                     style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -698,17 +692,16 @@ class SongInfoSheet extends StatelessWidget {
           Divider(color: p.hairline, height: 1),
           const SizedBox(height: 6),
           // F-57: bookmark controls for the currently playing track.
-          _buildBookmarkRow(p, cubit),
+          _buildBookmarkRow(context, p, cubit),
         ],
       ),
     );
   }
 
-  Widget _buildBookmarkRow(PulsrPalette p, PlayerCubit cubit) {
+  Widget _buildBookmarkRow(BuildContext context, PulsrPalette p, PlayerCubit cubit) {
     final current = cubit.state.currentSong;
     if (current == null || current.id != song.id) {
-      return Text(
-        'Bookmarks are available for the track currently playing.',
+      return Text(context.l10n.bookmarkHint,
         style: TextStyle(color: p.textSecondary, fontSize: 12),
       );
     }
@@ -717,7 +710,7 @@ class SongInfoSheet extends StatelessWidget {
       builder: (context, setLocalState) {
         final stored = cubit.storedBookmarkFor(song);
         final storedLabel = stored == null
-            ? 'Not set'
+            ? context.l10n.notSetLabel
             : Formatters.formatDuration(
                 Duration(milliseconds: stored.positionMs));
         return Column(
@@ -726,15 +719,16 @@ class SongInfoSheet extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Bookmark',
+                Text(context.l10n.bookmarkLabel,
                   style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                       color: p.textSecondary),
                 ),
                 Text(
-                  stored == null ? storedLabel : 'Resume at $storedLabel',
+                  stored == null
+                      ? storedLabel
+                      : context.l10n.resumeAtTpl(storedLabel),
                   style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -759,7 +753,7 @@ class SongInfoSheet extends StatelessWidget {
                           Duration(milliseconds: stored.positionMs));
                     },
                     icon: const Icon(Icons.play_arrow_rounded, size: 16),
-                    label: const Text('Resume'),
+                    label: Text(context.l10n.resumeAction),
                   ),
                 OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
@@ -771,13 +765,13 @@ class SongInfoSheet extends StatelessWidget {
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       content: Text(saved
-                          ? 'Bookmark saved.'
-                          : 'Play past 0:05 to save a bookmark.'),
+                          ? context.l10n.bookmarkSaved
+                          : context.l10n.bookmarkEarly),
                     ));
                     setLocalState(() {});
                   },
                   icon: const Icon(Icons.bookmark_add_outlined, size: 16),
-                  label: const Text('Save'),
+                  label: Text(context.l10n.save),
                 ),
                 if (stored != null)
                   OutlinedButton.icon(
@@ -795,7 +789,7 @@ class SongInfoSheet extends StatelessWidget {
                     },
                     icon:
                         const Icon(Icons.bookmark_remove_outlined, size: 16),
-                    label: const Text('Clear'),
+                    label: Text(context.l10n.clear),
                   ),
               ],
             ),
@@ -959,9 +953,7 @@ class _BpmOverrideDialogState extends State<_BpmOverrideDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Used by BPM-synced crossfade to align fades to the beat. '
-              'Range 40–240.',
+            Text(context.l10n.bpmXfadeDesc,
               style: TextStyle(color: p.textSecondary, fontSize: 13.5),
             ),
             const SizedBox(height: 12),
@@ -1004,14 +996,14 @@ class _BpmOverrideDialogState extends State<_BpmOverrideDialog> {
         if (widget.currentBpm != null)
           TextButton(
             onPressed: () => Navigator.of(context, rootNavigator: true).pop(''),
-            child: const Text('Clear'),
+            child: Text(context.l10n.clear),
           ),
         TextButton(
           onPressed: () => Navigator.of(context, rootNavigator: true).pop(null),
           style: TextButton.styleFrom(
             foregroundColor: p.textSecondary,
           ),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.cancel),
         ),
         FilledButton(
           onPressed: _save,
@@ -1022,7 +1014,7 @@ class _BpmOverrideDialogState extends State<_BpmOverrideDialog> {
               borderRadius: BorderRadius.circular(12),
             ),
           ),
-          child: const Text('Save'),
+          child: Text(context.l10n.save),
         ),
       ],
     );

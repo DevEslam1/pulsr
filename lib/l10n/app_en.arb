@@ -1554,5 +1554,1074 @@
   "saturationBandDesc": "Restricts saturation to the mid band for clean sub-bass.",
   "@saturationBandDesc": {
     "description": "tranche6 eq batch2b"
+  },
+  "matchLogic": "MATCH LOGIC",
+  "@matchLogic": {
+    "description": "tranche7 batch"
+  },
+  "rulesLabel": "RULES",
+  "@rulesLabel": {
+    "description": "tranche7 batch"
+  },
+  "sortingLimit": "SORTING & LIMIT",
+  "@sortingLimit": {
+    "description": "tranche7 batch"
+  },
+  "sortField": "Sort Field",
+  "@sortField": {
+    "description": "tranche7 batch"
+  },
+  "titleLabel": "Title",
+  "@titleLabel": {
+    "description": "tranche7 batch"
+  },
+  "playCountLabel": "Play Count",
+  "@playCountLabel": {
+    "description": "tranche7 batch"
+  },
+  "lastPlayedLabel": "Last Played",
+  "@lastPlayedLabel": {
+    "description": "tranche7 batch"
+  },
+  "yearLabel": "Year",
+  "@yearLabel": {
+    "description": "tranche7 batch"
+  },
+  "trackLimit": "Track Limit",
+  "@trackLimit": {
+    "description": "tranche7 batch"
+  },
+  "matchingPreview": "MATCHING TRACKS PREVIEW",
+  "@matchingPreview": {
+    "description": "tranche7 batch"
+  },
+  "yesBool": "Yes (True)",
+  "@yesBool": {
+    "description": "tranche7 batch"
+  },
+  "noBool": "No (False)",
+  "@noBool": {
+    "description": "tranche7 batch"
+  },
+  "noRuleMatch": "No tracks match the selected rules.",
+  "@noRuleMatch": {
+    "description": "tranche7 batch"
+  },
+  "cannotDownloadEmpty": "Cannot download an empty playlist.",
+  "@cannotDownloadEmpty": {
+    "description": "tranche7 batch"
+  },
+  "cannotExportEmpty": "Cannot export an empty playlist.",
+  "@cannotExportEmpty": {
+    "description": "tranche7 batch"
+  },
+  "cannotShareEmpty": "Cannot share an empty playlist.",
+  "@cannotShareEmpty": {
+    "description": "tranche7 batch"
+  },
+  "downloadAllTracks": "Download All Tracks",
+  "@downloadAllTracks": {
+    "description": "tranche7 batch"
+  },
+  "exportM3u": "Export as M3U",
+  "@exportM3u": {
+    "description": "tranche7 batch"
+  },
+  "manageSongs": "Manage Songs",
+  "@manageSongs": {
+    "description": "tranche7 batch"
+  },
+  "sharePlaylist": "Share Playlist",
+  "@sharePlaylist": {
+    "description": "tranche7 batch"
+  },
+  "downloadAll": "Download All",
+  "@downloadAll": {
+    "description": "tranche7 batch"
+  },
+  "saveToPulsr": "Save to Pulsr",
+  "@saveToPulsr": {
+    "description": "tranche7 batch"
+  },
+  "fetchingYtmTracks": "Fetching playlist tracks from YouTube Music...",
+  "@fetchingYtmTracks": {
+    "description": "tranche7 batch"
+  },
+  "ytmHeader": "YOUTUBE MUSIC",
+  "@ytmHeader": {
+    "description": "tranche7 batch"
+  },
+  "importTracks": "Import Tracks",
+  "@importTracks": {
+    "description": "tranche7 batch"
+  },
+  "importYtmFav": "Import YouTube Music Favorites",
+  "@importYtmFav": {
+    "description": "tranche7 batch"
+  },
+  "pastePlaylistLink": "Paste a playlist link or Liked playlist from YouTube Music",
+  "@pastePlaylistLink": {
+    "description": "tranche7 batch"
+  },
+  "noFavToDownload": "No favorite songs to download.",
+  "@noFavToDownload": {
+    "description": "tranche7 batch"
+  },
+  "syncingYtm": "Syncing YouTube Music Liked Songs...",
+  "@syncingYtm": {
+    "description": "tranche7 batch"
+  },
+  "sessionExpired": "YouTube Music session expired. Please sign in again.",
+  "@sessionExpired": {
+    "description": "tranche7 batch"
+  },
+  "libLoadFailed": "Could not load your library.",
+  "@libLoadFailed": {
+    "description": "tranche7 batch"
+  },
+  "scanPrompt": "Scan your device storage to load your audio tracks.",
+  "@scanPrompt": {
+    "description": "tranche7 batch"
+  },
+  "noMusicYet": "No Music Loaded Yet",
+  "@noMusicYet": {
+    "description": "tranche7 batch"
+  },
+  "ytmPromo": "Find millions of songs, artists & stream online",
+  "@ytmPromo": {
+    "description": "tranche7 batch"
+  },
+  "loadMoreHistory": "Load More History",
+  "@loadMoreHistory": {
+    "description": "tranche7 batch"
+  },
+  "noRecentSongs": "No recently played songs",
+  "@noRecentSongs": {
+    "description": "tranche7 batch"
+  },
+  "recentEmptyHint": "Play your favorite music and it will appear here.",
+  "@recentEmptyHint": {
+    "description": "tranche7 batch"
+  },
+  "songInfo": "Song info",
+  "@songInfo": {
+    "description": "tranche7 batch"
+  },
+  "reciterStyle": "RECITER STYLE",
+  "@reciterStyle": {
+    "description": "tranche7 batch"
+  },
+  "learningSpeed": "Learning Speed",
+  "@learningSpeed": {
+    "description": "tranche7 batch"
+  },
+  "reciterSpeedDesc": "Slow recitation down for memorization",
+  "@reciterSpeedDesc": {
+    "description": "tranche7 batch"
+  },
+  "outputHardware": "OUTPUT HARDWARE",
+  "@outputHardware": {
+    "description": "tranche7 batch"
+  },
+  "resetProfile": "Reset Profile",
+  "@resetProfile": {
+    "description": "tranche7 batch"
+  },
+  "reciterDesc": "Vocal-optimized recitation profiles",
+  "@reciterDesc": {
+    "description": "tranche7 batch"
+  },
+  "sibilanceDesc": "Sibilance is tamed with a high-shelf EQ cut. Spectral noise and breath reduction are not available in the current audio engine.",
+  "@sibilanceDesc": {
+    "description": "tranche7 batch"
+  },
+  "compressorTitle": "Multiband Compressor",
+  "@compressorTitle": {
+    "description": "tranche7 batch"
+  },
+  "compressorDesc": "Native 4-band compressor with Linkwitz-Riley crossovers. Tames each frequency band independently before the limiter.",
+  "@compressorDesc": {
+    "description": "tranche7 batch"
+  },
+  "compressorLimitDesc": "Ratio, Attack and Make-up Gain need the Android DynamicsProcessing engine.",
+  "@compressorLimitDesc": {
+    "description": "tranche7 batch"
+  },
+  "resetStudioDefaults": "Reset to Studio Defaults",
+  "@resetStudioDefaults": {
+    "description": "tranche7 batch"
+  },
+  "studioCompressor": "Studio Dynamics Compressor",
+  "@studioCompressor": {
+    "description": "tranche7 batch"
+  },
+  "studioCompressorDesc": "Studio-grade lookahead dynamics processing and peak brickwall limiting.",
+  "@studioCompressorDesc": {
+    "description": "tranche7 batch"
+  },
+  "bytecodeJit": "Bytecode JIT",
+  "@bytecodeJit": {
+    "description": "tranche7 batch"
+  },
+  "compileRun": "Compile & Run",
+  "@compileRun": {
+    "description": "tranche7 batch"
+  },
+  "eelCompiled": "EEL Script Compiled & Loaded into DSP Engine",
+  "@eelCompiled": {
+    "description": "tranche7 batch"
+  },
+  "exampleScripts": "Example Scripts & Algorithms",
+  "@exampleScripts": {
+    "description": "tranche7 batch"
+  },
+  "eelEditor": "Jesusonic / EEL Script Editor",
+  "@eelEditor": {
+    "description": "tranche7 batch"
+  },
+  "liveSliders": "Live Control Sliders",
+  "@liveSliders": {
+    "description": "tranche7 batch"
+  },
+  "liveProgDspTitle": "Live Programmable DSP",
+  "@liveProgDspTitle": {
+    "description": "tranche7 batch"
+  },
+  "lyricsEditorTitle": "Synced Lyrics Editor",
+  "@lyricsEditorTitle": {
+    "description": "tranche7 batch"
+  },
+  "nowAtLabel": "Now at",
+  "@nowAtLabel": {
+    "description": "tranche7 batch"
+  },
+  "pitchShift": "Pitch / Tone Shift",
+  "@pitchShift": {
+    "description": "tranche7 batch"
+  },
+  "activeProfile": "Active Profile",
+  "@activeProfile": {
+    "description": "tranche7 batch"
+  },
+  "openVdc": "Open .vdc",
+  "@openVdc": {
+    "description": "tranche7 batch"
+  },
+  "refHpProfiles": "Reference Headphone Profiles",
+  "@refHpProfiles": {
+    "description": "tranche7 batch"
+  },
+  "bookmarkLabel": "Bookmark",
+  "@bookmarkLabel": {
+    "description": "tranche7 batch"
+  },
+  "bookmarkHint": "Bookmarks are available for the track currently playing.",
+  "@bookmarkHint": {
+    "description": "tranche7 batch"
+  },
+  "defaultGlobalEq": "Default (Global EQ)",
+  "@defaultGlobalEq": {
+    "description": "tranche7 batch"
+  },
+  "dspSavedAlbum": "DSP settings saved for this album.",
+  "@dspSavedAlbum": {
+    "description": "tranche7 batch"
+  },
+  "saveDspAlbum": "Save DSP settings for this album",
+  "@saveDspAlbum": {
+    "description": "tranche7 batch"
+  },
+  "playbackTools": "Playback Tools",
+  "@playbackTools": {
+    "description": "tranche7 batch"
+  },
+  "trackEqOverride": "Track EQ Override",
+  "@trackEqOverride": {
+    "description": "tranche7 batch"
+  },
+  "trackRating": "Track Rating",
+  "@trackRating": {
+    "description": "tranche7 batch"
+  },
+  "trackVolumeOffset": "Track Volume Offset",
+  "@trackVolumeOffset": {
+    "description": "tranche7 batch"
+  },
+  "bpmXfadeDesc": "Used by BPM-synced crossfade to align fades to the beat. Range 40-240.",
+  "@bpmXfadeDesc": {
+    "description": "tranche7 batch"
+  },
+  "rgOff": "Off",
+  "@rgOff": {
+    "description": "tranche7 batch"
+  },
+  "rgTrack": "Track",
+  "@rgTrack": {
+    "description": "tranche7 batch"
+  },
+  "rgAlbum": "Album",
+  "@rgAlbum": {
+    "description": "tranche7 batch"
+  },
+  "rgAuto": "Auto",
+  "@rgAuto": {
+    "description": "tranche7 batch"
+  },
+  "autoCalibrate": "Auto-calibrate",
+  "@autoCalibrate": {
+    "description": "tranche7 batch"
+  },
+  "noSessionLogs": "No audio session logs recorded yet",
+  "@noSessionLogs": {
+    "description": "tranche7 batch"
+  },
+  "dspInspectorDebug": "DSP Signal Inspector & Debug",
+  "@dspInspectorDebug": {
+    "description": "tranche7 batch"
+  },
+  "bpResolved": "Resolved: Bit-Perfect bypass disabled - ReplayGain is adjustable again",
+  "@bpResolved": {
+    "description": "tranche7 batch"
+  },
+  "replayGainTitle": "ReplayGain Loudness Normalization",
+  "@replayGainTitle": {
+    "description": "tranche7 batch"
+  },
+  "appColorSource": "App Color Source",
+  "@appColorSource": {
+    "description": "tranche7 batch"
+  },
+  "importMilk": "Import .milk Preset",
+  "@importMilk": {
+    "description": "tranche7 batch"
+  },
+  "importJsonViz": "Import JSON Visualizer Preset",
+  "@importJsonViz": {
+    "description": "tranche7 batch"
+  },
+  "loadJsonVizDesc": "Load a Custom visualizer preset (.json) from storage",
+  "@loadJsonVizDesc": {
+    "description": "tranche7 batch"
+  },
+  "loadMilkDesc": "Load a Winamp/Milkdrop preset file from storage",
+  "@loadMilkDesc": {
+    "description": "tranche7 batch"
+  },
+  "npArtworkSwipe": "Now Playing Artwork Swipe",
+  "@npArtworkSwipe": {
+    "description": "tranche7 batch"
+  },
+  "npDoubleTap": "Now Playing Double-Tap Action",
+  "@npDoubleTap": {
+    "description": "tranche7 batch"
+  },
+  "selectPlayerTheme": "Select Player Theme",
+  "@selectPlayerTheme": {
+    "description": "tranche7 batch"
+  },
+  "aboutBlurb": "An audiophile-grade local music player with bit-perfect output, a full DSP chain, per-device profiles and automation.",
+  "@aboutBlurb": {
+    "description": "tranche7 batch"
+  },
+  "accentPalette": "Accent Color Palette",
+  "@accentPalette": {
+    "description": "tranche7 batch"
+  },
+  "ambientGlow": "Ambient Acoustic Glow",
+  "@ambientGlow": {
+    "description": "tranche7 batch"
+  },
+  "applyTheme": "Apply Theme",
+  "@applyTheme": {
+    "description": "tranche7 batch"
+  },
+  "themeStudio": "Custom Theme Studio",
+  "@themeStudio": {
+    "description": "tranche7 batch"
+  },
+  "glowDesc": "Glows with the active track artwork",
+  "@glowDesc": {
+    "description": "tranche7 batch"
+  },
+  "importThemeJson": "Import Theme JSON",
+  "@importThemeJson": {
+    "description": "tranche7 batch"
+  },
+  "livePreview": "Live Theme Preview",
+  "@livePreview": {
+    "description": "tranche7 batch"
+  },
+  "pasteThemeJson": "Paste a valid Pulsr theme JSON string below:",
+  "@pasteThemeJson": {
+    "description": "tranche7 batch"
+  },
+  "playAllCount": "Play All ({count})",
+  "@playAllCount": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "noResultsFor": "No results for \"{query}\"",
+  "@noResultsFor": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "query": {}
+    }
+  },
+  "selectedCount": "{count} Selected",
+  "@selectedCount": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "addedToQueue": "Added {count} tracks to queue",
+  "@addedToQueue": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "savedToLocal": "Saved \"{title}\" to Local Playlists ({count} tracks)",
+  "@savedToLocal": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "title": {},
+      "count": {}
+    }
+  },
+  "playlistExported": "Playlist exported successfully ({count} tracks).",
+  "@playlistExported": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "queuedForDownload": "Queued {count} tracks for download (3 active downloads)...",
+  "@queuedForDownload": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "previewTrackCount": "{count} tracks",
+  "@previewTrackCount": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "btCalibrated": "Bluetooth latency calibrated to {ms} ms",
+  "@btCalibrated": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "ms": {}
+    }
+  },
+  "importedOnline": "Successfully imported {count} tracks to Online Favorites!",
+  "@importedOnline": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "syncedOnline": "Synced {count} tracks from your YouTube Music Liked library!",
+  "@syncedOnline": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "syncFailed": "Sync failed: {error}",
+  "@syncFailed": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "scanComplete": "Scan complete! {count} tracks loaded.",
+  "@scanComplete": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "loadSongsFailed": "Could not load songs for {title}",
+  "@loadSongsFailed": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "title": {}
+    }
+  },
+  "removedFavorite": "Removed \"{title}\" from favorites",
+  "@removedFavorite": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "title": {}
+    }
+  },
+  "cornerRadiusLabel": "Card & Artwork Corner Radius ({px}px)",
+  "@cornerRadiusLabel": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "px": {}
+    }
+  },
+  "vdcLoaded": "Loaded ViPER-DDC profile: {name}",
+  "@vdcLoaded": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "vdcFailed": "Failed to load .vdc file: {error}",
+  "@vdcFailed": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "conflictsWith": "Conflicts with: {name}",
+  "@conflictsWith": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "visualizerStyleLabel": "Audio Visualizer Style",
+  "@visualizerStyleLabel": {
+    "description": "tranche7 sup"
+  },
+  "doneAction": "Done",
+  "@doneAction": {
+    "description": "tranche7 sup"
+  },
+  "scrobblerSaved": "Scrobbler credentials saved securely.",
+  "@scrobblerSaved": {
+    "description": "tranche7 sup"
+  },
+  "usbPermDenied": "USB permission denied - hardware volume unavailable",
+  "@usbPermDenied": {
+    "description": "tranche7 sup"
+  },
+  "hwVolume": "Hardware Volume",
+  "@hwVolume": {
+    "description": "tranche7 sup"
+  },
+  "ytmDisconnected": "Disconnected from YouTube Music",
+  "@ytmDisconnected": {
+    "description": "tranche7 sup"
+  },
+  "allowBackground": "Allow Background Playback",
+  "@allowBackground": {
+    "description": "tranche7 sup"
+  },
+  "totalScrobbles": "Total Scrobbles:",
+  "@totalScrobbles": {
+    "description": "tranche7 sup"
+  },
+  "lastScrobbled": "Last Scrobbled:",
+  "@lastScrobbled": {
+    "description": "tranche7 sup"
+  },
+  "quickPresets": "QUICK PRESETS",
+  "@quickPresets": {
+    "description": "tranche7 sup"
+  },
+  "savedProxyPool": "SAVED PROXY POOL",
+  "@savedProxyPool": {
+    "description": "tranche7 sup"
+  },
+  "noProxiesPool": "No Proxies in Pool",
+  "@noProxiesPool": {
+    "description": "tranche7 sup"
+  },
+  "importProxies": "Import Proxies",
+  "@importProxies": {
+    "description": "tranche7 sup"
+  },
+  "importProxiesDesc": "Import your proxy list (.txt) or paste lines in IP:PORT:USER:PASS format.",
+  "@importProxiesDesc": {
+    "description": "tranche7 sup"
+  },
+  "pasteOrPick": "Paste proxy lines or pick a text file. Lines will be parsed automatically.",
+  "@pasteOrPick": {
+    "description": "tranche7 sup"
+  },
+  "bypassHostsDesc": "Requests matching these hosts will connect directly without routing through proxy.",
+  "@bypassHostsDesc": {
+    "description": "tranche7 sup"
+  },
+  "pasteClipboard": "Paste Clipboard",
+  "@pasteClipboard": {
+    "description": "tranche7 sup"
+  },
+  "pickFile": "Pick File",
+  "@pickFile": {
+    "description": "tranche7 sup"
+  },
+  "importParse": "Import & Parse",
+  "@importParse": {
+    "description": "tranche7 sup"
+  },
+  "importPaste": "Import / Paste",
+  "@importPaste": {
+    "description": "tranche7 sup"
+  },
+  "sortBySpeed": "Sort by Speed",
+  "@sortBySpeed": {
+    "description": "tranche7 sup"
+  },
+  "testingLabel": "Testing",
+  "@testingLabel": {
+    "description": "tranche7 sup"
+  },
+  "failedLabel": "Failed",
+  "@failedLabel": {
+    "description": "tranche7 sup"
+  },
+  "unverifiedLabel": "Unverified",
+  "@unverifiedLabel": {
+    "description": "tranche7 sup"
+  },
+  "clearAll": "Clear All",
+  "@clearAll": {
+    "description": "tranche7 sup"
+  },
+  "suggestCreateFailed": "Could not create the suggested playlist.",
+  "@suggestCreateFailed": {
+    "description": "tranche7 sup"
+  },
+  "mostCompatible": "Most compatible",
+  "@mostCompatible": {
+    "description": "tranche7 sup"
+  },
+  "loadTracksFailed": "Could not load tracks for this playlist.",
+  "@loadTracksFailed": {
+    "description": "tranche7 sup"
+  },
+  "noLikedToDownload": "No liked songs to download. Sync first.",
+  "@noLikedToDownload": {
+    "description": "tranche7 sup"
+  },
+  "fetchingAccount": "Fetching account playlists...",
+  "@fetchingAccount": {
+    "description": "tranche7 sup"
+  },
+  "noAccountPlaylists": "No playlists found in your YouTube Music library.",
+  "@noAccountPlaylists": {
+    "description": "tranche7 sup"
+  },
+  "selectPlaylistHint": "Select a playlist to view tracks",
+  "@selectPlaylistHint": {
+    "description": "tranche7 sup"
+  },
+  "signInToSync": "Sign in to sync your Liked Music library and account playlists.",
+  "@signInToSync": {
+    "description": "tranche7 sup"
+  },
+  "suggestedForYou": "SUGGESTED FOR YOU",
+  "@suggestedForYou": {
+    "description": "tranche7 sup"
+  },
+  "accountPlaylists": "ACCOUNT PLAYLISTS",
+  "@accountPlaylists": {
+    "description": "tranche7 sup"
+  },
+  "addedPlaylists": "ADDED PLAYLISTS",
+  "@addedPlaylists": {
+    "description": "tranche7 sup"
+  },
+  "addYtmUrl": "Add YouTube Playlist URL",
+  "@addYtmUrl": {
+    "description": "tranche7 sup"
+  },
+  "connectYtm": "Connect YouTube Music",
+  "@connectYtm": {
+    "description": "tranche7 sup"
+  },
+  "exportBackup": "Export Backup",
+  "@exportBackup": {
+    "description": "tranche7 sup"
+  },
+  "importBackup": "Import Backup",
+  "@importBackup": {
+    "description": "tranche7 sup"
+  },
+  "backupExportDesc": "Save favorites, playlists, history & settings to JSON",
+  "@backupExportDesc": {
+    "description": "tranche7 sup"
+  },
+  "backupImportDesc": "Restore favorites, playlists, history & settings from JSON file",
+  "@backupImportDesc": {
+    "description": "tranche7 sup"
+  },
+  "backupTooLarge": "Backup file too large (max 10 MB)",
+  "@backupTooLarge": {
+    "description": "tranche7 sup"
+  },
+  "backupMissing": "Selected backup file does not exist",
+  "@backupMissing": {
+    "description": "tranche7 sup"
+  },
+  "backupInvalid": "Invalid JSON backup file format",
+  "@backupInvalid": {
+    "description": "tranche7 sup"
+  },
+  "clearCacheReset": "Clear Cache & Reset",
+  "@clearCacheReset": {
+    "description": "tranche7 sup"
+  },
+  "cookiesCleared": "Cookies and cache cleared. Reloading YouTube Music...",
+  "@cookiesCleared": {
+    "description": "tranche7 sup"
+  },
+  "forceEgypt": "Force Egypt Mode",
+  "@forceEgypt": {
+    "description": "tranche7 sup"
+  },
+  "googleBlockHelp": "If Google blocks embedded browser login on this device, you can paste your raw cookie string directly:",
+  "@googleBlockHelp": {
+    "description": "tranche7 sup"
+  },
+  "importCookiesToken": "Import Cookies / Token Manually",
+  "@importCookiesToken": {
+    "description": "tranche7 sup"
+  },
+  "importCookiesManual": "Import Cookies Manually",
+  "@importCookiesManual": {
+    "description": "tranche7 sup"
+  },
+  "loginDetected": "Login detected! Tap the green \"Done\" button to complete setup.",
+  "@loginDetected": {
+    "description": "tranche7 sup"
+  },
+  "confirmAccount": "Make sure you sign into the correct Google account. Tap \"Done\" once logged in.",
+  "@confirmAccount": {
+    "description": "tranche7 sup"
+  },
+  "openYtmWebDirect": "Open YouTube Music web directly",
+  "@openYtmWebDirect": {
+    "description": "tranche7 sup"
+  },
+  "openYtWeb": "Open YouTube Web",
+  "@openYtWeb": {
+    "description": "tranche7 sup"
+  },
+  "completeSignInFirst": "Please complete sign in on YouTube Music first.",
+  "@completeSignInFirst": {
+    "description": "tranche7 sup"
+  },
+  "googleTvSignIn": "Sign in with Google TV (no captcha)",
+  "@googleTvSignIn": {
+    "description": "tranche7 sup"
+  },
+  "googleBlockTip": "Tip: if Google continues to block in-app sign-in on this device, paste your cookies from your browser using the button above.",
+  "@googleBlockTip": {
+    "description": "tranche7 sup"
+  },
+  "ipOutsideYtm": "Your network IP is outside YouTube Music Web support. Force Egypt mode or switch to YouTube Web (never geo-blocked).",
+  "@ipOutsideYtm": {
+    "description": "tranche7 sup"
+  },
+  "ytmRestricted": "YouTube Music is restricted in your region",
+  "@ytmRestricted": {
+    "description": "tranche7 sup"
+  },
+  "importedPresetTpl": "Imported {preset}: {name}",
+  "@importedPresetTpl": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "preset": {},
+      "name": {}
+    }
+  },
+  "appliedProfileTpl": "Applied {profile}: {name}",
+  "@appliedProfileTpl": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "profile": {},
+      "name": {}
+    }
+  },
+  "proxyImported": "Successfully imported {count} new proxies",
+  "@proxyImported": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "proxyActivated": "Activated proxy: {addr}",
+  "@proxyActivated": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "addr": {}
+    }
+  },
+  "proxyPresetApplied": "Applied preset: {name} ({host}:{port})",
+  "@proxyPresetApplied": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "name": {},
+      "host": {},
+      "port": {}
+    }
+  },
+  "pickFileFailed": "Failed to pick file: {error}",
+  "@pickFileFailed": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "importPlaylistFailed": "Failed to import playlist: {error}",
+  "@importPlaylistFailed": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "fetchingForDownload": "Fetching \"{title}\" for download...",
+  "@fetchingForDownload": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "title": {}
+    }
+  },
+  "suggestedCreated": "Created \"{title}\" with {count} tracks.",
+  "@suggestedCreated": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "title": {},
+      "count": {}
+    }
+  },
+  "entryAdded": "{count} tracks - Added",
+  "@entryAdded": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "tapToCreate": "{count} tracks - Tap to create",
+  "@tapToCreate": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "importMatched": "{matched} of {total} tracks matched.",
+  "@importMatched": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "matched": {},
+      "total": {}
+    }
+  },
+  "accountPlaylistCount": "{count} playlists",
+  "@accountPlaylistCount": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "historyLine": "History: {count}",
+  "@historyLine": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "backupExportedTo": "Backup exported successfully to {uri}",
+  "@backupExportedTo": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "uri": {}
+    }
+  },
+  "tryIdentity": "Try {name}",
+  "@tryIdentity": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "clearPoolConfirm": "Are you sure you want to delete all {count} saved proxies?",
+  "@clearPoolConfirm": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "playingOnCast": "Playing on Cast",
+  "@playingOnCast": {
+    "description": "tranche7 sup3"
+  },
+  "castConnected": "Connected",
+  "@castConnected": {
+    "description": "tranche7 sup3"
+  },
+  "resumeAction": "Resume",
+  "@resumeAction": {
+    "description": "tranche7 sup4"
+  },
+  "notSetLabel": "Not set",
+  "@notSetLabel": {
+    "description": "tranche7 fix"
+  },
+  "bookmarkSaved": "Bookmark saved.",
+  "@bookmarkSaved": {
+    "description": "tranche7 fix"
+  },
+  "bookmarkEarly": "Play past 0:05 to save a bookmark.",
+  "@bookmarkEarly": {
+    "description": "tranche7 fix"
+  },
+  "resumeAtTpl": "Resume at {time}",
+  "@resumeAtTpl": {
+    "description": "tranche7 fix tpl",
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "selectAllAction": "Select All",
+  "@selectAllAction": {
+    "description": "tranche7 final"
+  },
+  "clearPoolTitle": "Clear Proxy Pool?",
+  "@clearPoolTitle": {
+    "description": "tranche7 final"
+  },
+  "milkRendererDesc": "Winamp/Milkdrop preset renderer (built-in or imported .milk file)",
+  "@milkRendererDesc": {
+    "description": "tranche7 final"
+  },
+  "includedLabel": "Included",
+  "@includedLabel": {
+    "description": "tranche7 final"
+  },
+  "noneLabel": "None",
+  "@noneLabel": {
+    "description": "tranche7 final"
+  },
+  "queuedFromTitle": "Queued {count} tracks from \"{title}\" for download...",
+  "@queuedFromTitle": {
+    "description": "tranche7 final tpl",
+    "placeholders": {
+      "count": {},
+      "title": {}
+    }
+  },
+  "allDownloaded": "All tracks from \"{title}\" are already downloaded or queued.",
+  "@allDownloaded": {
+    "description": "tranche7 final tpl",
+    "placeholders": {
+      "title": {}
+    }
+  },
+  "hwOutputRouting": "HARDWARE OUTPUT ROUTING",
+  "@hwOutputRouting": {
+    "description": "tranche7 quality"
+  },
+  "usbDacAttached": "USB DAC ATTACHED",
+  "@usbDacAttached": {
+    "description": "tranche7 quality"
+  },
+  "outputPathDiag": "OUTPUT PATH DIAGNOSTICS",
+  "@outputPathDiag": {
+    "description": "tranche7 quality"
+  },
+  "dsdPcmNote": "DSD files decode to PCM; native DSD streaming is not supported yet",
+  "@dsdPcmNote": {
+    "description": "tranche7 quality"
+  },
+  "targetSampleRate": "TARGET OUTPUT SAMPLE RATE",
+  "@targetSampleRate": {
+    "description": "tranche7 quality"
+  },
+  "targetBitPerfect": "TARGET BIT DEPTH & BIT-PERFECT",
+  "@targetBitPerfect": {
+    "description": "tranche7 quality"
+  },
+  "trackSourceSpecs": "TRACK SOURCE SPECIFICATIONS",
+  "@trackSourceSpecs": {
+    "description": "tranche7 quality"
+  },
+  "liveSignalChain": "LIVE AUDIO SIGNAL CHAIN",
+  "@liveSignalChain": {
+    "description": "tranche7 quality"
+  },
+  "applyDone": "Apply & Done",
+  "@applyDone": {
+    "description": "tranche7 quality"
+  },
+  "switchOutputPanel": "Switch output in system panel",
+  "@switchOutputPanel": {
+    "description": "tranche7 quality"
+  },
+  "directBpMode": "Direct Bit-Perfect Mode",
+  "@directBpMode": {
+    "description": "tranche7 quality"
+  },
+  "armedLabel": "ARMED",
+  "@armedLabel": {
+    "description": "tranche7 quality"
+  },
+  "bpGuardrails": "Bit-Perfect Guardrails Active: DSP processing & software volume bypassed. Adjust volume via hardware DAC.",
+  "@bpGuardrails": {
+    "description": "tranche7 quality"
+  },
+  "btAudioCodec": "BLUETOOTH AUDIO CODEC",
+  "@btAudioCodec": {
+    "description": "tranche7 quality"
+  },
+  "earbudsConnected": "Earbuds connected. See specs below.",
+  "@earbudsConnected": {
+    "description": "tranche7 quality"
+  },
+  "supportedCodecs": "SUPPORTED CODECS (TAP TO SWITCH)",
+  "@supportedCodecs": {
+    "description": "tranche7 quality"
+  },
+  "sampleRateLabel": "SAMPLE RATE",
+  "@sampleRateLabel": {
+    "description": "tranche7 quality"
+  },
+  "bitDepthLabel": "BIT DEPTH",
+  "@bitDepthLabel": {
+    "description": "tranche7 quality"
+  },
+  "ldacQuality": "LDAC QUALITY",
+  "@ldacQuality": {
+    "description": "tranche7 quality"
+  },
+  "changeBtCodec": "Change Bluetooth Codec",
+  "@changeBtCodec": {
+    "description": "tranche7 quality"
+  },
+  "nearbyPermDesc": "Nearby Devices permission needed to read and control codec settings.",
+  "@nearbyPermDesc": {
+    "description": "tranche7 quality"
+  },
+  "grantBtPerm": "Grant Bluetooth Permission",
+  "@grantBtPerm": {
+    "description": "tranche7 quality"
+  },
+  "leAudio": "LE AUDIO",
+  "@leAudio": {
+    "description": "tranche7 quality"
+  },
+  "lc3Negotiation": "Android negotiates the LC3 stream with your earbuds. Codec, sample rate and bit depth are not app-adjustable on LE Audio.",
+  "@lc3Negotiation": {
+    "description": "tranche7 quality"
+  },
+  "connectingBt": "Connecting to Bluetooth stack...",
+  "@connectingBt": {
+    "description": "tranche7 quality"
+  },
+  "bitPerfectMode": "Bit-Perfect Mode",
+  "@bitPerfectMode": {
+    "description": "tranche7 quality"
   }
 }

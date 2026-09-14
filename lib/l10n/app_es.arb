@@ -1269,5 +1269,1074 @@
   "saturationBandDesc": "Limita la saturacion a medios.",
   "@saturationBandDesc": {
     "description": "tranche6 eq batch2b"
+  },
+  "matchLogic": "LOGICA DE COINCIDENCIA",
+  "@matchLogic": {
+    "description": "tranche7 batch"
+  },
+  "rulesLabel": "REGLAS",
+  "@rulesLabel": {
+    "description": "tranche7 batch"
+  },
+  "sortingLimit": "ORDEN Y LIMITE",
+  "@sortingLimit": {
+    "description": "tranche7 batch"
+  },
+  "sortField": "Campo de orden",
+  "@sortField": {
+    "description": "tranche7 batch"
+  },
+  "titleLabel": "Titulo",
+  "@titleLabel": {
+    "description": "tranche7 batch"
+  },
+  "playCountLabel": "Reproducciones",
+  "@playCountLabel": {
+    "description": "tranche7 batch"
+  },
+  "lastPlayedLabel": "Ultima reproduccion",
+  "@lastPlayedLabel": {
+    "description": "tranche7 batch"
+  },
+  "yearLabel": "Ano",
+  "@yearLabel": {
+    "description": "tranche7 batch"
+  },
+  "trackLimit": "Limite de pistas",
+  "@trackLimit": {
+    "description": "tranche7 batch"
+  },
+  "matchingPreview": "VISTA PREVIA",
+  "@matchingPreview": {
+    "description": "tranche7 batch"
+  },
+  "yesBool": "Si (verdadero)",
+  "@yesBool": {
+    "description": "tranche7 batch"
+  },
+  "noBool": "No (falso)",
+  "@noBool": {
+    "description": "tranche7 batch"
+  },
+  "noRuleMatch": "Sin coincidencias.",
+  "@noRuleMatch": {
+    "description": "tranche7 batch"
+  },
+  "cannotDownloadEmpty": "Lista vacia, nada que descargar.",
+  "@cannotDownloadEmpty": {
+    "description": "tranche7 batch"
+  },
+  "cannotExportEmpty": "Lista vacia, nada que exportar.",
+  "@cannotExportEmpty": {
+    "description": "tranche7 batch"
+  },
+  "cannotShareEmpty": "Lista vacia, nada que compartir.",
+  "@cannotShareEmpty": {
+    "description": "tranche7 batch"
+  },
+  "downloadAllTracks": "Descargar todo",
+  "@downloadAllTracks": {
+    "description": "tranche7 batch"
+  },
+  "exportM3u": "Exportar como M3U",
+  "@exportM3u": {
+    "description": "tranche7 batch"
+  },
+  "manageSongs": "Gestionar canciones",
+  "@manageSongs": {
+    "description": "tranche7 batch"
+  },
+  "sharePlaylist": "Compartir lista",
+  "@sharePlaylist": {
+    "description": "tranche7 batch"
+  },
+  "downloadAll": "Descargar todo",
+  "@downloadAll": {
+    "description": "tranche7 batch"
+  },
+  "saveToPulsr": "Guardar en Pulsr",
+  "@saveToPulsr": {
+    "description": "tranche7 batch"
+  },
+  "fetchingYtmTracks": "Obteniendo pistas...",
+  "@fetchingYtmTracks": {
+    "description": "tranche7 batch"
+  },
+  "ytmHeader": "YOUTUBE MUSIC",
+  "@ytmHeader": {
+    "description": "tranche7 batch"
+  },
+  "importTracks": "Importar pistas",
+  "@importTracks": {
+    "description": "tranche7 batch"
+  },
+  "importYtmFav": "Importar favoritos",
+  "@importYtmFav": {
+    "description": "tranche7 batch"
+  },
+  "pastePlaylistLink": "Pega un enlace de lista",
+  "@pastePlaylistLink": {
+    "description": "tranche7 batch"
+  },
+  "noFavToDownload": "Sin favoritos para descargar.",
+  "@noFavToDownload": {
+    "description": "tranche7 batch"
+  },
+  "syncingYtm": "Sincronizando...",
+  "@syncingYtm": {
+    "description": "tranche7 batch"
+  },
+  "sessionExpired": "Sesion expirada. Inicia sesion.",
+  "@sessionExpired": {
+    "description": "tranche7 batch"
+  },
+  "libLoadFailed": "No se pudo cargar la biblioteca.",
+  "@libLoadFailed": {
+    "description": "tranche7 batch"
+  },
+  "scanPrompt": "Escanea tu dispositivo.",
+  "@scanPrompt": {
+    "description": "tranche7 batch"
+  },
+  "noMusicYet": "Sin musica aun",
+  "@noMusicYet": {
+    "description": "tranche7 batch"
+  },
+  "ytmPromo": "Millones de canciones en linea",
+  "@ytmPromo": {
+    "description": "tranche7 batch"
+  },
+  "loadMoreHistory": "Cargar mas historial",
+  "@loadMoreHistory": {
+    "description": "tranche7 batch"
+  },
+  "noRecentSongs": "Sin reproducciones recientes",
+  "@noRecentSongs": {
+    "description": "tranche7 batch"
+  },
+  "recentEmptyHint": "Reproduce musica y aparecera aqui.",
+  "@recentEmptyHint": {
+    "description": "tranche7 batch"
+  },
+  "songInfo": "Info de cancion",
+  "@songInfo": {
+    "description": "tranche7 batch"
+  },
+  "reciterStyle": "ESTILO DE RECITADOR",
+  "@reciterStyle": {
+    "description": "tranche7 batch"
+  },
+  "learningSpeed": "Velocidad de aprendizaje",
+  "@learningSpeed": {
+    "description": "tranche7 batch"
+  },
+  "reciterSpeedDesc": "Ralentiza para memorizar",
+  "@reciterSpeedDesc": {
+    "description": "tranche7 batch"
+  },
+  "outputHardware": "HARDWARE DE SALIDA",
+  "@outputHardware": {
+    "description": "tranche7 batch"
+  },
+  "resetProfile": "Restablecer perfil",
+  "@resetProfile": {
+    "description": "tranche7 batch"
+  },
+  "reciterDesc": "Perfiles optimizados para voz",
+  "@reciterDesc": {
+    "description": "tranche7 batch"
+  },
+  "sibilanceDesc": "Sibilancia atenuada. Reduccion no disponible.",
+  "@sibilanceDesc": {
+    "description": "tranche7 batch"
+  },
+  "compressorTitle": "Compresor multibanda",
+  "@compressorTitle": {
+    "description": "tranche7 batch"
+  },
+  "compressorDesc": "Compresor nativo de 4 bandas. Domina cada banda.",
+  "@compressorDesc": {
+    "description": "tranche7 batch"
+  },
+  "compressorLimitDesc": "Ratio y Attack requieren el motor del sistema.",
+  "@compressorLimitDesc": {
+    "description": "tranche7 batch"
+  },
+  "resetStudioDefaults": "Restablecer valores de estudio",
+  "@resetStudioDefaults": {
+    "description": "tranche7 batch"
+  },
+  "studioCompressor": "Compresor dinamico de estudio",
+  "@studioCompressor": {
+    "description": "tranche7 batch"
+  },
+  "studioCompressorDesc": "Procesamiento dinamico de estudio.",
+  "@studioCompressorDesc": {
+    "description": "tranche7 batch"
+  },
+  "bytecodeJit": "Bytecode JIT",
+  "@bytecodeJit": {
+    "description": "tranche7 batch"
+  },
+  "compileRun": "Compilar y ejecutar",
+  "@compileRun": {
+    "description": "tranche7 batch"
+  },
+  "eelCompiled": "Script compilado y cargado.",
+  "@eelCompiled": {
+    "description": "tranche7 batch"
+  },
+  "exampleScripts": "Scripts de ejemplo",
+  "@exampleScripts": {
+    "description": "tranche7 batch"
+  },
+  "eelEditor": "Editor EEL",
+  "@eelEditor": {
+    "description": "tranche7 batch"
+  },
+  "liveSliders": "Controles en vivo",
+  "@liveSliders": {
+    "description": "tranche7 batch"
+  },
+  "liveProgDspTitle": "DSP programable en vivo",
+  "@liveProgDspTitle": {
+    "description": "tranche7 batch"
+  },
+  "lyricsEditorTitle": "Editor de letras",
+  "@lyricsEditorTitle": {
+    "description": "tranche7 batch"
+  },
+  "nowAtLabel": "Ahora en",
+  "@nowAtLabel": {
+    "description": "tranche7 batch"
+  },
+  "pitchShift": "Tono",
+  "@pitchShift": {
+    "description": "tranche7 batch"
+  },
+  "activeProfile": "Perfil activo",
+  "@activeProfile": {
+    "description": "tranche7 batch"
+  },
+  "openVdc": "Abrir .vdc",
+  "@openVdc": {
+    "description": "tranche7 batch"
+  },
+  "refHpProfiles": "Perfiles de referencia",
+  "@refHpProfiles": {
+    "description": "tranche7 batch"
+  },
+  "bookmarkLabel": "Marcador",
+  "@bookmarkLabel": {
+    "description": "tranche7 batch"
+  },
+  "bookmarkHint": "Marcadores para la pista actual.",
+  "@bookmarkHint": {
+    "description": "tranche7 batch"
+  },
+  "defaultGlobalEq": "Por defecto (EQ global)",
+  "@defaultGlobalEq": {
+    "description": "tranche7 batch"
+  },
+  "dspSavedAlbum": "Ajustes guardados.",
+  "@dspSavedAlbum": {
+    "description": "tranche7 batch"
+  },
+  "saveDspAlbum": "Guardar ajustes del album",
+  "@saveDspAlbum": {
+    "description": "tranche7 batch"
+  },
+  "playbackTools": "Herramientas",
+  "@playbackTools": {
+    "description": "tranche7 batch"
+  },
+  "trackEqOverride": "EQ de pista",
+  "@trackEqOverride": {
+    "description": "tranche7 batch"
+  },
+  "trackRating": "Calificacion",
+  "@trackRating": {
+    "description": "tranche7 batch"
+  },
+  "trackVolumeOffset": "Desplazamiento de volumen",
+  "@trackVolumeOffset": {
+    "description": "tranche7 batch"
+  },
+  "bpmXfadeDesc": "Para crossfade sincronizado. Rango 40-240.",
+  "@bpmXfadeDesc": {
+    "description": "tranche7 batch"
+  },
+  "rgOff": "Apagado",
+  "@rgOff": {
+    "description": "tranche7 batch"
+  },
+  "rgTrack": "Pista",
+  "@rgTrack": {
+    "description": "tranche7 batch"
+  },
+  "rgAlbum": "Album",
+  "@rgAlbum": {
+    "description": "tranche7 batch"
+  },
+  "rgAuto": "Auto",
+  "@rgAuto": {
+    "description": "tranche7 batch"
+  },
+  "autoCalibrate": "Autocalibrar",
+  "@autoCalibrate": {
+    "description": "tranche7 batch"
+  },
+  "noSessionLogs": "Sin registros aun",
+  "@noSessionLogs": {
+    "description": "tranche7 batch"
+  },
+  "dspInspectorDebug": "Inspector y depuracion",
+  "@dspInspectorDebug": {
+    "description": "tranche7 batch"
+  },
+  "bpResolved": "Resuelto: bypass desactivado.",
+  "@bpResolved": {
+    "description": "tranche7 batch"
+  },
+  "replayGainTitle": "Normalizacion ReplayGain",
+  "@replayGainTitle": {
+    "description": "tranche7 batch"
+  },
+  "appColorSource": "Fuente de color",
+  "@appColorSource": {
+    "description": "tranche7 batch"
+  },
+  "importMilk": "Importar .milk",
+  "@importMilk": {
+    "description": "tranche7 batch"
+  },
+  "importJsonViz": "Importar visualizador JSON",
+  "@importJsonViz": {
+    "description": "tranche7 batch"
+  },
+  "loadJsonVizDesc": "Carga un preajuste .json",
+  "@loadJsonVizDesc": {
+    "description": "tranche7 batch"
+  },
+  "loadMilkDesc": "Carga un archivo Milkdrop",
+  "@loadMilkDesc": {
+    "description": "tranche7 batch"
+  },
+  "npArtworkSwipe": "Deslizar caratula",
+  "@npArtworkSwipe": {
+    "description": "tranche7 batch"
+  },
+  "npDoubleTap": "Doble toque",
+  "@npDoubleTap": {
+    "description": "tranche7 batch"
+  },
+  "selectPlayerTheme": "Elegir tema",
+  "@selectPlayerTheme": {
+    "description": "tranche7 batch"
+  },
+  "aboutBlurb": "Reproductor local de alta fidelidad.",
+  "@aboutBlurb": {
+    "description": "tranche7 batch"
+  },
+  "accentPalette": "Paleta de acento",
+  "@accentPalette": {
+    "description": "tranche7 batch"
+  },
+  "ambientGlow": "Resplandor ambiental",
+  "@ambientGlow": {
+    "description": "tranche7 batch"
+  },
+  "applyTheme": "Aplicar tema",
+  "@applyTheme": {
+    "description": "tranche7 batch"
+  },
+  "themeStudio": "Estudio de temas",
+  "@themeStudio": {
+    "description": "tranche7 batch"
+  },
+  "glowDesc": "Brilla con la caratula",
+  "@glowDesc": {
+    "description": "tranche7 batch"
+  },
+  "importThemeJson": "Importar tema JSON",
+  "@importThemeJson": {
+    "description": "tranche7 batch"
+  },
+  "livePreview": "Vista previa",
+  "@livePreview": {
+    "description": "tranche7 batch"
+  },
+  "pasteThemeJson": "Pega un JSON valido:",
+  "@pasteThemeJson": {
+    "description": "tranche7 batch"
+  },
+  "playAllCount": "Todo ({count})",
+  "@playAllCount": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "noResultsFor": "Sin resultados para \"{query}\"",
+  "@noResultsFor": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "query": {}
+    }
+  },
+  "selectedCount": "{count} seleccionados",
+  "@selectedCount": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "addedToQueue": "{count} anadidas a la cola",
+  "@addedToQueue": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "savedToLocal": "\"{title}\" guardada ({count})",
+  "@savedToLocal": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "title": {},
+      "count": {}
+    }
+  },
+  "playlistExported": "Lista exportada ({count}).",
+  "@playlistExported": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "queuedForDownload": "{count} en cola de descarga...",
+  "@queuedForDownload": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "previewTrackCount": "{count} pistas",
+  "@previewTrackCount": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "btCalibrated": "Latencia: {ms} ms",
+  "@btCalibrated": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "ms": {}
+    }
+  },
+  "importedOnline": "Importados {count}!",
+  "@importedOnline": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "syncedOnline": "Sincronizados {count}.",
+  "@syncedOnline": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "syncFailed": "Error: {error}",
+  "@syncFailed": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "scanComplete": "Escaneo completo: {count}.",
+  "@scanComplete": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "loadSongsFailed": "Sin canciones para {title}",
+  "@loadSongsFailed": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "title": {}
+    }
+  },
+  "removedFavorite": "\"{title}\" eliminada de favoritas",
+  "@removedFavorite": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "title": {}
+    }
+  },
+  "cornerRadiusLabel": "Radio de esquinas ({px}px)",
+  "@cornerRadiusLabel": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "px": {}
+    }
+  },
+  "vdcLoaded": "Perfil cargado: {name}",
+  "@vdcLoaded": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "vdcFailed": "Error al cargar .vdc: {error}",
+  "@vdcFailed": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "conflictsWith": "Conflicto con: {name}",
+  "@conflictsWith": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "visualizerStyleLabel": "Estilo de visualizador",
+  "@visualizerStyleLabel": {
+    "description": "tranche7 sup"
+  },
+  "doneAction": "Listo",
+  "@doneAction": {
+    "description": "tranche7 sup"
+  },
+  "scrobblerSaved": "Credenciales guardadas.",
+  "@scrobblerSaved": {
+    "description": "tranche7 sup"
+  },
+  "usbPermDenied": "Permiso USB denegado",
+  "@usbPermDenied": {
+    "description": "tranche7 sup"
+  },
+  "hwVolume": "Volumen de hardware",
+  "@hwVolume": {
+    "description": "tranche7 sup"
+  },
+  "ytmDisconnected": "Desconectado de YouTube Music",
+  "@ytmDisconnected": {
+    "description": "tranche7 sup"
+  },
+  "allowBackground": "Permitir en segundo plano",
+  "@allowBackground": {
+    "description": "tranche7 sup"
+  },
+  "totalScrobbles": "Total:",
+  "@totalScrobbles": {
+    "description": "tranche7 sup"
+  },
+  "lastScrobbled": "Ultimo:",
+  "@lastScrobbled": {
+    "description": "tranche7 sup"
+  },
+  "quickPresets": "PREAJUSTES",
+  "@quickPresets": {
+    "description": "tranche7 sup"
+  },
+  "savedProxyPool": "LISTA GUARDADA",
+  "@savedProxyPool": {
+    "description": "tranche7 sup"
+  },
+  "noProxiesPool": "Sin proxies",
+  "@noProxiesPool": {
+    "description": "tranche7 sup"
+  },
+  "importProxies": "Importar proxies",
+  "@importProxies": {
+    "description": "tranche7 sup"
+  },
+  "importProxiesDesc": "Importa tu lista (.txt) o pega lineas.",
+  "@importProxiesDesc": {
+    "description": "tranche7 sup"
+  },
+  "pasteOrPick": "Pega lineas o elige archivo.",
+  "@pasteOrPick": {
+    "description": "tranche7 sup"
+  },
+  "bypassHostsDesc": "Estos hosts conectan directo.",
+  "@bypassHostsDesc": {
+    "description": "tranche7 sup"
+  },
+  "pasteClipboard": "Pegar portapapeles",
+  "@pasteClipboard": {
+    "description": "tranche7 sup"
+  },
+  "pickFile": "Elegir archivo",
+  "@pickFile": {
+    "description": "tranche7 sup"
+  },
+  "importParse": "Importar y analizar",
+  "@importParse": {
+    "description": "tranche7 sup"
+  },
+  "importPaste": "Importar / Pegar",
+  "@importPaste": {
+    "description": "tranche7 sup"
+  },
+  "sortBySpeed": "Ordenar por velocidad",
+  "@sortBySpeed": {
+    "description": "tranche7 sup"
+  },
+  "testingLabel": "Probando",
+  "@testingLabel": {
+    "description": "tranche7 sup"
+  },
+  "failedLabel": "Fallo",
+  "@failedLabel": {
+    "description": "tranche7 sup"
+  },
+  "unverifiedLabel": "Sin verificar",
+  "@unverifiedLabel": {
+    "description": "tranche7 sup"
+  },
+  "clearAll": "Borrar todo",
+  "@clearAll": {
+    "description": "tranche7 sup"
+  },
+  "suggestCreateFailed": "No se pudo crear.",
+  "@suggestCreateFailed": {
+    "description": "tranche7 sup"
+  },
+  "mostCompatible": "Mas compatible",
+  "@mostCompatible": {
+    "description": "tranche7 sup"
+  },
+  "loadTracksFailed": "Sin pistas para esta lista.",
+  "@loadTracksFailed": {
+    "description": "tranche7 sup"
+  },
+  "noLikedToDownload": "Sin Me gusta. Sincroniza.",
+  "@noLikedToDownload": {
+    "description": "tranche7 sup"
+  },
+  "fetchingAccount": "Obteniendo listas...",
+  "@fetchingAccount": {
+    "description": "tranche7 sup"
+  },
+  "noAccountPlaylists": "Sin listas en tu biblioteca.",
+  "@noAccountPlaylists": {
+    "description": "tranche7 sup"
+  },
+  "selectPlaylistHint": "Elige una lista",
+  "@selectPlaylistHint": {
+    "description": "tranche7 sup"
+  },
+  "signInToSync": "Inicia sesion para sincronizar.",
+  "@signInToSync": {
+    "description": "tranche7 sup"
+  },
+  "suggestedForYou": "SUGERENCIAS",
+  "@suggestedForYou": {
+    "description": "tranche7 sup"
+  },
+  "accountPlaylists": "LISTAS DE CUENTA",
+  "@accountPlaylists": {
+    "description": "tranche7 sup"
+  },
+  "addedPlaylists": "LISTAS ANADIDAS",
+  "@addedPlaylists": {
+    "description": "tranche7 sup"
+  },
+  "addYtmUrl": "Anadir URL de lista",
+  "@addYtmUrl": {
+    "description": "tranche7 sup"
+  },
+  "connectYtm": "Conectar YouTube Music",
+  "@connectYtm": {
+    "description": "tranche7 sup"
+  },
+  "exportBackup": "Exportar copia",
+  "@exportBackup": {
+    "description": "tranche7 sup"
+  },
+  "importBackup": "Importar copia",
+  "@importBackup": {
+    "description": "tranche7 sup"
+  },
+  "backupExportDesc": "Guarda todo en JSON",
+  "@backupExportDesc": {
+    "description": "tranche7 sup"
+  },
+  "backupImportDesc": "Restaura desde JSON",
+  "@backupImportDesc": {
+    "description": "tranche7 sup"
+  },
+  "backupTooLarge": "Archivo muy grande (max 10 MB)",
+  "@backupTooLarge": {
+    "description": "tranche7 sup"
+  },
+  "backupMissing": "El archivo no existe",
+  "@backupMissing": {
+    "description": "tranche7 sup"
+  },
+  "backupInvalid": "JSON invalido",
+  "@backupInvalid": {
+    "description": "tranche7 sup"
+  },
+  "clearCacheReset": "Borrar cache",
+  "@clearCacheReset": {
+    "description": "tranche7 sup"
+  },
+  "cookiesCleared": "Cache borrada. Recargando...",
+  "@cookiesCleared": {
+    "description": "tranche7 sup"
+  },
+  "forceEgypt": "Forzar modo Egipto",
+  "@forceEgypt": {
+    "description": "tranche7 sup"
+  },
+  "googleBlockHelp": "Si Google bloquea el login, pega tus cookies:",
+  "@googleBlockHelp": {
+    "description": "tranche7 sup"
+  },
+  "importCookiesToken": "Importar cookies manual",
+  "@importCookiesToken": {
+    "description": "tranche7 sup"
+  },
+  "importCookiesManual": "Importar cookies",
+  "@importCookiesManual": {
+    "description": "tranche7 sup"
+  },
+  "loginDetected": "Login detectado! Pulsa \"Listo\".",
+  "@loginDetected": {
+    "description": "tranche7 sup"
+  },
+  "confirmAccount": "Usa la cuenta correcta. Pulsa \"Listo\".",
+  "@confirmAccount": {
+    "description": "tranche7 sup"
+  },
+  "openYtmWebDirect": "Abrir web directamente",
+  "@openYtmWebDirect": {
+    "description": "tranche7 sup"
+  },
+  "openYtWeb": "Abrir YouTube Web",
+  "@openYtWeb": {
+    "description": "tranche7 sup"
+  },
+  "completeSignInFirst": "Completa el login primero.",
+  "@completeSignInFirst": {
+    "description": "tranche7 sup"
+  },
+  "googleTvSignIn": "Login con Google TV",
+  "@googleTvSignIn": {
+    "description": "tranche7 sup"
+  },
+  "googleBlockTip": "Consejo: pega tus cookies del navegador.",
+  "@googleBlockTip": {
+    "description": "tranche7 sup"
+  },
+  "ipOutsideYtm": "Tu IP esta fuera del soporte de YouTube Music Web. Fuerza el modo Egipto o cambia a YouTube Web (sin bloqueo).",
+  "@ipOutsideYtm": {
+    "description": "tranche7 sup"
+  },
+  "ytmRestricted": "YouTube Music restringido en tu region",
+  "@ytmRestricted": {
+    "description": "tranche7 sup"
+  },
+  "importedPresetTpl": "Importado {preset}: {name}",
+  "@importedPresetTpl": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "preset": {},
+      "name": {}
+    }
+  },
+  "appliedProfileTpl": "Aplicado {profile}: {name}",
+  "@appliedProfileTpl": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "profile": {},
+      "name": {}
+    }
+  },
+  "proxyImported": "Importados {count}",
+  "@proxyImported": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "proxyActivated": "Proxy activado: {addr}",
+  "@proxyActivated": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "addr": {}
+    }
+  },
+  "proxyPresetApplied": "Preajuste: {name}",
+  "@proxyPresetApplied": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "name": {},
+      "host": {},
+      "port": {}
+    }
+  },
+  "pickFileFailed": "Error al elegir: {error}",
+  "@pickFileFailed": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "importPlaylistFailed": "Error al importar: {error}",
+  "@importPlaylistFailed": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "fetchingForDownload": "Obteniendo \"{title}\"...",
+  "@fetchingForDownload": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "title": {}
+    }
+  },
+  "suggestedCreated": "\"{title}\" creada ({count}).",
+  "@suggestedCreated": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "title": {},
+      "count": {}
+    }
+  },
+  "entryAdded": "{count} - Anadidas",
+  "@entryAdded": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "tapToCreate": "{count} - Toca para crear",
+  "@tapToCreate": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "importMatched": "{matched} de {total}.",
+  "@importMatched": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "matched": {},
+      "total": {}
+    }
+  },
+  "accountPlaylistCount": "{count} listas",
+  "@accountPlaylistCount": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "historyLine": "Historial: {count}",
+  "@historyLine": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "backupExportedTo": "Copia exportada a {uri}",
+  "@backupExportedTo": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "uri": {}
+    }
+  },
+  "tryIdentity": "Probar {name}",
+  "@tryIdentity": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "clearPoolConfirm": "Borrar los {count}?",
+  "@clearPoolConfirm": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "playingOnCast": "Reproduciendo en Cast",
+  "@playingOnCast": {
+    "description": "tranche7 sup3"
+  },
+  "castConnected": "Conectado",
+  "@castConnected": {
+    "description": "tranche7 sup3"
+  },
+  "resumeAction": "Continuar",
+  "@resumeAction": {
+    "description": "tranche7 sup4"
+  },
+  "notSetLabel": "Sin definir",
+  "@notSetLabel": {
+    "description": "tranche7 fix"
+  },
+  "bookmarkSaved": "Marcador guardado.",
+  "@bookmarkSaved": {
+    "description": "tranche7 fix"
+  },
+  "bookmarkEarly": "Reproduce mas de 0:05.",
+  "@bookmarkEarly": {
+    "description": "tranche7 fix"
+  },
+  "resumeAtTpl": "Continuar en {time}",
+  "@resumeAtTpl": {
+    "description": "tranche7 fix tpl",
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "selectAllAction": "Seleccionar todo",
+  "@selectAllAction": {
+    "description": "tranche7 final"
+  },
+  "clearPoolTitle": "Borrar lista?",
+  "@clearPoolTitle": {
+    "description": "tranche7 final"
+  },
+  "milkRendererDesc": "Renderizador Milkdrop",
+  "@milkRendererDesc": {
+    "description": "tranche7 final"
+  },
+  "includedLabel": "Incluido",
+  "@includedLabel": {
+    "description": "tranche7 final"
+  },
+  "noneLabel": "Ninguno",
+  "@noneLabel": {
+    "description": "tranche7 final"
+  },
+  "queuedFromTitle": "{count} de \"{title}\" en cola...",
+  "@queuedFromTitle": {
+    "description": "tranche7 final tpl",
+    "placeholders": {
+      "count": {},
+      "title": {}
+    }
+  },
+  "allDownloaded": "Todo de \"{title}\" ya descargado.",
+  "@allDownloaded": {
+    "description": "tranche7 final tpl",
+    "placeholders": {
+      "title": {}
+    }
+  },
+  "hwOutputRouting": "SALIDA DE HARDWARE",
+  "@hwOutputRouting": {
+    "description": "tranche7 quality"
+  },
+  "usbDacAttached": "DAC USB CONECTADO",
+  "@usbDacAttached": {
+    "description": "tranche7 quality"
+  },
+  "outputPathDiag": "DIAGNOSTICO DE SALIDA",
+  "@outputPathDiag": {
+    "description": "tranche7 quality"
+  },
+  "dsdPcmNote": "DSD se decodifica a PCM.",
+  "@dsdPcmNote": {
+    "description": "tranche7 quality"
+  },
+  "targetSampleRate": "FRECUENCIA OBJETIVO",
+  "@targetSampleRate": {
+    "description": "tranche7 quality"
+  },
+  "targetBitPerfect": "PROFUNDIDAD Y BIT-PERFECT",
+  "@targetBitPerfect": {
+    "description": "tranche7 quality"
+  },
+  "trackSourceSpecs": "ESPECIFICACIONES DE FUENTE",
+  "@trackSourceSpecs": {
+    "description": "tranche7 quality"
+  },
+  "liveSignalChain": "CADENA DE SENAL",
+  "@liveSignalChain": {
+    "description": "tranche7 quality"
+  },
+  "applyDone": "Aplicar y listo",
+  "@applyDone": {
+    "description": "tranche7 quality"
+  },
+  "switchOutputPanel": "Cambia la salida en el panel",
+  "@switchOutputPanel": {
+    "description": "tranche7 quality"
+  },
+  "directBpMode": "Modo Bit-Perfect directo",
+  "@directBpMode": {
+    "description": "tranche7 quality"
+  },
+  "armedLabel": "ARMADO",
+  "@armedLabel": {
+    "description": "tranche7 quality"
+  },
+  "bpGuardrails": "Protecciones activas: DSP omitido. Ajusta con el DAC.",
+  "@bpGuardrails": {
+    "description": "tranche7 quality"
+  },
+  "btAudioCodec": "CODEC BLUETOOTH",
+  "@btAudioCodec": {
+    "description": "tranche7 quality"
+  },
+  "earbudsConnected": "Auriculares conectados.",
+  "@earbudsConnected": {
+    "description": "tranche7 quality"
+  },
+  "supportedCodecs": "CODECS (TOCA PARA CAMBIAR)",
+  "@supportedCodecs": {
+    "description": "tranche7 quality"
+  },
+  "sampleRateLabel": "FRECUENCIA",
+  "@sampleRateLabel": {
+    "description": "tranche7 quality"
+  },
+  "bitDepthLabel": "PROFUNDIDAD",
+  "@bitDepthLabel": {
+    "description": "tranche7 quality"
+  },
+  "ldacQuality": "CALIDAD LDAC",
+  "@ldacQuality": {
+    "description": "tranche7 quality"
+  },
+  "changeBtCodec": "Cambiar codec",
+  "@changeBtCodec": {
+    "description": "tranche7 quality"
+  },
+  "nearbyPermDesc": "Se necesita permiso de dispositivos.",
+  "@nearbyPermDesc": {
+    "description": "tranche7 quality"
+  },
+  "grantBtPerm": "Conceder permiso",
+  "@grantBtPerm": {
+    "description": "tranche7 quality"
+  },
+  "leAudio": "LE AUDIO",
+  "@leAudio": {
+    "description": "tranche7 quality"
+  },
+  "lc3Negotiation": "Android negocia el LC3. Codec y tasa no ajustables.",
+  "@lc3Negotiation": {
+    "description": "tranche7 quality"
+  },
+  "connectingBt": "Conectando...",
+  "@connectingBt": {
+    "description": "tranche7 quality"
+  },
+  "bitPerfectMode": "Modo Bit-Perfect",
+  "@bitPerfectMode": {
+    "description": "tranche7 quality"
   }
 }

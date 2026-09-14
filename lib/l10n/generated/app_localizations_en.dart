@@ -2549,4 +2549,824 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get saturationBandDesc =>
       'Restricts saturation to the mid band for clean sub-bass.';
+
+  @override
+  String get matchLogic => 'MATCH LOGIC';
+
+  @override
+  String get rulesLabel => 'RULES';
+
+  @override
+  String get sortingLimit => 'SORTING & LIMIT';
+
+  @override
+  String get sortField => 'Sort Field';
+
+  @override
+  String get titleLabel => 'Title';
+
+  @override
+  String get playCountLabel => 'Play Count';
+
+  @override
+  String get lastPlayedLabel => 'Last Played';
+
+  @override
+  String get yearLabel => 'Year';
+
+  @override
+  String get trackLimit => 'Track Limit';
+
+  @override
+  String get matchingPreview => 'MATCHING TRACKS PREVIEW';
+
+  @override
+  String get yesBool => 'Yes (True)';
+
+  @override
+  String get noBool => 'No (False)';
+
+  @override
+  String get noRuleMatch => 'No tracks match the selected rules.';
+
+  @override
+  String get cannotDownloadEmpty => 'Cannot download an empty playlist.';
+
+  @override
+  String get cannotExportEmpty => 'Cannot export an empty playlist.';
+
+  @override
+  String get cannotShareEmpty => 'Cannot share an empty playlist.';
+
+  @override
+  String get downloadAllTracks => 'Download All Tracks';
+
+  @override
+  String get exportM3u => 'Export as M3U';
+
+  @override
+  String get manageSongs => 'Manage Songs';
+
+  @override
+  String get sharePlaylist => 'Share Playlist';
+
+  @override
+  String get downloadAll => 'Download All';
+
+  @override
+  String get saveToPulsr => 'Save to Pulsr';
+
+  @override
+  String get fetchingYtmTracks =>
+      'Fetching playlist tracks from YouTube Music...';
+
+  @override
+  String get ytmHeader => 'YOUTUBE MUSIC';
+
+  @override
+  String get importTracks => 'Import Tracks';
+
+  @override
+  String get importYtmFav => 'Import YouTube Music Favorites';
+
+  @override
+  String get pastePlaylistLink =>
+      'Paste a playlist link or Liked playlist from YouTube Music';
+
+  @override
+  String get noFavToDownload => 'No favorite songs to download.';
+
+  @override
+  String get syncingYtm => 'Syncing YouTube Music Liked Songs...';
+
+  @override
+  String get sessionExpired =>
+      'YouTube Music session expired. Please sign in again.';
+
+  @override
+  String get libLoadFailed => 'Could not load your library.';
+
+  @override
+  String get scanPrompt =>
+      'Scan your device storage to load your audio tracks.';
+
+  @override
+  String get noMusicYet => 'No Music Loaded Yet';
+
+  @override
+  String get ytmPromo => 'Find millions of songs, artists & stream online';
+
+  @override
+  String get loadMoreHistory => 'Load More History';
+
+  @override
+  String get noRecentSongs => 'No recently played songs';
+
+  @override
+  String get recentEmptyHint =>
+      'Play your favorite music and it will appear here.';
+
+  @override
+  String get songInfo => 'Song info';
+
+  @override
+  String get reciterStyle => 'RECITER STYLE';
+
+  @override
+  String get learningSpeed => 'Learning Speed';
+
+  @override
+  String get reciterSpeedDesc => 'Slow recitation down for memorization';
+
+  @override
+  String get outputHardware => 'OUTPUT HARDWARE';
+
+  @override
+  String get resetProfile => 'Reset Profile';
+
+  @override
+  String get reciterDesc => 'Vocal-optimized recitation profiles';
+
+  @override
+  String get sibilanceDesc =>
+      'Sibilance is tamed with a high-shelf EQ cut. Spectral noise and breath reduction are not available in the current audio engine.';
+
+  @override
+  String get compressorTitle => 'Multiband Compressor';
+
+  @override
+  String get compressorDesc =>
+      'Native 4-band compressor with Linkwitz-Riley crossovers. Tames each frequency band independently before the limiter.';
+
+  @override
+  String get compressorLimitDesc =>
+      'Ratio, Attack and Make-up Gain need the Android DynamicsProcessing engine.';
+
+  @override
+  String get resetStudioDefaults => 'Reset to Studio Defaults';
+
+  @override
+  String get studioCompressor => 'Studio Dynamics Compressor';
+
+  @override
+  String get studioCompressorDesc =>
+      'Studio-grade lookahead dynamics processing and peak brickwall limiting.';
+
+  @override
+  String get bytecodeJit => 'Bytecode JIT';
+
+  @override
+  String get compileRun => 'Compile & Run';
+
+  @override
+  String get eelCompiled => 'EEL Script Compiled & Loaded into DSP Engine';
+
+  @override
+  String get exampleScripts => 'Example Scripts & Algorithms';
+
+  @override
+  String get eelEditor => 'Jesusonic / EEL Script Editor';
+
+  @override
+  String get liveSliders => 'Live Control Sliders';
+
+  @override
+  String get liveProgDspTitle => 'Live Programmable DSP';
+
+  @override
+  String get lyricsEditorTitle => 'Synced Lyrics Editor';
+
+  @override
+  String get nowAtLabel => 'Now at';
+
+  @override
+  String get pitchShift => 'Pitch / Tone Shift';
+
+  @override
+  String get activeProfile => 'Active Profile';
+
+  @override
+  String get openVdc => 'Open .vdc';
+
+  @override
+  String get refHpProfiles => 'Reference Headphone Profiles';
+
+  @override
+  String get bookmarkLabel => 'Bookmark';
+
+  @override
+  String get bookmarkHint =>
+      'Bookmarks are available for the track currently playing.';
+
+  @override
+  String get defaultGlobalEq => 'Default (Global EQ)';
+
+  @override
+  String get dspSavedAlbum => 'DSP settings saved for this album.';
+
+  @override
+  String get saveDspAlbum => 'Save DSP settings for this album';
+
+  @override
+  String get playbackTools => 'Playback Tools';
+
+  @override
+  String get trackEqOverride => 'Track EQ Override';
+
+  @override
+  String get trackRating => 'Track Rating';
+
+  @override
+  String get trackVolumeOffset => 'Track Volume Offset';
+
+  @override
+  String get bpmXfadeDesc =>
+      'Used by BPM-synced crossfade to align fades to the beat. Range 40-240.';
+
+  @override
+  String get rgOff => 'Off';
+
+  @override
+  String get rgTrack => 'Track';
+
+  @override
+  String get rgAlbum => 'Album';
+
+  @override
+  String get rgAuto => 'Auto';
+
+  @override
+  String get autoCalibrate => 'Auto-calibrate';
+
+  @override
+  String get noSessionLogs => 'No audio session logs recorded yet';
+
+  @override
+  String get dspInspectorDebug => 'DSP Signal Inspector & Debug';
+
+  @override
+  String get bpResolved =>
+      'Resolved: Bit-Perfect bypass disabled - ReplayGain is adjustable again';
+
+  @override
+  String get replayGainTitle => 'ReplayGain Loudness Normalization';
+
+  @override
+  String get appColorSource => 'App Color Source';
+
+  @override
+  String get importMilk => 'Import .milk Preset';
+
+  @override
+  String get importJsonViz => 'Import JSON Visualizer Preset';
+
+  @override
+  String get loadJsonVizDesc =>
+      'Load a Custom visualizer preset (.json) from storage';
+
+  @override
+  String get loadMilkDesc => 'Load a Winamp/Milkdrop preset file from storage';
+
+  @override
+  String get npArtworkSwipe => 'Now Playing Artwork Swipe';
+
+  @override
+  String get npDoubleTap => 'Now Playing Double-Tap Action';
+
+  @override
+  String get selectPlayerTheme => 'Select Player Theme';
+
+  @override
+  String get aboutBlurb =>
+      'An audiophile-grade local music player with bit-perfect output, a full DSP chain, per-device profiles and automation.';
+
+  @override
+  String get accentPalette => 'Accent Color Palette';
+
+  @override
+  String get ambientGlow => 'Ambient Acoustic Glow';
+
+  @override
+  String get applyTheme => 'Apply Theme';
+
+  @override
+  String get themeStudio => 'Custom Theme Studio';
+
+  @override
+  String get glowDesc => 'Glows with the active track artwork';
+
+  @override
+  String get importThemeJson => 'Import Theme JSON';
+
+  @override
+  String get livePreview => 'Live Theme Preview';
+
+  @override
+  String get pasteThemeJson => 'Paste a valid Pulsr theme JSON string below:';
+
+  @override
+  String playAllCount(Object count) {
+    return 'Play All ($count)';
+  }
+
+  @override
+  String noResultsFor(Object query) {
+    return 'No results for \"$query\"';
+  }
+
+  @override
+  String selectedCount(Object count) {
+    return '$count Selected';
+  }
+
+  @override
+  String addedToQueue(Object count) {
+    return 'Added $count tracks to queue';
+  }
+
+  @override
+  String savedToLocal(Object title, Object count) {
+    return 'Saved \"$title\" to Local Playlists ($count tracks)';
+  }
+
+  @override
+  String playlistExported(Object count) {
+    return 'Playlist exported successfully ($count tracks).';
+  }
+
+  @override
+  String queuedForDownload(Object count) {
+    return 'Queued $count tracks for download (3 active downloads)...';
+  }
+
+  @override
+  String previewTrackCount(Object count) {
+    return '$count tracks';
+  }
+
+  @override
+  String btCalibrated(Object ms) {
+    return 'Bluetooth latency calibrated to $ms ms';
+  }
+
+  @override
+  String importedOnline(Object count) {
+    return 'Successfully imported $count tracks to Online Favorites!';
+  }
+
+  @override
+  String syncedOnline(Object count) {
+    return 'Synced $count tracks from your YouTube Music Liked library!';
+  }
+
+  @override
+  String syncFailed(Object error) {
+    return 'Sync failed: $error';
+  }
+
+  @override
+  String scanComplete(Object count) {
+    return 'Scan complete! $count tracks loaded.';
+  }
+
+  @override
+  String loadSongsFailed(Object title) {
+    return 'Could not load songs for $title';
+  }
+
+  @override
+  String removedFavorite(Object title) {
+    return 'Removed \"$title\" from favorites';
+  }
+
+  @override
+  String cornerRadiusLabel(Object px) {
+    return 'Card & Artwork Corner Radius (${px}px)';
+  }
+
+  @override
+  String vdcLoaded(Object name) {
+    return 'Loaded ViPER-DDC profile: $name';
+  }
+
+  @override
+  String vdcFailed(Object error) {
+    return 'Failed to load .vdc file: $error';
+  }
+
+  @override
+  String conflictsWith(Object name) {
+    return 'Conflicts with: $name';
+  }
+
+  @override
+  String get visualizerStyleLabel => 'Audio Visualizer Style';
+
+  @override
+  String get doneAction => 'Done';
+
+  @override
+  String get scrobblerSaved => 'Scrobbler credentials saved securely.';
+
+  @override
+  String get usbPermDenied =>
+      'USB permission denied - hardware volume unavailable';
+
+  @override
+  String get hwVolume => 'Hardware Volume';
+
+  @override
+  String get ytmDisconnected => 'Disconnected from YouTube Music';
+
+  @override
+  String get allowBackground => 'Allow Background Playback';
+
+  @override
+  String get totalScrobbles => 'Total Scrobbles:';
+
+  @override
+  String get lastScrobbled => 'Last Scrobbled:';
+
+  @override
+  String get quickPresets => 'QUICK PRESETS';
+
+  @override
+  String get savedProxyPool => 'SAVED PROXY POOL';
+
+  @override
+  String get noProxiesPool => 'No Proxies in Pool';
+
+  @override
+  String get importProxies => 'Import Proxies';
+
+  @override
+  String get importProxiesDesc =>
+      'Import your proxy list (.txt) or paste lines in IP:PORT:USER:PASS format.';
+
+  @override
+  String get pasteOrPick =>
+      'Paste proxy lines or pick a text file. Lines will be parsed automatically.';
+
+  @override
+  String get bypassHostsDesc =>
+      'Requests matching these hosts will connect directly without routing through proxy.';
+
+  @override
+  String get pasteClipboard => 'Paste Clipboard';
+
+  @override
+  String get pickFile => 'Pick File';
+
+  @override
+  String get importParse => 'Import & Parse';
+
+  @override
+  String get importPaste => 'Import / Paste';
+
+  @override
+  String get sortBySpeed => 'Sort by Speed';
+
+  @override
+  String get testingLabel => 'Testing';
+
+  @override
+  String get failedLabel => 'Failed';
+
+  @override
+  String get unverifiedLabel => 'Unverified';
+
+  @override
+  String get clearAll => 'Clear All';
+
+  @override
+  String get suggestCreateFailed => 'Could not create the suggested playlist.';
+
+  @override
+  String get mostCompatible => 'Most compatible';
+
+  @override
+  String get loadTracksFailed => 'Could not load tracks for this playlist.';
+
+  @override
+  String get noLikedToDownload => 'No liked songs to download. Sync first.';
+
+  @override
+  String get fetchingAccount => 'Fetching account playlists...';
+
+  @override
+  String get noAccountPlaylists =>
+      'No playlists found in your YouTube Music library.';
+
+  @override
+  String get selectPlaylistHint => 'Select a playlist to view tracks';
+
+  @override
+  String get signInToSync =>
+      'Sign in to sync your Liked Music library and account playlists.';
+
+  @override
+  String get suggestedForYou => 'SUGGESTED FOR YOU';
+
+  @override
+  String get accountPlaylists => 'ACCOUNT PLAYLISTS';
+
+  @override
+  String get addedPlaylists => 'ADDED PLAYLISTS';
+
+  @override
+  String get addYtmUrl => 'Add YouTube Playlist URL';
+
+  @override
+  String get connectYtm => 'Connect YouTube Music';
+
+  @override
+  String get exportBackup => 'Export Backup';
+
+  @override
+  String get importBackup => 'Import Backup';
+
+  @override
+  String get backupExportDesc =>
+      'Save favorites, playlists, history & settings to JSON';
+
+  @override
+  String get backupImportDesc =>
+      'Restore favorites, playlists, history & settings from JSON file';
+
+  @override
+  String get backupTooLarge => 'Backup file too large (max 10 MB)';
+
+  @override
+  String get backupMissing => 'Selected backup file does not exist';
+
+  @override
+  String get backupInvalid => 'Invalid JSON backup file format';
+
+  @override
+  String get clearCacheReset => 'Clear Cache & Reset';
+
+  @override
+  String get cookiesCleared =>
+      'Cookies and cache cleared. Reloading YouTube Music...';
+
+  @override
+  String get forceEgypt => 'Force Egypt Mode';
+
+  @override
+  String get googleBlockHelp =>
+      'If Google blocks embedded browser login on this device, you can paste your raw cookie string directly:';
+
+  @override
+  String get importCookiesToken => 'Import Cookies / Token Manually';
+
+  @override
+  String get importCookiesManual => 'Import Cookies Manually';
+
+  @override
+  String get loginDetected =>
+      'Login detected! Tap the green \"Done\" button to complete setup.';
+
+  @override
+  String get confirmAccount =>
+      'Make sure you sign into the correct Google account. Tap \"Done\" once logged in.';
+
+  @override
+  String get openYtmWebDirect => 'Open YouTube Music web directly';
+
+  @override
+  String get openYtWeb => 'Open YouTube Web';
+
+  @override
+  String get completeSignInFirst =>
+      'Please complete sign in on YouTube Music first.';
+
+  @override
+  String get googleTvSignIn => 'Sign in with Google TV (no captcha)';
+
+  @override
+  String get googleBlockTip =>
+      'Tip: if Google continues to block in-app sign-in on this device, paste your cookies from your browser using the button above.';
+
+  @override
+  String get ipOutsideYtm =>
+      'Your network IP is outside YouTube Music Web support. Force Egypt mode or switch to YouTube Web (never geo-blocked).';
+
+  @override
+  String get ytmRestricted => 'YouTube Music is restricted in your region';
+
+  @override
+  String importedPresetTpl(Object preset, Object name) {
+    return 'Imported $preset: $name';
+  }
+
+  @override
+  String appliedProfileTpl(Object profile, Object name) {
+    return 'Applied $profile: $name';
+  }
+
+  @override
+  String proxyImported(Object count) {
+    return 'Successfully imported $count new proxies';
+  }
+
+  @override
+  String proxyActivated(Object addr) {
+    return 'Activated proxy: $addr';
+  }
+
+  @override
+  String proxyPresetApplied(Object name, Object host, Object port) {
+    return 'Applied preset: $name ($host:$port)';
+  }
+
+  @override
+  String pickFileFailed(Object error) {
+    return 'Failed to pick file: $error';
+  }
+
+  @override
+  String importPlaylistFailed(Object error) {
+    return 'Failed to import playlist: $error';
+  }
+
+  @override
+  String fetchingForDownload(Object title) {
+    return 'Fetching \"$title\" for download...';
+  }
+
+  @override
+  String suggestedCreated(Object title, Object count) {
+    return 'Created \"$title\" with $count tracks.';
+  }
+
+  @override
+  String entryAdded(Object count) {
+    return '$count tracks - Added';
+  }
+
+  @override
+  String tapToCreate(Object count) {
+    return '$count tracks - Tap to create';
+  }
+
+  @override
+  String importMatched(Object matched, Object total) {
+    return '$matched of $total tracks matched.';
+  }
+
+  @override
+  String accountPlaylistCount(Object count) {
+    return '$count playlists';
+  }
+
+  @override
+  String historyLine(Object count) {
+    return 'History: $count';
+  }
+
+  @override
+  String backupExportedTo(Object uri) {
+    return 'Backup exported successfully to $uri';
+  }
+
+  @override
+  String tryIdentity(Object name) {
+    return 'Try $name';
+  }
+
+  @override
+  String clearPoolConfirm(Object count) {
+    return 'Are you sure you want to delete all $count saved proxies?';
+  }
+
+  @override
+  String get playingOnCast => 'Playing on Cast';
+
+  @override
+  String get castConnected => 'Connected';
+
+  @override
+  String get resumeAction => 'Resume';
+
+  @override
+  String get notSetLabel => 'Not set';
+
+  @override
+  String get bookmarkSaved => 'Bookmark saved.';
+
+  @override
+  String get bookmarkEarly => 'Play past 0:05 to save a bookmark.';
+
+  @override
+  String resumeAtTpl(Object time) {
+    return 'Resume at $time';
+  }
+
+  @override
+  String get selectAllAction => 'Select All';
+
+  @override
+  String get clearPoolTitle => 'Clear Proxy Pool?';
+
+  @override
+  String get milkRendererDesc =>
+      'Winamp/Milkdrop preset renderer (built-in or imported .milk file)';
+
+  @override
+  String get includedLabel => 'Included';
+
+  @override
+  String get noneLabel => 'None';
+
+  @override
+  String queuedFromTitle(Object count, Object title) {
+    return 'Queued $count tracks from \"$title\" for download...';
+  }
+
+  @override
+  String allDownloaded(Object title) {
+    return 'All tracks from \"$title\" are already downloaded or queued.';
+  }
+
+  @override
+  String get hwOutputRouting => 'HARDWARE OUTPUT ROUTING';
+
+  @override
+  String get usbDacAttached => 'USB DAC ATTACHED';
+
+  @override
+  String get outputPathDiag => 'OUTPUT PATH DIAGNOSTICS';
+
+  @override
+  String get dsdPcmNote =>
+      'DSD files decode to PCM; native DSD streaming is not supported yet';
+
+  @override
+  String get targetSampleRate => 'TARGET OUTPUT SAMPLE RATE';
+
+  @override
+  String get targetBitPerfect => 'TARGET BIT DEPTH & BIT-PERFECT';
+
+  @override
+  String get trackSourceSpecs => 'TRACK SOURCE SPECIFICATIONS';
+
+  @override
+  String get liveSignalChain => 'LIVE AUDIO SIGNAL CHAIN';
+
+  @override
+  String get applyDone => 'Apply & Done';
+
+  @override
+  String get switchOutputPanel => 'Switch output in system panel';
+
+  @override
+  String get directBpMode => 'Direct Bit-Perfect Mode';
+
+  @override
+  String get armedLabel => 'ARMED';
+
+  @override
+  String get bpGuardrails =>
+      'Bit-Perfect Guardrails Active: DSP processing & software volume bypassed. Adjust volume via hardware DAC.';
+
+  @override
+  String get btAudioCodec => 'BLUETOOTH AUDIO CODEC';
+
+  @override
+  String get earbudsConnected => 'Earbuds connected. See specs below.';
+
+  @override
+  String get supportedCodecs => 'SUPPORTED CODECS (TAP TO SWITCH)';
+
+  @override
+  String get sampleRateLabel => 'SAMPLE RATE';
+
+  @override
+  String get bitDepthLabel => 'BIT DEPTH';
+
+  @override
+  String get ldacQuality => 'LDAC QUALITY';
+
+  @override
+  String get changeBtCodec => 'Change Bluetooth Codec';
+
+  @override
+  String get nearbyPermDesc =>
+      'Nearby Devices permission needed to read and control codec settings.';
+
+  @override
+  String get grantBtPerm => 'Grant Bluetooth Permission';
+
+  @override
+  String get leAudio => 'LE AUDIO';
+
+  @override
+  String get lc3Negotiation =>
+      'Android negotiates the LC3 stream with your earbuds. Codec, sample rate and bit depth are not app-adjustable on LE Audio.';
+
+  @override
+  String get connectingBt => 'Connecting to Bluetooth stack...';
+
+  @override
+  String get bitPerfectMode => 'Bit-Perfect Mode';
 }

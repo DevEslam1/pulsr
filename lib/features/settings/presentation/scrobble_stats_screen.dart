@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
@@ -153,7 +154,7 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Total Scrobbles:',
+                          Text(context.l10n.totalScrobbles,
                               style: TextStyle(
                                   color: p.textSecondary, fontSize: 13)),
                           Text('$_totalScrobbles',
@@ -167,7 +168,7 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Last Scrobbled:',
+                          Text(context.l10n.lastScrobbled,
                               style: TextStyle(
                                   color: p.textSecondary, fontSize: 13)),
                           Text(lastDateStr,

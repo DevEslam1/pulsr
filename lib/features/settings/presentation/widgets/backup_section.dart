@@ -69,7 +69,7 @@ class _BackupSectionState extends State<BackupSection> {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Backup exported successfully to $outputUri'),
+              content: Text(context.l10n.backupExportedTo(outputUri)),
               backgroundColor: context.palette.accent,
             ),
           );
@@ -105,8 +105,7 @@ class _BackupSectionState extends State<BackupSection> {
       if (webBytes.length > maxBackupBytes) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Backup file too large (max 10 MB)'),
+            SnackBar(content: Text(context.l10n.backupTooLarge),
               backgroundColor: Colors.redAccent,
             ),
           );
@@ -122,8 +121,7 @@ class _BackupSectionState extends State<BackupSection> {
     if (!await file.exists()) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Selected backup file does not exist'),
+          SnackBar(content: Text(context.l10n.backupMissing),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -137,8 +135,7 @@ class _BackupSectionState extends State<BackupSection> {
     if (resolvedContent.length > maxBackupBytes) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Backup file too large (max 10 MB)'),
+          SnackBar(content: Text(context.l10n.backupTooLarge),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -151,8 +148,7 @@ class _BackupSectionState extends State<BackupSection> {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invalid JSON backup file format'),
+          SnackBar(content: Text(context.l10n.backupInvalid),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -187,9 +183,9 @@ class _BackupSectionState extends State<BackupSection> {
           const SizedBox(height: 12),
           Text('• ${context.l10n.favorites}: $favsCount'),
           Text('• ${context.l10n.playlists}: $playlistsCount'),
-          Text('• History: $historyCount'),
+          Text('• ${context.l10n.historyLine(historyCount)}'),
           Text(
-              '• ${context.l10n.settings}: ${hasSettings ? "Included" : "None"}'),
+              '• ${context.l10n.settings}: ${hasSettings ? context.l10n.includedLabel : context.l10n.noneLabel}'),
           const SizedBox(height: 12),
           Text(
             context.l10n.existingLibraryUpdateNotice,
@@ -265,7 +261,7 @@ class _BackupSectionState extends State<BackupSection> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Done'),
+              child: Text(context.l10n.doneAction),
             ),
           ],
         );
@@ -293,12 +289,10 @@ class _BackupSectionState extends State<BackupSection> {
       children: [
         ListTile(
           leading: _buildIconContainer(context, Icons.upload_file_rounded),
-          title: const Text(
-            'Export Backup',
+          title: Text(context.l10n.exportBackup,
             style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
           ),
-          subtitle: Text(
-            'Save favorites, playlists, history & settings to JSON',
+          subtitle: Text(context.l10n.backupExportDesc,
             style: TextStyle(color: textSecondary, fontSize: 12),
           ),
           trailing: _isExporting
@@ -313,12 +307,10 @@ class _BackupSectionState extends State<BackupSection> {
         ListTile(
           leading:
               _buildIconContainer(context, Icons.download_for_offline_rounded),
-          title: const Text(
-            'Import Backup',
+          title: Text(context.l10n.importBackup,
             style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
           ),
-          subtitle: Text(
-            'Restore favorites, playlists, history & settings from JSON file',
+          subtitle: Text(context.l10n.backupImportDesc,
             style: TextStyle(color: textSecondary, fontSize: 12),
           ),
           trailing: _isImporting

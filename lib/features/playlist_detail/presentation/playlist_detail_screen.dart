@@ -2,6 +2,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
@@ -43,7 +44,7 @@ class PlaylistDetailScreen extends StatelessWidget {
   void _downloadPlaylist(BuildContext context, List<SongsTableData> songs) {
     if (songs.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cannot download an empty playlist.')),
+        SnackBar(content: Text(context.l10n.cannotDownloadEmpty)),
       );
       return;
     }
@@ -56,7 +57,7 @@ class PlaylistDetailScreen extends StatelessWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-              'Queued $queuedCount tracks for download (3 active downloads)...'),
+              context.l10n.queuedForDownload(queuedCount)),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -80,7 +81,7 @@ class PlaylistDetailScreen extends StatelessWidget {
       BuildContext context, List<SongsTableData> songs) async {
     if (songs.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cannot export an empty playlist.')),
+        SnackBar(content: Text(context.l10n.cannotExportEmpty)),
       );
       return;
     }
@@ -90,7 +91,7 @@ class PlaylistDetailScreen extends StatelessWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content:
-              Text('Playlist exported successfully (${songs.length} tracks).'),
+              Text(context.l10n.playlistExported(songs.length)),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -101,7 +102,7 @@ class PlaylistDetailScreen extends StatelessWidget {
       BuildContext context, List<SongsTableData> songs) async {
     if (songs.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cannot share an empty playlist.')),
+        SnackBar(content: Text(context.l10n.cannotShareEmpty)),
       );
       return;
     }
@@ -240,7 +241,7 @@ class PlaylistDetailScreen extends StatelessWidget {
                           Icon(Icons.playlist_add_check_rounded,
                               color: p.accent, size: 20),
                           const SizedBox(width: 12),
-                          const Text('Manage Songs'),
+                          Text(context.l10n.manageSongs),
                         ],
                       ),
                     ),
@@ -252,7 +253,7 @@ class PlaylistDetailScreen extends StatelessWidget {
                           Icon(Icons.download_rounded,
                               color: p.accent, size: 20),
                           const SizedBox(width: 12),
-                          const Text('Download All Tracks'),
+                          Text(context.l10n.downloadAllTracks),
                         ],
                       ),
                     ),
@@ -263,7 +264,7 @@ class PlaylistDetailScreen extends StatelessWidget {
                         Icon(Icons.file_upload_outlined,
                             color: p.accent, size: 20),
                         const SizedBox(width: 12),
-                        const Text('Export as M3U'),
+                        Text(context.l10n.exportM3u),
                       ],
                     ),
                   ),
@@ -273,7 +274,7 @@ class PlaylistDetailScreen extends StatelessWidget {
                       children: [
                         Icon(Icons.share_rounded, color: p.accent, size: 20),
                         const SizedBox(width: 12),
-                        const Text('Share Playlist'),
+                        Text(context.l10n.sharePlaylist),
                       ],
                     ),
                   ),
@@ -329,7 +330,7 @@ class PlaylistDetailScreen extends StatelessWidget {
                                         },
                                         icon:
                                             const Icon(Icons.play_arrow_rounded),
-                                        label: const Text('Play All'),
+                                        label: Text(context.l10n.playAll),
                                       ),
                                     ),
                                     const SizedBox(width: 12),
@@ -345,7 +346,7 @@ class PlaylistDetailScreen extends StatelessWidget {
                                         },
                                         icon: Icon(Icons.shuffle_rounded,
                                             color: p.accent),
-                                        label: const Text('Shuffle'),
+                                        label: Text(context.l10n.shuffle),
                                       ),
                                     ),
                                     if (AppConfig.ytmEnabled) ...[

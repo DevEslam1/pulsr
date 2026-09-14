@@ -1269,5 +1269,1074 @@
   "saturationBandDesc": "يحد التشبع بالنطاق المتوسط",
   "@saturationBandDesc": {
     "description": "tranche6 eq batch2b"
+  },
+  "matchLogic": "منطق المطابقة",
+  "@matchLogic": {
+    "description": "tranche7 batch"
+  },
+  "rulesLabel": "القواعد",
+  "@rulesLabel": {
+    "description": "tranche7 batch"
+  },
+  "sortingLimit": "الفرز والحد",
+  "@sortingLimit": {
+    "description": "tranche7 batch"
+  },
+  "sortField": "حقل الفرز",
+  "@sortField": {
+    "description": "tranche7 batch"
+  },
+  "titleLabel": "العنوان",
+  "@titleLabel": {
+    "description": "tranche7 batch"
+  },
+  "playCountLabel": "عدد التشغيل",
+  "@playCountLabel": {
+    "description": "tranche7 batch"
+  },
+  "lastPlayedLabel": "اخر تشغيل",
+  "@lastPlayedLabel": {
+    "description": "tranche7 batch"
+  },
+  "yearLabel": "السنة",
+  "@yearLabel": {
+    "description": "tranche7 batch"
+  },
+  "trackLimit": "حد المسارات",
+  "@trackLimit": {
+    "description": "tranche7 batch"
+  },
+  "matchingPreview": "معاينة المسارات",
+  "@matchingPreview": {
+    "description": "tranche7 batch"
+  },
+  "yesBool": "نعم",
+  "@yesBool": {
+    "description": "tranche7 batch"
+  },
+  "noBool": "لا",
+  "@noBool": {
+    "description": "tranche7 batch"
+  },
+  "noRuleMatch": "لا توجد مسارات مطابقة",
+  "@noRuleMatch": {
+    "description": "tranche7 batch"
+  },
+  "cannotDownloadEmpty": "لا يمكن تنزيل قائمة فارغة",
+  "@cannotDownloadEmpty": {
+    "description": "tranche7 batch"
+  },
+  "cannotExportEmpty": "لا يمكن تصدير قائمة فارغة",
+  "@cannotExportEmpty": {
+    "description": "tranche7 batch"
+  },
+  "cannotShareEmpty": "لا يمكن مشاركة قائمة فارغة",
+  "@cannotShareEmpty": {
+    "description": "tranche7 batch"
+  },
+  "downloadAllTracks": "تنزيل كل المسارات",
+  "@downloadAllTracks": {
+    "description": "tranche7 batch"
+  },
+  "exportM3u": "تصدير كـ M3U",
+  "@exportM3u": {
+    "description": "tranche7 batch"
+  },
+  "manageSongs": "ادارة الاغاني",
+  "@manageSongs": {
+    "description": "tranche7 batch"
+  },
+  "sharePlaylist": "مشاركة القائمة",
+  "@sharePlaylist": {
+    "description": "tranche7 batch"
+  },
+  "downloadAll": "تنزيل الكل",
+  "@downloadAll": {
+    "description": "tranche7 batch"
+  },
+  "saveToPulsr": "حفظ في Pulsr",
+  "@saveToPulsr": {
+    "description": "tranche7 batch"
+  },
+  "fetchingYtmTracks": "جار جلب المسارات...",
+  "@fetchingYtmTracks": {
+    "description": "tranche7 batch"
+  },
+  "ytmHeader": "يوتيوب ميوزك",
+  "@ytmHeader": {
+    "description": "tranche7 batch"
+  },
+  "importTracks": "استيراد المسارات",
+  "@importTracks": {
+    "description": "tranche7 batch"
+  },
+  "importYtmFav": "استيراد المفضلة",
+  "@importYtmFav": {
+    "description": "tranche7 batch"
+  },
+  "pastePlaylistLink": "الصق رابط قائمة تشغيل",
+  "@pastePlaylistLink": {
+    "description": "tranche7 batch"
+  },
+  "noFavToDownload": "لا توجد مفضلة للتنزيل",
+  "@noFavToDownload": {
+    "description": "tranche7 batch"
+  },
+  "syncingYtm": "جار المزامنة...",
+  "@syncingYtm": {
+    "description": "tranche7 batch"
+  },
+  "sessionExpired": "انتهت الجلسة. سجل الدخول مجددا",
+  "@sessionExpired": {
+    "description": "tranche7 batch"
+  },
+  "libLoadFailed": "تعذر تحميل المكتبة",
+  "@libLoadFailed": {
+    "description": "tranche7 batch"
+  },
+  "scanPrompt": "افحص جهازك لتحميل المسارات",
+  "@scanPrompt": {
+    "description": "tranche7 batch"
+  },
+  "noMusicYet": "لا توجد موسيقى بعد",
+  "@noMusicYet": {
+    "description": "tranche7 batch"
+  },
+  "ytmPromo": "ملايين الاغاني عبر الانترنت",
+  "@ytmPromo": {
+    "description": "tranche7 batch"
+  },
+  "loadMoreHistory": "تحميل المزيد",
+  "@loadMoreHistory": {
+    "description": "tranche7 batch"
+  },
+  "noRecentSongs": "لا توجد مسارات حديثة",
+  "@noRecentSongs": {
+    "description": "tranche7 batch"
+  },
+  "recentEmptyHint": "شغل موسيقاك وستظهر هنا",
+  "@recentEmptyHint": {
+    "description": "tranche7 batch"
+  },
+  "songInfo": "معلومات الاغنية",
+  "@songInfo": {
+    "description": "tranche7 batch"
+  },
+  "reciterStyle": "اسلوب القارئ",
+  "@reciterStyle": {
+    "description": "tranche7 batch"
+  },
+  "learningSpeed": "سرعة التعلم",
+  "@learningSpeed": {
+    "description": "tranche7 batch"
+  },
+  "reciterSpeedDesc": "ابطئ الحفظ",
+  "@reciterSpeedDesc": {
+    "description": "tranche7 batch"
+  },
+  "outputHardware": "عتاد الاخراج",
+  "@outputHardware": {
+    "description": "tranche7 batch"
+  },
+  "resetProfile": "اعادة الملف",
+  "@resetProfile": {
+    "description": "tranche7 batch"
+  },
+  "reciterDesc": "ملفات محسنة للصوت",
+  "@reciterDesc": {
+    "description": "tranche7 batch"
+  },
+  "sibilanceDesc": "يتم ترويض الصفير. التقليل غير متوفر",
+  "@sibilanceDesc": {
+    "description": "tranche7 batch"
+  },
+  "compressorTitle": "ضاغط متعدد النطاقات",
+  "@compressorTitle": {
+    "description": "tranche7 batch"
+  },
+  "compressorDesc": "ضاغط اصلي رباعي النطاقات يروض كل نطاق",
+  "@compressorDesc": {
+    "description": "tranche7 batch"
+  },
+  "compressorLimitDesc": "تحتاج نسبة وهجوم محرك النظام",
+  "@compressorLimitDesc": {
+    "description": "tranche7 batch"
+  },
+  "resetStudioDefaults": "اعادة لضبط الاستوديو",
+  "@resetStudioDefaults": {
+    "description": "tranche7 batch"
+  },
+  "studioCompressor": "ضاغط ديناميكية الاستوديو",
+  "@studioCompressor": {
+    "description": "tranche7 batch"
+  },
+  "studioCompressorDesc": "معالجة ديناميكية بمستوى الاستوديو",
+  "@studioCompressorDesc": {
+    "description": "tranche7 batch"
+  },
+  "bytecodeJit": "بايت كود JIT",
+  "@bytecodeJit": {
+    "description": "tranche7 batch"
+  },
+  "compileRun": "ترجمة وتشغيل",
+  "@compileRun": {
+    "description": "tranche7 batch"
+  },
+  "eelCompiled": "تمت ترجمة السكربت وتحميله",
+  "@eelCompiled": {
+    "description": "tranche7 batch"
+  },
+  "exampleScripts": "سكربتات مثال",
+  "@exampleScripts": {
+    "description": "tranche7 batch"
+  },
+  "eelEditor": "محرر EEL",
+  "@eelEditor": {
+    "description": "tranche7 batch"
+  },
+  "liveSliders": "ازرار تحكم حية",
+  "@liveSliders": {
+    "description": "tranche7 batch"
+  },
+  "liveProgDspTitle": "DSP قابل للبرمجة",
+  "@liveProgDspTitle": {
+    "description": "tranche7 batch"
+  },
+  "lyricsEditorTitle": "محرر الكلمات",
+  "@lyricsEditorTitle": {
+    "description": "tranche7 batch"
+  },
+  "nowAtLabel": "الان عند",
+  "@nowAtLabel": {
+    "description": "tranche7 batch"
+  },
+  "pitchShift": "طبقة الصوت",
+  "@pitchShift": {
+    "description": "tranche7 batch"
+  },
+  "activeProfile": "الملف النشط",
+  "@activeProfile": {
+    "description": "tranche7 batch"
+  },
+  "openVdc": "فتح .vdc",
+  "@openVdc": {
+    "description": "tranche7 batch"
+  },
+  "refHpProfiles": "ملفات مرجعية",
+  "@refHpProfiles": {
+    "description": "tranche7 batch"
+  },
+  "bookmarkLabel": "علامة",
+  "@bookmarkLabel": {
+    "description": "tranche7 batch"
+  },
+  "bookmarkHint": "العلامات متاحة للمسار الحالي",
+  "@bookmarkHint": {
+    "description": "tranche7 batch"
+  },
+  "defaultGlobalEq": "الافتراضي (معادل عام)",
+  "@defaultGlobalEq": {
+    "description": "tranche7 batch"
+  },
+  "dspSavedAlbum": "تم حفظ الاعدادات لهذا الالبوم",
+  "@dspSavedAlbum": {
+    "description": "tranche7 batch"
+  },
+  "saveDspAlbum": "حفظ اعدادات الالبوم",
+  "@saveDspAlbum": {
+    "description": "tranche7 batch"
+  },
+  "playbackTools": "ادوات التشغيل",
+  "@playbackTools": {
+    "description": "tranche7 batch"
+  },
+  "trackEqOverride": "تجاوز معادل المسار",
+  "@trackEqOverride": {
+    "description": "tranche7 batch"
+  },
+  "trackRating": "تقييم المسار",
+  "@trackRating": {
+    "description": "tranche7 batch"
+  },
+  "trackVolumeOffset": "ازاحة صوت المسار",
+  "@trackVolumeOffset": {
+    "description": "tranche7 batch"
+  },
+  "bpmXfadeDesc": "لمزامنة التلاشي. النطاق 40-240",
+  "@bpmXfadeDesc": {
+    "description": "tranche7 batch"
+  },
+  "rgOff": "مغلق",
+  "@rgOff": {
+    "description": "tranche7 batch"
+  },
+  "rgTrack": "مسار",
+  "@rgTrack": {
+    "description": "tranche7 batch"
+  },
+  "rgAlbum": "البوم",
+  "@rgAlbum": {
+    "description": "tranche7 batch"
+  },
+  "rgAuto": "تلقائي",
+  "@rgAuto": {
+    "description": "tranche7 batch"
+  },
+  "autoCalibrate": "معايرة تلقائية",
+  "@autoCalibrate": {
+    "description": "tranche7 batch"
+  },
+  "noSessionLogs": "لا توجد سجلات بعد",
+  "@noSessionLogs": {
+    "description": "tranche7 batch"
+  },
+  "dspInspectorDebug": "الفاحص والتنقيح",
+  "@dspInspectorDebug": {
+    "description": "tranche7 batch"
+  },
+  "bpResolved": "تم الحل: تم تعطيل التجاوز",
+  "@bpResolved": {
+    "description": "tranche7 batch"
+  },
+  "replayGainTitle": "تطبيع الصوت ReplayGain",
+  "@replayGainTitle": {
+    "description": "tranche7 batch"
+  },
+  "appColorSource": "مصدر اللون",
+  "@appColorSource": {
+    "description": "tranche7 batch"
+  },
+  "importMilk": "استيراد .milk",
+  "@importMilk": {
+    "description": "tranche7 batch"
+  },
+  "importJsonViz": "استيراد مرئي JSON",
+  "@importJsonViz": {
+    "description": "tranche7 batch"
+  },
+  "loadJsonVizDesc": "حمّل اعداد مرئي مخصص",
+  "@loadJsonVizDesc": {
+    "description": "tranche7 batch"
+  },
+  "loadMilkDesc": "حمّل ملف Milkdrop",
+  "@loadMilkDesc": {
+    "description": "tranche7 batch"
+  },
+  "npArtworkSwipe": "تمرير الغلاف",
+  "@npArtworkSwipe": {
+    "description": "tranche7 batch"
+  },
+  "npDoubleTap": "النقر المزدوج",
+  "@npDoubleTap": {
+    "description": "tranche7 batch"
+  },
+  "selectPlayerTheme": "اختيار سمة المشغل",
+  "@selectPlayerTheme": {
+    "description": "tranche7 batch"
+  },
+  "aboutBlurb": "مشغل محلي عالي الجودة",
+  "@aboutBlurb": {
+    "description": "tranche7 batch"
+  },
+  "accentPalette": "لوحة التمييز",
+  "@accentPalette": {
+    "description": "tranche7 batch"
+  },
+  "ambientGlow": "توهج محيطي",
+  "@ambientGlow": {
+    "description": "tranche7 batch"
+  },
+  "applyTheme": "تطبيق السمة",
+  "@applyTheme": {
+    "description": "tranche7 batch"
+  },
+  "themeStudio": "استوديو السمات",
+  "@themeStudio": {
+    "description": "tranche7 batch"
+  },
+  "glowDesc": "يتوهج مع الغلاف",
+  "@glowDesc": {
+    "description": "tranche7 batch"
+  },
+  "importThemeJson": "استيراد سمة JSON",
+  "@importThemeJson": {
+    "description": "tranche7 batch"
+  },
+  "livePreview": "معاينة حية",
+  "@livePreview": {
+    "description": "tranche7 batch"
+  },
+  "pasteThemeJson": "الصق JSON صالح:",
+  "@pasteThemeJson": {
+    "description": "tranche7 batch"
+  },
+  "playAllCount": "تشغيل الكل ({count})",
+  "@playAllCount": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "noResultsFor": "لا نتائج لـ \"{query}\"",
+  "@noResultsFor": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "query": {}
+    }
+  },
+  "selectedCount": "{count} محدد",
+  "@selectedCount": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "addedToQueue": "تمت اضافة {count} الى القائمة",
+  "@addedToQueue": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "savedToLocal": "تم حفظ \"{title}\" ({count})",
+  "@savedToLocal": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "title": {},
+      "count": {}
+    }
+  },
+  "playlistExported": "تم تصدير القائمة ({count}).",
+  "@playlistExported": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "queuedForDownload": "{count} في قائمة التنزيل...",
+  "@queuedForDownload": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "previewTrackCount": "{count} مسار",
+  "@previewTrackCount": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "btCalibrated": "زمن البلوتوث {ms}ms",
+  "@btCalibrated": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "ms": {}
+    }
+  },
+  "importedOnline": "تم استيراد {count}!",
+  "@importedOnline": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "syncedOnline": "تمت مزامنة {count}.",
+  "@syncedOnline": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "syncFailed": "فشل: {error}",
+  "@syncFailed": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "scanComplete": "اكتمل الفحص: {count}.",
+  "@scanComplete": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "loadSongsFailed": "تعذر تحميل اغاني {title}",
+  "@loadSongsFailed": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "title": {}
+    }
+  },
+  "removedFavorite": "تمت ازالة \"{title}\"",
+  "@removedFavorite": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "title": {}
+    }
+  },
+  "cornerRadiusLabel": "استدارة الزوايا ({px})",
+  "@cornerRadiusLabel": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "px": {}
+    }
+  },
+  "vdcLoaded": "تم تحميل الملف: {name}",
+  "@vdcLoaded": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "vdcFailed": "فشل تحميل .vdc: {error}",
+  "@vdcFailed": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "conflictsWith": "تعارض مع: {name}",
+  "@conflictsWith": {
+    "description": "tranche7 tpl",
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "visualizerStyleLabel": "نمط المرئي",
+  "@visualizerStyleLabel": {
+    "description": "tranche7 sup"
+  },
+  "doneAction": "تم",
+  "@doneAction": {
+    "description": "tranche7 sup"
+  },
+  "scrobblerSaved": "تم حفظ البيانات بامان",
+  "@scrobblerSaved": {
+    "description": "tranche7 sup"
+  },
+  "usbPermDenied": "تم رفض اذن USB",
+  "@usbPermDenied": {
+    "description": "tranche7 sup"
+  },
+  "hwVolume": "صوت العتاد",
+  "@hwVolume": {
+    "description": "tranche7 sup"
+  },
+  "ytmDisconnected": "تم قطع الاتصال",
+  "@ytmDisconnected": {
+    "description": "tranche7 sup"
+  },
+  "allowBackground": "السماح بالتشغيل في الخلفية",
+  "@allowBackground": {
+    "description": "tranche7 sup"
+  },
+  "totalScrobbles": "الاجمالي:",
+  "@totalScrobbles": {
+    "description": "tranche7 sup"
+  },
+  "lastScrobbled": "الاخير:",
+  "@lastScrobbled": {
+    "description": "tranche7 sup"
+  },
+  "quickPresets": "اعدادات سريعة",
+  "@quickPresets": {
+    "description": "tranche7 sup"
+  },
+  "savedProxyPool": "قائمة محفوظة",
+  "@savedProxyPool": {
+    "description": "tranche7 sup"
+  },
+  "noProxiesPool": "لا توجد بروكسيات",
+  "@noProxiesPool": {
+    "description": "tranche7 sup"
+  },
+  "importProxies": "استيراد بروكسيات",
+  "@importProxies": {
+    "description": "tranche7 sup"
+  },
+  "importProxiesDesc": "استورد قائمتك او الصق سطورا",
+  "@importProxiesDesc": {
+    "description": "tranche7 sup"
+  },
+  "pasteOrPick": "الصق سطورا او اختر ملفا",
+  "@pasteOrPick": {
+    "description": "tranche7 sup"
+  },
+  "bypassHostsDesc": "هذه المضيفات تتصل مباشرة",
+  "@bypassHostsDesc": {
+    "description": "tranche7 sup"
+  },
+  "pasteClipboard": "لصق الحافظة",
+  "@pasteClipboard": {
+    "description": "tranche7 sup"
+  },
+  "pickFile": "اختيار ملف",
+  "@pickFile": {
+    "description": "tranche7 sup"
+  },
+  "importParse": "استيراد وتحليل",
+  "@importParse": {
+    "description": "tranche7 sup"
+  },
+  "importPaste": "استيراد / لصق",
+  "@importPaste": {
+    "description": "tranche7 sup"
+  },
+  "sortBySpeed": "فرز حسب السرعة",
+  "@sortBySpeed": {
+    "description": "tranche7 sup"
+  },
+  "testingLabel": "جار الاختبار",
+  "@testingLabel": {
+    "description": "tranche7 sup"
+  },
+  "failedLabel": "فشل",
+  "@failedLabel": {
+    "description": "tranche7 sup"
+  },
+  "unverifiedLabel": "غير مؤكد",
+  "@unverifiedLabel": {
+    "description": "tranche7 sup"
+  },
+  "clearAll": "مسح الكل",
+  "@clearAll": {
+    "description": "tranche7 sup"
+  },
+  "suggestCreateFailed": "تعذر انشاء القائمة المقترحة",
+  "@suggestCreateFailed": {
+    "description": "tranche7 sup"
+  },
+  "mostCompatible": "الاكثر توافقا",
+  "@mostCompatible": {
+    "description": "tranche7 sup"
+  },
+  "loadTracksFailed": "تعذر تحميل المسارات",
+  "@loadTracksFailed": {
+    "description": "tranche7 sup"
+  },
+  "noLikedToDownload": "لا توجد اغاني محببة. زامن اولا",
+  "@noLikedToDownload": {
+    "description": "tranche7 sup"
+  },
+  "fetchingAccount": "جار جلب القوائم...",
+  "@fetchingAccount": {
+    "description": "tranche7 sup"
+  },
+  "noAccountPlaylists": "لا توجد قوائم في مكتبتك",
+  "@noAccountPlaylists": {
+    "description": "tranche7 sup"
+  },
+  "selectPlaylistHint": "اختر قائمة لعرض المسارات",
+  "@selectPlaylistHint": {
+    "description": "tranche7 sup"
+  },
+  "signInToSync": "سجل الدخول للمزامنة",
+  "@signInToSync": {
+    "description": "tranche7 sup"
+  },
+  "suggestedForYou": "مقترح لك",
+  "@suggestedForYou": {
+    "description": "tranche7 sup"
+  },
+  "accountPlaylists": "قوائم الحساب",
+  "@accountPlaylists": {
+    "description": "tranche7 sup"
+  },
+  "addedPlaylists": "قوائم مضافة",
+  "@addedPlaylists": {
+    "description": "tranche7 sup"
+  },
+  "addYtmUrl": "اضافة رابط قائمة",
+  "@addYtmUrl": {
+    "description": "tranche7 sup"
+  },
+  "connectYtm": "ربط يوتيوب ميوزك",
+  "@connectYtm": {
+    "description": "tranche7 sup"
+  },
+  "exportBackup": "تصدير نسخة",
+  "@exportBackup": {
+    "description": "tranche7 sup"
+  },
+  "importBackup": "استيراد نسخة",
+  "@importBackup": {
+    "description": "tranche7 sup"
+  },
+  "backupExportDesc": "حفظ الكل في JSON",
+  "@backupExportDesc": {
+    "description": "tranche7 sup"
+  },
+  "backupImportDesc": "استعادة من ملف JSON",
+  "@backupImportDesc": {
+    "description": "tranche7 sup"
+  },
+  "backupTooLarge": "الملف كبير (اقصى 10 م.ب)",
+  "@backupTooLarge": {
+    "description": "tranche7 sup"
+  },
+  "backupMissing": "الملف غير موجود",
+  "@backupMissing": {
+    "description": "tranche7 sup"
+  },
+  "backupInvalid": "صيغة JSON غير صالحة",
+  "@backupInvalid": {
+    "description": "tranche7 sup"
+  },
+  "clearCacheReset": "مسح التخزين المؤقت",
+  "@clearCacheReset": {
+    "description": "tranche7 sup"
+  },
+  "cookiesCleared": "تم المسح. جار اعادة التحميل...",
+  "@cookiesCleared": {
+    "description": "tranche7 sup"
+  },
+  "forceEgypt": "فرض وضع مصر",
+  "@forceEgypt": {
+    "description": "tranche7 sup"
+  },
+  "googleBlockHelp": "اذا حظر جوجل الدخول الصق الكوكيز:",
+  "@googleBlockHelp": {
+    "description": "tranche7 sup"
+  },
+  "importCookiesToken": "استيراد الكوكيز يدويا",
+  "@importCookiesToken": {
+    "description": "tranche7 sup"
+  },
+  "importCookiesManual": "استيراد الكوكيز",
+  "@importCookiesManual": {
+    "description": "tranche7 sup"
+  },
+  "loginDetected": "تم رصد الدخول! اضغط \"تم\".",
+  "@loginDetected": {
+    "description": "tranche7 sup"
+  },
+  "confirmAccount": "تاكد من الحساب الصحيح ثم اضغط \"تم\".",
+  "@confirmAccount": {
+    "description": "tranche7 sup"
+  },
+  "openYtmWebDirect": "فتح الويب مباشرة",
+  "@openYtmWebDirect": {
+    "description": "tranche7 sup"
+  },
+  "openYtWeb": "فتح يوتيوب ويب",
+  "@openYtWeb": {
+    "description": "tranche7 sup"
+  },
+  "completeSignInFirst": "اكمل الدخول اولا",
+  "@completeSignInFirst": {
+    "description": "tranche7 sup"
+  },
+  "googleTvSignIn": "الدخول عبر Google TV",
+  "@googleTvSignIn": {
+    "description": "tranche7 sup"
+  },
+  "googleBlockTip": "تلميح: الصق الكوكيز من متصفحك",
+  "@googleBlockTip": {
+    "description": "tranche7 sup"
+  },
+  "ipOutsideYtm": "عنوان IP خارج دعم يوتيوب ميوزك ويب. افرض وضع مصر او انتقل الى يوتيوب ويب",
+  "@ipOutsideYtm": {
+    "description": "tranche7 sup"
+  },
+  "ytmRestricted": "يوتيوب ميوزك مقيد في منطقتك",
+  "@ytmRestricted": {
+    "description": "tranche7 sup"
+  },
+  "importedPresetTpl": "تم استيراد {preset}: {name}",
+  "@importedPresetTpl": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "preset": {},
+      "name": {}
+    }
+  },
+  "appliedProfileTpl": "تم تطبيق {profile}: {name}",
+  "@appliedProfileTpl": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "profile": {},
+      "name": {}
+    }
+  },
+  "proxyImported": "تم استيراد {count}",
+  "@proxyImported": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "proxyActivated": "تم تفعيل: {addr}",
+  "@proxyActivated": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "addr": {}
+    }
+  },
+  "proxyPresetApplied": "تم تطبيق: {name}",
+  "@proxyPresetApplied": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "name": {},
+      "host": {},
+      "port": {}
+    }
+  },
+  "pickFileFailed": "فشل الاختيار: {error}",
+  "@pickFileFailed": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "importPlaylistFailed": "فشل الاستيراد: {error}",
+  "@importPlaylistFailed": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "fetchingForDownload": "جار جلب \"{title}\"...",
+  "@fetchingForDownload": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "title": {}
+    }
+  },
+  "suggestedCreated": "تم انشاء \"{title}\" ({count}).",
+  "@suggestedCreated": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "title": {},
+      "count": {}
+    }
+  },
+  "entryAdded": "{count} - مضافة",
+  "@entryAdded": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "tapToCreate": "{count} - اضغط للانشاء",
+  "@tapToCreate": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "importMatched": "{matched} من {total}.",
+  "@importMatched": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "matched": {},
+      "total": {}
+    }
+  },
+  "accountPlaylistCount": "{count} قائمة",
+  "@accountPlaylistCount": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "historyLine": "السجل: {count}",
+  "@historyLine": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "backupExportedTo": "تم التصدير الى {uri}",
+  "@backupExportedTo": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "uri": {}
+    }
+  },
+  "tryIdentity": "جرب {name}",
+  "@tryIdentity": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "clearPoolConfirm": "حذف الـ {count}؟",
+  "@clearPoolConfirm": {
+    "description": "tranche7 sup tpl",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "playingOnCast": "يتم البث",
+  "@playingOnCast": {
+    "description": "tranche7 sup3"
+  },
+  "castConnected": "متصل",
+  "@castConnected": {
+    "description": "tranche7 sup3"
+  },
+  "resumeAction": "استئناف",
+  "@resumeAction": {
+    "description": "tranche7 sup4"
+  },
+  "notSetLabel": "غير محدد",
+  "@notSetLabel": {
+    "description": "tranche7 fix"
+  },
+  "bookmarkSaved": "تم حفظ العلامة",
+  "@bookmarkSaved": {
+    "description": "tranche7 fix"
+  },
+  "bookmarkEarly": "شغل بعد 0:05 للحفظ",
+  "@bookmarkEarly": {
+    "description": "tranche7 fix"
+  },
+  "resumeAtTpl": "استئناف عند {time}",
+  "@resumeAtTpl": {
+    "description": "tranche7 fix tpl",
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "selectAllAction": "تحديد الكل",
+  "@selectAllAction": {
+    "description": "tranche7 final"
+  },
+  "clearPoolTitle": "مسح القائمة؟",
+  "@clearPoolTitle": {
+    "description": "tranche7 final"
+  },
+  "milkRendererDesc": "عارض Milkdrop",
+  "@milkRendererDesc": {
+    "description": "tranche7 final"
+  },
+  "includedLabel": "مشمول",
+  "@includedLabel": {
+    "description": "tranche7 final"
+  },
+  "noneLabel": "لا شيء",
+  "@noneLabel": {
+    "description": "tranche7 final"
+  },
+  "queuedFromTitle": "{count} من \"{title}\" في القائمة...",
+  "@queuedFromTitle": {
+    "description": "tranche7 final tpl",
+    "placeholders": {
+      "count": {},
+      "title": {}
+    }
+  },
+  "allDownloaded": "كل مسارات \"{title}\" محملة.",
+  "@allDownloaded": {
+    "description": "tranche7 final tpl",
+    "placeholders": {
+      "title": {}
+    }
+  },
+  "hwOutputRouting": "توجيه العتاد",
+  "@hwOutputRouting": {
+    "description": "tranche7 quality"
+  },
+  "usbDacAttached": "DAC موصول",
+  "@usbDacAttached": {
+    "description": "tranche7 quality"
+  },
+  "outputPathDiag": "تشخيص مسار الاخراج",
+  "@outputPathDiag": {
+    "description": "tranche7 quality"
+  },
+  "dsdPcmNote": "ملفات DSD تفك الى PCM",
+  "@dsdPcmNote": {
+    "description": "tranche7 quality"
+  },
+  "targetSampleRate": "معدل العينات المستهدف",
+  "@targetSampleRate": {
+    "description": "tranche7 quality"
+  },
+  "targetBitPerfect": "عمق البت وBit-Perfect",
+  "@targetBitPerfect": {
+    "description": "tranche7 quality"
+  },
+  "trackSourceSpecs": "مواصفات المصدر",
+  "@trackSourceSpecs": {
+    "description": "tranche7 quality"
+  },
+  "liveSignalChain": "سلسلة الاشارة",
+  "@liveSignalChain": {
+    "description": "tranche7 quality"
+  },
+  "applyDone": "تطبيق وتم",
+  "@applyDone": {
+    "description": "tranche7 quality"
+  },
+  "switchOutputPanel": "بدل الاخراج من لوحة النظام",
+  "@switchOutputPanel": {
+    "description": "tranche7 quality"
+  },
+  "directBpMode": "وضع Bit-Perfect المباشر",
+  "@directBpMode": {
+    "description": "tranche7 quality"
+  },
+  "armedLabel": "مجهز",
+  "@armedLabel": {
+    "description": "tranche7 quality"
+  },
+  "bpGuardrails": "الحماية نشطة: تم تجاوز DSP. اضبط الصوت من DAC",
+  "@bpGuardrails": {
+    "description": "tranche7 quality"
+  },
+  "btAudioCodec": "كودك البلوتوث",
+  "@btAudioCodec": {
+    "description": "tranche7 quality"
+  },
+  "earbudsConnected": "السماعات متصلة",
+  "@earbudsConnected": {
+    "description": "tranche7 quality"
+  },
+  "supportedCodecs": "الكودكات المدعومة",
+  "@supportedCodecs": {
+    "description": "tranche7 quality"
+  },
+  "sampleRateLabel": "معدل العينات",
+  "@sampleRateLabel": {
+    "description": "tranche7 quality"
+  },
+  "bitDepthLabel": "عمق البت",
+  "@bitDepthLabel": {
+    "description": "tranche7 quality"
+  },
+  "ldacQuality": "جودة LDAC",
+  "@ldacQuality": {
+    "description": "tranche7 quality"
+  },
+  "changeBtCodec": "تغيير الكودك",
+  "@changeBtCodec": {
+    "description": "tranche7 quality"
+  },
+  "nearbyPermDesc": "يلزم اذن الاجهزة القريبة",
+  "@nearbyPermDesc": {
+    "description": "tranche7 quality"
+  },
+  "grantBtPerm": "منح الاذن",
+  "@grantBtPerm": {
+    "description": "tranche7 quality"
+  },
+  "leAudio": "LE AUDIO",
+  "@leAudio": {
+    "description": "tranche7 quality"
+  },
+  "lc3Negotiation": "اندرويد يتفاوض على LC3. الكودك والمعدل غير قابلين للضبط",
+  "@lc3Negotiation": {
+    "description": "tranche7 quality"
+  },
+  "connectingBt": "جار الاتصال...",
+  "@connectingBt": {
+    "description": "tranche7 quality"
+  },
+  "bitPerfectMode": "وضع Bit-Perfect",
+  "@bitPerfectMode": {
+    "description": "tranche7 quality"
   }
 }

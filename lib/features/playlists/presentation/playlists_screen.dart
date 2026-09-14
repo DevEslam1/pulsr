@@ -69,14 +69,16 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
   Future<void> _createPlaylistFromSuggestion(
       PlaylistSuggestion suggestion) async {
     final messenger = ScaffoldMessenger.of(context);
+    // Capture localized strings before async gaps (no context-across-gap).
+    final createFailedText = context.l10n.suggestCreateFailed;
+    final loc = context.l10n;
     final useCases = getIt<PlaylistUseCases>();
     try {
       final created = await useCases.createPlaylist(suggestion.title);
       final playlistId = created.fold<int?>((_) => null, (id) => id);
       if (playlistId == null) {
         messenger.showSnackBar(
-          const SnackBar(
-              content: Text('Could not create the suggested playlist.')),
+          SnackBar(content: Text(createFailedText)),
         );
         return;
       }
@@ -87,14 +89,13 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       }
       messenger.showSnackBar(
         SnackBar(
-          content: Text(
-              'Created "${suggestion.title}" with ${songIds.length} tracks.'),
+          content:
+              Text(loc.suggestedCreated(suggestion.title, songIds.length)),
         ),
       );
     } catch (_) {
       messenger.showSnackBar(
-        const SnackBar(
-            content: Text('Could not create the suggested playlist.')),
+        SnackBar(content: Text(createFailedText)),
       );
     }
   }
@@ -215,7 +216,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
             ListTile(
               leading: const Icon(Icons.playlist_play_rounded),
               title: const Text('M3U'),
-              subtitle: const Text('Most compatible'),
+              subtitle: Text(context.l10n.mostCompatible),
               onTap: () => Navigator.pop(ctx, PlaylistFormat.m3u),
             ),
             ListTile(
@@ -311,7 +312,8 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       (failure) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Failed to import playlist: ${failure.message}')),
+              content: Text(context.l10n
+                  .importPlaylistFailed(failure.message))),
         );
       },
       (importResult) {
@@ -321,8 +323,9 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               color: context.palette.success, size: 28),
           title: Text(context.l10n.playlistImported,
               style: const TextStyle(fontWeight: FontWeight.w800)),
-          content: Text(
-              '${importResult.matchedTrackCount} of ${importResult.totalExtractedPaths} tracks matched.'),
+          content: Text(context.l10n.importMatched(
+              importResult.matchedTrackCount,
+              importResult.totalExtractedPaths)),
           actions: [
             FilledButton(
               onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
@@ -440,8 +443,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                                   Icon(Icons.queue_music_rounded,
                                       size: 64, color: p.textTertiary),
                                   const SizedBox(height: 16),
-                                  Text(
-                                    'Select a playlist to view tracks',
+                                  Text(context.l10n.selectPlaylistHint,
                                     style: TextStyle(
                                       color: p.textSecondary,
                                       fontSize: 16,
@@ -521,8 +523,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                 top: 24,
                 bottom: 10,
               ),
-              child: Text(
-                'SUGGESTED FOR YOU',
+              child: Text(context.l10n.suggestedForYou,
                 style: Theme.of(context)
                     .textTheme
                     .labelSmall
@@ -847,9 +848,9 @@ class _OnlinePlaylistsContent extends StatelessWidget {
           ),
         );
       } else {
+        final emptyText = loadFailedText;
         scaffoldMessenger.showSnackBar(
-          const SnackBar(
-              content: Text('Could not load tracks for this playlist.')),
+          SnackBar(content: Text(emptyText)),
         );
       }
     } catch (_) {
@@ -891,8 +892,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
   ) {
     if (likedTracks.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('No liked songs to download. Sync first.')),
+        SnackBar(content: Text(context.l10n.noLikedToDownload)),
       );
       return;
     }
@@ -957,8 +957,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'Connect YouTube Music',
+                                Text(context.l10n.connectYtm,
                                   style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w800,
@@ -966,8 +965,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(height: 4),
-                                Text(
-                                  'Sign in to sync your Liked Music library and account playlists.',
+                                Text(context.l10n.signInToSync,
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: p.textSecondary,
@@ -1029,8 +1027,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                     child: Row(
                       children: [
                         Expanded(
-                          child: Text(
-                            'ACCOUNT PLAYLISTS',
+                          child: Text(context.l10n.accountPlaylists,
                             style: Theme.of(context)
                                 .textTheme
                                 .labelSmall
@@ -1046,7 +1043,8 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                           )
                         else if (online.accountPlaylists.isNotEmpty)
                           Text(
-                            '${online.accountPlaylists.length} playlists',
+                            context.l10n.accountPlaylistCount(
+                                online.accountPlaylists.length),
                             style: TextStyle(
                                 color: p.textTertiary,
                                 fontSize: 11,
@@ -1069,7 +1067,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                                 child: CircularProgressIndicator(
                                     strokeWidth: 2.5, color: p.accent)),
                             const SizedBox(height: 12),
-                            Text('Fetching account playlists…',
+                            Text(context.l10n.fetchingAccount,
                                 style: TextStyle(
                                     color: p.textSecondary, fontSize: 13)),
                           ],
@@ -1127,8 +1125,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                                 color: p.textTertiary, size: 26),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: Text(
-                                'No playlists found in your YouTube Music library.',
+                              child: Text(context.l10n.noAccountPlaylists,
                                 style: TextStyle(
                                     color: p.textSecondary, fontSize: 13),
                               ),
@@ -1170,8 +1167,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                   Padding(
                     padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context),
                         24, Adaptive.pagePadding(context), 10),
-                    child: Text(
-                      'ADDED PLAYLISTS',
+                    child: Text(context.l10n.addedPlaylists,
                       style: Theme.of(context)
                           .textTheme
                           .labelSmall
@@ -1217,12 +1213,11 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                       color: const Color(0xFFFF0000),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(Icons.add_rounded,
+                        children: [
+                          const Icon(Icons.add_rounded,
                               color: Color(0xFFFF0000), size: 20),
-                          SizedBox(width: 8),
-                          Text(
-                            'Add YouTube Playlist URL',
+                          const SizedBox(width: 8),
+                          Text(context.l10n.addYtmUrl,
                             style: TextStyle(
                               color: Color(0xFFFF0000),
                               fontWeight: FontWeight.w800,
@@ -1452,8 +1447,7 @@ class _LikedMusicOnlineCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Liked Music',
+                  Text(context.l10n.likedMusic,
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w900,
@@ -1636,7 +1630,7 @@ class _OnlinePlaylistCard extends StatelessWidget {
                         fontSize: 13),
                   ),
                   const SizedBox(height: 2),
-                  Text('${entry.tracks.length} tracks • Added',
+                  Text(context.l10n.entryAdded(entry.tracks.length),
                       style: TextStyle(color: p.textSecondary, fontSize: 11.5)),
                 ],
               ),
@@ -1784,7 +1778,7 @@ class _SuggestionCard extends StatelessWidget {
             ),
             const Spacer(),
             Text(
-              '${suggestion.songs.length} tracks • Tap to create',
+              context.l10n.tapToCreate(suggestion.songs.length),
               style: TextStyle(color: p.textTertiary, fontSize: 11),
             ),
           ],

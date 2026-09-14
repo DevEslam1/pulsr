@@ -12,6 +12,7 @@ import '../../domain/models/audio_effects_config.dart';
 import '../../domain/models/eq_preset.dart';
 import '../../domain/models/headphone_profile.dart';
 import '../../domain/models/reverb_preset.dart';
+import 'async_lock.dart';
 import 'audio_effects_channel.dart';
 import 'comparison_slot.dart';
 import 'headphone_profiles_repository.dart';
@@ -19,19 +20,7 @@ import 'ir_file_parser.dart';
 import 'optimized_dsp_pipeline.dart';
 
 export 'comparison_slot.dart';
-
-/// Simple async lock for serializing concurrent effect state changes.
-/// Prevents race conditions when multiple effects are toggled rapidly.
-class _AsyncLock {
-  Future<void> _chain = Future<void>.value();
-
-  Future<T> lock<T>(Future<T> Function() fn) {
-    final future = _chain.then((_) => fn());
-    // Always chain the next operation to maintain serialization, even if this one fails
-    _chain = future.whenComplete(() {});
-    return future;
-  }
-}
+export 'async_lock.dart' show AsyncLock;
 
 class EqualizerManager {
   final AndroidLoudnessEnhancer? loudnessEnhancerA;
@@ -41,7 +30,7 @@ class EqualizerManager {
   Timer? _bandGainDebounce;
   final Map<int, double> _pendingBandGains = {};
   final _effectsLock =
-      _AsyncLock(); // Serializes concurrent effect state changes
+      AsyncLock(); // Serializes concurrent effect state changes
 
   /// Per-effect truthful status: a key is present only while the most recent
   /// native apply attempt was rejected (unsupported capability, build failure,

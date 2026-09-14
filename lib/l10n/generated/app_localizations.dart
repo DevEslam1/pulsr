@@ -4678,6 +4678,1422 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Restricts saturation to the mid band for clean sub-bass.'**
   String get saturationBandDesc;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'MATCH LOGIC'**
+  String get matchLogic;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'RULES'**
+  String get rulesLabel;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'SORTING & LIMIT'**
+  String get sortingLimit;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Sort Field'**
+  String get sortField;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get titleLabel;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Play Count'**
+  String get playCountLabel;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Last Played'**
+  String get lastPlayedLabel;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Year'**
+  String get yearLabel;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Track Limit'**
+  String get trackLimit;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'MATCHING TRACKS PREVIEW'**
+  String get matchingPreview;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Yes (True)'**
+  String get yesBool;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'No (False)'**
+  String get noBool;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'No tracks match the selected rules.'**
+  String get noRuleMatch;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot download an empty playlist.'**
+  String get cannotDownloadEmpty;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot export an empty playlist.'**
+  String get cannotExportEmpty;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot share an empty playlist.'**
+  String get cannotShareEmpty;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Download All Tracks'**
+  String get downloadAllTracks;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Export as M3U'**
+  String get exportM3u;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Songs'**
+  String get manageSongs;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Share Playlist'**
+  String get sharePlaylist;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Download All'**
+  String get downloadAll;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Save to Pulsr'**
+  String get saveToPulsr;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Fetching playlist tracks from YouTube Music...'**
+  String get fetchingYtmTracks;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'YOUTUBE MUSIC'**
+  String get ytmHeader;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Import Tracks'**
+  String get importTracks;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Import YouTube Music Favorites'**
+  String get importYtmFav;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Paste a playlist link or Liked playlist from YouTube Music'**
+  String get pastePlaylistLink;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'No favorite songs to download.'**
+  String get noFavToDownload;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Syncing YouTube Music Liked Songs...'**
+  String get syncingYtm;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube Music session expired. Please sign in again.'**
+  String get sessionExpired;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load your library.'**
+  String get libLoadFailed;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Scan your device storage to load your audio tracks.'**
+  String get scanPrompt;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'No Music Loaded Yet'**
+  String get noMusicYet;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Find millions of songs, artists & stream online'**
+  String get ytmPromo;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Load More History'**
+  String get loadMoreHistory;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'No recently played songs'**
+  String get noRecentSongs;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Play your favorite music and it will appear here.'**
+  String get recentEmptyHint;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Song info'**
+  String get songInfo;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'RECITER STYLE'**
+  String get reciterStyle;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Learning Speed'**
+  String get learningSpeed;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Slow recitation down for memorization'**
+  String get reciterSpeedDesc;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'OUTPUT HARDWARE'**
+  String get outputHardware;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Profile'**
+  String get resetProfile;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Vocal-optimized recitation profiles'**
+  String get reciterDesc;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Sibilance is tamed with a high-shelf EQ cut. Spectral noise and breath reduction are not available in the current audio engine.'**
+  String get sibilanceDesc;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Multiband Compressor'**
+  String get compressorTitle;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Native 4-band compressor with Linkwitz-Riley crossovers. Tames each frequency band independently before the limiter.'**
+  String get compressorDesc;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Ratio, Attack and Make-up Gain need the Android DynamicsProcessing engine.'**
+  String get compressorLimitDesc;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to Studio Defaults'**
+  String get resetStudioDefaults;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Studio Dynamics Compressor'**
+  String get studioCompressor;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Studio-grade lookahead dynamics processing and peak brickwall limiting.'**
+  String get studioCompressorDesc;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Bytecode JIT'**
+  String get bytecodeJit;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Compile & Run'**
+  String get compileRun;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'EEL Script Compiled & Loaded into DSP Engine'**
+  String get eelCompiled;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Example Scripts & Algorithms'**
+  String get exampleScripts;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Jesusonic / EEL Script Editor'**
+  String get eelEditor;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Live Control Sliders'**
+  String get liveSliders;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Live Programmable DSP'**
+  String get liveProgDspTitle;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Synced Lyrics Editor'**
+  String get lyricsEditorTitle;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Now at'**
+  String get nowAtLabel;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Pitch / Tone Shift'**
+  String get pitchShift;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Active Profile'**
+  String get activeProfile;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Open .vdc'**
+  String get openVdc;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Reference Headphone Profiles'**
+  String get refHpProfiles;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmark'**
+  String get bookmarkLabel;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmarks are available for the track currently playing.'**
+  String get bookmarkHint;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Default (Global EQ)'**
+  String get defaultGlobalEq;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'DSP settings saved for this album.'**
+  String get dspSavedAlbum;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Save DSP settings for this album'**
+  String get saveDspAlbum;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Playback Tools'**
+  String get playbackTools;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Track EQ Override'**
+  String get trackEqOverride;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Track Rating'**
+  String get trackRating;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Track Volume Offset'**
+  String get trackVolumeOffset;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Used by BPM-synced crossfade to align fades to the beat. Range 40-240.'**
+  String get bpmXfadeDesc;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get rgOff;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Track'**
+  String get rgTrack;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Album'**
+  String get rgAlbum;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get rgAuto;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-calibrate'**
+  String get autoCalibrate;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'No audio session logs recorded yet'**
+  String get noSessionLogs;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'DSP Signal Inspector & Debug'**
+  String get dspInspectorDebug;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Resolved: Bit-Perfect bypass disabled - ReplayGain is adjustable again'**
+  String get bpResolved;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'ReplayGain Loudness Normalization'**
+  String get replayGainTitle;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'App Color Source'**
+  String get appColorSource;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Import .milk Preset'**
+  String get importMilk;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Import JSON Visualizer Preset'**
+  String get importJsonViz;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Load a Custom visualizer preset (.json) from storage'**
+  String get loadJsonVizDesc;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Load a Winamp/Milkdrop preset file from storage'**
+  String get loadMilkDesc;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Now Playing Artwork Swipe'**
+  String get npArtworkSwipe;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Now Playing Double-Tap Action'**
+  String get npDoubleTap;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Select Player Theme'**
+  String get selectPlayerTheme;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'An audiophile-grade local music player with bit-perfect output, a full DSP chain, per-device profiles and automation.'**
+  String get aboutBlurb;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Accent Color Palette'**
+  String get accentPalette;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Ambient Acoustic Glow'**
+  String get ambientGlow;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Apply Theme'**
+  String get applyTheme;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Theme Studio'**
+  String get themeStudio;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Glows with the active track artwork'**
+  String get glowDesc;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Import Theme JSON'**
+  String get importThemeJson;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Live Theme Preview'**
+  String get livePreview;
+
+  /// tranche7 batch
+  ///
+  /// In en, this message translates to:
+  /// **'Paste a valid Pulsr theme JSON string below:'**
+  String get pasteThemeJson;
+
+  /// tranche7 tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Play All ({count})'**
+  String playAllCount(Object count);
+
+  /// tranche7 tpl
+  ///
+  /// In en, this message translates to:
+  /// **'No results for \"{query}\"'**
+  String noResultsFor(Object query);
+
+  /// tranche7 tpl
+  ///
+  /// In en, this message translates to:
+  /// **'{count} Selected'**
+  String selectedCount(Object count);
+
+  /// tranche7 tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Added {count} tracks to queue'**
+  String addedToQueue(Object count);
+
+  /// tranche7 tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Saved \"{title}\" to Local Playlists ({count} tracks)'**
+  String savedToLocal(Object title, Object count);
+
+  /// tranche7 tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Playlist exported successfully ({count} tracks).'**
+  String playlistExported(Object count);
+
+  /// tranche7 tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Queued {count} tracks for download (3 active downloads)...'**
+  String queuedForDownload(Object count);
+
+  /// tranche7 tpl
+  ///
+  /// In en, this message translates to:
+  /// **'{count} tracks'**
+  String previewTrackCount(Object count);
+
+  /// tranche7 tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth latency calibrated to {ms} ms'**
+  String btCalibrated(Object ms);
+
+  /// tranche7 tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Successfully imported {count} tracks to Online Favorites!'**
+  String importedOnline(Object count);
+
+  /// tranche7 tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Synced {count} tracks from your YouTube Music Liked library!'**
+  String syncedOnline(Object count);
+
+  /// tranche7 tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Sync failed: {error}'**
+  String syncFailed(Object error);
+
+  /// tranche7 tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Scan complete! {count} tracks loaded.'**
+  String scanComplete(Object count);
+
+  /// tranche7 tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load songs for {title}'**
+  String loadSongsFailed(Object title);
+
+  /// tranche7 tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Removed \"{title}\" from favorites'**
+  String removedFavorite(Object title);
+
+  /// tranche7 tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Card & Artwork Corner Radius ({px}px)'**
+  String cornerRadiusLabel(Object px);
+
+  /// tranche7 tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Loaded ViPER-DDC profile: {name}'**
+  String vdcLoaded(Object name);
+
+  /// tranche7 tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load .vdc file: {error}'**
+  String vdcFailed(Object error);
+
+  /// tranche7 tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Conflicts with: {name}'**
+  String conflictsWith(Object name);
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Audio Visualizer Style'**
+  String get visualizerStyleLabel;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get doneAction;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Scrobbler credentials saved securely.'**
+  String get scrobblerSaved;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'USB permission denied - hardware volume unavailable'**
+  String get usbPermDenied;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Hardware Volume'**
+  String get hwVolume;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnected from YouTube Music'**
+  String get ytmDisconnected;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Allow Background Playback'**
+  String get allowBackground;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Total Scrobbles:'**
+  String get totalScrobbles;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Last Scrobbled:'**
+  String get lastScrobbled;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'QUICK PRESETS'**
+  String get quickPresets;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'SAVED PROXY POOL'**
+  String get savedProxyPool;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'No Proxies in Pool'**
+  String get noProxiesPool;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Import Proxies'**
+  String get importProxies;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Import your proxy list (.txt) or paste lines in IP:PORT:USER:PASS format.'**
+  String get importProxiesDesc;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Paste proxy lines or pick a text file. Lines will be parsed automatically.'**
+  String get pasteOrPick;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Requests matching these hosts will connect directly without routing through proxy.'**
+  String get bypassHostsDesc;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Paste Clipboard'**
+  String get pasteClipboard;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Pick File'**
+  String get pickFile;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Import & Parse'**
+  String get importParse;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Import / Paste'**
+  String get importPaste;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Sort by Speed'**
+  String get sortBySpeed;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Testing'**
+  String get testingLabel;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get failedLabel;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Unverified'**
+  String get unverifiedLabel;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Clear All'**
+  String get clearAll;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Could not create the suggested playlist.'**
+  String get suggestCreateFailed;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Most compatible'**
+  String get mostCompatible;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load tracks for this playlist.'**
+  String get loadTracksFailed;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'No liked songs to download. Sync first.'**
+  String get noLikedToDownload;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Fetching account playlists...'**
+  String get fetchingAccount;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'No playlists found in your YouTube Music library.'**
+  String get noAccountPlaylists;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Select a playlist to view tracks'**
+  String get selectPlaylistHint;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to sync your Liked Music library and account playlists.'**
+  String get signInToSync;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'SUGGESTED FOR YOU'**
+  String get suggestedForYou;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'ACCOUNT PLAYLISTS'**
+  String get accountPlaylists;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'ADDED PLAYLISTS'**
+  String get addedPlaylists;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Add YouTube Playlist URL'**
+  String get addYtmUrl;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Connect YouTube Music'**
+  String get connectYtm;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Export Backup'**
+  String get exportBackup;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Import Backup'**
+  String get importBackup;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Save favorites, playlists, history & settings to JSON'**
+  String get backupExportDesc;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Restore favorites, playlists, history & settings from JSON file'**
+  String get backupImportDesc;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Backup file too large (max 10 MB)'**
+  String get backupTooLarge;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Selected backup file does not exist'**
+  String get backupMissing;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid JSON backup file format'**
+  String get backupInvalid;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Cache & Reset'**
+  String get clearCacheReset;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Cookies and cache cleared. Reloading YouTube Music...'**
+  String get cookiesCleared;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Force Egypt Mode'**
+  String get forceEgypt;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'If Google blocks embedded browser login on this device, you can paste your raw cookie string directly:'**
+  String get googleBlockHelp;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Import Cookies / Token Manually'**
+  String get importCookiesToken;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Import Cookies Manually'**
+  String get importCookiesManual;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Login detected! Tap the green \"Done\" button to complete setup.'**
+  String get loginDetected;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Make sure you sign into the correct Google account. Tap \"Done\" once logged in.'**
+  String get confirmAccount;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Open YouTube Music web directly'**
+  String get openYtmWebDirect;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Open YouTube Web'**
+  String get openYtWeb;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Please complete sign in on YouTube Music first.'**
+  String get completeSignInFirst;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with Google TV (no captcha)'**
+  String get googleTvSignIn;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Tip: if Google continues to block in-app sign-in on this device, paste your cookies from your browser using the button above.'**
+  String get googleBlockTip;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'Your network IP is outside YouTube Music Web support. Force Egypt mode or switch to YouTube Web (never geo-blocked).'**
+  String get ipOutsideYtm;
+
+  /// tranche7 sup
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube Music is restricted in your region'**
+  String get ytmRestricted;
+
+  /// tranche7 sup tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Imported {preset}: {name}'**
+  String importedPresetTpl(Object preset, Object name);
+
+  /// tranche7 sup tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Applied {profile}: {name}'**
+  String appliedProfileTpl(Object profile, Object name);
+
+  /// tranche7 sup tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Successfully imported {count} new proxies'**
+  String proxyImported(Object count);
+
+  /// tranche7 sup tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Activated proxy: {addr}'**
+  String proxyActivated(Object addr);
+
+  /// tranche7 sup tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Applied preset: {name} ({host}:{port})'**
+  String proxyPresetApplied(Object name, Object host, Object port);
+
+  /// tranche7 sup tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to pick file: {error}'**
+  String pickFileFailed(Object error);
+
+  /// tranche7 sup tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to import playlist: {error}'**
+  String importPlaylistFailed(Object error);
+
+  /// tranche7 sup tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Fetching \"{title}\" for download...'**
+  String fetchingForDownload(Object title);
+
+  /// tranche7 sup tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Created \"{title}\" with {count} tracks.'**
+  String suggestedCreated(Object title, Object count);
+
+  /// tranche7 sup tpl
+  ///
+  /// In en, this message translates to:
+  /// **'{count} tracks - Added'**
+  String entryAdded(Object count);
+
+  /// tranche7 sup tpl
+  ///
+  /// In en, this message translates to:
+  /// **'{count} tracks - Tap to create'**
+  String tapToCreate(Object count);
+
+  /// tranche7 sup tpl
+  ///
+  /// In en, this message translates to:
+  /// **'{matched} of {total} tracks matched.'**
+  String importMatched(Object matched, Object total);
+
+  /// tranche7 sup tpl
+  ///
+  /// In en, this message translates to:
+  /// **'{count} playlists'**
+  String accountPlaylistCount(Object count);
+
+  /// tranche7 sup tpl
+  ///
+  /// In en, this message translates to:
+  /// **'History: {count}'**
+  String historyLine(Object count);
+
+  /// tranche7 sup tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Backup exported successfully to {uri}'**
+  String backupExportedTo(Object uri);
+
+  /// tranche7 sup tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Try {name}'**
+  String tryIdentity(Object name);
+
+  /// tranche7 sup tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete all {count} saved proxies?'**
+  String clearPoolConfirm(Object count);
+
+  /// tranche7 sup3
+  ///
+  /// In en, this message translates to:
+  /// **'Playing on Cast'**
+  String get playingOnCast;
+
+  /// tranche7 sup3
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get castConnected;
+
+  /// tranche7 sup4
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get resumeAction;
+
+  /// tranche7 fix
+  ///
+  /// In en, this message translates to:
+  /// **'Not set'**
+  String get notSetLabel;
+
+  /// tranche7 fix
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmark saved.'**
+  String get bookmarkSaved;
+
+  /// tranche7 fix
+  ///
+  /// In en, this message translates to:
+  /// **'Play past 0:05 to save a bookmark.'**
+  String get bookmarkEarly;
+
+  /// tranche7 fix tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Resume at {time}'**
+  String resumeAtTpl(Object time);
+
+  /// tranche7 final
+  ///
+  /// In en, this message translates to:
+  /// **'Select All'**
+  String get selectAllAction;
+
+  /// tranche7 final
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Proxy Pool?'**
+  String get clearPoolTitle;
+
+  /// tranche7 final
+  ///
+  /// In en, this message translates to:
+  /// **'Winamp/Milkdrop preset renderer (built-in or imported .milk file)'**
+  String get milkRendererDesc;
+
+  /// tranche7 final
+  ///
+  /// In en, this message translates to:
+  /// **'Included'**
+  String get includedLabel;
+
+  /// tranche7 final
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get noneLabel;
+
+  /// tranche7 final tpl
+  ///
+  /// In en, this message translates to:
+  /// **'Queued {count} tracks from \"{title}\" for download...'**
+  String queuedFromTitle(Object count, Object title);
+
+  /// tranche7 final tpl
+  ///
+  /// In en, this message translates to:
+  /// **'All tracks from \"{title}\" are already downloaded or queued.'**
+  String allDownloaded(Object title);
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'HARDWARE OUTPUT ROUTING'**
+  String get hwOutputRouting;
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'USB DAC ATTACHED'**
+  String get usbDacAttached;
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'OUTPUT PATH DIAGNOSTICS'**
+  String get outputPathDiag;
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'DSD files decode to PCM; native DSD streaming is not supported yet'**
+  String get dsdPcmNote;
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'TARGET OUTPUT SAMPLE RATE'**
+  String get targetSampleRate;
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'TARGET BIT DEPTH & BIT-PERFECT'**
+  String get targetBitPerfect;
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'TRACK SOURCE SPECIFICATIONS'**
+  String get trackSourceSpecs;
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'LIVE AUDIO SIGNAL CHAIN'**
+  String get liveSignalChain;
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'Apply & Done'**
+  String get applyDone;
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'Switch output in system panel'**
+  String get switchOutputPanel;
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'Direct Bit-Perfect Mode'**
+  String get directBpMode;
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'ARMED'**
+  String get armedLabel;
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-Perfect Guardrails Active: DSP processing & software volume bypassed. Adjust volume via hardware DAC.'**
+  String get bpGuardrails;
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'BLUETOOTH AUDIO CODEC'**
+  String get btAudioCodec;
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'Earbuds connected. See specs below.'**
+  String get earbudsConnected;
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'SUPPORTED CODECS (TAP TO SWITCH)'**
+  String get supportedCodecs;
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'SAMPLE RATE'**
+  String get sampleRateLabel;
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'BIT DEPTH'**
+  String get bitDepthLabel;
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'LDAC QUALITY'**
+  String get ldacQuality;
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'Change Bluetooth Codec'**
+  String get changeBtCodec;
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'Nearby Devices permission needed to read and control codec settings.'**
+  String get nearbyPermDesc;
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'Grant Bluetooth Permission'**
+  String get grantBtPerm;
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'LE AUDIO'**
+  String get leAudio;
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'Android negotiates the LC3 stream with your earbuds. Codec, sample rate and bit depth are not app-adjustable on LE Audio.'**
+  String get lc3Negotiation;
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting to Bluetooth stack...'**
+  String get connectingBt;
+
+  /// tranche7 quality
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-Perfect Mode'**
+  String get bitPerfectMode;
 }
 
 class _AppLocalizationsDelegate

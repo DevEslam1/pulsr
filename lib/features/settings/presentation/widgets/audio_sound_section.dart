@@ -40,10 +40,10 @@ class AudioSoundSection extends StatelessWidget {
       BuildContext context, SettingsCubit cubit) async {
     await cubit.setBypassDspOnBitPerfect(false);
     if (!context.mounted) return;
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(const SnackBar(
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
       behavior: SnackBarBehavior.floating,
       content:
-          Text('Resolved: Bit-Perfect bypass disabled — ReplayGain is adjustable again'),
+          Text(context.l10n.bpResolved),
     ));
   }
 
@@ -507,8 +507,7 @@ class AudioSoundSection extends StatelessWidget {
                           Row(
                             children: [
                               Expanded(
-                                child: Text(
-                                  'ReplayGain Loudness Normalization',
+                                child: Text(context.l10n.replayGainTitle,
                                   style: TextStyle(
                                     color: rgBlocked != null
                                         ? p.textTertiary
@@ -565,28 +564,28 @@ class AudioSoundSection extends StatelessWidget {
                         EdgeInsets.symmetric(horizontal: 4),
                       ),
                     ),
-                    segments: const [
+                    segments: [
                       ButtonSegment(
                         value: ReplayGainMode.off,
-                        label: Text('Off',
+                        label: Text(context.l10n.rgOff,
                             style: TextStyle(
                                 fontSize: 11, fontWeight: FontWeight.w700)),
                       ),
                       ButtonSegment(
                         value: ReplayGainMode.track,
-                        label: Text('Track',
+                        label: Text(context.l10n.rgTrack,
                             style: TextStyle(
                                 fontSize: 11, fontWeight: FontWeight.w700)),
                       ),
                       ButtonSegment(
                         value: ReplayGainMode.album,
-                        label: Text('Album',
+                        label: Text(context.l10n.rgAlbum,
                             style: TextStyle(
                                 fontSize: 11, fontWeight: FontWeight.w700)),
                       ),
                       ButtonSegment(
                         value: ReplayGainMode.auto,
-                        label: Text('Auto',
+                        label: Text(context.l10n.rgAuto,
                             style: TextStyle(
                                 fontSize: 11, fontWeight: FontWeight.w700)),
                       ),
@@ -826,8 +825,7 @@ class AudioSoundSection extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'DSP Signal Inspector & Debug',
+                        Text(context.l10n.dspInspectorDebug,
                           style: TextStyle(
                             color:
                                 isAndroid ? p.textPrimary : p.textTertiary,
@@ -989,7 +987,7 @@ class AudioSoundSection extends StatelessWidget {
                     onPressed: () =>
                         _autoCalibrateBluetoothLatency(context, cubit),
                     icon: const Icon(Icons.auto_fix_high_rounded, size: 16),
-                    label: const Text('Auto-calibrate'),
+                    label: Text(context.l10n.autoCalibrate),
                   ),
                 ),
             ],
@@ -1146,11 +1144,13 @@ class AudioSoundSection extends StatelessWidget {
   /// sheet. Best-effort: a missing/failed export surfaces a message, never a throw.
   Future<void> _exportSessionLogs(BuildContext context) async {
     final messenger = ScaffoldMessenger.maybeOf(context);
+    // Captured before async gaps (no context-across-gap).
+    final noLogsText = context.l10n.noSessionLogs;
+    final exportFailedText = context.l10n.exportFailed;
     try {
       final file = await AudioSessionLog.instance.exportToFile();
       if (file == null || await file.length() == 0) {
-        messenger?.showSnackBar(const SnackBar(
-          content: Text('No audio session logs recorded yet'),
+        messenger?.showSnackBar(SnackBar(content: Text(noLogsText),
         ));
         return;
       }
@@ -1158,9 +1158,9 @@ class AudioSoundSection extends StatelessWidget {
         files: [XFile(file.path, mimeType: 'application/x-ndjson')],
         text: 'Pulsr audio session logs',
       ));
-    } catch (e) {
+    } catch (_) {
       messenger?.showSnackBar(
-        SnackBar(content: Text('Export failed: ${e.toString()}')),
+        SnackBar(content: Text(exportFailedText)),
       );
     }
   }

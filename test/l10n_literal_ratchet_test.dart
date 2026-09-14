@@ -1,7 +1,8 @@
 // Localization ratchet (defect 28-01): raw user-facing Text('...') literals
 // bypass the complete ARB files (623/623/623). This lexical lower bound may
 // only shrink: localize a surface and lower the baseline, never raise it.
-// Baseline: 542 matches at tranche 6 (was ~665 before the EQ-sheet sweep).
+// Baseline: 271 matches at tranche 7 (542 at tranche 6, ~665 before the
+// EQ-sheet sweep; audio_quality_sheet 39 -> 9 this tranche).
 // Excludes generated l10n. Proper nouns (crossfeed inventor names), channel
 // symbols (L/R), unit interpolations ($bits-bit) and live-value templates
 // (${state...}) are the known-acceptable remainder, tracked to zero next.
@@ -11,7 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('raw Text literals do not increase (28-01 ratchet)', () {
-    const baseline = 542;
+    const baseline = 271;
     final pattern = RegExp(r"Text\(\s*'");
     var count = 0;
     final dir = Directory('lib');

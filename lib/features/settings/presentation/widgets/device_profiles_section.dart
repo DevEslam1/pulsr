@@ -102,7 +102,7 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
     await context.read<PlayerCubit>().applyProfile(profile, manual: true);
     if (!mounted) return;
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      SnackBar(content: Text('${l10n.applyProfileNow}: ${profile.name}')),
+      SnackBar(content: Text(context.l10n.appliedProfileTpl(l10n.applyProfileNow, profile.name))),
     );
   }
 

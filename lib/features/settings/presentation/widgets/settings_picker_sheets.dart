@@ -232,8 +232,7 @@ void showThemePickerSheet(
             const SizedBox(height: 12),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-              child: Text(
-                'Select Player Theme',
+              child: Text(context.l10n.selectPlayerTheme,
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
@@ -467,10 +466,9 @@ void showColorSourcePickerSheet(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Text(
-              'App Color Source',
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Text(context.l10n.appColorSource,
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w900,
@@ -571,8 +569,7 @@ void showVisualizerStylePickerSheet(
     (
       style: VisualizerStyle.milkdrop,
       title: 'MILKDROP',
-      subtitle:
-          'Winamp/Milkdrop preset renderer (built-in or imported .milk file)',
+      subtitle: context.l10n.milkRendererDesc,
       icon: Icons.blur_on_rounded,
     ),
     (
@@ -660,13 +657,11 @@ void showVisualizerStylePickerSheet(
               ),
               child: ListTile(
                 leading: Icon(Icons.file_open_rounded, color: textSecondary),
-                title: Text(
-                  'Import .milk Preset',
+                title: Text(context.l10n.importMilk,
                   style:
                       TextStyle(fontWeight: FontWeight.w700, color: textPrimary),
                 ),
-                subtitle: Text(
-                  'Load a Winamp/Milkdrop preset file from storage',
+                subtitle: Text(context.l10n.loadMilkDesc,
                   style: TextStyle(fontSize: 12, color: textSecondary),
                 ),
                 onTap: () async {
@@ -678,7 +673,8 @@ void showVisualizerStylePickerSheet(
                     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
                       SnackBar(
                         content:
-                            Text('Imported Milkdrop preset: ${preset.name}'),
+                            Text(context.l10n.importedPresetTpl(
+                                'Milkdrop', preset.name)),
                       ),
                     );
                   }
@@ -696,13 +692,11 @@ void showVisualizerStylePickerSheet(
               ),
               child: ListTile(
                 leading: Icon(Icons.data_object_rounded, color: textSecondary),
-                title: Text(
-                  'Import JSON Visualizer Preset',
+                title: Text(context.l10n.importJsonViz,
                   style:
                       TextStyle(fontWeight: FontWeight.w700, color: textPrimary),
                 ),
-                subtitle: Text(
-                  'Load a Custom visualizer preset (.json) from storage',
+                subtitle: Text(context.l10n.loadJsonVizDesc,
                   style: TextStyle(fontSize: 12, color: textSecondary),
                 ),
                 onTap: () async {
@@ -714,7 +708,8 @@ void showVisualizerStylePickerSheet(
                     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
                       SnackBar(
                         content:
-                            Text('Imported visualizer preset: ${preset.name}'),
+                            Text(context.l10n.importedPresetTpl(
+                                'JSON', preset.name)),
                       ),
                     );
                   }
@@ -888,10 +883,9 @@ void showNowPlayingDoubleTapPickerSheet(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Text(
-              'Now Playing Double-Tap Action',
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Text(context.l10n.npDoubleTap,
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
             ),
           ),
@@ -980,10 +974,9 @@ void showNowPlayingArtworkSwipePickerSheet(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Text(
-              'Now Playing Artwork Swipe',
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Text(context.l10n.npArtworkSwipe,
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
             ),
           ),
@@ -1472,8 +1465,7 @@ void showAboutSheet(BuildContext context) {
               style: TextStyle(color: p.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 16),
-            Text(
-              'An audiophile-grade local music player with bit-perfect output, a full DSP chain, per-device profiles and automation.',
+            Text(context.l10n.aboutBlurb,
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: p.textSecondary,

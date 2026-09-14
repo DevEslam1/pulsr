@@ -1,5 +1,6 @@
 // lib/features/player/presentation/widgets/live_prog_sheet.dart
 import 'package:flutter/material.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -76,7 +77,7 @@ if (pan_pos > 2 * 3.141592653589793) pan_pos = pan_pos - 2 * 3.141592653589793;'
     if (code.isNotEmpty) {
       context.read<PlayerCubit>().setLiveProgEnabled(true, code: code);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('EEL Script Compiled & Loaded into DSP Engine')),
+        SnackBar(content: Text(context.l10n.eelCompiled)),
       );
     }
   }
@@ -120,8 +121,7 @@ if (pan_pos > 2 * 3.141592653589793) pan_pos = pan_pos - 2 * 3.141592653589793;'
                       children: [
                         Icon(Icons.terminal_rounded, color: p.primary),
                         const SizedBox(width: 10),
-                        Text(
-                          'Live Programmable DSP',
+                        Text(context.l10n.liveProgDspTitle,
                           style: TextStyle(
                             color: p.textPrimary,
                             fontSize: 18,
@@ -160,8 +160,7 @@ if (pan_pos > 2 * 3.141592653589793) pan_pos = pan_pos - 2 * 3.141592653589793;'
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'Jesusonic / EEL Script Editor',
+                          Text(context.l10n.eelEditor,
                             style: TextStyle(
                               color: p.textSecondary,
                               fontSize: 12,
@@ -175,8 +174,7 @@ if (pan_pos > 2 * 3.141592653589793) pan_pos = pan_pos - 2 * 3.141592653589793;'
                               color: p.primary.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            child: Text(
-                              'Bytecode JIT',
+                            child: Text(context.l10n.bytecodeJit,
                               style: TextStyle(
                                 color: p.primary,
                                 fontSize: 10,
@@ -222,7 +220,7 @@ if (pan_pos > 2 * 3.141592653589793) pan_pos = pan_pos - 2 * 3.141592653589793;'
                           ElevatedButton.icon(
                             onPressed: () => _compileAndRun(context),
                             icon: const Icon(Icons.play_arrow_rounded, size: 16),
-                            label: const Text('Compile & Run'),
+                            label: Text(context.l10n.compileRun),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: p.primary,
                               foregroundColor: Colors.white,
@@ -240,8 +238,7 @@ if (pan_pos > 2 * 3.141592653589793) pan_pos = pan_pos - 2 * 3.141592653589793;'
                 const SizedBox(height: 20),
 
                 // Real-time Slider Controls (slider1, slider2)
-                Text(
-                  'Live Control Sliders',
+                Text(context.l10n.liveSliders,
                   style: TextStyle(
                     color: p.textPrimary,
                     fontSize: 14,
@@ -273,8 +270,7 @@ if (pan_pos > 2 * 3.141592653589793) pan_pos = pan_pos - 2 * 3.141592653589793;'
                 ),
                 const SizedBox(height: 20),
 
-                Text(
-                  'Example Scripts & Algorithms',
+                Text(context.l10n.exampleScripts,
                   style: TextStyle(
                     color: p.textPrimary,
                     fontSize: 14,

@@ -1,6 +1,7 @@
 // lib/features/player/presentation/widgets/lyrics_editor_sheet.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/formatters.dart';
@@ -127,16 +128,14 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Synced Lyrics Editor',
+                  Text(context.l10n.lyricsEditorTitle,
                     style: TextStyle(
                       color: p.textPrimary,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  Text(
-                    'Now at: ',
+                  Text(context.l10n.nowAtLabel,
                     style: TextStyle(
                         color: p.textSecondary,
                         fontSize: 12,
@@ -179,7 +178,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                       widget.onSave(sorted);
                       Navigator.pop(context);
                     },
-                    child: const Text('Save',
+                    child: Text(context.l10n.save,
                         style: TextStyle(
                             color: Colors.black, fontWeight: FontWeight.bold)),
                   ),

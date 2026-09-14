@@ -290,7 +290,7 @@ class PlaybackSection extends StatelessWidget {
             if (!context.mounted) return;
             ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
               behavior: SnackBarBehavior.floating,
-              content: Text('Bluetooth latency calibrated: $ms ms'),
+              content: Text(context.l10n.btCalibrated(ms)),
             ));
           },
         ),
@@ -443,7 +443,7 @@ class _SponsorBlockSettingTileState extends State<_SponsorBlockSettingTile> {
                       style: FilledButton.styleFrom(backgroundColor: p.accent),
                       onPressed: () =>
                           Navigator.of(sheetContext).pop(selected),
-                      child: const Text('Done'),
+                      child: Text(context.l10n.doneAction),
                     ),
                   ),
                 ],

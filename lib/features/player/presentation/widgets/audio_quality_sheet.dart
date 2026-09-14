@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -186,8 +187,7 @@ class AudioQualitySheet extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'HARDWARE OUTPUT ROUTING',
+                      Text(context.l10n.hwOutputRouting,
                         style: TextStyle(
                           fontSize: 11,
                           letterSpacing: 1.4,
@@ -207,8 +207,7 @@ class AudioQualitySheet extends StatelessWidget {
                             ).withValues(alpha: 0.18),
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: const Text(
-                            'USB DAC ATTACHED',
+                          child: Text(context.l10n.usbDacAttached,
                             style: TextStyle(
                               color: Color(0xFFFFD700),
                               fontSize: 9.5,
@@ -268,8 +267,7 @@ class AudioQualitySheet extends StatelessWidget {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'OUTPUT PATH DIAGNOSTICS',
+                          Text(context.l10n.outputPathDiag,
                             style: TextStyle(
                               fontSize: 11,
                               letterSpacing: 1.4,
@@ -300,8 +298,7 @@ class AudioQualitySheet extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 2),
-                          Text(
-                            'DSD files decode to PCM; native DSD streaming is not supported yet',
+                          Text(context.l10n.dsdPcmNote,
                             style: TextStyle(
                               fontSize: 10.5,
                               color: p.textSecondary,
@@ -315,8 +312,7 @@ class AudioQualitySheet extends StatelessWidget {
                   const SizedBox(height: 20),
 
                   // --- SECTION 2: OUTPUT SAMPLE RATE CONTROL ---
-                  Text(
-                    'TARGET OUTPUT SAMPLE RATE',
+                  Text(context.l10n.targetSampleRate,
                     style: TextStyle(
                       fontSize: 11,
                       letterSpacing: 1.4,
@@ -338,8 +334,7 @@ class AudioQualitySheet extends StatelessWidget {
                   const SizedBox(height: 20),
 
                   // --- SECTION 3: BIT DEPTH & BIT-PERFECT ---
-                  Text(
-                    'TARGET BIT DEPTH & BIT-PERFECT',
+                  Text(context.l10n.targetBitPerfect,
                     style: TextStyle(
                       fontSize: 11,
                       letterSpacing: 1.4,
@@ -361,8 +356,7 @@ class AudioQualitySheet extends StatelessWidget {
                   const SizedBox(height: 20),
 
                   // --- SECTION 4: AUDIO SPECIFICATIONS ---
-                  Text(
-                    'TRACK SOURCE SPECIFICATIONS',
+                  Text(context.l10n.trackSourceSpecs,
                     style: TextStyle(
                       fontSize: 11,
                       letterSpacing: 1.4,
@@ -441,8 +435,7 @@ class AudioQualitySheet extends StatelessWidget {
                   const SizedBox(height: 16),
 
                   // --- SECTION 5: LIVE SIGNAL CHAIN INDICATOR ---
-                  Text(
-                    'LIVE AUDIO SIGNAL CHAIN',
+                  Text(context.l10n.liveSignalChain,
                     style: TextStyle(
                       fontSize: 11,
                       letterSpacing: 1.4,
@@ -477,8 +470,7 @@ class AudioQualitySheet extends StatelessWidget {
                         ),
                       ),
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const Text(
-                        'Apply & Done',
+                      child: Text(context.l10n.applyDone,
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 14,
@@ -670,8 +662,7 @@ class AudioQualitySheet extends StatelessWidget {
               cubit?.openOutputSwitcher();
             },
             icon: const Icon(Icons.open_in_new_rounded, size: 15),
-            label: const Text(
-              'Switch output in system panel',
+            label: Text(context.l10n.switchOutputPanel,
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
             ),
             style: TextButton.styleFrom(
@@ -904,8 +895,7 @@ class AudioQualitySheet extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Text(
-                          'Direct Bit-Perfect Mode',
+                        Text(context.l10n.directBpMode,
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 13,
@@ -925,8 +915,7 @@ class AudioQualitySheet extends StatelessWidget {
                               color: goldAccent.withValues(alpha: 0.25),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: const Text(
-                              'ACTIVE',
+                            child: Text(context.l10n.activeLabel,
                               style: TextStyle(
                                 color: goldAccent,
                                 fontSize: 9,
@@ -945,8 +934,7 @@ class AudioQualitySheet extends StatelessWidget {
                               color: p.accent.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: Text(
-                              'ARMED',
+                            child: Text(context.l10n.armedLabel,
                               style: TextStyle(
                                 color: p.accent,
                                 fontSize: 9,
@@ -996,7 +984,7 @@ class AudioQualitySheet extends StatelessWidget {
                               context: context,
                               builder: (ctx) => AlertDialog(
                                 backgroundColor: p.surface,
-                                title: const Text('Bit-Perfect Mode'),
+                                title: Text(context.l10n.bitPerfectMode),
                                 content: Text(
                                   AudioFeatureRegistry.bitPerfect.description,
                                   style: TextStyle(
@@ -1007,7 +995,7 @@ class AudioQualitySheet extends StatelessWidget {
                                 actions: [
                                   TextButton(
                                     onPressed: () => Navigator.pop(ctx),
-                                    child: const Text('Got it'),
+                                    child: Text(context.l10n.gotIt),
                                   ),
                                 ],
                               ),
@@ -1194,17 +1182,16 @@ class AudioQualitySheet extends StatelessWidget {
                   color: const Color(0xFFFFD700).withValues(alpha: 0.3),
                 ),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.verified_rounded,
                     color: Color(0xFFFFD700),
                     size: 16,
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      'Bit-Perfect Guardrails Active: DSP processing & software volume bypassed. Adjust volume via hardware DAC.',
+                    child: Text(context.l10n.bpGuardrails,
                       style: TextStyle(
                         color: Color(0xFFFFD700),
                         fontSize: 10.5,
@@ -1551,8 +1538,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
               color: _btAccent,
             ),
             const SizedBox(width: 6),
-            Text(
-              'BLUETOOTH AUDIO CODEC',
+            Text(context.l10n.btAudioCodec,
               style: TextStyle(
                 fontSize: 11,
                 letterSpacing: 1.4,
@@ -1667,8 +1653,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Text(
-                        'Earbuds connected. See specs below.',
+                      child: Text(context.l10n.earbudsConnected,
                         style: TextStyle(
                           color: p.textSecondary,
                           fontSize: 11.5,
@@ -1684,8 +1669,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
           const SizedBox(height: 14),
 
           // ── Codec chips: tap a supported codec to request it natively ──
-          Text(
-            'SUPPORTED CODECS (TAP TO SWITCH)',
+          Text(context.l10n.supportedCodecs,
             style: TextStyle(
               fontSize: 10,
               letterSpacing: 1.2,
@@ -1768,8 +1752,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'SAMPLE RATE',
+                    Text(context.l10n.sampleRateLabel,
                       style: TextStyle(
                         fontSize: 10,
                         letterSpacing: 1.2,
@@ -1808,8 +1791,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'BIT DEPTH',
+                    Text(context.l10n.bitDepthLabel,
                       style: TextStyle(
                         fontSize: 10,
                         letterSpacing: 1.2,
@@ -1860,8 +1842,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                   ),
                 ),
                 const SizedBox(width: 6),
-                Text(
-                  'LDAC QUALITY',
+                Text(context.l10n.ldacQuality,
                   style: TextStyle(
                     fontSize: 10,
                     letterSpacing: 1.2,
@@ -1975,8 +1956,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Change Bluetooth Codec',
+                        Text(context.l10n.changeBtCodec,
                           style: TextStyle(
                             color: _btAccent,
                             fontSize: 13,
@@ -2028,8 +2008,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                 color: _btAccent,
               ),
               const SizedBox(width: 6),
-              Text(
-                'BLUETOOTH AUDIO CODEC',
+              Text(context.l10n.btAudioCodec,
                 style: TextStyle(
                   fontSize: 11,
                   letterSpacing: 1.4,
@@ -2049,8 +2028,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: Text(
-                  'Nearby Devices permission needed to read and control codec settings.',
+                child: Text(context.l10n.nearbyPermDesc,
                   style: TextStyle(color: p.textSecondary, fontSize: 12),
                 ),
               ),
@@ -2069,7 +2047,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: _warnAccent.withValues(alpha: 0.5)),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
@@ -2077,9 +2055,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                     color: _warnAccent,
                     size: 16,
                   ),
-                  SizedBox(width: 8),
-                  Text(
-                    'Grant Bluetooth Permission',
+                  const SizedBox(width: 8),
+                  Text(context.l10n.grantBtPerm,
                     style: TextStyle(
                       color: _warnAccent,
                       fontSize: 12.5,
@@ -2108,8 +2085,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
             const Icon(Icons.bluetooth_audio_rounded,
                 size: 14, color: _btAccent),
             const SizedBox(width: 6),
-            Text(
-              'LE AUDIO',
+            Text(context.l10n.leAudio,
               style: TextStyle(
                 fontSize: 11,
                 letterSpacing: 1.4,
@@ -2161,10 +2137,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                         letterSpacing: 0.5,
                       ),
                     ),
-                    Text(
-                      'Android negotiates the LC3 stream with your earbuds. '
-                      'Codec, sample rate and bit depth are not app-adjustable '
-                      'on LE Audio.',
+                    Text(context.l10n.lc3Negotiation,
                       style: TextStyle(
                         fontSize: 11.5,
                         color: p.textSecondary,
@@ -2200,8 +2173,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
           const Icon(Icons.bluetooth_audio_rounded, size: 14, color: _btAccent),
           const SizedBox(width: 6),
           Expanded(
-            child: Text(
-              'Connecting to Bluetooth stack…',
+            child: Text(context.l10n.connectingBt,
               style: TextStyle(
                 color: p.textSecondary,
                 fontSize: 12,
@@ -2214,8 +2186,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
               HapticFeedback.selectionClick();
               cubit?.refreshOutputDevice();
             },
-            child: const Text(
-              'Retry',
+            child: Text(context.l10n.retry,
               style: TextStyle(
                 color: _btAccent,
                 fontSize: 12,

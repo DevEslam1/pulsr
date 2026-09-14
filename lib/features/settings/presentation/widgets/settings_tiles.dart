@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 
 /// Icon container used as `leading` on settings tiles (was `_iconBox`).
 class SettingsIconBox extends StatelessWidget {
@@ -190,7 +191,7 @@ void showAudioFeatureInfoDialog(
                   children: [
                     const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 18),
                     const SizedBox(width: 8),
-                    Expanded(child: Text('Conflicts with: ${info.conflictsWith}', style: TextStyle(color: p.textSecondary, fontSize: 11, fontWeight: FontWeight.w600))),
+                    Expanded(child: Text(context.l10n.conflictsWith(info.conflictsWith ?? ''), style: TextStyle(color: p.textSecondary, fontSize: 11, fontWeight: FontWeight.w600))),
                   ],
                 ),
               ),

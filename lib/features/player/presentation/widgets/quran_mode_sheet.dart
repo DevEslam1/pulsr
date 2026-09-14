@@ -1,5 +1,6 @@
 // lib/features/player/presentation/widgets/quran_mode_sheet.dart
 import 'package:flutter/material.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/services/earbud_optimization_service.dart';
@@ -121,8 +122,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
                             )),
-                        Text(
-                          'Vocal-optimized recitation profiles',
+                        Text(context.l10n.reciterDesc,
                           style:
                               TextStyle(color: p.textSecondary, fontSize: 12),
                         ),
@@ -143,7 +143,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
             // Reciter styles
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Text('RECITER STYLE',
+              child: Text(context.l10n.reciterStyle,
                   style: TextStyle(
                     color: p.textSecondary,
                     fontSize: 11,
@@ -225,12 +225,12 @@ class _QuranModePanelState extends State<QuranModePanel> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Learning Speed',
+                        Text(context.l10n.learningSpeed,
                             style: TextStyle(
                                 color: p.textPrimary,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700)),
-                        Text('Slow recitation down for memorization',
+                        Text(context.l10n.reciterSpeedDesc,
                             style: TextStyle(
                                 color: p.textSecondary, fontSize: 12)),
                       ],
@@ -268,7 +268,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
             // Detected output hardware
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Text('OUTPUT HARDWARE',
+              child: Text(context.l10n.outputHardware,
                   style: TextStyle(
                     color: p.textSecondary,
                     fontSize: 11,
@@ -344,7 +344,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
                       onPressed:
                           enabled ? () => cubit.reapplyQuranProfile() : null,
                       icon: const Icon(Icons.restart_alt_rounded, size: 18),
-                      label: const Text('Reset Profile'),
+                      label: Text(context.l10n.resetProfile),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: p.accent,
                         side:
@@ -359,10 +359,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
             const SizedBox(height: 6),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Text(
-                'Sibilance is tamed with a high-shelf EQ cut. Spectral noise '
-                'and breath reduction are not available in the current audio '
-                'engine.',
+              child: Text(context.l10n.sibilanceDesc,
                 style: TextStyle(color: p.textTertiary, fontSize: 10.5),
               ),
             ),

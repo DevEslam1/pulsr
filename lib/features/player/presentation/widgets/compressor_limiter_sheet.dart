@@ -1,5 +1,6 @@
 // lib/features/player/presentation/widgets/compressor_limiter_sheet.dart
 import 'package:flutter/material.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../data/audio/equalizer_manager.dart';
 
@@ -98,8 +99,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                   children: [
                     Icon(Icons.tune_rounded, color: p.primary),
                     const SizedBox(width: 10),
-                    Text(
-                      'Studio Dynamics Compressor',
+                    Text(context.l10n.studioCompressor,
                       style: TextStyle(
                         color: p.textPrimary,
                         fontSize: 18,
@@ -120,8 +120,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
               ],
             ),
             const SizedBox(height: 8),
-            Text(
-              'Studio-grade lookahead dynamics processing and peak brickwall limiting.',
+            Text(context.l10n.studioCompressorDesc,
               style: TextStyle(color: p.textSecondary, fontSize: 13),
             ),
             if (!_advancedSupported) ...[
@@ -140,8 +139,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                         size: 16, color: p.textTertiary),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        'Ratio, Attack and Make-up Gain need the Android DynamicsProcessing engine, which this device does not expose. Only Threshold and Release are applied to the native brickwall limiter.',
+                      child: Text(context.l10n.compressorLimitDesc,
                         style: TextStyle(
                             color: p.textTertiary,
                             fontSize: 11,
@@ -250,7 +248,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                   });
                   _applyParams();
                 },
-                child: const Text('Reset to Studio Defaults'),
+                child: Text(context.l10n.resetStudioDefaults),
               ),
             ),
             const SizedBox(height: 28),
@@ -263,8 +261,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                   children: [
                     Icon(Icons.graphic_eq_rounded, color: p.primary),
                     const SizedBox(width: 10),
-                    Text(
-                      'Multiband Compressor',
+                    Text(context.l10n.compressorTitle,
                       style: TextStyle(
                         color: p.textPrimary,
                         fontSize: 16,
@@ -284,9 +281,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
               ],
             ),
             const SizedBox(height: 4),
-            Text(
-              'Native 4-band compressor with Linkwitz-Riley crossovers. Tames '
-              'each frequency band independently before the limiter.',
+            Text(context.l10n.compressorDesc,
               style: TextStyle(color: p.textSecondary, fontSize: 12.5),
             ),
             const SizedBox(height: 12),

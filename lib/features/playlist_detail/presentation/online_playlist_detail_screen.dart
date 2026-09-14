@@ -1,5 +1,6 @@
 // lib/features/playlist_detail/presentation/online_playlist_detail_screen.dart
 import 'package:flutter/material.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/di/injection.dart';
@@ -162,10 +163,10 @@ class _OnlinePlaylistDetailScreenState
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
+          content: Text(
           count > 0
-              ? 'Queued $count tracks from "$_title" for download (3 active downloads)...'
-              : 'All tracks from "$_title" are already downloaded or queued.',
+              ? context.l10n.queuedFromTitle(count, _title)
+              : context.l10n.allDownloaded(_title),
         ),
         behavior: SnackBarBehavior.floating,
       ),
@@ -175,6 +176,9 @@ class _OnlinePlaylistDetailScreenState
   Future<void> _saveToLocalPlaylists() async {
     if (_tracks.isEmpty) return;
     final messenger = ScaffoldMessenger.of(context);
+    // Captured before async gaps (no context-across-gap).
+    final saveFailedText = context.l10n.saveFailed;
+    final loc = context.l10n;
     try {
       final playlistUseCases = getIt<PlaylistUseCases>();
       final songs = _tracks.map((t) => t.toSongData()).toList();
@@ -192,15 +196,15 @@ class _OnlinePlaylistDetailScreenState
         }
         messenger.showSnackBar(
           SnackBar(
-            content: Text('Saved "$_title" to Local Playlists (${songs.length} tracks)'),
+            content: Text(loc.savedToLocal(_title, songs.length)),
             behavior: SnackBarBehavior.floating,
           ),
         );
       }
-    } catch (e) {
+    } catch (_) {
       messenger.showSnackBar(
         SnackBar(
-          content: Text('Failed to save to local playlists: $e'),
+          content: Text(saveFailedText),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -250,7 +254,7 @@ class _OnlinePlaylistDetailScreenState
                     child: FilledButton.icon(
                       onPressed: () => _playAll(shuffle: false),
                       icon: const Icon(Icons.play_arrow_rounded, size: 20),
-                      label: const Text('Play All',
+                      label: Text(context.l10n.playAll,
                           style: TextStyle(fontWeight: FontWeight.w800)),
                       style: FilledButton.styleFrom(
                         backgroundColor: p.accent,
@@ -266,7 +270,7 @@ class _OnlinePlaylistDetailScreenState
                     child: FilledButton.tonalIcon(
                       onPressed: () => _playAll(shuffle: true),
                       icon: const Icon(Icons.shuffle_rounded, size: 18),
-                      label: const Text('Shuffle',
+                      label: Text(context.l10n.shuffle,
                           style: TextStyle(fontWeight: FontWeight.w700)),
                       style: FilledButton.styleFrom(
                         backgroundColor: p.surfaceContainerHigh,
@@ -294,7 +298,7 @@ class _OnlinePlaylistDetailScreenState
                     child: OutlinedButton.icon(
                       onPressed: _downloadAll,
                       icon: const Icon(Icons.download_rounded, size: 16),
-                      label: const Text('Download All',
+                      label: Text(context.l10n.downloadAll,
                           style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: p.hairline),
@@ -310,7 +314,7 @@ class _OnlinePlaylistDetailScreenState
                     child: OutlinedButton.icon(
                       onPressed: _saveToLocalPlaylists,
                       icon: const Icon(Icons.playlist_add_rounded, size: 18),
-                      label: const Text('Save to Pulsr',
+                      label: Text(context.l10n.saveToPulsr,
                           style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: p.hairline),
@@ -379,7 +383,7 @@ class _OnlinePlaylistDetailScreenState
                           strokeWidth: 2.5, color: p.accent),
                     ),
                     const SizedBox(height: 16),
-                    Text('Fetching playlist tracks from YouTube Music…',
+                    Text(context.l10n.fetchingYtmTracks,
                         style: TextStyle(color: p.textSecondary, fontSize: 13)),
                   ],
                 ),
@@ -406,7 +410,7 @@ class _OnlinePlaylistDetailScreenState
                     FilledButton.icon(
                       onPressed: _fetchTracks,
                       icon: const Icon(Icons.refresh_rounded, size: 18),
-                      label: const Text('Retry'),
+                      label: Text(context.l10n.retry),
                     ),
                   ],
                 ),
@@ -555,14 +559,13 @@ class _OnlinePlaylistDetailScreenState
                           color: const Color(0xFFFF0000),
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.play_circle_fill_rounded,
-                                color: Colors.white, size: 14),
-                            SizedBox(width: 4),
-                            Text(
-                              'YOUTUBE MUSIC',
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.play_circle_fill_rounded,
+                            color: Colors.white, size: 14),
+                        const SizedBox(width: 4),
+                            Text(context.l10n.ytmHeader,
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 10,
@@ -609,7 +612,7 @@ class _OnlinePlaylistDetailScreenState
                         size: 14, color: p.textTertiary),
                     const SizedBox(width: 4),
                     Text(
-                      '${_tracks.length} tracks',
+                      context.l10n.previewTrackCount(_tracks.length),
                       style: TextStyle(
                         fontSize: 12,
                         color: p.textTertiary,
