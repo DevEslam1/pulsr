@@ -279,7 +279,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       title: 'Delete "${pl.name}"?',
       message: 'This cannot be undone.',
       icon: Icons.delete_outline_rounded,
-      confirmLabel: 'Delete',
+      confirmLabel: context.l10n.delete,
       isDestructive: true,
     );
     if (confirmed == true) {
@@ -625,15 +625,15 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                     isSelected: isTabletLandscape && _selectedPlaylist?.id == pl.id,
                     onTap: () => _onSelectPlaylist(pl),
                     onLongPress: () => _onSelectPlaylist(pl),
-                    menuItems: (_) => const [
+                    menuItems: (_) => [
                       PopupMenuItem(
                           value: 'edit-smart',
-                          child: Text('Edit smart rules')),
-                      PopupMenuItem(value: 'share', child: Text('Share')),
+                          child: Text(context.l10n.editSmartRules)),
+                      PopupMenuItem(value: 'share', child: Text(context.l10n.share)),
                       PopupMenuItem(
-                          value: 'rename', child: Text('Rename')),
+                          value: 'rename', child: Text(context.l10n.rename)),
                       PopupMenuItem(
-                          value: 'delete', child: Text('Delete')),
+                          value: 'delete', child: Text(context.l10n.delete)),
                     ],
                     onMenuSelected: (v) {
                       if (v == 'edit-smart') {
@@ -760,14 +760,14 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                       isSelected: isTabletLandscape && _selectedPlaylist?.id == pl.id,
                       onTap: () => _onSelectPlaylist(pl),
                       onLongPress: () => _onSelectPlaylist(pl),
-                      menuItems: (_) => const [
+                      menuItems: (_) => [
                         PopupMenuItem(
-                            value: 'export', child: Text('Export')),
-                        PopupMenuItem(value: 'share', child: Text('Share')),
+                            value: 'export', child: Text(context.l10n.export)),
+                        PopupMenuItem(value: 'share', child: Text(context.l10n.share)),
                         PopupMenuItem(
-                            value: 'rename', child: Text('Rename')),
+                            value: 'rename', child: Text(context.l10n.rename)),
                         PopupMenuItem(
-                            value: 'delete', child: Text('Delete')),
+                            value: 'delete', child: Text(context.l10n.delete)),
                       ],
                       onMenuSelected: (v) {
                         if (v == 'export') {
@@ -819,6 +819,8 @@ class _OnlinePlaylistsContent extends StatelessWidget {
     YtmAccountPlaylist playlist,
   ) async {
     final scaffoldMessenger = ScaffoldMessenger.of(context);
+    // Capture localized strings before async gaps (avoid context-across-gap).
+    final loadFailedText = context.l10n.playlistLoadFailed;
     scaffoldMessenger.showSnackBar(
       SnackBar(
         content: Text('Fetching "${playlist.title}" for download…'),
@@ -850,9 +852,9 @@ class _OnlinePlaylistsContent extends StatelessWidget {
               content: Text('Could not load tracks for this playlist.')),
         );
       }
-    } catch (e) {
+    } catch (_) {
       scaffoldMessenger.showSnackBar(
-        SnackBar(content: Text('Failed to load playlist: $e')),
+        SnackBar(content: Text(loadFailedText)),
       );
     }
   }
@@ -863,7 +865,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
   ) {
     if (entry.tracks.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No tracks in this playlist.')),
+        SnackBar(content: Text(context.l10n.emptyPlaylist)),
       );
       return;
     }
@@ -988,8 +990,8 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                               shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12)),
                             ),
-                            child: const Text('Sign in',
-                                style: TextStyle(fontSize: 12.5)),
+                            child: Text(context.l10n.signIn,
+                                style: const TextStyle(fontSize: 12.5)),
                           ),
                         ],
                       ),
@@ -1102,7 +1104,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                             ),
                             TextButton(
                               onPressed: () => cubit.fetchAccountPlaylists(),
-                              child: const Text('Retry'),
+                              child: Text(context.l10n.retry),
                             ),
                           ],
                         ),

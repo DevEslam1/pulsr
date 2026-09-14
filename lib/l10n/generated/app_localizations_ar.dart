@@ -2189,4 +2189,31 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get addToQueue => 'اضافة الى قائمة الانتظار';
+
+  @override
+  String get rename => 'اعادة تسمية';
+
+  @override
+  String get export => 'تصدير';
+
+  @override
+  String get sortAZ => 'الاسم (ابجدي)';
+
+  @override
+  String get emptyPlaylist => 'لا توجد مسارات في هذه القائمة.';
+
+  @override
+  String get playlistLoadFailed => 'تعذر تحميل قائمة التشغيل.';
+
+  @override
+  String get importFailed => 'فشل الاستيراد.';
+
+  @override
+  String get exportFailed => 'فشل التصدير.';
+
+  @override
+  String get editSmartRules => 'تحرير القواعد الذكية';
+
+  @override
+  String get sortTrackNumber => 'رقم المسار';
 }

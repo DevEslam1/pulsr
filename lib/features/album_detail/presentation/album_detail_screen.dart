@@ -27,13 +27,34 @@ class AlbumDetailScreen extends StatefulWidget {
   State<AlbumDetailScreen> createState() => _AlbumDetailScreenState();
 }
 
+enum _AlbumSort { track, title, duration }
+
 class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   late GetAlbumsUseCase _useCase;
+  _AlbumSort _sort = _AlbumSort.track;
+  final Set<int> _selectedIds = {};
 
   @override
   void initState() {
     super.initState();
     _useCase = widget.getAlbumsUseCase ?? getIt<GetAlbumsUseCase>();
+  }
+
+  List<SongsTableData> _sorted(List<SongsTableData> songs) {
+    final out = List<SongsTableData>.of(songs);
+    switch (_sort) {
+      case _AlbumSort.title:
+        out.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+      case _AlbumSort.duration:
+        out.sort((a, b) => a.durationMs.compareTo(b.durationMs));
+      case _AlbumSort.track:
+        out.sort((a, b) {
+          final da = a.discNumber ?? 1, db = b.discNumber ?? 1;
+          if (da != db) return da.compareTo(db);
+          return (a.trackNumber ?? 0).compareTo(b.trackNumber ?? 0);
+        });
+    }
+    return out;
   }
 
   @override
@@ -54,8 +75,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
             if (snapshot.hasError) {
               return _AlbumErrorView(onRetry: () => setState(() {}));
             }
-            final songs =
+            final rawSongs =
                 snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
+            final songs = _sorted(rawSongs);
 
             return Center(
               child: ConstrainedBox(
@@ -160,18 +182,52 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                                 fontWeight: FontWeight.w700),
                           ),
                           const Spacer(),
+                          // In-list sort (gap 07-01, persisted per session).
+                          DropdownButton<_AlbumSort>(
+                            value: _sort,
+                            underline: const SizedBox.shrink(),
+                            icon: Icon(Icons.sort_rounded,
+                                color: p.textSecondary, size: 18),
+                            items: [
+                              DropdownMenuItem(
+                                  value: _AlbumSort.track,
+                                  child: Text(context.l10n.sortTrackNumber)),
+                              DropdownMenuItem(
+                                  value: _AlbumSort.title,
+                                  child: Text(context.l10n.sortAZ)),
+                              DropdownMenuItem(
+                                  value: _AlbumSort.duration,
+                                  child: Text(context.l10n.sortDuration)),
+                            ],
+                            onChanged: (v) {
+                              if (v != null) setState(() => _sort = v);
+                            },
+                          ),
                           // Album-level queue actions (gap 07-03).
                           PopupMenuButton<String>(
                             icon: Icon(Icons.more_horiz_rounded,
                                 color: p.textSecondary),
                             onSelected: (v) async {
                               final cubit = context.read<PlayerCubit>();
+                              final target = _selectedIds.isEmpty
+                                  ? songs
+                                  : songs
+                                      .where((s) => _selectedIds.contains(s.id))
+                                      .toList();
                               if (v == 'add') {
-                                await cubit.addAllToQueue(songs);
-                              } else if (v == 'next' && songs.isNotEmpty) {
-                                for (final s in songs.reversed) {
+                                await cubit.addAllToQueue(target);
+                                if (mounted) {
+                                  setState(() => _selectedIds.clear());
+                                }
+                              } else if (v == 'next' && target.isNotEmpty) {
+                                for (final s in target.reversed) {
                                   await cubit.playNext(s);
                                 }
+                                if (mounted) {
+                                  setState(() => _selectedIds.clear());
+                                }
+                              } else if (v == 'clear') {
+                                setState(() => _selectedIds.clear());
                               }
                             },
                             itemBuilder: (c) => [
@@ -181,6 +237,11 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                               PopupMenuItem(
                                   value: 'next',
                                   child: Text(context.l10n.playNext)),
+                              if (_selectedIds.isNotEmpty)
+                                PopupMenuItem(
+                                    value: 'clear',
+                                    child: Text(
+                                        '${context.l10n.clear} (${_selectedIds.length})')),
                             ],
                           ),
                         ],
@@ -217,9 +278,31 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                               song: song,
                               index: index,
                               showArtwork: false,
-                              onTap: () => context
-                                  .read<PlayerCubit>()
-                                  .playSong(song, queue: songs),
+                              // Batch multi-select (gap 07-04): long-press toggles,
+                              // tap plays (or toggles when selection active).
+                              selected: _selectedIds.contains(song.id),
+                              onLongPress: () => setState(() {
+                                if (_selectedIds.contains(song.id)) {
+                                  _selectedIds.remove(song.id);
+                                } else {
+                                  _selectedIds.add(song.id);
+                                }
+                              }),
+                              onTap: () {
+                                if (_selectedIds.isNotEmpty) {
+                                  setState(() {
+                                    if (_selectedIds.contains(song.id)) {
+                                      _selectedIds.remove(song.id);
+                                    } else {
+                                      _selectedIds.add(song.id);
+                                    }
+                                  });
+                                } else {
+                                  context
+                                      .read<PlayerCubit>()
+                                      .playSong(song, queue: songs);
+                                }
+                              },
                               onMorePressed: () => showModalBottomSheet(
                                 context: context,
                                 useRootNavigator: true,

@@ -525,9 +525,16 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
 
         // ---------- Recently played (50 by 50 smooth lazy load) ----------
-        _RecentlyPlayedSection(
-          getSongsUseCase: getSongsUseCase,
-          isTablet: isTablet,
+        // Section isolation (gap 04-02): each stream section is wrapped in a
+        // RepaintBoundary so one emission never repaints unrelated sections.
+        // Note: this screen has no whole-dashboard BlocBuilder; the 57KB
+        // rebuild claim (04-01) was overstated — emissions are already scoped
+        // to the StreamBuilders below.
+        RepaintBoundary(
+          child: _RecentlyPlayedSection(
+            getSongsUseCase: getSongsUseCase,
+            isTablet: isTablet,
+          ),
         ),
 
         const SizedBox(height: 12),

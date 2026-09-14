@@ -690,7 +690,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get sortAlbum => 'Álbum';
 
   @override
-  String get sortDuration => 'Duración';
+  String get sortDuration => 'Duracion';
 
   @override
   String get sortDateAdded => 'Fecha añadida';
@@ -2195,4 +2195,31 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get addToQueue => 'Anadir a la cola';
+
+  @override
+  String get rename => 'Renombrar';
+
+  @override
+  String get export => 'Exportar';
+
+  @override
+  String get sortAZ => 'Nombre (A-Z)';
+
+  @override
+  String get emptyPlaylist => 'No hay pistas en esta lista.';
+
+  @override
+  String get playlistLoadFailed => 'No se pudo cargar la lista.';
+
+  @override
+  String get importFailed => 'Error al importar.';
+
+  @override
+  String get exportFailed => 'Error al exportar.';
+
+  @override
+  String get editSmartRules => 'Editar reglas inteligentes';
+
+  @override
+  String get sortTrackNumber => 'Numero de pista';
 }

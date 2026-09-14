@@ -222,7 +222,7 @@
   "sortTitle": "Título",
   "sortArtist": "Artista",
   "sortAlbum": "Álbum",
-  "sortDuration": "Duración",
+  "sortDuration": "Duracion",
   "sortDateAdded": "Fecha añadida",
   "sortYear": "Año",
   "sortTrackCount": "Número de pistas",
@@ -777,5 +777,44 @@
   "addToQueue": "Anadir a la cola",
   "@addToQueue": {
     "description": "detail header"
+  },
+  "rename": "Renombrar",
+  "@rename": {
+    "description": "tranche4 l10n"
+  },
+  "export": "Exportar",
+  "@export": {
+    "description": "tranche4 l10n"
+  },
+  "sortAZ": "Nombre (A-Z)",
+  "@sortAZ": {
+    "description": "tranche4 l10n"
+  },
+  "emptyPlaylist": "No hay pistas en esta lista.",
+  "@emptyPlaylist": {
+    "description": "tranche4 l10n"
+  },
+  "playlistLoadFailed": "No se pudo cargar la lista.",
+  "@playlistLoadFailed": {
+    "description": "tranche4 l10n"
+  },
+  "importFailed": "Error al importar.",
+  "@importFailed": {
+    "description": "tranche4 l10n"
+  },
+  "exportFailed": "Error al exportar.",
+  "@exportFailed": {
+    "description": "tranche4 l10n"
+  },
+  "editSmartRules": "Editar reglas inteligentes",
+  "@editSmartRules": {
+    "description": "tranche4 l10n"
+  },
+  "sortTrackNumber": "Numero de pista",
+  "@sortTrackNumber": {
+    "description": "detail sort"
+  },
+  "@sortDuration": {
+    "description": "detail sort"
   }
 }

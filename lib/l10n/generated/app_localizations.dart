@@ -1432,7 +1432,7 @@ abstract class AppLocalizations {
   /// **'Album'**
   String get sortAlbum;
 
-  /// No description provided for @sortDuration.
+  /// detail sort
   ///
   /// In en, this message translates to:
   /// **'Duration'**
@@ -3958,6 +3958,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add to Queue'**
   String get addToQueue;
+
+  /// tranche4 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get rename;
+
+  /// tranche4 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get export;
+
+  /// tranche4 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Name (A-Z)'**
+  String get sortAZ;
+
+  /// tranche4 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'No tracks in this playlist.'**
+  String get emptyPlaylist;
+
+  /// tranche4 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load playlist.'**
+  String get playlistLoadFailed;
+
+  /// tranche4 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Import failed.'**
+  String get importFailed;
+
+  /// tranche4 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed.'**
+  String get exportFailed;
+
+  /// tranche4 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Edit smart rules'**
+  String get editSmartRules;
+
+  /// detail sort
+  ///
+  /// In en, this message translates to:
+  /// **'Track number'**
+  String get sortTrackNumber;
 }
 
 class _AppLocalizationsDelegate

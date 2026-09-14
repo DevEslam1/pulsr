@@ -1062,5 +1062,44 @@
   "addToQueue": "Add to Queue",
   "@addToQueue": {
     "description": "detail header"
+  },
+  "rename": "Rename",
+  "@rename": {
+    "description": "tranche4 l10n"
+  },
+  "export": "Export",
+  "@export": {
+    "description": "tranche4 l10n"
+  },
+  "sortAZ": "Name (A-Z)",
+  "@sortAZ": {
+    "description": "tranche4 l10n"
+  },
+  "emptyPlaylist": "No tracks in this playlist.",
+  "@emptyPlaylist": {
+    "description": "tranche4 l10n"
+  },
+  "playlistLoadFailed": "Failed to load playlist.",
+  "@playlistLoadFailed": {
+    "description": "tranche4 l10n"
+  },
+  "importFailed": "Import failed.",
+  "@importFailed": {
+    "description": "tranche4 l10n"
+  },
+  "exportFailed": "Export failed.",
+  "@exportFailed": {
+    "description": "tranche4 l10n"
+  },
+  "editSmartRules": "Edit smart rules",
+  "@editSmartRules": {
+    "description": "tranche4 l10n"
+  },
+  "sortTrackNumber": "Track number",
+  "@sortTrackNumber": {
+    "description": "detail sort"
+  },
+  "@sortDuration": {
+    "description": "detail sort"
   }
 }

@@ -777,5 +777,44 @@
   "addToQueue": "اضافة الى قائمة الانتظار",
   "@addToQueue": {
     "description": "detail header"
+  },
+  "rename": "اعادة تسمية",
+  "@rename": {
+    "description": "tranche4 l10n"
+  },
+  "export": "تصدير",
+  "@export": {
+    "description": "tranche4 l10n"
+  },
+  "sortAZ": "الاسم (ابجدي)",
+  "@sortAZ": {
+    "description": "tranche4 l10n"
+  },
+  "emptyPlaylist": "لا توجد مسارات في هذه القائمة.",
+  "@emptyPlaylist": {
+    "description": "tranche4 l10n"
+  },
+  "playlistLoadFailed": "تعذر تحميل قائمة التشغيل.",
+  "@playlistLoadFailed": {
+    "description": "tranche4 l10n"
+  },
+  "importFailed": "فشل الاستيراد.",
+  "@importFailed": {
+    "description": "tranche4 l10n"
+  },
+  "exportFailed": "فشل التصدير.",
+  "@exportFailed": {
+    "description": "tranche4 l10n"
+  },
+  "editSmartRules": "تحرير القواعد الذكية",
+  "@editSmartRules": {
+    "description": "tranche4 l10n"
+  },
+  "sortTrackNumber": "رقم المسار",
+  "@sortTrackNumber": {
+    "description": "detail sort"
+  },
+  "@sortDuration": {
+    "description": "detail sort"
   }
 }

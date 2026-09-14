@@ -2169,4 +2169,31 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get addToQueue => 'Add to Queue';
+
+  @override
+  String get rename => 'Rename';
+
+  @override
+  String get export => 'Export';
+
+  @override
+  String get sortAZ => 'Name (A-Z)';
+
+  @override
+  String get emptyPlaylist => 'No tracks in this playlist.';
+
+  @override
+  String get playlistLoadFailed => 'Failed to load playlist.';
+
+  @override
+  String get importFailed => 'Import failed.';
+
+  @override
+  String get exportFailed => 'Export failed.';
+
+  @override
+  String get editSmartRules => 'Edit smart rules';
+
+  @override
+  String get sortTrackNumber => 'Track number';
 }
