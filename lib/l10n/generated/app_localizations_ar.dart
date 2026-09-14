@@ -2126,4 +2126,11 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get notificationPermissionNotNow => 'ليس الآن';
+
+  @override
+  String get onboardingPermissionRationale =>
+      'بدون الوصول إلى الصوت ستكون مكتبتك فارغة. يمكنك المتابعة بوصول محدود ومنح الإذن لاحقا من الإعدادات.';
+
+  @override
+  String get continueLimitedAccess => 'المتابعة بوصول محدود';
 }

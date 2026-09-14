@@ -505,12 +505,16 @@ class AudioEffectsChannel {
   }
 
   /// Sets the band center frequencies (Hz). Length defines the band count.
-  Future<void> setEqBands(List<double> frequencies) async {
-    if (!_isAndroid) return;
+  /// Returns true when the platform channel acknowledged the call.
+  /// Single-application guarantee (13-01): callers use the return value to
+  /// decide whether the legacy mirror write is needed as a fallback.
+  Future<bool> setEqBands(List<double> frequencies) async {
+    if (!_isAndroid) return true;
     try {
       await _channel
           .invokeMethod('setEqBands', {'frequencies': frequencies})
           .timeout(const Duration(seconds: 3));
+      return true;
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set EQ bands ($frequencies)',
@@ -518,17 +522,19 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      return false;
     }
   }
 
   /// Live-updates a single band's gain (dB) without rebuilding the effect.
-  Future<void> setEqBandGain(int index, double gainDb) async {
-    if (!_isAndroid) return;
+  Future<bool> setEqBandGain(int index, double gainDb) async {
+    if (!_isAndroid) return true;
     try {
       await _channel.invokeMethod('setEqBandGain', {
         'index': index,
         'gainDb': gainDb,
       });
+      return true;
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set EQ band gain (index $index, $gainDb dB)',
@@ -536,16 +542,18 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      return false;
     }
   }
 
   /// Sets all band gains (dB) at once. Length should match the band count.
-  Future<void> setEqBandGains(List<double> gains) async {
-    if (!_isAndroid) return;
+  Future<bool> setEqBandGains(List<double> gains) async {
+    if (!_isAndroid) return true;
     try {
       await _channel
           .invokeMethod('setEqBandGains', {'gains': gains})
           .timeout(const Duration(seconds: 3));
+      return true;
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set EQ band gains ($gains)',
@@ -553,6 +561,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      return false;
     }
   }
 
@@ -575,7 +584,7 @@ class AudioEffectsChannel {
 
   // --- NATIVE PARAMETRIC EQ ---
 
-  Future<void> setNativeEqBand(
+  Future<bool> setNativeEqBand(
     int index,
     double freq,
     double gainDb,
@@ -583,7 +592,7 @@ class AudioEffectsChannel {
     int type = 0,
     bool enabled = true,
   }) async {
-    if (!_isAndroid) return;
+    if (!_isAndroid) return true;
     try {
       await _channel
           .invokeMethod('setNativeEqBand', {
@@ -595,6 +604,7 @@ class AudioEffectsChannel {
             'enabled': enabled,
           })
           .timeout(const Duration(seconds: 3));
+      return true;
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set native EQ band ($index)',
@@ -602,17 +612,21 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      return false;
     }
   }
 
   /// Bulk update for all bands in a single JNI hop (reduces 32 hops -> 1).
-  Future<void> setNativeEqBandsBulk({
+  /// Returns true on channel ACK so callers can skip the legacy mirror
+  /// (single-application guarantee, defect 13-01). Previously void + swallowed,
+  /// so the manager could never tell success from failure.
+  Future<bool> setNativeEqBandsBulk({
     required List<double> frequencies,
     required List<double> gains,
     List<double>? qs,
     List<int>? types,
   }) async {
-    if (!_isAndroid) return;
+    if (!_isAndroid) return true;
     try {
       await _channel
           .invokeMethod('setNativeEqBandsBulk', {
@@ -622,6 +636,7 @@ class AudioEffectsChannel {
             'types': types ?? List<int>.filled(frequencies.length, 0),
           })
           .timeout(const Duration(seconds: 5));
+      return true;
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set native EQ bands bulk',
@@ -629,15 +644,17 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      return false;
     }
   }
 
-  Future<void> setNativeEqBandCount(int count) async {
-    if (!_isAndroid) return;
+  Future<bool> setNativeEqBandCount(int count) async {
+    if (!_isAndroid) return true;
     try {
       await _channel
           .invokeMethod('setNativeEqBandCount', {'count': count})
           .timeout(const Duration(seconds: 3));
+      return true;
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set native EQ band count ($count)',
@@ -645,6 +662,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      return false;
     }
   }
 

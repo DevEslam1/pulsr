@@ -34,6 +34,8 @@ class AudioVisualizer extends StatefulWidget {
   final bool isPlaying;
   final int? audioSessionId;
   final int? trackSeed;
+  final int? trackId;
+  final String? trackPath;
   final MilkdropPreset? milkdropPreset;
   final VisualizerPreset? customPreset;
 
@@ -42,13 +44,37 @@ class AudioVisualizer extends StatefulWidget {
     this.style = VisualizerStyle.bar,
     this.color,
     this.width = double.infinity,
-    this.height = 120.0,
+    this.height = double.infinity,
     this.isPlaying = true,
     this.audioSessionId,
     this.trackSeed,
+    this.trackId,
+    this.trackPath,
     this.milkdropPreset,
     this.customPreset,
   });
+
+  /// Deterministic per-track seed (defect 16-05): prefers explicit trackSeed,
+  /// then stable hash of trackId/trackPath, then session id. Never shares one
+  /// constant across different tracks.
+  static int resolveSeed({
+    int? trackSeed,
+    int? trackId,
+    String? trackPath,
+    int? audioSessionId,
+  }) {
+    if (trackSeed != null) return trackSeed;
+    if (trackId != null) return trackId * 2654435761 & 0x7fffffff;
+    if (trackPath != null && trackPath.isNotEmpty) {
+      var h = 0;
+      for (var i = 0; i < trackPath.length; i++) {
+        h = (h * 31 + trackPath.codeUnitAt(i)) & 0x7fffffff;
+      }
+      return h;
+    }
+    if (audioSessionId != null) return audioSessionId;
+    return 0;
+  }
 
   @override
   State<AudioVisualizer> createState() => _AudioVisualizerState();
@@ -97,6 +123,13 @@ class _AudioVisualizerState extends State<AudioVisualizer>
 
   /// Loads the GPU Milkdrop warp shader. Falls back to the Canvas painter if the
   /// runtime effect is unavailable on this platform/build.
+  /// Honest degradation (defect 16-01): [_shaderFailed] is surfaced to the UI
+  /// so a silent style swap never claims to be MilkDrop.
+  bool _shaderFailed = false;
+
+  /// True when the GPU shader path is unavailable and the Canvas fallback is
+  /// rendering. Exposed for tests / UI badge.
+  bool get isFallbackActive => _shaderFailed || _milkShader == null;
   Future<void> _loadMilkShader() async {
     if (_milkShader != null) return;
     try {
@@ -107,9 +140,14 @@ class _AudioVisualizerState extends State<AudioVisualizer>
         shader.dispose();
         return;
       }
-      setState(() => _milkShader = shader);
-    } catch (_) {
-      // Canvas fallback handles the display.
+      setState(() {
+        _milkShader = shader;
+        _shaderFailed = false;
+      });
+    } catch (e, st) {
+      ErrorLogger.log('Visualizer shader failed; using Canvas fallback',
+          error: e, stackTrace: st, category: 'Visualizer');
+      if (mounted) setState(() => _shaderFailed = true);
     }
   }
 
@@ -117,14 +155,20 @@ class _AudioVisualizerState extends State<AudioVisualizer>
     try {
       final preset = await MilkdropPresetStore().load();
       if (mounted) setState(() => _milkPreset = preset);
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Visualizer preset load failed',
+          error: e, stackTrace: st, category: 'Visualizer');
+    }
   }
 
   Future<void> _loadCustomPreset() async {
     try {
       final preset = await VisualizerPresetStore().load();
       if (mounted) setState(() => _customPreset = preset);
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Visualizer custom preset load failed',
+          error: e, stackTrace: st, category: 'Visualizer');
+    }
   }
 
   void _startAnimation() {
@@ -255,7 +299,12 @@ class _AudioVisualizerState extends State<AudioVisualizer>
 
     if (isStale && widget.isPlaying && widget.style != VisualizerStyle.off) {
       final t = now.millisecondsSinceEpoch / 1000.0;
-      final seed = widget.trackSeed ?? widget.audioSessionId ?? 0;
+      final seed = AudioVisualizer.resolveSeed(
+        trackSeed: widget.trackSeed,
+        trackId: widget.trackId,
+        trackPath: widget.trackPath,
+        audioSessionId: widget.audioSessionId,
+      );
       final seedOffset = (seed.abs() % 100) / 100.0;
       for (int i = 0; i < _numBands; i++) {
         final phase = i * 0.25 + seedOffset;

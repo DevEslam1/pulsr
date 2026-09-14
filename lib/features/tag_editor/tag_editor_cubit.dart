@@ -416,7 +416,11 @@ class TagEditorCubit extends Cubit<TagEditorState> {
               payload['comment'] = state.comment;
             }
             // Do NOT include 'lyrics' in batch mode to preserve each track's embedded lyrics
-            await _channel.invokeMethod('writeTags', payload);
+            final batchResult =
+                await _channel.invokeMethod<dynamic>('writeTags', payload);
+            if (!_isWriteVerified(batchResult)) {
+              throw const _UnverifiedTagWriteException();
+            }
             if (isClosed) return;
             await _scannerService.rescanSingleFile(s.path);
             taggedSongs.add(s);
@@ -464,7 +468,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
         lyricsTruncated = true;
       }
 
-      await _channel.invokeMethod('writeTags', {
+      final writeResult = await _channel.invokeMethod<dynamic>('writeTags', {
         'path': state.song.path,
         'title': state.title,
         'artist': state.artist,
@@ -478,6 +482,15 @@ class TagEditorCubit extends Cubit<TagEditorState> {
         'artworkPath': state.newArtworkPath,
         'removeArtwork': state.removeArtwork,
       });
+      if (!_isWriteVerified(writeResult)) {
+        if (isClosed) return;
+        emit(state.copyWith(
+          status: TagEditorStatus.failure,
+          errorMessage:
+              'Tags were sent but could not be verified on this device (storage permission or format limitation). Original file was restored when possible.',
+        ));
+        return;
+      }
       if (isClosed) return;
 
       // Update Drift DB and clear cached parsed lyrics for THIS track only.
@@ -497,11 +510,22 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       } else {
         emit(state.copyWith(status: TagEditorStatus.success));
       }
-    } on PlatformException catch (e) {
+    } on _UnverifiedTagWriteException {
       if (isClosed) return;
       emit(state.copyWith(
         status: TagEditorStatus.failure,
-        errorMessage: e.message ?? 'Failed to save tags on this device.',
+        errorMessage:
+            'Tag write could not be verified — file left unchanged when possible. Check storage permission (Android 11+ scoped storage) and WAV limitations.',
+      ));
+    } on PlatformException catch (e) {
+      if (isClosed) return;
+      final isScopedStorage = e.code == 'WRITE_TAGS_ERROR' &&
+          (e.message ?? '').toLowerCase().contains('permission');
+      emit(state.copyWith(
+        status: TagEditorStatus.failure,
+        errorMessage: isScopedStorage
+            ? 'Storage permission denied (Android 11+ scoped storage). Grant All-files access and retry — no changes were applied.'
+            : (e.message ?? 'Failed to save tags on this device.'),
       ));
     } catch (e) {
       if (isClosed) return;
@@ -511,4 +535,23 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       ));
     }
   }
+}
+
+/// Native write returned without a verified re-read (or legacy `true` bridge
+/// pending update). Treated as failure so the UI never reports success for an
+/// unverified write (defects 24-01/24-03, 15-03 pattern).
+bool _isWriteVerified(dynamic result) {
+  if (result is Map) {
+    final v = result['verified'];
+    if (v is bool) return v;
+    // Back-compat: old native returned bare `true` with no verification.
+    if (result['ok'] == true) return false;
+    return false;
+  }
+  // Legacy bare-bool success carries no verification proof.
+  return false;
+}
+
+class _UnverifiedTagWriteException implements Exception {
+  const _UnverifiedTagWriteException();
 }

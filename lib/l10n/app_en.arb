@@ -2,14 +2,12 @@
   "@@locale": "en",
   "appTitle": "Pulsr Music",
   "appTagline": "Pure Offline Sound",
-
   "navHome": "Home",
   "navLibrary": "Library",
   "navSearch": "Search",
   "navPlaylists": "Playlists",
   "navSettings": "Settings",
   "navYtmSearch": "Online Search",
-
   "goodMorning": "Good morning",
   "goodAfternoon": "Good afternoon",
   "goodEvening": "Good evening",
@@ -22,7 +20,6 @@
   "quickMix": "Quick Mix",
   "history": "History",
   "stats": "Stats",
-
   "songs": "Songs",
   "albums": "Albums",
   "artists": "Artists",
@@ -30,7 +27,6 @@
   "genres": "Genres",
   "folders": "Folders",
   "years": "Years",
-
   "search": "Search",
   "searchPlaceholder": "Search songs, artists, albums...",
   "searchOnline": "Search YouTube Music...",
@@ -38,7 +34,6 @@
   "clearSearchHistory": "Clear History",
   "noResultsFound": "No music found",
   "noResultsSubtitle": "Try a different search term or check spelling",
-
   "nowPlaying": "Now Playing",
   "queue": "Up Next",
   "clearQueue": "Clear Queue",
@@ -55,7 +50,6 @@
   "sleepTimerSubtitle": "Auto pause with gentle fade-out",
   "audioQuality": "Audio Quality",
   "speedAndPitch": "Speed & Pitch",
-
   "play": "Play",
   "pause": "Pause",
   "next": "Next",
@@ -79,23 +73,19 @@
   "confirm": "Confirm",
   "reset": "Reset",
   "apply": "Apply",
-
   "noSongsFound": "No Songs Found",
   "noSongsSubtitle": "Scan your local storage to find all offline music files.",
   "rescanLibrary": "Rescan Media Library",
   "rescanSubtitle": "Scan local storage for music files",
   "scanning": "Scanning audio files...",
   "scanCompleted": "Scan completed",
-
   "permissionRequired": "Permission Required",
   "audioAccessRequired": "Audio access is required to display your music library.",
   "grantAccess": "Grant Access",
   "openSettings": "Open Settings",
   "privacyGuarantee": "100% Offline • Zero Telemetry • Local Storage",
-
   "onboardingTitle": "Private & Offline",
   "onboardingSubtitle": "Your music never leaves your device. No ads, no tracking, no accounts.",
-
   "createPlaylist": "New Playlist",
   "createSmartPlaylist": "New Smart Playlist",
   "smartPlaylists": "Smart Playlists",
@@ -109,7 +99,6 @@
   "addToPlaylist": "Add to Playlist",
   "addedToPlaylist": "Added to playlist",
   "removedFromPlaylist": "Removed from playlist",
-
   "smartRules": "Rules",
   "matchAllRules": "Match All Rules",
   "matchAnyRule": "Match Any Rule",
@@ -119,7 +108,6 @@
   "rulePlayCount": "Play Count",
   "ruleDuration": "Duration",
   "ruleRating": "Rating",
-
   "trackNumber": "Track",
   "discNumber": "Disc",
   "year": "Year",
@@ -132,14 +120,12 @@
   "removeArtwork": "Remove Artwork",
   "tagsSavedSuccess": "Tags updated successfully",
   "tagsSaveError": "Failed to update tags",
-
   "fileInfo": "File Information",
   "filePath": "File Path",
   "format": "Format",
   "bitrate": "Bitrate",
   "sampleRate": "Sample Rate",
   "fileSize": "File Size",
-
   "settings": "Settings",
   "appearance": "Theme & Appearance",
   "language": "Language",
@@ -168,7 +154,6 @@
   "visualizerWave": "Smooth Wave",
   "visualizerCircle": "Radial Pulse",
   "visualizerParticles": "Ambient Particles",
-
   "audioSettings": "Audio & Playback",
   "gaplessPlayback": "Gapless Playback",
   "gaplessSubtitle": "Continuous audio without silence",
@@ -183,7 +168,6 @@
   "replayGainOff": "Off",
   "preampWithRg": "Preamp with ReplayGain",
   "preampWithoutRg": "Preamp without ReplayGain",
-
   "librarySettings": "Library & Storage",
   "minDuration": "Minimum Track Duration",
   "minDurationSubtitle": "Hide audio clips shorter than",
@@ -191,7 +175,6 @@
   "autoHideSystemMediaSubtitle": "Filter out non-music audio files",
   "hiddenFolders": "Excluded Folders",
   "hiddenFoldersSubtitle": "Manage excluded and hidden music folders",
-
   "networkAndProxy": "Network & Proxy",
   "proxySettings": "Proxy Settings",
   "enableProxy": "Enable Proxy",
@@ -204,7 +187,6 @@
   "testProxy": "Test Proxy Connection",
   "proxySuccess": "Proxy connection successful",
   "proxyFailed": "Proxy connection failed",
-
   "extractorBackend": "Extractor & Backend Engine",
   "backendUrl": "Backend Server URL",
   "backendToken": "Backend API Token",
@@ -214,7 +196,6 @@
   "engineAuto": "Automatic Selection",
   "engineRemote": "Remote Yt-dlp Server",
   "engineOnDevice": "On-Device Extractor",
-
   "cloudSync": "Cloud Sync & Backup",
   "cloudSyncSubtitle": "Sync favorites, playlists, and settings across devices",
   "signInWithGoogle": "Sign In with Google",
@@ -229,17 +210,14 @@
   "importBackupJson": "Import Backup File (JSON)",
   "backupCreated": "Backup created successfully",
   "backupRestored": "Backup restored successfully",
-
   "batteryOptimization": "Battery Optimization",
   "batteryOptimizationSubtitle": "Allow unrestricted background playback",
   "batteryOptimizationPrompt": "Disable battery restrictions for uninterrupted playback",
   "requestWhitelist": "Disable Restrictions",
-
   "about": "About Pulsr",
   "aboutSubtitle": "Premium offline music player",
   "version": "Version",
   "sourceCode": "Open Source Licenses",
-
   "sortBy": "Sort by",
   "sortTitle": "Title",
   "sortArtist": "Artist",
@@ -250,7 +228,6 @@
   "sortTrackCount": "Track Count",
   "sortAscending": "Ascending",
   "sortDescending": "Descending",
-
   "playAll": "Play All",
   "shuffleAll": "Shuffle All",
   "tracksCount": "{count, plural, =0{0 tracks} =1{1 track} other{{count} tracks}}",
@@ -288,7 +265,6 @@
       }
     }
   },
-
   "deleteSongConfirmation": "Are you sure you want to permanently delete this song from your device?",
   "deleteMultipleConfirmation": "Are you sure you want to permanently delete {count} songs from your device?",
   "@deleteMultipleConfirmation": {
@@ -300,12 +276,10 @@
   },
   "songDeleted": "Song deleted",
   "songsDeleted": "Songs deleted",
-
   "unknownSong": "Unknown Track",
   "unknownArtist": "Unknown Artist",
   "unknownAlbum": "Unknown Album",
   "unknownGenre": "Unknown Genre",
-
   "localMusic": "Local Music",
   "onlineStream": "Online Stream",
   "likedTracks": "Liked tracks",
@@ -358,201 +332,6 @@
   "searchYtmSubtitle": "Search, stream & download songs",
   "streamingQuality": "Streaming Quality",
   "downloadQuality": "Download Quality",
-  "extractionEngine": "Extraction Engine",
-  "ytdlpConfig": "yt-dlp Server Config",
-  "storageAndCache": "Storage & Cache",
-  "privacyAndData": "Privacy & Data",
-  "privacyGuaranteeSubtitle": "100% offline. Zero telemetry, zero tracking.",
-  "aboutAppSubtitle": "Version 1.0.0 • Pure Offline Sound",
-  "signIn": "Sign In",
-  "lastSyncedJustNow": "Last synced: Just now",
-  "lastSyncedMinutesAgo": "Last synced: {minutes}m ago",
-  "@lastSyncedMinutesAgo": {
-    "placeholders": {
-      "minutes": {
-        "type": "int"
-      }
-    }
-  },
-  "lastSyncedHoursAgo": "Last synced: {hours}h ago",
-  "@lastSyncedHoursAgo": {
-    "placeholders": {
-      "hours": {
-        "type": "int"
-      }
-    }
-  },
-  "connectedReadyToSync": "Connected • Ready to sync",
-  "downloaded": "Downloaded",
-  "exploreOnlineMusic": "Explore Online Music",
-  "noDownloadsYet": "No Downloads Yet",
-  "noDownloadsYetSubtitle": "Download your favorite songs from YouTube Music to listen offline anywhere.",
-  "offlineDownloads": "Offline Downloads",
-  "local": "Local",
-  "online": "Online",
-  "syncYouTubeMusic": "Sync YouTube Music",
-  "importByPlaylistLink": "Import by Playlist Link",
-  "noLocalFavorites": "No Local Favorites",
-  "noLocalFavoritesSubtitle": "Tap the heart icon on any of your local tracks to add them here.",
-  "noOnlineFavorites": "No Online Favorites",
-  "scanStorage": "Scan Storage",
-  "noFoldersFound": "No Folders Found",
-  "noFoldersSubtitle": "Scan device storage to discover music directories and organize by path.",
-  "playNext": "Play Next",
-  "favorite": "Favorite",
-  "all": "All",
-  "importM3u": "Import M3U",
-  "syncOnlineLibrary": "Sync Online Library",
-  "addPlaylistUrl": "Add Playlist URL",
-  "addYouTubePlaylist": "Add YouTube Playlist",
-  "playlistImported": "Playlist Imported",
-  "tracksMatched": "{matched} of {total} tracks matched.",
-  "@tracksMatched": {
-    "placeholders": {
-      "matched": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
-    }
-  },
-  "fetch": "Fetch",
-  "ok": "OK",
-  "tracksCountPlural": "{count} {count, plural, =1{track} other{tracks}}",
-  "@tracksCountPlural": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "noTrackSelected": "No Track Selected",
-  "playbackSpeed": "Playback Speed",
-  "vinylCircle": "Vinyl Circle",
-  "sortAndFilter": "Sort & Filter",
-  "title": "Title",
-  "duration": "Duration",
-  "qualityAndCodec": "QUALITY & CODEC",
-  "audioFormat": "Audio Format",
-  "channels": "Channels",
-  "playCount": "Play Count",
-  "ringtone": "Ringtone",
-  "editTags": "Edit Tags",
-  "setAudioAs": "Set Audio As",
-  "phoneRingtone": "Phone Ringtone",
-  "notificationSound": "Notification Sound",
-  "alarmSound": "Alarm Sound",
-  "turnOff": "Turn Off",
-  "presets": "Presets",
-  "customTime": "Custom Time",
-  "stopAtSpecificTime": "Stop at specific time",
-  "currentSpeed": "Current speed: {speed}",
-  "@currentSpeed": {
-    "placeholders": {
-      "speed": {
-        "type": "String"
-      }
-    }
-  },
-  "addedTo": "Added to {name}",
-  "@addedTo": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
-  "playCountTimes": "{count} {count, plural, =1{time} other{times}}",
-  "@playCountTimes": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "pastePlaylistUrl": "Paste YouTube Playlist URL or ID",
-  "hideCustomFolder": "Hide Custom Folder",
-  "hideFolderDesc": "Enter the full directory path you want to hide from your music library:",
-  "hideFolder": "Hide Folder",
-  "confirmRestore": "Confirm Restore",
-  "confirmRestoreDesc": "Are you sure you want to restore backup data from this file?",
-  "existingLibraryUpdateNotice": "Existing library matching tracks will be updated.",
-  "audioVisualizerPermission": "Audio Visualizer Permission",
-  "audioVisualizerPermissionDesc": "The visualizer reads audio output, not your microphone. Android requires the Record Audio permission to process frequency data.",
-  "useSimulation": "Use Simulation",
-  "visualizerSimulationNotice": "Visualizer permission denied — showing a simulated animation instead.",
-  "ytmAccount": "YouTube Music Account",
-  "disconnect": "Disconnect",
-  "openWebPlayer": "Open Web Player",
-  "ytdlpServerConfig": "yt-dlp Server Config",
-  "ytdlpServerDesc": "Connects Pulsr to a remote yt-dlp backend with rotating proxies to bypass YouTube bot detection and IP bans.",
-  "downloadsTitle": "Downloads",
-  "noDownloadsTitle": "No downloads yet",
-  "noDownloadsSubtitle": "Songs downloaded for offline playback will appear here.",
-  "statusQueued": "Queued",
-  "statusDownloading": "Downloading",
-  "statusPaused": "Paused",
-  "statusCompleted": "Completed",
-  "statusFailed": "Failed",
-  "storageUsed": "Storage Used",
-  "storageFree": "Free Space",
-  "resume": "Resume",
-  "downloadErrorNoSpace": "Storage full — free up space and retry",
-  "downloadErrorStorage": "Storage full — free up space and retry",
-  "downloadErrorPermission": "Storage permission denied. Please grant permission in Settings.",
-  "downloadErrorInterrupted": "Download was interrupted. Tap to resume.",
-  "downloadErrorDisabled": "Downloads are disabled or unavailable in this build.",
-  "downloadErrorTransition": "Invalid download state transition.",
-  "downloadErrorRateLimited": "YouTube is busy. Cooling down…",
-  "downloadErrorNetwork": "No connection. Check your network.",
-  "downloadErrorBotChallenge": "YouTube verification triggered. Retrying…",
-  "downloadErrorUnavailable": "This track is unavailable.",
-  "downloadWifiOnly": "Wi-Fi Only Mode is active. Connect to Wi-Fi to download.",
-  "downloadErrorAlreadyQueued": "This song is already in the download queue.",
-  "downloadErrorCorrupt": "Downloaded file was corrupted or incomplete. Please retry.",
-  "downloadErrorInvalidTransition": "Invalid download state transition.",
-  "downloadErrorTimeout": "Download timed out. Please retry.",
-  "dspEnginePreference": "DSP Engine Preference",
-  "dspEnginePreferenceSubtitle": "Choose real-time DSP engine or OEM system sound effects",
-  "dspEngineNative": "Native Studio DSP (Zero Latency)",
-  "dspEngineOem": "OEM / System AudioFX",
-  "dspEngineAuto": "Automatic (Prefer Native)",
-  "audioStageDegraded": "Audio stage \"{stage}\" was bypassed to prevent stutter under high load.",
-  "@audioStageDegraded": {
-    "placeholders": {
-      "stage": {
-        "type": "String"
-      }
-    }
-  },
-  "stageEq": "Parametric EQ",
-  "stageReverb": "Convolution Reverb",
-  "stageCrossfeed": "Crossfeed",
-  "stageLimiter": "Lookahead Limiter",
-  "stageResampler": "Resampler",
-  "stagePanner": "Spatial Panner",
-  "dspSaturationTitle": "Harmonic Saturation",
-  "dspSaturationSubtitle": "Tube/tape-style harmonic exciter",
-  "dspSaturationDrive": "Drive",
-  "dspSaturationMix": "Mix",
-  "dspSaturationTilt": "Tilt Emphasis",
-  "dspStereoWidthTitle": "Stereo Width",
-  "dspStereoWidthSubtitle": "Independent Mid/Side field control",
-  "dspStereoWidthAmount": "Width",
-  "dspLoudnessTitle": "Loudness Contour",
-  "dspLoudnessSubtitle": "Fletcher–Munson volume-linked tone compensation",
-  "dspLoudnessIntensity": "Intensity",
-  "dspLoudnessReplayGainNote": "Complements ReplayGain: ReplayGain levels loudness across tracks, while this contour adapts tone to your listening volume.",
-  "dspSubCrossoverTitle": "Subwoofer Crossover",
-  "dspSubCrossoverSubtitle": "Bass redirection into a summed mono sub tap",
-  "dspSubCrossoverCorner": "Crossover Corner",
-  "dspSubCrossoverSubLevel": "Sub Level",
-  "dspSubCrossoverNote": "Bass redirection: a low-passed mono sum is added to both channels — this is not true multichannel LFE routing.",
-  "dspDynamicEqTitle": "Dynamic EQ",
-  "dspDynamicEqSubtitle": "Cuts resonances only when band energy exceeds the threshold",
-  "dspDynamicEqFrequency": "Band Frequency",
-"downloadQuality": "Download Quality",
   "extractionEngine": "Extraction Engine",
   "ytdlpConfig": "yt-dlp Server Config",
   "storageAndCache": "Storage & Cache",
@@ -872,7 +651,6 @@
     }
   },
   "goHome": "Go Home",
-
   "resetToDefault30s": "Reset to default (30s)",
   "autoFilteringVoiceMemos": "Auto-filtering voice memos • Custom paths",
   "manageExcludedDirectories": "Manage excluded directories",
@@ -1131,7 +909,6 @@
   "dsdDopRequiresUsbDac": "Requires a connected USB DAC that supports DSD over PCM (DoP)",
   "dsdOutputPcm": "PCM",
   "dsdOutputDop": "DoP",
-
   "enableShuffle": "Enable shuffle",
   "disableShuffle": "Disable shuffle",
   "like": "Like",
@@ -1205,5 +982,13 @@
   "notificationPermissionTitle": "Show playback controls",
   "notificationPermissionRationale": "Allow notifications so Pulsr can show playback controls on your lock screen and in the notification shade.",
   "notificationPermissionAllow": "Allow",
-  "notificationPermissionNotNow": "Not now"
+  "notificationPermissionNotNow": "Not now",
+  "onboardingPermissionRationale": "Without audio access your library will be empty. You can continue with limited access and grant permission later from Settings.",
+  "@onboardingPermissionRationale": {
+    "description": "Explains denied permission with limited-access option"
+  },
+  "continueLimitedAccess": "Continue with limited access",
+  "@continueLimitedAccess": {
+    "description": "Continue onboarding without permission"
+  }
 }

@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../core/constants/app_radii.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_logo.dart';
 import '../../../data/scanner/media_scanner_service.dart';
@@ -42,20 +43,43 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         if (Platform.isAndroid) {
           try {
             await Permission.notification.request();
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('Notification permission request failed',
+                error: e, stackTrace: st, category: 'Onboarding');
+          }
         }
         await widget.scannerService.scanDeviceLibrary();
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(context.l10n.audioAccessRequired),
-              action: SnackBarAction(
-                label: context.l10n.openSettings,
-                onPressed: () => openAppSettings(),
-              ),
+          // No dead end (defect 02-01): explain + offer Settings AND a
+          // continue-with-limited-access path that completes onboarding.
+          final action = await showDialog<String>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: Text(context.l10n.audioAccessRequired),
+              content: Text(context.l10n.onboardingPermissionRationale),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, 'settings'),
+                  child: Text(context.l10n.openSettings),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, 'limited'),
+                  child: Text(context.l10n.continueLimitedAccess),
+                ),
+              ],
             ),
           );
+          if (action == 'settings') {
+            await openAppSettings();
+            return;
+          }
+          // 'limited' (or dismiss): complete onboarding with an empty library
+          // so the user is never stuck; they can grant later from Settings.
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('onboarding_completed', true);
+          if (mounted) context.go('/');
+          return;
         }
         return;
       }

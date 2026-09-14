@@ -213,6 +213,18 @@ class EqualizerManager {
   /// SettingsCubit persists to the same PrefsKeys.dspPreference key.
   String dspPreference = 'native';
 
+  /// Test/compat override for the legacy DynamicsProcessing mirror.
+  /// null (default) => mirror follows [dspPreference]: disabled when 'native'
+  /// owns the curve (single-application guarantee, defect 13-01), enabled
+  /// otherwise as a fallback for old APKs / OEM path.
+  bool? debugForceLegacyMirror;
+
+  /// True when the legacy 10-band postEq mirror must be written alongside the
+  /// native parametric stage. When false and the native bulk write ACKs, the
+  /// legacy write is skipped so the curve is applied exactly once.
+  bool get legacyMirrorEnabled =>
+      debugForceLegacyMirror ?? dspPreference != 'native';
+
   /// Bit-perfect bypass mirror. Owned here so reattach/route resync restores
   /// it (previously only pushed once from SettingsCubit and lost on resync).
   bool isBitPerfectBypass = false;
@@ -998,15 +1010,15 @@ class EqualizerManager {
     );
 
     if (PlatformCapabilities.isAndroid) {
-      // Single bulk JNI hop (was 32 hops, 150-300ms jank) + fallback for legacy 10-band path
-      try {
-        await _effectsChannel.setNativeEqBandsBulk(
-          frequencies: targetFreqs,
-          gains: currentPreset.gains,
-        );
-      } catch (_) {
+      // Single bulk JNI hop (was 32 hops, 150-300ms jank) + fallback for legacy 10-band path.
+      // Single-application (13-01): skip legacy mirror when native ACKs and owns the curve.
+      final nativeOk = await _effectsChannel.setNativeEqBandsBulk(
+        frequencies: targetFreqs,
+        gains: currentPreset.gains,
+      );
+      if (!nativeOk) {
         await _effectsChannel.setNativeEqBandCount(targetFreqs.length);
-        final futures = <Future<void>>[];
+        final futures = <Future<bool>>[];
         for (int i = 0; i < targetFreqs.length; i++) {
           futures.add(
             _effectsChannel.setNativeEqBand(
@@ -1023,16 +1035,18 @@ class EqualizerManager {
         }
         if (futures.isNotEmpty) await Future.wait(futures);
       }
-      if (count == 10) {
-        await _effectsChannel.setEqBands(targetFreqs);
-        await _effectsChannel.setEqBandGains(currentPreset.gains);
-      } else {
-        final tenBandGains = EqPreset.interpolateGains(
-          currentPreset.gains,
-          targetFrequencies: customFrequencies,
-        );
-        await _effectsChannel.setEqBands(customFrequencies);
-        await _effectsChannel.setEqBandGains(tenBandGains);
+      if (legacyMirrorEnabled || !nativeOk) {
+        if (count == 10) {
+          await _effectsChannel.setEqBands(targetFreqs);
+          await _effectsChannel.setEqBandGains(currentPreset.gains);
+        } else {
+          final tenBandGains = EqPreset.interpolateGains(
+            currentPreset.gains,
+            targetFrequencies: customFrequencies,
+          );
+          await _effectsChannel.setEqBands(customFrequencies);
+          await _effectsChannel.setEqBandGains(tenBandGains);
+        }
       }
     }
     _debouncedSavePreferences();
@@ -1118,19 +1132,25 @@ class EqualizerManager {
     try {
       if (PlatformCapabilities.isAndroid && isEnabled) {
         if (eqBandCount != 10) {
+          var nativeOk = true;
           for (final entry in valid.entries) {
-            await _effectsChannel.setNativeEqBand(
+            final ok = await _effectsChannel.setNativeEqBand(
               entry.key,
               targetFreqs[entry.key],
               entry.value,
               1.414,
             );
+            if (!ok) nativeOk = false;
           }
-          final tenBandGains = EqPreset.interpolateGains(
-            currentPreset.gains,
-            targetFrequencies: customFrequencies,
-          );
-          await _effectsChannel.setEqBandGains(tenBandGains);
+          // Single-application: skip the interpolated legacy mirror when the
+          // native stage ACKed and owns the curve (defect 13-01).
+          if (!nativeOk || legacyMirrorEnabled) {
+            final tenBandGains = EqPreset.interpolateGains(
+              currentPreset.gains,
+              targetFrequencies: customFrequencies,
+            );
+            await _effectsChannel.setEqBandGains(tenBandGains);
+          }
         } else {
           for (final entry in valid.entries) {
             await _effectsChannel.setEqBandGain(entry.key, entry.value);
@@ -1165,42 +1185,39 @@ class EqualizerManager {
     if (!isEnabled) return;
     final targetFreqs = activeFrequencies;
     if (PlatformCapabilities.isAndroid) {
-      // Prefer bulk path — single generation publish, zero per-band JNI overhead
-      try {
-        await _effectsChannel.setNativeEqBandsBulk(
-          frequencies: targetFreqs,
-          gains: currentPreset.gains,
-        );
-        if (eqBandCount == 10) {
-          // Keep legacy 10-band DynamicsProcessing in sync only for 10-band mode
-          await _effectsChannel.setEqBands(targetFreqs);
-          await _effectsChannel.setEqBandGains(currentPreset.gains);
-        } else {
-          // In 32/64-band mode, interpolate to 10 bands so the audible DynamicsProcessing postEq
-          // reflects the EQ curve instead of remaining silent/flat!
-          final tenBandGains = EqPreset.interpolateGains(
-            currentPreset.gains,
-            targetFrequencies: customFrequencies,
-          );
-          await _effectsChannel.setEqBands(customFrequencies);
-          await _effectsChannel.setEqBandGains(tenBandGains);
+      // Prefer bulk path — single generation publish, zero per-band JNI overhead.
+      // Single-application guarantee (13-01): when native owns the curve
+      // (dspPreference 'native') and bulk ACKs, skip the legacy postEq mirror
+      // so gains are not applied twice. The mirror is kept only as a fallback
+      // for old APKs / OEM routing or when explicitly forced for tests.
+      final nativeOk = await _effectsChannel.setNativeEqBandsBulk(
+        frequencies: targetFreqs,
+        gains: currentPreset.gains,
+      );
+      if (nativeOk) {
+        if (legacyMirrorEnabled) {
+          if (eqBandCount == 10) {
+            await _effectsChannel.setEqBands(targetFreqs);
+            await _effectsChannel.setEqBandGains(currentPreset.gains);
+          } else {
+            final tenBandGains = EqPreset.interpolateGains(
+              currentPreset.gains,
+              targetFrequencies: customFrequencies,
+            );
+            await _effectsChannel.setEqBands(customFrequencies);
+            await _effectsChannel.setEqBandGains(tenBandGains);
+          }
         }
         return;
-      } catch (e, st) {
-        // Bulk native apply failed; fall through to the per-band writes
-        // below. Logged so a silently degraded EQ is visible to
-        // telemetry instead of disappearing (defect 13-02).
-        ErrorLogger.log(
-          'Native bulk EQ apply failed; falling back to per-band writes',
-          error: e,
-          stackTrace: st,
-          category: 'DSP',
-        );
       }
+      ErrorLogger.log(
+        'Native bulk EQ apply failed; falling back to per-band writes',
+        category: 'DSP',
+      );
       // Fallback to legacy per-band if bulk unavailable (old APK)
       if (eqBandCount != 10) {
         await _effectsChannel.setNativeEqBandCount(targetFreqs.length);
-        final futures = <Future<void>>[];
+        final futures = <Future<bool>>[];
         for (int i = 0; i < targetFreqs.length; i++) {
           futures.add(
             _effectsChannel.setNativeEqBand(
@@ -1220,7 +1237,7 @@ class EqualizerManager {
         await _effectsChannel.setEqBands(targetFreqs);
         await _effectsChannel.setEqBandGains(currentPreset.gains);
         await _effectsChannel.setNativeEqBandCount(targetFreqs.length);
-        final futures2 = <Future<void>>[];
+        final futures2 = <Future<bool>>[];
         for (int i = 0; i < targetFreqs.length; i++) {
           futures2.add(
             _effectsChannel.setNativeEqBand(

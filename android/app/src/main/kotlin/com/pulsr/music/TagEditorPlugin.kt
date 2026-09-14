@@ -317,13 +317,57 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                             tag.deleteArtworkField()
                         }
 
-                        AudioFileIO.write(audioFile)
+                        // Atomic safety net (defect 24-01): backup the original so an
+                        // interrupted write is recoverable instead of corrupting the
+                        // user's only copy.
+                        var backupFile: java.io.File? = null
+                        if (!isContentUri) {
+                            try {
+                                val src = File(path)
+                                backupFile = java.io.File(src.parent, ".${src.name}.pulsr.bak")
+                                runCatching { if (backupFile.exists()) backupFile.delete() }
+                                src.copyTo(backupFile, overwrite = true)
+                            } catch (_: Exception) {
+                                backupFile = null
+                            }
+                        }
+
+                        try {
+                            AudioFileIO.write(audioFile)
+                        } catch (writeEx: Exception) {
+                            // Restore backup on failed write when possible.
+                            try {
+                                if (!isContentUri && backupFile != null && backupFile.exists()) {
+                                    backupFile.copyTo(File(path), overwrite = true)
+                                }
+                            } catch (_: Exception) {}
+                            throw writeEx
+                        }
 
                         if (isContentUri) {
                             val uri = android.net.Uri.parse(path)
                             context?.contentResolver?.openOutputStream(uri, "rwt")?.use { out ->
                                 file.inputStream().use { input -> input.copyTo(out) }
                             }
+                        }
+
+                        // Post-write verification: re-read and compare key fields.
+                        // Returns a map so Dart can distinguish written-but-unverified
+                        // from fully verified (defect 24-03 scoped-storage honesty).
+                        var verified = false
+                        try {
+                            val reread = AudioFileIO.read(if (isContentUri) file else File(path))
+                            val rtag = reread.tag
+                            if (rtag != null) {
+                                val expTitle = tags["title"]?.toString()
+                                val gotTitle = runCatching { rtag.getFirst(FieldKey.TITLE) }.getOrNull()
+                                verified = expTitle.isNullOrEmpty() || gotTitle == expTitle
+                            }
+                        } catch (_: Exception) {
+                            verified = false
+                        }
+                        if (verified) {
+                            runCatching { backupFile?.delete() }
                         }
 
                         // Trigger Android system MediaStore scan so filesystem changes are indexed immediately.
@@ -337,7 +381,7 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                         }
 
                         android.os.Handler(android.os.Looper.getMainLooper()).post {
-                            result.success(true)
+                            result.success(mapOf("ok" to true, "verified" to verified))
                         }
                     } catch (e: Exception) {
                         android.os.Handler(android.os.Looper.getMainLooper()).post {

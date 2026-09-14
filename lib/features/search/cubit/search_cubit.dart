@@ -249,6 +249,29 @@ class SearchCubit extends PulsrCubit<SearchState> {
         results.add(song);
       }
     }
+    // Relevance ranking (gap 08-2): exact title prefix first, then exact word,
+    // then title over artist/album, preserving stable order otherwise.
+    results.sort((a, b) {
+      int score(SongsTableData s) {
+        final t = normalize(s.title);
+        final ar = normalize(s.artist);
+        final al = normalize(s.album);
+        if (t == q) return 0;
+        if (t.startsWith(q)) return 1;
+        if (ar == q || al == q) return 2;
+        final titleWord =
+            t.split(RegExp(r'\s+')).any((w) => w == q || w.startsWith(q));
+        if (titleWord) return 3;
+        if (t.contains(q)) return 4;
+        if (ar.contains(q) || al.contains(q)) return 5;
+        return 6;
+      }
+
+      final sa = score(a);
+      final sb = score(b);
+      if (sa != sb) return sa.compareTo(sb);
+      return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+    });
     return results;
   }
 

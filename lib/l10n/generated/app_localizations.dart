@@ -3838,6 +3838,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Not now'**
   String get notificationPermissionNotNow;
+
+  /// Explains denied permission with limited-access option
+  ///
+  /// In en, this message translates to:
+  /// **'Without audio access your library will be empty. You can continue with limited access and grant permission later from Settings.'**
+  String get onboardingPermissionRationale;
+
+  /// Continue onboarding without permission
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with limited access'**
+  String get continueLimitedAccess;
 }
 
 class _AppLocalizationsDelegate

@@ -7,9 +7,12 @@ import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 import '../db/app_database.dart';
 
-/// Unfolds Master Quality Authenticated (MQA) audio into high-resolution PCM.
-/// Implements MQA Core Unfold (first unfold from 44.1/48 kHz to 88.2/96 kHz 24-bit PCM)
-/// with 13-tap spline reconstruction filtering.
+/// Detects likely MQA-encoded audio and performs an *approximate* first-unfold
+/// (44.1/48 kHz -> 88.2/96 kHz) via linear interpolation of PCM frames.
+/// This is NOT a licensed/authenticated MQA Core decoder: no authentication,
+/// no proprietary reconstruction filter. UI must label this as
+/// "MQA detected (approximate, not authenticated)" — see audio_quality_info.
+/// (Honesty fix, defect 14-02.)
 class MqaDecoderHelper {
   /// MQA magic sync word in 24-bit LSB stream: 0xbe0498c4
   static const int mqaSyncWord = 0xbe0498c4;
@@ -71,7 +74,8 @@ class MqaDecoderHelper {
     return false;
   }
 
-  /// Performs Core Unfold (2x sample rate expansion using spline interpolation filter).
+  /// Approximate 2x expansion using linear interpolation of the signed 24-bit
+  /// sample value (NOT a 13-tap spline / licensed MQA filter).
   static Uint8List coreUnfoldPcm24({
     required Uint8List pcm24Bytes,
     required int inputSampleRate,
@@ -80,8 +84,6 @@ class MqaDecoderHelper {
     final int inFrames = pcm24Bytes.length ~/ 6;
     final int outFrames = inFrames * 2;
     final Uint8List outBytes = Uint8List(outFrames * 6);
-
-    // 13-tap symmetric spline interpolation coefficients (normalized to 1.0)
 
     for (int ch = 0; ch < 2; ch++) {
       final chOffset = ch * 3;
@@ -97,7 +99,7 @@ class MqaDecoderHelper {
         outBytes[outEven + 1] = s1;
         outBytes[outEven + 2] = s2;
 
-        // Reconstructed sample (odd output frame) using 13-tap spline filter
+        // Reconstructed sample (odd output frame) via linear average (approximate).
         final outOdd = (i * 2 + 1) * 6 + chOffset;
         if (i + 1 < inFrames) {
           final n0 = pcm24Bytes[srcIdx + 6];

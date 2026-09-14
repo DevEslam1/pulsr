@@ -52,7 +52,15 @@ class ScrobblerService {
       String secureKey, String legacyKey) async {
     try {
       final val = await _secureStorage.read(key: secureKey);
-      if (val != null && val.isNotEmpty) return val;
+      if (val != null && val.isNotEmpty) {
+        // Single credential store (defect 23-01): best-effort wipe of any
+        // leftover plaintext copy whenever the secure copy is authoritative.
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.remove(legacyKey);
+        } catch (_) {}
+        return val;
+      }
     } catch (_) {}
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -69,6 +77,26 @@ class ScrobblerService {
       }
     } catch (_) {}
     return null;
+  }
+
+  /// Proactively migrates every known plaintext credential into secure storage
+  /// and wipes the prefs copies. Call once at startup. Single store (23-01).
+  Future<void> migrateAllCredentialsToSecureStorage() async {
+    const pairs = [
+      (keyLastFmApiKeySecure, keyLastFmApiKey),
+      (keyLastFmSecretSecure, keyLastFmSecret),
+      (keyLastFmSessionKeySecure, keyLastFmSessionKey),
+      (keyLibreFmSessionKeySecure, keyLibreFmSessionKey),
+      (keyListenBrainzTokenSecure, keyListenBrainzToken),
+    ];
+    for (final pair in pairs) {
+      try {
+        await _getSecureOrMigrate(pair.$1, pair.$2);
+      } catch (e, st) {
+        ErrorLogger.log('Scrobbler credential migration failed for ${pair.$2}',
+            error: e, stackTrace: st, category: 'Scrobbler');
+      }
+    }
   }
 
   static const String _keyLastScrobbleSong = 'scrobbler_last_song';

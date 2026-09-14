@@ -1226,6 +1226,11 @@ class MusicRepository implements IMusicRepository {
   }
 
   // --- QUEUE PERSISTENCE ---
+  // Ownership (defect 10-01): the authoritative queue lives in
+  // PlayerCubit.queue_slots_v1 (3 UI slots + active index). This Drift table
+  // is a DERIVED cold-resume cache for the audio service only: PlayerCubit
+  // writes it through on slot persist, AudioHandler reads it on cold start.
+  // On conflict, queue_slots_v1 wins. Do not introduce a third writer.
   @override
   Future<Result<void>> saveQueue(
       List<int> songIds, int currentIndex, int positionMs) async {

@@ -2,14 +2,12 @@
   "@@locale": "es",
   "appTitle": "Pulsr Música",
   "appTagline": "Sonido puro sin conexión",
-
   "navHome": "Inicio",
   "navLibrary": "Biblioteca",
   "navSearch": "Buscar",
   "navPlaylists": "Listas",
   "navSettings": "Ajustes",
   "navYtmSearch": "Búsqueda Online",
-
   "goodMorning": "Buenos días",
   "goodAfternoon": "Buenas tardes",
   "goodEvening": "Buenas noches",
@@ -22,7 +20,6 @@
   "quickMix": "Mezcla rápida",
   "history": "Historial",
   "stats": "Estadísticas",
-
   "songs": "Canciones",
   "albums": "Álbumes",
   "artists": "Artistas",
@@ -30,7 +27,6 @@
   "genres": "Géneros",
   "folders": "Carpetas",
   "years": "Años",
-
   "search": "Buscar",
   "searchPlaceholder": "Buscar canciones, artistas, álbumes...",
   "searchOnline": "Buscar en YouTube Music...",
@@ -38,7 +34,6 @@
   "clearSearchHistory": "Borrar historial",
   "noResultsFound": "No se encontró música",
   "noResultsSubtitle": "Intenta con otro término o revisa la ortografía",
-
   "nowPlaying": "Sonando ahora",
   "queue": "A continuación",
   "clearQueue": "Vaciar cola",
@@ -55,7 +50,6 @@
   "sleepTimerSubtitle": "Pausa automática con desvanecimiento suave",
   "audioQuality": "Calidad de audio",
   "speedAndPitch": "Velocidad y tono",
-
   "play": "Reproducir",
   "pause": "Pausar",
   "next": "Siguiente",
@@ -79,23 +73,19 @@
   "confirm": "Confirmar",
   "reset": "Restablecer",
   "apply": "Aplicar",
-
   "noSongsFound": "No se encontraron canciones",
   "noSongsSubtitle": "Escanea el almacenamiento local para encontrar toda tu música.",
   "rescanLibrary": "Reescanear biblioteca",
   "rescanSubtitle": "Escanear almacenamiento local en busca de archivos de música",
   "scanning": "Escaneando archivos de audio...",
   "scanCompleted": "Escaneo completado",
-
   "permissionRequired": "Permiso requerido",
   "audioAccessRequired": "Se requiere acceso al audio para mostrar tu biblioteca musical.",
   "grantAccess": "Conceder permiso",
   "openSettings": "Abrir ajustes",
   "privacyGuarantee": "100% Sin conexión • Cero telemetría • Almacenamiento local",
-
   "onboardingTitle": "Privado y sin conexión",
   "onboardingSubtitle": "Tu música nunca sale de tu dispositivo. Sin anuncios, sin rastreo, sin cuentas.",
-
   "createPlaylist": "Nueva lista de reproducción",
   "createSmartPlaylist": "Nueva lista inteligente",
   "smartPlaylists": "Listas inteligentes",
@@ -109,7 +99,6 @@
   "addToPlaylist": "Añadir a lista",
   "addedToPlaylist": "Añadido a la lista",
   "removedFromPlaylist": "Eliminado de la lista",
-
   "smartRules": "Reglas",
   "matchAllRules": "Cumplir todas las reglas",
   "matchAnyRule": "Cumplir cualquier regla",
@@ -119,7 +108,6 @@
   "rulePlayCount": "Reproducciones",
   "ruleDuration": "Duración",
   "ruleRating": "Calificación",
-
   "trackNumber": "Pista",
   "discNumber": "Disco",
   "year": "Año",
@@ -132,14 +120,12 @@
   "removeArtwork": "Quitar portada",
   "tagsSavedSuccess": "Etiquetas actualizadas con éxito",
   "tagsSaveError": "Error al actualizar las etiquetas",
-
   "fileInfo": "Información del archivo",
   "filePath": "Ruta del archivo",
   "format": "Formato",
   "bitrate": "Tasa de bits",
   "sampleRate": "Frecuencia de muestreo",
   "fileSize": "Tamaño",
-
   "settings": "Ajustes",
   "appearance": "Tema y apariencia",
   "language": "Idioma",
@@ -168,7 +154,6 @@
   "visualizerWave": "Onda suave",
   "visualizerCircle": "Pulso radial",
   "visualizerParticles": "Partículas ambientales",
-
   "audioSettings": "Audio y reproducción",
   "gaplessPlayback": "Reproducción sin pausas",
   "gaplessSubtitle": "Audio continuo sin silencios",
@@ -183,7 +168,6 @@
   "replayGainOff": "Desactivado",
   "preampWithRg": "Preamplificador con ReplayGain",
   "preampWithoutRg": "Preamplificador sin ReplayGain",
-
   "librarySettings": "Biblioteca y almacenamiento",
   "minDuration": "Duración mínima de pista",
   "minDurationSubtitle": "Ocultar pistas más cortas que",
@@ -191,7 +175,6 @@
   "autoHideSystemMediaSubtitle": "Filtrar tonos y notificaciones",
   "hiddenFolders": "Carpetas excluidas",
   "hiddenFoldersSubtitle": "Gestionar carpetas de música excluidas",
-
   "networkAndProxy": "Red y proxy",
   "proxySettings": "Ajustes de proxy",
   "enableProxy": "Activar proxy",
@@ -204,7 +187,6 @@
   "testProxy": "Probar conexión proxy",
   "proxySuccess": "Conexión proxy exitosa",
   "proxyFailed": "Falló la conexión proxy",
-
   "extractorBackend": "Motor de extracción y servidor",
   "backendUrl": "URL del servidor backend",
   "backendToken": "Token API del backend",
@@ -214,7 +196,6 @@
   "engineAuto": "Selección automática",
   "engineRemote": "Servidor Yt-dlp remoto",
   "engineOnDevice": "Extractor en el dispositivo",
-
   "cloudSync": "Sincronización en la nube y respaldo",
   "cloudSyncSubtitle": "Sincroniza favoritos, listas y ajustes entre dispositivos",
   "signInWithGoogle": "Iniciar sesión con Google",
@@ -229,17 +210,14 @@
   "importBackupJson": "Importar copia de seguridad (JSON)",
   "backupCreated": "Copia de seguridad creada correctamente",
   "backupRestored": "Copia de seguridad restaurada correctamente",
-
   "batteryOptimization": "Optimización de batería",
   "batteryOptimizationSubtitle": "Permitir reproducción en segundo plano sin restricciones",
   "batteryOptimizationPrompt": "Desactiva las restricciones de batería para una reproducción ininterrumpida",
   "requestWhitelist": "Desactivar restricciones",
-
   "about": "Acerca de Pulsr",
   "aboutSubtitle": "Reproductor de música offline de alta calidad",
   "version": "Versión",
   "sourceCode": "Licencias de código abierto",
-
   "sortBy": "Ordenar por",
   "sortTitle": "Título",
   "sortArtist": "Artista",
@@ -250,7 +228,6 @@
   "sortTrackCount": "Número de pistas",
   "sortAscending": "Ascendente",
   "sortDescending": "Descendente",
-
   "playAll": "Reproducir todo",
   "shuffleAll": "Mezclar todo",
   "tracksCount": "{count, plural, =0{0 pistas} =1{1 pista} other{{count} pistas}}",
@@ -288,7 +265,6 @@
       }
     }
   },
-
   "deleteSongConfirmation": "¿Estás seguro de que deseas eliminar permanentemente esta canción de tu dispositivo?",
   "deleteMultipleConfirmation": "¿Estás seguro de que deseas eliminar permanentemente {count} canciones de tu dispositivo?",
   "@deleteMultipleConfirmation": {
@@ -300,12 +276,10 @@
   },
   "songDeleted": "Canción eliminada",
   "songsDeleted": "Canciones eliminadas",
-
   "unknownSong": "Pista desconocida",
   "unknownArtist": "Artista desconocido",
   "unknownAlbum": "Álbum desconocido",
   "unknownGenre": "Género desconocido",
-
   "localMusic": "Música local",
   "onlineStream": "Transmisión en línea",
   "likedTracks": "Pistas favoritas",
@@ -576,7 +550,6 @@
   "pageNotFoundTitle": "Página no encontrada",
   "pageNotFoundMessage": "No se encontró ninguna página en {path}",
   "goHome": "Ir al inicio",
-
   "resetToDefault30s": "Restablecer a predeterminado (30 s)",
   "autoFilteringVoiceMemos": "Filtrado automático de notas de voz • Rutas personalizadas",
   "manageExcludedDirectories": "Gestionar directorios excluidos",
@@ -696,7 +669,6 @@
   "dsdDopRequiresUsbDac": "Requiere un DAC USB conectado compatible con DSD sobre PCM (DoP)",
   "dsdOutputPcm": "PCM",
   "dsdOutputDop": "DoP",
-
   "enableShuffle": "Activar aleatorio",
   "disableShuffle": "Desactivar aleatorio",
   "like": "Me gusta",
@@ -725,5 +697,13 @@
   "notificationPermissionTitle": "Mostrar controles de reproducción",
   "notificationPermissionRationale": "Permite las notificaciones para que Pulsr muestre los controles de reproducción en la pantalla de bloqueo y en el panel de notificaciones.",
   "notificationPermissionAllow": "Permitir",
-  "notificationPermissionNotNow": "Ahora no"
+  "notificationPermissionNotNow": "Ahora no",
+  "onboardingPermissionRationale": "Sin acceso al audio tu biblioteca estara vacia. Puedes continuar con acceso limitado y conceder el permiso mas tarde desde Ajustes.",
+  "@onboardingPermissionRationale": {
+    "description": "Explains denied permission with limited-access option"
+  },
+  "continueLimitedAccess": "Continuar con acceso limitado",
+  "@continueLimitedAccess": {
+    "description": "Continue onboarding without permission"
+  }
 }

@@ -527,6 +527,11 @@ GoRouter createRouter(MediaScannerService scannerService) {
         path: '/cloud-backup-dashboard',
         name: 'cloud-backup-dashboard',
         parentNavigatorKey: rootNavigatorKey,
+        // Spec F-49/F-56 marks cloud backup SKIPPED: block the route in Pure
+        // builds and when cloud sync is disallowed instead of shipping a dead
+        // surface (defects 03-02/22-01/20-03).
+        redirect: (context, state) =>
+            AppConfig.isCloudSyncAllowed ? null : '/settings',
         builder: (context, state) => const CloudBackupDashboardScreen(),
       ),
       GoRoute(

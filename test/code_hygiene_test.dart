@@ -9,9 +9,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('code hygiene guards', () {
-    // Baseline counted at commit 09ce0cb plus remediation tranche 1. Lower this
-    // constant as empty catch bodies are fixed; never raise it.
-    const int emptyCatchBaseline = 441;
+    // Baseline counted at commit 09ce0cb plus remediation tranches 1-2. Lower
+    // this constant as empty catch bodies are fixed; never raise it.
+    const int emptyCatchBaseline = 439;
 
     List<File> dartFilesUnderLib() {
       final dir = Directory('lib');

@@ -2105,4 +2105,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notificationPermissionNotNow => 'Not now';
+
+  @override
+  String get onboardingPermissionRationale =>
+      'Without audio access your library will be empty. You can continue with limited access and grant permission later from Settings.';
+
+  @override
+  String get continueLimitedAccess => 'Continue with limited access';
 }

@@ -2,14 +2,12 @@
   "@@locale": "ar",
   "appTitle": "بولسر للموسيقى",
   "appTagline": "صوت نقي بدون اتصال",
-
   "navHome": "الرئيسية",
   "navLibrary": "المكتبة",
   "navSearch": "بحث",
   "navPlaylists": "قوائم التشغيل",
   "navSettings": "الإعدادات",
   "navYtmSearch": "بحث عبر الإنترنت",
-
   "goodMorning": "صباح الخير",
   "goodAfternoon": "مساء الخير",
   "goodEvening": "مساء الخير",
@@ -22,7 +20,6 @@
   "quickMix": "مزيج سريع",
   "history": "السجل",
   "stats": "الإحصائيات",
-
   "songs": "الأغاني",
   "albums": "الألبومات",
   "artists": "الفنانون",
@@ -30,7 +27,6 @@
   "genres": "الأنواع الموسيقية",
   "folders": "المجلدات",
   "years": "السنوات",
-
   "search": "بحث",
   "searchPlaceholder": "ابحث عن الأغاني، الفنانين، الألبومات...",
   "searchOnline": "ابحث في يوتيوب ميوزك...",
@@ -38,7 +34,6 @@
   "clearSearchHistory": "مسح السجل",
   "noResultsFound": "لم يتم العثور على موسيقى",
   "noResultsSubtitle": "جرب كلمة بحث أخرى أو تحقق من الإملاء",
-
   "nowPlaying": "قيد التشغيل الآن",
   "queue": "التالي في القائمة",
   "clearQueue": "مسح قائمة الانتظار",
@@ -55,7 +50,6 @@
   "sleepTimerSubtitle": "إيقاف تلقائي مع تلاشٍ صوتي سلس",
   "audioQuality": "جودة الصوت",
   "speedAndPitch": "السرعة والنغمة",
-
   "play": "تشغيل",
   "pause": "إيقاف مؤقت",
   "next": "التالي",
@@ -79,23 +73,19 @@
   "confirm": "تأكيد",
   "reset": "إعادة تعيين",
   "apply": "تطبيق",
-
   "noSongsFound": "لم يتم العثور على أغانٍ",
   "noSongsSubtitle": "افحص وحدة التخزين للعثور على الملفات الصوتية دون اتصال.",
   "rescanLibrary": "إعادة فحص مكتبة الوسائط",
   "rescanSubtitle": "فحص وحدة التخزين بحثاً عن ملفات الموسيقى",
   "scanning": "جاري فحص الملفات الصوتية...",
   "scanCompleted": "اكتمل الفحص",
-
   "permissionRequired": "الإذن مطلوب",
   "audioAccessRequired": "يتطلب الوصول إلى الملفات الصوتية لعرض مكتبة الموسيقى الخاصة بك.",
   "grantAccess": "منح الإذن",
   "openSettings": "فتح الإعدادات",
   "privacyGuarantee": "١٠٠٪ بدون اتصال • بدون تتبع • تخزين محلي",
-
   "onboardingTitle": "خصوصية وبدون اتصال",
   "onboardingSubtitle": "موسيقاك لا تغادر جهازك أبدًا. بدون إعلانات، بدون تتبع، وبدون حسابات.",
-
   "createPlaylist": "قائمة تشغيل جديدة",
   "createSmartPlaylist": "قائمة تشغيل ذكية جديدة",
   "smartPlaylists": "قوائم التشغيل الذكية",
@@ -109,7 +99,6 @@
   "addToPlaylist": "إضافة إلى قائمة تشغيل",
   "addedToPlaylist": "تمت الإضافة إلى قائمة التشغيل",
   "removedFromPlaylist": "تمت الإزالة من قائمة التشغيل",
-
   "smartRules": "القواعد",
   "matchAllRules": "مطابقة جميع القواعد",
   "matchAnyRule": "مطابقة أي قاعدة",
@@ -119,7 +108,6 @@
   "rulePlayCount": "عدد مرات التشغيل",
   "ruleDuration": "المدة",
   "ruleRating": "التقييم",
-
   "trackNumber": "المسار",
   "discNumber": "القرص",
   "year": "السنة",
@@ -132,14 +120,12 @@
   "removeArtwork": "إزالة الغلاف",
   "tagsSavedSuccess": "تم تحديث البيانات بنجاح",
   "tagsSaveError": "فشل تحديث البيانات",
-
   "fileInfo": "معلومات الملف",
   "filePath": "مسار الملف",
   "format": "الصيغة",
   "bitrate": "معدل البت",
   "sampleRate": "معدل العينة",
   "fileSize": "الحجم",
-
   "settings": "الإعدادات",
   "appearance": "المظهر والسمة",
   "language": "اللغة",
@@ -168,7 +154,6 @@
   "visualizerWave": "موجة ناعمة",
   "visualizerCircle": "نبض دائري",
   "visualizerParticles": "جزيئات متحركة",
-
   "audioSettings": "الصوت والتشغيل",
   "gaplessPlayback": "تشغيل بلا فواصل",
   "gaplessSubtitle": "صوت مستمر بدون صمت بين الأغاني",
@@ -183,7 +168,6 @@
   "replayGainOff": "معطل",
   "preampWithRg": "التضخيم مع ReplayGain",
   "preampWithoutRg": "التضخيم بدون ReplayGain",
-
   "librarySettings": "المكتبة والتخزين",
   "minDuration": "الحد الأدنى لمدة المسار",
   "minDurationSubtitle": "إخفاء المقاطع الأقصر من",
@@ -191,7 +175,6 @@
   "autoHideSystemMediaSubtitle": "تصفية الملفات الصوتية غير الموسيقية",
   "hiddenFolders": "المجلدات المستبعدة",
   "hiddenFoldersSubtitle": "إدارة المجلدات الموسيقية المستبعدة والمخفية",
-
   "networkAndProxy": "الشبكة والبروكسي",
   "proxySettings": "إعدادات البروكسي",
   "enableProxy": "تفعيل البروكسي",
@@ -204,7 +187,6 @@
   "testProxy": "اختبار اتصال البروكسي",
   "proxySuccess": "نجح اتصال البروكسي",
   "proxyFailed": "فشل اتصال البروكسي",
-
   "extractorBackend": "محرك الاستخراج والخادم",
   "backendUrl": "رابط خادم الاستخراج",
   "backendToken": "رمز API للخادم",
@@ -214,7 +196,6 @@
   "engineAuto": "تحديد تلقائي",
   "engineRemote": "خادم Yt-dlp بعيد",
   "engineOnDevice": "استخراج محلي على الجهاز",
-
   "cloudSync": "المزامنة السحابية والنسخ الاحتياطي",
   "cloudSyncSubtitle": "مزامنة المفضلة وقوائم التشغيل والإعدادات بين أجهزتك",
   "signInWithGoogle": "تسجيل الدخول عبر Google",
@@ -229,17 +210,14 @@
   "importBackupJson": "استيراد ملف النسخ الاحتياطي (JSON)",
   "backupCreated": "تم إنشاء النسخة الاحتياطية بنجاح",
   "backupRestored": "تمت استعادة النسخة الاحتياطية بنجاح",
-
   "batteryOptimization": "تحسين استخدام البطارية",
   "batteryOptimizationSubtitle": "السماح بالتشغيل في الخلفية دون قيود النظام",
   "batteryOptimizationPrompt": "عطّل قيود البطارية للتشغيل بدون انقطاع",
   "requestWhitelist": "إلغاء القيود",
-
   "about": "حول بولسر",
   "aboutSubtitle": "مشغل موسيقى متميز دون اتصال",
   "version": "الإصدار",
   "sourceCode": "تراخيص المصدر المفتوح",
-
   "sortBy": "ترتيب حسب",
   "sortTitle": "العنوان",
   "sortArtist": "الفنان",
@@ -250,7 +228,6 @@
   "sortTrackCount": "عدد المسارات",
   "sortAscending": "تصاعدي",
   "sortDescending": "تنازلي",
-
   "playAll": "تشغيل الكل",
   "shuffleAll": "خلط الكل",
   "tracksCount": "{count, plural, =0{٠ مسار} =1{مسار واحد} =2{مساران} few{{count} مسارات} many{{count} مسارًا} other{{count} مسار}}",
@@ -288,7 +265,6 @@
       }
     }
   },
-
   "deleteSongConfirmation": "هل أنت متأكد من رغبتك في حذف هذه الأغنية نهائيًا من جهازك؟",
   "deleteMultipleConfirmation": "هل أنت متأكد من رغبتك في حذف {count} أغنية نهائيًا من جهازك؟",
   "@deleteMultipleConfirmation": {
@@ -300,12 +276,10 @@
   },
   "songDeleted": "تم حذف الأغنية",
   "songsDeleted": "تم حذف الأغاني",
-
   "unknownSong": "مسار غير معروف",
   "unknownArtist": "فنان غير معروف",
   "unknownAlbum": "ألبوم غير معروف",
   "unknownGenre": "نوع غير معروف",
-
   "localMusic": "الموسيقى المحلية",
   "onlineStream": "البث المباشر",
   "likedTracks": "المقاطع المفضلة",
@@ -576,7 +550,6 @@
   "pageNotFoundTitle": "الصفحة غير موجودة",
   "pageNotFoundMessage": "لم يتم العثور على صفحة في {path}",
   "goHome": "العودة إلى الرئيسية",
-
   "resetToDefault30s": "إعادة التعيين إلى الافتراضي (٣٠ ث)",
   "autoFilteringVoiceMemos": "تصفية تلقائية للملاحظات الصوتية • مسارات مخصصة",
   "manageExcludedDirectories": "إدارة الأدلة المستبعدة",
@@ -696,7 +669,6 @@
   "dsdDopRequiresUsbDac": "يتطلب توصيل DAC USB يدعم DSD فوق PCM (DoP)",
   "dsdOutputPcm": "PCM",
   "dsdOutputDop": "DoP",
-
   "enableShuffle": "تفعيل العشوائي",
   "disableShuffle": "تعطيل العشوائي",
   "like": "إعجاب",
@@ -725,5 +697,13 @@
   "notificationPermissionTitle": "إظهار عناصر التحكم بالتشغيل",
   "notificationPermissionRationale": "اسمح بالإشعارات ليتمكن Pulsr من إظهار عناصر التحكم بالتشغيل على شاشة القفل وفي درج الإشعارات.",
   "notificationPermissionAllow": "السماح",
-  "notificationPermissionNotNow": "ليس الآن"
+  "notificationPermissionNotNow": "ليس الآن",
+  "onboardingPermissionRationale": "بدون الوصول إلى الصوت ستكون مكتبتك فارغة. يمكنك المتابعة بوصول محدود ومنح الإذن لاحقا من الإعدادات.",
+  "@onboardingPermissionRationale": {
+    "description": "Explains denied permission with limited-access option"
+  },
+  "continueLimitedAccess": "المتابعة بوصول محدود",
+  "@continueLimitedAccess": {
+    "description": "Continue onboarding without permission"
+  }
 }
