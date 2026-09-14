@@ -4102,6 +4102,582 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Scanning for Cast devices...'**
   String get scanningCastDevices;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Got it'**
+  String get gotIt;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'All Equalizer & DSP settings restored to defaults'**
+  String get eqResetNotice;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Save Custom EQ Preset'**
+  String get saveCustomEqPreset;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Import EQ Preset'**
+  String get importEqPreset;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get importAction;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Custom band frequencies applied.'**
+  String get customFreqsApplied;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Room Correction'**
+  String get roomCorrection;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Measure room response'**
+  String get measureRoom;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Run the stepped-sine wizard'**
+  String get roomWizardDesc;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Export current EQ as FIR'**
+  String get exportEqFir;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Loads the curve into the convolution stage'**
+  String get firDesc;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Export Preset (JSON)'**
+  String get exportPresetJson;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Import Preset (JSON)'**
+  String get importPresetJson;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'DSP Signal Inspector'**
+  String get dspInspector;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'AutoEQ 2.0 Search'**
+  String get autoEqSearch;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Dynamics Compressor'**
+  String get dynamicsCompressor;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'DSP Chain'**
+  String get dspChain;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Frequencies'**
+  String get frequencies;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Native DSP unavailable on this device'**
+  String get nativeDspUnavailable;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Width'**
+  String get width;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Bass Mono'**
+  String get bassMono;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Anti-Pop'**
+  String get antiPop;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Add Band'**
+  String get addBand;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Mode'**
+  String get modeLabel;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Cut'**
+  String get cutAction;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Boost'**
+  String get boostAction;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Filter'**
+  String get filterLabel;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Peaking'**
+  String get peakingFilter;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Low Shelf'**
+  String get lowShelfFilter;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'High Shelf'**
+  String get highShelfFilter;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Loudness Contour'**
+  String get loudnessContour;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Equal-loudness bass/treble lift at low volume'**
+  String get loudnessContourDesc;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'TPDF Dither'**
+  String get tpdfDither;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Target Bit Depth'**
+  String get targetBitDepth;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Sinc Resampler'**
+  String get sincResampler;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'High-quality resampling when rates differ'**
+  String get sincDesc;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Wet / Dry Mix'**
+  String get wetDryMix;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Release Time'**
+  String get releaseTime;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Mono'**
+  String get monoLabel;
+
+  /// tranche6 eq l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Neutral / Custom'**
+  String get neutralCustom;
+
+  /// tranche6 eq interpolation
+  ///
+  /// In en, this message translates to:
+  /// **'Preset \"{name}\" saved!'**
+  String eqPresetSaved(Object name);
+
+  /// tranche6 eq interpolation
+  ///
+  /// In en, this message translates to:
+  /// **'Custom {count}-band Frequencies'**
+  String customBandFreqs(Object count);
+
+  /// tranche6 eq interpolation
+  ///
+  /// In en, this message translates to:
+  /// **'Band {number}'**
+  String eqBandLabel(Object number);
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Equalizer (EQ)'**
+  String get equalizerTitle;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'DSP & Spatial Effects'**
+  String get dspSpatialTitle;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'A/B Flat'**
+  String get abFlat;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Arbitrary EQ'**
+  String get arbitraryEq;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'LiveProg DSP'**
+  String get liveProgDsp;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Dynamic Bass'**
+  String get dynamicBass;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Bands'**
+  String get bandsLabel;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Preamp'**
+  String get preampLabel;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Bass Enhancer'**
+  String get bassEnhancer;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Volume Boost'**
+  String get volumeBoost;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'High boost may cause audio distortion or hearing fatigue.'**
+  String get highBoostWarn;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Applied Tuning Profile'**
+  String get appliedTuningProfile;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to Flat'**
+  String get resetToFlat;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'No headphone profiles found.'**
+  String get noHpProfiles;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get activeLabel;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'All DSP is bypassed by Bit-Perfect. Disable it in Settings to re-enable.'**
+  String get allDspBypassed;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Spatial Audio'**
+  String get spatialAudio;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Spatial API'**
+  String get spatialApi;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Android Spatializer API with head tracking'**
+  String get spatialApiDesc;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Soundstage Widening'**
+  String get soundstageWidening;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Virtualizer stereo field expansion'**
+  String get virtualizerDesc;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Studio Dynamics & Limiter'**
+  String get studioDynamics;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Multiband compression engine'**
+  String get multibandDesc;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Crossfeed (Headphones)'**
+  String get crossfeedHp;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Natural acoustic room speaker simulation'**
+  String get crossfeedNatural;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Crossfeed Algorithm'**
+  String get crossfeedAlgorithm;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Authentic BS2B IIR crossfeed network (low-pass + high-boost biquads) active.'**
+  String get bs2bActive;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Delay-Line'**
+  String get customDelayLine;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Delay Time'**
+  String get delayTime;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Opposite Ear Bleed'**
+  String get oppositeEarBleed;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Lookahead Brickwall Limiter'**
+  String get lookaheadLimiter;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Zero-overshoot anti-clipping protection'**
+  String get lookaheadDesc;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Ceiling Threshold'**
+  String get ceilingThreshold;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Stereo Balance & Mono Mix'**
+  String get stereoBalanceMono;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Left / Right acoustic panning balance'**
+  String get panDesc;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Acoustic Room Convolution'**
+  String get roomConv;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Impulse Response spatial acoustic simulation'**
+  String get irDesc;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Multiband Warmth'**
+  String get multibandWarmth;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Forces low bass to mono, eliminates headphone phase cancellation'**
+  String get bassMonoDesc;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Soft-limits transient bass bursts to protect speakers'**
+  String get antiPopDesc;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-depth dithering (auto-skipped on Bluetooth)'**
+  String get ditherDesc;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Edit GraphicEq Text & Presets...'**
+  String get editGraphicEq;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Open EEL Script Editor...'**
+  String get openEelEditor;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Acoustic Calibration Model'**
+  String get acousticCalibModel;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Not applied by the audio engine on this device/session - this control may have no audible effect.'**
+  String get notAppliedWarn;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Hardware Effects Unavailable'**
+  String get hwFxUnavailable;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Hardware AudioFX, Equalizer, Virtualizer and DynamicsProcessing are supported on Android devices.'**
+  String get hwFxDesc;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'System-level audio enhancement is active on your device. Running Pulsr DSP on top may cause double-processing. Consider disabling system Dolby/OEM effects or using Bit-Perfect output.'**
+  String get systemFxActive;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Paste a JSON preset string below:'**
+  String get pasteJsonPreset;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Set the center frequency (Hz) for each band. Values must be strictly ascending between 10 Hz and 30 kHz.'**
+  String get centerFreqHelp;
+
+  /// tranche6 eq batch2
+  ///
+  /// In en, this message translates to:
+  /// **'Measure your room, then export the correction as a convolution impulse response.'**
+  String get roomMeasureHelp;
+
+  /// tranche6 eq batch2b
+  ///
+  /// In en, this message translates to:
+  /// **'DSP disabled by Bit-Perfect bypass. Disable Bit-Perfect or Bypass DSP in Settings to re-enable.'**
+  String get dspDisabledBp;
+
+  /// tranche6 eq batch2b
+  ///
+  /// In en, this message translates to:
+  /// **'Restricts saturation to the mid band for clean sub-bass.'**
+  String get saturationBandDesc;
 }
 
 class _AppLocalizationsDelegate

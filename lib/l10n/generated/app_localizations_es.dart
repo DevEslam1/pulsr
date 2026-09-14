@@ -2267,4 +2267,304 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get scanningCastDevices => 'Buscando dispositivos...';
+
+  @override
+  String get gotIt => 'Entendido';
+
+  @override
+  String get eqResetNotice =>
+      'Todos los ajustes de ecualizador y DSP restaurados';
+
+  @override
+  String get saveCustomEqPreset => 'Guardar preajuste personalizado';
+
+  @override
+  String get importEqPreset => 'Importar preajuste de EQ';
+
+  @override
+  String get importAction => 'Importar';
+
+  @override
+  String get customFreqsApplied => 'Frecuencias personalizadas aplicadas.';
+
+  @override
+  String get roomCorrection => 'Correccion de sala';
+
+  @override
+  String get measureRoom => 'Medir respuesta de la sala';
+
+  @override
+  String get roomWizardDesc => 'Ejecutar el asistente de tonos';
+
+  @override
+  String get exportEqFir => 'Exportar EQ actual como FIR';
+
+  @override
+  String get firDesc => 'Carga la curva en la etapa de convolucion';
+
+  @override
+  String get exportPresetJson => 'Exportar preajuste (JSON)';
+
+  @override
+  String get importPresetJson => 'Importar preajuste (JSON)';
+
+  @override
+  String get dspInspector => 'Inspector de senal DSP';
+
+  @override
+  String get autoEqSearch => 'Busqueda AutoEQ 2.0';
+
+  @override
+  String get dynamicsCompressor => 'Compresor de dinamica';
+
+  @override
+  String get dspChain => 'Cadena DSP';
+
+  @override
+  String get frequencies => 'Frecuencias';
+
+  @override
+  String get nativeDspUnavailable =>
+      'DSP nativo no disponible en este dispositivo';
+
+  @override
+  String get width => 'Amplitud';
+
+  @override
+  String get bassMono => 'Bajos mono';
+
+  @override
+  String get antiPop => 'Anti-pop';
+
+  @override
+  String get addBand => 'Anadir banda';
+
+  @override
+  String get modeLabel => 'Modo';
+
+  @override
+  String get cutAction => 'Cortar';
+
+  @override
+  String get boostAction => 'Realzar';
+
+  @override
+  String get filterLabel => 'Filtro';
+
+  @override
+  String get peakingFilter => 'Pico';
+
+  @override
+  String get lowShelfFilter => 'Estante bajo';
+
+  @override
+  String get highShelfFilter => 'Estante alto';
+
+  @override
+  String get loudnessContour => 'Contorno de sonoridad';
+
+  @override
+  String get loudnessContourDesc => 'Realce de graves/agudos a bajo volumen';
+
+  @override
+  String get tpdfDither => 'Dither TPDF';
+
+  @override
+  String get targetBitDepth => 'Profundidad de bits objetivo';
+
+  @override
+  String get sincResampler => 'Remuestreador Sinc';
+
+  @override
+  String get sincDesc => 'Remuestreo de alta calidad';
+
+  @override
+  String get wetDryMix => 'Mezcla Wet/Dry';
+
+  @override
+  String get releaseTime => 'Tiempo de liberacion';
+
+  @override
+  String get monoLabel => 'Mono';
+
+  @override
+  String get neutralCustom => 'Neutro / Personalizado';
+
+  @override
+  String eqPresetSaved(Object name) {
+    return 'Preajuste \"$name\" guardado!';
+  }
+
+  @override
+  String customBandFreqs(Object count) {
+    return 'Frecuencias de $count bandas';
+  }
+
+  @override
+  String eqBandLabel(Object number) {
+    return 'Banda $number';
+  }
+
+  @override
+  String get equalizerTitle => 'Ecualizador (EQ)';
+
+  @override
+  String get dspSpatialTitle => 'Efectos DSP y espaciales';
+
+  @override
+  String get abFlat => 'A/B plano';
+
+  @override
+  String get arbitraryEq => 'EQ arbitrario';
+
+  @override
+  String get liveProgDsp => 'LiveProg DSP';
+
+  @override
+  String get dynamicBass => 'Bajos dinamicos';
+
+  @override
+  String get bandsLabel => 'Bandas';
+
+  @override
+  String get preampLabel => 'Preamplificador';
+
+  @override
+  String get bassEnhancer => 'Realce de bajos';
+
+  @override
+  String get volumeBoost => 'Amplificacion';
+
+  @override
+  String get highBoostWarn => 'Un realce alto puede distorsionar o fatigar.';
+
+  @override
+  String get appliedTuningProfile => 'Perfil de ajuste aplicado';
+
+  @override
+  String get resetToFlat => 'Restablecer a plano';
+
+  @override
+  String get noHpProfiles => 'No se encontraron perfiles.';
+
+  @override
+  String get activeLabel => 'Activo';
+
+  @override
+  String get allDspBypassed =>
+      'DSP omitido por Bit-Perfect. Desactivalo en Ajustes.';
+
+  @override
+  String get spatialAudio => 'Audio espacial';
+
+  @override
+  String get spatialApi => 'API espacial';
+
+  @override
+  String get spatialApiDesc => 'API con seguimiento de cabeza';
+
+  @override
+  String get soundstageWidening => 'Ampliacion de escena';
+
+  @override
+  String get virtualizerDesc => 'Expansion estereo del virtualizador';
+
+  @override
+  String get studioDynamics => 'Dinamica y limitador';
+
+  @override
+  String get multibandDesc => 'Motor de compresion multibanda';
+
+  @override
+  String get crossfeedHp => 'Crossfeed (auriculares)';
+
+  @override
+  String get crossfeedNatural => 'Simulacion de sala natural';
+
+  @override
+  String get crossfeedAlgorithm => 'Algoritmo de crossfeed';
+
+  @override
+  String get bs2bActive => 'Red BS2B activa.';
+
+  @override
+  String get customDelayLine => 'Linea de retardo personalizada';
+
+  @override
+  String get delayTime => 'Tiempo de retardo';
+
+  @override
+  String get oppositeEarBleed => 'Fuga al oido opuesto';
+
+  @override
+  String get lookaheadLimiter => 'Limitador brickwall';
+
+  @override
+  String get lookaheadDesc => 'Proteccion anti-saturacion';
+
+  @override
+  String get ceilingThreshold => 'Umbral de techo';
+
+  @override
+  String get stereoBalanceMono => 'Balance y mezcla mono';
+
+  @override
+  String get panDesc => 'Balance izquierdo/derecho';
+
+  @override
+  String get roomConv => 'Convolucion de sala';
+
+  @override
+  String get irDesc => 'Simulacion por respuesta al impulso';
+
+  @override
+  String get multibandWarmth => 'Calidez multibanda';
+
+  @override
+  String get bassMonoDesc => 'Bajos a mono, elimina cancelacion';
+
+  @override
+  String get antiPopDesc => 'Limita picos para proteger altavoces';
+
+  @override
+  String get ditherDesc => 'Dither (omitido en Bluetooth)';
+
+  @override
+  String get editGraphicEq => 'Editar texto y preajustes...';
+
+  @override
+  String get openEelEditor => 'Abrir editor EEL...';
+
+  @override
+  String get acousticCalibModel => 'Modelo de calibracion';
+
+  @override
+  String get notAppliedWarn => 'No aplicado por el motor en este dispositivo.';
+
+  @override
+  String get hwFxUnavailable => 'Efectos de hardware no disponibles';
+
+  @override
+  String get hwFxDesc => 'AudioFX y ecualizador soportados en Android.';
+
+  @override
+  String get systemFxActive =>
+      'Mejora del sistema activa. Ejecutar DSP encima puede duplicar el procesado. Desactiva Dolby/OEM o usa Bit-Perfect.';
+
+  @override
+  String get pasteJsonPreset => 'Pega un preajuste JSON:';
+
+  @override
+  String get centerFreqHelp =>
+      'Frecuencia central por banda, ascendente entre 10 Hz y 30 kHz.';
+
+  @override
+  String get roomMeasureHelp => 'Mide tu sala y exporta la correccion.';
+
+  @override
+  String get dspDisabledBp =>
+      'DSP omitido por Bit-Perfect. Desactivalo en Ajustes.';
+
+  @override
+  String get saturationBandDesc => 'Limita la saturacion a medios.';
 }

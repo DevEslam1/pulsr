@@ -1161,5 +1161,398 @@
   "scanningCastDevices": "Scanning for Cast devices...",
   "@scanningCastDevices": {
     "description": "tranche5 l10n"
+  },
+  "gotIt": "Got it",
+  "@gotIt": {
+    "description": "tranche6 eq l10n"
+  },
+  "eqResetNotice": "All Equalizer & DSP settings restored to defaults",
+  "@eqResetNotice": {
+    "description": "tranche6 eq l10n"
+  },
+  "saveCustomEqPreset": "Save Custom EQ Preset",
+  "@saveCustomEqPreset": {
+    "description": "tranche6 eq l10n"
+  },
+  "importEqPreset": "Import EQ Preset",
+  "@importEqPreset": {
+    "description": "tranche6 eq l10n"
+  },
+  "importAction": "Import",
+  "@importAction": {
+    "description": "tranche6 eq l10n"
+  },
+  "customFreqsApplied": "Custom band frequencies applied.",
+  "@customFreqsApplied": {
+    "description": "tranche6 eq l10n"
+  },
+  "roomCorrection": "Room Correction",
+  "@roomCorrection": {
+    "description": "tranche6 eq l10n"
+  },
+  "measureRoom": "Measure room response",
+  "@measureRoom": {
+    "description": "tranche6 eq l10n"
+  },
+  "roomWizardDesc": "Run the stepped-sine wizard",
+  "@roomWizardDesc": {
+    "description": "tranche6 eq l10n"
+  },
+  "exportEqFir": "Export current EQ as FIR",
+  "@exportEqFir": {
+    "description": "tranche6 eq l10n"
+  },
+  "firDesc": "Loads the curve into the convolution stage",
+  "@firDesc": {
+    "description": "tranche6 eq l10n"
+  },
+  "exportPresetJson": "Export Preset (JSON)",
+  "@exportPresetJson": {
+    "description": "tranche6 eq l10n"
+  },
+  "importPresetJson": "Import Preset (JSON)",
+  "@importPresetJson": {
+    "description": "tranche6 eq l10n"
+  },
+  "dspInspector": "DSP Signal Inspector",
+  "@dspInspector": {
+    "description": "tranche6 eq l10n"
+  },
+  "autoEqSearch": "AutoEQ 2.0 Search",
+  "@autoEqSearch": {
+    "description": "tranche6 eq l10n"
+  },
+  "dynamicsCompressor": "Dynamics Compressor",
+  "@dynamicsCompressor": {
+    "description": "tranche6 eq l10n"
+  },
+  "dspChain": "DSP Chain",
+  "@dspChain": {
+    "description": "tranche6 eq l10n"
+  },
+  "frequencies": "Frequencies",
+  "@frequencies": {
+    "description": "tranche6 eq l10n"
+  },
+  "nativeDspUnavailable": "Native DSP unavailable on this device",
+  "@nativeDspUnavailable": {
+    "description": "tranche6 eq l10n"
+  },
+  "width": "Width",
+  "@width": {
+    "description": "tranche6 eq l10n"
+  },
+  "bassMono": "Bass Mono",
+  "@bassMono": {
+    "description": "tranche6 eq l10n"
+  },
+  "antiPop": "Anti-Pop",
+  "@antiPop": {
+    "description": "tranche6 eq l10n"
+  },
+  "addBand": "Add Band",
+  "@addBand": {
+    "description": "tranche6 eq l10n"
+  },
+  "modeLabel": "Mode",
+  "@modeLabel": {
+    "description": "tranche6 eq l10n"
+  },
+  "cutAction": "Cut",
+  "@cutAction": {
+    "description": "tranche6 eq l10n"
+  },
+  "boostAction": "Boost",
+  "@boostAction": {
+    "description": "tranche6 eq l10n"
+  },
+  "filterLabel": "Filter",
+  "@filterLabel": {
+    "description": "tranche6 eq l10n"
+  },
+  "peakingFilter": "Peaking",
+  "@peakingFilter": {
+    "description": "tranche6 eq l10n"
+  },
+  "lowShelfFilter": "Low Shelf",
+  "@lowShelfFilter": {
+    "description": "tranche6 eq l10n"
+  },
+  "highShelfFilter": "High Shelf",
+  "@highShelfFilter": {
+    "description": "tranche6 eq l10n"
+  },
+  "loudnessContour": "Loudness Contour",
+  "@loudnessContour": {
+    "description": "tranche6 eq l10n"
+  },
+  "loudnessContourDesc": "Equal-loudness bass/treble lift at low volume",
+  "@loudnessContourDesc": {
+    "description": "tranche6 eq l10n"
+  },
+  "tpdfDither": "TPDF Dither",
+  "@tpdfDither": {
+    "description": "tranche6 eq l10n"
+  },
+  "targetBitDepth": "Target Bit Depth",
+  "@targetBitDepth": {
+    "description": "tranche6 eq l10n"
+  },
+  "sincResampler": "Sinc Resampler",
+  "@sincResampler": {
+    "description": "tranche6 eq l10n"
+  },
+  "sincDesc": "High-quality resampling when rates differ",
+  "@sincDesc": {
+    "description": "tranche6 eq l10n"
+  },
+  "wetDryMix": "Wet / Dry Mix",
+  "@wetDryMix": {
+    "description": "tranche6 eq l10n"
+  },
+  "releaseTime": "Release Time",
+  "@releaseTime": {
+    "description": "tranche6 eq l10n"
+  },
+  "monoLabel": "Mono",
+  "@monoLabel": {
+    "description": "tranche6 eq l10n"
+  },
+  "neutralCustom": "Neutral / Custom",
+  "@neutralCustom": {
+    "description": "tranche6 eq l10n"
+  },
+  "eqPresetSaved": "Preset \"{name}\" saved!",
+  "@eqPresetSaved": {
+    "description": "tranche6 eq interpolation",
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "customBandFreqs": "Custom {count}-band Frequencies",
+  "@customBandFreqs": {
+    "description": "tranche6 eq interpolation",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "eqBandLabel": "Band {number}",
+  "@eqBandLabel": {
+    "description": "tranche6 eq interpolation",
+    "placeholders": {
+      "number": {}
+    }
+  },
+  "equalizerTitle": "Equalizer (EQ)",
+  "@equalizerTitle": {
+    "description": "tranche6 eq batch2"
+  },
+  "dspSpatialTitle": "DSP & Spatial Effects",
+  "@dspSpatialTitle": {
+    "description": "tranche6 eq batch2"
+  },
+  "abFlat": "A/B Flat",
+  "@abFlat": {
+    "description": "tranche6 eq batch2"
+  },
+  "arbitraryEq": "Arbitrary EQ",
+  "@arbitraryEq": {
+    "description": "tranche6 eq batch2"
+  },
+  "liveProgDsp": "LiveProg DSP",
+  "@liveProgDsp": {
+    "description": "tranche6 eq batch2"
+  },
+  "dynamicBass": "Dynamic Bass",
+  "@dynamicBass": {
+    "description": "tranche6 eq batch2"
+  },
+  "bandsLabel": "Bands",
+  "@bandsLabel": {
+    "description": "tranche6 eq batch2"
+  },
+  "preampLabel": "Preamp",
+  "@preampLabel": {
+    "description": "tranche6 eq batch2"
+  },
+  "bassEnhancer": "Bass Enhancer",
+  "@bassEnhancer": {
+    "description": "tranche6 eq batch2"
+  },
+  "volumeBoost": "Volume Boost",
+  "@volumeBoost": {
+    "description": "tranche6 eq batch2"
+  },
+  "highBoostWarn": "High boost may cause audio distortion or hearing fatigue.",
+  "@highBoostWarn": {
+    "description": "tranche6 eq batch2"
+  },
+  "appliedTuningProfile": "Applied Tuning Profile",
+  "@appliedTuningProfile": {
+    "description": "tranche6 eq batch2"
+  },
+  "resetToFlat": "Reset to Flat",
+  "@resetToFlat": {
+    "description": "tranche6 eq batch2"
+  },
+  "noHpProfiles": "No headphone profiles found.",
+  "@noHpProfiles": {
+    "description": "tranche6 eq batch2"
+  },
+  "activeLabel": "Active",
+  "@activeLabel": {
+    "description": "tranche6 eq batch2"
+  },
+  "allDspBypassed": "All DSP is bypassed by Bit-Perfect. Disable it in Settings to re-enable.",
+  "@allDspBypassed": {
+    "description": "tranche6 eq batch2"
+  },
+  "spatialAudio": "Spatial Audio",
+  "@spatialAudio": {
+    "description": "tranche6 eq batch2"
+  },
+  "spatialApi": "Spatial API",
+  "@spatialApi": {
+    "description": "tranche6 eq batch2"
+  },
+  "spatialApiDesc": "Android Spatializer API with head tracking",
+  "@spatialApiDesc": {
+    "description": "tranche6 eq batch2"
+  },
+  "soundstageWidening": "Soundstage Widening",
+  "@soundstageWidening": {
+    "description": "tranche6 eq batch2"
+  },
+  "virtualizerDesc": "Virtualizer stereo field expansion",
+  "@virtualizerDesc": {
+    "description": "tranche6 eq batch2"
+  },
+  "studioDynamics": "Studio Dynamics & Limiter",
+  "@studioDynamics": {
+    "description": "tranche6 eq batch2"
+  },
+  "multibandDesc": "Multiband compression engine",
+  "@multibandDesc": {
+    "description": "tranche6 eq batch2"
+  },
+  "crossfeedHp": "Crossfeed (Headphones)",
+  "@crossfeedHp": {
+    "description": "tranche6 eq batch2"
+  },
+  "crossfeedNatural": "Natural acoustic room speaker simulation",
+  "@crossfeedNatural": {
+    "description": "tranche6 eq batch2"
+  },
+  "crossfeedAlgorithm": "Crossfeed Algorithm",
+  "@crossfeedAlgorithm": {
+    "description": "tranche6 eq batch2"
+  },
+  "bs2bActive": "Authentic BS2B IIR crossfeed network (low-pass + high-boost biquads) active.",
+  "@bs2bActive": {
+    "description": "tranche6 eq batch2"
+  },
+  "customDelayLine": "Custom Delay-Line",
+  "@customDelayLine": {
+    "description": "tranche6 eq batch2"
+  },
+  "delayTime": "Delay Time",
+  "@delayTime": {
+    "description": "tranche6 eq batch2"
+  },
+  "oppositeEarBleed": "Opposite Ear Bleed",
+  "@oppositeEarBleed": {
+    "description": "tranche6 eq batch2"
+  },
+  "lookaheadLimiter": "Lookahead Brickwall Limiter",
+  "@lookaheadLimiter": {
+    "description": "tranche6 eq batch2"
+  },
+  "lookaheadDesc": "Zero-overshoot anti-clipping protection",
+  "@lookaheadDesc": {
+    "description": "tranche6 eq batch2"
+  },
+  "ceilingThreshold": "Ceiling Threshold",
+  "@ceilingThreshold": {
+    "description": "tranche6 eq batch2"
+  },
+  "stereoBalanceMono": "Stereo Balance & Mono Mix",
+  "@stereoBalanceMono": {
+    "description": "tranche6 eq batch2"
+  },
+  "panDesc": "Left / Right acoustic panning balance",
+  "@panDesc": {
+    "description": "tranche6 eq batch2"
+  },
+  "roomConv": "Acoustic Room Convolution",
+  "@roomConv": {
+    "description": "tranche6 eq batch2"
+  },
+  "irDesc": "Impulse Response spatial acoustic simulation",
+  "@irDesc": {
+    "description": "tranche6 eq batch2"
+  },
+  "multibandWarmth": "Multiband Warmth",
+  "@multibandWarmth": {
+    "description": "tranche6 eq batch2"
+  },
+  "bassMonoDesc": "Forces low bass to mono, eliminates headphone phase cancellation",
+  "@bassMonoDesc": {
+    "description": "tranche6 eq batch2"
+  },
+  "antiPopDesc": "Soft-limits transient bass bursts to protect speakers",
+  "@antiPopDesc": {
+    "description": "tranche6 eq batch2"
+  },
+  "ditherDesc": "Bit-depth dithering (auto-skipped on Bluetooth)",
+  "@ditherDesc": {
+    "description": "tranche6 eq batch2"
+  },
+  "editGraphicEq": "Edit GraphicEq Text & Presets...",
+  "@editGraphicEq": {
+    "description": "tranche6 eq batch2"
+  },
+  "openEelEditor": "Open EEL Script Editor...",
+  "@openEelEditor": {
+    "description": "tranche6 eq batch2"
+  },
+  "acousticCalibModel": "Acoustic Calibration Model",
+  "@acousticCalibModel": {
+    "description": "tranche6 eq batch2"
+  },
+  "notAppliedWarn": "Not applied by the audio engine on this device/session - this control may have no audible effect.",
+  "@notAppliedWarn": {
+    "description": "tranche6 eq batch2"
+  },
+  "hwFxUnavailable": "Hardware Effects Unavailable",
+  "@hwFxUnavailable": {
+    "description": "tranche6 eq batch2"
+  },
+  "hwFxDesc": "Hardware AudioFX, Equalizer, Virtualizer and DynamicsProcessing are supported on Android devices.",
+  "@hwFxDesc": {
+    "description": "tranche6 eq batch2"
+  },
+  "systemFxActive": "System-level audio enhancement is active on your device. Running Pulsr DSP on top may cause double-processing. Consider disabling system Dolby/OEM effects or using Bit-Perfect output.",
+  "@systemFxActive": {
+    "description": "tranche6 eq batch2"
+  },
+  "pasteJsonPreset": "Paste a JSON preset string below:",
+  "@pasteJsonPreset": {
+    "description": "tranche6 eq batch2"
+  },
+  "centerFreqHelp": "Set the center frequency (Hz) for each band. Values must be strictly ascending between 10 Hz and 30 kHz.",
+  "@centerFreqHelp": {
+    "description": "tranche6 eq batch2"
+  },
+  "roomMeasureHelp": "Measure your room, then export the correction as a convolution impulse response.",
+  "@roomMeasureHelp": {
+    "description": "tranche6 eq batch2"
+  },
+  "dspDisabledBp": "DSP disabled by Bit-Perfect bypass. Disable Bit-Perfect or Bypass DSP in Settings to re-enable.",
+  "@dspDisabledBp": {
+    "description": "tranche6 eq batch2b"
+  },
+  "saturationBandDesc": "Restricts saturation to the mid band for clean sub-bass.",
+  "@saturationBandDesc": {
+    "description": "tranche6 eq batch2b"
   }
 }

@@ -13,11 +13,12 @@ import '../../domain/models/eq_preset.dart';
 import '../../domain/models/headphone_profile.dart';
 import '../../domain/models/reverb_preset.dart';
 import 'audio_effects_channel.dart';
+import 'comparison_slot.dart';
 import 'headphone_profiles_repository.dart';
 import 'ir_file_parser.dart';
 import 'optimized_dsp_pipeline.dart';
 
-enum ComparisonSlot { slotA, slotB, slotC, slotD }
+export 'comparison_slot.dart';
 
 /// Simple async lock for serializing concurrent effect state changes.
 /// Prevents race conditions when multiple effects are toggled rapidly.

@@ -876,5 +876,398 @@
   "scanningCastDevices": "جار البحث عن اجهزة البث...",
   "@scanningCastDevices": {
     "description": "tranche5 l10n"
+  },
+  "gotIt": "فهمت",
+  "@gotIt": {
+    "description": "tranche6 eq l10n"
+  },
+  "eqResetNotice": "تمت استعادة جميع اعدادات المعادل وDSP",
+  "@eqResetNotice": {
+    "description": "tranche6 eq l10n"
+  },
+  "saveCustomEqPreset": "حفظ اعداد مخصص للمعادل",
+  "@saveCustomEqPreset": {
+    "description": "tranche6 eq l10n"
+  },
+  "importEqPreset": "استيراد اعداد المعادل",
+  "@importEqPreset": {
+    "description": "tranche6 eq l10n"
+  },
+  "importAction": "استيراد",
+  "@importAction": {
+    "description": "tranche6 eq l10n"
+  },
+  "customFreqsApplied": "تم تطبيق الترددات المخصصة",
+  "@customFreqsApplied": {
+    "description": "tranche6 eq l10n"
+  },
+  "roomCorrection": "تصحيح الغرفة",
+  "@roomCorrection": {
+    "description": "tranche6 eq l10n"
+  },
+  "measureRoom": "قياس استجابة الغرفة",
+  "@measureRoom": {
+    "description": "tranche6 eq l10n"
+  },
+  "roomWizardDesc": "تشغيل معالج القياس",
+  "@roomWizardDesc": {
+    "description": "tranche6 eq l10n"
+  },
+  "exportEqFir": "تصدير المعادل الحالي كـ FIR",
+  "@exportEqFir": {
+    "description": "tranche6 eq l10n"
+  },
+  "firDesc": "تحميل المنحنى في مرحلة الالتفاف",
+  "@firDesc": {
+    "description": "tranche6 eq l10n"
+  },
+  "exportPresetJson": "تصدير الاعداد (JSON)",
+  "@exportPresetJson": {
+    "description": "tranche6 eq l10n"
+  },
+  "importPresetJson": "استيراد الاعداد (JSON)",
+  "@importPresetJson": {
+    "description": "tranche6 eq l10n"
+  },
+  "dspInspector": "فاحص اشارة DSP",
+  "@dspInspector": {
+    "description": "tranche6 eq l10n"
+  },
+  "autoEqSearch": "بحث AutoEQ 2.0",
+  "@autoEqSearch": {
+    "description": "tranche6 eq l10n"
+  },
+  "dynamicsCompressor": "ضاغط الديناميكية",
+  "@dynamicsCompressor": {
+    "description": "tranche6 eq l10n"
+  },
+  "dspChain": "سلسلة DSP",
+  "@dspChain": {
+    "description": "tranche6 eq l10n"
+  },
+  "frequencies": "الترددات",
+  "@frequencies": {
+    "description": "tranche6 eq l10n"
+  },
+  "nativeDspUnavailable": "DSP الاصلي غير متوفر على هذا الجهاز",
+  "@nativeDspUnavailable": {
+    "description": "tranche6 eq l10n"
+  },
+  "width": "العرض",
+  "@width": {
+    "description": "tranche6 eq l10n"
+  },
+  "bassMono": "باس احادي",
+  "@bassMono": {
+    "description": "tranche6 eq l10n"
+  },
+  "antiPop": "مانع الطقطقة",
+  "@antiPop": {
+    "description": "tranche6 eq l10n"
+  },
+  "addBand": "اضافة نطاق",
+  "@addBand": {
+    "description": "tranche6 eq l10n"
+  },
+  "modeLabel": "الوضع",
+  "@modeLabel": {
+    "description": "tranche6 eq l10n"
+  },
+  "cutAction": "خفض",
+  "@cutAction": {
+    "description": "tranche6 eq l10n"
+  },
+  "boostAction": "تعزيز",
+  "@boostAction": {
+    "description": "tranche6 eq l10n"
+  },
+  "filterLabel": "المرشح",
+  "@filterLabel": {
+    "description": "tranche6 eq l10n"
+  },
+  "peakingFilter": "ذروة",
+  "@peakingFilter": {
+    "description": "tranche6 eq l10n"
+  },
+  "lowShelfFilter": "رف منخفض",
+  "@lowShelfFilter": {
+    "description": "tranche6 eq l10n"
+  },
+  "highShelfFilter": "رف مرتفع",
+  "@highShelfFilter": {
+    "description": "tranche6 eq l10n"
+  },
+  "loudnessContour": "منحنى الصوت",
+  "@loudnessContour": {
+    "description": "tranche6 eq l10n"
+  },
+  "loudnessContourDesc": "تعزيز الجهير والحدة عند مستوى منخفض",
+  "@loudnessContourDesc": {
+    "description": "tranche6 eq l10n"
+  },
+  "tpdfDither": "ديذر TPDF",
+  "@tpdfDither": {
+    "description": "tranche6 eq l10n"
+  },
+  "targetBitDepth": "عمق البت المستهدف",
+  "@targetBitDepth": {
+    "description": "tranche6 eq l10n"
+  },
+  "sincResampler": "معيد التشكيل Sinc",
+  "@sincResampler": {
+    "description": "tranche6 eq l10n"
+  },
+  "sincDesc": "اعادة تشكيل عالية الجودة",
+  "@sincDesc": {
+    "description": "tranche6 eq l10n"
+  },
+  "wetDryMix": "مزيج Wet/Dry",
+  "@wetDryMix": {
+    "description": "tranche6 eq l10n"
+  },
+  "releaseTime": "زمن التحرير",
+  "@releaseTime": {
+    "description": "tranche6 eq l10n"
+  },
+  "monoLabel": "احادي",
+  "@monoLabel": {
+    "description": "tranche6 eq l10n"
+  },
+  "neutralCustom": "محايد / مخصص",
+  "@neutralCustom": {
+    "description": "tranche6 eq l10n"
+  },
+  "eqPresetSaved": "تم حفظ الاعداد \"{name}\"!",
+  "@eqPresetSaved": {
+    "description": "tranche6 eq interpolation",
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "customBandFreqs": "ترددات مخصصة ({count})",
+  "@customBandFreqs": {
+    "description": "tranche6 eq interpolation",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "eqBandLabel": "النطاق {number}",
+  "@eqBandLabel": {
+    "description": "tranche6 eq interpolation",
+    "placeholders": {
+      "number": {}
+    }
+  },
+  "equalizerTitle": "المعادل (EQ)",
+  "@equalizerTitle": {
+    "description": "tranche6 eq batch2"
+  },
+  "dspSpatialTitle": "مؤثرات DSP والمكانية",
+  "@dspSpatialTitle": {
+    "description": "tranche6 eq batch2"
+  },
+  "abFlat": "A/B مسطح",
+  "@abFlat": {
+    "description": "tranche6 eq batch2"
+  },
+  "arbitraryEq": "معادل حر",
+  "@arbitraryEq": {
+    "description": "tranche6 eq batch2"
+  },
+  "liveProgDsp": "LiveProg DSP",
+  "@liveProgDsp": {
+    "description": "tranche6 eq batch2"
+  },
+  "dynamicBass": "باس ديناميكي",
+  "@dynamicBass": {
+    "description": "tranche6 eq batch2"
+  },
+  "bandsLabel": "النطاقات",
+  "@bandsLabel": {
+    "description": "tranche6 eq batch2"
+  },
+  "preampLabel": "المضخم الاولي",
+  "@preampLabel": {
+    "description": "tranche6 eq batch2"
+  },
+  "bassEnhancer": "محسن الجهير",
+  "@bassEnhancer": {
+    "description": "tranche6 eq batch2"
+  },
+  "volumeBoost": "تعزيز الصوت",
+  "@volumeBoost": {
+    "description": "tranche6 eq batch2"
+  },
+  "highBoostWarn": "التعزيز العالي قد يسبب تشويها او ارهاقا سمعيا",
+  "@highBoostWarn": {
+    "description": "tranche6 eq batch2"
+  },
+  "appliedTuningProfile": "ملف الضبط المطبق",
+  "@appliedTuningProfile": {
+    "description": "tranche6 eq batch2"
+  },
+  "resetToFlat": "اعادة الى المسطح",
+  "@resetToFlat": {
+    "description": "tranche6 eq batch2"
+  },
+  "noHpProfiles": "لم يتم العثور على ملفات سماعات",
+  "@noHpProfiles": {
+    "description": "tranche6 eq batch2"
+  },
+  "activeLabel": "نشط",
+  "@activeLabel": {
+    "description": "tranche6 eq batch2"
+  },
+  "allDspBypassed": "تم تجاوز DSP بسبب Bit-Perfect. عطله من الاعدادات",
+  "@allDspBypassed": {
+    "description": "tranche6 eq batch2"
+  },
+  "spatialAudio": "صوت مكاني",
+  "@spatialAudio": {
+    "description": "tranche6 eq batch2"
+  },
+  "spatialApi": "واجهة مكانية",
+  "@spatialApi": {
+    "description": "tranche6 eq batch2"
+  },
+  "spatialApiDesc": "واجهة مع تتبع الراس",
+  "@spatialApiDesc": {
+    "description": "tranche6 eq batch2"
+  },
+  "soundstageWidening": "توسيع المسرح الصوتي",
+  "@soundstageWidening": {
+    "description": "tranche6 eq batch2"
+  },
+  "virtualizerDesc": "توسيع المجال الاستريو",
+  "@virtualizerDesc": {
+    "description": "tranche6 eq batch2"
+  },
+  "studioDynamics": "الديناميكية والمحدد",
+  "@studioDynamics": {
+    "description": "tranche6 eq batch2"
+  },
+  "multibandDesc": "محرك ضغط متعدد النطاقات",
+  "@multibandDesc": {
+    "description": "tranche6 eq batch2"
+  },
+  "crossfeedHp": "كروس فيد (سماعات)",
+  "@crossfeedHp": {
+    "description": "tranche6 eq batch2"
+  },
+  "crossfeedNatural": "محاكاة غرفة طبيعية",
+  "@crossfeedNatural": {
+    "description": "tranche6 eq batch2"
+  },
+  "crossfeedAlgorithm": "خوارزمية كروس فيد",
+  "@crossfeedAlgorithm": {
+    "description": "tranche6 eq batch2"
+  },
+  "bs2bActive": "شبكة BS2B نشطة",
+  "@bs2bActive": {
+    "description": "tranche6 eq batch2"
+  },
+  "customDelayLine": "خط تاخير مخصص",
+  "@customDelayLine": {
+    "description": "tranche6 eq batch2"
+  },
+  "delayTime": "زمن التاخير",
+  "@delayTime": {
+    "description": "tranche6 eq batch2"
+  },
+  "oppositeEarBleed": "تسرب للاذن المعاكسة",
+  "@oppositeEarBleed": {
+    "description": "tranche6 eq batch2"
+  },
+  "lookaheadLimiter": "محدد brickwall",
+  "@lookaheadLimiter": {
+    "description": "tranche6 eq batch2"
+  },
+  "lookaheadDesc": "حماية ضد التشويه",
+  "@lookaheadDesc": {
+    "description": "tranche6 eq batch2"
+  },
+  "ceilingThreshold": "عتبة السقف",
+  "@ceilingThreshold": {
+    "description": "tranche6 eq batch2"
+  },
+  "stereoBalanceMono": "التوازن والمزج الاحادي",
+  "@stereoBalanceMono": {
+    "description": "tranche6 eq batch2"
+  },
+  "panDesc": "توازن يمين/يسار",
+  "@panDesc": {
+    "description": "tranche6 eq batch2"
+  },
+  "roomConv": "التفاف الغرفة",
+  "@roomConv": {
+    "description": "tranche6 eq batch2"
+  },
+  "irDesc": "محاكاة بالاستجابة النبضية",
+  "@irDesc": {
+    "description": "tranche6 eq batch2"
+  },
+  "multibandWarmth": "دفء متعدد النطاقات",
+  "@multibandWarmth": {
+    "description": "tranche6 eq batch2"
+  },
+  "bassMonoDesc": "جهير احادي يلغي الالغاء الطوري",
+  "@bassMonoDesc": {
+    "description": "tranche6 eq batch2"
+  },
+  "antiPopDesc": "يحد من الذروات لحماية السماعات",
+  "@antiPopDesc": {
+    "description": "tranche6 eq batch2"
+  },
+  "ditherDesc": "ديذر (يتخطى البلوتوث)",
+  "@ditherDesc": {
+    "description": "tranche6 eq batch2"
+  },
+  "editGraphicEq": "تحرير النص والاعدادات...",
+  "@editGraphicEq": {
+    "description": "tranche6 eq batch2"
+  },
+  "openEelEditor": "فتح محرر EEL...",
+  "@openEelEditor": {
+    "description": "tranche6 eq batch2"
+  },
+  "acousticCalibModel": "نموذج المعايرة",
+  "@acousticCalibModel": {
+    "description": "tranche6 eq batch2"
+  },
+  "notAppliedWarn": "غير مطبق بواسطة المحرك على هذا الجهاز",
+  "@notAppliedWarn": {
+    "description": "tranche6 eq batch2"
+  },
+  "hwFxUnavailable": "مؤثرات العتاد غير متوفرة",
+  "@hwFxUnavailable": {
+    "description": "tranche6 eq batch2"
+  },
+  "hwFxDesc": "مؤثرات الصوت مدعومة على اندرويد",
+  "@hwFxDesc": {
+    "description": "tranche6 eq batch2"
+  },
+  "systemFxActive": "تحسين النظام نشط. تشغيل DSP فوقه قد يضاعف المعالجة. عطل Dolby او استخدم Bit-Perfect",
+  "@systemFxActive": {
+    "description": "tranche6 eq batch2"
+  },
+  "pasteJsonPreset": "الصق اعداد JSON:",
+  "@pasteJsonPreset": {
+    "description": "tranche6 eq batch2"
+  },
+  "centerFreqHelp": "التردد المركزي لكل نطاق تصاعديا بين 10 هرتز و30 كيلوهرتز",
+  "@centerFreqHelp": {
+    "description": "tranche6 eq batch2"
+  },
+  "roomMeasureHelp": "قس غرفتك ثم صدر التصحيح",
+  "@roomMeasureHelp": {
+    "description": "tranche6 eq batch2"
+  },
+  "dspDisabledBp": "تم تجاوز DSP بسبب Bit-Perfect. عطله من الاعدادات",
+  "@dspDisabledBp": {
+    "description": "tranche6 eq batch2b"
+  },
+  "saturationBandDesc": "يحد التشبع بالنطاق المتوسط",
+  "@saturationBandDesc": {
+    "description": "tranche6 eq batch2b"
   }
 }

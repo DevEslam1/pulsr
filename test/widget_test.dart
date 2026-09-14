@@ -326,6 +326,13 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
             const MethodChannel('com.pulsr.music/proxy'), (call) async => null);
+    // Hermetic smoke test: connectivity_plus opens an EventChannel stream at
+    // startup; without a mock the async listen throws MissingPluginException
+    // under full-suite load and flakes the suite (no relation to app logic).
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            const MethodChannel('dev.fluttercommunity.plus/connectivity_status'),
+            (call) async => null);
 
     SharedPreferences.setMockInitialValues({});
     final db = AppDatabase.forTesting(NativeDatabase.memory());

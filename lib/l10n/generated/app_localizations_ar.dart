@@ -2261,4 +2261,302 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get scanningCastDevices => 'جار البحث عن اجهزة البث...';
+
+  @override
+  String get gotIt => 'فهمت';
+
+  @override
+  String get eqResetNotice => 'تمت استعادة جميع اعدادات المعادل وDSP';
+
+  @override
+  String get saveCustomEqPreset => 'حفظ اعداد مخصص للمعادل';
+
+  @override
+  String get importEqPreset => 'استيراد اعداد المعادل';
+
+  @override
+  String get importAction => 'استيراد';
+
+  @override
+  String get customFreqsApplied => 'تم تطبيق الترددات المخصصة';
+
+  @override
+  String get roomCorrection => 'تصحيح الغرفة';
+
+  @override
+  String get measureRoom => 'قياس استجابة الغرفة';
+
+  @override
+  String get roomWizardDesc => 'تشغيل معالج القياس';
+
+  @override
+  String get exportEqFir => 'تصدير المعادل الحالي كـ FIR';
+
+  @override
+  String get firDesc => 'تحميل المنحنى في مرحلة الالتفاف';
+
+  @override
+  String get exportPresetJson => 'تصدير الاعداد (JSON)';
+
+  @override
+  String get importPresetJson => 'استيراد الاعداد (JSON)';
+
+  @override
+  String get dspInspector => 'فاحص اشارة DSP';
+
+  @override
+  String get autoEqSearch => 'بحث AutoEQ 2.0';
+
+  @override
+  String get dynamicsCompressor => 'ضاغط الديناميكية';
+
+  @override
+  String get dspChain => 'سلسلة DSP';
+
+  @override
+  String get frequencies => 'الترددات';
+
+  @override
+  String get nativeDspUnavailable => 'DSP الاصلي غير متوفر على هذا الجهاز';
+
+  @override
+  String get width => 'العرض';
+
+  @override
+  String get bassMono => 'باس احادي';
+
+  @override
+  String get antiPop => 'مانع الطقطقة';
+
+  @override
+  String get addBand => 'اضافة نطاق';
+
+  @override
+  String get modeLabel => 'الوضع';
+
+  @override
+  String get cutAction => 'خفض';
+
+  @override
+  String get boostAction => 'تعزيز';
+
+  @override
+  String get filterLabel => 'المرشح';
+
+  @override
+  String get peakingFilter => 'ذروة';
+
+  @override
+  String get lowShelfFilter => 'رف منخفض';
+
+  @override
+  String get highShelfFilter => 'رف مرتفع';
+
+  @override
+  String get loudnessContour => 'منحنى الصوت';
+
+  @override
+  String get loudnessContourDesc => 'تعزيز الجهير والحدة عند مستوى منخفض';
+
+  @override
+  String get tpdfDither => 'ديذر TPDF';
+
+  @override
+  String get targetBitDepth => 'عمق البت المستهدف';
+
+  @override
+  String get sincResampler => 'معيد التشكيل Sinc';
+
+  @override
+  String get sincDesc => 'اعادة تشكيل عالية الجودة';
+
+  @override
+  String get wetDryMix => 'مزيج Wet/Dry';
+
+  @override
+  String get releaseTime => 'زمن التحرير';
+
+  @override
+  String get monoLabel => 'احادي';
+
+  @override
+  String get neutralCustom => 'محايد / مخصص';
+
+  @override
+  String eqPresetSaved(Object name) {
+    return 'تم حفظ الاعداد \"$name\"!';
+  }
+
+  @override
+  String customBandFreqs(Object count) {
+    return 'ترددات مخصصة ($count)';
+  }
+
+  @override
+  String eqBandLabel(Object number) {
+    return 'النطاق $number';
+  }
+
+  @override
+  String get equalizerTitle => 'المعادل (EQ)';
+
+  @override
+  String get dspSpatialTitle => 'مؤثرات DSP والمكانية';
+
+  @override
+  String get abFlat => 'A/B مسطح';
+
+  @override
+  String get arbitraryEq => 'معادل حر';
+
+  @override
+  String get liveProgDsp => 'LiveProg DSP';
+
+  @override
+  String get dynamicBass => 'باس ديناميكي';
+
+  @override
+  String get bandsLabel => 'النطاقات';
+
+  @override
+  String get preampLabel => 'المضخم الاولي';
+
+  @override
+  String get bassEnhancer => 'محسن الجهير';
+
+  @override
+  String get volumeBoost => 'تعزيز الصوت';
+
+  @override
+  String get highBoostWarn => 'التعزيز العالي قد يسبب تشويها او ارهاقا سمعيا';
+
+  @override
+  String get appliedTuningProfile => 'ملف الضبط المطبق';
+
+  @override
+  String get resetToFlat => 'اعادة الى المسطح';
+
+  @override
+  String get noHpProfiles => 'لم يتم العثور على ملفات سماعات';
+
+  @override
+  String get activeLabel => 'نشط';
+
+  @override
+  String get allDspBypassed =>
+      'تم تجاوز DSP بسبب Bit-Perfect. عطله من الاعدادات';
+
+  @override
+  String get spatialAudio => 'صوت مكاني';
+
+  @override
+  String get spatialApi => 'واجهة مكانية';
+
+  @override
+  String get spatialApiDesc => 'واجهة مع تتبع الراس';
+
+  @override
+  String get soundstageWidening => 'توسيع المسرح الصوتي';
+
+  @override
+  String get virtualizerDesc => 'توسيع المجال الاستريو';
+
+  @override
+  String get studioDynamics => 'الديناميكية والمحدد';
+
+  @override
+  String get multibandDesc => 'محرك ضغط متعدد النطاقات';
+
+  @override
+  String get crossfeedHp => 'كروس فيد (سماعات)';
+
+  @override
+  String get crossfeedNatural => 'محاكاة غرفة طبيعية';
+
+  @override
+  String get crossfeedAlgorithm => 'خوارزمية كروس فيد';
+
+  @override
+  String get bs2bActive => 'شبكة BS2B نشطة';
+
+  @override
+  String get customDelayLine => 'خط تاخير مخصص';
+
+  @override
+  String get delayTime => 'زمن التاخير';
+
+  @override
+  String get oppositeEarBleed => 'تسرب للاذن المعاكسة';
+
+  @override
+  String get lookaheadLimiter => 'محدد brickwall';
+
+  @override
+  String get lookaheadDesc => 'حماية ضد التشويه';
+
+  @override
+  String get ceilingThreshold => 'عتبة السقف';
+
+  @override
+  String get stereoBalanceMono => 'التوازن والمزج الاحادي';
+
+  @override
+  String get panDesc => 'توازن يمين/يسار';
+
+  @override
+  String get roomConv => 'التفاف الغرفة';
+
+  @override
+  String get irDesc => 'محاكاة بالاستجابة النبضية';
+
+  @override
+  String get multibandWarmth => 'دفء متعدد النطاقات';
+
+  @override
+  String get bassMonoDesc => 'جهير احادي يلغي الالغاء الطوري';
+
+  @override
+  String get antiPopDesc => 'يحد من الذروات لحماية السماعات';
+
+  @override
+  String get ditherDesc => 'ديذر (يتخطى البلوتوث)';
+
+  @override
+  String get editGraphicEq => 'تحرير النص والاعدادات...';
+
+  @override
+  String get openEelEditor => 'فتح محرر EEL...';
+
+  @override
+  String get acousticCalibModel => 'نموذج المعايرة';
+
+  @override
+  String get notAppliedWarn => 'غير مطبق بواسطة المحرك على هذا الجهاز';
+
+  @override
+  String get hwFxUnavailable => 'مؤثرات العتاد غير متوفرة';
+
+  @override
+  String get hwFxDesc => 'مؤثرات الصوت مدعومة على اندرويد';
+
+  @override
+  String get systemFxActive =>
+      'تحسين النظام نشط. تشغيل DSP فوقه قد يضاعف المعالجة. عطل Dolby او استخدم Bit-Perfect';
+
+  @override
+  String get pasteJsonPreset => 'الصق اعداد JSON:';
+
+  @override
+  String get centerFreqHelp =>
+      'التردد المركزي لكل نطاق تصاعديا بين 10 هرتز و30 كيلوهرتز';
+
+  @override
+  String get roomMeasureHelp => 'قس غرفتك ثم صدر التصحيح';
+
+  @override
+  String get dspDisabledBp =>
+      'تم تجاوز DSP بسبب Bit-Perfect. عطله من الاعدادات';
+
+  @override
+  String get saturationBandDesc => 'يحد التشبع بالنطاق المتوسط';
 }

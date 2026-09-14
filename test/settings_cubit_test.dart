@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/network/proxy_config.dart';
+import 'package:pulsr/data/audio/mqa_decoder_helper.dart';
 import 'package:pulsr/data/scanner/media_scanner_service.dart';
 import 'package:pulsr/domain/models/audio_output_info.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
@@ -414,6 +415,25 @@ void main() {
           isNot(contains('n5fui7pyec1q')));
 
       await cubit.close();
+    });
+
+    test('MQA toggle owns the decoder hook and persists (20-01 effect proof)',
+        () async {
+      final cubit = SettingsCubit(scannerService: mockScannerService);
+
+      await cubit.setMqaDecodingEnabled(false);
+      expect(SettingsCubit.isMqaDecodingEnabled, false);
+      expect(MqaDecoderHelper.isMqaEnabled?.call(), false);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('setting_mqa_decoding_enabled'), false);
+
+      await cubit.setMqaDecodingEnabled(true);
+      expect(SettingsCubit.isMqaDecodingEnabled, true);
+      expect(MqaDecoderHelper.isMqaEnabled?.call(), true);
+      expect(prefs.getBool('setting_mqa_decoding_enabled'), true);
+
+      await cubit.close();
+      MqaDecoderHelper.isMqaEnabled = null;
     });
   });
 }
