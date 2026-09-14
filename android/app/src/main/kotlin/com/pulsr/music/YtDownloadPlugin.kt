@@ -36,15 +36,7 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
             plugin.context = context
             plugin.channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME)
             plugin.channel.setMethodCallHandler(plugin)
-            DownloadService.onDownloadCancelledListener = { videoId ->
-                mainHandler.post {
-                    if (plugin.context != null) {
-                        try {
-                            plugin.channel.invokeMethod("onDownloadCancelled", mapOf("videoId" to videoId))
-                        } catch (_: Exception) {}
-                    }
-                }
-            }
+            plugin.installDownloadCallbacks()
             return plugin
         }
     }
@@ -53,23 +45,50 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
         context = binding.applicationContext
         channel = MethodChannel(binding.binaryMessenger, CHANNEL_NAME)
         channel.setMethodCallHandler(this)
-        DownloadService.onDownloadCancelledListener = { videoId ->
-            mainHandler.post {
-                if (context != null) {
-                    try {
-                        channel.invokeMethod("onDownloadCancelled", mapOf("videoId" to videoId))
-                    } catch (_: Exception) {}
-                }
-            }
-        }
+        installDownloadCallbacks()
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         cleanup()
     }
 
+    /**
+     * Wires the DownloadService's process-global callbacks to this plugin's
+     * channel. Called on engine attach and again before every
+     * startDownloadForeground, because DownloadService.onDestroy clears these
+     * statics (C-8) and a later download would otherwise lose its notification
+     * controls.
+     */
+    private fun installDownloadCallbacks() {
+        DownloadService.onDownloadCancelledListener = { videoId ->
+            invokeOnChannel("onDownloadCancelled", mapOf("videoId" to videoId))
+        }
+        DownloadService.onDownloadPausedListener = { videoId ->
+            invokeOnChannel("onDownloadPaused", mapOf("videoId" to videoId))
+        }
+        DownloadService.onDownloadResumedListener = { videoId ->
+            invokeOnChannel("onDownloadResumed", mapOf("videoId" to videoId))
+        }
+        DownloadService.onDownloadDegradedListener = { stage ->
+            invokeOnChannel("onDownloadServiceDegraded", mapOf("stage" to stage))
+        }
+    }
+
+    private fun invokeOnChannel(method: String, arguments: Map<String, Any?>) {
+        mainHandler.post {
+            if (context == null) return@post
+            if (!::channel.isInitialized) return@post
+            try {
+                channel.invokeMethod(method, arguments)
+            } catch (_: Exception) {}
+        }
+    }
+
     fun cleanup() {
         DownloadService.onDownloadCancelledListener = null
+        DownloadService.onDownloadPausedListener = null
+        DownloadService.onDownloadResumedListener = null
+        DownloadService.onDownloadDegradedListener = null
         if (::channel.isInitialized) {
             channel.setMethodCallHandler(null)
         }
@@ -100,16 +119,28 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                     return
                 }
 
-                try {
-                    val finalPath = saveToMediaStore(currentContext, source, displayName, title, mimeType)
-                    if (finalPath != null) {
-                        result.success(finalPath)
-                    } else {
-                        result.error("SAVE_FAILED", "MediaStore did not return a path", null)
+                // F7: the copy plus the MediaStore insert is a full-file
+                // transfer and used to run right here, on the main thread
+                // inside `onMethodCall`. On a large file that blocked the UI
+                // thread (jank, and an ANR when the file is slow to write), so
+                // it moves to a worker and the outcome is delivered back on the
+                // platform thread — which is where `result` must be invoked.
+                Thread {
+                    try {
+                        val finalPath = saveToMediaStore(currentContext, source, displayName, title, mimeType)
+                        mainHandler.post {
+                            if (finalPath != null) {
+                                result.success(finalPath)
+                            } else {
+                                result.error("SAVE_FAILED", "MediaStore did not return a path", null)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        mainHandler.post {
+                            result.error("SAVE_FAILED", e.localizedMessage ?: "Unknown error", e.stackTraceToString())
+                        }
                     }
-                } catch (e: Exception) {
-                    result.error("SAVE_FAILED", e.localizedMessage ?: "Unknown error", e.stackTraceToString())
-                }
+                }.start()
             }
             "getFreeDiskSpace" -> {
                 try {
@@ -130,7 +161,10 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
             // B-07: Download foreground service lifecycle
             "startDownloadForeground" -> {
                 val videoId = call.argument<String>("videoId") ?: ""
-                val title = call.argument<String>("title") ?: "Downloading"
+                val title = call.argument<String>("title") ?: ""
+                // DownloadService.onDestroy clears these statics (C-8), so they
+                // must be re-installed before every new download.
+                installDownloadCallbacks()
                 try {
                     DownloadService.start(currentContext, videoId, title)
                     result.success(true)
@@ -140,10 +174,21 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
             }
             "updateDownloadProgress" -> {
                 val videoId = call.argument<String>("videoId") ?: ""
-                val title = call.argument<String>("title") ?: "Downloading"
+                val title = call.argument<String>("title") ?: ""
                 val progress = (call.argument<Int>("progress") ?: 0).coerceIn(0, 100)
                 try {
                     DownloadService.updateProgress(currentContext, videoId, title, progress)
+                    result.success(true)
+                } catch (e: Exception) {
+                    result.success(false)
+                }
+            }
+            // C-7: mirror an in-app pause/resume into the download notification.
+            "setDownloadPaused" -> {
+                val videoId = call.argument<String>("videoId") ?: ""
+                val paused = call.argument<Boolean>("paused") ?: false
+                try {
+                    DownloadService.setPaused(currentContext, videoId, paused)
                     result.success(true)
                 } catch (e: Exception) {
                     result.success(false)

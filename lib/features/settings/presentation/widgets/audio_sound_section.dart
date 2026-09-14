@@ -1000,9 +1000,9 @@ class AudioSoundSection extends StatelessWidget {
         SettingsSwitchTile(
           Icons.sync_alt_rounded,
           'Per-Track Output Format Negotiation',
-          'Requests each track\'s native sample rate / bit depth from the '
-              'output device (device-capped). Bit-Perfect keeps its exclusive '
-              'format. Off: the manual output format is used as-is',
+          'Hi-res first: requests each track\'s native sample rate / bit depth '
+              'from the output device (device-capped). Bit-Perfect keeps its '
+              'exclusive format. Turn off to use one manual output format',
           value: isAndroid && state.outputFormatNegotiationEnabled,
           disabledReason: isAndroid ? null : unsupported,
           onChanged: !isAndroid
@@ -1010,13 +1010,13 @@ class AudioSoundSection extends StatelessWidget {
               : cubit.setOutputFormatNegotiationEnabled,
         ),
         settingsCardDivider(p),
-        // Opt-in 24/32-bit float DSP path. Off by default: the native DSP chain
-        // stays on the historical 16-bit sink path, byte-identical to today.
+        // 24/32-bit float DSP path. ON by default so hi-res sources are never
+        // truncated to 16-bit; 16-bit content is unaffected.
         SettingsSwitchTile(
           Icons.graphic_eq_rounded,
           '24/32-bit Float DSP Path',
-          'Feeds the native DSP chain float32 samples and keeps the higher bit '
-              'depth on output (24/32-bit float DSP path; off = 16-bit). '
+          'Hi-res first: feeds the native DSP chain float32 samples so 24/32-bit '
+              'sources keep their depth (16-bit content is unaffected). '
               'Unsupported devices safely fall back to 16-bit',
           value: isAndroid && state.floatOutputEnabled,
           disabledReason: isAndroid ? null : unsupported,

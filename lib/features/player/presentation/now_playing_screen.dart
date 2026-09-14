@@ -39,28 +39,46 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final settingsState = context.watch<SettingsCubit>().state;
+    // Narrow subscriptions: only the fields this screen actually renders.
+    // Watching the whole SettingsCubit / DynamicThemeCubit states rebuilt the
+    // entire theme tree on any unrelated settings change (A-16).
+    final settingsConfig = context.select<
+        SettingsCubit,
+        ({
+          bool dynamicThemingEnabled,
+          Color customAccentColor,
+          PlayerThemeMode playerThemeMode
+        })>((c) => (
+          dynamicThemingEnabled: c.state.dynamicThemingEnabled,
+          customAccentColor: c.state.customAccentColor,
+          playerThemeMode: c.state.playerThemeMode,
+        ));
 
     return BlocConsumer<PlayerCubit, PlayerState>(
       buildWhen: (prev, curr) => prev.differsFromBeyondPosition(curr),
       listenWhen: (prev, curr) => prev.currentSong?.id != curr.currentSong?.id,
       listener: (context, state) {
         final song = state.currentSong;
-        if (song != null && settingsState.dynamicThemingEnabled) {
+        if (song != null && settingsConfig.dynamicThemingEnabled) {
           context.read<DynamicThemeCubit>().updateFromSong(song);
         }
       },
       builder: (context, state) {
         final cubit = context.read<PlayerCubit>();
-        final dynamicTheme = context.watch<DynamicThemeCubit>().state;
+        final dynamicThemeConfig = context.select<
+            DynamicThemeCubit,
+            ({Color primaryColor, Color backgroundColor})>((c) => (
+              primaryColor: c.state.primaryColor,
+              backgroundColor: c.state.backgroundColor,
+            ));
 
-        final activeColor = settingsState.dynamicThemingEnabled
-            ? dynamicTheme.primaryColor
-            : settingsState.customAccentColor;
+        final activeColor = settingsConfig.dynamicThemingEnabled
+            ? dynamicThemeConfig.primaryColor
+            : settingsConfig.customAccentColor;
         final isDark =
             Theme.of(context).brightness == Brightness.dark;
-        final bgColor = settingsState.dynamicThemingEnabled
-            ? dynamicTheme.backgroundColor
+        final bgColor = settingsConfig.dynamicThemingEnabled
+            ? dynamicThemeConfig.backgroundColor
             : (isDark
                 ? const Color(0xFF14172B)
                 : Theme.of(context).colorScheme.surface);
@@ -73,7 +91,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
         );
 
         Widget themeWidget;
-        switch (settingsState.playerThemeMode) {
+        switch (settingsConfig.playerThemeMode) {
           case PlayerThemeMode.classic:
             themeWidget = ClassicPlayerTheme(props: props);
             break;
@@ -223,6 +241,17 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
     final screenHeight = MediaQuery.sizeOf(context).height;
     final progress = (_dragOffset / screenHeight).clamp(0.0, 1.0);
 
+    // Only introduce the (saveLayer-backed) opacity layer while a dismiss drag
+    // is actually in progress: at rest the subtree paints exactly as before.
+    // The RepaintBoundary lets the compositor reuse the cached subtree layer
+    // across drag frames instead of re-rasterising it per frame (A-16).
+    final child = progress > 0.0
+        ? Opacity(
+            opacity: (1.0 - progress * 0.4).clamp(0.0, 1.0),
+            child: RepaintBoundary(child: widget.child),
+          )
+        : widget.child;
+
     return Listener(
       onPointerDown: (_) => _activePointers++,
       onPointerUp: (_) => _activePointers = (_activePointers - 1).clamp(0, 10),
@@ -235,10 +264,7 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
         onVerticalDragEnd: _onVerticalDragEnd,
         child: Transform.translate(
           offset: Offset(0, _dragOffset),
-          child: Opacity(
-            opacity: (1.0 - progress * 0.4).clamp(0.0, 1.0),
-            child: widget.child,
-          ),
+          child: child,
         ),
       ),
     );

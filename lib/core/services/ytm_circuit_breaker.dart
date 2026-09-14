@@ -32,12 +32,24 @@ class YtmCircuitBreaker {
   final Map<YtmBlockSignal, int> _totalFailures = {};
   int _totalSuccesses = 0;
 
+  /// The wall clock is injectable so the half-open transition (F2) can be
+  /// exercised without waiting out a real cooldown window in a test.
+  YtmCircuitBreaker([DateTime Function()? now]) : _now = now ?? DateTime.now;
+
+  final DateTime Function() _now;
+
   /// False when this signal's breaker is open (still cooling down).
   bool shouldAllow(YtmBlockSignal signal) {
     final until = _openUntil[signal];
     if (until == null) return true;
-    if (DateTime.now().isAfter(until)) {
+    if (_now().isAfter(until)) {
       _openUntil.remove(signal);
+      // F2: a half-open breaker starts its failure budget over. Leaving the
+      // tripped count in place meant a single failure after the cooldown
+      // re-opened the window for its full length, so one bad resolve per
+      // cooldown latched the signal shut for good instead of requiring
+      // `maxConsecutiveFailures` fresh failures.
+      _consecutiveFailures.remove(signal);
       return true;
     }
     return false;
@@ -51,13 +63,13 @@ class YtmCircuitBreaker {
     if (n >= maxConsecutiveFailures) {
       final window = cooldowns[signal] ?? const Duration(minutes: 2);
       if (window > Duration.zero) {
-        _openUntil[signal] = DateTime.now().add(window);
+        _openUntil[signal] = _now().add(window);
       }
     } else if (signal == YtmBlockSignal.botChallenge ||
         signal == YtmBlockSignal.ipBlocked) {
       // First bot/IP hit still cools briefly to avoid burning client matrix.
       final window = cooldowns[signal] ?? const Duration(minutes: 5);
-      _openUntil[signal] = DateTime.now().add(window);
+      _openUntil[signal] = _now().add(window);
     }
   }
 
@@ -72,7 +84,7 @@ class YtmCircuitBreaker {
         'failures': {for (final e in _totalFailures.entries) e.key.name: e.value},
         'open': {
           for (final e in _openUntil.entries)
-            if (DateTime.now().isBefore(e.value)) e.key.name: e.value.toIso8601String(),
+            if (_now().isBefore(e.value)) e.key.name: e.value.toIso8601String(),
         },
       };
 

@@ -115,7 +115,7 @@ void main() {
   group('YtmResolvingSource — quality keying', () {
     test('a low-quality resolve is cached under low, not high', () async {
       final urlCache = YtmUrlCache();
-      await _seedCacheFile('lowqualityvid');
+      await _seedCacheFile('lowqualityvid', quality: 'low');
 
       var calls = 0;
       final source = YtmResolvingSource(
@@ -139,7 +139,7 @@ void main() {
 
     test('a cached low URL is reused instead of re-resolved', () async {
       final urlCache = YtmUrlCache();
-      await _seedCacheFile('lowqualityvi2');
+      await _seedCacheFile('lowqualityvi2', quality: 'low');
       urlCache.put('lowqualityvi2', _streamUrl(), quality: 'low');
 
       var calls = 0;
@@ -280,11 +280,18 @@ void main() {
 /// serves the request straight off disk. `TestWidgetsFlutterBinding` forces
 /// every `HttpClient` response to 400 and makes no real request, so this is the
 /// only way to exercise the resolve path without a fabricated byte error.
-Future<void> _seedCacheFile(String videoId, {String ext = 'm4a'}) async {
+///
+/// F9: the byte-cache slot is quality-keyed, so this fixture seeds the slot the
+/// production writer (`YtmResolvingSource._createInner`) now targets through the
+/// same `YtmCacheManager.cacheFileName` the reader uses — rather than repeating
+/// the old un-keyed name, which the reader no longer looks at for a non-`high`
+/// quality.
+Future<void> _seedCacheFile(String videoId,
+    {String ext = 'm4a', String quality = 'high'}) async {
   final manager = YtmCacheManager();
   final dir = await manager.getCacheDirectory();
   final hash = manager.getHashForVideoId(videoId);
-  File(p.join(dir.path, '$hash.$ext'))
+  File(p.join(dir.path, YtmCacheManager.cacheFileName(hash, quality, ext)))
       .writeAsBytesSync(List<int>.filled(4096, 7));
 }
 

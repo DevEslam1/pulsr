@@ -1439,66 +1439,64 @@ class AppLocalizationsAr extends AppLocalizations {
   String get profileDropdownLabel => 'الملف';
 
   @override
-  String get smartAudioTitle => 'Smart Audio';
+  String get smartAudioTitle => 'الصوت الذكي';
 
   @override
-  String get smartAudioSubtitle =>
-      'Automatically tune the sound to your headphones and track';
+  String get smartAudioSubtitle => 'اضبط الصوت تلقائيًا حسب سماعاتك والمقطع';
 
   @override
-  String get smartAudioModeLabel => 'Mode';
+  String get smartAudioModeLabel => 'الوضع';
 
   @override
-  String get smartAudioAuto => 'Auto';
+  String get smartAudioAuto => 'تلقائي';
 
   @override
-  String get smartAudioManual => 'Manual';
+  String get smartAudioManual => 'يدوي';
 
   @override
   String get smartAudioAutoDesc =>
-      'Detect the connected headphones, apply the matching AutoEQ correction, and use the highest output quality the device supports';
+      'يكتشف السماعات المتصلة، ويطبّق تصحيح AutoEQ المطابق، ويستخدم أعلى جودة يدعمها الجهاز';
 
   @override
   String get smartAudioManualDesc =>
-      'Keep your EQ, effects and output quality exactly as you set them';
+      'يحافظ على إعدادات المعادل والتأثيرات وجودة الإخراج كما ضبطتها';
 
   @override
   String smartAudioDetectedDevice(String device) {
-    return 'Current output: $device';
+    return 'الإخراج الحالي: $device';
   }
 
   @override
   String smartAudioMatchedProfile(String profile) {
-    return 'Matched correction: $profile';
+    return 'التصحيح المطابق: $profile';
   }
 
   @override
-  String get smartAudioNoMatch =>
-      'No headphone correction matched for this device';
+  String get smartAudioNoMatch => 'لا يوجد تصحيح سماعات مطابق لهذا الجهاز';
 
   @override
   String get smartAudioAutoCatchAllHint =>
-      'Auto only adjusts sound when it recognises your headphones or a manual device profile; your choices are never overwritten in Manual mode';
+      'لا يعدّل الوضع التلقائي الصوت إلا عند التعرّف على سماعاتك أو على ملف جهاز محفوظ؛ ولا يتم استبدال اختياراتك في الوضع اليدوي';
 
   @override
-  String get experienceModeTitle => 'Experience Mode';
+  String get experienceModeTitle => 'وضع الاستخدام';
 
   @override
-  String get experienceModeSubtitle => 'Choose how much control you want';
+  String get experienceModeSubtitle => 'اختر مقدار التحكم الذي تريده';
 
   @override
-  String get experienceModeNormal => 'Normal';
+  String get experienceModeNormal => 'عادي';
 
   @override
-  String get experienceModeProfessional => 'Professional';
+  String get experienceModeProfessional => 'احترافي';
 
   @override
   String get experienceModeNormalDesc =>
-      'Smart and simple — Pulsr tunes the sound to your headphones and picks the best quality automatically';
+      'ذكي وبسيط — يضبط Pulsr الصوت لسماعاتك ويختار أفضل جودة تلقائيًا';
 
   @override
   String get experienceModeProfessionalDesc =>
-      'Full control over every DSP stage, output format and diagnostic option';
+      'تحكم كامل في كل مرحلة معالجة وصيغة إخراج وخيار تشخيصي';
 
   @override
   String get undo => 'تراجع';
@@ -2027,4 +2025,105 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get dsdOutputDop => 'DoP';
+
+  @override
+  String get enableShuffle => 'تفعيل العشوائي';
+
+  @override
+  String get disableShuffle => 'تعطيل العشوائي';
+
+  @override
+  String get like => 'إعجاب';
+
+  @override
+  String get unlike => 'إلغاء الإعجاب';
+
+  @override
+  String get mute => 'كتم الصوت';
+
+  @override
+  String get unmute => 'إلغاء الكتم';
+
+  @override
+  String get volume => 'مستوى الصوت';
+
+  @override
+  String get audioOutputAndDac => 'مخرج الصوت وDAC';
+
+  @override
+  String get toggleSideQueue => 'إظهار أو إخفاء قائمة الانتظار الجانبية';
+
+  @override
+  String get fullscreenPlayer => 'المشغل بملء الشاشة';
+
+  @override
+  String nowPlayingSemantics(String title, String artist) {
+    return 'يتم الآن تشغيل: $title لـ $artist';
+  }
+
+  @override
+  String resumeFromPrompt(String time) {
+    return 'المتابعة من $time؟';
+  }
+
+  @override
+  String setLoopPointA(String time) {
+    return 'تعيين نقطة التكرار A ($time)';
+  }
+
+  @override
+  String setLoopPointB(String time) {
+    return 'تعيين نقطة التكرار B ($time)';
+  }
+
+  @override
+  String get enableAbLoop => 'تفعيل تكرار A-B';
+
+  @override
+  String get disableAbLoop => 'تعطيل تكرار A-B';
+
+  @override
+  String get clearAbLoop => 'مسح تكرار A-B';
+
+  @override
+  String audioDelayTooltip(int ms) {
+    return 'تأخير الصوت ($ms مللي ثانية)';
+  }
+
+  @override
+  String audioDelayMsLabel(int ms) {
+    return 'تأخير الصوت: $ms مللي ثانية';
+  }
+
+  @override
+  String get audioDelayHelp =>
+      'القيم الموجبة تؤخر الصوت (مثل البلوتوث أو الفيديو البطيء).';
+
+  @override
+  String get themeExported => 'تم تصدير المظهر إلى ورقة المشاركة';
+
+  @override
+  String get themeExportFailed => 'تعذّر تصدير المظهر';
+
+  @override
+  String get themeImportFailed => 'تعذّر تحليل JSON المظهر';
+
+  @override
+  String get themeApplied => 'تم تطبيق المظهر المخصص!';
+
+  @override
+  String get invalidThemeJson => 'تنسيق JSON للمظهر غير صالح';
+
+  @override
+  String get notificationPermissionTitle => 'إظهار عناصر التحكم بالتشغيل';
+
+  @override
+  String get notificationPermissionRationale =>
+      'اسمح بالإشعارات ليتمكن Pulsr من إظهار عناصر التحكم بالتشغيل على شاشة القفل وفي درج الإشعارات.';
+
+  @override
+  String get notificationPermissionAllow => 'السماح';
+
+  @override
+  String get notificationPermissionNotNow => 'ليس الآن';
 }

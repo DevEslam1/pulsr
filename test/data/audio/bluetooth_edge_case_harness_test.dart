@@ -194,21 +194,21 @@ void main() {
 
     setUp(() => scanner = MockMediaScannerService());
 
-    test('output-format negotiation defaults OFF and persists OFF/ON',
+    test('output-format negotiation defaults ON and persists OFF/ON',
         () async {
       final cubit = SettingsCubit(scannerService: scanner);
       await pumpEventQueue();
-      expect(cubit.state.outputFormatNegotiationEnabled, isFalse,
-          reason: 'negotiation must be opt-in');
-
-      await cubit.setOutputFormatNegotiationEnabled(true);
-      expect(cubit.state.outputFormatNegotiationEnabled, isTrue);
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getBool(PrefsKeys.outputFormatNegotiationEnabled), isTrue);
+      expect(cubit.state.outputFormatNegotiationEnabled, isTrue,
+          reason: 'hi-res-first: negotiation is on by default');
 
       await cubit.setOutputFormatNegotiationEnabled(false);
-      expect(prefs.getBool(PrefsKeys.outputFormatNegotiationEnabled), isFalse,
-          reason: 'turning it back off must not leave the opt-in on disk');
+      expect(cubit.state.outputFormatNegotiationEnabled, isFalse);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool(PrefsKeys.outputFormatNegotiationEnabled), isFalse);
+
+      await cubit.setOutputFormatNegotiationEnabled(true);
+      expect(prefs.getBool(PrefsKeys.outputFormatNegotiationEnabled), isTrue,
+          reason: 're-enabling must persist on disk');
       await cubit.close();
     });
 

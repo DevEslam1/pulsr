@@ -3,13 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
+import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
 
+/// AB-loop / bookmark labels need a placeholder for an unset point; the
+/// duration itself is formatted with the shared [Formatters.formatDuration] so
+/// it can never disagree with the seek bar (A-12).
 String _fmt(Duration? d) {
   if (d == null) return '--:--';
-  final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-  final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-  return '$m:$s';
+  return Formatters.formatDuration(d);
 }
 
 class AdvancedPlaybackBar extends StatelessWidget {
@@ -17,6 +20,7 @@ class AdvancedPlaybackBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return BlocBuilder<PlayerCubit, PlayerState>(
       buildWhen: (p, c) =>
           p.abLoopEnabled != c.abLoopEnabled ||
@@ -39,15 +43,16 @@ class AdvancedPlaybackBar extends StatelessWidget {
                   child: ListTile(
                     dense: true,
                     leading: const Icon(Icons.bookmark, color: Colors.amber),
-                    title: Text(
-                        'Resume from ${_fmt(state.bookmarkPosition)}?'),
+                    title: Text(l10n.resumeFromPrompt(
+                        _fmt(state.bookmarkPosition))),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         TextButton(
                             onPressed: cubit.seekToBookmark,
-                            child: const Text('Resume')),
+                            child: Text(l10n.resume)),
                         IconButton(
+                            tooltip: l10n.close,
                             onPressed: cubit.dismissBookmark,
                             icon: const Icon(Icons.close, size: 18)),
                       ],
@@ -62,14 +67,14 @@ class AdvancedPlaybackBar extends StatelessWidget {
                 children: [
                   // F1: AB loop
                   IconButton(
-                    tooltip: 'Set loop point A (${_fmt(state.abPointA)})',
+                    tooltip: l10n.setLoopPointA(_fmt(state.abPointA)),
                     color: state.abPointA != null ? Colors.blue : null,
                     onPressed: cubit.setAbPointA,
                     icon: const Text('A',
                         style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                   IconButton(
-                    tooltip: 'Set loop point B (${_fmt(state.abPointB)})',
+                    tooltip: l10n.setLoopPointB(_fmt(state.abPointB)),
                     color: state.abPointB != null ? Colors.blue : null,
                     onPressed: cubit.setAbPointB,
                     icon: const Text('B',
@@ -77,8 +82,8 @@ class AdvancedPlaybackBar extends StatelessWidget {
                   ),
                   IconButton(
                     tooltip: state.abLoopEnabled
-                        ? 'Disable AB loop'
-                        : 'Enable AB loop',
+                        ? l10n.disableAbLoop
+                        : l10n.enableAbLoop,
                     color: state.abLoopEnabled ? Colors.green : null,
                     onPressed: (state.abPointA != null &&
                             state.abPointB != null)
@@ -88,15 +93,14 @@ class AdvancedPlaybackBar extends StatelessWidget {
                   ),
                   if (state.abPointA != null || state.abPointB != null)
                     IconButton(
-                      tooltip: 'Clear AB loop',
+                      tooltip: l10n.clearAbLoop,
                       onPressed: cubit.clearAbLoop,
                       icon: const Icon(Icons.clear, size: 18),
                     ),
                   const SizedBox(width: 8),
                   // F2: per-track delay
                   IconButton(
-                    tooltip:
-                        'Audio delay (${state.trackDelayMs} ms)',
+                    tooltip: l10n.audioDelayTooltip(state.trackDelayMs),
                     onPressed: () =>
                         _showDelaySheet(context, cubit, state.trackDelayMs),
                     icon: const Icon(Icons.av_timer_outlined, size: 20),
@@ -137,6 +141,7 @@ class _DelaySheetState extends State<_DelaySheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -144,9 +149,9 @@ class _DelaySheetState extends State<_DelaySheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Audio delay: ${value.round()} ms',
+            Text(l10n.audioDelayMsLabel(value.round()),
                 style: Theme.of(context).textTheme.titleMedium),
-            const Text('Positive delays audio (e.g. slow Bluetooth/video).'),
+            Text(l10n.audioDelayHelp),
             PulsrSlider(
               min: -2000,
               max: 2000,
@@ -163,11 +168,11 @@ class _DelaySheetState extends State<_DelaySheet> {
                     widget.cubit.setTrackDelayMs(0);
                     Navigator.of(context).pop();
                   },
-                  child: const Text('Reset'),
+                  child: Text(l10n.reset),
                 ),
                 FilledButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Done'),
+                  child: Text(l10n.done),
                 ),
               ],
             ),

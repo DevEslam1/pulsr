@@ -7,6 +7,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
@@ -20,8 +21,10 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.Process
 import android.support.v4.media.MediaBrowserCompat
 import android.support.v4.media.session.MediaControllerCompat
+import android.support.v4.media.session.PlaybackStateCompat
 import android.util.SizeF
 import android.view.KeyEvent
 import android.view.View
@@ -40,39 +43,79 @@ class NowPlayingWidget : AppWidgetProvider() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action
-        if (action != null && action.startsWith("com.pulsr.music.widget.")) {
+        if (action != null && action.startsWith(WIDGET_ACTION_PREFIX)) {
             // Enforce authentic widget broadcast origin: either holds signature permission WIDGET_CONTROL,
             // or carries the process token injected into PendingIntents created by our own AppWidget.
-            val token = intent.getStringExtra(EXTRA_WIDGET_TOKEN)
-            val isAuthenticInternal = token != null && token == WIDGET_INTERNAL_TOKEN
-            val hasSignaturePermission = runCatching {
-                context.checkCallingOrSelfPermission("com.pulsr.music.permission.WIDGET_CONTROL") == android.content.pm.PackageManager.PERMISSION_GRANTED
-            }.getOrDefault(false)
-
-            if (!isAuthenticInternal && !hasSignaturePermission) {
-                android.util.Log.w("NowPlayingWidget", "Rejected unauthorized widget action from untrusted sender")
+            // C-10: only the known transport actions are accepted — an arbitrary broadcast that merely
+            // shares our prefix must not reach the action handler.
+            if (!isTrustedWidgetAction(context, intent)) {
+                android.util.Log.w("NowPlayingWidget", "Rejected unauthorized widget action: $action")
                 return
             }
             handleWidgetAction(context, intent)
             return
         }
 
-        super.onReceive(context, intent)
-        if (action != null && action == AppWidgetManager.ACTION_APPWIDGET_UPDATE) {
+        // C-10: no repaint is driven by caller-supplied extras any more. Every
+        // other broadcast (the launcher's APPWIDGET_UPDATE, options changes,
+        // enable/disable, boot) is framework lifecycle and is handled below.
+        if (action == AppWidgetManager.ACTION_APPWIDGET_UPDATE &&
+            intent.getBooleanExtra(HomeWidgetPlugin.TRIGGERED_FROM_HOME_WIDGET, false)) {
+            // Dart-driven update (home_widget). C-4: decide full vs progress-only
+            // from the persisted content version instead of an Intent extra,
+            // which home_widget's updateWidget() cannot carry.
+            try {
+                val appWidgetManager = AppWidgetManager.getInstance(context)
+                val componentName = ComponentName(context, NowPlayingWidget::class.java)
+                val appWidgetIds = intent.getIntArrayExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS)
+                    ?: appWidgetManager.getAppWidgetIds(componentName)
+                val data = HomeWidgetPlugin.getData(context)
+                val progressOnly = shouldRenderProgressOnly(data)
+                if (appWidgetIds != null && appWidgetIds.isNotEmpty()) {
+                    for (appWidgetId in appWidgetIds) {
+                        updateAppWidget(context, appWidgetManager, appWidgetId, progressOnly)
+                    }
+                }
+            } catch (_: Throwable) {
+                // Self-heal gracefully
+            }
             return
         }
-        try {
-            val appWidgetManager = AppWidgetManager.getInstance(context)
-            val componentName = ComponentName(context, NowPlayingWidget::class.java)
-            val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
-            if (appWidgetIds != null && appWidgetIds.isNotEmpty()) {
-                val isProgressOnly = intent.getBooleanExtra("isProgressOnly", false)
-                for (appWidgetId in appWidgetIds) {
-                    updateAppWidget(context, appWidgetManager, appWidgetId, isProgressOnly)
-                }
+
+        // Launcher/OS lifecycle: must always render in full.
+        super.onReceive(context, intent)
+    }
+
+    /// C-10: validate an inbound widget broadcast before acting on it.
+    ///
+    /// Accepts only the known transport actions; on API 34+ the broadcast must
+    /// additionally originate in this process (the only legitimate sender of the
+    /// widget's own PendingIntents), and on every release it must carry either the
+    /// per-process token injected into those PendingIntents or the signature-level
+    /// WIDGET_CONTROL permission.
+    ///
+    /// Declared on the receiver (not the companion) because `sentFromUid` is an
+    /// instance property of BroadcastReceiver.
+    private fun isTrustedWidgetAction(context: Context, intent: Intent): Boolean {
+        val action = intent.action ?: return false
+        if (action !in WIDGET_ACTIONS) return false
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val senderUid = try {
+                sentFromUid
+            } catch (_: Throwable) {
+                Process.myUid()
             }
+            if (senderUid != Process.myUid()) return false
+        }
+
+        val token = intent.getStringExtra(EXTRA_WIDGET_TOKEN)
+        if (token != null && token == WIDGET_INTERNAL_TOKEN) return true
+        return try {
+            context.checkCallingOrSelfPermission(WIDGET_CONTROL_PERMISSION) ==
+                PackageManager.PERMISSION_GRANTED
         } catch (_: Throwable) {
-            // Self-heal gracefully
+            false
         }
     }
 
@@ -94,36 +137,47 @@ class NowPlayingWidget : AppWidgetProvider() {
         val prefs = HomeWidgetPlugin.getData(context)
         val currentDuration = getSafeLong(prefs, "durationMs", 0L)
         val currentPosition = getSafeLong(prefs, "positionMs", 0L)
-        val currentIsPlaying = getSafeBoolean(prefs, "isPlaying", false)
 
         when (intent.action) {
             ACTION_PLAY_PAUSE -> {
-                performMediaAction(context, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) { controls, isPlaying, _, _ ->
+                // C-3: the toggle decision reads the live MediaSession state, not
+                // the widget's own prefs snapshot. A stale snapshot (media button,
+                // Android Auto, another app) used to make the button perform the
+                // inverse action. prefs remain display-only.
+                performMediaAction(context, fallbackKeyCode = KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) { controls, isPlaying, _, _ ->
                     if (isPlaying) controls.pause() else controls.play()
                 }
             }
             ACTION_NEXT -> {
-                performMediaAction(context, KeyEvent.KEYCODE_MEDIA_NEXT) { controls, _, _, _ ->
+                performMediaAction(context, fallbackKeyCode = KeyEvent.KEYCODE_MEDIA_NEXT) { controls, _, _, _ ->
                     controls.skipToNext()
                 }
             }
             ACTION_PREV -> {
-                performMediaAction(context, KeyEvent.KEYCODE_MEDIA_PREVIOUS) { controls, _, _, _ ->
+                performMediaAction(context, fallbackKeyCode = KeyEvent.KEYCODE_MEDIA_PREVIOUS) { controls, _, _, _ ->
                     controls.skipToPrevious()
                 }
             }
             ACTION_REWIND -> {
                 val newPos = (currentPosition - 10000L).coerceAtLeast(0L)
-                prefs.edit().putLong("positionMs", newPos).apply()
-                performMediaAction(context) { controls, _, _, _ ->
+                // C-2: prefs are written only once the transport call was actually
+                // dispatched; a dropped action must not repaint an assumed state.
+                performMediaAction(
+                    context,
+                    fallbackKeyCode = KeyEvent.KEYCODE_MEDIA_REWIND,
+                    onDispatched = { prefs.edit().putLong("positionMs", newPos).apply() }
+                ) { controls, _, _, _ ->
                     controls.seekTo(newPos)
                 }
             }
             ACTION_FORWARD -> {
                 val maxDur = if (currentDuration > 0) currentDuration else currentPosition + 10000L
                 val newPos = (currentPosition + 10000L).coerceAtMost(maxDur)
-                prefs.edit().putLong("positionMs", newPos).apply()
-                performMediaAction(context) { controls, _, _, _ ->
+                performMediaAction(
+                    context,
+                    fallbackKeyCode = KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
+                    onDispatched = { prefs.edit().putLong("positionMs", newPos).apply() }
+                ) { controls, _, _, _ ->
                     controls.seekTo(newPos)
                 }
             }
@@ -131,23 +185,29 @@ class NowPlayingWidget : AppWidgetProvider() {
                 val ratio = intent.getFloatExtra(EXTRA_RATIO, 0.5f)
                 if (currentDuration > 0) {
                     val seekPos = (currentDuration * ratio).toLong().coerceIn(0L, currentDuration)
-                    prefs.edit().putLong("positionMs", seekPos).apply()
-                    performMediaAction(context) { controls, _, _, _ ->
+                    performMediaAction(
+                        context,
+                        onDispatched = { prefs.edit().putLong("positionMs", seekPos).apply() }
+                    ) { controls, _, _, _ ->
                         controls.seekTo(seekPos)
                     }
                 }
             }
             ACTION_FAVORITE -> {
-                val isFav = getSafeBoolean(prefs, "isFavorite", false)
-                prefs.edit().putBoolean("isFavorite", !isFav).apply()
-                performMediaAction(context) { controls, _, _, _ ->
+                val nextFavorite = !getSafeBoolean(prefs, "isFavorite", false)
+                performMediaAction(
+                    context,
+                    onDispatched = { prefs.edit().putBoolean("isFavorite", nextFavorite).apply() }
+                ) { controls, _, _, _ ->
                     controls.sendCustomAction("toggleFavorite", null)
                 }
             }
             ACTION_SHUFFLE -> {
-                val isShuffle = getSafeBoolean(prefs, "isShuffle", false)
-                prefs.edit().putBoolean("isShuffle", !isShuffle).apply()
-                performMediaAction(context) { controls, _, _, _ ->
+                val nextShuffle = !getSafeBoolean(prefs, "isShuffle", false)
+                performMediaAction(
+                    context,
+                    onDispatched = { prefs.edit().putBoolean("isShuffle", nextShuffle).apply() }
+                ) { controls, _, _, _ ->
                     controls.sendCustomAction("toggleShuffle", null)
                 }
             }
@@ -158,8 +218,10 @@ class NowPlayingWidget : AppWidgetProvider() {
                     "all" -> "one"
                     else -> "off"
                 }
-                prefs.edit().putString("repeatMode", nextRepeat).apply()
-                performMediaAction(context) { controls, _, _, _ ->
+                performMediaAction(
+                    context,
+                    onDispatched = { prefs.edit().putString("repeatMode", nextRepeat).apply() }
+                ) { controls, _, _, _ ->
                     controls.sendCustomAction("toggleRepeat", null)
                 }
             }
@@ -194,6 +256,8 @@ class NowPlayingWidget : AppWidgetProvider() {
         cachedArtworkBitmap = null
         cachedArtworkPath = null
         cachedArtworkMtime = 0L
+        // A dismissed widget must re-render in full when it comes back.
+        renderedContentVersion = -1L
     }
 
     companion object {
@@ -208,7 +272,22 @@ class NowPlayingWidget : AppWidgetProvider() {
         const val ACTION_REPEAT = "com.pulsr.music.widget.REPEAT"
         const val EXTRA_RATIO = "extra_ratio"
         private const val EXTRA_WIDGET_TOKEN = "com.pulsr.music.widget.extra.TOKEN"
+        private const val WIDGET_ACTION_PREFIX = "com.pulsr.music.widget."
+        private const val WIDGET_CONTROL_PERMISSION = "com.pulsr.music.permission.WIDGET_CONTROL"
         private val WIDGET_INTERNAL_TOKEN = java.util.UUID.randomUUID().toString()
+
+        /// C-10: the complete set of broadcasts this receiver will act on.
+        private val WIDGET_ACTIONS = setOf(
+            ACTION_PLAY_PAUSE,
+            ACTION_NEXT,
+            ACTION_PREV,
+            ACTION_REWIND,
+            ACTION_FORWARD,
+            ACTION_SEEK_RATIO,
+            ACTION_FAVORITE,
+            ACTION_SHUFFLE,
+            ACTION_REPEAT,
+        )
 
         private const val UNIFIED_ART_TARGET_PX = 192
 
@@ -217,6 +296,12 @@ class NowPlayingWidget : AppWidgetProvider() {
         private var cachedArtworkPath: String? = null
         private var cachedArtworkMtime: Long = 0L
         private var cachedArtworkBitmap: Bitmap? = null
+
+        /// Content version rendered by the last *full* repaint. Compared against
+        /// the `contentVersion` the Dart side persists to recognise a progress-only
+        /// tick (C-4).
+        @Volatile
+        private var renderedContentVersion: Long = -1L
 
         private fun sendExplicitMediaButton(context: Context, keyCode: Int) {
             try {
@@ -261,21 +346,45 @@ class NowPlayingWidget : AppWidgetProvider() {
             updateHandler.postDelayed(runnable, delayMs)
         }
 
+        /// C-4: true when the only thing that changed since the last full repaint
+        /// is progress/position — i.e. the persisted content version still matches
+        /// what was last rendered — and the artwork bitmap is still usable.
+        private fun shouldRenderProgressOnly(data: SharedPreferences): Boolean {
+            val cached = cachedArtworkBitmap
+            if (cached == null || cached.isRecycled) return false
+            val version = getSafeLong(data, "contentVersion", -1L)
+            return version >= 0L && version == renderedContentVersion
+        }
+
+        /// C-3: whether the live session is in a state where "play/pause" should
+        /// mean pause. Derived from the MediaController, never from widget prefs.
+        private fun liveIsPlaying(controller: MediaControllerCompat): Boolean {
+            return when (controller.playbackState?.state) {
+                PlaybackStateCompat.STATE_PLAYING,
+                PlaybackStateCompat.STATE_BUFFERING,
+                PlaybackStateCompat.STATE_FAST_FORWARDING,
+                PlaybackStateCompat.STATE_REWINDING -> true
+                else -> false
+            }
+        }
+
         private fun performMediaAction(
             context: Context,
             fallbackKeyCode: Int? = null,
+            onDispatched: (() -> Unit)? = null,
             action: (MediaControllerCompat.TransportControls, Boolean, Long, Long) -> Unit
         ) {
             try {
                 val data = HomeWidgetPlugin.getData(context)
                 val duration = getSafeLong(data, "durationMs", 0L)
                 val position = getSafeLong(data, "positionMs", 0L)
-                val isPlaying = getSafeBoolean(data, "isPlaying", false)
 
                 synchronized(mediaBrowserLock) {
                     val controller = cachedMediaController
                     if (controller != null && cachedMediaBrowser?.isConnected == true) {
-                        action(controller.transportControls, isPlaying, position, duration)
+                        // Live state, so play/pause can never invert (C-3).
+                        action(controller.transportControls, liveIsPlaying(controller), position, duration)
+                        onDispatched?.invoke()
                         return
                     }
                 }
@@ -297,7 +406,6 @@ class NowPlayingWidget : AppWidgetProvider() {
                         }
                         try {
                             val latestData = HomeWidgetPlugin.getData(appContext)
-                            val latestIsPlaying = getSafeBoolean(latestData, "isPlaying", false)
                             synchronized(mediaBrowserLock) {
                                 val token = localBrowser?.sessionToken
                                 if (token != null) {
@@ -306,10 +414,11 @@ class NowPlayingWidget : AppWidgetProvider() {
                                     cachedMediaBrowser = localBrowser
                                     action(
                                         newController.transportControls,
-                                        latestIsPlaying,
+                                        liveIsPlaying(newController),
                                         getSafeLong(latestData, "positionMs", 0L),
                                         getSafeLong(latestData, "durationMs", 0L)
                                     )
+                                    onDispatched?.invoke()
                                 } else {
                                     fallbackKeyCode?.let { sendExplicitMediaButton(appContext, it) }
                                     try { localBrowser?.disconnect() } catch (_: Throwable) {}
@@ -344,7 +453,7 @@ class NowPlayingWidget : AppWidgetProvider() {
                         connectionCallback,
                         null
                     )
-                    localBrowser?.connect()
+                    localBrowser.connect()
                 }
 
                 timeoutRunnable = Runnable {
@@ -389,12 +498,20 @@ class NowPlayingWidget : AppWidgetProvider() {
             return if (s.isEmpty()) default else s
         }
 
+        /// C-11: same shape as the app's shared Dart formatter (`Formatters`
+        /// .formatDuration): `m:ss` below an hour, `h:mm:ss` with zero-padded
+        /// minutes/seconds above it. The old copy rendered 75:30 for long tracks.
         fun formatMs(ms: Long): String {
             if (ms <= 0) return "0:00"
             val totalSeconds = ms / 1000
-            val minutes = totalSeconds / 60
+            val hours = totalSeconds / 3600
+            val minutes = (totalSeconds % 3600) / 60
             val seconds = totalSeconds % 60
-            return "$minutes:${seconds.toString().padStart(2, '0')}"
+            return if (hours > 0) {
+                "$hours:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}"
+            } else {
+                "$minutes:${seconds.toString().padStart(2, '0')}"
+            }
         }
 
         fun updateAppWidget(
@@ -405,11 +522,15 @@ class NowPlayingWidget : AppWidgetProvider() {
         ) {
             try {
                 val data = HomeWidgetPlugin.getData(context)
+                // The caller's decision is honoured only when the cached bitmap it
+                // relies on is actually usable; otherwise fall back to a full render.
+                val cached = cachedArtworkBitmap
+                val progressOnly = isProgressOnly && cached != null && !cached.isRecycled
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    val viewsCompact = createPopulatedRemoteViews(context, R.layout.widget_now_playing, data, 56, isProgressOnly)
-                    val viewsMedium = createPopulatedRemoteViews(context, R.layout.widget_now_playing_medium, data, 68, isProgressOnly)
-                    val viewsLarge = createPopulatedRemoteViews(context, R.layout.widget_now_playing_large, data, 88, isProgressOnly)
+                    val viewsCompact = createPopulatedRemoteViews(context, R.layout.widget_now_playing, data, 56, progressOnly)
+                    val viewsMedium = createPopulatedRemoteViews(context, R.layout.widget_now_playing_medium, data, 68, progressOnly)
+                    val viewsLarge = createPopulatedRemoteViews(context, R.layout.widget_now_playing_large, data, 88, progressOnly)
                     val viewMapping = mapOf(
                         SizeF(140f, 60f) to viewsCompact,
                         SizeF(180f, 110f) to viewsMedium,
@@ -425,8 +546,12 @@ class NowPlayingWidget : AppWidgetProvider() {
                         minHeight >= 110 -> Pair(R.layout.widget_now_playing_medium, 68)
                         else -> Pair(R.layout.widget_now_playing, 56)
                     }
-                    val views = createPopulatedRemoteViews(context, layoutId, data, artDp, isProgressOnly)
+                    val views = createPopulatedRemoteViews(context, layoutId, data, artDp, progressOnly)
                     appWidgetManager.updateAppWidget(appWidgetId, views)
+                }
+
+                if (!progressOnly) {
+                    renderedContentVersion = getSafeLong(data, "contentVersion", -1L)
                 }
             } catch (e: Throwable) {
                 android.util.Log.e("NowPlayingWidget", "Widget update failed, recovering with fallback views", e)
@@ -435,13 +560,20 @@ class NowPlayingWidget : AppWidgetProvider() {
                     cachedArtworkBitmap = null
                     cachedArtworkPath = null
                     cachedArtworkMtime = 0L
+                    renderedContentVersion = -1L
 
                     val fallbackViews = RemoteViews(context.packageName, R.layout.widget_now_playing).apply {
                         val data = HomeWidgetPlugin.getData(context)
                         val title = getSafeString(data, "title")
                         val artist = getSafeString(data, "artist")
-                        setTextViewText(R.id.widget_title, if (title.isNullOrBlank()) "Pulsr Music" else title)
-                        setTextViewText(R.id.widget_artist, if (artist.isNullOrBlank()) "Nothing playing" else artist)
+                        setTextViewText(
+                            R.id.widget_title,
+                            if (title.isNullOrBlank()) context.getString(R.string.app_name) else title
+                        )
+                        setTextViewText(
+                            R.id.widget_artist,
+                            if (artist.isNullOrBlank()) context.getString(R.string.widget_nothing_playing) else artist
+                        )
                         setImageViewResource(R.id.widget_artwork, R.mipmap.launcher_icon)
                     }
                     appWidgetManager.updateAppWidget(appWidgetId, fallbackViews)
@@ -480,7 +612,9 @@ class NowPlayingWidget : AppWidgetProvider() {
                 if (isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play
             )
 
-            // If progress-only tick, populate cached artwork to preserve display and skip heavy churn
+            // C-4 progress-only tick: re-attach the cached artwork (so the launcher
+            // keeps showing it) and touch nothing else — no bitmap decode, no text,
+            // no fresh PendingIntents.
             if (isProgressOnly) {
                 val cachedBmp = cachedArtworkBitmap
                 if (cachedBmp != null && !cachedBmp.isRecycled) {
@@ -492,8 +626,14 @@ class NowPlayingWidget : AppWidgetProvider() {
             // ---- Text (Title & Artist) ----
             val title = getSafeString(data, "title")
             val artist = getSafeString(data, "artist")
-            views.setTextViewText(R.id.widget_title, if (title.isNullOrBlank()) "Pulsr Music" else title)
-            views.setTextViewText(R.id.widget_artist, if (artist.isNullOrBlank()) "Nothing playing" else artist)
+            views.setTextViewText(
+                R.id.widget_title,
+                if (title.isNullOrBlank()) context.getString(R.string.app_name) else title
+            )
+            views.setTextViewText(
+                R.id.widget_artist,
+                if (artist.isNullOrBlank()) context.getString(R.string.widget_nothing_playing) else artist
+            )
 
             // ---- Album (for Medium & Large Layouts) ----
             val album = getSafeString(data, "album")
@@ -516,7 +656,10 @@ class NowPlayingWidget : AppWidgetProvider() {
                     views.setTextViewText(R.id.widget_next_track_0, "1. $nextTrack0")
                     views.setViewVisibility(R.id.widget_next_track_0, View.VISIBLE)
                 } else {
-                    views.setTextViewText(R.id.widget_next_track_0, "No upcoming tracks")
+                    views.setTextViewText(
+                        R.id.widget_next_track_0,
+                        context.getString(R.string.widget_no_upcoming_tracks)
+                    )
                     views.setViewVisibility(R.id.widget_next_track_0, View.VISIBLE)
                 }
 

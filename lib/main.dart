@@ -18,6 +18,7 @@ import 'core/services/automation_trigger_service.dart';
 import 'core/theme/aura_theme.dart';
 import 'core/theme/dynamic_theme_cubit.dart';
 import 'core/widgets/cached_artwork.dart';
+import 'core/widgets/pulsr_toast.dart';
 import 'core/router/app_router.dart';
 import 'core/network/network_change_monitor.dart';
 import 'core/services/auth_service.dart';
@@ -183,6 +184,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
   StreamSubscription<void>? _networkChangeSub;
   NetworkChangeMonitor? _networkMonitor;
   AutomationTriggerService? _automationTriggerService;
+  VoidCallback? _platformBridgeDegradedListener;
   DateTime? _lastAuthExpiredPrompt;
 
   @override
@@ -195,6 +197,43 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     if (AppConfig.ytmEnabled) _listenForYtmSessionExpiry();
     if (AppConfig.isCloudSyncAllowed) _startNetworkChangeMonitor();
     _startAutomationTriggers();
+    _watchPlatformBridgeHealth();
+  }
+
+  /// B-6: if the platform audio bridge failed to initialise, playback still
+  /// works but the lock-screen / shade controls silently do not exist. Surface
+  /// it once so the user is not left wondering where the media notification is.
+  void _watchPlatformBridgeHealth() {
+    try {
+      if (!getIt.isRegistered<PulsrAudioHandler>()) return;
+      final handler = getIt<PulsrAudioHandler>();
+      void surface() {
+        if (!handler.platformBridgeDegraded.value) return;
+        final ctx = rootNavigatorKey.currentContext;
+        if (ctx == null || !ctx.mounted) return;
+        PulsrToast.show(
+          ctx,
+          message:
+              'Background media controls are unavailable on this launch. '
+              'Playback works, but the lock-screen controls could not start.',
+          icon: Icons.warning_amber_rounded,
+          isError: true,
+          duration: const Duration(seconds: 5),
+        );
+      }
+
+      if (handler.platformBridgeDegraded.value) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => surface());
+      } else {
+        handler.platformBridgeDegraded.addListener(surface);
+        _platformBridgeDegradedListener = surface;
+      }
+    } catch (e, st) {
+      // Best-effort diagnostic only; never let it block startup (e.g. a test
+      // double of the handler that does not expose the notifier).
+      ErrorLogger.log('Failed to watch platform bridge health',
+          error: e, stackTrace: st, category: 'Startup');
+    }
   }
 
   /// Watches output-device changes (Bluetooth/headphones) and fires the
@@ -298,6 +337,12 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     _networkChangeSub?.cancel();
     _networkMonitor?.dispose();
     _automationTriggerService?.dispose();
+    if (_platformBridgeDegradedListener != null &&
+        getIt.isRegistered<PulsrAudioHandler>()) {
+      getIt<PulsrAudioHandler>()
+          .platformBridgeDegraded
+          .removeListener(_platformBridgeDegradedListener!);
+    }
     super.dispose();
   }
 
@@ -440,6 +485,29 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                 } else {
                   context.read<DynamicThemeCubit>().resetToDefault();
                 }
+              },
+            ),
+            // App-level surface for transport failures: PlayerCubit writes the
+            // message to PlayerState.errorMessage, so without this every
+            // seek/skip/shuffle/repeat failure would be silent (A-10).
+            BlocListener<PlayerCubit, PlayerState>(
+              listenWhen: (prev, curr) =>
+                  curr.errorMessage != null &&
+                  curr.errorMessage != prev.errorMessage,
+              listener: (context, state) {
+                final message = state.errorMessage;
+                if (message != null) {
+                  final ctx = rootNavigatorKey.currentContext;
+                  if (ctx != null && ctx.mounted) {
+                    PulsrToast.show(
+                      ctx,
+                      message: message,
+                      icon: Icons.error_outline_rounded,
+                      isError: true,
+                    );
+                  }
+                }
+                context.read<PlayerCubit>().clearError();
               },
             ),
           ],

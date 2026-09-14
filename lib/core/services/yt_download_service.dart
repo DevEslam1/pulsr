@@ -108,7 +108,56 @@ class YtDownloadService {
   /// to kill the moment the app left the foreground.
   bool _foregroundServiceRunning = false;
   bool _processing = false; // FIX-A03: Guard against re-entrant calls in _processQueue
-  final Map<String, YtmStream> _resolvedStreams = {}; // FIX-A05/C05: Track resolved stream duration
+  /// FIX-A05/C05: track resolved stream duration.
+  /// F12: bounded — it used to hold one entry per video id for the whole
+  /// process lifetime, and nothing ever removed one.
+  static const int _maxResolvedStreams = 128;
+  final Map<String, YtmStream> _resolvedStreams = {};
+
+  /// Video ids the user paused. While any entry is present the download
+  /// foreground service is deliberately kept alive so the notification — and
+  /// with it the Resume action — survives a pause (C-7). Without this, pausing
+  /// emptied the active set and `_stopForegroundServiceIfIdle` tore the
+  /// notification down, leaving no way back.
+  final Set<String> _pausedVideoIds = <String>{};
+
+  /// When each paused id was marked, so a marker that is never resumed or
+  /// deleted can expire (F14).
+  final Map<String, DateTime> _pausedSince = {};
+
+  /// How long a paused marker keeps the foreground service alive on its own.
+  /// Nothing else ever drops one, so a paused-then-abandoned download held the
+  /// service — and the process — up indefinitely on API < 35, where there is
+  /// no dataSync foreground-time cap to end it.
+  static const Duration _pausedMarkerIdleWindow = Duration(minutes: 30);
+
+  /// Marks [videoId] as paused so the foreground service is not stopped while
+  /// it is waiting to be resumed.
+  void markPaused(String videoId) {
+    _pausedVideoIds.add(videoId);
+    _pausedSince[videoId] = DateTime.now();
+  }
+
+  /// Clears the paused marker and stops the foreground service if that leaves
+  /// nothing running or waiting.
+  void clearPaused(String videoId) {
+    _pausedVideoIds.remove(videoId);
+    _pausedSince.remove(videoId);
+    _stopForegroundServiceIfIdle();
+  }
+
+  /// Drops paused markers older than [_pausedMarkerIdleWindow].
+  void _pruneExpiredPausedMarkers() {
+    if (_pausedSince.isEmpty) return;
+    final cutoff = DateTime.now().subtract(_pausedMarkerIdleWindow);
+    _pausedSince.removeWhere((id, since) {
+      if (since.isBefore(cutoff)) {
+        _pausedVideoIds.remove(id);
+        return true;
+      }
+      return false;
+    });
+  }
 
   /// Returns last resolved YtmStream for videoId if available
   YtmStream? getResolvedStream(String videoId) => _resolvedStreams[videoId];
@@ -134,6 +183,31 @@ class YtDownloadService {
         stream.duration.inSeconds > 0 ? stream.duration.inSeconds : 240;
     return seconds * bitrate * 1000 ~/ 8;
   }
+
+  /// Disk space this service insists on before starting a download of
+  /// [stream], including the scratch the parallel path needs (F3).
+  ///
+  /// The true peak is two copies of the body: all four `.partN` chunks exist
+  /// while `.part` is being merged, which is the same 2x bar that
+  /// [_downloadParallel] checks against. The old `_concurrentChunks + 1` (= 5x)
+  /// pre-flight refused downloads that would have completed — a 40-minute
+  /// 256kbps track asked for ~394MB free when ~154MB is enough.
+  @visibleForTesting
+  static int requiredPreflightBytes(YtmStream stream) =>
+      estimateBytes(stream) * 2 + (10 * 1024 * 1024);
+
+  /// Stamp value written beside a sequential `.part` so a resume can tell
+  /// whether those bytes came from the URL it is about to re-request (F6).
+  @visibleForTesting
+  static String resumeStampFor(Uri uri) => uri.toString().hashCode.toString();
+
+  /// Whether a `.part` carrying [stampContents] may be resumed against
+  /// [urlStamp]. Anything else — a different URL, a missing stamp, or a stamp
+  /// written by a build that did not write one — means the bytes on disk are
+  /// not known to line up with the body about to be requested.
+  @visibleForTesting
+  static bool resumeStampMatches(String? stampContents, String urlStamp) =>
+      stampContents != null && stampContents.trim() == urlStamp;
 
   /// How much life a URL needs left for this download to finish on it.
   ///
@@ -218,26 +292,53 @@ class YtDownloadService {
   /// search screen simply stopped when the user switched apps — the very moment
   /// a user expects a download to keep going.
   void _startForegroundService(String videoId, String title) {
-    _foregroundServiceRunning = true;
     _downloadChannel.invokeMethod('startDownloadForeground', {
       'videoId': videoId,
       'title': title,
-    }).catchError((_) => null);
+    }).then((ok) {
+      // F13: only claim foreground protection once the platform confirms it.
+      // The flag used to be raised before the call, so a degraded start
+      // (Android 12+ background-start refusal, Doze) left Dart believing the
+      // download was protected and it never retried — while every later
+      // progress publish went to a service that was not there.
+      if (ok == true) _foregroundServiceRunning = true;
+    }).catchError((_) {
+      _foregroundServiceRunning = false;
+      return null;
+    });
   }
 
   /// Tears the notification down once, when nothing is left to download.
   void _stopForegroundServiceIfIdle() {
     if (!_foregroundServiceRunning) return;
     if (_activeDownloads.isNotEmpty || _queue.isNotEmpty) return;
+    // A paused download is not idle: the notification must stay up so the user
+    // can resume it (C-7).
+    _pruneExpiredPausedMarkers();
+    if (_pausedVideoIds.isNotEmpty) return;
     _foregroundServiceRunning = false;
     _downloadChannel
         .invokeMethod('stopDownloadForeground')
         .catchError((_) => null);
   }
 
+  /// F8: every publish is a `startService(ACTION_UPDATE)` on the platform
+  /// channel and the transfer loops call this many times a second per download
+  /// — up to ~36 service starts a second with three concurrent transfers, each
+  /// one rebuilding the notification. Coalescing to 250ms keeps the visible
+  /// progress responsive at a fraction of the IPC cost. A terminal value is
+  /// always published so the notification cannot be left stale.
+  static const int _foregroundPublishMinIntervalMs = 250;
+  final Map<String, int> _lastForegroundPublishMs = {};
+
   void _publishForegroundProgress(
       String videoId, String title, double? fraction) {
     if (!_foregroundServiceRunning || fraction == null) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final last = _lastForegroundPublishMs[videoId] ?? 0;
+    final isTerminal = fraction >= 1.0;
+    if (!isTerminal && now - last < _foregroundPublishMinIntervalMs) return;
+    _lastForegroundPublishMs[videoId] = now;
     _downloadChannel.invokeMethod('updateDownloadProgress', {
       'videoId': videoId,
       'title': title,
@@ -357,9 +458,8 @@ class YtDownloadService {
         final freeBytes =
             await _downloadChannel.invokeMethod<int>('getFreeDiskSpace');
         if (freeBytes != null && freeBytes > 0) {
-          // FIX-A04: For parallel downloads the multiplier must be _concurrentChunks + 1
-          final requiredSpace =
-              estimateBytes(stream) * (_concurrentChunks + 1) + (10 * 1024 * 1024);
+          // F3: see [requiredPreflightBytes].
+          final requiredSpace = requiredPreflightBytes(stream);
           if (freeBytes < requiredSpace) {
             return const Left(
                 DownloadFailure('Insufficient storage space for download'));
@@ -367,7 +467,7 @@ class YtDownloadService {
         }
       } catch (_) {}
 
-      var ext = stream.container.isNotEmpty ? stream.container : 'm4a';
+      var ext = safeExtension(stream.container);
       temp = File(p.join(dir.path, 'ytdl_$videoId.$ext'));
 
       if (task.isCanceled || _canceledVideoIds.contains(videoId)) {
@@ -384,7 +484,14 @@ class YtDownloadService {
       void reportProgress(YtDownloadProgress p) {
         onProgress?.call(p);
         if (p.stage == YtDownloadStage.downloading) {
-          _publishForegroundProgress(videoId, song.title, p.fraction);
+          // F5: byte progress reaching 1.0 does NOT mean the job is finished —
+          // tagging, saving and indexing still run — and the foreground service
+          // treats `progress == 100` as "remove this job, and stop the service
+          // if it was the last one". Reporting 1.0 here tore the ongoing
+          // notification (and its Resume action) down a few hundred
+          // milliseconds early, so hold at 99 until the `done` stage.
+          final capped = p.fraction?.clamp(0.0, 0.99);
+          _publishForegroundProgress(videoId, song.title, capped);
         }
       }
 
@@ -429,12 +536,13 @@ class YtDownloadService {
       final sniffed = await _sniffContainer(temp);
       if (sniffed != null) {
         mimeType = sniffed.mime;
-        if (sniffed.ext != ext) {
+        final sniffedExt = safeExtension(sniffed.ext);
+        if (sniffedExt != ext) {
           ErrorLogger.addBreadcrumb(
               'Download container corrected: $ext → ${sniffed.ext}',
               category: 'download',
               data: {'videoId': videoId});
-          ext = sniffed.ext;
+          ext = sniffedExt;
           File? renamed;
           try {
             renamed =
@@ -500,6 +608,9 @@ class YtDownloadService {
                 'Downloaded file was not found in the library'));
           }
           onProgress?.call(const YtDownloadProgress(YtDownloadStage.done, 1));
+          // F5: the only place allowed to report a finished transfer to the
+          // foreground service, now that the byte progress is capped at 99.
+          _publishForegroundProgress(videoId, song.title, 1);
           ErrorLogger.addBreadcrumb('Download done: $videoId',
               category: 'download', data: {'newId': newId});
           return Right<AppFailure, int>(newId);
@@ -558,6 +669,7 @@ class YtDownloadService {
           }
         } catch (_) {}
       }
+      _lastForegroundPublishMs.remove(videoId);
     }
   }
 
@@ -576,6 +688,14 @@ class YtDownloadService {
         quality: quality, forceRefresh: forceRefresh);
     final resolved = native.withResolvedExpiry();
     _resolvedStreams[videoId] = resolved; // FIX-A05/C05: Store resolved stream for duration lookup
+    if (_resolvedStreams.length > _maxResolvedStreams) {
+      // F12: drop the oldest ids rather than growing for the process lifetime.
+      for (final id in _resolvedStreams.keys
+          .take(_resolvedStreams.length - _maxResolvedStreams)
+          .toList()) {
+        _resolvedStreams.remove(id);
+      }
+    }
     return resolved;
   }
 
@@ -1140,16 +1260,43 @@ class YtDownloadService {
   }) async {
     final stopwatch = Stopwatch()..start();
     final partFile = File('${dest.path}.part');
+    // F6: a `.part` is only resumable against the URL that wrote it. The
+    // parallel path pins its chunks with a `.parts` stamp precisely so a
+    // re-resolve that changed container cannot be merged in; this path had no
+    // such guard, so a stale partial could be appended with bytes from a
+    // different format at the same offsets and still satisfy the size check.
+    final stampFile = File('${dest.path}.part.stamp');
+    final urlStamp = resumeStampFor(uri);
     int resumeOffset = 0;
     try {
       if (await partFile.exists()) {
         resumeOffset = allowResume ? await partFile.length() : 0;
+        var stampMatches = false;
+        try {
+          if (await stampFile.exists()) {
+            stampMatches =
+                resumeStampMatches(await stampFile.readAsString(), urlStamp);
+          }
+        } catch (_) {}
+        if (resumeOffset > 0 && !stampMatches) {
+          // Written for a different URL, or by a build without the stamp:
+          // nothing in it is known to line up, so start over.
+          try {
+            await partFile.delete();
+          } catch (_) {}
+          resumeOffset = 0;
+        }
         // Keep resume only if meaningful (>64k) to avoid overhead for tiny partials
         if (resumeOffset < 64 * 1024) {
-          await partFile.delete();
+          try {
+            await partFile.delete();
+          } catch (_) {}
           resumeOffset = 0;
         }
       }
+      try {
+        await stampFile.writeAsString(urlStamp, flush: true);
+      } catch (_) {}
     } catch (_) {
       resumeOffset = 0;
     }
@@ -1330,6 +1477,11 @@ class YtDownloadService {
         await dest.delete();
       }
       await partFile.rename(dest.path);
+      try {
+        if (await stampFile.exists()) {
+          await stampFile.delete();
+        }
+      } catch (_) {}
     }
   }
 
@@ -1449,7 +1601,33 @@ class YtDownloadService {
         category: 'YTM');
   }
 
+  /// Audio container extensions this service is willing to name a file after.
+  static const Set<String> _allowedExtensions = {
+    'm4a',
+    'webm',
+    'opus',
+    'mp4',
+    'ogg',
+    'oga',
+    'mp3',
+    'flac',
+    'aac',
+  };
+
+  /// F11: [ext] arrives from the resolver and from byte sniffing and is then
+  /// interpolated straight into a file name, so it has to be a bare container
+  /// extension and nothing that could carry a path separator or a traversal
+  /// segment.
+  static String safeExtension(String? ext) {
+    final e = (ext ?? '').trim().toLowerCase();
+    if (e.isEmpty || e.contains('.') || e.contains('/') || e.contains('\\')) {
+      return 'm4a';
+    }
+    return _allowedExtensions.contains(e) ? e : 'm4a';
+  }
+
   static String sanitizeFilename(String artist, String title, String ext) {
+    ext = safeExtension(ext);
     var rawArtist = artist.trim();
     var rawTitle = title.trim();
     if (rawArtist.isEmpty) rawArtist = 'Unknown Artist';
@@ -1500,6 +1678,9 @@ class YtDownloadService {
         encoded = utf8.encode(base);
       }
     }
+    // F11: strip trailing dots/spaces — not a valid file-name tail on every
+    // target, and the shape a traversal attempt takes once separators are gone.
+    base = base.replaceAll(RegExp(r'[. ]+$'), '').trim();
     if (base.isEmpty) base = 'Track';
 
     return '$base.$ext';

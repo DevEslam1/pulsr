@@ -22,7 +22,7 @@
             android:layout_height="88dp"
             android:scaleType="centerCrop"
             android:src="@mipmap/launcher_icon"
-            android:contentDescription="Album Artwork" />
+            android:contentDescription="@string/widget_album_artwork" />
 
         <!-- Track Title, Artist, Album -->
         <LinearLayout
@@ -38,7 +38,7 @@
                 android:id="@+id/widget_title"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Pulsr Music"
+                android:text="@string/app_name"
                 android:textColor="#FFFFFF"
                 android:textSize="17sp"
                 android:textStyle="bold"
@@ -51,7 +51,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="3dp"
-                android:text="Nothing playing"
+                android:text="@string/widget_nothing_playing"
                 android:textColor="#A3ABB8"
                 android:textSize="13.5sp"
                 android:fontFamily="sans-serif"
@@ -80,7 +80,7 @@
             android:padding="8.5dp"
             android:background="@drawable/widget_secondary_button_background"
             android:src="@drawable/ic_widget_heart"
-            android:contentDescription="Toggle Favorite" />
+            android:contentDescription="@string/widget_toggle_favorite" />
     </LinearLayout>
 
     <!-- Interactive Track Slider & High Precision Touch Zones -->
@@ -166,7 +166,7 @@
             android:padding="8.5dp"
             android:background="@drawable/widget_secondary_button_background"
             android:src="@drawable/ic_widget_shuffle"
-            android:contentDescription="Shuffle" />
+            android:contentDescription="@string/widget_shuffle" />
 
         <TextView
             android:layout_width="0dp"
@@ -180,7 +180,7 @@
             android:padding="8.5dp"
             android:background="@drawable/widget_secondary_button_background"
             android:src="@drawable/ic_widget_skip_prev"
-            android:contentDescription="Previous" />
+            android:contentDescription="@string/widget_previous" />
 
         <TextView
             android:layout_width="0dp"
@@ -194,7 +194,7 @@
             android:padding="8dp"
             android:background="@drawable/widget_secondary_button_background"
             android:src="@drawable/ic_widget_rewind"
-            android:contentDescription="Rewind 10s" />
+            android:contentDescription="@string/widget_rewind_10s" />
 
         <TextView
             android:layout_width="0dp"
@@ -208,7 +208,7 @@
             android:padding="14dp"
             android:background="@drawable/widget_play_button_background"
             android:src="@drawable/ic_widget_play"
-            android:contentDescription="Play/Pause" />
+            android:contentDescription="@string/widget_play_pause" />
 
         <TextView
             android:layout_width="0dp"
@@ -222,7 +222,7 @@
             android:padding="8dp"
             android:background="@drawable/widget_secondary_button_background"
             android:src="@drawable/ic_widget_forward"
-            android:contentDescription="Forward 10s" />
+            android:contentDescription="@string/widget_forward_10s" />
 
         <TextView
             android:layout_width="0dp"
@@ -236,7 +236,7 @@
             android:padding="8.5dp"
             android:background="@drawable/widget_secondary_button_background"
             android:src="@drawable/ic_widget_skip_next"
-            android:contentDescription="Next" />
+            android:contentDescription="@string/widget_next" />
 
         <TextView
             android:layout_width="0dp"
@@ -250,7 +250,7 @@
             android:padding="8.5dp"
             android:background="@drawable/widget_secondary_button_background"
             android:src="@drawable/ic_widget_repeat"
-            android:contentDescription="Repeat" />
+            android:contentDescription="@string/widget_repeat" />
     </LinearLayout>
 
     <!-- Up Next Queue Card Section (Fills remaining height smoothly) -->
@@ -275,13 +275,13 @@
                 android:layout_width="14dp"
                 android:layout_height="14dp"
                 android:src="@drawable/ic_widget_queue"
-                android:contentDescription="Queue Icon" />
+                android:contentDescription="@string/widget_queue_icon" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
-                android:text="UP NEXT"
+                android:text="@string/widget_up_next"
                 android:textColor="#FF3358"
                 android:textSize="10.5sp"
                 android:textStyle="bold"
@@ -294,7 +294,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:text="No upcoming tracks"
+            android:text="@string/widget_no_upcoming_tracks"
             android:textColor="#FFFFFF"
             android:textSize="12.5sp"
             android:textStyle="bold"

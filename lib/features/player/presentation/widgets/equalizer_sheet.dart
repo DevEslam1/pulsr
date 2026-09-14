@@ -111,6 +111,13 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   final HeadphoneProfilesRepository _headphoneRepo =
       HeadphoneProfilesRepository();
 
+  /// AutoEq and Spatial & DSP are intentionally not exposed in the Equalizer
+  /// dialog: headphone correction is applied automatically by Smart Audio and
+  /// the advanced DSP stages live in Settings (Professional mode). Kept as a
+  /// runtime flag (not const) so the tab code stays referenced and can be
+  /// surfaced again without being shown today.
+  static final bool _advancedTabsEnabled = false;
+
   StreamSubscription<int>? _degradedSessionSub;
   bool _degradeSnackQueued = false;
 
@@ -1399,74 +1406,68 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       _buildHardwareDeviceProfileBar(context, cubit, state, p),
                       const SizedBox(height: 8),
 
-                      // Tabs Navigation + Content. In Normal experience mode only
-                      // the core Equalizer is shown; AutoEq and Spatial & DSP are
-                      // Professional surfaces.
-                      Builder(builder: (ctx) {
-                        var isPro = true;
-                        try {
-                          isPro = ctx.select<SettingsCubit, bool>(
-                              (c) => c.state.isProfessional);
-                        } catch (_) {
-                          isPro = true;
-                        }
-                        return Expanded(
-                          child: Column(
-                            children: [
-                              if (isPro)
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16),
-                                  child: Container(
-                                    height: 38,
-                                    decoration: BoxDecoration(
-                                      color: p.surfaceContainer,
+                      // The AutoEq and Spatial & DSP tabs are intentionally not
+                      // exposed in the Equalizer dialog. Headphone correction is
+                      // applied automatically by Smart Audio and the advanced DSP
+                      // stages live in Settings (Professional mode).
+                      Expanded(
+                        child: Column(
+                          children: [
+                            if (_advancedTabsEnabled)
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 16),
+                                child: Container(
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: p.surfaceContainer,
+                                    borderRadius: BorderRadius.circular(19),
+                                    border: Border.all(color: p.hairline),
+                                  ),
+                                  child: TabBar(
+                                    controller: _tabController,
+                                    tabAlignment: TabAlignment.fill,
+                                    indicator: BoxDecoration(
+                                      color: p.accent,
                                       borderRadius: BorderRadius.circular(19),
-                                      border: Border.all(color: p.hairline),
                                     ),
-                                    child: TabBar(
-                                      controller: _tabController,
-                                      tabAlignment: TabAlignment.fill,
-                                      indicator: BoxDecoration(
-                                        color: p.accent,
-                                        borderRadius: BorderRadius.circular(19),
-                                      ),
-                                      indicatorSize: TabBarIndicatorSize.tab,
-                                      labelColor: p.onAccent,
-                                      unselectedLabelColor: p.textSecondary,
-                                      labelStyle: const TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 12),
-                                      dividerColor: Colors.transparent,
-                                      tabs: const [
-                                        Tab(text: 'Equalizer'),
-                                        Tab(text: 'AutoEq'),
-                                        Tab(text: 'Spatial & DSP'),
-                                      ],
-                                    ),
+                                    indicatorSize: TabBarIndicatorSize.tab,
+                                    labelColor: p.onAccent,
+                                    unselectedLabelColor: p.textSecondary,
+                                    labelStyle: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 12),
+                                    dividerColor: Colors.transparent,
+                                    tabs: const [
+                                      Tab(text: 'Equalizer'),
+                                      Tab(text: 'AutoEq'),
+                                      Tab(text: 'Spatial & DSP'),
+                                    ],
                                   ),
                                 ),
-                              const SizedBox(height: 8),
-                              Expanded(
-                                child: isPro
-                                    ? TabBarView(
-                                        controller: _tabController,
-                                        children: [
-                                          _buildEqualizerTab(
-                                              context, cubit, state, p),
-                                          _buildAutoEqTab(
-                                              context, cubit, state, p),
-                                          _buildSpatialDynamicsTab(
-                                              context, cubit, state, p),
-                                        ],
-                                      )
-                                    : _buildEqualizerTab(
-                                        context, cubit, state, p),
                               ),
-                            ],
-                          ),
-                        );
-                      }),
+                            const SizedBox(height: 8),
+                            Expanded(
+                              child: _advancedTabsEnabled
+                                  ? TabBarView(
+                                      controller: _tabController,
+                                      physics:
+                                          const NeverScrollableScrollPhysics(),
+                                      children: [
+                                        _buildEqualizerTab(
+                                            context, cubit, state, p),
+                                        _buildAutoEqTab(
+                                            context, cubit, state, p),
+                                        _buildSpatialDynamicsTab(
+                                            context, cubit, state, p),
+                                      ],
+                                    )
+                                  : _buildEqualizerTab(
+                                      context, cubit, state, p),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -1686,6 +1687,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     ],
                   ),
                 ),
+                if (_advancedTabsEnabled) ...[
                 const SizedBox(width: 8),
 
                 // AutoEQ Online Search
@@ -1915,6 +1917,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     );
                   },
                 ),
+                ],
               ],
             ),
           ),

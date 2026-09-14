@@ -101,15 +101,21 @@ class StreamResolutionPipeline {
       // the native chain load for a verdict that is already known.
       final YtmStream stream = (hedgedEnabled && !ytmService.isBotCoolingDown)
           ? await HedgedStreamResolver.raceDuplicate<YtmStream>(doResolve,
-              hedgeDelay: const Duration(milliseconds: 300))
+              hedgeDelay: const Duration(milliseconds: 300),
+              timeout: const Duration(seconds: 25))
           : await doResolve();
       if (stream.url.trim().isEmpty) {
         throw const YtmException('YTM_UNAVAILABLE', 'Resolved stream URL is empty');
       }
 
-      final expireParam = Uri.tryParse(stream.url)?.queryParameters['expire'];
-      final expires = expireParam != null
-          ? DateTime.fromMillisecondsSinceEpoch(int.parse(expireParam) * 1000)
+      // F4: one expiry parser, not a second one. `int.parse` on a malformed or
+      // out-of-range `expire` threw straight out of the resolver — surfacing as
+      // "resolution failed" for a URL that was perfectly fine — and only the
+      // `?expire=` query form was read, while `YtmStream.expiryFromUrl` handles
+      // both that and the `/expire/<epoch>/` path form without throwing.
+      final stamp = YtmStream.expiryFromUrl(stream.url);
+      final expires = stamp != null
+          ? DateTime.fromMillisecondsSinceEpoch(stamp)
           : DateTime.now().add(const Duration(hours: 5));
 
       _streamCache[cacheKey] = CachedStreamUrl(

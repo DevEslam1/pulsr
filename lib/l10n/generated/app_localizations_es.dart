@@ -1440,66 +1440,66 @@ class AppLocalizationsEs extends AppLocalizations {
   String get profileDropdownLabel => 'Perfil';
 
   @override
-  String get smartAudioTitle => 'Smart Audio';
+  String get smartAudioTitle => 'Audio inteligente';
 
   @override
   String get smartAudioSubtitle =>
-      'Automatically tune the sound to your headphones and track';
+      'Ajusta el sonido automáticamente a tus auriculares y a cada pista';
 
   @override
-  String get smartAudioModeLabel => 'Mode';
+  String get smartAudioModeLabel => 'Modo';
 
   @override
-  String get smartAudioAuto => 'Auto';
+  String get smartAudioAuto => 'Automático';
 
   @override
   String get smartAudioManual => 'Manual';
 
   @override
   String get smartAudioAutoDesc =>
-      'Detect the connected headphones, apply the matching AutoEQ correction, and use the highest output quality the device supports';
+      'Detecta los auriculares conectados, aplica la corrección AutoEQ correspondiente y usa la máxima calidad que admita el dispositivo';
 
   @override
   String get smartAudioManualDesc =>
-      'Keep your EQ, effects and output quality exactly as you set them';
+      'Mantiene tu ecualizador, efectos y calidad de salida tal como los configuraste';
 
   @override
   String smartAudioDetectedDevice(String device) {
-    return 'Current output: $device';
+    return 'Salida actual: $device';
   }
 
   @override
   String smartAudioMatchedProfile(String profile) {
-    return 'Matched correction: $profile';
+    return 'Corrección aplicada: $profile';
   }
 
   @override
   String get smartAudioNoMatch =>
-      'No headphone correction matched for this device';
+      'No hay corrección de auriculares para este dispositivo';
 
   @override
   String get smartAudioAutoCatchAllHint =>
-      'Auto only adjusts sound when it recognises your headphones or a manual device profile; your choices are never overwritten in Manual mode';
+      'El modo automático solo ajusta el sonido cuando reconoce tus auriculares o un perfil de dispositivo guardado; tus ajustes nunca se sobrescriben en modo manual';
 
   @override
-  String get experienceModeTitle => 'Experience Mode';
+  String get experienceModeTitle => 'Modo de uso';
 
   @override
-  String get experienceModeSubtitle => 'Choose how much control you want';
+  String get experienceModeSubtitle => 'Elige cuánto control quieres';
 
   @override
   String get experienceModeNormal => 'Normal';
 
   @override
-  String get experienceModeProfessional => 'Professional';
+  String get experienceModeProfessional => 'Profesional';
 
   @override
   String get experienceModeNormalDesc =>
-      'Smart and simple — Pulsr tunes the sound to your headphones and picks the best quality automatically';
+      'Inteligente y sencillo: Pulsr ajusta el sonido a tus auriculares y elige la mejor calidad automáticamente';
 
   @override
   String get experienceModeProfessionalDesc =>
-      'Full control over every DSP stage, output format and diagnostic option';
+      'Control total sobre cada etapa de DSP, formato de salida y opción de diagnóstico';
 
   @override
   String get undo => 'Deshacer';
@@ -2025,4 +2025,105 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get dsdOutputDop => 'DoP';
+
+  @override
+  String get enableShuffle => 'Activar aleatorio';
+
+  @override
+  String get disableShuffle => 'Desactivar aleatorio';
+
+  @override
+  String get like => 'Me gusta';
+
+  @override
+  String get unlike => 'Quitar me gusta';
+
+  @override
+  String get mute => 'Silenciar';
+
+  @override
+  String get unmute => 'Activar sonido';
+
+  @override
+  String get volume => 'Volumen';
+
+  @override
+  String get audioOutputAndDac => 'Salida de audio y DAC';
+
+  @override
+  String get toggleSideQueue => 'Mostrar u ocultar la cola lateral';
+
+  @override
+  String get fullscreenPlayer => 'Reproductor a pantalla completa';
+
+  @override
+  String nowPlayingSemantics(String title, String artist) {
+    return 'Reproduciendo: $title de $artist';
+  }
+
+  @override
+  String resumeFromPrompt(String time) {
+    return '¿Reanudar desde $time?';
+  }
+
+  @override
+  String setLoopPointA(String time) {
+    return 'Establecer punto de bucle A ($time)';
+  }
+
+  @override
+  String setLoopPointB(String time) {
+    return 'Establecer punto de bucle B ($time)';
+  }
+
+  @override
+  String get enableAbLoop => 'Activar bucle A-B';
+
+  @override
+  String get disableAbLoop => 'Desactivar bucle A-B';
+
+  @override
+  String get clearAbLoop => 'Borrar bucle A-B';
+
+  @override
+  String audioDelayTooltip(int ms) {
+    return 'Retardo de audio ($ms ms)';
+  }
+
+  @override
+  String audioDelayMsLabel(int ms) {
+    return 'Retardo de audio: $ms ms';
+  }
+
+  @override
+  String get audioDelayHelp =>
+      'Los valores positivos retrasan el audio (p. ej., Bluetooth o vídeo lento).';
+
+  @override
+  String get themeExported => 'Tema exportado a la hoja de compartir';
+
+  @override
+  String get themeExportFailed => 'No se pudo exportar el tema';
+
+  @override
+  String get themeImportFailed => 'Error al analizar el JSON del tema';
+
+  @override
+  String get themeApplied => '¡Tema personalizado aplicado!';
+
+  @override
+  String get invalidThemeJson => 'Formato JSON del tema no válido';
+
+  @override
+  String get notificationPermissionTitle => 'Mostrar controles de reproducción';
+
+  @override
+  String get notificationPermissionRationale =>
+      'Permite las notificaciones para que Pulsr muestre los controles de reproducción en la pantalla de bloqueo y en el panel de notificaciones.';
+
+  @override
+  String get notificationPermissionAllow => 'Permitir';
+
+  @override
+  String get notificationPermissionNotNow => 'Ahora no';
 }

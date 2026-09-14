@@ -375,8 +375,8 @@ void main() {
       expect(inactiveVolumes.last, closeTo(1.0, 1e-9));
     });
 
-    test('native path arms per-sample curves on both players and steps no '
-        'volumes', () async {
+    test('native outgoing ramp is armed per-sample while the incoming player '
+        'is stepped (no full-volume buffer leak)', () async {
       final curvesArmed = <MockAudioPlayer, List<double>>{};
       when(() => mockPlayerA.dspSetGainCurve(any(),
           segmentMs: any(named: 'segmentMs'))).thenAnswer((inv) async {
@@ -391,6 +391,15 @@ void main() {
         return true;
       });
 
+      final outgoingVolumes = <double>[];
+      final incomingVolumes = <double>[];
+      when(() => mockPlayerA.setVolume(any())).thenAnswer((inv) async {
+        outgoingVolumes.add(inv.positionalArguments[0] as double);
+      });
+      when(() => mockPlayerB.setVolume(any())).thenAnswer((inv) async {
+        incomingVolumes.add(inv.positionalArguments[0] as double);
+      });
+
       crossfadeManager.curve = CrossfadeCurve.equalPower;
       final fadeId = crossfadeManager.nextFadeId();
       await crossfadeManager.crossfadeVolumes(
@@ -402,17 +411,27 @@ void main() {
         fadeId: fadeId,
       );
 
+      // Only the outgoing player is armed with a native curve. The incoming
+      // player is never armed: pinning its base volume at the target while a
+      // native multiplier ramps from 0 leaks an already-buffered full-gain
+      // buffer the moment the base is raised.
       final oldCurve = curvesArmed[mockPlayerA]!;
-      final newCurve = curvesArmed[mockPlayerB]!;
+      expect(curvesArmed.containsKey(mockPlayerB), isFalse);
       expect(oldCurve.first, closeTo(1.0, 1e-9));
       expect(oldCurve.last, closeTo(0.0, 1e-9));
-      expect(newCurve.first, closeTo(0.0, 1e-9));
-      expect(newCurve.last, closeTo(1.0, 1e-9));
 
-      // Native ramp: base volumes are pinned, not stepped. The incoming
-      // player gets exactly its target once during the fade, then the exact
-      // endpoint write; the outgoing player only gets the final 0.0.
-      verify(() => mockPlayerB.setVolume(0.8)).called(2);
+      // Incoming is stepped from near silence up to exactly its target, and
+      // never jumps to the target early.
+      expect(incomingVolumes, isNotEmpty);
+      expect(incomingVolumes.first, lessThan(0.4));
+      expect(incomingVolumes.last, closeTo(0.8, 1e-9));
+      for (var i = 1; i < incomingVolumes.length; i++) {
+        expect(incomingVolumes[i], greaterThanOrEqualTo(incomingVolumes[i - 1]));
+      }
+      expect(incomingVolumes.every((v) => v <= 0.8 + 1e-9), isTrue);
+
+      // Outgoing keeps its base volume during the armed ramp; only the final
+      // exact endpoint write (0.0) is sent.
       verify(() => mockPlayerA.setVolume(0.0)).called(1);
       verifyNever(() => mockPlayerA.setVolume(
           any(that: inInclusiveRange(0.001, 0.999))));

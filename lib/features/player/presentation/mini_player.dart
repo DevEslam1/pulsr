@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -34,7 +36,16 @@ class _MiniPlayerState extends State<MiniPlayer> {
   PageController? _pageController;
   int _lastKnownIndex = -1;
   bool _isUserDragging = false;
+  bool _swipeInFlight = false;
   double _verticalDragDy = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Created eagerly so the PageView is always driven by this controller and
+    // synchronisation never has to run inside build (A-9).
+    _pageController = PageController();
+  }
 
   @override
   void dispose() {
@@ -43,23 +54,43 @@ class _MiniPlayerState extends State<MiniPlayer> {
   }
 
   void _syncPageController(int targetIndex, int queueLength) {
-    if (queueLength == 0) return;
+    final controller = _pageController;
+    if (queueLength == 0 || controller == null) return;
     final safeIndex = targetIndex.clamp(0, queueLength - 1);
-    if (_pageController == null) {
+    // Never fight an in-progress user gesture; the page-change handler releases
+    // the latch once the skip it triggered has completed.
+    if (_isUserDragging) return;
+    if (_lastKnownIndex != safeIndex) {
       _lastKnownIndex = safeIndex;
-      _pageController = PageController(initialPage: safeIndex);
-    } else if (!_isUserDragging && _lastKnownIndex != safeIndex) {
-      _lastKnownIndex = safeIndex;
-      if (_pageController!.hasClients &&
-          _pageController!.page?.round() != safeIndex) {
-        _pageController!.jumpToPage(safeIndex);
+      if (controller.hasClients && controller.page?.round() != safeIndex) {
+        controller.jumpToPage(safeIndex);
       }
     }
   }
 
+  /// A swipe landed on [page]: latch the intent and release it only after the
+  /// skip has actually been applied, so a notification that arrives mid-skip
+  /// (e.g. ScrollEnd before the state update) can no longer snap the carousel
+  /// back to the old track.
+  Future<void> _completeSwipe(int page, PlayerCubit cubit) async {
+    try {
+      await cubit.skipToQueueItem(page);
+    } catch (_) {
+      // Failure is already surfaced by PlayerCubit; just release the latch.
+    }
+    if (!mounted) return;
+    setState(() {
+      _isUserDragging = false;
+      _swipeInFlight = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final settingsState = context.watch<SettingsCubit>().state;
+    // Narrow subscription: only the vinyl theme decision is read here, so an
+    // unrelated settings change must not rebuild the mini player (A-11).
+    final playerThemeMode = context
+        .select<SettingsCubit, PlayerThemeMode>((c) => c.state.playerThemeMode);
     final p = context.palette;
 
     return BlocBuilder<PlayerCubit, PlayerState>(
@@ -81,10 +112,14 @@ class _MiniPlayerState extends State<MiniPlayer> {
         final queue = state.queue.isNotEmpty ? state.queue : [song];
         final currentIndex = state.currentIndex.clamp(0, queue.length - 1);
 
-        _syncPageController(currentIndex, queue.length);
+        // Page synchronisation must not run during build: defer the jump to the
+        // end of the frame, after the PageView has laid out (A-9).
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _syncPageController(currentIndex, queue.length);
+        });
 
         return Semantics(
-          label: 'Now playing: ${song.title} by ${song.artist}',
+          label: context.l10n.nowPlayingSemantics(song.title, song.artist),
           button: true,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
@@ -108,7 +143,10 @@ class _MiniPlayerState extends State<MiniPlayer> {
               _verticalDragDy = 0.0;
             },
             child: Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(12, 4, 12, 8),
+              // Outer bottom padding + the row's bottom padding are reduced in
+              // step with the taller seek hit area below so the mini player's
+              // intrinsic height (and the dock's stacked geometry) is unchanged.
+              padding: const EdgeInsetsDirectional.fromSTEB(12, 4, 12, 2.5),
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: AppRadii.miniPlayerRadius,
@@ -148,7 +186,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                         Directionality(
                           textDirection: TextDirection.ltr,
                           child: Padding(
-                            padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+                            padding: const EdgeInsets.fromLTRB(10, 8, 8, 0),
                             child: Row(
                               children: [
                                 // Interactive Swipeable Track Info Carousel
@@ -157,11 +195,21 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                     height: 52,
                                     child: NotificationListener<ScrollNotification>(
                                       onNotification: (notification) {
-                                        if (notification is UserScrollNotification) {
-                                          _isUserDragging = notification.direction !=
-                                              ScrollDirection.idle;
+                                        if (notification is ScrollStartNotification &&
+                                            notification.dragDetails != null) {
+                                          // Latch the swipe intent at drag start.
+                                          _isUserDragging = true;
+                                          _swipeInFlight = false;
+                                        } else if (notification is UserScrollNotification) {
+                                          _isUserDragging =
+                                              notification.direction != ScrollDirection.idle;
                                         } else if (notification is ScrollEndNotification) {
-                                          _isUserDragging = false;
+                                          // Only release immediately when no skip is
+                                          // pending; otherwise the page-change handler
+                                          // releases it after the skip completes.
+                                          if (!_swipeInFlight) {
+                                            _isUserDragging = false;
+                                          }
                                         }
                                         return false;
                                       },
@@ -173,7 +221,8 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                           if (_isUserDragging &&
                                               page != currentIndex) {
                                             _lastKnownIndex = page;
-                                            cubit.skipToQueueItem(page);
+                                            _swipeInFlight = true;
+                                            unawaited(_completeSwipe(page, cubit));
                                           }
                                         },
                                       itemBuilder: (context, index) {
@@ -186,8 +235,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                           child: Row(
                                             children: [
                                               // Artwork or Vinyl Disc
-                                              if (settingsState
-                                                      .playerThemeMode ==
+                                              if (playerThemeMode ==
                                                   PlayerThemeMode.vinyl)
                                                 SpinningVinylDisc(
                                                   id: item.id,
@@ -382,42 +430,52 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar> {
                 onHorizontalDragCancel: () {
                   setState(() => _dragProgress = null);
                 },
+                // 18px-tall hit area so the thin 4.5px progress bar is actually
+                // grabbable; the visual track stays centered and thin.
                 child: SizedBox(
-                  height: 4.5,
+                  height: 18,
                   width: double.infinity,
-                  child: Stack(
-                    alignment: Alignment.centerLeft,
-                    children: [
-                      Positioned.fill(
-                        child: ColoredBox(
-                            color: widget.hairlineColor.withValues(alpha: 0.35)),
-                      ),
-                      Align(
+                  child: Center(
+                    child: SizedBox(
+                      height: 4.5,
+                      width: double.infinity,
+                      child: Stack(
                         alignment: Alignment.centerLeft,
-                        child: FractionallySizedBox(
-                          widthFactor: progress,
-                          alignment: Alignment.centerLeft,
-                          child: Container(
-                            height: 4.5,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  widget.activeAccent.withValues(alpha: 0.7),
-                                  widget.activeAccent,
-                                ],
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: widget.activeAccent
-                                      .withValues(alpha: 0.45),
-                                  blurRadius: 4,
+                        children: [
+                          Positioned.fill(
+                            child: ColoredBox(
+                                color: widget.hairlineColor
+                                    .withValues(alpha: 0.35)),
+                          ),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: FractionallySizedBox(
+                              widthFactor: progress,
+                              alignment: Alignment.centerLeft,
+                              child: Container(
+                                height: 4.5,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      widget.activeAccent
+                                          .withValues(alpha: 0.7),
+                                      widget.activeAccent,
+                                    ],
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: widget.activeAccent
+                                          .withValues(alpha: 0.45),
+                                      blurRadius: 4,
+                                    ),
+                                  ],
                                 ),
-                              ],
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               );

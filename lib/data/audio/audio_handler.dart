@@ -33,6 +33,7 @@ import 'artwork_uri_resolver.dart';
 import 'audio_effects_channel.dart';
 import 'audio_session_id_router.dart';
 import 'crossfade_manager.dart';
+import 'interruption_state_machine.dart';
 import 'equalizer_manager.dart';
 import 'sleep_timer_manager.dart';
 import 'ytm_resolving_source.dart';
@@ -74,26 +75,56 @@ class PulsrAudioHandler extends BaseAudioHandler
   @factoryMethod
   static Future<PulsrAudioHandler> create(
       IMusicRepository repository, YtmService ytmService) async {
+    // The instance is captured so that if AudioService.init times out we can
+    // reuse the very instance its builder produced. A late completion of the
+    // in-flight init then binds THIS handler instead of creating and binding a
+    // second, state-less one (B-2).
+    PulsrAudioHandler? built;
+    // If the platform handshake times out before `builder` runs, this holds the
+    // degraded-mode instance the app has already fallen back to. The builder
+    // adopts it instead of constructing a second, unbound handler, so a late
+    // init success binds the very instance the UI drives (B-2/B-6).
+    PulsrAudioHandler? fallback;
+    final initFuture = AudioService.init(
+      builder: () {
+        built = fallback ?? PulsrAudioHandler(repository, ytmService);
+        return built!;
+      },
+      // The channel name stays English on purpose (C-6): the config is a const
+      // evaluated while dependencies are still being constructed, before any
+      // SettingsCubit / MaterialApp has resolved the *app-selected* locale — the
+      // platform locale alone would mislabel the channel for users who picked a
+      // different language than the system one, and Android only applies a
+      // channel's name when the channel is first created, so a later re-resolve
+      // could not fix it anyway.
+      config: const AudioServiceConfig(
+        androidNotificationChannelId: 'com.pulsr.music.audio',
+        androidNotificationChannelName: 'Pulsr Audio Playback',
+        androidNotificationChannelDescription:
+            'Playback controls and now-playing information for Pulsr Music.',
+        androidNotificationOngoing: true,
+        androidNotificationClickStartsActivity: true,
+        androidStopForegroundOnPause: true,
+        androidResumeOnClick: true,
+        androidNotificationIcon: 'drawable/ic_notification',
+      ),
+    );
     try {
-      return await AudioService.init(
-        builder: () => PulsrAudioHandler(repository, ytmService),
-        config: const AudioServiceConfig(
-          androidNotificationChannelId: 'com.pulsr.music.audio',
-          androidNotificationChannelName: 'Pulsr Audio Playback',
-          androidNotificationOngoing: true,
-          androidNotificationClickStartsActivity: true,
-          androidStopForegroundOnPause: true,
-          androidResumeOnClick: true,
-          androidNotificationIcon: 'drawable/ic_notification',
-        ),
-      ).timeout(const Duration(seconds: 10));
+      return await initFuture.timeout(const Duration(seconds: 10));
     } catch (e, st) {
       ErrorLogger.log(
-          'AudioService.init failed or timed out, returning standalone handler',
+          'AudioService.init failed or timed out: running in degraded audio '
+          'mode (playback works, but there is no media notification / '
+          'foreground service)',
           error: e,
           stackTrace: st,
           category: 'AudioHandler');
-      return PulsrAudioHandler(repository, ytmService);
+      // Fall back to the instance the builder created (if it got that far);
+      // otherwise adopt this one so a late init success binds the same handler
+      // the app is already using instead of orphaning it (B-2/B-6).
+      fallback = built ?? PulsrAudioHandler(repository, ytmService);
+      fallback.platformBridgeDegraded.value = true;
+      return fallback;
     }
   }
 
@@ -128,8 +159,9 @@ class PulsrAudioHandler extends BaseAudioHandler
   double? _preDuckInactiveVolume;
   // ignore: unused_field, prefer_final_fields
   bool _duckActive = false;
-  // ignore: unused_field, prefer_final_fields
-  bool _pauseInterruptionActive = false;
+  /// Pure, testable interruption bookkeeping (B-1). Replaces the previous pair
+  /// of loose booleans whose begin/end bookkeeping was asymmetric.
+  final InterruptionStateMachine _interruption = InterruptionStateMachine();
   // ignore: unused_field
   DateTime? _lastNoisyTime;
   int _consecutiveFailures = 0;
@@ -141,7 +173,6 @@ class PulsrAudioHandler extends BaseAudioHandler
   // this debounce collapses the duplicate. See [_notifySleepTrackCompleted].
   DateTime? _lastSleepTrackCompletedAt;
   final List<int> _shuffleHistory = [];
-  bool _wasPlayingBeforeInterruption = false;
   DateTime? _lastPreviousTapTime;
   bool _isManualSkip = false;
 
@@ -366,6 +397,12 @@ class PulsrAudioHandler extends BaseAudioHandler
   StreamPreResolver get streamPreResolver => _streamPreResolver;
   PlaybackVolumeController get volumeController => _volumeController;
   StreamResolutionPipeline get streamResolutionPipeline => _streamResolutionPipeline;
+
+  /// Observable degraded-mode flag (B-2): true when [AudioService.init] failed
+  /// or timed out, so playback runs without a platform media bridge (no
+  /// notification / mediaPlayback foreground service). The UI can read this to
+  /// surface the condition; it is never set on a healthy start-up.
+  final ValueNotifier<bool> platformBridgeDegraded = ValueNotifier<bool>(false);
 
   /// Mirrors the cached output route's Bluetooth flag into the effects layer.
   /// Synchronous (uses the HiResAudioService cache) so a route-change resync
@@ -878,23 +915,32 @@ class PulsrAudioHandler extends BaseAudioHandler
   }
 
   Future<void> saveCurrentPositionImmediate() async {
-    _positionDirty = false;
-    if (_songs.isNotEmpty &&
+    final hasPosition = _songs.isNotEmpty &&
         _currentIndex >= 0 &&
-        _currentIndex < _songs.length) {
-      final currentSong = _songs[_currentIndex];
-      final posMs = _activePlayer.position.inMilliseconds;
-      try {
-        await _repository.updateLastPosition(currentSong.id, posMs);
-        if (_queueDirty) {
-          await _repository.saveQueue(
-              _songs.map((s) => s.id).toList(), _currentIndex, posMs);
-          _queueDirty = false;
-        }
-      } catch (e, st) {
-        ErrorLogger.log('Failed to save current position',
-            error: e, stackTrace: st, category: 'AudioHandler');
+        _currentIndex < _songs.length;
+    if (!hasPosition) {
+      // Nothing to write; clear so the periodic timer does not spin.
+      _positionDirty = false;
+      return;
+    }
+    final currentSong = _songs[_currentIndex];
+    final posMs = _activePlayer.position.inMilliseconds;
+    try {
+      await _repository.updateLastPosition(currentSong.id, posMs);
+      if (_queueDirty) {
+        await _repository.saveQueue(
+            _songs.map((s) => s.id).toList(), _currentIndex, posMs);
+        _queueDirty = false;
       }
+      // Only clear AFTER a successful write: clearing first meant a failed
+      // write was never retried and resume-after-kill could restore a stale
+      // position (B-4).
+      _positionDirty = false;
+    } catch (e, st) {
+      // Re-dirty so the periodic timer (and a later app pause) retries.
+      _positionDirty = true;
+      ErrorLogger.log('Failed to save current position',
+          error: e, stackTrace: st, category: 'AudioHandler');
     }
   }
 
@@ -1105,7 +1151,10 @@ class PulsrAudioHandler extends BaseAudioHandler
         player.playerStateStream.listen(
           (state) async {
             if (isTargetActive()) {
-              _broadcastState(player.playbackEvent);
+              // Broadcast is driven solely by the playbackEventStream listener
+              // above (C-5): playerStateStream is derived from the same event
+              // stream, so broadcasting here serialised every transition to the
+              // platform twice per state change.
               // Gapless loop-all support
               if (_gaplessMode &&
                   state.processingState == ProcessingState.completed &&
@@ -1332,9 +1381,12 @@ class PulsrAudioHandler extends BaseAudioHandler
                 // F7: ducking behavior is user-controllable (duck/pause/ignore).
                 if (duckingController.shouldIgnore) break;
                 if (duckingController.shouldPause) {
-                  if (!_pauseInterruptionActive) {
-                    _wasPlayingBeforeInterruption = _activePlayer.playing;
-                    _pauseInterruptionActive = true;
+                  _interruption.begin(InterruptionKind.duck,
+                      playing: _activePlayer.playing);
+                  if (_crossfadeManager.isCrossfading) {
+                    await _crossfadeManager.cancel(
+                        _inactivePlayer, _activePlayer,
+                        restoreVolume: _preCrossfadeVolume ?? _volume);
                   }
                   await _activePlayer.pause();
                   break;
@@ -1360,11 +1412,9 @@ class PulsrAudioHandler extends BaseAudioHandler
                     .recordInterruption(AudioInterruptionKind.pause));
                 // Stack-safe: keep the original pre-interruption state so an
                 // overlapping duck + call doesn't lose the resume decision.
-                if (!_pauseInterruptionActive) {
-                  _wasPlayingBeforeInterruption = _activePlayer.playing;
-                  _pauseInterruptionActive = true;
-                }
-                if (_wasPlayingBeforeInterruption) {
+                _interruption.begin(InterruptionKind.pause,
+                    playing: _activePlayer.playing);
+                if (_interruption.wasPlayingBeforeInterruption) {
                   if (_crossfadeManager.isCrossfading) {
                     await _crossfadeManager.cancel(
                         _inactivePlayer, _activePlayer,
@@ -1377,11 +1427,9 @@ class PulsrAudioHandler extends BaseAudioHandler
                 unawaited(AudioSessionLog.instance
                     .recordInterruption(AudioInterruptionKind.unknown));
                 // Permanent/unknown loss: pause, never auto-resume, free DSP.
-                if (!_pauseInterruptionActive) {
-                  _wasPlayingBeforeInterruption = _activePlayer.playing;
-                  _pauseInterruptionActive = true;
-                }
-                _wasPlayingBeforeInterruption = false;
+                _interruption.begin(InterruptionKind.unknown,
+                    playing: _activePlayer.playing);
+                _interruption.neverResume();
                 if (_crossfadeManager.isCrossfading) {
                   await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
                       restoreVolume: _preCrossfadeVolume ?? _volume);
@@ -1392,6 +1440,11 @@ class PulsrAudioHandler extends BaseAudioHandler
           } else {
             switch (event.type) {
               case AudioInterruptionType.duck:
+                // A duck that began in pause-mode also holds the interruption
+                // bookkeeping; end it here so a later call can snapshot afresh
+                // instead of inheriting a stale half-open pause (B-1).
+                final wasPlayingBeforeDuck =
+                    _interruption.end(InterruptionKind.duck);
                 if (_duckActive) {
                   _duckActive = false;
                   // Restore to the CURRENT ReplayGain-compensated target, not
@@ -1423,30 +1476,39 @@ class PulsrAudioHandler extends BaseAudioHandler
                       perSongOffsetDb: perSongDb));
                   _preDuckVolume = null;
                   _preDuckInactiveVolume = null;
+                } else if (shouldResumeAfterInterruption(
+                  wasPlayingBeforeInterruption: wasPlayingBeforeDuck,
+                  resumeAfterInterruption:
+                      _cachedPrefs?.getBool(PrefsKeys.resumeAfterInterruption) ??
+                          true,
+                  currentlyPlaying: _activePlayer.playing,
+                )) {
+                  // Pause-mode duck: playback was running when the navigation
+                  // prompt began, so resume it now that the prompt ended. It was
+                  // previously left paused permanently.
+                  unawaited(_activePlayer.play());
                 }
                 break;
               case AudioInterruptionType.pause:
-                if (_pauseInterruptionActive) {
-                  _pauseInterruptionActive = false;
-                  if (_wasPlayingBeforeInterruption) {
-                    _wasPlayingBeforeInterruption = false;
-                    // Cached prefs: this fires on every call-end; a disk read
-                    // here delayed resume by ~10-20ms.
-                    final resume =
-                        _cachedPrefs?.getBool(PrefsKeys.resumeAfterInterruption) ??
-                            true;
-                    if (resume && !_activePlayer.playing) {
-                      unawaited(_activePlayer.play());
-                    }
-                  }
+                final wasPlayingBeforePause =
+                    _interruption.end(InterruptionKind.pause);
+                if (shouldResumeAfterInterruption(
+                  wasPlayingBeforeInterruption: wasPlayingBeforePause,
+                  // Cached prefs: this fires on every call-end; a disk read
+                  // here delayed resume by ~10-20ms.
+                  resumeAfterInterruption:
+                      _cachedPrefs?.getBool(PrefsKeys.resumeAfterInterruption) ??
+                          true,
+                  currentlyPlaying: _activePlayer.playing,
+                )) {
+                  unawaited(_activePlayer.play());
                 }
                 _preDuckVolume = null;
                 _preDuckInactiveVolume = null;
                 _duckActive = false;
                 break;
               case AudioInterruptionType.unknown:
-                _wasPlayingBeforeInterruption = false;
-                _pauseInterruptionActive = false;
+                _interruption.reset();
                 _preDuckVolume = null;
                 _preDuckInactiveVolume = null;
                 _duckActive = false;
@@ -1994,8 +2056,8 @@ class PulsrAudioHandler extends BaseAudioHandler
 
     // Fast-path: check if YouTube track is already cached in local disk stream cache
     if (song.remoteId != null && song.remoteId!.isNotEmpty) {
-      final cachedFile =
-          await YtmCacheManager().getCachedAudioFile(song.remoteId!);
+      final cachedFile = await YtmCacheManager()
+          .getCachedAudioFile(song.remoteId!, quality: _currentStreamingQuality());
       if (cachedFile != null) {
         return AudioSource.file(cachedFile.path, tag: tag);
       }
@@ -3008,15 +3070,16 @@ class PulsrAudioHandler extends BaseAudioHandler
     final activeSong = currentSong;
     final isStream =
         activeSong != null && _isStreamUrl(activeSong.path);
-    final controls = isStream
-        ? <MediaControl>[
-            if (isPlaying) MediaControl.pause else MediaControl.play,
-          ]
-        : <MediaControl>[
-            MediaControl.skipToPrevious,
-            if (isPlaying) MediaControl.pause else MediaControl.play,
-            MediaControl.skipToNext,
-          ];
+    // Skip controls follow the queue, not the URL scheme (C-1): a lone live
+    // stream has nowhere to skip, and neither has a single-track local queue.
+    // What matters is whether a neighbouring queue entry actually exists.
+    final hasPrevious = _hasQueueNeighbour(forward: false);
+    final hasNext = _hasQueueNeighbour(forward: true);
+    final controls = <MediaControl>[
+      if (hasPrevious) MediaControl.skipToPrevious,
+      if (isPlaying) MediaControl.pause else MediaControl.play,
+      if (hasNext) MediaControl.skipToNext,
+    ];
     final processingState = const {
       ProcessingState.idle: AudioProcessingState.idle,
       ProcessingState.loading: AudioProcessingState.loading,
@@ -3028,28 +3091,63 @@ class PulsrAudioHandler extends BaseAudioHandler
     playbackState.add(
       playbackState.value.copyWith(
         controls: controls,
-        // Streams may never expose a duration: seek/shuffle/repeat are
-        // meaningless for a live source, so don't advertise them.
+        // Keep the advertised system actions consistent with the control set
+        // above: a stream may never expose a duration, so seek is meaningless
+        // for a live source, and shuffle/repeat mean nothing when the queue
+        // holds no other entry to act on (C-1).
         systemActions: {
           if (!isStream) ...[
             MediaAction.seek,
             MediaAction.seekForward,
             MediaAction.seekBackward,
           ],
-          MediaAction.setShuffleMode,
-          MediaAction.setRepeatMode,
+          if (hasPrevious || hasNext) ...[
+            MediaAction.setShuffleMode,
+            MediaAction.setRepeatMode,
+          ],
         },
-        androidCompactActionIndices:
-            isStream ? const [0] : const [0, 1, 2],
+        androidCompactActionIndices: [
+          for (var i = 0; i < controls.length; i++) i,
+        ],
         processingState: processingState,
         playing: isPlaying,
-        updatePosition: _activePlayer.position,
+        // Report the latency-compensated position so the notification shade's
+        // scrubber matches what the user actually hears (matches the in-app
+        // UI/lyrics, which already use compensatedPosition).
+        updatePosition: compensatedPosition,
         bufferedPosition: _activePlayer.bufferedPosition,
         speed: _activePlayer.speed,
         queueIndex: _currentIndex,
       ),
     );
   }
+
+  /// Whether the queue holds another entry to skip to in [forward] direction.
+  ///
+  /// Non-destructive on purpose — it is called from [_broadcastState], which
+  /// must not consume shuffle history or otherwise mutate navigation state the
+  /// way [_getNextIndex] / [_getPreviousIndex] do when they are read for
+  /// real. A single-entry queue (a lone live stream, a one-track album) has no
+  /// neighbour; so does the last track of a non-looping queue going forward.
+  bool _hasQueueNeighbour({required bool forward}) {
+    if (_songs.length <= 1) return false;
+    if (_activePlayer.shuffleModeEnabled) return true;
+    if (_activePlayer.loopMode == LoopMode.all) return true;
+    return forward ? _currentIndex + 1 < _songs.length : _currentIndex > 0;
+  }
+
+  /// Resume decision shared by every interruption-end path: resume only when
+  /// playback was actually running when the interruption began, the user's
+  /// preference allows it, and nothing else has already resumed playback.
+  @visibleForTesting
+  static bool shouldResumeAfterInterruption({
+    required bool wasPlayingBeforeInterruption,
+    required bool resumeAfterInterruption,
+    required bool currentlyPlaying,
+  }) =>
+      wasPlayingBeforeInterruption &&
+      resumeAfterInterruption &&
+      !currentlyPlaying;
 
   bool _isSameSongList(List<SongsTableData> a, List<SongsTableData> b) {
     if (identical(a, b)) return true;
@@ -3883,11 +3981,28 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> pause() async {
-    _wasPlayingBeforeInterruption = false;
+    // A deliberate pause invalidates any pending interruption snapshot so a
+    // later call can still pause us (B-1); the previous code only cleared the
+    // "was playing" half, leaving the active flag set.
+    _interruption.onUserPause();
     ErrorLogger.addBreadcrumb('Playback paused', category: 'player');
     await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
         restoreVolume: _preCrossfadeVolume ?? _volume);
     _saveCurrentPosition();
+    // If an online source is still being fetched/loaded (the track is not
+    // playable yet), invalidate the in-flight load cycle so a late resolve — or
+    // the play() at the end of playSongAt — cannot start playback after the
+    // user paused. The position is remembered so a later play() re-runs the
+    // cycle (re-fetches) instead of silently doing nothing.
+    final playerState = _activePlayer.processingState;
+    final stillLoading = playerState == ProcessingState.loading ||
+        playerState == ProcessingState.buffering ||
+        playerState == ProcessingState.idle;
+    if (stillLoading) {
+      _playGeneration++;
+      cancelPrefetches();
+      _pendingLazyPosition = _activePlayer.position;
+    }
     await _activePlayer.pause();
   }
 
@@ -5284,8 +5399,12 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   Future<void> onTaskRemoved() async {
     await saveCurrentPositionImmediate();
+    // Route through the public pause path so it performs the same cleanup as a
+    // user pause: reset the interruption bookkeeping, cancel any crossfade and
+    // bump the play generation so a slow in-flight resolve cannot start
+    // playback after the task is gone (B-3).
     try {
-      await _activePlayer.pause();
+      await pause();
     } catch (_) {}
     await super.onTaskRemoved();
   }
@@ -5352,6 +5471,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     await _playerA.dispose();
     await _playerB.dispose();
     await _prefetchPlayer.dispose();
+    platformBridgeDegraded.dispose();
   }
 }
 

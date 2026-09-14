@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_back_button.dart';
 import '../../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
@@ -34,6 +35,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
   ];
 
   Future<void> _exportTheme() async {
+    final l10n = context.l10n;
     final themeData = {
       'pulsr_theme_version': 1,
       'name': 'Custom Pulsr Theme',
@@ -49,17 +51,20 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
           subject: 'Pulsr Custom Theme',
         ),
       );
+      if (!mounted) return;
+      PulsrToast.show(context,
+          message: l10n.themeExported, icon: Icons.check_circle_rounded);
     } catch (_) {
-      if (mounted) {
-        PulsrToast.show(context,
-            message: 'Theme exported to share sheet',
-            icon: Icons.check_circle_rounded);
-      }
+      // Report the failure honestly instead of claiming a successful export.
+      if (!mounted) return;
+      PulsrToast.show(context,
+          message: l10n.themeExportFailed, isError: true);
     }
   }
 
   Future<void> _showImportDialog() async {
     final p = context.palette;
+    final l10n = context.l10n;
     final controller = TextEditingController();
 
     final result = await showDialog<String>(
@@ -121,6 +126,9 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
       ),
     );
 
+    // The dialog's controller is local to this call and must not leak.
+    controller.dispose();
+
     if (result != null && result.trim().isNotEmpty && mounted) {
       try {
         final decoded = jsonDecode(result.trim()) as Map<String, dynamic>;
@@ -136,15 +144,13 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
           });
           context.read<SettingsCubit>().setCustomAccentColor(Color(colorVal));
           PulsrToast.show(context,
-              message: 'Custom theme applied!',
-              icon: Icons.palette_rounded);
+              message: l10n.themeApplied, icon: Icons.palette_rounded);
         } else {
           PulsrToast.show(context,
-              message: 'Invalid theme JSON format', isError: true);
+              message: l10n.invalidThemeJson, isError: true);
         }
-      } catch (e) {
-        PulsrToast.show(context,
-            message: 'Failed to parse theme JSON: $e', isError: true);
+      } catch (_) {
+        PulsrToast.show(context, message: l10n.themeImportFailed, isError: true);
       }
     }
   }

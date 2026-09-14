@@ -1130,5 +1130,80 @@
   "dsdOutputModeSubtitle": "How DSF/DFF files reach the DAC: PCM decode, or native DSD streamed as DSD over PCM",
   "dsdDopRequiresUsbDac": "Requires a connected USB DAC that supports DSD over PCM (DoP)",
   "dsdOutputPcm": "PCM",
-  "dsdOutputDop": "DoP"
+  "dsdOutputDop": "DoP",
+
+  "enableShuffle": "Enable shuffle",
+  "disableShuffle": "Disable shuffle",
+  "like": "Like",
+  "unlike": "Unlike",
+  "mute": "Mute",
+  "unmute": "Unmute",
+  "volume": "Volume",
+  "audioOutputAndDac": "Audio Output & DAC",
+  "toggleSideQueue": "Toggle Side Queue",
+  "fullscreenPlayer": "Fullscreen Player",
+  "nowPlayingSemantics": "Now playing: {title} by {artist}",
+  "@nowPlayingSemantics": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "artist": {
+        "type": "String"
+      }
+    }
+  },
+  "resumeFromPrompt": "Resume from {time}?",
+  "@resumeFromPrompt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "setLoopPointA": "Set loop point A ({time})",
+  "@setLoopPointA": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "setLoopPointB": "Set loop point B ({time})",
+  "@setLoopPointB": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "enableAbLoop": "Enable AB loop",
+  "disableAbLoop": "Disable AB loop",
+  "clearAbLoop": "Clear AB loop",
+  "audioDelayTooltip": "Audio delay ({ms} ms)",
+  "@audioDelayTooltip": {
+    "placeholders": {
+      "ms": {
+        "type": "int"
+      }
+    }
+  },
+  "audioDelayMsLabel": "Audio delay: {ms} ms",
+  "@audioDelayMsLabel": {
+    "placeholders": {
+      "ms": {
+        "type": "int"
+      }
+    }
+  },
+  "audioDelayHelp": "Positive delays audio (e.g. slow Bluetooth/video).",
+  "themeExported": "Theme exported to share sheet",
+  "themeExportFailed": "Could not export theme",
+  "themeImportFailed": "Failed to parse theme JSON",
+  "themeApplied": "Custom theme applied!",
+  "invalidThemeJson": "Invalid theme JSON format",
+  "notificationPermissionTitle": "Show playback controls",
+  "notificationPermissionRationale": "Allow notifications so Pulsr can show playback controls on your lock screen and in the notification shade.",
+  "notificationPermissionAllow": "Allow",
+  "notificationPermissionNotNow": "Not now"
 }

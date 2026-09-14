@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Now-playing home-screen widget (C-6) -->
+    <string name="widget_album_artwork">Carátula del álbum</string>
+    <string name="widget_nothing_playing">No se está reproduciendo nada</string>
+    <string name="widget_toggle_favorite">Alternar favorito</string>
+    <string name="widget_previous">Anterior</string>
+    <string name="widget_play_pause">Reproducir/Pausar</string>
+    <string name="widget_next">Siguiente</string>
+    <string name="widget_rewind_10s">Retroceder 10 s</string>
+    <string name="widget_forward_10s">Avanzar 10 s</string>
+    <string name="widget_shuffle">Aleatorio</string>
+    <string name="widget_repeat">Repetir</string>
+    <string name="widget_queue_icon">Icono de cola</string>
+    <string name="widget_up_next">A CONTINUACIÓN</string>
+    <string name="widget_no_upcoming_tracks">No hay pistas próximas</string>
+
+    <!-- Download foreground-service notification (C-6) -->
+    <string name="download_channel_name">Descargas</string>
+    <string name="download_channel_description">Muestra el progreso de las descargas de YouTube</string>
+    <string name="download_notification_default_title">Descargando</string>
+    <string name="download_notification_downloads">Descargas</string>
+    <string name="download_notification_count">%1$d descargas</string>
+    <string name="download_notification_preparing">Preparando descarga…</string>
+    <string name="download_notification_progress">%1$d%% • Descargando</string>
+    <string name="download_notification_paused">%1$d%% • En pausa</string>
+    <string name="download_notification_action_cancel">Cancelar</string>
+    <string name="download_notification_action_pause">Pausar</string>
+    <string name="download_notification_action_resume">Reanudar</string>
+    <string name="download_notification_degraded">Protección en segundo plano limitada — mantén Pulsr abierto</string>
+    <string name="download_notification_timeout">Descargas en pausa — se agotó el tiempo de ejecución en segundo plano de Android. Abre Pulsr para continuar.</string>
+</resources>

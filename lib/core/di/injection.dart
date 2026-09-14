@@ -6,7 +6,6 @@ import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 
 import 'package:pulsr/core/services/file_intent_handler.dart';
-import 'package:pulsr/core/services/smart_audio_service.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
 import 'package:pulsr/data/audio/per_song_eq_store.dart';
 import 'package:pulsr/data/audio/per_song_volume_store.dart';
@@ -20,11 +19,6 @@ final GetIt getIt = GetIt.instance;
 @InjectableInit()
 Future<void> configureDependencies() async {
   getIt.init();
-  // Smart Audio is hand-registered (not injectable-generated) so the settings
-  // section and PlayerCubit share one instance without a codegen pass.
-  if (!getIt.isRegistered<SmartAudioService>()) {
-    getIt.registerLazySingleton<SmartAudioService>(() => SmartAudioService());
-  }
   // Pre-warm async singletons so sync getIt<T>() in main.dart never throws
   // StateError (audio handler -> player cubit -> download cubit -> intents).
   try {

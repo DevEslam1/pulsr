@@ -245,14 +245,29 @@ class YtmUrlCache {
       return;
     }
 
+    // F1: a stream-less re-`put` for a URL already stored must not throw the
+    // rich entry away. The lazy playback source (`YtmResolvingSource`) writes
+    // one of these immediately after `YtmService.resolveStream` stored the real
+    // container/MIME/bitrate/duration through `putStream`, so on every cache
+    // miss the rich record was replaced by a URL-only one — and a later hit
+    // then rebuilt the stream with `duration: Duration.zero` and a container
+    // guessed from the URL. Same key plus same URL means the same body, so the
+    // richer fields are carried forward.
+    final previous = _cache[key];
+    final sameUrl = previous != null && previous.url == url;
+    final effectiveStream = stream ?? (sameUrl ? previous.stream : null);
+    final effectiveUserAgent =
+        userAgent ?? (sameUrl ? previous.userAgent : null);
+    final effectiveCookies = cookies ?? (sameUrl ? previous.cookies : null);
+
     final entry = YtmUrlCacheEntry(
       videoId: videoId,
       url: url,
       fetchedAt: now,
       expiresAt: computedExpiry,
-      userAgent: userAgent,
-      cookies: cookies,
-      stream: stream,
+      userAgent: effectiveUserAgent,
+      cookies: effectiveCookies,
+      stream: effectiveStream,
     );
 
     // Evict oldest if full

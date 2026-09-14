@@ -3664,6 +3664,180 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'DoP'**
   String get dsdOutputDop;
+
+  /// No description provided for @enableShuffle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable shuffle'**
+  String get enableShuffle;
+
+  /// No description provided for @disableShuffle.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable shuffle'**
+  String get disableShuffle;
+
+  /// No description provided for @like.
+  ///
+  /// In en, this message translates to:
+  /// **'Like'**
+  String get like;
+
+  /// No description provided for @unlike.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlike'**
+  String get unlike;
+
+  /// No description provided for @mute.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute'**
+  String get mute;
+
+  /// No description provided for @unmute.
+  ///
+  /// In en, this message translates to:
+  /// **'Unmute'**
+  String get unmute;
+
+  /// No description provided for @volume.
+  ///
+  /// In en, this message translates to:
+  /// **'Volume'**
+  String get volume;
+
+  /// No description provided for @audioOutputAndDac.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio Output & DAC'**
+  String get audioOutputAndDac;
+
+  /// No description provided for @toggleSideQueue.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle Side Queue'**
+  String get toggleSideQueue;
+
+  /// No description provided for @fullscreenPlayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Fullscreen Player'**
+  String get fullscreenPlayer;
+
+  /// No description provided for @nowPlayingSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Now playing: {title} by {artist}'**
+  String nowPlayingSemantics(String title, String artist);
+
+  /// No description provided for @resumeFromPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume from {time}?'**
+  String resumeFromPrompt(String time);
+
+  /// No description provided for @setLoopPointA.
+  ///
+  /// In en, this message translates to:
+  /// **'Set loop point A ({time})'**
+  String setLoopPointA(String time);
+
+  /// No description provided for @setLoopPointB.
+  ///
+  /// In en, this message translates to:
+  /// **'Set loop point B ({time})'**
+  String setLoopPointB(String time);
+
+  /// No description provided for @enableAbLoop.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable AB loop'**
+  String get enableAbLoop;
+
+  /// No description provided for @disableAbLoop.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable AB loop'**
+  String get disableAbLoop;
+
+  /// No description provided for @clearAbLoop.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear AB loop'**
+  String get clearAbLoop;
+
+  /// No description provided for @audioDelayTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio delay ({ms} ms)'**
+  String audioDelayTooltip(int ms);
+
+  /// No description provided for @audioDelayMsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio delay: {ms} ms'**
+  String audioDelayMsLabel(int ms);
+
+  /// No description provided for @audioDelayHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Positive delays audio (e.g. slow Bluetooth/video).'**
+  String get audioDelayHelp;
+
+  /// No description provided for @themeExported.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme exported to share sheet'**
+  String get themeExported;
+
+  /// No description provided for @themeExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not export theme'**
+  String get themeExportFailed;
+
+  /// No description provided for @themeImportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to parse theme JSON'**
+  String get themeImportFailed;
+
+  /// No description provided for @themeApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom theme applied!'**
+  String get themeApplied;
+
+  /// No description provided for @invalidThemeJson.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid theme JSON format'**
+  String get invalidThemeJson;
+
+  /// No description provided for @notificationPermissionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show playback controls'**
+  String get notificationPermissionTitle;
+
+  /// No description provided for @notificationPermissionRationale.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow notifications so Pulsr can show playback controls on your lock screen and in the notification shade.'**
+  String get notificationPermissionRationale;
+
+  /// No description provided for @notificationPermissionAllow.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get notificationPermissionAllow;
+
+  /// No description provided for @notificationPermissionNotNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get notificationPermissionNotNow;
 }
 
 class _AppLocalizationsDelegate

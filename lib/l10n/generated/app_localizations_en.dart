@@ -2004,4 +2004,105 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dsdOutputDop => 'DoP';
+
+  @override
+  String get enableShuffle => 'Enable shuffle';
+
+  @override
+  String get disableShuffle => 'Disable shuffle';
+
+  @override
+  String get like => 'Like';
+
+  @override
+  String get unlike => 'Unlike';
+
+  @override
+  String get mute => 'Mute';
+
+  @override
+  String get unmute => 'Unmute';
+
+  @override
+  String get volume => 'Volume';
+
+  @override
+  String get audioOutputAndDac => 'Audio Output & DAC';
+
+  @override
+  String get toggleSideQueue => 'Toggle Side Queue';
+
+  @override
+  String get fullscreenPlayer => 'Fullscreen Player';
+
+  @override
+  String nowPlayingSemantics(String title, String artist) {
+    return 'Now playing: $title by $artist';
+  }
+
+  @override
+  String resumeFromPrompt(String time) {
+    return 'Resume from $time?';
+  }
+
+  @override
+  String setLoopPointA(String time) {
+    return 'Set loop point A ($time)';
+  }
+
+  @override
+  String setLoopPointB(String time) {
+    return 'Set loop point B ($time)';
+  }
+
+  @override
+  String get enableAbLoop => 'Enable AB loop';
+
+  @override
+  String get disableAbLoop => 'Disable AB loop';
+
+  @override
+  String get clearAbLoop => 'Clear AB loop';
+
+  @override
+  String audioDelayTooltip(int ms) {
+    return 'Audio delay ($ms ms)';
+  }
+
+  @override
+  String audioDelayMsLabel(int ms) {
+    return 'Audio delay: $ms ms';
+  }
+
+  @override
+  String get audioDelayHelp =>
+      'Positive delays audio (e.g. slow Bluetooth/video).';
+
+  @override
+  String get themeExported => 'Theme exported to share sheet';
+
+  @override
+  String get themeExportFailed => 'Could not export theme';
+
+  @override
+  String get themeImportFailed => 'Failed to parse theme JSON';
+
+  @override
+  String get themeApplied => 'Custom theme applied!';
+
+  @override
+  String get invalidThemeJson => 'Invalid theme JSON format';
+
+  @override
+  String get notificationPermissionTitle => 'Show playback controls';
+
+  @override
+  String get notificationPermissionRationale =>
+      'Allow notifications so Pulsr can show playback controls on your lock screen and in the notification shade.';
+
+  @override
+  String get notificationPermissionAllow => 'Allow';
+
+  @override
+  String get notificationPermissionNotNow => 'Not now';
 }

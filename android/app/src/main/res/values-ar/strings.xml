@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Now-playing home-screen widget (C-6) -->
+    <string name="widget_album_artwork">غلاف الألبوم</string>
+    <string name="widget_nothing_playing">لا شيء قيد التشغيل</string>
+    <string name="widget_toggle_favorite">تبديل المفضلة</string>
+    <string name="widget_previous">السابق</string>
+    <string name="widget_play_pause">تشغيل/إيقاف</string>
+    <string name="widget_next">التالي</string>
+    <string name="widget_rewind_10s">رجوع 10 ثوانٍ</string>
+    <string name="widget_forward_10s">تقديم 10 ثوانٍ</string>
+    <string name="widget_shuffle">عشوائي</string>
+    <string name="widget_repeat">تكرار</string>
+    <string name="widget_queue_icon">أيقونة قائمة الانتظار</string>
+    <string name="widget_up_next">التالي</string>
+    <string name="widget_no_upcoming_tracks">لا توجد مقاطع قادمة</string>
+
+    <!-- Download foreground-service notification (C-6) -->
+    <string name="download_channel_name">التنزيلات</string>
+    <string name="download_channel_description">يعرض تقدم تنزيلات YouTube</string>
+    <string name="download_notification_default_title">جارٍ التنزيل</string>
+    <string name="download_notification_downloads">التنزيلات</string>
+    <string name="download_notification_count">%1$d تنزيلات</string>
+    <string name="download_notification_preparing">جارٍ التحضير للتنزيل…</string>
+    <string name="download_notification_progress">%1$d%% • جارٍ التنزيل</string>
+    <string name="download_notification_paused">%1$d%% • متوقف مؤقتًا</string>
+    <string name="download_notification_action_cancel">إلغاء</string>
+    <string name="download_notification_action_pause">إيقاف مؤقت</string>
+    <string name="download_notification_action_resume">استئناف</string>
+    <string name="download_notification_degraded">حماية محدودة في الخلفية — أبقِ Pulsr مفتوحًا</string>
+    <string name="download_notification_timeout">تم إيقاف التنزيلات مؤقتًا — انتهى وقت التشغيل في الخلفية المسموح به في Android. افتح Pulsr للمتابعة.</string>
+</resources>

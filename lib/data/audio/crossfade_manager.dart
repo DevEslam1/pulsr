@@ -444,13 +444,13 @@ class CrossfadeManager {
   /// power pairs peaking at √2 hard-clip on coincident track peaks exactly
   /// during the overlap (user-audible crackle/distortion).
   ///
-  /// On the Pulsr Android fork both ramps are applied per-sample inside the
-  /// audio sink ([AudioPlayer.dspSetGainCurve]): the outgoing player keeps its
-  /// absolute volume with a 1→0 multiplier curve, the incoming player has its
-  /// volume pinned at [toInactiveVol] with a 0→1 multiplier curve armed BEFORE
-  /// that volume is applied. Dart only watches the clock (no per-tick
-  /// platform-channel volume traffic). Every other platform falls back to the
-  /// 10 ms stepped timer below.
+  /// On the Pulsr Android fork the OUTGOING player's 1→0 ramp is applied
+  /// per-sample inside the audio sink ([AudioPlayer.dspSetGainCurve]); its base
+  /// volume is kept and the sink multiplies it down, so there is no per-tick
+  /// platform-channel traffic for it. The INCOMING player is always driven by
+  /// the 10 ms stepped timer instead — see the inline note for why pinning its
+  /// base volume to a native multiplier leaks a full-volume buffer. Every other
+  /// platform steps both players.
   Future<void> crossfadeVolumes({
     required AudioPlayer active,
     required AudioPlayer inactive,
@@ -474,7 +474,19 @@ class CrossfadeManager {
     final completer = Completer<void>();
     final stopwatch = clock.stopwatch()..start();
 
-    // --- Native sample-accurate path (Pulsr Android fork) ---
+    // Only the OUTGOING player may use the native per-sample gain ramp. The
+    // INCOMING player is always ramped with stepped absolute setVolume calls.
+    //
+    // Why: the native curve is a *multiplier* on the player's base volume, so
+    // fading in requires pinning the base at the target and arming a 0→1
+    // multiplier. The platform applies that base-volume change on the main
+    // thread while the sink still holds output buffers already rendered at the
+    // pre-arm (unity) gain; raising the base exposes up to one buffer of full-
+    // gain audio the instant the fade opens — heard as the next track starting
+    // loud, then dropping and fading in. Stepping the incoming player's
+    // ABSOLUTE volume never lets the base jump past the current fade gain, so
+    // no such buffer can leak. The outgoing side is already audible, so its
+    // one-buffer latency is inaudible and it keeps the smooth native ramp.
     final points = _curvePointCount(totalMs);
     final segmentMs = (totalMs / (points - 1)).ceil().clamp(1, 1000);
     final oldCurve = List<double>.generate(points, (i) {
@@ -482,48 +494,7 @@ class CrossfadeManager {
           isRepeatOne: isRepeatOne);
       return o;
     });
-    final newCurve = List<double>.generate(points, (i) {
-      final (_, n) = evaluateSumSafeGainPair(i / (points - 1),
-          isRepeatOne: isRepeatOne);
-      return n;
-    });
     final oldArmed = await _armNativeCurve(active, oldCurve, segmentMs);
-    final newArmed = await _armNativeCurve(inactive, newCurve, segmentMs);
-    var nativeReady = oldArmed && newArmed;
-    if (nativeReady) {
-      // Pin base volumes: outgoing keeps its ReplayGain-compensated level
-      // (the ramp multiplies it down), incoming jumps to its target while the
-      // curve still holds 0 — inaudible.
-      try {
-        await inactive.setVolume(toInactiveVol.clamp(0.0, 1.0));
-      } catch (_) {
-        // Volume never applied: the ramp would multiply a wrong base level.
-        nativeReady = false;
-      }
-    }
-    if ((oldArmed || newArmed) && !nativeReady) {
-      // Partial arming would double-attenuate the armed side once the stepped
-      // path drives volumes too — revert to stepping on both.
-      _clearNativeCurve(active);
-      _clearNativeCurve(inactive);
-    }
-    if (nativeReady) {
-      Timer? singleTimer;
-      singleTimer = Timer(Duration(milliseconds: totalMs.round()), () {
-        _activeTimers.remove(singleTimer);
-        if (_fadeId != fadeId) {
-          if (!completer.isCompleted) completer.complete();
-          return;
-        }
-        try {
-          active.setVolume(0.0);
-          inactive.setVolume(toInactiveVol.clamp(0.0, 1.0));
-        } catch (_) {}
-        if (!completer.isCompleted) completer.complete();
-      });
-      _activeTimers.add(singleTimer);
-      return completer.future;
-    }
 
     late final Timer timer;
     timer = Timer.periodic(const Duration(milliseconds: 10), (t) {
@@ -538,10 +509,14 @@ class CrossfadeManager {
       final (oldGain, newGain) = evaluateSumSafeGainPair(fraction,
           isRepeatOne: isRepeatOne);
       try {
-        // Gains are 0→1; scale by the ReplayGain-compensated peaks. The
-        // sum-safe pair bounds oldGain+newGain <= 1 so the AudioFlinger
+        // A native-armed outgoing keeps its base volume and ramps inside the
+        // sink; only the non-armed side (and always the incoming side) is
+        // stepped. Gains are 0→1 scaled by the ReplayGain-compensated peaks;
+        // the sum-safe pair bounds oldGain+newGain <= 1 so the AudioFlinger
         // mix of both players cannot exceed full scale.
-        active.setVolume((oldGain * fromActiveVol).clamp(0.0, 1.0));
+        if (!oldArmed) {
+          active.setVolume((oldGain * fromActiveVol).clamp(0.0, 1.0));
+        }
         inactive.setVolume((newGain * toInactiveVol).clamp(0.0, 1.0));
       } catch (e, st) {
         ErrorLogger.log(
@@ -561,6 +536,7 @@ class CrossfadeManager {
           active.setVolume(0.0);
           inactive.setVolume(toInactiveVol.clamp(0.0, 1.0));
         } catch (_) {}
+        if (oldArmed) _clearNativeCurve(active);
         t.cancel();
         _activeTimers.remove(t);
         if (!completer.isCompleted) completer.complete();

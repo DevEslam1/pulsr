@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../cubit/player_state.dart';
 
 class PlayerControls extends StatelessWidget {
@@ -17,6 +18,11 @@ class PlayerControls extends StatelessWidget {
   final double mainButtonSize;
   final Color primaryColor;
 
+  /// Whether a neighbouring queue entry exists in each direction. Defaults to
+  /// true so standalone usages keep the pre-existing always-enabled behavior.
+  final bool hasPrevious;
+  final bool hasNext;
+
   const PlayerControls({
     super.key,
     required this.isPlaying,
@@ -29,14 +35,24 @@ class PlayerControls extends StatelessWidget {
     required this.onToggleRepeat,
     this.mainButtonSize = 64.0,
     required this.primaryColor,
+    this.hasPrevious = true,
+    this.hasNext = true,
   });
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final l10n = context.l10n;
     final onPrimaryColor = primaryColor.computeLuminance() > 0.5
         ? const Color(0xFF101223)
         : Colors.white;
+
+    final shuffleLabel = isShuffle ? l10n.disableShuffle : l10n.enableShuffle;
+    final repeatLabel = repeatMode == PlayerRepeatMode.one
+        ? l10n.repeatOne
+        : repeatMode == PlayerRepeatMode.all
+            ? l10n.repeatAll
+            : l10n.repeatOff;
 
     return Directionality(
       textDirection: TextDirection.ltr,
@@ -48,10 +64,10 @@ class PlayerControls extends StatelessWidget {
           children: [
             // Shuffle Button with active indicator
             Semantics(
-              label: isShuffle ? 'Disable shuffle' : 'Enable shuffle',
+              label: shuffleLabel,
               button: true,
               child: _ControlButton(
-                tooltip: isShuffle ? 'Disable shuffle' : 'Enable shuffle',
+                tooltip: shuffleLabel,
                 isActive: isShuffle,
                 activeColor: primaryColor,
                 inactiveColor: p.textSecondary,
@@ -66,22 +82,27 @@ class PlayerControls extends StatelessWidget {
 
             // Previous Button
             Semantics(
-              label: 'Previous track',
+              label: l10n.previous,
               button: true,
+              enabled: hasPrevious,
               child: Material(
                 color: Colors.transparent,
                 shape: const CircleBorder(),
                 clipBehavior: Clip.antiAlias,
                 child: IconButton(
-                  tooltip: 'Previous track',
+                  tooltip: l10n.previous,
                   splashRadius: 28,
-                  onPressed: () {
-                    HapticFeedback.lightImpact();
-                    onPrevious();
-                  },
+                  onPressed: hasPrevious
+                      ? () {
+                          HapticFeedback.lightImpact();
+                          onPrevious();
+                        }
+                      : null,
                   icon: Icon(
                     Icons.skip_previous_rounded,
-                    color: p.textPrimary,
+                    color: hasPrevious
+                        ? p.textPrimary
+                        : p.textSecondary.withValues(alpha: 0.35),
                     size: 38,
                   ),
                 ),
@@ -90,7 +111,7 @@ class PlayerControls extends StatelessWidget {
 
             // Main Play / Pause Button
             Semantics(
-              label: isPlaying ? 'Pause' : 'Play',
+              label: isPlaying ? l10n.pause : l10n.play,
               button: true,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
@@ -156,22 +177,27 @@ class PlayerControls extends StatelessWidget {
 
             // Next Button
             Semantics(
-              label: 'Next track',
+              label: l10n.next,
               button: true,
+              enabled: hasNext,
               child: Material(
                 color: Colors.transparent,
                 shape: const CircleBorder(),
                 clipBehavior: Clip.antiAlias,
                 child: IconButton(
-                  tooltip: 'Next track',
+                  tooltip: l10n.next,
                   splashRadius: 28,
-                  onPressed: () {
-                    HapticFeedback.lightImpact();
-                    onNext();
-                  },
+                  onPressed: hasNext
+                      ? () {
+                          HapticFeedback.lightImpact();
+                          onNext();
+                        }
+                      : null,
                   icon: Icon(
                     Icons.skip_next_rounded,
-                    color: p.textPrimary,
+                    color: hasNext
+                        ? p.textPrimary
+                        : p.textSecondary.withValues(alpha: 0.35),
                     size: 38,
                   ),
                 ),
@@ -180,18 +206,10 @@ class PlayerControls extends StatelessWidget {
 
             // Repeat Button with active indicator
             Semantics(
-              label: repeatMode == PlayerRepeatMode.one
-                  ? 'Repeat one'
-                  : repeatMode == PlayerRepeatMode.all
-                      ? 'Repeat all'
-                      : 'Repeat off',
+              label: repeatLabel,
               button: true,
               child: _ControlButton(
-                tooltip: repeatMode == PlayerRepeatMode.one
-                    ? 'Repeat one'
-                    : repeatMode == PlayerRepeatMode.all
-                        ? 'Repeat all'
-                        : 'Repeat off',
+                tooltip: repeatLabel,
                 isActive: repeatMode != PlayerRepeatMode.off,
                 activeColor: primaryColor,
                 inactiveColor: p.textSecondary,
@@ -233,51 +251,54 @@ class _ControlButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isActive
-                      ? activeColor.withValues(alpha: 0.15)
-                      : Colors.transparent,
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isActive
+                        ? activeColor.withValues(alpha: 0.15)
+                        : Colors.transparent,
+                  ),
+                  child: Icon(
+                    icon,
+                    color: isActive ? activeColor : inactiveColor,
+                    size: iconSize,
+                  ),
                 ),
-                child: Icon(
-                  icon,
-                  color: isActive ? activeColor : inactiveColor,
-                  size: iconSize,
+                const SizedBox(height: 2),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: isActive ? 4 : 0,
+                  height: isActive ? 4 : 0,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: activeColor,
+                    boxShadow: isActive
+                        ? [
+                            BoxShadow(
+                              color: activeColor.withValues(alpha: 0.6),
+                              blurRadius: 4,
+                              spreadRadius: 0.5,
+                            )
+                          ]
+                        : null,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: isActive ? 4 : 0,
-                height: isActive ? 4 : 0,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: activeColor,
-                  boxShadow: isActive
-                      ? [
-                          BoxShadow(
-                            color: activeColor.withValues(alpha: 0.6),
-                            blurRadius: 4,
-                            spreadRadius: 0.5,
-                          )
-                        ]
-                      : null,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

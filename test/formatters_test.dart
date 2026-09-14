@@ -30,6 +30,18 @@ void main() {
       expect(Formatters.formatDurationMs(185000), '3:05');
     });
 
+    test('formatDuration switches to h:mm:ss past an hour (A-12 agreement)', () {
+      // The AB-loop / bookmark labels now share this formatter with the seek
+      // bar, so long tracks must render identically in both.
+      expect(Formatters.formatDuration(const Duration(minutes: 59, seconds: 59)),
+          '59:59');
+      expect(Formatters.formatDuration(const Duration(hours: 1)), '1:00:00');
+      expect(
+          Formatters.formatDuration(
+              const Duration(hours: 2, minutes: 5, seconds: 9)),
+          '2:05:09');
+    });
+
     test('formatTrackCount and formatSongCount pluralization', () {
       expect(Formatters.formatTrackCount(0), '0 tracks');
       expect(Formatters.formatTrackCount(1), '1 track');

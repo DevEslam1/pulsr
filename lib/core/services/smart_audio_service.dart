@@ -9,6 +9,7 @@
 // only reads/writes state.
 import 'dart:convert';
 
+import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/services/smart_audio_plan.dart';
@@ -47,6 +48,7 @@ class SmartAudioEqLink {
       );
 }
 
+@lazySingleton
 class SmartAudioService {
   Future<SmartAudioMode> getMode() async {
     try {

@@ -160,6 +160,7 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i265.PlaylistExportUseCase());
     gh.lazySingleton<_i558.FlutterSecureStorage>(
         () => storageModule.secureStorage);
+    gh.lazySingleton<_i197.SmartAudioService>(() => _i197.SmartAudioService());
     gh.lazySingleton<_i626.PlaybackLatencyTracker>(
         () => _i626.PlaybackLatencyTracker());
     gh.lazySingleton<_i655.DeviceProfileService>(

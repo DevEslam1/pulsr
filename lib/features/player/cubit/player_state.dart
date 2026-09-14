@@ -246,6 +246,23 @@ abstract class PlayerState with _$PlayerState {
         quranReciterStyle != other.quranReciterStyle;
   }
 
+  /// Whether a neighbouring queue entry exists to skip to, mirroring the
+  /// handler's notification-control decision (`_hasQueueNeighbour`). A lone
+  /// stream or a single-entry queue has no neighbour in either direction.
+  bool get hasPreviousNeighbour => _hasQueueNeighbour(forward: false);
+
+  /// See [hasPreviousNeighbour].
+  bool get hasNextNeighbour => _hasQueueNeighbour(forward: true);
+
+  bool _hasQueueNeighbour({required bool forward}) {
+    final length =
+        queue.isNotEmpty ? queue.length : (currentSong != null ? 1 : 0);
+    if (length <= 1) return false;
+    if (isShuffle) return true;
+    if (repeatMode == PlayerRepeatMode.all) return true;
+    return forward ? currentIndex + 1 < length : currentIndex > 0;
+  }
+
   bool get isDspActive =>
       isEqEnabled ||
       selectedHeadphoneProfile != null ||

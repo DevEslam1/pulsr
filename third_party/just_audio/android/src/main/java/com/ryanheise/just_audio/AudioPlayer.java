@@ -514,6 +514,14 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                 // unsupported so Dart falls back to stepped setVolume().
                 boolean applied = false;
                 try {
+                    // AAudio Direct replaces the whole sink and bypasses the
+                    // processor chain, so the curve would never be applied.
+                    // Report unsupported so callers fall back to stepped
+                    // volume instead of silently not fading at all.
+                    if (aaudioOutputEnabled) {
+                        result.success(false);
+                        break;
+                    }
                     List<?> gains = call.argument("gains");
                     Integer segmentMs = call.argument("segmentMs");
                     if (dspAudioProcessor != null && gains != null && !gains.isEmpty()) {

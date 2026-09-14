@@ -24,6 +24,18 @@ class WidgetService {
 
   int? _lastSavedArtworkSongId;
 
+  /// Monotonic counter bumped whenever non-progress content changes (track,
+  /// favourite/shuffle/repeat state, queue preview, artwork). Persisted as
+  /// `contentVersion` and compared by the Kotlin provider against the value it
+  /// last rendered in full, so the ~1/s progress tick can be recognised as such
+  /// without an Intent extra that home_widget cannot carry (C-4).
+  int _contentVersion = 0;
+
+  Future<void> _bumpContentVersion() async {
+    _contentVersion += 1;
+    await HomeWidget.saveWidgetData<int>('contentVersion', _contentVersion);
+  }
+
   /// Whether an artwork resolve is currently in-flight (to avoid stacking).
   bool _artworkResolveInFlight = false;
   SongsTableData? _pendingArtworkSong;
@@ -111,6 +123,7 @@ class WidgetService {
         _lastSavedArtworkSongId = null;
       }
 
+      await _bumpContentVersion();
       await HomeWidget.updateWidget(
         name: androidWidgetName,
         androidName: androidWidgetName,
@@ -141,6 +154,7 @@ class WidgetService {
         }
         _lastSavedArtworkSongId = song.id;
         await HomeWidget.saveWidgetData<String>('artwork', artPath);
+        await _bumpContentVersion();
         await HomeWidget.updateWidget(
           name: androidWidgetName,
           androidName: androidWidgetName,
@@ -153,6 +167,7 @@ class WidgetService {
         }
         _lastSavedArtworkSongId = song.id;
         await HomeWidget.saveWidgetData<String>('artwork', '');
+        await _bumpContentVersion();
         await HomeWidget.updateWidget(
           name: androidWidgetName,
           androidName: androidWidgetName,
@@ -165,6 +180,7 @@ class WidgetService {
       // FIX-G03: Reset artwork on error
       try {
         await HomeWidget.saveWidgetData<String>('artwork', '');
+        await _bumpContentVersion();
         await HomeWidget.updateWidget(
           name: androidWidgetName,
           androidName: androidWidgetName,

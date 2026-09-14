@@ -44,6 +44,52 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     this._ytDownloadService,
   ) {
     // FIX-I02: Move reconcileOnBoot() call OUT of the constructor to DownloadsCubit._init()
+    // C-7/C-9: the native foreground service reports notification-driven
+    // pause/resume/cancel and foreground degradation back on this channel.
+    _downloadChannel.setMethodCallHandler(_handleNativeDownloadCall);
+  }
+
+  /// Handles the download foreground service's callbacks.
+  ///
+  /// The notification's Pause/Resume/Cancel buttons run in the service, which
+  /// owns no transfer state — the Dart engine does. These callbacks are how the
+  /// service's intent reaches it (C-7); degradation notices are logged because
+  /// the ongoing notification already carries the user-visible signal (C-9).
+  Future<void> _handleNativeDownloadCall(MethodCall call) async {
+    final args = call.arguments;
+    final videoId = args is Map ? args['videoId'] as String? : null;
+    switch (call.method) {
+      case 'onDownloadCancelled':
+        if (videoId != null && videoId.isNotEmpty) {
+          await deleteDownload(videoId);
+        }
+        break;
+      case 'onDownloadPaused':
+        if (videoId != null && videoId.isNotEmpty) {
+          await pauseDownload(videoId);
+        }
+        break;
+      case 'onDownloadResumed':
+        if (videoId != null && videoId.isNotEmpty) {
+          await resumeDownload(videoId);
+        }
+        break;
+      case 'onDownloadServiceDegraded':
+        final stage = args is Map ? args['stage'] : null;
+        ErrorLogger.log(
+            'Download foreground service degraded ($stage): the download '
+            'continues without foreground protection',
+            category: 'Download');
+        break;
+    }
+  }
+
+  /// Mirrors an in-app pause/resume state into the native notification (C-7).
+  void _notifyNativePaused(String videoId, bool paused) {
+    _downloadChannel.invokeMethod('setDownloadPaused', {
+      'videoId': videoId,
+      'paused': paused,
+    }).catchError((_) => null);
   }
 
   @override
@@ -123,6 +169,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
 
     _pausedVideoIds.add(videoId);
     _queue.remove(videoId);
+    // Keep the download foreground service (and its Resume action) alive (C-7).
+    _ytDownloadService.markPaused(videoId);
 
     if (_activeVideoIds.contains(videoId)) {
       _ytDownloadService.cancel(videoId);
@@ -139,6 +187,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     }
 
     _updateTask(task.copyWith(status: DownloadStatus.paused));
+    _notifyNativePaused(videoId, true);
     return const Right(unit);
   }
 
@@ -150,6 +199,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     }
 
     _pausedVideoIds.remove(videoId);
+    _ytDownloadService.clearPaused(videoId);
+    _notifyNativePaused(videoId, false);
     final queuedTask = task.copyWith(status: DownloadStatus.queued, error: null);
     _updateTask(queuedTask);
 
@@ -185,6 +236,9 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     final task = _tasks[videoId];
     _pausedVideoIds.remove(videoId);
     _queue.remove(videoId);
+    // A deleted task must not keep the foreground service alive through its
+    // paused marker (C-7).
+    _ytDownloadService.clearPaused(videoId);
 
     // Delete-while-downloading race: cancel → await job completion → then delete
     if (_activeVideoIds.contains(videoId)) {

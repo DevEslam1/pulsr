@@ -338,7 +338,7 @@ class YtmResolvingSource extends StreamAudioSource {
       );
     }
 
-    final cacheFile = await _cacheFileFor(videoId, url);
+    final cacheFile = await _cacheFileFor(videoId, url, quality);
     final headers = <String, String>{
       if (effectiveUa != null && effectiveUa.isNotEmpty)
         'User-Agent': effectiveUa
@@ -442,9 +442,9 @@ class YtmResolvingSource extends StreamAudioSource {
   static Future<void> _deleteCacheFilesFor(String videoId) async {
     final dir = await _cacheManager.getCacheDirectory();
     final hash = _cacheManager.getHashForVideoId(videoId);
-    for (final ext in const ['m4a', 'webm', 'opus', 'mp4']) {
+    for (final name in YtmCacheManager.allCacheFileNames(hash)) {
       for (final suffix in const ['', '.part', '.mime']) {
-        final f = File(p.join(dir.path, '$hash.$ext$suffix'));
+        final f = File(p.join(dir.path, '$name$suffix'));
         if (await f.exists()) {
           try {
             await f.delete();
@@ -458,7 +458,8 @@ class YtmResolvingSource extends StreamAudioSource {
   static final LinkedHashMap<String, Future<void>> _pathCreationLocks =
       LinkedHashMap<String, Future<void>>();
 
-  static Future<File> _cacheFileFor(String videoId, String url) async {
+  static Future<File> _cacheFileFor(
+      String videoId, String url, String quality) async {
     final dir = await _cacheManager.getCacheDirectory();
     final hash = _cacheManager.getHashForVideoId(videoId);
     // Container-aware extension: a webm/opus resolve must not reuse (or be
@@ -468,6 +469,9 @@ class YtmResolvingSource extends StreamAudioSource {
       final mime = Uri.parse(url).queryParameters['mime'] ?? '';
       if (mime.contains('webm')) ext = 'webm';
     } catch (_) {}
-    return File(p.join(dir.path, '$hash.$ext'));
+    // F9: quality-keyed too, through the one naming helper every reader and
+    // sweeper shares rather than a second inline format string.
+    return File(
+        p.join(dir.path, YtmCacheManager.cacheFileName(hash, quality, ext)));
   }
 }

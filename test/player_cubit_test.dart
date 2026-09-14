@@ -500,10 +500,17 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   Future<void> validatePlayerState() async {}
 
   @override
-  Future<void> play() async {}
+  Future<void> play() async {
+    playCalls++;
+  }
 
   @override
-  Future<void> pause() async {}
+  Future<void> pause() async {
+    pauseCalls++;
+  }
+
+  int playCalls = 0;
+  int pauseCalls = 0;
 
   @override
   Future<void> stop() async {}
@@ -609,6 +616,36 @@ void main() {
 
       await cubit.close();
       tracker.dispose();
+    });
+
+    test('pause during an online fetch pauses instead of restarting the load',
+        () async {
+      final cubit = PlayerCubit(
+        audioHandler: testAudioHandler,
+        repository: mockRepository,
+        toggleFavoriteUseCase: mockToggleFavorite,
+      );
+      addTearDown(cubit.close);
+
+      // The engine reports playing while still loading (online stream not yet
+      // fetched): the UI shows the pause button in this window.
+      testAudioHandler._playbackStateController.add(
+        PlaybackState(
+          processingState: AudioProcessingState.loading,
+          playing: true,
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(cubit.state.isPlaying, isTrue);
+
+      await cubit.togglePlayPause();
+
+      // Tapping pause must call pause(), never play(). The old branch keyed off
+      // the engine's playWhenReady and re-issued play(), letting the fetch
+      // cycle start playback anyway; the UI must also flip to paused at once.
+      expect(testAudioHandler.pauseCalls, 1);
+      expect(testAudioHandler.playCalls, 0);
+      expect(cubit.state.isPlaying, isFalse);
     });
 
     test(

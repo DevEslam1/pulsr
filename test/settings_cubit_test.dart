@@ -49,23 +49,23 @@ void main() {
       cubit.close();
     });
 
-    test('float output setting defaults OFF and persists/restores', () async {
-      // Default is OFF: the 16-bit sink path must stay the default behaviour.
-      expect(const SettingsState().floatOutputEnabled, false);
+    test('float output defaults ON (hi-res) and persists/restores', () async {
+      // Default ON: hi-res sources must not be truncated to 16-bit.
+      expect(const SettingsState().floatOutputEnabled, true);
 
       final cubit = SettingsCubit(scannerService: mockScannerService);
-      expect(cubit.state.floatOutputEnabled, false);
-
-      await cubit.setFloatOutputEnabled(true);
       expect(cubit.state.floatOutputEnabled, true);
 
+      await cubit.setFloatOutputEnabled(false);
+      expect(cubit.state.floatOutputEnabled, false);
+
       final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getBool('setting_float_output_enabled'), true);
+      expect(prefs.getBool('setting_float_output_enabled'), false);
       cubit.close();
 
       final restored = SettingsCubit(scannerService: mockScannerService);
       await restored.reloadSettings();
-      expect(restored.state.floatOutputEnabled, true);
+      expect(restored.state.floatOutputEnabled, false);
       restored.close();
     });
 

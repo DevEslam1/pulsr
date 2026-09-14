@@ -42,6 +42,7 @@ class PlayerSeekBar extends StatefulWidget {
 class _PlayerSeekBarState extends State<PlayerSeekBar> {
   double? _dragValue;
   int? _lastSongId;
+  String? _lastFilePath;
   Future<List<double>>? _cachedWaveformFuture;
 
   static final List<double> _loadingWaveformSamples = List.generate(
@@ -63,8 +64,11 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
 
     // Check if Waveform Seek Bar is enabled in settings and song ID is available
     if (waveformEnabled && effectiveSongId != null) {
-      if (_lastSongId != effectiveSongId || _cachedWaveformFuture == null) {
+      if (_lastSongId != effectiveSongId ||
+          _lastFilePath != effectiveFilePath ||
+          _cachedWaveformFuture == null) {
         _lastSongId = effectiveSongId;
+        _lastFilePath = effectiveFilePath;
         _cachedWaveformFuture = WaveformService.instance.getWaveform(
           songId: effectiveSongId,
           filePath: effectiveFilePath,

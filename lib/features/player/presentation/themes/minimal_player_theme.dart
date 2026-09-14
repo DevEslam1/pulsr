@@ -1,6 +1,5 @@
 // lib/features/player/presentation/themes/minimal_player_theme.dart
 import 'dart:math' as math;
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -16,23 +15,19 @@ import '../../../../data/db/app_database.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../../../sheets/add_to_playlist_sheet.dart';
-import '../../../sheets/sleep_timer_sheet.dart';
 import '../../../sheets/song_info_sheet.dart';
 import '../../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 import '../widgets/audio_quality_badge.dart';
-import '../widgets/audio_quality_sheet.dart';
 import '../widgets/audio_visualizer.dart';
-import '../widgets/equalizer_sheet.dart';
 import '../widgets/lyrics_view.dart';
 import '../widgets/now_playing_queue_view.dart';
 import '../widgets/advanced_playback_bar.dart';
 import '../widgets/player_controls.dart';
 import '../widgets/player_seek_bar.dart';
-import '../widgets/quran_mode_button.dart';
-import '../widgets/speed_picker_sheet.dart';
 import 'player_theme.dart';
+import 'player_theme_chrome.dart';
 
 class MinimalPlayerTheme extends StatelessWidget {
   final PlayerThemeProps props;
@@ -306,14 +301,17 @@ class MinimalPlayerTheme extends StatelessWidget {
 
                           // Right Symmetrical Action: Animated Favorite Button
                           SizedBox(
-                            width: isTablet ? 46 : 40,
-                            height: isTablet ? 46 : 40,
+                            width: 48,
+                            height: 48,
                             child: Material(
                               color: Colors.white.withValues(alpha: 0.06),
                               shape: const CircleBorder(),
                               clipBehavior: Clip.antiAlias,
-                              child: _AnimatedFavoriteButton(
+                              child: PlayerAnimatedFavoriteButton(
                                 isFavorite: song?.isFavorite == true,
+                                semanticLabel: song?.isFavorite == true
+                                    ? context.l10n.unlike
+                                    : context.l10n.like,
                                 favoriteColor: p.favorite,
                                 inactiveColor: p.textSecondary,
                                 iconSize: isTablet ? 24 : 22,
@@ -365,6 +363,8 @@ class MinimalPlayerTheme extends StatelessWidget {
                   isPlaying: state.isPlaying,
                   isShuffle: state.isShuffle,
                   repeatMode: state.repeatMode,
+                  hasPrevious: state.hasPreviousNeighbour,
+                  hasNext: state.hasNextNeighbour,
                   primaryColor: activeColor,
                   mainButtonSize: isTablet ? 72 : (isLandscape ? 56 : 64),
                   onPlayPause: () => cubit.togglePlayPause(),
@@ -633,100 +633,20 @@ class MinimalPlayerTheme extends StatelessWidget {
     required double barWidth,
     required double barHeight,
   }) {
-    final isLyrics = state.isLyricsVisible;
-    final isQueue = state.isQueueVisible;
-    final isTrack = !isLyrics && !isQueue;
-
-    return Center(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: barWidth,
-          minWidth: barWidth,
-          maxHeight: barHeight,
-          minHeight: barHeight,
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              padding: const EdgeInsets.all(3.0),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.12),
-                  width: 1.0,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.20),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _SwitcherItem(
-                      label: 'Track',
-                      icon: Icons.album_rounded,
-                      isSelected: isTrack,
-                      activeColor: activeColor,
-                      isTablet: isTablet,
-                      onTap: () {
-                        if (!isTrack) {
-                          HapticFeedback.selectionClick();
-                          if (isLyrics) cubit.toggleLyricsVisibility();
-                          if (isQueue) cubit.toggleQueueVisibility();
-                        }
-                      },
-                    ),
-                  ),
-                  Expanded(
-                    child: _SwitcherItem(
-                      label: 'Lyrics',
-                      icon: Icons.lyrics_rounded,
-                      isSelected: isLyrics,
-                      activeColor: activeColor,
-                      isTablet: isTablet,
-                      onTap: () {
-                        if (!isLyrics) {
-                          HapticFeedback.selectionClick();
-                          cubit.toggleLyricsVisibility();
-                        }
-                      },
-                    ),
-                  ),
-                  Expanded(
-                    child: _SwitcherItem(
-                      label: 'Queue',
-                      icon: Icons.queue_music_rounded,
-                      isSelected: isQueue,
-                      badgeCount: state.queue.length,
-                      activeColor: activeColor,
-                      isTablet: isTablet,
-                      onTap: () {
-                        if (!isQueue) {
-                          HapticFeedback.selectionClick();
-                          cubit.toggleQueueVisibility();
-                        }
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
+    // Extracted to player_theme_chrome.dart (A-13); only the tokens this theme
+    // actually differed on are passed through.
+    return PlayerViewSwitcher(
+      state: state,
+      cubit: cubit,
+      activeColor: activeColor,
+      isTablet: isTablet,
+      barWidth: barWidth,
+      barHeight: barHeight,
+      trackIcon: Icons.album_rounded,
+      surfaceFillAlpha: 0.06,
+      borderAlpha: 0.12,
     );
   }
-
-  // ---------------------------------------------------------------------------
-  // Floating Glass Bottom Action Dock (5 Actions) - Twin Capsule to Lyrics Bar
-  // ---------------------------------------------------------------------------
   Widget _buildBottomActionDock({
     required BuildContext context,
     required PlayerThemeProps props,
@@ -735,389 +655,15 @@ class MinimalPlayerTheme extends StatelessWidget {
     required double barWidth,
     required double barHeight,
   }) {
-    final song = props.state.currentSong;
-    final p = context.palette;
-    final isUsb = settingsState.currentOutputDevice?.isUsbDac == true;
-    final outputDevice = settingsState.currentOutputDevice;
-    final isEqActive = props.state.isEqEnabled;
-    final speed = props.state.playbackSpeed;
-    final hasTimer = props.state.sleepTimerRemaining != null;
-
-    final IconData outputIcon = isUsb
-        ? Icons.usb_rounded
-        : (outputDevice?.deviceName.contains('Bluetooth') == true ||
-                outputDevice?.deviceName.contains('A2DP') == true
-            ? Icons.bluetooth_audio_rounded
-            : (outputDevice?.deviceName.contains('Speaker') == true
-                ? Icons.speaker_rounded
-                : Icons.headphones_rounded));
-
-    return Center(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: barWidth,
-          minWidth: barWidth,
-          maxHeight: barHeight,
-          minHeight: barHeight,
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              padding: const EdgeInsets.all(3.0),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.12),
-                  width: 1.0,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.20),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  // 1. Equalizer & DSP
-                  Expanded(
-                    child: _DockIconButton(
-                      icon: Icons.tune_rounded,
-                      tooltip: context.l10n.equalizer,
-                      isActive: isEqActive,
-                      activeColor: props.activeColor,
-                      inactiveColor: p.textSecondary,
-                      isTablet: isTablet,
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        showModalBottomSheet<void>(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (_) => const EqualizerSheet(),
-                        );
-                      },
-                    ),
-                  ),
-
-                  // 2. Audio Output & DAC
-                  Expanded(
-                    child: _DockIconButton(
-                      icon: outputIcon,
-                      tooltip: 'Audio Output & DAC',
-                      isActive: isUsb,
-                      activeColor: const Color(0xFFFFD700),
-                      inactiveColor: p.textSecondary,
-                      isTablet: isTablet,
-                      onTap: () {
-                        if (song != null) {
-                          HapticFeedback.lightImpact();
-                          AudioQualitySheet.show(
-                              context, song, props.activeColor);
-                        }
-                      },
-                    ),
-                  ),
-
-                  // 3. Playback Speed
-                  Expanded(
-                    child: _DockIconButton(
-                      icon: Icons.speed_rounded,
-                      tooltip: context.l10n.playbackSpeed,
-                      badgeText: speed != 1.0
-                          ? '${speed.toStringAsFixed(1)}x'
-                          : null,
-                      isActive: speed != 1.0,
-                      activeColor: props.activeColor,
-                      inactiveColor: p.textSecondary,
-                      isTablet: isTablet,
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        SpeedPickerSheet.show(context);
-                      },
-                    ),
-                  ),
-
-                  // 4. Sleep Timer
-                  Expanded(
-                    child: _DockIconButton(
-                      icon: Icons.timer_outlined,
-                      tooltip: context.l10n.sleepTimer,
-                      badgeText: hasTimer
-                          ? (props.cubit.sleepTimerRemainingTracks != null
-                              ? '${props.cubit.sleepTimerRemainingTracks} tr'
-                              : '${props.state.sleepTimerRemaining!.inMinutes}m')
-                          : null,
-                      isActive: hasTimer,
-                      activeColor: props.activeColor,
-                      inactiveColor: p.textSecondary,
-                      isTablet: isTablet,
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        showModalBottomSheet<void>(
-                          context: context,
-                          useRootNavigator: true,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (_) => const SleepTimerSheet(),
-                        );
-                      },
-                    ),
-                  ),
-
-                  // 5. Quran Mode
-                  Expanded(
-                    child: QuranModeDockButton(
-                      activeColor: props.activeColor,
-                      inactiveColor: p.textSecondary,
-                      isTablet: isTablet,
-                    ),
-                  ),
-
-                  // 6. Add to Playlist
-                  Expanded(
-                    child: _DockIconButton(
-                      icon: Icons.playlist_add_rounded,
-                      tooltip: context.l10n.addToPlaylist,
-                      isActive: false,
-                      activeColor: props.activeColor,
-                      inactiveColor: p.textSecondary,
-                      isTablet: isTablet,
-                      onTap: () {
-                        if (song != null) {
-                          HapticFeedback.lightImpact();
-                          showModalBottomSheet<void>(
-                            context: context,
-                            useRootNavigator: true,
-                            isScrollControlled: true,
-                            backgroundColor: Colors.transparent,
-                            builder: (_) => AddToPlaylistSheet(song: song),
-                          );
-                        }
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
+    // Extracted to player_theme_chrome.dart (A-13).
+    return PlayerBottomActionDock(
+      props: props,
+      settingsState: settingsState,
+      isTablet: isTablet,
+      barWidth: barWidth,
+      barHeight: barHeight,
+      dockIconStyle: PlayerDockIconStyle.common,
     );
   }
 }
 
-class _SwitcherItem extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool isSelected;
-  final Color activeColor;
-  final int? badgeCount;
-  final bool isTablet;
-  final VoidCallback onTap;
-
-  const _SwitcherItem({
-    required this.label,
-    required this.icon,
-    required this.isSelected,
-    required this.activeColor,
-    this.badgeCount,
-    this.isTablet = false,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutCubic,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: isSelected
-              ? activeColor.withValues(alpha: 0.22)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: isSelected
-              ? Border.all(
-                  color: activeColor.withValues(alpha: 0.45),
-                  width: 1.0,
-                )
-              : null,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: isTablet ? 16 : 14,
-              color: isSelected ? activeColor : Colors.white60,
-            ),
-            const SizedBox(width: 4),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: isTablet ? 13 : 11.5,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                  color: isSelected ? Colors.white : Colors.white60,
-                  letterSpacing: 0.2,
-                ),
-              ),
-            ),
-            if (badgeCount != null && badgeCount! > 0) ...[
-              const SizedBox(width: 4),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? activeColor
-                      : Colors.white.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '$badgeCount',
-                  style: TextStyle(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w800,
-                    color: isSelected ? Colors.black : Colors.white70,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AnimatedFavoriteButton extends StatelessWidget {
-  final bool isFavorite;
-  final Color favoriteColor;
-  final Color inactiveColor;
-  final double iconSize;
-  final VoidCallback onTap;
-
-  const _AnimatedFavoriteButton({
-    required this.isFavorite,
-    required this.favoriteColor,
-    required this.inactiveColor,
-    this.iconSize = 24,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () {
-        HapticFeedback.mediumImpact();
-        onTap();
-      },
-      child: Center(
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 240),
-          transitionBuilder: (child, anim) => ScaleTransition(
-            scale: anim,
-            child: child,
-          ),
-          child: Icon(
-            isFavorite
-                ? Icons.favorite_rounded
-                : Icons.favorite_border_rounded,
-            key: ValueKey(isFavorite),
-            color: isFavorite ? favoriteColor : inactiveColor,
-            size: iconSize,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DockIconButton extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
-  final bool isActive;
-  final Color activeColor;
-  final Color inactiveColor;
-  final String? badgeText;
-  final bool isTablet;
-  final VoidCallback onTap;
-
-  const _DockIconButton({
-    required this.icon,
-    required this.tooltip,
-    this.isActive = false,
-    required this.activeColor,
-    required this.inactiveColor,
-    this.badgeText,
-    this.isTablet = false,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Center(
-          child: Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.center,
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isActive
-                      ? activeColor.withValues(alpha: 0.18)
-                      : Colors.transparent,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  icon,
-                  size: isTablet ? 22 : 19,
-                  color: isActive ? activeColor : inactiveColor,
-                ),
-              ),
-              if (badgeText != null)
-                Positioned(
-                  top: -2,
-                  right: -6,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 3.5, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: activeColor,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      badgeText!,
-                      style: const TextStyle(
-                        fontSize: 8,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.black,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}

@@ -4,13 +4,24 @@ import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart'
+    show
+        AlertDialog,
+        FilledButton,
+        Navigator,
+        Text,
+        TextButton,
+        WidgetsBinding,
+        showDialog;
 import 'package:injectable/injectable.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/audio/ir_file_parser.dart';
 import '../../../core/bloc/base_cubit.dart';
 import '../../../core/constants/prefs_keys.dart';
 import '../../../core/di/injection.dart';
+import '../../../core/router/app_router.dart';
 import '../../../core/services/lrclib_service.dart';
 import '../../../core/services/radio_station_store.dart';
 import '../../../core/services/scrobbler_service.dart';
@@ -18,6 +29,7 @@ import '../../../core/services/sponsorblock_service.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/telemetry/playback_latency_tracker.dart';
 import '../../../core/utils/error_logger.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/utils/lrc_parser.dart';
 import '../../../core/utils/cue_parser.dart';
 import '../../../core/constants/audio_feature_info.dart';
@@ -246,6 +258,13 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   /// - a stale speed echo must not clobber a just-set speed.
   double? _lastSpeedPushed;
   DateTime? _lastSpeedPushAt;
+
+  /// True when the user explicitly paused while a track was still loading or
+  /// buffering (e.g. an online stream that has not been fetched yet). It
+  /// suppresses the optimistic "still playing" re-assert during loading so the
+  /// pause is not visually reverted, and is cleared as soon as playback really
+  /// starts or a new track is requested.
+  bool _userPausedIntentionally = false;
 
   /// Bumped on every queue mutation. [_getNextTitles]'s cache is keyed by
   /// index/length/current song, none of which changes when songs AFTER the
@@ -814,6 +833,80 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     );
   }
 
+  bool _notificationPermissionPrompted = false;
+
+  /// Bounded retry counter for the case where the first playback starts before
+  /// the navigator is mounted (e.g. a restored session auto-playing at cold
+  /// start). Prevents both suppressing the ask for the whole session and an
+  /// unbounded post-frame loop on a headless launch.
+  int _notificationPermissionRetries = 0;
+  static const int _maxNotificationPermissionRetries = 30;
+
+  /// B-5: Android 13+ hides the media notification until POST_NOTIFICATIONS is
+  /// granted, which silently removes the app's main background control surface
+  /// (audio_service 0.18.19 declares the permission but never requests it).
+  ///
+  /// Asked at the first start of playback rather than at cold start, behind an
+  /// in-app rationale, and fired-and-forgotten so a denial can never block or
+  /// fail playback — the notification simply does not appear.
+  Future<void> _maybeRequestNotificationPermission() async {
+    if (_notificationPermissionPrompted || !Platform.isAndroid) return;
+    try {
+      final status = await Permission.notification.status;
+      // Only a state Android can still prompt from. `permanentlyDenied` means
+      // the user turned it off and only Settings can undo it; asking again
+      // would be a no-op with no dialog.
+      if (status.isGranted ||
+          status.isPermanentlyDenied ||
+          status.isRestricted) {
+        _notificationPermissionPrompted = true;
+        return;
+      }
+      final ctx = rootNavigatorKey.currentContext;
+      if (ctx == null || !ctx.mounted) {
+        // UI is not mounted yet: retry after the next frame instead of latching
+        // the prompt off for the entire session.
+        if (_notificationPermissionRetries++ <
+            _maxNotificationPermissionRetries) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!_notificationPermissionPrompted) {
+              unawaited(_maybeRequestNotificationPermission());
+            }
+          });
+        }
+        return;
+      }
+      // Commit only once the dialog can actually be shown, so a missing context
+      // never burns the single ask.
+      _notificationPermissionPrompted = true;
+      final proceed = await showDialog<bool>(
+        context: ctx,
+        builder: (dialogCtx) => AlertDialog(
+          title: Text(dialogCtx.l10n.notificationPermissionTitle),
+          content: Text(dialogCtx.l10n.notificationPermissionRationale),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(false),
+              child: Text(dialogCtx.l10n.notificationPermissionNotNow),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(true),
+              child: Text(dialogCtx.l10n.notificationPermissionAllow),
+            ),
+          ],
+        ),
+      );
+      if (proceed == true) {
+        await Permission.notification.request();
+      }
+    } catch (e, st) {
+      // Suppress repeats on a hard failure rather than risk a dialog loop.
+      _notificationPermissionPrompted = true;
+      ErrorLogger.log('Notification permission request failed',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+    }
+  }
+
   bool _isSameTrack(SongsTableData? a, SongsTableData? b) {
     if (identical(a, b)) return true;
     if (a == null || b == null) return false;
@@ -1088,6 +1181,13 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       };
 
       final isPlaying = playbackState.playing && !isCompleted;
+      // Real playback resuming clears the explicit-pause latch.
+      if (isPlaying) {
+        _userPausedIntentionally = false;
+        // B-5: the permission ask is anchored to the first start of playback,
+        // not to app launch. It self-guards, so repeated calls are cheap no-ops.
+        unawaited(_maybeRequestNotificationPermission());
+      }
       // Task 0: mark first bytes / playing stages — TTFA telemetry must
       // reflect real audible start, so only mark when ExoPlayer is actually
       // ready (just_audio processingState == ready) AND playing, never while
@@ -1108,10 +1208,12 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
 
       // Transient loading/buffering echoes report playing:false while the
       // engine is actually spinning up after an optimistic playSong(true).
-      // Regressing here flashes the UI to paused for one frame.
+      // Regressing here flashes the UI to paused for one frame — but an
+      // explicit user pause during the fetch must win, so it is honored.
       var resolvedPlaying = isPlaying;
       if (!isPlaying &&
           state.isPlaying &&
+          !_userPausedIntentionally &&
           (playbackState.processingState == AudioProcessingState.loading ||
               playbackState.processingState ==
                   AudioProcessingState.buffering)) {
@@ -1668,6 +1770,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     // Immediate emission so tap feels instant: song row highlights,
     // play/pause updates to playing, and miniplayer shows the track.
     final isSameSong = _isSameTrack(state.currentSong, song);
+    _userPausedIntentionally = false;
     safeEmit(state.copyWith(
       queue: effectiveQueue,
       currentIndex: effectiveIndex,
@@ -1757,7 +1860,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       try {
         _latencyTracker?.markStage(PlaybackStage.sourceSet);
       } catch (_) {}
-      if (_mediaItemResolutionGen == capturedGen && !isClosed) {
+      if (_mediaItemResolutionGen == capturedGen &&
+          !isClosed &&
+          !_userPausedIntentionally) {
         safeEmit(state.copyWith(isPlaying: true));
       }
     } catch (e) {
@@ -2191,12 +2296,29 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
 
   Future<void> togglePlayPause() async {
     try {
-      if (_audioHandler.playbackState.value.playing) {
+      // Decide from what the user actually sees (the transport mirrors
+      // state.isPlaying), not the engine's playWhenReady alone: while an online
+      // stream is still being fetched the engine can report playing while the
+      // track has not been fetched, and branching on that turned a pause tap
+      // into a redundant play() that let the fetch cycle start playback anyway.
+      final enginePlaying = _audioHandler.playbackState.value.playing;
+      final shouldPause = state.isPlaying || enginePlaying;
+      // Reconcile the visible state with the decision before acting, so the
+      // button can never perform the inverse of the icon it is showing (A-7).
+      if (state.isPlaying != shouldPause) {
+        safeEmit(state.copyWith(isPlaying: shouldPause));
+      }
+      if (shouldPause) {
+        _userPausedIntentionally = true;
+        // Reflect the pause immediately, then abort the in-flight load cycle in
+        // the handler so a late resolve cannot auto-start playback.
+        safeEmit(state.copyWith(isPlaying: false));
         await _audioHandler.pause();
       } else {
         if (state.currentSong == null && state.queue.isEmpty) {
           return;
         }
+        _userPausedIntentionally = false;
         await _audioHandler.play();
       }
     } catch (e, st) {
@@ -2259,7 +2381,17 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     _lastSkippedSegmentEnd = null;
     _lastSponsorSkipTime = null;
     // Discrete intent: bypass the handler's scrub debounce (single layer).
-    return _audioHandler.seekDirect(target);
+    // Callers discard the returned future, so a rethrow here would become an
+    // unhandled async error with a silent rollback and no user feedback. Route
+    // it through the same failure handling as the coalesced path (A-6).
+    return _audioHandler.seekDirect(target).catchError((Object e, StackTrace st) {
+      ErrorLogger.log('Discrete seek failed',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+      if (!isClosed) {
+        safeEmit(
+            state.copyWith(errorMessage: 'Seek failed, position restored'));
+      }
+    });
   }
 
   Future<void> next() async {

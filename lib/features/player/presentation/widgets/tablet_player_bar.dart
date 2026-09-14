@@ -4,8 +4,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
+import '../../../../data/audio/audio_handler.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
@@ -31,8 +33,10 @@ class TabletPlayerBar extends StatefulWidget {
 }
 
 class _TabletPlayerBarState extends State<TabletPlayerBar> {
-  double _volume = 1.0;
-  bool _isMuted = false;
+  /// Local drag override while the user is scrubbing the volume slider. When
+  /// null, the authoritative volume is read from [PulsrAudioHandler] (the
+  /// single volume owner used across the app). Mirrors [_dragSeekValue].
+  double? _dragVolume;
   double _preMuteVolume = 1.0;
   double? _dragSeekValue;
 
@@ -50,18 +54,28 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
               prev.currentSong?.id != curr.currentSong?.id ||
               prev.currentSong?.title != curr.currentSong?.title ||
               prev.currentSong?.artist != curr.currentSong?.artist ||
+              prev.currentSong?.isFavorite != curr.currentSong?.isFavorite ||
               prev.isPlaying != curr.isPlaying ||
               prev.duration != curr.duration ||
               prev.isShuffle != curr.isShuffle ||
               prev.repeatMode != curr.repeatMode ||
               prev.isLyricsVisible != curr.isLyricsVisible ||
-              prev.isQueueVisible != curr.isQueueVisible,
+              prev.isQueueVisible != curr.isQueueVisible ||
+              prev.isEqEnabled != curr.isEqEnabled,
           builder: (context, state) {
             final song = state.currentSong;
             if (song == null) return const SizedBox.shrink();
 
             final cubit = context.read<PlayerCubit>();
             final activeColor = p.accent;
+            // A-3: the handler owns the master volume (no PlayerState.volume by
+            // design). Read it as the single source of truth, keeping the local
+            // drag override only while the user is scrubbing.
+            final handlerVolume =
+                context.read<PulsrAudioHandler>().volume.clamp(0.0, 1.0);
+            final effectiveVolume = (_dragVolume ?? handlerVolume).clamp(0.0, 1.0);
+            final isMuted = effectiveVolume <= 0.0;
+            final l10n = context.l10n;
 
             return Container(
           height: 90,
@@ -149,9 +163,9 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                       ),
                       IconButton(
                         visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.all(6),
+                        padding: EdgeInsets.zero,
                         constraints:
-                            const BoxConstraints(minWidth: 36, minHeight: 36),
+                            const BoxConstraints(minWidth: 48, minHeight: 48),
                         icon: Icon(
                           song.isFavorite
                               ? Icons.favorite_rounded
@@ -159,7 +173,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                           color: song.isFavorite ? p.favorite : p.textSecondary,
                           size: 20,
                         ),
-                        tooltip: song.isFavorite ? 'Unlike' : 'Like',
+                        tooltip: song.isFavorite ? l10n.unlike : l10n.like,
                         onPressed: () => cubit.toggleFavorite(song.id),
                       ),
                     ],
@@ -176,97 +190,120 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         // Controls Row
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            IconButton(
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.all(4),
-                              constraints: const BoxConstraints(
-                                  minWidth: 34, minHeight: 34),
-                              icon: Icon(
-                                Icons.shuffle_rounded,
-                                size: 19,
-                                color: state.isShuffle
-                                    ? activeColor
-                                    : p.textSecondary,
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                    minWidth: 48, minHeight: 48),
+                                icon: Icon(
+                                  Icons.shuffle_rounded,
+                                  size: 19,
+                                  color: state.isShuffle
+                                      ? activeColor
+                                      : p.textSecondary,
+                                ),
+                                tooltip: state.isShuffle
+                                    ? l10n.disableShuffle
+                                    : l10n.enableShuffle,
+                                onPressed: cubit.toggleShuffle,
                               ),
-                              tooltip: 'Shuffle',
-                              onPressed: cubit.toggleShuffle,
-                            ),
-                            const SizedBox(width: 2),
-                            IconButton(
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.all(4),
-                              constraints: const BoxConstraints(
-                                  minWidth: 38, minHeight: 38),
-                              icon: Icon(
-                                Icons.skip_previous_rounded,
-                                size: 25,
-                                color: p.textPrimary,
+                              const SizedBox(width: 2),
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                    minWidth: 48, minHeight: 48),
+                                icon: Icon(
+                                  Icons.skip_previous_rounded,
+                                  size: 25,
+                                  color: p.textPrimary,
+                                ),
+                                tooltip: l10n.previous,
+                                onPressed: cubit.previous,
                               ),
-                              tooltip: 'Previous',
-                              onPressed: cubit.previous,
-                            ),
-                            const SizedBox(width: 4),
-                            GestureDetector(
-                              onTap: cubit.togglePlayPause,
-                              child: Container(
-                                width: 42,
-                                height: 42,
-                                decoration: BoxDecoration(
-                                  color: activeColor,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: p.glow.withValues(alpha: 0.4),
-                                      blurRadius: 10,
-                                      spreadRadius: 1,
+                              const SizedBox(width: 4),
+                              Semantics(
+                                label: state.isPlaying ? l10n.pause : l10n.play,
+                                button: true,
+                                child: GestureDetector(
+                                  onTap: cubit.togglePlayPause,
+                                  child: SizedBox(
+                                    width: 48,
+                                    height: 48,
+                                    child: Center(
+                                      child: Container(
+                                        width: 42,
+                                        height: 42,
+                                        decoration: BoxDecoration(
+                                          color: activeColor,
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: p.glow
+                                                  .withValues(alpha: 0.4),
+                                              blurRadius: 10,
+                                              spreadRadius: 1,
+                                            ),
+                                          ],
+                                        ),
+                                        child: Icon(
+                                          state.isPlaying
+                                              ? Icons.pause_rounded
+                                              : Icons.play_arrow_rounded,
+                                          color: p.onAccent,
+                                          size: 26,
+                                        ),
+                                      ),
                                     ),
-                                  ],
-                                ),
-                                child: Icon(
-                                  state.isPlaying
-                                      ? Icons.pause_rounded
-                                      : Icons.play_arrow_rounded,
-                                  color: p.onAccent,
-                                  size: 26,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 4),
-                            IconButton(
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.all(4),
-                              constraints: const BoxConstraints(
-                                  minWidth: 38, minHeight: 38),
-                              icon: Icon(
-                                Icons.skip_next_rounded,
-                                size: 25,
-                                color: p.textPrimary,
+                              const SizedBox(width: 4),
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                    minWidth: 48, minHeight: 48),
+                                icon: Icon(
+                                  Icons.skip_next_rounded,
+                                  size: 25,
+                                  color: p.textPrimary,
+                                ),
+                                tooltip: l10n.next,
+                                onPressed: cubit.next,
                               ),
-                              tooltip: 'Next',
-                              onPressed: cubit.next,
-                            ),
-                            const SizedBox(width: 2),
-                            IconButton(
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.all(4),
-                              constraints: const BoxConstraints(
-                                  minWidth: 34, minHeight: 34),
-                              icon: Icon(
-                                state.repeatMode == PlayerRepeatMode.one
-                                    ? Icons.repeat_one_rounded
-                                    : Icons.repeat_rounded,
-                                size: 19,
-                                color: state.repeatMode != PlayerRepeatMode.off
-                                    ? activeColor
-                                    : p.textSecondary,
+                              const SizedBox(width: 2),
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                    minWidth: 48, minHeight: 48),
+                                icon: Icon(
+                                  state.repeatMode == PlayerRepeatMode.one
+                                      ? Icons.repeat_one_rounded
+                                      : Icons.repeat_rounded,
+                                  size: 19,
+                                  color:
+                                      state.repeatMode != PlayerRepeatMode.off
+                                          ? activeColor
+                                          : p.textSecondary,
+                                ),
+                                tooltip:
+                                    state.repeatMode == PlayerRepeatMode.one
+                                        ? l10n.repeatOne
+                                        : state.repeatMode ==
+                                                PlayerRepeatMode.all
+                                            ? l10n.repeatAll
+                                            : l10n.repeatOff,
+                                onPressed: cubit.toggleRepeat,
                               ),
-                              tooltip: 'Repeat',
-                              onPressed: cubit.toggleRepeat,
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
 
                         // Seekbar Row
@@ -351,9 +388,9 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                 // ── Right: Volume & Quick Actions ───────────────────────
                 Flexible(
                   flex: 0,
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerRight,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    reverse: true,
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       mainAxisAlignment: MainAxisAlignment.end,
@@ -361,47 +398,58 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                         // Volume Mute / Slider
                         IconButton(
                           visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.all(6),
+                          padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(
-                              minWidth: 34, minHeight: 34),
+                              minWidth: 48, minHeight: 48),
                           icon: Icon(
-                            _isMuted || _volume == 0
+                            isMuted
                                 ? Icons.volume_off_rounded
-                                : (_volume < 0.5
+                                : (effectiveVolume < 0.5
                                     ? Icons.volume_down_rounded
                                     : Icons.volume_up_rounded),
                             color: p.textSecondary,
                             size: 19,
                           ),
-                          tooltip: _isMuted ? 'Unmute' : 'Mute',
+                          tooltip: isMuted ? l10n.unmute : l10n.mute,
                           onPressed: () {
-                            setState(() {
-                              if (_isMuted) {
-                                _volume = _preMuteVolume;
-                                _isMuted = false;
-                              } else {
-                                _preMuteVolume = _volume;
-                                _volume = 0.0;
-                                _isMuted = true;
-                              }
-                            });
-                            cubit.setVolume(_volume);
+                            if (isMuted) {
+                              final restore =
+                                  _preMuteVolume <= 0.0 ? 1.0 : _preMuteVolume;
+                              setState(() {
+                                _preMuteVolume = restore;
+                                _dragVolume = null;
+                              });
+                              cubit.setVolume(restore);
+                            } else {
+                              setState(() {
+                                _preMuteVolume = effectiveVolume;
+                                _dragVolume = null;
+                              });
+                              cubit.setVolume(0.0);
+                            }
                           },
                         ),
                         SizedBox(
                           width: 80,
-                          child: PulsrSlider(
-                            min: 0.0,
-                            max: 1.0,
-                            value: _volume.clamp(0.0, 1.0),
-                            activeColor: p.textPrimary,
-                            onChanged: (v) {
-                              setState(() {
-                                _volume = v;
-                                _isMuted = v == 0;
-                              });
-                              cubit.setVolume(v);
-                            },
+                          child: Semantics(
+                            label: l10n.volume,
+                            child: PulsrSlider(
+                              min: 0.0,
+                              max: 1.0,
+                              value: effectiveVolume,
+                              activeColor: p.textPrimary,
+                              onChangeStart: (v) =>
+                                  setState(() => _dragVolume = v),
+                              onChanged: (v) {
+                                setState(() => _dragVolume = v);
+                                cubit.setVolume(v);
+                              },
+                              onChangeEnd: (v) {
+                                setState(() => _dragVolume = null);
+                                cubit.setVolume(v);
+                                if (v > 0.0) _preMuteVolume = v;
+                              },
+                            ),
                           ),
                         ),
                         const SizedBox(width: 2),
@@ -409,9 +457,9 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                         // DAC / Output
                         IconButton(
                           visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.all(6),
+                          padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(
-                              minWidth: 34, minHeight: 34),
+                              minWidth: 48, minHeight: 48),
                           icon: Icon(
                             Icons.settings_input_component_rounded,
                             size: 19,
@@ -421,7 +469,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                 ? const Color(0xFFFFD700)
                                 : p.textSecondary,
                           ),
-                          tooltip: 'Audio Output & DAC',
+                          tooltip: l10n.audioOutputAndDac,
                           onPressed: () => AudioQualitySheet.show(
                               context, song, activeColor),
                         ),
@@ -429,9 +477,9 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                         // Equalizer
                         IconButton(
                           visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.all(6),
+                          padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(
-                              minWidth: 34, minHeight: 34),
+                              minWidth: 48, minHeight: 48),
                           icon: Icon(
                             Icons.equalizer_rounded,
                             size: 19,
@@ -439,7 +487,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                 ? activeColor
                                 : p.textSecondary,
                           ),
-                          tooltip: 'Equalizer',
+                          tooltip: l10n.equalizer,
                           onPressed: () => showModalBottomSheet(
                             context: context,
                             isScrollControlled: true,
@@ -452,9 +500,9 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                         if (widget.onToggleSideInspector != null)
                           IconButton(
                             visualDensity: VisualDensity.compact,
-                            padding: const EdgeInsets.all(6),
+                            padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(
-                                minWidth: 34, minHeight: 34),
+                                minWidth: 48, minHeight: 48),
                             icon: Icon(
                               Icons.queue_music_rounded,
                               size: 19,
@@ -462,22 +510,22 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                   ? activeColor
                                   : p.textSecondary,
                             ),
-                            tooltip: 'Toggle Side Queue',
+                            tooltip: l10n.toggleSideQueue,
                             onPressed: widget.onToggleSideInspector,
                           ),
 
                         // Expand Fullscreen
                         IconButton(
                           visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.all(6),
+                          padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(
-                              minWidth: 34, minHeight: 34),
+                              minWidth: 48, minHeight: 48),
                           icon: Icon(
                             Icons.open_in_full_rounded,
                             size: 18,
                             color: p.textSecondary,
                           ),
-                          tooltip: 'Fullscreen Player',
+                          tooltip: l10n.fullscreenPlayer,
                           onPressed: widget.onOpenNowPlaying,
                         ),
                       ],

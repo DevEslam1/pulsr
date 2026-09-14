@@ -592,9 +592,9 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
             prefs.getBool(PrefsKeys.audioSessionLogEnabled) ?? true,
         outputFormatNegotiationEnabled: prefs
                 .getBool(PrefsKeys.outputFormatNegotiationEnabled) ??
-            false,
+            true,
         floatOutputEnabled:
-            prefs.getBool(PrefsKeys.floatOutputEnabled) ?? false,
+            prefs.getBool(PrefsKeys.floatOutputEnabled) ?? true,
         aaudioOutputEnabled:
             prefs.getBool(PrefsKeys.aaudioOutputEnabled) ?? false,
         aaudioPreferExclusive:

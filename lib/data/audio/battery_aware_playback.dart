@@ -36,7 +36,13 @@ class BatteryAwarePlayback {
       }
     } else if (batteryPercentage < 15) {
       if (_currentLevel != BatteryOptimizationLevel.lowPower) {
+        final leavingCritical =
+            _currentLevel == BatteryOptimizationLevel.critical;
         _currentLevel = BatteryOptimizationLevel.lowPower;
+        // Critical-only degradations (crossfade, buffers) must be lifted when
+        // the battery recovers past 5%, then low-power degradations re-applied.
+        // Without this the critical-only state persisted until >15% (B-8).
+        if (leavingCritical) onRestoreNormal?.call();
         onLowPowerMode?.call(disableVisualizer: true, reduceDsp: true);
       }
     } else {

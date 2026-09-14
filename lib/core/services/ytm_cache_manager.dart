@@ -26,13 +26,47 @@ class YtmCacheManager {
     return sha256.convert(utf8.encode(videoId)).toString();
   }
 
-  /// Returns the cached audio file for [videoId] if it exists on disk and is non-empty (>100KB).
-  Future<File?> getCachedAudioFile(String videoId) async {
+  /// Audio containers the stream cache may hold.
+  static const List<String> cacheExtensions = ['m4a', 'webm'];
+
+  /// Every extension any version of this app may have written, for cleanup.
+  static const List<String> allCacheExtensions = ['m4a', 'webm', 'opus', 'mp4'];
+
+  /// Qualities the streaming setting can name.
+  static const List<String> cacheQualities = ['high', 'medium', 'low'];
+
+  /// File name for one cache slot.
+  ///
+  /// F9: the slot is quality-keyed. The in-memory URL cache always was, but the
+  /// on-disk body was keyed on the video id alone, so a body cached for one
+  /// streaming quality could be served for another. `high` keeps the historical
+  /// un-keyed name so bodies written before this keying are still found.
+  static String cacheFileName(String hash, String quality, String ext) {
+    final q = quality.trim().toLowerCase();
+    return q.isEmpty || q == 'high' ? '$hash.$ext' : '$hash.$q.$ext';
+  }
+
+  /// Every name any version may have used for [hash]. Cleanup sweeps only.
+  static List<String> allCacheFileNames(String hash) {
+    final names = <String>{};
+    for (final ext in allCacheExtensions) {
+      names.add('$hash.$ext');
+      for (final q in cacheQualities) {
+        names.add('$hash.$q.$ext');
+      }
+    }
+    return names.toList();
+  }
+
+  /// Returns the cached audio file for [videoId] at [quality] if it exists on
+  /// disk and is non-empty (>100KB).
+  Future<File?> getCachedAudioFile(String videoId,
+      {String quality = 'high'}) async {
     try {
       final dir = await getCacheDirectory();
       final hash = getHashForVideoId(videoId);
-      for (final ext in const ['m4a', 'webm']) {
-        final f = File(p.join(dir.path, '$hash.$ext'));
+      for (final ext in cacheExtensions) {
+        final f = File(p.join(dir.path, cacheFileName(hash, quality, ext)));
         if (await f.exists()) {
           final len = await f.length();
           if (len > 100 * 1024) {
