@@ -56,6 +56,18 @@ class SearchCubit extends PulsrCubit<SearchState> {
   List<String>? _cachedExcludedFolders;
   DateTime? _lastExcludedFetch;
   static const int _historyMax = 10;
+
+  /// Single bound applied to the query at every stage of the pipeline.
+  /// The FTS query and the fuzzy post-filter MUST use the same length: if the
+  /// post-filter tests a prefix of the real needle it admits false positives
+  /// (defect 08-02).
+  static const int maxQueryLength = 64;
+
+  /// Maximum number of matches handed to the UI. Must stay >= the repository
+  /// FTS window (music_repository.dart passes 'limit ?? 200'), so the
+  /// presentation layer never truncates what the data layer was willing to
+  /// return (defect 08-01).
+  static const int maxResultCount = 200;
   static const String _historyKey = 'search_history';
 
   Future<void> _persistHistory(String query) async {
@@ -91,7 +103,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
 
     // Limit search query to 64 chars to avoid CPU starvation on huge pastes
     final boundedQuery =
-        trimmed.length > 64 ? trimmed.substring(0, 64) : trimmed;
+        trimmed.length > maxQueryLength ? trimmed.substring(0, maxQueryLength) : trimmed;
 
     safeEmit(state.copyWith(isLoading: true));
 
@@ -193,11 +205,11 @@ class SearchCubit extends PulsrCubit<SearchState> {
 
   List<SongsTableData> _filterWithFuzzy(
       List<SongsTableData> songs, String rawQ, String filter) {
-    final q = rawQ.length > 20 ? rawQ.substring(0, 20) : rawQ;
+    final q = rawQ.length > maxQueryLength ? rawQ.substring(0, maxQueryLength) : rawQ;
     final results = <SongsTableData>[];
 
     for (final song in songs) {
-      if (results.length >= 100) break;
+      if (results.length >= maxResultCount) break;
 
       final key = '${song.id}|${song.title}|${song.artist}|${song.album}';
       var norm = _normCache[key];

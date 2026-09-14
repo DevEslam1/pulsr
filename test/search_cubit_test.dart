@@ -209,5 +209,86 @@ void main() {
 
       await cubit.close();
     });
+    test('long query is not silently truncated to its first 20 characters (08-02)',
+        () async {
+      // Regression for defect 08-02. The fuzzy post-filter used to truncate the
+      // needle to 20 characters while the FTS query was bounded to 64. A
+      // 30-character query therefore matched any title containing only its
+      // first 20 characters - a FALSE POSITIVE, not a dropped match.
+      const partialTitle = 'abcdefghijklmnopqrst'; // 20 chars, first of the query
+      const longQuery = 'abcdefghijklmnopqrstuvwxyz0123'; // 30 chars
+      expect(partialTitle.length, equals(20));
+      expect(longQuery.length, equals(30));
+      expect(longQuery.startsWith(partialTitle), isTrue);
+
+      final cubit = SearchCubit(
+        searchUseCase: MockSearchMusicUseCase(mockSongs: const [
+          SongsTableData(
+            id: 1,
+            title: 'abcdefghijklmnopqrst',
+            artist: 'Artist A',
+            album: 'Album A',
+            durationMs: 180000,
+            path: '/path/1',
+            source: SongSource.local,
+            isFavorite: false,
+            isMissing: false,
+            isDownloaded: false,
+            playCount: 0,
+            lastPositionMs: 0,
+          ),
+        ]),
+        folderUseCases: mockFolderUseCases,
+      );
+
+      cubit.onQueryChanged(longQuery);
+      // Asserting an absence, so give the 250 ms debounce room to fire and then
+      // prove the pipeline produced nothing for the full-length needle.
+      await Future<void>.delayed(const Duration(seconds: 1));
+
+      expect(cubit.state.results, isEmpty,
+          reason: 'a title holding only the first 20 characters of a '
+              '30-character query must not be reported as a match');
+
+      await cubit.close();
+    });
+
+    test('every match is returned when there are more than 100 (08-01)',
+        () async {
+      // Regression for defect 08-01. The fuzzy post-filter broke out of its
+      // loop at 100 results while the repository FTS window is 200, so matches
+      // beyond the first 100 were dropped with no indication in the UI.
+      final songs = <SongsTableData>[
+        for (var i = 1; i <= 120; i++)
+          SongsTableData(
+            id: i,
+            title: 'Beat Track $i',
+            artist: 'Artist A',
+            album: 'Album A',
+            durationMs: 180000,
+            path: '/path/$i',
+            source: SongSource.local,
+            isFavorite: false,
+            isMissing: false,
+            isDownloaded: false,
+            playCount: 0,
+            lastPositionMs: 0,
+          ),
+      ];
+      final cubit = SearchCubit(
+        searchUseCase: MockSearchMusicUseCase(mockSongs: songs),
+        folderUseCases: mockFolderUseCases,
+      );
+
+      cubit.onQueryChanged('beat');
+      await pumpUntil(() => cubit.state.results.length >= 100);
+      // Let the pipeline settle on its final emission.
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      expect(cubit.state.results.length, equals(120),
+          reason: 'all 120 matching tracks must be reachable');
+
+      await cubit.close();
+    });
   });
 }

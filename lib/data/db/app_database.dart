@@ -2,6 +2,7 @@
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:injectable/injectable.dart';
+import '../../core/utils/error_logger.dart';
 import 'tables.dart';
 
 export 'tables.dart' show SongSource;
@@ -20,6 +21,11 @@ part 'app_database.g.dart';
   ExcludedFoldersTable,
 ])
 class AppDatabase extends _$AppDatabase {
+
+  /// Set true when the FTS rebuild during migration failed, so the
+  /// search index may be incomplete and tracks can be unfindable.
+  /// Surfaced instead of only printed (defect 08-04 / 05-01).
+  static bool ftsRebuildFailed = false;
   @factoryMethod
   AppDatabase() : super(driftDatabase(name: 'pulsr_music_db'));
 
@@ -254,8 +260,14 @@ class AppDatabase extends _$AppDatabase {
             } catch (e, st) {
               // Migration must not fail the open, but silence hides an
               // empty search index. Logged for diagnostics.
-              // ignore: avoid_print
-              print('songs_fts rebuild failed: $e\n$st');
+              ftsRebuildFailed = true;
+              ErrorLogger.log(
+                'songs_fts rebuild failed during migration; the search index '
+                'may be incomplete',
+                error: e,
+                stackTrace: st,
+                category: 'Database',
+              );
             }
           }
           if (from < 10) {

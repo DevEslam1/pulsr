@@ -1186,7 +1186,17 @@ class EqualizerManager {
           await _effectsChannel.setEqBandGains(tenBandGains);
         }
         return;
-      } catch (_) {}
+      } catch (e, st) {
+        // Bulk native apply failed; fall through to the per-band writes
+        // below. Logged so a silently degraded EQ is visible to
+        // telemetry instead of disappearing (defect 13-02).
+        ErrorLogger.log(
+          'Native bulk EQ apply failed; falling back to per-band writes',
+          error: e,
+          stackTrace: st,
+          category: 'DSP',
+        );
+      }
       // Fallback to legacy per-band if bulk unavailable (old APK)
       if (eqBandCount != 10) {
         await _effectsChannel.setNativeEqBandCount(targetFreqs.length);
