@@ -2133,4 +2133,66 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get continueLimitedAccess => 'Continuar con acceso limitado';
+
+  @override
+  String get notFoundGeneric => 'No encontrado';
+
+  @override
+  String get albumNotFoundHint =>
+      'Album no encontrado — abrelo desde la biblioteca.';
+
+  @override
+  String get artistNotFoundHint =>
+      'Artista no encontrado — abrelo desde la biblioteca.';
+
+  @override
+  String get genreNotFoundHint =>
+      'Genero no encontrado — abrelo desde la biblioteca.';
+
+  @override
+  String get yearNotFoundHint =>
+      'Ano no encontrado — abrelo desde la biblioteca.';
+
+  @override
+  String get playlistNotFoundHint =>
+      'Lista no encontrada — abrela desde la biblioteca.';
+
+  @override
+  String get folderNotFound => 'Carpeta no encontrada';
+
+  @override
+  String get songNotFound => 'Cancion no encontrada';
+
+  @override
+  String get couldNotLoadAlbumSongs =>
+      'No se pudieron cargar las canciones del album';
+
+  @override
+  String get couldNotLoadFolderSongs =>
+      'No se pudieron cargar las canciones de la carpeta';
+
+  @override
+  String get libraryReadError => 'Algo salio mal al leer tu biblioteca.';
+
+  @override
+  String get folderExcluded => 'Carpeta excluida del analisis';
+
+  @override
+  String get folderIncluded => 'Carpeta incluida en el analisis';
+
+  @override
+  String get clearQueueConfirm =>
+      'Vaciar la cola? (Se conservara la cancion en reproduccion)';
+
+  @override
+  String get queueSaved => 'Lista guardada';
+
+  @override
+  String get saveAsPlaylist => 'Guardar como lista';
+
+  @override
+  String get saveFailed => 'Error al guardar';
+
+  @override
+  String get addToQueue => 'Anadir a la cola';
 }

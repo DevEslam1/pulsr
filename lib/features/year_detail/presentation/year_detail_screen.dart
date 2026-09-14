@@ -1,5 +1,6 @@
 // lib/features/year_detail/presentation/year_detail_screen.dart
 import 'package:flutter/material.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
@@ -68,7 +69,7 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Something went wrong while reading your library.',
+                      context.l10n.libraryReadError,
                       textAlign: TextAlign.center,
                       style: TextStyle(color: p.textSecondary, fontSize: 13),
                     ),
@@ -76,7 +77,7 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
                     ElevatedButton.icon(
                       onPressed: () => setState(() {}),
                       icon: const Icon(Icons.refresh_rounded),
-                      label: const Text('Retry'),
+                      label: Text(context.l10n.retry),
                     ),
                   ],
                 ),
@@ -148,7 +149,7 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
                                     .playSong(songs.first, queue: songs)
                                 : null,
                             icon: const Icon(Icons.play_arrow_rounded),
-                            label: const Text('Play All'),
+                            label: Text(context.l10n.playAll),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -165,7 +166,7 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
                                   }
                                 : null,
                             icon: Icon(Icons.shuffle_rounded, color: p.accent),
-                            label: const Text('Shuffle'),
+                            label: Text(context.l10n.shuffle),
                           ),
                         ),
                       ],

@@ -443,9 +443,10 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     ));
   }
 
-  /// Selects every song in the library. When only a paginated window is
-  /// loaded, resolves the full ID set from the repository so "Select All"
-  /// batch actions cover the entire library rather than the visible page.
+  /// Selects every song in the library. Bounded (gap 06-04): resolves IDs in a
+  /// capped window (2000) so a 10k+ select-all stays instant and never
+  /// materialises the whole library into memory at once.
+  static const int selectAllCap = 2000;
   Future<void> selectAllSongs() async {
     if (!_hasMoreSongs) {
       final allIds = state.songs.map((s) => s.id).toSet();
@@ -464,14 +465,17 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
         (await _folderUseCases.getExcludedFolders()).fold((_) => <String>[], (r) => r);
     if (isClosed) return;
     final res = await repo
-        .watchAllSongs(limit: null, excludedFolders: excluded)
+        .watchAllSongs(limit: selectAllCap, excludedFolders: excluded)
         .first;
     if (isClosed) return;
     res.fold(
       (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
       (songs) => safeEmit(state.copyWith(
           selectedSongIds: songs.map((s) => s.id).toSet(),
-          isMultiSelectMode: true)),
+          isMultiSelectMode: true,
+          errorMessage: songs.length >= selectAllCap
+              ? 'Selected first $selectAllCap tracks (library exceeds cap)'
+              : null)),
     );
   }
 

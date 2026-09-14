@@ -705,5 +705,77 @@
   "continueLimitedAccess": "المتابعة بوصول محدود",
   "@continueLimitedAccess": {
     "description": "Continue onboarding without permission"
+  },
+  "notFoundGeneric": "غير موجود",
+  "@notFoundGeneric": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "albumNotFoundHint": "تعذر العثور على الالبوم — افتحه من المكتبة.",
+  "@albumNotFoundHint": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "artistNotFoundHint": "تعذر العثور على الفنان — افتحه من المكتبة.",
+  "@artistNotFoundHint": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "genreNotFoundHint": "تعذر العثور على النوع — افتحه من المكتبة.",
+  "@genreNotFoundHint": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "yearNotFoundHint": "تعذر العثور على السنة — افتحها من المكتبة.",
+  "@yearNotFoundHint": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "playlistNotFoundHint": "تعذر العثور على قائمة التشغيل — افتحها من المكتبة.",
+  "@playlistNotFoundHint": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "folderNotFound": "تعذر العثور على المجلد",
+  "@folderNotFound": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "songNotFound": "تعذر العثور على الاغنية",
+  "@songNotFound": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "couldNotLoadAlbumSongs": "تعذر تحميل اغاني الالبوم",
+  "@couldNotLoadAlbumSongs": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "couldNotLoadFolderSongs": "تعذر تحميل اغاني المجلد",
+  "@couldNotLoadFolderSongs": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "libraryReadError": "حدث خطا اثناء قراءة مكتبتك.",
+  "@libraryReadError": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "folderExcluded": "المجلد مستبعد من الفحص",
+  "@folderExcluded": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "folderIncluded": "المجلد مشمول في الفحص",
+  "@folderIncluded": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "clearQueueConfirm": "مسح قائمة الانتظار؟ (سيتم الاحتفاظ بالمسار الحالي)",
+  "@clearQueueConfirm": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "queueSaved": "تم حفظ القائمة",
+  "@queueSaved": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "saveAsPlaylist": "حفظ كقائمة تشغيل",
+  "@saveAsPlaylist": {
+    "description": "queue l10n"
+  },
+  "saveFailed": "فشل الحفظ",
+  "@saveFailed": {
+    "description": "queue l10n"
+  },
+  "addToQueue": "اضافة الى قائمة الانتظار",
+  "@addToQueue": {
+    "description": "detail header"
   }
 }

@@ -234,16 +234,11 @@ GoRouter createRouter(MediaScannerService scannerService) {
               ? state.extra as AlbumsTableData
               : null;
           if (album == null) {
-            final id = state.uri.queryParameters['id'];
             return _buildPulsrPageRoute(
               key: state.pageKey,
               child: Scaffold(
                 appBar: AppBar(),
-                body: Center(
-                  child: Text(id == null
-                      ? 'Album not found — open it from the library (deep links need ?id=).'
-                      : 'Album $id not found — open it from the library.'),
-                ),
+                body: Center(child: Text(context.l10n.albumNotFoundHint)),
               ),
             );
           }
@@ -266,10 +261,7 @@ GoRouter createRouter(MediaScannerService scannerService) {
               key: state.pageKey,
               child: Scaffold(
                 appBar: AppBar(),
-                body: const Center(
-                  child: Text(
-                      'Artist not found — open it from the library (deep links need ?id=).'),
-                ),
+                body: Center(child: Text(context.l10n.artistNotFoundHint)),
               ),
             );
           }
@@ -291,10 +283,7 @@ GoRouter createRouter(MediaScannerService scannerService) {
               key: state.pageKey,
               child: Scaffold(
                 appBar: AppBar(),
-                body: const Center(
-                  child: Text(
-                      'Genre not found — open it from the library (deep links need ?id=).'),
-                ),
+                body: Center(child: Text(context.l10n.genreNotFoundHint)),
               ),
             );
           }
@@ -315,10 +304,7 @@ GoRouter createRouter(MediaScannerService scannerService) {
               key: state.pageKey,
               child: Scaffold(
                 appBar: AppBar(),
-                body: const Center(
-                  child: Text(
-                      'Year not found — open it from the library (deep links need ?id=).'),
-                ),
+                body: Center(child: Text(context.l10n.yearNotFoundHint)),
               ),
             );
           }
@@ -341,10 +327,7 @@ GoRouter createRouter(MediaScannerService scannerService) {
               key: state.pageKey,
               child: Scaffold(
                 appBar: AppBar(),
-                body: const Center(
-                  child: Text(
-                      'Playlist not found — open it from the library (deep links need ?id=).'),
-                ),
+                body: Center(child: Text(context.l10n.playlistNotFoundHint)),
               ),
             );
           }
@@ -363,8 +346,8 @@ GoRouter createRouter(MediaScannerService scannerService) {
               ? state.extra as PlaylistsTableData
               : null;
           if (playlist == null) {
-            return const Scaffold(
-                body: Center(child: Text('Playlist not found')));
+            return Scaffold(
+                body: Center(child: Text(context.l10n.playlistNotFoundHint)));
           }
           return ManagePlaylistScreen(playlist: playlist);
         },
@@ -442,8 +425,8 @@ GoRouter createRouter(MediaScannerService scannerService) {
           final folder =
               state.extra is FolderItem ? state.extra as FolderItem : null;
           if (folder == null) {
-            return const Scaffold(
-                body: Center(child: Text('Folder not found')));
+            return Scaffold(
+                body: Center(child: Text(context.l10n.folderNotFound)));
           }
           return FolderDetailScreen(folder: folder);
         },
@@ -457,7 +440,7 @@ GoRouter createRouter(MediaScannerService scannerService) {
               ? state.extra as SongsTableData
               : null;
           if (song == null) {
-            return const Scaffold(body: Center(child: Text('Song not found')));
+            return Scaffold(body: Center(child: Text(context.l10n.songNotFound)));
           }
           return TagEditorScreen(song: song);
         },

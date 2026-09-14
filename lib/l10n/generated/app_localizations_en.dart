@@ -2112,4 +2112,61 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get continueLimitedAccess => 'Continue with limited access';
+
+  @override
+  String get notFoundGeneric => 'Not found';
+
+  @override
+  String get albumNotFoundHint => 'Album not found — open it from the library.';
+
+  @override
+  String get artistNotFoundHint =>
+      'Artist not found — open it from the library.';
+
+  @override
+  String get genreNotFoundHint => 'Genre not found — open it from the library.';
+
+  @override
+  String get yearNotFoundHint => 'Year not found — open it from the library.';
+
+  @override
+  String get playlistNotFoundHint =>
+      'Playlist not found — open it from the library.';
+
+  @override
+  String get folderNotFound => 'Folder not found';
+
+  @override
+  String get songNotFound => 'Song not found';
+
+  @override
+  String get couldNotLoadAlbumSongs => 'Could not load album songs';
+
+  @override
+  String get couldNotLoadFolderSongs => 'Could not load folder songs';
+
+  @override
+  String get libraryReadError =>
+      'Something went wrong while reading your library.';
+
+  @override
+  String get folderExcluded => 'Folder excluded from library scan';
+
+  @override
+  String get folderIncluded => 'Folder included in library scan';
+
+  @override
+  String get clearQueueConfirm => 'Clear queue? (Playing track will be kept)';
+
+  @override
+  String get queueSaved => 'Saved queue playlist';
+
+  @override
+  String get saveAsPlaylist => 'Save as Playlist';
+
+  @override
+  String get saveFailed => 'Save failed';
+
+  @override
+  String get addToQueue => 'Add to Queue';
 }

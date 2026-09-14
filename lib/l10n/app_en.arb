@@ -990,5 +990,77 @@
   "continueLimitedAccess": "Continue with limited access",
   "@continueLimitedAccess": {
     "description": "Continue onboarding without permission"
+  },
+  "notFoundGeneric": "Not found",
+  "@notFoundGeneric": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "albumNotFoundHint": "Album not found — open it from the library.",
+  "@albumNotFoundHint": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "artistNotFoundHint": "Artist not found — open it from the library.",
+  "@artistNotFoundHint": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "genreNotFoundHint": "Genre not found — open it from the library.",
+  "@genreNotFoundHint": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "yearNotFoundHint": "Year not found — open it from the library.",
+  "@yearNotFoundHint": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "playlistNotFoundHint": "Playlist not found — open it from the library.",
+  "@playlistNotFoundHint": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "folderNotFound": "Folder not found",
+  "@folderNotFound": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "songNotFound": "Song not found",
+  "@songNotFound": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "couldNotLoadAlbumSongs": "Could not load album songs",
+  "@couldNotLoadAlbumSongs": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "couldNotLoadFolderSongs": "Could not load folder songs",
+  "@couldNotLoadFolderSongs": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "libraryReadError": "Something went wrong while reading your library.",
+  "@libraryReadError": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "folderExcluded": "Folder excluded from library scan",
+  "@folderExcluded": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "folderIncluded": "Folder included in library scan",
+  "@folderIncluded": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "clearQueueConfirm": "Clear queue? (Playing track will be kept)",
+  "@clearQueueConfirm": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "queueSaved": "Saved queue playlist",
+  "@queueSaved": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "saveAsPlaylist": "Save as Playlist",
+  "@saveAsPlaylist": {
+    "description": "queue l10n"
+  },
+  "saveFailed": "Save failed",
+  "@saveFailed": {
+    "description": "queue l10n"
+  },
+  "addToQueue": "Add to Queue",
+  "@addToQueue": {
+    "description": "detail header"
   }
 }

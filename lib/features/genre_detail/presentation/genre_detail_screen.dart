@@ -69,7 +69,7 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Something went wrong while reading your library.',
+                      context.l10n.libraryReadError,
                       textAlign: TextAlign.center,
                       style: TextStyle(color: p.textSecondary, fontSize: 13),
                     ),
@@ -77,7 +77,7 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
                     ElevatedButton.icon(
                       onPressed: () => setState(() {}),
                       icon: const Icon(Icons.refresh_rounded),
-                      label: const Text('Retry'),
+                      label: Text(context.l10n.retry),
                     ),
                   ],
                 ),

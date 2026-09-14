@@ -1989,6 +1989,42 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     safeEmit(state.copyWith(queue: updatedQueue));
   }
 
+  /// Batch album/detail-level queue action (gap 07-03): appends [songs] to the
+  /// end of the active queue, skipping tracks already queued. Bounded by
+  /// [_maxQueueSize] with an error message instead of silent truncation.
+  Future<void> addAllToQueue(List<SongsTableData> songs) async {
+    if (songs.isEmpty || isClosed) return;
+    final room = _maxQueueSize - state.queue.length;
+    if (room <= 0) {
+      safeEmit(state.copyWith(
+          errorMessage: 'Queue full ($_maxQueueSize) — cannot add more'));
+      return;
+    }
+    final toAdd = songs
+        .where((s) => !state.queue.any((q) => _isSameTrack(q, s)))
+        .take(room)
+        .toList();
+    for (final s in toAdd) {
+      try {
+        await _audioHandler.addToQueueEnd(s);
+      } catch (e, st) {
+        ErrorLogger.log('Failed to batch-add to queue',
+            error: e, stackTrace: st, category: 'PlayerCubit');
+        break;
+      }
+    }
+    final updatedQueue = List<SongsTableData>.from(state.queue)..addAll(toAdd);
+    _queueSlots[state.activeQueueSlot] = _QueueSlotData(
+      songs: updatedQueue,
+      currentIndex: state.currentIndex,
+      position: state.position,
+      speed: state.playbackSpeed,
+    );
+    _debouncedPersistQueueSlots();
+    _queueVersion++;
+    safeEmit(state.copyWith(queue: updatedQueue));
+  }
+
   Future<void> addToQueue(SongsTableData song) async {
     if (state.queue.length >= _maxQueueSize) {
       safeEmit(state.copyWith(
@@ -2049,6 +2085,23 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     _debouncedPersistQueueSlots();
     _queueVersion++;
     safeEmit(state.copyWith(queue: updatedQueue, currentIndex: 0));
+  }
+
+  /// Restores a previously cleared queue (Undo for destructive clear, gap 10-03).
+  /// Cubit slots are the source of truth (10-01); the handler re-syncs on the
+  /// next play/seek via the existing persist path.
+  Future<void> restoreQueue(List<SongsTableData> songs, int index) async {
+    if (songs.isEmpty || isClosed) return;
+    final safeIndex = index.clamp(0, songs.length - 1);
+    _queueSlots[state.activeQueueSlot] = _QueueSlotData(
+      songs: List.of(songs),
+      currentIndex: safeIndex,
+      position: Duration.zero,
+      speed: state.playbackSpeed,
+    );
+    _debouncedPersistQueueSlots();
+    _queueVersion++;
+    safeEmit(state.copyWith(queue: List.of(songs), currentIndex: safeIndex));
   }
 
   Future<void> reorderQueue(int oldIndex, int newIndex) async {

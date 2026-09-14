@@ -146,25 +146,91 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                       ),
                     ),
                   ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: Adaptive.pagePadding(context)),
+                      child: Row(
+                        children: [
+                          Text(
+                            context.l10n.queue,
+                            style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700),
+                          ),
+                          const Spacer(),
+                          // Album-level queue actions (gap 07-03).
+                          PopupMenuButton<String>(
+                            icon: Icon(Icons.more_horiz_rounded,
+                                color: p.textSecondary),
+                            onSelected: (v) async {
+                              final cubit = context.read<PlayerCubit>();
+                              if (v == 'add') {
+                                await cubit.addAllToQueue(songs);
+                              } else if (v == 'next' && songs.isNotEmpty) {
+                                for (final s in songs.reversed) {
+                                  await cubit.playNext(s);
+                                }
+                              }
+                            },
+                            itemBuilder: (c) => [
+                              PopupMenuItem(
+                                  value: 'add',
+                                  child: Text(context.l10n.addToQueue)),
+                              PopupMenuItem(
+                                  value: 'next',
+                                  child: Text(context.l10n.playNext)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                   SliverPadding(
-                    padding: const EdgeInsets.only(top: 16, bottom: 160),
+                    padding: const EdgeInsets.only(top: 8, bottom: 160),
                     sliver: SliverList.builder(
                       itemCount: songs.length,
-                      itemBuilder: (context, index) => SongTile(
-                        song: songs[index],
-                        index: index,
-                        showArtwork: false,
-                        onTap: () => context
-                            .read<PlayerCubit>()
-                            .playSong(songs[index], queue: songs),
-                        onMorePressed: () => showModalBottomSheet(
-                          context: context,
-                          useRootNavigator: true,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (_) => SongInfoSheet(song: songs[index]),
-                        ),
-                      ),
+                      itemBuilder: (context, index) {
+                        // Disc grouping (gap 07-02): data is already ordered by
+                        // discNumber/trackNumber; render a header on change.
+                        final song = songs[index];
+                        final showDiscHeader = index == 0 ||
+                            (song.discNumber ?? 1) !=
+                                (songs[index - 1].discNumber ?? 1);
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (showDiscHeader &&
+                                songs.any((s) => (s.discNumber ?? 1) > 1))
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                                child: Text(
+                                  'Disc ${song.discNumber ?? 1}',
+                                  style: TextStyle(
+                                      color: p.textSecondary,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                            SongTile(
+                              song: song,
+                              index: index,
+                              showArtwork: false,
+                              onTap: () => context
+                                  .read<PlayerCubit>()
+                                  .playSong(song, queue: songs),
+                              onMorePressed: () => showModalBottomSheet(
+                                context: context,
+                                useRootNavigator: true,
+                                isScrollControlled: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (_) => SongInfoSheet(song: song),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -198,7 +264,7 @@ class _AlbumErrorView extends StatelessWidget {
               Icon(Icons.error_outline_rounded, color: p.error, size: 48),
               const SizedBox(height: 16),
               Text(
-                'Could not load album songs',
+                context.l10n.couldNotLoadAlbumSongs,
                 style: TextStyle(
                     color: p.textPrimary,
                     fontWeight: FontWeight.w700,
@@ -206,7 +272,7 @@ class _AlbumErrorView extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Something went wrong while reading your library.',
+                context.l10n.libraryReadError,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: p.textSecondary, fontSize: 13),
               ),
@@ -214,7 +280,7 @@ class _AlbumErrorView extends StatelessWidget {
               ElevatedButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Retry'),
+                label: Text(context.l10n.retry),
               ),
             ],
           ),

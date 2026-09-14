@@ -2133,4 +2133,60 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get continueLimitedAccess => 'المتابعة بوصول محدود';
+
+  @override
+  String get notFoundGeneric => 'غير موجود';
+
+  @override
+  String get albumNotFoundHint => 'تعذر العثور على الالبوم — افتحه من المكتبة.';
+
+  @override
+  String get artistNotFoundHint => 'تعذر العثور على الفنان — افتحه من المكتبة.';
+
+  @override
+  String get genreNotFoundHint => 'تعذر العثور على النوع — افتحه من المكتبة.';
+
+  @override
+  String get yearNotFoundHint => 'تعذر العثور على السنة — افتحها من المكتبة.';
+
+  @override
+  String get playlistNotFoundHint =>
+      'تعذر العثور على قائمة التشغيل — افتحها من المكتبة.';
+
+  @override
+  String get folderNotFound => 'تعذر العثور على المجلد';
+
+  @override
+  String get songNotFound => 'تعذر العثور على الاغنية';
+
+  @override
+  String get couldNotLoadAlbumSongs => 'تعذر تحميل اغاني الالبوم';
+
+  @override
+  String get couldNotLoadFolderSongs => 'تعذر تحميل اغاني المجلد';
+
+  @override
+  String get libraryReadError => 'حدث خطا اثناء قراءة مكتبتك.';
+
+  @override
+  String get folderExcluded => 'المجلد مستبعد من الفحص';
+
+  @override
+  String get folderIncluded => 'المجلد مشمول في الفحص';
+
+  @override
+  String get clearQueueConfirm =>
+      'مسح قائمة الانتظار؟ (سيتم الاحتفاظ بالمسار الحالي)';
+
+  @override
+  String get queueSaved => 'تم حفظ القائمة';
+
+  @override
+  String get saveAsPlaylist => 'حفظ كقائمة تشغيل';
+
+  @override
+  String get saveFailed => 'فشل الحفظ';
+
+  @override
+  String get addToQueue => 'اضافة الى قائمة الانتظار';
 }

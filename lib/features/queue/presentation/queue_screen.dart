@@ -13,6 +13,7 @@ import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/di/injection.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/formatters.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../player/cubit/player_state.dart';
@@ -43,13 +44,36 @@ class QueueScreen extends StatelessWidget {
                     final confirm = await PulsrDialogHelper.showConfirmDialog(
                       context,
                       title: context.l10n.queue,
-                      message: 'Clear queue? (Playing track will be kept)',
+                      message: context.l10n.clearQueueConfirm,
                       icon: Icons.clear_all_rounded,
-                      confirmLabel: 'Clear',
+                      confirmLabel: context.l10n.clear,
                       isDestructive: true,
                     );
-                    if (confirm == true) {
+                    if (confirm == true && context.mounted) {
+                      final removed = List.of(state.queue);
+                      final removedIndex = state.currentIndex;
                       await cubit.clearQueue();
+                      if (context.mounted) {
+                        // Undo for destructive clear (gap 10-03).
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(context.l10n.clearQueueConfirm),
+                            action: SnackBarAction(
+                              label: context.l10n.undo,
+                              onPressed: () {
+                                try {
+                                  cubit.restoreQueue(removed, removedIndex);
+                                } catch (e, st) {
+                                  ErrorLogger.log('Queue undo failed',
+                                      error: e,
+                                      stackTrace: st,
+                                      category: 'Queue');
+                                }
+                              },
+                            ),
+                          ),
+                        );
+                      }
                     }
                     break;
                   case 'shuffle':
@@ -60,14 +84,14 @@ class QueueScreen extends StatelessWidget {
                     break;
                   case 'save':
                     final defaultName =
-                        'Queue ${DateTime.now().toIso8601String().substring(0, 10)}';
+                        '${context.l10n.queue} ${DateTime.now().toIso8601String().substring(0, 10)}';
                     final name = await PulsrDialogHelper.showInputDialog(
                       context,
-                      title: 'Save as Playlist',
+                      title: context.l10n.saveAsPlaylist,
                       initialText: defaultName,
                       icon: Icons.playlist_add_rounded,
-                      confirmLabel: 'Save',
-                      cancelLabel: 'Cancel',
+                      confirmLabel: context.l10n.save,
+                      cancelLabel: context.l10n.cancel,
                     );
                     if (name != null && name.isNotEmpty && context.mounted) {
                       final songIds = state.queue.map((s) => s.id).toList();
@@ -76,7 +100,7 @@ class QueueScreen extends StatelessWidget {
                         (failure) {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Failed to save playlist: ${failure.message}')),
+                              SnackBar(content: Text('${context.l10n.saveFailed}: ${failure.message}')),
                             );
                           }
                         },
@@ -84,7 +108,7 @@ class QueueScreen extends StatelessWidget {
                           await getIt<PlaylistUseCases>().addSongsToPlaylist(playlistId, songIds);
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Saved "$name" with ${songIds.length} tracks')),
+                              SnackBar(content: Text(context.l10n.queueSaved)),
                             );
                           }
                         },
@@ -94,10 +118,10 @@ class QueueScreen extends StatelessWidget {
                 }
               },
               itemBuilder: (c) => [
-                const PopupMenuItem(value: 'shuffle', child: Row(children: [Icon(Icons.shuffle), SizedBox(width: 8), Text('Shuffle queue')])),
-                const PopupMenuItem(value: 'save', child: Row(children: [Icon(Icons.playlist_add), SizedBox(width: 8), Text('Save as playlist')])),
+                PopupMenuItem(value: 'shuffle', child: Row(children: [const Icon(Icons.shuffle), const SizedBox(width: 8), Text(context.l10n.shuffle)])),
+                PopupMenuItem(value: 'save', child: Row(children: [const Icon(Icons.playlist_add), const SizedBox(width: 8), Text(context.l10n.saveAsPlaylist)])),
                 const PopupMenuDivider(),
-                const PopupMenuItem(value: 'clear', child: Row(children: [Icon(Icons.clear_all, color: Colors.red), SizedBox(width: 8), Text('Clear queue', style: TextStyle(color: Colors.red))])),
+                PopupMenuItem(value: 'clear', child: Row(children: [const Icon(Icons.clear_all, color: Colors.red), const SizedBox(width: 8), Text(context.l10n.clearQueueConfirm.split('?').first, style: const TextStyle(color: Colors.red))])),
               ],
             );
           }),

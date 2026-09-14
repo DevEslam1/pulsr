@@ -35,12 +35,19 @@ abstract class AppColors {
   static const Color lightOutline = Color(0xFFD8DFEC);
   static const Color lightSecondary = Color(0xFF4B4FBE);
 
-  // AMOLED (legacy)
+  // AMOLED (legacy, deprecated): single source of truth is AuraTheme.amoledTheme
+  // (defect 19-01). Kept only for tests referencing constants; do not use in UI.
+  @Deprecated('Use context.palette / AuraTheme.amoledTheme instead')
   static const Color amoledBackground = Color(0xFF000000);
+  @Deprecated('Use context.palette / AuraTheme.amoledTheme instead')
   static const Color amoledSurface = Color(0xFF0A0A0A);
+  @Deprecated('Use context.palette / AuraTheme.amoledTheme instead')
   static const Color amoledCard = Color(0xFF141414);
+  @Deprecated('Use context.palette / AuraTheme.amoledTheme instead')
   static const Color amoledTextPrimary = Color(0xFFFFFFFF);
+  @Deprecated('Use context.palette / AuraTheme.amoledTheme instead')
   static const Color amoledTextSecondary = Color(0xFFA0A0A0);
+  @Deprecated('Use context.palette / AuraTheme.amoledTheme instead')
   static const Color amoledOutline = Color(0xFF222222);
 
   static const List<Color> customAccents = [

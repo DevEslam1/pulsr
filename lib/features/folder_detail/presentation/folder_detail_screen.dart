@@ -74,8 +74,8 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                   SnackBar(
                     content: Text(
                       newExcluded
-                          ? 'Folder excluded from library scan'
-                          : 'Folder included in library scan',
+                          ? context.l10n.folderExcluded
+                          : context.l10n.folderIncluded,
                     ),
                   ),
                 );
@@ -97,7 +97,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                     Icon(Icons.error_outline_rounded, color: p.error, size: 48),
                     const SizedBox(height: 16),
                     Text(
-                      'Could not load folder songs',
+                      context.l10n.couldNotLoadFolderSongs,
                       style: TextStyle(
                         color: p.textPrimary,
                         fontWeight: FontWeight.w700,
@@ -106,7 +106,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Something went wrong while reading this folder.',
+                      context.l10n.libraryReadError,
                       textAlign: TextAlign.center,
                       style: TextStyle(color: p.textSecondary, fontSize: 13),
                     ),
@@ -114,7 +114,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                     ElevatedButton.icon(
                       onPressed: () => setState(() {}),
                       icon: const Icon(Icons.refresh_rounded),
-                      label: const Text('Retry'),
+                      label: Text(context.l10n.retry),
                     ),
                   ],
                 ),

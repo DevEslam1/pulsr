@@ -1,5 +1,6 @@
 // lib/features/artist_detail/presentation/artist_detail_screen.dart
 import 'package:flutter/material.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
@@ -303,7 +304,7 @@ class _ErrorSection extends StatelessWidget {
                 ),
                 TextButton(
                   onPressed: onRetry,
-                  child: const Text('Retry'),
+                  child: Text(context.l10n.retry),
                 ),
               ],
             ),

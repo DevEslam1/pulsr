@@ -705,5 +705,77 @@
   "continueLimitedAccess": "Continuar con acceso limitado",
   "@continueLimitedAccess": {
     "description": "Continue onboarding without permission"
+  },
+  "notFoundGeneric": "No encontrado",
+  "@notFoundGeneric": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "albumNotFoundHint": "Album no encontrado — abrelo desde la biblioteca.",
+  "@albumNotFoundHint": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "artistNotFoundHint": "Artista no encontrado — abrelo desde la biblioteca.",
+  "@artistNotFoundHint": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "genreNotFoundHint": "Genero no encontrado — abrelo desde la biblioteca.",
+  "@genreNotFoundHint": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "yearNotFoundHint": "Ano no encontrado — abrelo desde la biblioteca.",
+  "@yearNotFoundHint": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "playlistNotFoundHint": "Lista no encontrada — abrela desde la biblioteca.",
+  "@playlistNotFoundHint": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "folderNotFound": "Carpeta no encontrada",
+  "@folderNotFound": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "songNotFound": "Cancion no encontrada",
+  "@songNotFound": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "couldNotLoadAlbumSongs": "No se pudieron cargar las canciones del album",
+  "@couldNotLoadAlbumSongs": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "couldNotLoadFolderSongs": "No se pudieron cargar las canciones de la carpeta",
+  "@couldNotLoadFolderSongs": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "libraryReadError": "Algo salio mal al leer tu biblioteca.",
+  "@libraryReadError": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "folderExcluded": "Carpeta excluida del analisis",
+  "@folderExcluded": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "folderIncluded": "Carpeta incluida en el analisis",
+  "@folderIncluded": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "clearQueueConfirm": "Vaciar la cola? (Se conservara la cancion en reproduccion)",
+  "@clearQueueConfirm": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "queueSaved": "Lista guardada",
+  "@queueSaved": {
+    "description": "max-rate l10n tranche 3"
+  },
+  "saveAsPlaylist": "Guardar como lista",
+  "@saveAsPlaylist": {
+    "description": "queue l10n"
+  },
+  "saveFailed": "Error al guardar",
+  "@saveFailed": {
+    "description": "queue l10n"
+  },
+  "addToQueue": "Anadir a la cola",
+  "@addToQueue": {
+    "description": "detail header"
   }
 }

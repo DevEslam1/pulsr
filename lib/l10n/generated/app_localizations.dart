@@ -3850,6 +3850,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Continue with limited access'**
   String get continueLimitedAccess;
+
+  /// max-rate l10n tranche 3
+  ///
+  /// In en, this message translates to:
+  /// **'Not found'**
+  String get notFoundGeneric;
+
+  /// max-rate l10n tranche 3
+  ///
+  /// In en, this message translates to:
+  /// **'Album not found — open it from the library.'**
+  String get albumNotFoundHint;
+
+  /// max-rate l10n tranche 3
+  ///
+  /// In en, this message translates to:
+  /// **'Artist not found — open it from the library.'**
+  String get artistNotFoundHint;
+
+  /// max-rate l10n tranche 3
+  ///
+  /// In en, this message translates to:
+  /// **'Genre not found — open it from the library.'**
+  String get genreNotFoundHint;
+
+  /// max-rate l10n tranche 3
+  ///
+  /// In en, this message translates to:
+  /// **'Year not found — open it from the library.'**
+  String get yearNotFoundHint;
+
+  /// max-rate l10n tranche 3
+  ///
+  /// In en, this message translates to:
+  /// **'Playlist not found — open it from the library.'**
+  String get playlistNotFoundHint;
+
+  /// max-rate l10n tranche 3
+  ///
+  /// In en, this message translates to:
+  /// **'Folder not found'**
+  String get folderNotFound;
+
+  /// max-rate l10n tranche 3
+  ///
+  /// In en, this message translates to:
+  /// **'Song not found'**
+  String get songNotFound;
+
+  /// max-rate l10n tranche 3
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load album songs'**
+  String get couldNotLoadAlbumSongs;
+
+  /// max-rate l10n tranche 3
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load folder songs'**
+  String get couldNotLoadFolderSongs;
+
+  /// max-rate l10n tranche 3
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong while reading your library.'**
+  String get libraryReadError;
+
+  /// max-rate l10n tranche 3
+  ///
+  /// In en, this message translates to:
+  /// **'Folder excluded from library scan'**
+  String get folderExcluded;
+
+  /// max-rate l10n tranche 3
+  ///
+  /// In en, this message translates to:
+  /// **'Folder included in library scan'**
+  String get folderIncluded;
+
+  /// max-rate l10n tranche 3
+  ///
+  /// In en, this message translates to:
+  /// **'Clear queue? (Playing track will be kept)'**
+  String get clearQueueConfirm;
+
+  /// max-rate l10n tranche 3
+  ///
+  /// In en, this message translates to:
+  /// **'Saved queue playlist'**
+  String get queueSaved;
+
+  /// queue l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Save as Playlist'**
+  String get saveAsPlaylist;
+
+  /// queue l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Save failed'**
+  String get saveFailed;
+
+  /// detail header
+  ///
+  /// In en, this message translates to:
+  /// **'Add to Queue'**
+  String get addToQueue;
 }
 
 class _AppLocalizationsDelegate
