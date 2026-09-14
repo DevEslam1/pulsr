@@ -23,8 +23,12 @@ class PrefsKeys {
   static const String resumeAfterInterruption =
       'setting_resume_after_interruption';
   static const String themeMode = 'setting_theme_mode';
-  static const String customAccentColor = 'setting_custom_accent_color';
-  static const String dynamicThemingEnabled = 'setting_dynamic_theming_enabled';
+  // Live store is 'setting_custom_accent' (SettingsCubit._keyCustomAccent);
+  // the '_color' suffixed value was a dead duplicate (orphan 20-01).
+  static const String customAccentColor = 'setting_custom_accent';
+  // Live legacy bool is 'setting_dynamic_theme' (SettingsCubit._keyDynamicTheme);
+  // the '_enabled' suffixed value was a dead duplicate (orphan 20-01).
+  static const String dynamicThemingEnabled = 'setting_dynamic_theme';
   static const String playerThemeMode = 'setting_player_theme_mode';
   static const String playbackSpeed = 'setting_playback_speed';
   static const String playbackPitch = 'setting_playback_pitch';
@@ -38,7 +42,8 @@ class PrefsKeys {
       'setting_replay_gain_preamp_without_rg';
   static const String sleepTimerTarget = 'sleep_timer_target';
   static const String queueSlots = 'queue_slots_v1';
-  static const String queueActiveSlot = 'queue_active_slot_v1';
+  // Removed: queueActiveSlot ('queue_active_slot_v1') was dead — the active
+  // slot is embedded in queue_slots_v1 (orphan 20-01, tranche 5).
   static const String ytdlpBackendEnabled = 'setting_ytdlp_backend_enabled';
   static const String ytdlpBackendUrl = 'setting_ytdlp_backend_url';
   static const String ytdlpBackendToken = 'setting_ytdlp_backend_token';
@@ -139,11 +144,12 @@ class PrefsKeys {
   static const String cloudSyncLastTimestamp = 'cloud_sync_last_timestamp';
   static const String cloudSyncFavoritesEnabled = 'cloud_sync_favorites_enabled';
   static const String cloudSyncPlaylistsEnabled = 'cloud_sync_playlists_enabled';
-  static const String cloudSyncDocHashes = 'cloud_sync_doc_hashes_v1';
+  // Live store is 'cloud_sync_hashes_cache' (CloudSyncService._keySyncedHashes);
+  // the '_doc_hashes_v1' value was a dead duplicate (orphan 20-01).
+  static const String cloudSyncDocHashes = 'cloud_sync_hashes_cache';
 
-  // FIX(S1-FU): History deduplication keys
-  static const String historyLastSongId = 'history_last_song_id';
-  static const String historyLastTimeMs = 'history_last_time_ms';
+  // Removed: historyLastSongId/historyLastTimeMs were dead — history dedup is
+  // in-memory + Drift play_history (orphan 20-01, tranche 5).
 
   // FIX(B2): Canonical SharedPreferences keys for Scrobbler service
   static const String scrobbleLastKey = 'last_scrobble_key';
@@ -177,7 +183,8 @@ class PrefsKeys {
 
   // Advanced playback engine features
   // F1–F11 maximize-feature-set keys
-  static const String abLoopEnabled = 'ab_loop_enabled';
+  // Removed: abLoopEnabled ('ab_loop_enabled') was dead — A-B state lives in
+  // AbLoopManager 'ab_loops_v1' per-track store (orphan 20-01, tranche 5).
   static const String hedgedResolutionEnabled = 'hedged_resolution_enabled';
   static const String adaptiveQualityEnabled = 'adaptive_quality_enabled';
   static const String duckingMode = 'audio_ducking_mode_v1';
@@ -205,7 +212,8 @@ class PrefsKeys {
   // process restart (when the in-memory snapshot no longer exists).
   static const String quranRestoreSnapshot = 'quran_restore_snapshot_v1';
   static const String spatializerEngine = 'setting_spatializer_engine'; // 'off' | 'systemHardware' | 'binauralAmbisonic'
-  static const String exclusiveOffloadEnabled = 'setting_exclusive_offload_enabled';
+  // Removed: exclusiveOffloadEnabled was dead — no native exclusive-offload
+  // path exists (orphan 20-01, tranche 5). Reintroduce with native support.
 
   // T6: Direct Volume Control. Pins Android's media stream to maximum and
   // applies the composed gain in the native float DSP path instead of relying

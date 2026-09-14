@@ -4012,6 +4012,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Track number'**
   String get sortTrackNumber;
+
+  /// tranche5 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Set as ringtone'**
+  String get setAsRingtone;
+
+  /// tranche5 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Ringtone set successfully'**
+  String get ringtoneSet;
+
+  /// tranche5 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to set ringtone.'**
+  String get ringtoneFailed;
+
+  /// tranche5 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Change Cover'**
+  String get changeCover;
+
+  /// tranche5 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Cover'**
+  String get removeCover;
+
+  /// tranche5 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Track BPM'**
+  String get trackBpm;
+
+  /// tranche5 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'BPM override cleared.'**
+  String get bpmCleared;
+
+  /// tranche5 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmark cleared.'**
+  String get bookmarkCleared;
+
+  /// tranche5 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Backup export failed.'**
+  String get backupExportFailed;
+
+  /// tranche5 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Backup import failed.'**
+  String get backupImportFailed;
+
+  /// tranche5 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Proxy settings saved.'**
+  String get proxySaved;
+
+  /// tranche5 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Cast device'**
+  String get castDevice;
+
+  /// tranche5 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Cast Current Track'**
+  String get castCurrentTrack;
+
+  /// tranche5 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get stopCast;
+
+  /// tranche5 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Scanning for Cast devices...'**
+  String get scanningCastDevices;
 }
 
 class _AppLocalizationsDelegate

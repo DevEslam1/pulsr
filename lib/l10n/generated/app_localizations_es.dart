@@ -2222,4 +2222,49 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get sortTrackNumber => 'Numero de pista';
+
+  @override
+  String get setAsRingtone => 'Establecer como tono';
+
+  @override
+  String get ringtoneSet => 'Tono establecido correctamente';
+
+  @override
+  String get ringtoneFailed => 'No se pudo establecer el tono.';
+
+  @override
+  String get changeCover => 'Cambiar portada';
+
+  @override
+  String get removeCover => 'Quitar portada';
+
+  @override
+  String get trackBpm => 'BPM de la pista';
+
+  @override
+  String get bpmCleared => 'Ajuste de BPM eliminado.';
+
+  @override
+  String get bookmarkCleared => 'Marcador eliminado.';
+
+  @override
+  String get backupExportFailed => 'Error al exportar la copia.';
+
+  @override
+  String get backupImportFailed => 'Error al importar la copia.';
+
+  @override
+  String get proxySaved => 'Ajustes de proxy guardados.';
+
+  @override
+  String get castDevice => 'Dispositivo de Cast';
+
+  @override
+  String get castCurrentTrack => 'Transmitir pista actual';
+
+  @override
+  String get stopCast => 'Detener';
+
+  @override
+  String get scanningCastDevices => 'Buscando dispositivos...';
 }

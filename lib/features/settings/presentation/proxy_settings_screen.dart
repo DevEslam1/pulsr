@@ -117,7 +117,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
               Icon(Icons.check_circle_rounded,
                   color: context.palette.success, size: 20),
               const SizedBox(width: 10),
-              const Text('Proxy settings saved'),
+              Text(context.l10n.proxySaved),
             ],
           ),
           backgroundColor: context.palette.surfaceContainerHigh,

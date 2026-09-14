@@ -2216,4 +2216,49 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get sortTrackNumber => 'رقم المسار';
+
+  @override
+  String get setAsRingtone => 'تعيين كنغمة';
+
+  @override
+  String get ringtoneSet => 'تم تعيين النغمة بنجاح';
+
+  @override
+  String get ringtoneFailed => 'تعذر تعيين النغمة.';
+
+  @override
+  String get changeCover => 'تغيير الغلاف';
+
+  @override
+  String get removeCover => 'ازالة الغلاف';
+
+  @override
+  String get trackBpm => 'ايقاع المسار';
+
+  @override
+  String get bpmCleared => 'تم مسح تجاوز الايقاع.';
+
+  @override
+  String get bookmarkCleared => 'تم مسح العلامة.';
+
+  @override
+  String get backupExportFailed => 'فشل تصدير النسخة.';
+
+  @override
+  String get backupImportFailed => 'فشل استيراد النسخة.';
+
+  @override
+  String get proxySaved => 'تم حفظ اعدادات البروكسي.';
+
+  @override
+  String get castDevice => 'جهاز البث';
+
+  @override
+  String get castCurrentTrack => 'بث المسار الحالي';
+
+  @override
+  String get stopCast => 'ايقاف';
+
+  @override
+  String get scanningCastDevices => 'جار البحث عن اجهزة البث...';
 }

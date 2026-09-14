@@ -1101,5 +1101,65 @@
   },
   "@sortDuration": {
     "description": "detail sort"
+  },
+  "setAsRingtone": "Set as ringtone",
+  "@setAsRingtone": {
+    "description": "tranche5 l10n"
+  },
+  "ringtoneSet": "Ringtone set successfully",
+  "@ringtoneSet": {
+    "description": "tranche5 l10n"
+  },
+  "ringtoneFailed": "Failed to set ringtone.",
+  "@ringtoneFailed": {
+    "description": "tranche5 l10n"
+  },
+  "changeCover": "Change Cover",
+  "@changeCover": {
+    "description": "tranche5 l10n"
+  },
+  "removeCover": "Remove Cover",
+  "@removeCover": {
+    "description": "tranche5 l10n"
+  },
+  "trackBpm": "Track BPM",
+  "@trackBpm": {
+    "description": "tranche5 l10n"
+  },
+  "bpmCleared": "BPM override cleared.",
+  "@bpmCleared": {
+    "description": "tranche5 l10n"
+  },
+  "bookmarkCleared": "Bookmark cleared.",
+  "@bookmarkCleared": {
+    "description": "tranche5 l10n"
+  },
+  "backupExportFailed": "Backup export failed.",
+  "@backupExportFailed": {
+    "description": "tranche5 l10n"
+  },
+  "backupImportFailed": "Backup import failed.",
+  "@backupImportFailed": {
+    "description": "tranche5 l10n"
+  },
+  "proxySaved": "Proxy settings saved.",
+  "@proxySaved": {
+    "description": "tranche5 l10n"
+  },
+  "castDevice": "Cast device",
+  "@castDevice": {
+    "description": "tranche5 l10n"
+  },
+  "castCurrentTrack": "Cast Current Track",
+  "@castCurrentTrack": {
+    "description": "tranche5 l10n"
+  },
+  "stopCast": "Stop",
+  "@stopCast": {
+    "description": "tranche5 l10n"
+  },
+  "scanningCastDevices": "Scanning for Cast devices...",
+  "@scanningCastDevices": {
+    "description": "tranche5 l10n"
   }
 }

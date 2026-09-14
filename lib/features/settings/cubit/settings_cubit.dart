@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/bloc/base_cubit.dart';
 import '../../../core/constants/channels.dart';
 import '../../../core/constants/prefs_keys.dart';
+import '../../../data/audio/mqa_decoder_helper.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/network/app_http_overrides.dart';
 import '../../../core/network/proxy_config.dart';
@@ -650,6 +651,9 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       if (loadedState.bitPerfectOutput) {
         await _hiResAudioService.setBitPerfectMode(true);
       }
+      // MQA hook wiring (orphan 20-01): the decoder hook previously defaulted
+      // ON with no owner; the preference now owns it.
+      await loadMqaDecodingPreference();
       if (loadedState.bitPerfectOutput && loadedState.bypassDspOnBitPerfect) {
         // Re-assert the DSP-bypass policy at boot: without this the Kotlin
         // effects plugin keeps its default (bypass off) after a restart and
@@ -1432,7 +1436,37 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
           await AudioEffectsChannel().setBypassDspForBitPerfect(enabled);
         }
       } catch (_) {}
-      await refreshOutputDevice();
+    }
+    await refreshOutputDevice();
+  }
+
+  /// MQA approximate-unfold toggle (orphan 20-01 wiring, tranche 5). Drives
+  /// [MqaDecoderHelper.isMqaEnabled], which [FormatAwareDecoder] consults
+  /// before running the approximate first-unfold. Defaults ON to preserve
+  /// long-standing behaviour (hook defaulted to true via `?? true`).
+  static bool mqaEnabledCache = true;
+  static bool get isMqaDecodingEnabled => mqaEnabledCache;
+
+  Future<void> loadMqaDecodingPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      mqaEnabledCache = prefs.getBool(PrefsKeys.mqaDecodingEnabled) ?? true;
+    } catch (e, st) {
+      ErrorLogger.log('MQA preference load failed',
+          error: e, stackTrace: st, category: 'Settings');
+    }
+    MqaDecoderHelper.isMqaEnabled = () => mqaEnabledCache;
+  }
+
+  Future<void> setMqaDecodingEnabled(bool enabled) async {
+    mqaEnabledCache = enabled;
+    MqaDecoderHelper.isMqaEnabled = () => mqaEnabledCache;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(PrefsKeys.mqaDecodingEnabled, enabled);
+    } catch (e, st) {
+      ErrorLogger.log('MQA preference save failed',
+          error: e, stackTrace: st, category: 'Settings');
     }
   }
 

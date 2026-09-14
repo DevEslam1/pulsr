@@ -56,21 +56,13 @@ void main() {
       }
       if (hits == 0) orphans.add('${entry.key}=${entry.value}');
     }
-    // Ratchet (20-01): 9 keys are currently orphaned (declared but never
-    // read/written outside prefs_keys.dart) — these are the structurally
-    // likely inert toggles the audit flagged. The set may only shrink: remove
-    // an entry when you wire it, never add one.
-    const allowedOrphans = {
-      'customAccentColor',
-      'dynamicThemingEnabled',
-      'queueActiveSlot',
-      'cloudSyncDocHashes',
-      'historyLastSongId',
-      'historyLastTimeMs',
-      'abLoopEnabled',
-      'mqaDecodingEnabled',
-      'exclusiveOffloadEnabled',
-    };
+    // Ratchet (20-01): tranche 5 resolved all 9 orphans — 3 repointed at
+    // their live stores (customAccentColor, dynamicThemingEnabled,
+    // cloudSyncDocHashes), 5 dead constants removed (queueActiveSlot,
+    // historyLastSongId/TimeMs, abLoopEnabled, exclusiveOffloadEnabled), and
+    // mqaDecodingEnabled wired to MqaDecoderHelper via SettingsCubit.
+    // The set may only stay empty: wire any new key at introduction.
+    const allowedOrphans = <String>{};
     final orphanNames = orphans.map((e) => e.split('=').first).toSet();
     final unexpected = orphanNames.difference(allowedOrphans);
     final fixed = allowedOrphans.difference(orphanNames);

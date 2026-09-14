@@ -816,5 +816,65 @@
   },
   "@sortDuration": {
     "description": "detail sort"
+  },
+  "setAsRingtone": "تعيين كنغمة",
+  "@setAsRingtone": {
+    "description": "tranche5 l10n"
+  },
+  "ringtoneSet": "تم تعيين النغمة بنجاح",
+  "@ringtoneSet": {
+    "description": "tranche5 l10n"
+  },
+  "ringtoneFailed": "تعذر تعيين النغمة.",
+  "@ringtoneFailed": {
+    "description": "tranche5 l10n"
+  },
+  "changeCover": "تغيير الغلاف",
+  "@changeCover": {
+    "description": "tranche5 l10n"
+  },
+  "removeCover": "ازالة الغلاف",
+  "@removeCover": {
+    "description": "tranche5 l10n"
+  },
+  "trackBpm": "ايقاع المسار",
+  "@trackBpm": {
+    "description": "tranche5 l10n"
+  },
+  "bpmCleared": "تم مسح تجاوز الايقاع.",
+  "@bpmCleared": {
+    "description": "tranche5 l10n"
+  },
+  "bookmarkCleared": "تم مسح العلامة.",
+  "@bookmarkCleared": {
+    "description": "tranche5 l10n"
+  },
+  "backupExportFailed": "فشل تصدير النسخة.",
+  "@backupExportFailed": {
+    "description": "tranche5 l10n"
+  },
+  "backupImportFailed": "فشل استيراد النسخة.",
+  "@backupImportFailed": {
+    "description": "tranche5 l10n"
+  },
+  "proxySaved": "تم حفظ اعدادات البروكسي.",
+  "@proxySaved": {
+    "description": "tranche5 l10n"
+  },
+  "castDevice": "جهاز البث",
+  "@castDevice": {
+    "description": "tranche5 l10n"
+  },
+  "castCurrentTrack": "بث المسار الحالي",
+  "@castCurrentTrack": {
+    "description": "tranche5 l10n"
+  },
+  "stopCast": "ايقاف",
+  "@stopCast": {
+    "description": "tranche5 l10n"
+  },
+  "scanningCastDevices": "جار البحث عن اجهزة البث...",
+  "@scanningCastDevices": {
+    "description": "tranche5 l10n"
   }
 }

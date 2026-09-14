@@ -2196,4 +2196,49 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sortTrackNumber => 'Track number';
+
+  @override
+  String get setAsRingtone => 'Set as ringtone';
+
+  @override
+  String get ringtoneSet => 'Ringtone set successfully';
+
+  @override
+  String get ringtoneFailed => 'Failed to set ringtone.';
+
+  @override
+  String get changeCover => 'Change Cover';
+
+  @override
+  String get removeCover => 'Remove Cover';
+
+  @override
+  String get trackBpm => 'Track BPM';
+
+  @override
+  String get bpmCleared => 'BPM override cleared.';
+
+  @override
+  String get bookmarkCleared => 'Bookmark cleared.';
+
+  @override
+  String get backupExportFailed => 'Backup export failed.';
+
+  @override
+  String get backupImportFailed => 'Backup import failed.';
+
+  @override
+  String get proxySaved => 'Proxy settings saved.';
+
+  @override
+  String get castDevice => 'Cast device';
+
+  @override
+  String get castCurrentTrack => 'Cast Current Track';
+
+  @override
+  String get stopCast => 'Stop';
+
+  @override
+  String get scanningCastDevices => 'Scanning for Cast devices...';
 }

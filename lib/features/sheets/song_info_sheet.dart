@@ -85,7 +85,7 @@ class SongInfoSheet extends StatelessWidget {
       });
       if (context.mounted && (success ?? false)) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$label set successfully!')),
+          SnackBar(content: Text(context.l10n.ringtoneSet)),
         );
       }
     } on PlatformException catch (e) {
@@ -93,8 +93,7 @@ class SongInfoSheet extends StatelessWidget {
       if (e.code == 'PERMISSION_DENIED') {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content:
-                const Text('Permission required to change system settings'),
+            content: Text(context.l10n.ringtoneFailed),
             action: SnackBarAction(
               label: 'Settings',
               onPressed: () {
@@ -600,7 +599,7 @@ class SongInfoSheet extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Track BPM',
+                        context.l10n.trackBpm,
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -790,7 +789,7 @@ class SongInfoSheet extends StatelessWidget {
                       await cubit.clearBookmark();
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Bookmark cleared.')),
+                        SnackBar(content: Text(context.l10n.bookmarkCleared)),
                       );
                       setLocalState(() {});
                     },
@@ -845,7 +844,7 @@ class SongInfoSheet extends StatelessWidget {
     await playerCubit?.setTrackBpm(song, bpm);
     if (context.mounted && bpm == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('BPM override cleared.')),
+        SnackBar(content: Text(context.l10n.bpmCleared)),
       );
     }
   }
@@ -954,7 +953,7 @@ class _BpmOverrideDialogState extends State<_BpmOverrideDialog> {
     final p = context.palette;
     return PulsrDialog(
       icon: Icon(Icons.speed_rounded, color: p.accent, size: 28),
-      title: const Text('Track BPM'),
+      title: Text(context.l10n.trackBpm),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,

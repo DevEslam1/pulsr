@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/platform_capabilities.dart';
 import '../../../../domain/services/cast_service.dart';
 import '../../../player/cubit/player_cubit.dart';
@@ -150,7 +151,7 @@ class _CastSectionState extends State<CastSection> {
           if (_session.connected) ...[
             ListTile(
               leading: const Icon(Icons.cast_connected_rounded),
-              title: Text(_session.deviceName ?? 'Cast device'),
+              title: Text(_session.deviceName ?? context.l10n.castDevice),
               subtitle: Text(
                 _session.playing ? 'Playing on Cast' : 'Connected',
                 style: TextStyle(fontSize: 12, color: textSecondary),
@@ -164,7 +165,7 @@ class _CastSectionState extends State<CastSection> {
                     child: FilledButton.icon(
                       onPressed: _busy ? null : _castCurrent,
                       icon: const Icon(Icons.play_arrow_rounded),
-                      label: const Text('Cast Current Track'),
+                      label: Text(context.l10n.castCurrentTrack),
                     ),
                   ),
                   const SizedBox(width: 8),

@@ -235,7 +235,7 @@ class _BackupSectionState extends State<BackupSection> {
             children: [
               Icon(Icons.check_circle_rounded, color: context.palette.accent),
               const SizedBox(width: 8),
-              const Expanded(child: Text('Backup Restored')),
+              Expanded(child: Text(context.l10n.backupRestored)),
             ],
           ),
           content: Column(

@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../core/theme/aura_theme.dart';
+import '../../core/utils/l10n_extensions.dart';
 import '../../core/widgets/cached_artwork.dart';
 
 class ArtworkPicker extends StatelessWidget {
@@ -113,7 +114,7 @@ class ArtworkPicker extends StatelessWidget {
               TextButton.icon(
                 onPressed: onPick,
                 icon: const Icon(Icons.image_outlined, size: 18),
-                label: const Text('Change Cover'),
+                label: Text(context.l10n.changeCover),
                 style: TextButton.styleFrom(
                   foregroundColor: p.accent,
                 ),
@@ -123,7 +124,7 @@ class ArtworkPicker extends StatelessWidget {
                 TextButton.icon(
                   onPressed: onRemove,
                   icon: const Icon(Icons.delete_outline, size: 18),
-                  label: const Text('Remove'),
+                  label: Text(context.l10n.removeCover),
                   style: TextButton.styleFrom(
                     foregroundColor: Colors.redAccent,
                   ),

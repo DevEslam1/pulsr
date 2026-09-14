@@ -816,5 +816,65 @@
   },
   "@sortDuration": {
     "description": "detail sort"
+  },
+  "setAsRingtone": "Establecer como tono",
+  "@setAsRingtone": {
+    "description": "tranche5 l10n"
+  },
+  "ringtoneSet": "Tono establecido correctamente",
+  "@ringtoneSet": {
+    "description": "tranche5 l10n"
+  },
+  "ringtoneFailed": "No se pudo establecer el tono.",
+  "@ringtoneFailed": {
+    "description": "tranche5 l10n"
+  },
+  "changeCover": "Cambiar portada",
+  "@changeCover": {
+    "description": "tranche5 l10n"
+  },
+  "removeCover": "Quitar portada",
+  "@removeCover": {
+    "description": "tranche5 l10n"
+  },
+  "trackBpm": "BPM de la pista",
+  "@trackBpm": {
+    "description": "tranche5 l10n"
+  },
+  "bpmCleared": "Ajuste de BPM eliminado.",
+  "@bpmCleared": {
+    "description": "tranche5 l10n"
+  },
+  "bookmarkCleared": "Marcador eliminado.",
+  "@bookmarkCleared": {
+    "description": "tranche5 l10n"
+  },
+  "backupExportFailed": "Error al exportar la copia.",
+  "@backupExportFailed": {
+    "description": "tranche5 l10n"
+  },
+  "backupImportFailed": "Error al importar la copia.",
+  "@backupImportFailed": {
+    "description": "tranche5 l10n"
+  },
+  "proxySaved": "Ajustes de proxy guardados.",
+  "@proxySaved": {
+    "description": "tranche5 l10n"
+  },
+  "castDevice": "Dispositivo de Cast",
+  "@castDevice": {
+    "description": "tranche5 l10n"
+  },
+  "castCurrentTrack": "Transmitir pista actual",
+  "@castCurrentTrack": {
+    "description": "tranche5 l10n"
+  },
+  "stopCast": "Detener",
+  "@stopCast": {
+    "description": "tranche5 l10n"
+  },
+  "scanningCastDevices": "Buscando dispositivos...",
+  "@scanningCastDevices": {
+    "description": "tranche5 l10n"
   }
 }
