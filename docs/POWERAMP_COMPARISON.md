@@ -12,9 +12,10 @@
 > [`docs/POWERAMP_PARITY_PLAN.md`](POWERAMP_PARITY_PLAN.md). Shipped since the first pass:
 > follow-track sample-rate switching, strict no-resample bit-perfect, DoP DSD routing,
 > capability-filtered rate envelope (up to 768 kHz), **64-band** parametric EQ, CUE sheet
-> playback, HTTP internet radio, and PLS/WPL playlists. Still missing vs Poweramp: USB-exclusive
-> driver, native (non-DoP) DSD, DVC, 8.24/Float64, APE/WMA/TTA/TAK/WV/MPC/tracker decoders,
-> system-wide EQ and Chromecast.
+> playback, HTTP internet radio, and PLS/WPL playlists. Recently shipped: DVC, USB hardware volume,
+> Cast sessions (dev/ytm) and raw UAC2 USB streaming / Milkdrop GPU rendering (both unvalidated on
+> hardware). Still missing vs Poweramp: native (non-DoP) DSD, 8.24/Float64 and native decoders for
+> niche formats, plus system-wide EQ.
 
 ---
 
@@ -40,7 +41,7 @@
 | UI themes / skins | **Poweramp +** | Slight (ecosystem) |
 | Visualizations | **Poweramp +** | Slight (Milkdrop) |
 | Widgets / notification / Android Auto | **Even** | — |
-| Cast (Chromecast) | **Poweramp +** | Large |
+| Cast (Chromecast) | **Even** (dev/ytm) | — |
 | Automation & device profiles | **Pulsr +** | Moderate |
 | Scrobbling & listening stats | **Pulsr +** | Slight |
 | Optional cloud sync | **Pulsr +** | Slight |
@@ -48,7 +49,8 @@
 | System-wide EQ for other apps | **Poweramp +** | Large (separate app) |
 
 **Bottom line (revised):** the balance has shifted. Poweramp still owns the *deepest* output
-engine — USB-exclusive access, native DSD, DVC and 8.24/Float64 — but Pulsr now matches or beats
+engine — raw USB-exclusive streaming, native DSD, 8.24/Float64 and SoX-class resampling — but Pulsr
+now matches or beats
 it on **EQ depth (64-band)**, **internet radio**, **CUE**, **playlists**, and still leads on
 privacy, openness, room correction, effects breadth, library tools, automation, lyrics, online
 integration and i18n. The remaining Poweramp lead is narrower and mostly *native/hardware* work.
@@ -83,14 +85,14 @@ fair for what it delivers, but Pulsr wins on cost and openness.
 | Sample-rate switching per track | ✅ **Follow-Track** (per-track auto-reconfigure) | **Follow Track (beta)** auto-reconfigure |
 | Max sample rate | up to **768 kHz** (device-dependent; capability-gated) | up to **384 kHz** (stable) / **768 kHz (beta)** |
 | Bit depths | 16 / 24 / 32-float (8.24 unsupported) | 16 / 24 / **8.24 / 32 / Float** |
-| USB DAC | Device selection + negotiation via system picker | ✅ USB host + **USB Exclusive driver (beta)**, hardware volume |
+| USB DAC | USB host, **hardware volume (UAC Feature Unit)**, UAC1/2/3 detection, non-forced exclusive claim | ✅ USB host + **USB Exclusive driver (beta)**, hardware volume |
 | DSD | PCM decode + **DoP** (when a USB DAC advertises a carrier rate) | **Native + DoP DSD64–1024**, DSD remastering (beta) |
 | MQA | Detection + core unfold path | Not advertised |
 | Bluetooth codec control | ✅ (LDAC/aptX exposure) | ✅ LDAC/LDHC + codec matching |
 | Bluetooth Hi-Res | Device/codec dependent | ✅ (LDAC/LDHC) |
 | Resampler | Sinc resampler + quality setting | swr/SoX resampler |
 | Dither | TPDF | Multiple dither options |
-| Direct Volume Control (DVC) | ❌ (uses ReplayGain + per-song volume + HAL volume boost) | ✅ DVC, extended dynamic range/low-distortion bass |
+| Direct Volume Control (DVC) | 🟡 **Implemented** (native float gain stage; device validation pending) | ✅ DVC, extended dynamic range/low-distortion bass |
 | Output profiles | Device Profiles + Settings Profiles (per device) | Per-output presets, custom USB/BT profiles |
 | Dynamic reconfiguration | Engine hot-swap on route change | **Dynamic Reconfiguration (beta)** |
 
@@ -231,7 +233,7 @@ CUE) is now ahead across the board; playlist formats are matched.
 | Third-party skins | ❌ (open source; theme export) | ✅ large paid skin ecosystem |
 | Dynamic album-art theming | ✅ Aura palette extraction | skin/accent based |
 | AMOLED / high contrast | ✅ | ✅ dark skins |
-| Visualizations | 8 styles (bar/wave/circular/particles/3D terrain/album-reactive/custom JSON) | ✅ spectrum + **Milkdrop .milk presets** |
+| Visualizations | 9 styles (bar/wave/circular/particles/3D terrain/album-reactive/**custom JSON presets**/**Milkdrop**) | ✅ spectrum + **Milkdrop .milk presets** |
 | Widgets | ✅ interactive (play/pause/next/prev/seek/fav/shuffle/repeat) | ✅ highly customizable |
 | Mini-player | ✅ swipeable, drag-seek | ✅ |
 
@@ -248,7 +250,7 @@ has a strong free built-in set plus a theme studio but no marketplace.
 | MediaStyle notification / lock screen | ✅ | ✅ |
 | Headset/hardware buttons | ✅ | ✅ |
 | Home-screen widget | ✅ | ✅ |
-| **Chromecast / Cast** | ❌ | ✅ |
+| **Chromecast / Cast** | ✅ (dev/ytm; Play Services Default Media Receiver) | ✅ |
 | File intent handling (open audio from other apps) | ✅ | ✅ |
 | Device Profiles (auto per output) | ✅ | ✅ per-output presets |
 | Automation rules (trigger profiles on events) | ✅ | ❌ |
@@ -311,15 +313,16 @@ translation count.
 11. **CUE + PLS/WPL + 64-band EQ** — now at parity.
 
 ### Poweramp is ahead on
-1. **USB Exclusive driver** with hardware volume and true bypass (Pulsr uses the system picker).
+1. **Mature USB/DSD pipeline** — raw isochronous streaming, DSD512 and per-DAC tuning. Pulsr now
+   ships a raw UAC2 isochronous path and hardware volume, but it is unvalidated on hardware and
+   less battle-tested.
 2. **Native (non-DoP) DSD64–1024** and DSD remastering; Pulsr offers DoP only on capable DACs.
-3. **DVC** (Direct Volume Control) for low-distortion gain.
-4. **8.24 / Float64 pipeline** and SoX-class resampler + multiple dither flavors.
-5. **Native decoding breadth** — APE, WMA, TTA, TAK, WV, MPC, tracker mods, FLV.
-6. **System-wide EQ** via the separate Poweramp Equalizer app.
-7. **Chromecast** output.
-8. **Skins + Milkdrop visualizations** ecosystem.
-9. **Maturity/stability** of a decade-plus native engine.
+3. **8.24 / Float64 pipeline** and SoX-class resampler + multiple dither flavors.
+4. **Native decoding breadth** — APE, WMA, TTA, TAK, WV, MPC, tracker mods, FLV.
+5. **System-wide EQ** via the separate Poweramp Equalizer app.
+6. **Visualizer/skin marketplace** — Pulsr parses `.milk` presets and renders them on the GPU, but
+   does not execute the original HSLSL/EEL shader code or offer a skin marketplace.
+7. **Maturity/stability** of a decade-plus native engine.
 
 ### Roughly even
 Gapless/crossfade/replay gain, **parametric EQ depth (64-band)**, **internet radio**, **CUE**,
@@ -335,20 +338,24 @@ AutoEQ.
 > T7 64-band EQ, T9 format classification, T10 CUE, T11 radio, T12 PLS/WPL.
 
 ### Still open — native/hardware work
-1. **T1 USB Exclusive driver** with hardware volume and true bypass of the Android mixer.
-2. **T6 DVC-equivalent** direct gain stage (low-distortion, integrated with ducking/crossfade).
-3. **Native (non-DoP) DSD** and DSD remastering for DACs that accept raw DSD.
-4. **8.24 / Float64 pipeline** and **SoX-class resampler** + multiple dither flavors.
-5. **Native decoders** for APE, WMA, TTA, TAK, WV, MPC and tracker modules (FFmpeg/libavcodec
+1. **Native (non-DoP) DSD** and DSD remastering for DACs that accept raw DSD.
+2. **8.24 / Float64 pipeline** and **SoX-class resampler** + multiple dither flavors.
+3. **Native decoders** for APE, WMA, TTA, TAK, WV, MPC and tracker modules (FFmpeg/libavcodec
    bridge or libmpv backend) — currently classified honestly as "decoder required".
 
 ### Blocked by platform / third-party dependency
-6. **T8 System-wide EQ** for other apps — Android restricts session-0 global effects to
+4. **T8 System-wide EQ** for other apps — Android restricts session-0 global effects to
    privileged apps.
-7. **T13 Chromecast** — requires the Google Cast SDK + a registered receiver app id.
+5. **T13 Cast in the prod "Pure" build** — sessions need Play Services + INTERNET, which the
+   offline variant strips by design.
 
-### Out of scope
-8. Third-party **skins** and **Milkdrop visualizations** (UI ecosystem) — skipped by decision.
+### Shipped but unvalidated on hardware
+6. **T1 raw USB UAC2 isochronous streaming** + hardware volume (behind an explicit toggle).
+7. **T6 DVC** — native float gain stage.
+
+### Still partial
+8. **Milkdrop** — `.milk` parser + GPU fragment-shader renderer + preset import (HLSL not executed);
+   no skin marketplace.
 
 ### Optional polish
 9. Separate Bass/Treble controls; per-output preset granularity; volume-key long-press skip;
@@ -358,9 +365,10 @@ AutoEQ.
 
 ## 14. Honest verdict (revised)
 
-- **Poweramp still wins the extreme-output argument**: USB-exclusive access, native DSD,
-  DVC, 8.24/Float64, SoX-class resampling, native decoders for niche formats, system-wide EQ,
-  Cast, and a skin/visualizer ecosystem. Its beta engine overhaul keeps that lead.
+- **Poweramp's remaining edge is depth and maturity**: a decade-tuned USB/DSD pipeline,
+  8.24/Float64, SoX-class resampling, native decoders for niche formats, system-wide EQ, and a
+  visualizer/skin marketplace. Pulsr now implements raw USB streaming and DVC too, but those are
+  unvalidated on hardware.
 - **Pulsr now wins or ties almost everything else**: free/GPLv3, provably-offline Pure build,
   room correction, the richest built-in effects rack, 64-band EQ parity, CUE, internet radio,
   PLS/WPL, full library tooling, automation, superior lyrics, optional YouTube Music, and
@@ -369,10 +377,10 @@ AutoEQ.
   playlist formats, tag editing, widgets/Android Auto, scrobbling.
 
 After the parity pass, Pulsr is a **strictly stronger all-round local player** than Poweramp for
-the majority of users, and the remaining Poweramp advantages are concentrated in native DAC/DSD
-control (T1/T6 + native decoders), system-wide EQ and Cast. Closing those four native/dependency
-items would make Pulsr the stronger product on *every* axis except the skin/visualizer marketplace.
+the majority of users, and the remaining Poweramp advantages are concentrated in raw USB-exclusive
+streaming, native DSD, native decoders, system-wide EQ and Cast sessions. Closing those items would
+make Pulsr the stronger product on *every* axis except the full skin/visualizer marketplace.
 
-**Measurement caveat:** all new parity features are capability-gated and validated by 862 Dart
-tests + a native Kotlin compile. USB-exclusive, DVC and native-DSD behaviors still require
-real-device validation before being claimed as fully shipped.
+**Measurement caveat:** all new parity features are capability-gated and validated by 950+ Dart
+tests, Android Kotlin unit tests, and an NDK C++ syntax check. Raw USB-exclusive streaming, DVC and
+native-DSD behaviors still require real-device validation before being claimed as fully shipped.

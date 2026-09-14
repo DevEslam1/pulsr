@@ -78,6 +78,9 @@ flutter:
     - assets/app_icon/
     - assets/eq_profiles/
 
+  shaders:
+    - shaders/milkdrop.frag
+
   fonts:
     - family: Manrope
       fonts:

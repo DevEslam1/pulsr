@@ -207,6 +207,16 @@ class PrefsKeys {
   static const String spatializerEngine = 'setting_spatializer_engine'; // 'off' | 'systemHardware' | 'binauralAmbisonic'
   static const String exclusiveOffloadEnabled = 'setting_exclusive_offload_enabled';
 
+  // T6: Direct Volume Control. Pins Android's media stream to maximum and
+  // applies the composed gain in the native float DSP path instead of relying
+  // on Android's digital volume attenuation (higher dynamic range at low volume).
+  static const String dvcEnabled = 'setting_dvc_enabled';
+
+  // USB DAC hardware volume: when on, Pulsr drives the DAC's UAC Feature Unit
+  // hardware volume directly instead of only the Android media stream.
+  static const String usbHardwareVolumeEnabled =
+      'setting_usb_hardware_volume_enabled';
+
   // Per-session audio telemetry (route/codec/negotiated format/interruptions).
   static const String audioSessionLogEnabled =
       'setting_audio_session_log_enabled';

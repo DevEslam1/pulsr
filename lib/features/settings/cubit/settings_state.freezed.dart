@@ -99,6 +99,8 @@ mixin _$SettingsState {
   bool get outputFormatNegotiationEnabled;
   bool get floatOutputEnabled;
   bool get aaudioOutputEnabled;
+  bool get dvcEnabled;
+  bool get usbHardwareVolumeEnabled;
   bool get aaudioPreferExclusive;
   int get aaudioTargetBufferMs;
   int get sincResamplerQuality;
@@ -229,6 +231,8 @@ mixin _$SettingsState {
             (identical(other.outputFormatNegotiationEnabled, _this.outputFormatNegotiationEnabled) || other.outputFormatNegotiationEnabled == _this.outputFormatNegotiationEnabled) &&
             (identical(other.floatOutputEnabled, _this.floatOutputEnabled) || other.floatOutputEnabled == _this.floatOutputEnabled) &&
             (identical(other.aaudioOutputEnabled, _this.aaudioOutputEnabled) || other.aaudioOutputEnabled == _this.aaudioOutputEnabled) &&
+            (identical(other.dvcEnabled, _this.dvcEnabled) || other.dvcEnabled == _this.dvcEnabled) &&
+            (identical(other.usbHardwareVolumeEnabled, _this.usbHardwareVolumeEnabled) || other.usbHardwareVolumeEnabled == _this.usbHardwareVolumeEnabled) &&
             (identical(other.aaudioPreferExclusive, _this.aaudioPreferExclusive) || other.aaudioPreferExclusive == _this.aaudioPreferExclusive) &&
             (identical(other.aaudioTargetBufferMs, _this.aaudioTargetBufferMs) || other.aaudioTargetBufferMs == _this.aaudioTargetBufferMs) &&
             (identical(other.sincResamplerQuality, _this.sincResamplerQuality) || other.sincResamplerQuality == _this.sincResamplerQuality) &&
@@ -324,6 +328,8 @@ mixin _$SettingsState {
       _this.outputFormatNegotiationEnabled,
       _this.floatOutputEnabled,
       _this.aaudioOutputEnabled,
+      _this.dvcEnabled,
+      _this.usbHardwareVolumeEnabled,
       _this.aaudioPreferExclusive,
       _this.aaudioTargetBufferMs,
       _this.sincResamplerQuality,
@@ -334,7 +340,7 @@ mixin _$SettingsState {
   @override
   String toString() {
     final _this = this as SettingsState;
-    return 'SettingsState(gaplessPlayback: ${_this.gaplessPlayback}, crossfadeSeconds: ${_this.crossfadeSeconds}, minDurationSec: ${_this.minDurationSec}, autoHideSystemMedia: ${_this.autoHideSystemMedia}, themeColorSource: ${_this.themeColorSource}, resumeAfterInterruption: ${_this.resumeAfterInterruption}, waveformSeekBarEnabled: ${_this.waveformSeekBarEnabled}, themeMode: ${_this.themeMode}, autoThemeByTime: ${_this.autoThemeByTime}, highContrast: ${_this.highContrast}, languageCode: ${_this.languageCode}, customAccentColorValue: ${_this.customAccentColorValue}, playerThemeMode: ${_this.playerThemeMode}, visualizerStyle: ${_this.visualizerStyle}, miniPlayerSwipeLeft: ${_this.miniPlayerSwipeLeft}, miniPlayerSwipeRight: ${_this.miniPlayerSwipeRight}, nowPlayingDoubleTap: ${_this.nowPlayingDoubleTap}, nowPlayingArtworkSwipe: ${_this.nowPlayingArtworkSwipe}, replayGainMode: ${_this.replayGainMode}, replayGainPreampWithRg: ${_this.replayGainPreampWithRg}, replayGainPreampWithoutRg: ${_this.replayGainPreampWithoutRg}, streamingQuality: ${_this.streamingQuality}, downloadQuality: ${_this.downloadQuality}, wifiOnlyMode: ${_this.wifiOnlyMode}, offlineOnlyMode: ${_this.offlineOnlyMode}, isScanning: ${_this.isScanning}, proxyEnabled: ${_this.proxyEnabled}, proxyType: ${_this.proxyType}, proxyHost: ${_this.proxyHost}, proxyPort: ${_this.proxyPort}, proxyUsername: ${_this.proxyUsername}, hasProxyPassword: ${_this.hasProxyPassword}, proxyBypassHosts: ${_this.proxyBypassHosts}, proxyList: ${_this.proxyList}, isTestingAllProxies: ${_this.isTestingAllProxies}, extractorEngine: ${_this.extractorEngine}, ytdlpBackendEnabled: ${_this.ytdlpBackendEnabled}, ytdlpBackendUrl: ${_this.ytdlpBackendUrl}, ytdlpBackendToken: ${_this.ytdlpBackendToken}, syncCookiesToBackend: ${_this.syncCookiesToBackend}, isTestingYtdlpBackend: ${_this.isTestingYtdlpBackend}, ytdlpBackendStatusMessage: ${_this.ytdlpBackendStatusMessage}, ytdlpBackendVersion: ${_this.ytdlpBackendVersion}, ytdlpBackendProxyCount: ${_this.ytdlpBackendProxyCount}, ytdlpBackendCircuitState: ${_this.ytdlpBackendCircuitState}, bitPerfectOutput: ${_this.bitPerfectOutput}, bypassDspOnBitPerfect: ${_this.bypassDspOnBitPerfect}, followTrackSampleRate: ${_this.followTrackSampleRate}, strictBitPerfect: ${_this.strictBitPerfect}, dsdOutputMode: ${_this.dsdOutputMode}, experienceMode: ${_this.experienceMode}, dsdDopSupported: ${_this.dsdDopSupported}, currentOutputDevice: ${_this.currentOutputDevice}, scanResultCount: ${_this.scanResultCount}, errorMessage: ${_this.errorMessage}, crossfeedEnabled: ${_this.crossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, limiterEnabled: ${_this.limiterEnabled}, limiterLookaheadMs: ${_this.limiterLookaheadMs}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, reverbEnabled: ${_this.reverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, sincResamplerEnabled: ${_this.sincResamplerEnabled}, dspPreference: ${_this.dspPreference}, systemEffectsPolicy: ${_this.systemEffectsPolicy}, systemEffectsStatus: ${_this.systemEffectsStatus}, systemEffectsBundles: ${_this.systemEffectsBundles}, bluetoothLatencyOffsetMs: ${_this.bluetoothLatencyOffsetMs}, hedgedResolutionEnabled: ${_this.hedgedResolutionEnabled}, adaptiveQualityEnabled: ${_this.adaptiveQualityEnabled}, duckingMode: ${_this.duckingMode}, duckingLevel: ${_this.duckingLevel}, multiOutputMode: ${_this.multiOutputMode}, dspSnapshotEnabled: ${_this.dspSnapshotEnabled}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, sessionLogEnabled: ${_this.sessionLogEnabled}, outputFormatNegotiationEnabled: ${_this.outputFormatNegotiationEnabled}, floatOutputEnabled: ${_this.floatOutputEnabled}, aaudioOutputEnabled: ${_this.aaudioOutputEnabled}, aaudioPreferExclusive: ${_this.aaudioPreferExclusive}, aaudioTargetBufferMs: ${_this.aaudioTargetBufferMs}, sincResamplerQuality: ${_this.sincResamplerQuality}, bpmSyncCrossfadeEnabled: ${_this.bpmSyncCrossfadeEnabled})';
+    return 'SettingsState(gaplessPlayback: ${_this.gaplessPlayback}, crossfadeSeconds: ${_this.crossfadeSeconds}, minDurationSec: ${_this.minDurationSec}, autoHideSystemMedia: ${_this.autoHideSystemMedia}, themeColorSource: ${_this.themeColorSource}, resumeAfterInterruption: ${_this.resumeAfterInterruption}, waveformSeekBarEnabled: ${_this.waveformSeekBarEnabled}, themeMode: ${_this.themeMode}, autoThemeByTime: ${_this.autoThemeByTime}, highContrast: ${_this.highContrast}, languageCode: ${_this.languageCode}, customAccentColorValue: ${_this.customAccentColorValue}, playerThemeMode: ${_this.playerThemeMode}, visualizerStyle: ${_this.visualizerStyle}, miniPlayerSwipeLeft: ${_this.miniPlayerSwipeLeft}, miniPlayerSwipeRight: ${_this.miniPlayerSwipeRight}, nowPlayingDoubleTap: ${_this.nowPlayingDoubleTap}, nowPlayingArtworkSwipe: ${_this.nowPlayingArtworkSwipe}, replayGainMode: ${_this.replayGainMode}, replayGainPreampWithRg: ${_this.replayGainPreampWithRg}, replayGainPreampWithoutRg: ${_this.replayGainPreampWithoutRg}, streamingQuality: ${_this.streamingQuality}, downloadQuality: ${_this.downloadQuality}, wifiOnlyMode: ${_this.wifiOnlyMode}, offlineOnlyMode: ${_this.offlineOnlyMode}, isScanning: ${_this.isScanning}, proxyEnabled: ${_this.proxyEnabled}, proxyType: ${_this.proxyType}, proxyHost: ${_this.proxyHost}, proxyPort: ${_this.proxyPort}, proxyUsername: ${_this.proxyUsername}, hasProxyPassword: ${_this.hasProxyPassword}, proxyBypassHosts: ${_this.proxyBypassHosts}, proxyList: ${_this.proxyList}, isTestingAllProxies: ${_this.isTestingAllProxies}, extractorEngine: ${_this.extractorEngine}, ytdlpBackendEnabled: ${_this.ytdlpBackendEnabled}, ytdlpBackendUrl: ${_this.ytdlpBackendUrl}, ytdlpBackendToken: ${_this.ytdlpBackendToken}, syncCookiesToBackend: ${_this.syncCookiesToBackend}, isTestingYtdlpBackend: ${_this.isTestingYtdlpBackend}, ytdlpBackendStatusMessage: ${_this.ytdlpBackendStatusMessage}, ytdlpBackendVersion: ${_this.ytdlpBackendVersion}, ytdlpBackendProxyCount: ${_this.ytdlpBackendProxyCount}, ytdlpBackendCircuitState: ${_this.ytdlpBackendCircuitState}, bitPerfectOutput: ${_this.bitPerfectOutput}, bypassDspOnBitPerfect: ${_this.bypassDspOnBitPerfect}, followTrackSampleRate: ${_this.followTrackSampleRate}, strictBitPerfect: ${_this.strictBitPerfect}, dsdOutputMode: ${_this.dsdOutputMode}, experienceMode: ${_this.experienceMode}, dsdDopSupported: ${_this.dsdDopSupported}, currentOutputDevice: ${_this.currentOutputDevice}, scanResultCount: ${_this.scanResultCount}, errorMessage: ${_this.errorMessage}, crossfeedEnabled: ${_this.crossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, limiterEnabled: ${_this.limiterEnabled}, limiterLookaheadMs: ${_this.limiterLookaheadMs}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, reverbEnabled: ${_this.reverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, sincResamplerEnabled: ${_this.sincResamplerEnabled}, dspPreference: ${_this.dspPreference}, systemEffectsPolicy: ${_this.systemEffectsPolicy}, systemEffectsStatus: ${_this.systemEffectsStatus}, systemEffectsBundles: ${_this.systemEffectsBundles}, bluetoothLatencyOffsetMs: ${_this.bluetoothLatencyOffsetMs}, hedgedResolutionEnabled: ${_this.hedgedResolutionEnabled}, adaptiveQualityEnabled: ${_this.adaptiveQualityEnabled}, duckingMode: ${_this.duckingMode}, duckingLevel: ${_this.duckingLevel}, multiOutputMode: ${_this.multiOutputMode}, dspSnapshotEnabled: ${_this.dspSnapshotEnabled}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, sessionLogEnabled: ${_this.sessionLogEnabled}, outputFormatNegotiationEnabled: ${_this.outputFormatNegotiationEnabled}, floatOutputEnabled: ${_this.floatOutputEnabled}, aaudioOutputEnabled: ${_this.aaudioOutputEnabled}, dvcEnabled: ${_this.dvcEnabled}, usbHardwareVolumeEnabled: ${_this.usbHardwareVolumeEnabled}, aaudioPreferExclusive: ${_this.aaudioPreferExclusive}, aaudioTargetBufferMs: ${_this.aaudioTargetBufferMs}, sincResamplerQuality: ${_this.sincResamplerQuality}, bpmSyncCrossfadeEnabled: ${_this.bpmSyncCrossfadeEnabled})';
   }
 }
 
@@ -429,6 +435,8 @@ abstract mixin class $SettingsStateCopyWith<$Res> {
       bool outputFormatNegotiationEnabled,
       bool floatOutputEnabled,
       bool aaudioOutputEnabled,
+      bool dvcEnabled,
+      bool usbHardwareVolumeEnabled,
       bool aaudioPreferExclusive,
       int aaudioTargetBufferMs,
       int sincResamplerQuality,
@@ -532,6 +540,8 @@ class _$SettingsStateCopyWithImpl<$Res>
     Object? outputFormatNegotiationEnabled = null,
     Object? floatOutputEnabled = null,
     Object? aaudioOutputEnabled = null,
+    Object? dvcEnabled = null,
+    Object? usbHardwareVolumeEnabled = null,
     Object? aaudioPreferExclusive = null,
     Object? aaudioTargetBufferMs = null,
     Object? sincResamplerQuality = null,
@@ -874,6 +884,14 @@ class _$SettingsStateCopyWithImpl<$Res>
           ? _self.aaudioOutputEnabled
           : aaudioOutputEnabled // ignore: cast_nullable_to_non_nullable
               as bool,
+      dvcEnabled: null == dvcEnabled
+          ? _self.dvcEnabled
+          : dvcEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      usbHardwareVolumeEnabled: null == usbHardwareVolumeEnabled
+          ? _self.usbHardwareVolumeEnabled
+          : usbHardwareVolumeEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
       aaudioPreferExclusive: null == aaudioPreferExclusive
           ? _self.aaudioPreferExclusive
           : aaudioPreferExclusive // ignore: cast_nullable_to_non_nullable
@@ -1072,6 +1090,8 @@ extension SettingsStatePatterns on SettingsState {
             bool outputFormatNegotiationEnabled,
             bool floatOutputEnabled,
             bool aaudioOutputEnabled,
+            bool dvcEnabled,
+            bool usbHardwareVolumeEnabled,
             bool aaudioPreferExclusive,
             int aaudioTargetBufferMs,
             int sincResamplerQuality,
@@ -1167,6 +1187,8 @@ extension SettingsStatePatterns on SettingsState {
             _that.outputFormatNegotiationEnabled,
             _that.floatOutputEnabled,
             _that.aaudioOutputEnabled,
+            _that.dvcEnabled,
+            _that.usbHardwareVolumeEnabled,
             _that.aaudioPreferExclusive,
             _that.aaudioTargetBufferMs,
             _that.sincResamplerQuality,
@@ -1276,6 +1298,8 @@ extension SettingsStatePatterns on SettingsState {
             bool outputFormatNegotiationEnabled,
             bool floatOutputEnabled,
             bool aaudioOutputEnabled,
+            bool dvcEnabled,
+            bool usbHardwareVolumeEnabled,
             bool aaudioPreferExclusive,
             int aaudioTargetBufferMs,
             int sincResamplerQuality,
@@ -1370,6 +1394,8 @@ extension SettingsStatePatterns on SettingsState {
             _that.outputFormatNegotiationEnabled,
             _that.floatOutputEnabled,
             _that.aaudioOutputEnabled,
+            _that.dvcEnabled,
+            _that.usbHardwareVolumeEnabled,
             _that.aaudioPreferExclusive,
             _that.aaudioTargetBufferMs,
             _that.sincResamplerQuality,
@@ -1478,6 +1504,8 @@ extension SettingsStatePatterns on SettingsState {
             bool outputFormatNegotiationEnabled,
             bool floatOutputEnabled,
             bool aaudioOutputEnabled,
+            bool dvcEnabled,
+            bool usbHardwareVolumeEnabled,
             bool aaudioPreferExclusive,
             int aaudioTargetBufferMs,
             int sincResamplerQuality,
@@ -1572,6 +1600,8 @@ extension SettingsStatePatterns on SettingsState {
             _that.outputFormatNegotiationEnabled,
             _that.floatOutputEnabled,
             _that.aaudioOutputEnabled,
+            _that.dvcEnabled,
+            _that.usbHardwareVolumeEnabled,
             _that.aaudioPreferExclusive,
             _that.aaudioTargetBufferMs,
             _that.sincResamplerQuality,
@@ -1671,6 +1701,8 @@ class _SettingsState extends SettingsState {
       this.outputFormatNegotiationEnabled = true,
       this.floatOutputEnabled = true,
       this.aaudioOutputEnabled = false,
+      this.dvcEnabled = false,
+      this.usbHardwareVolumeEnabled = false,
       this.aaudioPreferExclusive = true,
       this.aaudioTargetBufferMs = 150,
       this.sincResamplerQuality = 3,
@@ -1939,6 +1971,12 @@ class _SettingsState extends SettingsState {
   final bool aaudioOutputEnabled;
   @override
   @JsonKey()
+  final bool dvcEnabled;
+  @override
+  @JsonKey()
+  final bool usbHardwareVolumeEnabled;
+  @override
+  @JsonKey()
   final bool aaudioPreferExclusive;
   @override
   @JsonKey()
@@ -2079,6 +2117,8 @@ class _SettingsState extends SettingsState {
             (identical(other.outputFormatNegotiationEnabled, outputFormatNegotiationEnabled) || other.outputFormatNegotiationEnabled == outputFormatNegotiationEnabled) &&
             (identical(other.floatOutputEnabled, floatOutputEnabled) || other.floatOutputEnabled == floatOutputEnabled) &&
             (identical(other.aaudioOutputEnabled, aaudioOutputEnabled) || other.aaudioOutputEnabled == aaudioOutputEnabled) &&
+            (identical(other.dvcEnabled, dvcEnabled) || other.dvcEnabled == dvcEnabled) &&
+            (identical(other.usbHardwareVolumeEnabled, usbHardwareVolumeEnabled) || other.usbHardwareVolumeEnabled == usbHardwareVolumeEnabled) &&
             (identical(other.aaudioPreferExclusive, aaudioPreferExclusive) || other.aaudioPreferExclusive == aaudioPreferExclusive) &&
             (identical(other.aaudioTargetBufferMs, aaudioTargetBufferMs) || other.aaudioTargetBufferMs == aaudioTargetBufferMs) &&
             (identical(other.sincResamplerQuality, sincResamplerQuality) || other.sincResamplerQuality == sincResamplerQuality) &&
@@ -2173,6 +2213,8 @@ class _SettingsState extends SettingsState {
       outputFormatNegotiationEnabled,
       floatOutputEnabled,
       aaudioOutputEnabled,
+      dvcEnabled,
+      usbHardwareVolumeEnabled,
       aaudioPreferExclusive,
       aaudioTargetBufferMs,
       sincResamplerQuality,
@@ -2182,7 +2224,7 @@ class _SettingsState extends SettingsState {
 
   @override
   String toString() {
-    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, autoThemeByTime: $autoThemeByTime, highContrast: $highContrast, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, hasProxyPassword: $hasProxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, syncCookiesToBackend: $syncCookiesToBackend, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, ytdlpBackendVersion: $ytdlpBackendVersion, ytdlpBackendProxyCount: $ytdlpBackendProxyCount, ytdlpBackendCircuitState: $ytdlpBackendCircuitState, bitPerfectOutput: $bitPerfectOutput, bypassDspOnBitPerfect: $bypassDspOnBitPerfect, followTrackSampleRate: $followTrackSampleRate, strictBitPerfect: $strictBitPerfect, dsdOutputMode: $dsdOutputMode, experienceMode: $experienceMode, dsdDopSupported: $dsdDopSupported, currentOutputDevice: $currentOutputDevice, scanResultCount: $scanResultCount, errorMessage: $errorMessage, crossfeedEnabled: $crossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, limiterEnabled: $limiterEnabled, limiterLookaheadMs: $limiterLookaheadMs, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, reverbEnabled: $reverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, sincResamplerEnabled: $sincResamplerEnabled, dspPreference: $dspPreference, systemEffectsPolicy: $systemEffectsPolicy, systemEffectsStatus: $systemEffectsStatus, systemEffectsBundles: $systemEffectsBundles, bluetoothLatencyOffsetMs: $bluetoothLatencyOffsetMs, hedgedResolutionEnabled: $hedgedResolutionEnabled, adaptiveQualityEnabled: $adaptiveQualityEnabled, duckingMode: $duckingMode, duckingLevel: $duckingLevel, multiOutputMode: $multiOutputMode, dspSnapshotEnabled: $dspSnapshotEnabled, silenceSkipSensitivity: $silenceSkipSensitivity, sessionLogEnabled: $sessionLogEnabled, outputFormatNegotiationEnabled: $outputFormatNegotiationEnabled, floatOutputEnabled: $floatOutputEnabled, aaudioOutputEnabled: $aaudioOutputEnabled, aaudioPreferExclusive: $aaudioPreferExclusive, aaudioTargetBufferMs: $aaudioTargetBufferMs, sincResamplerQuality: $sincResamplerQuality, bpmSyncCrossfadeEnabled: $bpmSyncCrossfadeEnabled)';
+    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, autoThemeByTime: $autoThemeByTime, highContrast: $highContrast, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, hasProxyPassword: $hasProxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, syncCookiesToBackend: $syncCookiesToBackend, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, ytdlpBackendVersion: $ytdlpBackendVersion, ytdlpBackendProxyCount: $ytdlpBackendProxyCount, ytdlpBackendCircuitState: $ytdlpBackendCircuitState, bitPerfectOutput: $bitPerfectOutput, bypassDspOnBitPerfect: $bypassDspOnBitPerfect, followTrackSampleRate: $followTrackSampleRate, strictBitPerfect: $strictBitPerfect, dsdOutputMode: $dsdOutputMode, experienceMode: $experienceMode, dsdDopSupported: $dsdDopSupported, currentOutputDevice: $currentOutputDevice, scanResultCount: $scanResultCount, errorMessage: $errorMessage, crossfeedEnabled: $crossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, limiterEnabled: $limiterEnabled, limiterLookaheadMs: $limiterLookaheadMs, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, reverbEnabled: $reverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, sincResamplerEnabled: $sincResamplerEnabled, dspPreference: $dspPreference, systemEffectsPolicy: $systemEffectsPolicy, systemEffectsStatus: $systemEffectsStatus, systemEffectsBundles: $systemEffectsBundles, bluetoothLatencyOffsetMs: $bluetoothLatencyOffsetMs, hedgedResolutionEnabled: $hedgedResolutionEnabled, adaptiveQualityEnabled: $adaptiveQualityEnabled, duckingMode: $duckingMode, duckingLevel: $duckingLevel, multiOutputMode: $multiOutputMode, dspSnapshotEnabled: $dspSnapshotEnabled, silenceSkipSensitivity: $silenceSkipSensitivity, sessionLogEnabled: $sessionLogEnabled, outputFormatNegotiationEnabled: $outputFormatNegotiationEnabled, floatOutputEnabled: $floatOutputEnabled, aaudioOutputEnabled: $aaudioOutputEnabled, dvcEnabled: $dvcEnabled, usbHardwareVolumeEnabled: $usbHardwareVolumeEnabled, aaudioPreferExclusive: $aaudioPreferExclusive, aaudioTargetBufferMs: $aaudioTargetBufferMs, sincResamplerQuality: $sincResamplerQuality, bpmSyncCrossfadeEnabled: $bpmSyncCrossfadeEnabled)';
   }
 }
 
@@ -2279,6 +2321,8 @@ abstract mixin class _$SettingsStateCopyWith<$Res>
       bool outputFormatNegotiationEnabled,
       bool floatOutputEnabled,
       bool aaudioOutputEnabled,
+      bool dvcEnabled,
+      bool usbHardwareVolumeEnabled,
       bool aaudioPreferExclusive,
       int aaudioTargetBufferMs,
       int sincResamplerQuality,
@@ -2382,6 +2426,8 @@ class __$SettingsStateCopyWithImpl<$Res>
     Object? outputFormatNegotiationEnabled = null,
     Object? floatOutputEnabled = null,
     Object? aaudioOutputEnabled = null,
+    Object? dvcEnabled = null,
+    Object? usbHardwareVolumeEnabled = null,
     Object? aaudioPreferExclusive = null,
     Object? aaudioTargetBufferMs = null,
     Object? sincResamplerQuality = null,
@@ -2723,6 +2769,14 @@ class __$SettingsStateCopyWithImpl<$Res>
       aaudioOutputEnabled: null == aaudioOutputEnabled
           ? _self.aaudioOutputEnabled
           : aaudioOutputEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      dvcEnabled: null == dvcEnabled
+          ? _self.dvcEnabled
+          : dvcEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      usbHardwareVolumeEnabled: null == usbHardwareVolumeEnabled
+          ? _self.usbHardwareVolumeEnabled
+          : usbHardwareVolumeEnabled // ignore: cast_nullable_to_non_nullable
               as bool,
       aaudioPreferExclusive: null == aaudioPreferExclusive
           ? _self.aaudioPreferExclusive

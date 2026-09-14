@@ -22,11 +22,11 @@
 | T10 CUE playback | ✅ DONE | Schema v10 (`cueStartMs/cueEndMs/cueFile`), `expandCueSheets`, container hiding, cue start/end playback boundaries. |
 | T11 Internet radio | ✅ DONE | `RadioStation`/`RadioStationStore`, HTTP/HTTPS stream playback via just_audio, Radio screen + Home entry. |
 | T12 PLS/WPL | ✅ DONE | PLS/WPL parsers + exporters, format picker, file-picker extensions. |
-| T1 USB Exclusive driver | ⛔ PENDING (native) | Requires a UAC2 exclusive driver + hardware-volume control in native code (see §4.1). Not shipped blind. |
-| T6 DVC-equivalent | ⛔ PENDING (native) | Requires a single native direct-gain stage integrated with ducking/crossfade/ReplayGain; unsafe to ship without device validation. |
+| T1 USB exclusive path | 🟡 IMPLEMENTED (device validation pending) | `UsbExclusivePlugin.kt` + `UsbAudioControlParser.kt`: UAC1/2/3 detection, runtime USB permission, UAC Feature-Unit hardware volume, non-forced interface claim, **and raw UAC2 isochronous streaming** via `UsbAudioSink.cpp` (usbfs URBs) with the processed PCM tee'd from the DSP chain. Unvalidated against physical hardware; only runs behind the explicit "USB Bit-Perfect Streaming" toggle and falls back safely on any failure. |
+| T6 DVC-equivalent | ✅ IMPLEMENTED (device validation pending) | Native float output-gain stage (`DirectVolumeParamSet`) applied after all DSP stages, with Android's media stream pinned to maximum (`AudioEffectsPlugin` + `PlaybackVolumeController` path). Toggle in Settings → Sound. Inactive under Bit-Perfect bypass / AAudio Direct. |
 | T8 System-wide EQ | ⛔ BLOCKED (platform) | Android restricts session-0 global `AudioEffect` to privileged apps. |
-| T13 Chromecast | ⛔ BLOCKED (dependency) | Needs Google Cast SDK + registered receiver app id. |
-| Skins / Milkdrop | — | Out of scope (UI). |
+| T13 Chromecast / Cast | ✅ IMPLEMENTED (dev/ytm) | `CastSessionPlugin.kt` (Play Services Cast framework, Google Default Media Receiver) + `CastMediaServer.kt` (local HTTP/Range server for local files) + Dart `CastService`/`CastSection` route list, connect/disconnect and "Cast Current Track". The prod "Pure" flavor keeps `CastDiscoveryPlugin.kt` mDNS discovery only (no Play Services, no INTERNET). |
+| Skins / Milkdrop | 🟡 PARTIAL | `MilkdropPreset` + `MilkdropPresetStore` parse `.milk` files and import user presets. Rendering uses a **GPU fragment shader** (`shaders/milkdrop.frag`) driven by the preset's motion scalars, with a Canvas fallback. The original HSLSL/EEL `warp`/`comp` code is parsed but **not executed**. A real Custom-JSON visualizer (parser + 5 shapes + import) replaces the previous label-only stub. |
 
 **Verification of this pass:** `flutter analyze` clean; `flutter test` → 862 passing; native
 `./gradlew :app:compileDevDebugKotlin` → BUILD SUCCESSFUL.
@@ -545,8 +545,29 @@ For **each** task, report:
 | HTTP radio | T11 | Import + source-build tests |
 | PLS/WPL | T12 | Parser round-trip tests |
 | System-wide EQ | BLOCKED | Documented Android restriction |
-| Chromecast | BLOCKED | Documented dependency |
-| Skins/Milkdrop | OUT OF SCOPE | — |
+| Chromecast | PARTIAL | mDNS discovery shipped; session blocked on Cast app id |
+| Skins/Milkdrop | PARTIAL | `.milk` parser + parameter-driven renderer + import |
 
 When all non-blocked rows pass, Pulsr matches or exceeds Poweramp on every axis except the two
 documented platform-blocked items.
+
+---
+
+## Appendix — 2026-09 hardening implementation
+
+The four gaps above were implemented in the 2026-09 pass. Exact surfaces:
+
+| Gap | Files |
+|---|---|
+| USB exclusive path | `UsbExclusivePlugin.kt`, `UsbAudioControlParser.kt` (+ JVM tests), `UsbAudioSink.cpp/.h` (usbfs isochronous URBs), JNI in `eq_jni_bridge.cpp`, DSP tee, `UsbExclusiveService`/`UsbDacSection` in Dart, `android.hardware.usb.host` feature. |
+| DVC | `DirectVolumeParamSet` (`DspParams.h`), DVC stage (`AudioDspEngine.cpp`), `nativeSetDirectVolumeParams` (`eq_jni_bridge.cpp`), `AudioEffectsPlugin.setDvcEnabled/setDvcGain`, `AudioEffectsChannel`, `PulsrAudioHandler.setDvcEnabled`, Settings switch. |
+| Cast | `CastSessionPlugin.kt` + `CastMediaServer.kt` + `CastOptionsProvider.kt` in `src/ytmEnabled` (prod stub in `src/ytmDisabled`), `play-services-cast-framework` scoped to dev/ytm, `CastService`/`CastSection` in Dart. |
+| Cast discovery | `CastDiscoveryPlugin.kt` (NsdManager), `CastService`/`CastSection` in Dart. |
+| Milkdrop | `MilkdropPreset`/`MilkdropPresetLibrary`, `MilkdropPresetStore`, `VisualizerStyle.milkdrop` + GPU `_MilkdropGpuPainter` (`shaders/milkdrop.frag`) + `_MilkdropPainter` fallback, picker entry + `.milk` import. |
+| Custom JSON visualizer | `VisualizerPreset` + `VisualizerPresetStore`, 5-shape `_CustomJsonVisualizerPainter`, picker entry + JSON import. |
+
+Known limits:
+- USB raw streaming and DVC are not device-validated; USB streaming is behind an explicit toggle and falls back safely.
+- Cast requires Play Services (dev/ytm only) and a reachable LAN; local-file casting transcodes nothing, so the Default Media Receiver's supported codecs apply.
+- Milkdrop HSLSL/EEL shaders are parsed but not executed; the GPU path reproduces preset motion from its scalars.
+

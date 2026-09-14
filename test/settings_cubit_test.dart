@@ -69,6 +69,35 @@ void main() {
       restored.close();
     });
 
+    test('DVC defaults OFF and persists/restores', () async {
+      expect(const SettingsState().dvcEnabled, false);
+
+      final cubit = SettingsCubit(scannerService: mockScannerService);
+      expect(cubit.state.dvcEnabled, false);
+
+      await cubit.setDvcEnabled(true);
+      expect(cubit.state.dvcEnabled, true);
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('setting_dvc_enabled'), true);
+      cubit.close();
+
+      final restored = SettingsCubit(scannerService: mockScannerService);
+      await restored.reloadSettings();
+      expect(restored.state.dvcEnabled, true);
+      restored.close();
+    });
+
+    test('USB hardware volume defaults OFF and persists', () async {
+      expect(const SettingsState().usbHardwareVolumeEnabled, false);
+      final cubit = SettingsCubit(scannerService: mockScannerService);
+      await cubit.setUsbHardwareVolumeEnabled(true);
+      expect(cubit.state.usbHardwareVolumeEnabled, true);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('setting_usb_hardware_volume_enabled'), true);
+      cubit.close();
+    });
+
     test(
         'setGapless, setCrossfade, setMinDuration, setDynamicTheming update state',
         () async {

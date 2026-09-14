@@ -40,6 +40,7 @@ add_library(pulsr_dsp SHARED
     eq_jni_bridge.cpp
     AAudioSink.cpp
     aaudio_jni_bridge.cpp
+    UsbAudioSink.cpp
 )
 
 target_compile_options(pulsr_dsp PRIVATE

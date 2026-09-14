@@ -333,6 +333,60 @@ class AudioEffectsChannel {
     }
   }
 
+  /// Whether the native Direct Volume Control float stage is available on this
+  /// device (requires the native DSP engine).
+  Future<bool> isDvcSupported() async {
+    if (!_isAndroid) return false;
+    try {
+      final bool? supported = await _channel
+          .invokeMethod<bool>('isDvcSupported')
+          .timeout(const Duration(seconds: 2));
+      return supported ?? false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Enables Direct Volume Control: pins Android's media stream to maximum and
+  /// routes the composed output gain through the native float DSP stage.
+  Future<bool> setDvcEnabled(bool enabled) async {
+    if (!_isAndroid) return false;
+    try {
+      final bool? applied = await _channel
+          .invokeMethod<bool>('setDvcEnabled', {'enabled': enabled})
+          .timeout(const Duration(seconds: 5));
+      return applied ?? false;
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set DVC enabled ($enabled)',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return false;
+    }
+  }
+
+  /// Pushes the composed linear output gain (user volume * ReplayGain) to the
+  /// native direct-volume stage. Only meaningful while DVC is enabled.
+  Future<bool> setDvcGain(double gainLinear) async {
+    if (!_isAndroid) return false;
+    try {
+      final bool? applied = await _channel
+          .invokeMethod<bool>('setDvcGain', {'gain': gainLinear})
+          .timeout(const Duration(seconds: 3));
+      return applied ?? false;
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set DVC gain ($gainLinear)',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return false;
+    }
+  }
+
   /// Returns true when the native BassBoost was actually applied.
   Future<bool> setBassBoost(int strength) async {
     if (!_isAndroid) return false;

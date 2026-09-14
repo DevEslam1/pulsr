@@ -597,6 +597,9 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
             prefs.getBool(PrefsKeys.floatOutputEnabled) ?? true,
         aaudioOutputEnabled:
             prefs.getBool(PrefsKeys.aaudioOutputEnabled) ?? false,
+        dvcEnabled: prefs.getBool(PrefsKeys.dvcEnabled) ?? false,
+        usbHardwareVolumeEnabled:
+            prefs.getBool(PrefsKeys.usbHardwareVolumeEnabled) ?? false,
         aaudioPreferExclusive:
             prefs.getBool(PrefsKeys.aaudioPreferExclusive) ?? true,
         aaudioTargetBufferMs:
@@ -1815,6 +1818,30 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     } catch (_) {
       // Player not available yet; boot/observer push covers it.
     }
+  }
+
+  /// Opt-in Direct Volume Control (DVC). Pins the Android media stream to
+  /// maximum and applies the composed output gain in the native float DSP path.
+  /// Unavailable on non-Android and while Bit-Perfect bypass is active.
+  Future<void> setDvcEnabled(bool enabled) async {
+    safeEmit(state.copyWith(dvcEnabled: enabled));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(PrefsKeys.dvcEnabled, enabled);
+    try {
+      if (getIt.isRegistered<PulsrAudioHandler>()) {
+        await getIt<PulsrAudioHandler>().setDvcEnabled(enabled);
+      }
+    } catch (_) {
+      // Player not available yet; boot/observer push covers it.
+    }
+  }
+
+  /// Opt-in USB DAC hardware volume control. Persisted only; the USB settings
+  /// widget applies it to the attached DAC when the toggle changes.
+  Future<void> setUsbHardwareVolumeEnabled(bool enabled) async {
+    safeEmit(state.copyWith(usbHardwareVolumeEnabled: enabled));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(PrefsKeys.usbHardwareVolumeEnabled, enabled);
   }
 
   /// Resampler quality (0=Fast/linear, 1=Standard, 2=High, 3=Ultra).

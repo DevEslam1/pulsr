@@ -237,6 +237,16 @@ struct BitPerfectParamSet {
     bool isDop = false;
 };
 
+// Direct Volume Control (DVC). Android's media stream is pinned to maximum by
+// the platform layer while the user's total desired output gain is applied here
+// in the float DSP path. This keeps attenuation out of Android's digital volume
+// stage (higher dynamic range / lower distortion at low hardware volumes).
+// gainLinear is the fully-composed linear gain (user volume * ReplayGain).
+struct DirectVolumeParamSet {
+    bool enabled = false;
+    double gainLinear = 1.0;
+};
+
 struct ViperDdcParamSet {
     bool enabled = false;
     std::string ddcContent; // Raw .vdc format text
@@ -279,6 +289,7 @@ struct DspParamSnapshot {
     ReplayGainParamSet replayGain;
     DitherParamSet dither;
     BitPerfectParamSet bitPerfect;
+    DirectVolumeParamSet directVolume;
     ViperDdcParamSet viperDdc;
     ArbitraryEqParamSet arbitraryEq;
     LiveProgParamSet liveProg;

@@ -176,6 +176,11 @@ abstract class SettingsState with _$SettingsState {
     @Default(true) bool floatOutputEnabled,
     // Opt-in AAudio Direct output (bit-perfect; DSP chain bypassed).
     @Default(false) bool aaudioOutputEnabled,
+    // Opt-in Direct Volume Control: pins the Android media stream to maximum
+    // and applies the composed gain in the native float DSP path.
+    @Default(false) bool dvcEnabled,
+    // Opt-in USB DAC hardware volume control (UAC Feature Unit).
+    @Default(false) bool usbHardwareVolumeEnabled,
     @Default(true) bool aaudioPreferExclusive,
     @Default(150) int aaudioTargetBufferMs,
     // Resampler quality (0=Fast/linear .. 3=Ultra/64-tap).

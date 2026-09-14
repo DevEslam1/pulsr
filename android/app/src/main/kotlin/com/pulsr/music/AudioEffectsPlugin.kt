@@ -98,6 +98,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     // the C++ chain is in the audible path whenever libpulsr_dsp loaded.
     private var isNativeDspLoaded = false
 
+    // Direct Volume Control (DVC): Android's media stream is pinned to maximum
+    // while the composed gain is applied in the native float path.
+    private var dvcEnabled = false
+    private var dvcSavedSystemVolume = -1
+    private var dvcActive = false
+
     private var isCrossfeedEnabled = false
     private var crossfeedDelayUs = 350.0
     private var crossfeedFeedDb = -9.0
@@ -365,6 +371,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         devicePreset: Int
     )
     private external fun nativeSetReplayGainEnabled(enabled: Boolean)
+    private external fun nativeSetDirectVolumeParams(enabled: Boolean, gainLinear: Double)
     private external fun nativeSetReplayGainParams(
         mode: Int, trackGainDb: Double, albumGainDb: Double,
         trackPeak: Double, albumPeak: Double,
@@ -2320,6 +2327,66 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     }
                 }
 
+                "isDvcSupported" -> {
+                    result.success(isNativeDspLoaded && context != null)
+                }
+
+                "setDvcEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    if (enabled && !isNativeDspLoaded) {
+                        result.success(notApplied("Direct Volume Control requires the native DSP engine (not loaded)"))
+                        return
+                    }
+                    if (enabled && isBitPerfectBypassActive) {
+                        dvcActive = false
+                        result.success(notApplied("Direct Volume Control is unavailable during Bit-Perfect playback"))
+                        return
+                    }
+                    try {
+                        val am = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                        if (enabled) {
+                            if (!dvcEnabled && am != null) {
+                                dvcSavedSystemVolume = am.getStreamVolume(AudioManager.STREAM_MUSIC)
+                                val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                                if (max > 0) {
+                                    am.setStreamVolume(AudioManager.STREAM_MUSIC, max, 0)
+                                }
+                            }
+                            dvcEnabled = true
+                            dvcActive = true
+                        } else {
+                            dvcEnabled = false
+                            dvcActive = false
+                            if (dvcSavedSystemVolume >= 0 && am != null) {
+                                am.setStreamVolume(AudioManager.STREAM_MUSIC, dvcSavedSystemVolume, 0)
+                            }
+                            dvcSavedSystemVolume = -1
+                            if (isNativeDspLoaded) {
+                                try { nativeSetDirectVolumeParams(false, 1.0) } catch (_: Exception) {}
+                            }
+                        }
+                        result.success(true)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "setDvcEnabled failed: ${e.message}")
+                        result.success(notApplied("Direct Volume Control failed: ${e.message}"))
+                    }
+                }
+
+                "setDvcGain" -> {
+                    val gain = call.argument<Double>("gain") ?: 1.0
+                    if (!dvcEnabled || !isNativeDspLoaded) {
+                        result.success(false)
+                        return
+                    }
+                    try {
+                        nativeSetDirectVolumeParams(true, gain)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "nativeSetDirectVolumeParams failed: ${e.message}")
+                        result.success(notApplied("Direct Volume gain failed: ${e.message}"))
+                    }
+                }
+
                 "setBypassDspForBitPerfect" -> {
                     val bypass = call.argument<Boolean>("bypass") ?: false
                     val isDop = (call.argument<Boolean>("isDop") ?: isDopActive)
@@ -2331,6 +2398,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             // Mirror into the native snapshot so the C++ early-return
                             // fires even if a stages mask is stale after reattach.
                             try { nativeSetBitPerfectParams(bypass, isDop) } catch (_: Exception) {}
+                            // DVC cannot apply its float gain through the bypass
+                            // early-return, so suspend it while bit-perfect is active.
+                            if (bypass && dvcEnabled) {
+                                dvcActive = false
+                                try { nativeSetDirectVolumeParams(false, 1.0) } catch (_: Exception) {}
+                            }
                             if (bypass) {
                                 // Immediately disable virtualizer/loudness/bass + native stages
                                 try { virtualizer?.enabled = false } catch (_: Exception) {}

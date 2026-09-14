@@ -14,6 +14,12 @@ abstract final class PulsrChannels {
   static const proxy = 'com.pulsr.music/proxy';
   static const hiresDac = 'com.pulsr.music/hires_dac';
   static const hiresDacEvents = 'com.pulsr.music/hires_dac_events';
+  static const usbExclusive = 'com.pulsr.music/usb_exclusive';
+  static const usbExclusiveEvents = 'com.pulsr.music/usb_exclusive_events';
+  static const cast = 'com.pulsr.music/cast';
+  static const castEvents = 'com.pulsr.music/cast_events';
+  static const castSession = 'com.pulsr.music/cast_session';
+  static const castSessionEvents = 'com.pulsr.music/cast_session_events';
   static const fileOpener = 'com.pulsr.music/file_opener';
   static const lyrics = 'com.pulsr.music/lyrics';
   static const battery = 'com.pulsr.music/battery_optimization';

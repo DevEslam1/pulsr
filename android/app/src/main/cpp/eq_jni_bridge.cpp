@@ -1,8 +1,10 @@
 // android/app/src/main/cpp/eq_jni_bridge.cpp
 #include <jni.h>
 #include <android/log.h>
+#include <cstring>
 #include <vector>
 #include "AudioDspEngine.h"
+#include "UsbAudioSink.h"
 
 #define LOG_TAG "PulsrDSP"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -666,6 +668,21 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReplayGainParams(
     });
 }
 
+// ---- Direct Volume Control (DVC) float output gain ----
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetDirectVolumeParams(
+        JNIEnv* /* env */, jobject /* thiz */, jboolean enabled, jdouble gainLinear) {
+    double g = gainLinear;
+    // Reject NaN/inf and clamp to a sane linear range. Negative gain is muted.
+    if (!(g >= 0.0)) g = 0.0;
+    if (g > 4.0) g = 4.0;
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        snap.directVolume.enabled = enabled;
+        snap.directVolume.gainLinear = g;
+    });
+}
+
 // ---- Dither (TPDF at 16/24/32-bit target) + Bluetooth route flag ----
 
 JNIEXPORT void JNICALL
@@ -866,7 +883,17 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
     auto* engine = reinterpret_cast<AudioDspEngine*>(engineHandle);
     if (!engine) engine = &AudioDspEngine::instance();
     try {
-        return static_cast<jint>(engine->processInterleaved(floatBuffer, frameCount, channels));
+        jint processed = static_cast<jint>(engine->processInterleaved(floatBuffer, frameCount, channels));
+        // USB exclusive streaming: tee the processed PCM to the isochronous USB
+        // sink and mute the HAL path so audio is never doubled if Android
+        // re-routes to another output.
+        auto& usb = pulsr::UsbAudioSink::instance();
+        if (usb.IsActive()) {
+            usb.WriteInterleaved(floatBuffer, frameCount, channels);
+            std::memset(floatBuffer, 0,
+                        static_cast<size_t>(frameCount) * channels * sizeof(float));
+        }
+        return processed;
     } catch (...) {
         return 0;
     }
@@ -880,6 +907,30 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeResyncForTrack(
     try {
         engine->resyncForTrack(sampleRate, channels);
     } catch (...) {}
+}
+
+// ---- USB UAC2 isochronous exclusive streaming (UsbExclusivePlugin) ----
+
+JNIEXPORT jboolean JNICALL
+Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamStart(
+        JNIEnv* /* env */, jobject /* thiz */, jint fd, jint endpoint,
+        jint interfaceNumber, jint altSetting, jint sampleRate, jint channels) {
+    return pulsr::UsbAudioSink::instance().Open(
+               fd, endpoint, interfaceNumber, altSetting, sampleRate, channels, 2)
+        ? JNI_TRUE
+        : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamStop(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    pulsr::UsbAudioSink::instance().Close();
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamIsActive(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return pulsr::UsbAudioSink::instance().IsActive() ? JNI_TRUE : JNI_FALSE;
 }
 
 } // extern "C"

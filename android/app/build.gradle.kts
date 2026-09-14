@@ -177,6 +177,14 @@ dependencies {
     val newPipeExtractor = "com.github.TeamNewPipe:NewPipeExtractor:v0.26.5"
     "devImplementation"(newPipeExtractor)
     "ytmImplementation"(newPipeExtractor)
+
+    // Google Cast SDK. Scoped to the dev/ytm flavors only: the prod (Play Store)
+    // "Pure" variant strips INTERNET and must not ship Cast or Play Services
+    // routing. The matching code lives in sourceSets dev/ytm (src/ytmEnabled).
+    val castFramework = "com.google.android.gms:play-services-cast-framework:21.5.0"
+    "devImplementation"(castFramework)
+    "ytmImplementation"(castFramework)
+
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20231013")
 }

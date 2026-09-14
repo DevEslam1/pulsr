@@ -198,6 +198,8 @@ private:
     uint32_t ditherPrngState2_ = 0x87654321;
     double smoothedReplayGain_ = 1.0;
     double targetReplayGain_ = 1.0;
+    // Direct Volume Control output gain, smoothed across a 20ms window.
+    double smoothedDirectVolume_ = 1.0;
 
     inline float generateTpdf() {
         ditherPrngState1_ ^= ditherPrngState1_ << 13;

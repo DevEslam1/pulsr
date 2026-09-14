@@ -565,6 +565,11 @@ class PulsrAudioHandler extends BaseAudioHandler
   double _volume = 1.0;
   double get volume => _volume;
 
+  /// Direct Volume Control: when true the composed gain is applied in the
+  /// native float DSP path and player volume stays at unity.
+  bool _dvcEnabled = false;
+  bool get isDvcEnabled => _dvcEnabled;
+
   /// Assumed Android mixer rate until the real output rate is known. The HAL
   /// only reports it after the first AudioTrack opens, so cold-start DSP
   /// coefficient init uses this; per-track [AudioEffectsChannel.resyncForTrack]
@@ -572,7 +577,13 @@ class PulsrAudioHandler extends BaseAudioHandler
   static const double assumedOutputSampleRate = 48000.0;
 
   double _calculateReplayGainVolume(SongsTableData? song) {
-    if (song == null) return _volume;
+    if (song == null) {
+      if (_dvcEnabled) {
+        unawaited(_pushDvcGain(_volume));
+        return 1.0;
+      }
+      return _volume;
+    }
 
     final prefs = _cachedPrefs;
     if (prefs == null) return _volume; // Null guard
@@ -582,9 +593,13 @@ class PulsrAudioHandler extends BaseAudioHandler
         (prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true);
     if (bitPerfect) return _volume;
 
+    final dvc = _dvcEnabled;
     var scaled = ReplayGainMath.apply(
       mode: prefs.getString(PrefsKeys.replayGainMode) ?? 'track',
-      volume: _volume,
+      // Under DVC the user volume is applied by the native float stage, so the
+      // player-side mixer carries only ReplayGain. This keeps crossfade and
+      // ducking (which scale the player volume) fully functional.
+      volume: dvc ? 1.0 : _volume,
       trackGainDb: song.replayGainTrack,
       trackPeak: song.replayGainTrackPeak,
       albumGainDb: song.replayGainAlbum,
@@ -603,7 +618,24 @@ class PulsrAudioHandler extends BaseAudioHandler
         scaled = (scaled * factor).clamp(0.0, 1.0);
       }
     } catch (_) {}
+    if (dvc) {
+      // Only the active track's user volume is authoritative for the single
+      // native DVC stage; other (crossfade) calculations must not clobber it.
+      if (song.id == currentSong?.id) {
+        unawaited(_pushDvcGain(_volume));
+      }
+      return scaled;
+    }
     return scaled;
+  }
+
+  /// Pushes the user-volume component to the native Direct Volume Control
+  /// stage (applied in the float DSP path). ReplayGain/per-song/fades stay in
+  /// the player mixer.
+  Future<void> _pushDvcGain(double gain) async {
+    try {
+      await AudioEffectsChannel().setDvcGain(gain.clamp(0.0, 4.0));
+    } catch (_) {}
   }
 
   /// Reads the per-song volume override without a hard DI dependency so unit
@@ -643,6 +675,34 @@ class PulsrAudioHandler extends BaseAudioHandler
     await _equalizerManager.updateLoudnessVolume(_volume);
     await _activePlayer.setVolume(target);
     unawaited(_pushNativeReplayGain(song));
+  }
+
+  /// Toggles Direct Volume Control. Enabling pins Android's media stream to
+  /// maximum and applies the composed gain in the native float DSP path;
+  /// disabling restores the previous system volume. No-op when native DVC is
+  /// unsupported (the preference push is then rolled back by the caller path).
+  Future<void> setDvcEnabled(bool enabled) async {
+    if (enabled == _dvcEnabled) {
+      if (enabled) {
+        await AudioEffectsChannel().setDvcEnabled(true);
+      }
+      return;
+    }
+    if (enabled) {
+      final supported = await AudioEffectsChannel().isDvcSupported();
+      if (!supported) {
+        _dvcEnabled = false;
+        await AudioEffectsChannel().setDvcEnabled(false);
+        return;
+      }
+      _dvcEnabled = true;
+      await AudioEffectsChannel().setDvcEnabled(true);
+    } else {
+      _dvcEnabled = false;
+      await AudioEffectsChannel().setDvcEnabled(false);
+    }
+    // Re-apply the current volume so the new gain stage takes effect now.
+    await setVolume(_volume);
   }
 
   bool get isEqualizerEnabled => _equalizerManager.isEnabled;
@@ -982,6 +1042,12 @@ class PulsrAudioHandler extends BaseAudioHandler
     await AudioEffectsChannel().setSincResamplerQuality(
       _cachedPrefs?.getInt(PrefsKeys.sincResamplerQuality) ?? 3,
     );
+    // Restore Direct Volume Control. Only the system-stream pinning needs to
+    // happen here; per-track gain is applied by _calculateReplayGainVolume.
+    _dvcEnabled = _cachedPrefs?.getBool(PrefsKeys.dvcEnabled) ?? false;
+    if (_dvcEnabled) {
+      unawaited(AudioEffectsChannel().setDvcEnabled(true));
+    }
     _crossfadeManager.bpmSyncEnabled =
         _cachedPrefs?.getBool(PrefsKeys.bpmSyncCrossfadeEnabled) ?? false;
 

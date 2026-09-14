@@ -35,6 +35,9 @@ class MainActivity : AudioServiceActivity() {
     private var waveformPlugin: WaveformPlugin? = null
     private var proxyPlugin: ProxyPlugin? = null
     private var hiResDacPlugin: HiResDacPlugin? = null
+    private var usbExclusivePlugin: UsbExclusivePlugin? = null
+    private var castDiscoveryPlugin: CastDiscoveryPlugin? = null
+    private var castSessionPlugin: CastSessionPlugin? = null
     private var roomCorrectionPlugin: RoomCorrectionPlugin? = null
     private val lyricsExecutor = java.util.concurrent.Executors.newFixedThreadPool(2)
  
@@ -182,6 +185,9 @@ class MainActivity : AudioServiceActivity() {
         waveformPlugin = WaveformPlugin.registerWith(flutterEngine, applicationContext)
         proxyPlugin = ProxyPlugin.registerWith(flutterEngine, applicationContext)
         hiResDacPlugin = HiResDacPlugin(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
+        usbExclusivePlugin = UsbExclusivePlugin(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
+        castDiscoveryPlugin = CastDiscoveryPlugin(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
+        castSessionPlugin = CastSessionPlugin.registerWith(flutterEngine, applicationContext)
         roomCorrectionPlugin = RoomCorrectionPlugin.registerWith(flutterEngine, applicationContext)
  
         val fileChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FILE_OPENER_CHANNEL)
@@ -371,6 +377,12 @@ class MainActivity : AudioServiceActivity() {
         proxyPlugin = null
         hiResDacPlugin?.dispose()
         hiResDacPlugin = null
+        usbExclusivePlugin?.dispose()
+        usbExclusivePlugin = null
+        castDiscoveryPlugin?.dispose()
+        castDiscoveryPlugin = null
+        castSessionPlugin?.cleanup()
+        castSessionPlugin = null
         roomCorrectionPlugin?.cleanup()
         roomCorrectionPlugin = null
         fileOpenerChannel?.setMethodCallHandler(null)

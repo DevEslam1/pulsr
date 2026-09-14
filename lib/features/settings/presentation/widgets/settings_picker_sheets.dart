@@ -4,6 +4,8 @@ import '../../../../core/config/app_config.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../data/visualizer/milkdrop_preset_store.dart';
+import '../../../../data/visualizer/visualizer_preset_store.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../../auth/presentation/ytm_web_login_sheet.dart';
 import '../../../player/presentation/widgets/audio_visualizer.dart';
@@ -53,6 +55,8 @@ String getVisualizerStyleTitle(VisualizerStyle style) {
       return 'Album Art Reactive Glow';
     case VisualizerStyle.custom:
       return 'Custom JSON Visualizer';
+    case VisualizerStyle.milkdrop:
+      return 'Milkdrop Preset Visualizer';
   }
 }
 
@@ -564,6 +568,20 @@ void showVisualizerStylePickerSheet(
       subtitle: 'Disable audio visualizer spectrum animation',
       icon: Icons.align_vertical_bottom_rounded,
     ),
+    (
+      style: VisualizerStyle.milkdrop,
+      title: 'MILKDROP',
+      subtitle:
+          'Winamp/Milkdrop preset renderer (built-in or imported .milk file)',
+      icon: Icons.blur_on_rounded,
+    ),
+    (
+      style: VisualizerStyle.custom,
+      title: 'CUSTOM (JSON)',
+      subtitle:
+          'User-authored JSON preset: bars / wave / radial / particles / lissajous',
+      icon: Icons.data_object_rounded,
+    ),
   ];
 
   showModalBottomSheet(
@@ -632,6 +650,78 @@ void showVisualizerStylePickerSheet(
               ),
             );
           }),
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: Material(
+              color: cardColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: outlineColor),
+              ),
+              child: ListTile(
+                leading: Icon(Icons.file_open_rounded, color: textSecondary),
+                title: Text(
+                  'Import .milk Preset',
+                  style:
+                      TextStyle(fontWeight: FontWeight.w700, color: textPrimary),
+                ),
+                subtitle: Text(
+                  'Load a Winamp/Milkdrop preset file from storage',
+                  style: TextStyle(fontSize: 12, color: textSecondary),
+                ),
+                onTap: () async {
+                  final preset = await MilkdropPresetStore().importFromFile();
+                  if (!context.mounted) return;
+                  Navigator.pop(ctx);
+                  cubit.setVisualizerStyle(VisualizerStyle.milkdrop);
+                  if (preset != null) {
+                    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                      SnackBar(
+                        content:
+                            Text('Imported Milkdrop preset: ${preset.name}'),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ),
+          ),
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: Material(
+              color: cardColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: outlineColor),
+              ),
+              child: ListTile(
+                leading: Icon(Icons.data_object_rounded, color: textSecondary),
+                title: Text(
+                  'Import JSON Visualizer Preset',
+                  style:
+                      TextStyle(fontWeight: FontWeight.w700, color: textPrimary),
+                ),
+                subtitle: Text(
+                  'Load a Custom visualizer preset (.json) from storage',
+                  style: TextStyle(fontSize: 12, color: textSecondary),
+                ),
+                onTap: () async {
+                  final preset = await VisualizerPresetStore().importFromFile();
+                  if (!context.mounted) return;
+                  Navigator.pop(ctx);
+                  cubit.setVisualizerStyle(VisualizerStyle.custom);
+                  if (preset != null) {
+                    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                      SnackBar(
+                        content:
+                            Text('Imported visualizer preset: ${preset.name}'),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ),
+          ),
         ],
       ),
     ),

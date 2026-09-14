@@ -399,6 +399,32 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         }
     }
 
+    // Direct Volume Control (DVC): applied after every DSP stage as the final
+    // float output gain. The platform layer pins Android's media stream to
+    // maximum while this stage carries the composed (user volume * ReplayGain)
+    // gain, keeping attenuation out of the system digital volume path. Smoothed
+    // over 20ms to avoid zipper noise on slider drags.
+    {
+        const double dvcTarget = snapshot->directVolume.enabled
+            ? std::clamp(snapshot->directVolume.gainLinear, 0.0, 4.0)
+            : 1.0;
+        if (std::abs(dvcTarget - smoothedDirectVolume_) > 1e-5) {
+            const double dvcTau = 0.020;
+            const double dvcSmooth =
+                1.0 - std::exp(-static_cast<double>(frames) / (currentSr * dvcTau));
+            smoothedDirectVolume_ += dvcSmooth * (dvcTarget - smoothedDirectVolume_);
+        } else {
+            smoothedDirectVolume_ = dvcTarget;
+        }
+        if (std::abs(smoothedDirectVolume_ - 1.0) > 1e-4) {
+            const float dvc = static_cast<float>(smoothedDirectVolume_);
+            const int totalSamples = frames * channels;
+            for (int i = 0; i < totalSamples; ++i) {
+                buffer[i] = std::clamp(buffer[i] * dvc, -1.0f, 1.0f);
+            }
+        }
+    }
+
     // TPDF Dither — its own stage bit, so a lone dither toggle acts standalone
     // (previously it was nested inside the non-unity-gain block and dead when no
     // other effect was active). Applied at the final requantization to the

@@ -19,11 +19,13 @@ import '../../../player/presentation/widgets/dsp_inspector_sheet.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
 import 'battery_optimization_card.dart';
+import 'cast_section.dart';
 import 'room_correction_sheet.dart';
 import 'settings_conflict_card.dart';
 import 'settings_section.dart';
 import 'settings_slider_row.dart';
 import 'settings_tiles.dart';
+import 'usb_dac_section.dart';
 
 /// Sound engine: equalizer, DSP engine, output device / bit-perfect,
 /// ReplayGain and battery optimization for background audio.
@@ -1054,6 +1056,32 @@ class AudioSoundSection extends StatelessWidget {
           enabled: isAndroid && state.aaudioOutputEnabled,
           onChanged: (v) => cubit.setAaudioTargetBufferMs(v.round()),
         ),
+        settingsCardDivider(p),
+        // Opt-in Direct Volume Control (DVC). Pins Android's media stream to
+        // maximum and applies the composed gain in the native float DSP path,
+        // keeping attenuation out of Android's digital volume stage for higher
+        // dynamic range at low hardware volumes.
+        SettingsSwitchTile(
+          Icons.volume_up_rounded,
+          'Direct Volume Control (DVC)',
+          'Pins the Android media stream to maximum and applies volume in the '
+              'native float DSP path, for higher dynamic range and lower '
+              'distortion at low volumes. Unavailable during Bit-Perfect '
+              'playback and on the AAudio Direct output path',
+          value: isAndroid && state.dvcEnabled && !state.aaudioOutputEnabled,
+          disabledReason: !isAndroid
+              ? unsupported
+              : (state.aaudioOutputEnabled
+                  ? 'Unavailable while AAudio Direct output is enabled'
+                  : null),
+          onChanged: !isAndroid || state.aaudioOutputEnabled
+              ? (v) {}
+              : cubit.setDvcEnabled,
+        ),
+        settingsCardDivider(p),
+        // USB DAC hardware volume + optional exclusive interface claim.
+        UsbDacSection(cubit: cubit, state: state),
+        const CastSection(),
         settingsCardDivider(p),
         // Resampler quality: Fast (linear) .. Ultra (full 64-tap polyphase).
         SettingSliderRow(
