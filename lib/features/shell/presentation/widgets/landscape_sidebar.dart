@@ -277,8 +277,7 @@ class _SidebarBrandHeader extends StatelessWidget {
                       fontSize: 15.5,
                     ),
                   ),
-                  Text(
-                    'STUDIO AUDIO',
+                  Text(context.l10n.studioAudio,
                     style: TextStyle(
                       color: p.accent,
                       fontWeight: FontWeight.w700,

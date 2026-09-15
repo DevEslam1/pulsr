@@ -170,9 +170,8 @@ class _TagEditorView extends StatelessWidget {
                                             if (matches.isEmpty) {
                                               ScaffoldMessenger.of(context)
                                                   .showSnackBar(
-                                                const SnackBar(
-                                                  content: Text(
-                                                      'No matching online metadata found.'),
+                                                SnackBar(
+                                                  content: Text(context.l10n.noOnlineMetadata),
                                                 ),
                                               );
                                               return;
@@ -186,8 +185,7 @@ class _TagEditorView extends StatelessWidget {
                                                 ScaffoldMessenger.of(context)
                                                     .showSnackBar(
                                                   SnackBar(
-                                                    content: const Text(
-                                                        'Online metadata applied successfully!'),
+                                                    content: Text(context.l10n.onlineMetadataApplied),
                                                     backgroundColor: p.accent,
                                                   ),
                                                 );
@@ -317,8 +315,7 @@ class _TagEditorView extends StatelessWidget {
                                                 ScaffoldMessenger.of(context)
                                                     .showSnackBar(
                                                   SnackBar(
-                                                    content: const Text(
-                                                        'Online metadata applied successfully!'),
+                                                    content: Text(context.l10n.onlineMetadataApplied),
                                                     backgroundColor: p.accent,
                                                   ),
                                                 );

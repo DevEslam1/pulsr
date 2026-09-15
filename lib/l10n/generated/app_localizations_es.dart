@@ -3358,4 +3358,327 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get bitPerfectMode => 'Modo Bit-Perfect';
+
+  @override
+  String get ytmSessionExpired =>
+      'Sesion de YouTube Music expirada. Inicia sesion de nuevo.';
+
+  @override
+  String get noOnlineMetadata => 'No se encontro metadatos en linea.';
+
+  @override
+  String get onlineMetadataApplied => 'Metadatos aplicados!';
+
+  @override
+  String get ytmExplore => 'Explorar YouTube Music';
+
+  @override
+  String get couldNotLoadYear =>
+      'No se pudieron cargar las canciones de este ano';
+
+  @override
+  String get studioAudio => 'AUDIO DE ESTUDIO';
+
+  @override
+  String get lyricsLabel => 'Letras';
+
+  @override
+  String get cloudBackupSync => 'Copia y sincronizacion';
+
+  @override
+  String get cloudStorageStatus => 'Estado del almacenamiento';
+
+  @override
+  String get cloudBackupDesc =>
+      'Copia cifrada bidireccional entre dispositivos.';
+
+  @override
+  String get whatGetsSynced => 'Que se sincroniza';
+
+  @override
+  String get syncItemsPrefix => 'Favoritos, listas, historial y metadatos ';
+
+  @override
+  String get autoFilterVoiceNotes => 'Filtro automatico de notas de voz';
+
+  @override
+  String get autoFilterVoiceNotesDesc =>
+      'Ignora audios de WhatsApp, Telegram y grabaciones.';
+
+  @override
+  String get shortAudioFilterDesc => 'Ignora clips cortos y efectos';
+
+  @override
+  String get minFileSize => 'Tamano minimo';
+
+  @override
+  String get minFileSizeDesc => 'Excluye fragmentos y archivos danados';
+
+  @override
+  String get deviceAudioDirectories => 'DIRECTORIOS DE AUDIO';
+
+  @override
+  String get httpHttps => 'HTTP / HTTPS';
+
+  @override
+  String get socks5 => 'SOCKS5';
+
+  @override
+  String get scrobblingAnalytics => 'Analiticas de scrobbling';
+
+  @override
+  String get universalScrobblingEngine => 'Motor universal de scrobbling';
+
+  @override
+  String get scrobblingServicesDesc =>
+      'Conectado a Last.fm, ListenBrainz, Libre.fm y Webhooks.';
+
+  @override
+  String get last7DaysActivity => 'Actividad de 7 dias';
+
+  @override
+  String get topScrobbledArtists => 'Artistas mas escuchados';
+
+  @override
+  String get themeModeLabel => 'MODO DE TEMA';
+
+  @override
+  String get amoledLabel => 'AMOLED';
+
+  @override
+  String get settingsSearchHint =>
+      'Prueba buscar \"equalizer\", \"dark mode\", \"crossfade\", \"proxy\", \"cache\" o \"scrobble\".';
+
+  @override
+  String get bitPerfectLabel => 'BIT-PERFECT';
+
+  @override
+  String get automationRules => 'Reglas de automatizacion';
+
+  @override
+  String get automationRulesDesc =>
+      'Aplica un perfil automaticamente cuando ocurre un evento.';
+
+  @override
+  String get noAutomationRules => 'Sin reglas configuradas.';
+
+  @override
+  String get playbackStopsScreenOff => 'Se detiene al apagar la pantalla?';
+
+  @override
+  String get batteryExemptionDesc =>
+      'Algunos fabricantes detienen la reproduccion en segundo plano. Concede la exencion de bateria.';
+
+  @override
+  String get deviceGuide => 'Guia de dispositivos';
+
+  @override
+  String get sponsorBlockCategoriesLabel => 'Categorias de SponsorBlock';
+
+  @override
+  String get syncedLabel => 'SINCRONIZADO';
+
+  @override
+  String get quickDiscovery => 'DESCUBRIMIENTO RAPIDO';
+
+  @override
+  String get ytmSearchDesc => 'Millones de canciones sin anuncios.';
+
+  @override
+  String get popularSearches => 'BUSQUEDAS POPULARES';
+
+  @override
+  String get quranMode => 'Modo Coran';
+
+  @override
+  String get managePlaylist => 'Gestionar lista';
+
+  @override
+  String get exportFailedRetry => 'Error al exportar. Intenta de nuevo.';
+
+  @override
+  String get appliedGraphicEq => 'Curva GraphicEq aplicada';
+
+  @override
+  String get arbitraryResponseEq => 'EQ de respuesta arbitraria';
+
+  @override
+  String get graphicEqSpec => 'Especificacion GraphicEq';
+
+  @override
+  String get fir512 => 'Filtro FIR de 512';
+
+  @override
+  String get applyCurve => 'Aplicar curva';
+
+  @override
+  String get presetAcousticTargets => 'Objetivos acusticos';
+
+  @override
+  String get devOptionsBtCodec =>
+      'Abre Opciones de desarrollador -> Codec Bluetooth';
+
+  @override
+  String get autoEqDatabase => 'Base de datos AutoEQ 2.0';
+
+  @override
+  String get noHpMatch => 'Sin perfiles coincidentes';
+
+  @override
+  String get dspReportCopied => 'Informe DSP copiado!';
+
+  @override
+  String get dspInspectorDesc => 'Depuracion del motor de audio y DSP';
+
+  @override
+  String get activeAudioStages => 'ETAPAS ACTIVAS';
+
+  @override
+  String get noDspStages => 'Sin etapas reportadas por el motor.';
+
+  @override
+  String get dolbyHijackDesc =>
+      'Dolby Atmos controla la sesion HAL. Cambia a OEM o desactiva Dolby.';
+
+  @override
+  String get switchedToOem => 'Cambiado a OEM. Reinicia la pista.';
+
+  @override
+  String get switchPrefFailed => 'Error al cambiar. Hazlo en Ajustes -> Audio';
+
+  @override
+  String get fixSwitchOem => 'Solucion: cambiar a OEM';
+
+  @override
+  String get retryingHal => 'Reintentando HAL... reproduce una pista';
+
+  @override
+  String get retryAttach => 'Reintentar';
+
+  @override
+  String get placeLrcHint =>
+      'Coloca un archivo .lrc junto a la pista o incrusta la letra.';
+
+  @override
+  String get searchLyrics => 'Buscar letras';
+
+  @override
+  String get queueEmpty => 'La cola esta vacia';
+
+  @override
+  String get skipAction => 'Omitir';
+
+  @override
+  String get onboardingHeading => 'Tu musica, tu privacidad';
+
+  @override
+  String get onboardingPrivacyDesc =>
+      'Reproduccion 100% local. Sin cuentas ni nube.';
+
+  @override
+  String get onboardingPowerful => 'Reproduccion potente';
+
+  @override
+  String get onboardingPowerfulDesc =>
+      'Ecualizador de 10 bandas, crossfade, gapless y temporizador.';
+
+  @override
+  String get onboardingThemes => '4 TEMAS DE REPRODUCTOR';
+
+  @override
+  String get onboardingBeautiful => 'Hermoso y personal';
+
+  @override
+  String get onboardingBeautifulDesc =>
+      'Color dinamico del arte y 4 temas unicos.';
+
+  @override
+  String get artworkWall => 'Muro de portadas';
+
+  @override
+  String get noAlbumsFound => 'Sin albumes en la biblioteca';
+
+  @override
+  String get listeningStats => 'Estadisticas de escucha';
+
+  @override
+  String get audioQualityTiers => 'Niveles de calidad';
+
+  @override
+  String get noPlayHistory => 'Sin historial aun. Escucha musica!';
+
+  @override
+  String get downloadsLabel => 'DESCARGAS';
+
+  @override
+  String get noMusicIndexed => 'Sin archivos indexados';
+
+  @override
+  String get parentDirectory => 'Directorio superior';
+
+  @override
+  String get folderEmpty => 'Carpeta vacia';
+
+  @override
+  String get otherGenres => 'Otros generos';
+
+  @override
+  String get couldNotLoadGenre =>
+      'No se pudieron cargar las canciones del genero';
+
+  @override
+  String get syncAcrossDevices => 'Sincroniza favoritos y listas';
+
+  @override
+  String get continueWithGoogle => 'Continuar con Google';
+
+  @override
+  String get orWithEmail => 'O CON CORREO';
+
+  @override
+  String get enterEmailFirst => 'Ingresa tu correo primero';
+
+  @override
+  String get forgotPassword => 'Olvidaste la contrasena?';
+
+  @override
+  String get signInGoogleTv => 'Iniciar sesion con Google TV';
+
+  @override
+  String get noCaptchaDesc => 'Sin captcha - aprueba en otro dispositivo';
+
+  @override
+  String get tryAgain => 'Intentar de nuevo';
+
+  @override
+  String get oauthStep1 => '1. Abre esta direccion:';
+
+  @override
+  String get oauthStep2 => '2. Ingresa este codigo:';
+
+  @override
+  String get copyCode => 'Copiar codigo';
+
+  @override
+  String get waitingApproval => 'Esperando aprobacion...';
+
+  @override
+  String get aboutArtist => 'Acerca del artista';
+
+  @override
+  String get openingYtmTrack => 'Abriendo pista de YouTube Music...';
+
+  @override
+  String get formatNotSupported => 'Formato no compatible';
+
+  @override
+  String get waveformLabel => 'FORMA DE ONDA';
+
+  @override
+  String get usbBpFailed =>
+      'El streaming USB bit-perfect no pudo iniciarse (DAC no compatible).';
+
+  @override
+  String get cloudSyncItemsDesc =>
+      'Favoritos, listas e historial se sincronizan en ambos sentidos. Los ajustes permanecen en este dispositivo.';
 }

@@ -11,6 +11,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/di/injection.dart';
@@ -167,16 +168,14 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Sign in with Google TV',
+                          Text(context.l10n.signInGoogleTv,
                             style: TextStyle(
                               color: p.textPrimary,
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          Text(
-                            'No captcha — approve on another device',
+                          Text(context.l10n.noCaptchaDesc,
                             style: TextStyle(
                                 color: p.textSecondary, fontSize: 12),
                           ),
@@ -231,7 +230,7 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
         FilledButton.icon(
           onPressed: _busy ? null : _start,
           icon: const Icon(Icons.refresh_rounded, size: 18),
-          label: const Text('Try again',
+          label: Text(context.l10n.tryAgain,
               style: TextStyle(fontWeight: FontWeight.w700)),
           style: FilledButton.styleFrom(
             backgroundColor: p.accent,
@@ -256,15 +255,13 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          '1. On your phone or computer, open this address:',
+        Text(context.l10n.oauthStep1,
           style: TextStyle(color: p.textSecondary, fontSize: 13),
         ),
         const SizedBox(height: 8),
         _copyRow(p, code.verificationUrl, 'Address'),
         const SizedBox(height: 18),
-        Text(
-          '2. Enter this code:',
+        Text(context.l10n.oauthStep2,
           style: TextStyle(color: p.textSecondary, fontSize: 13),
         ),
         const SizedBox(height: 8),
@@ -291,7 +288,7 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
         OutlinedButton.icon(
           onPressed: () => _copy(code.userCode, 'Code'),
           icon: const Icon(Icons.copy_rounded, size: 18),
-          label: const Text('Copy code',
+          label: Text(context.l10n.copyCode,
               style: TextStyle(fontWeight: FontWeight.w700)),
           style: OutlinedButton.styleFrom(
             foregroundColor: p.textPrimary,
@@ -311,8 +308,7 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
             const SizedBox(width: 10),
-            Text(
-              'Waiting for approval…',
+            Text(context.l10n.waitingApproval,
               style: TextStyle(color: p.textTertiary, fontSize: 12),
             ),
           ],

@@ -1,5 +1,6 @@
 // lib/features/ytm_browse/presentation/ytm_browse_screen.dart
 import 'package:flutter/material.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/services/ytm_browse_service.dart';
@@ -66,8 +67,7 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
           backgroundColor: p.surface,
           elevation: 0,
           leading: const PulsrBackButton(),
-          title: Text(
-          'YouTube Music Explore',
+          title: Text(context.l10n.ytmExplore,
           style: TextStyle(
             color: p.textPrimary,
             fontSize: 20,
@@ -99,7 +99,7 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                         const SizedBox(height: 12),
                         FilledButton(
                             onPressed: _loadFeed,
-                            child: const Text('Retry')),
+                            child: Text(context.l10n.retry)),
                       ],
                     ),
                   ),

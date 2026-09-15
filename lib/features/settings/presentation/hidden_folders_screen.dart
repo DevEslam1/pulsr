@@ -198,13 +198,11 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                             child: Icon(Icons.mic_off_rounded,
                                 color: p.accent, size: 19),
                           ),
-                          title: const Text(
-                            'Auto-Filter Voice Notes & Messengers',
+                          title: Text(context.l10n.autoFilterVoiceNotes,
                             style: TextStyle(
                                 fontWeight: FontWeight.w700, fontSize: 14),
                           ),
-                          subtitle: Text(
-                            'Automatically ignores WhatsApp audio, voice notes, Telegram, Call Recordings, and sound recorder files.',
+                          subtitle: Text(context.l10n.autoFilterVoiceNotesDesc,
                             style:
                                 TextStyle(color: p.textSecondary, fontSize: 12),
                           ),
@@ -237,16 +235,14 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                          Text(
-                                            'Short Audio Filter',
+                                          Text(context.l10n.shortAudioFilter,
                                             style: TextStyle(
                                               color: p.textPrimary,
                                               fontWeight: FontWeight.w700,
                                               fontSize: 14,
                                             ),
                                           ),
-                                          Text(
-                                            'Ignore short clips and sound effects',
+                                          Text(context.l10n.shortAudioFilterDesc,
                                             style: TextStyle(
                                                 color: p.textSecondary,
                                                 fontSize: 12),
@@ -338,16 +334,14 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      'Min File Size',
+                                    Text(context.l10n.minFileSize,
                                       style: TextStyle(
                                         color: p.textPrimary,
                                         fontWeight: FontWeight.w700,
                                         fontSize: 14,
                                       ),
                                     ),
-                                    Text(
-                                      'Exclude small audio snippets & corrupt files',
+                                    Text(context.l10n.minFileSizeDesc,
                                       style: TextStyle(
                                           color: p.textSecondary,
                                           fontSize: 12),
@@ -418,8 +412,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                     children: [
                       Padding(
                         padding: const EdgeInsets.only(left: 6),
-                        child: Text(
-                          'DEVICE AUDIO DIRECTORIES',
+                        child: Text(context.l10n.deviceAudioDirectories,
                           style: Theme.of(context)
                               .textTheme
                               .labelSmall

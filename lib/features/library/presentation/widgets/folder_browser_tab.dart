@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/empty_state_widget.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../cubit/library_cubit.dart';
@@ -147,7 +148,7 @@ class FolderBrowserTab extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
-                                  'DOWNLOADS',
+                                  context.l10n.downloadsLabel,
                                   style: TextStyle(
                                     fontSize: 9,
                                     fontWeight: FontWeight.w800,

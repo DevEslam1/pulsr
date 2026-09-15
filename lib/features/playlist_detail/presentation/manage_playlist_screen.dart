@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/constants/app_radii.dart';
 import '../../../core/di/injection.dart';
@@ -108,8 +109,7 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
               title: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Manage Playlist',
+                  Text(context.l10n.managePlaylist,
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                   ),
                   Text(

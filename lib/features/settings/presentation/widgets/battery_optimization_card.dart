@@ -66,8 +66,7 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard> {
               Icon(Icons.battery_alert_rounded, color: p.accent, size: 22),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  'Playback stops when screen is off?',
+                child: Text(context.l10n.playbackStopsScreenOff,
                   style: TextStyle(
                     color: p.textPrimary,
                     fontWeight: FontWeight.w700,
@@ -88,8 +87,7 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard> {
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            'Some device manufacturers aggressively stop background playback. Granting battery exemption ensures uninterrupted music playback.',
+          Text(context.l10n.batteryExemptionDesc,
             style: TextStyle(color: p.textSecondary, fontSize: 12, height: 1.4),
           ),
           const SizedBox(height: 12),
@@ -129,14 +127,13 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard> {
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.of(ctx).pop(),
-                            child: const Text('Close'),
+                            child: Text(context.l10n.close),
                           ),
                         ],
                       ),
                     );
                   },
-                  child: Text(
-                    'Device Guide',
+                  child: Text(context.l10n.deviceGuide,
                     style: TextStyle(
                         color: p.accent,
                         fontSize: 12,

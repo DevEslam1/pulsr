@@ -246,7 +246,7 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                           ));
                         },
                         icon: const Icon(Icons.add_rounded, size: 18),
-                        label: const Text('Add Rule'),
+                        label: Text(context.l10n.addRule),
                       ),
                     ],
                   ),

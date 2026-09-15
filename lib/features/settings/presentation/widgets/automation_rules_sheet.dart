@@ -1,5 +1,6 @@
 // lib/features/settings/presentation/widgets/automation_rules_sheet.dart
 import 'package:flutter/material.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/services/automation_rules_service.dart';
 import '../../../../core/services/automation_trigger_service.dart';
@@ -85,8 +86,7 @@ class _AutomationRulesSheetState extends State<AutomationRulesSheet> {
                 children: [
                   Icon(Icons.auto_awesome_rounded, color: p.accent, size: 24),
                   const SizedBox(width: 10),
-                  Text(
-                    'Automation Rules',
+                  Text(context.l10n.automationRules,
                     style: TextStyle(
                       color: p.textPrimary,
                       fontWeight: FontWeight.w800,
@@ -96,8 +96,7 @@ class _AutomationRulesSheetState extends State<AutomationRulesSheet> {
                 ],
               ),
               const SizedBox(height: 6),
-              Text(
-                'Apply a settings profile automatically when a device event fires.',
+              Text(context.l10n.automationRulesDesc,
                 style: TextStyle(color: p.textSecondary, fontSize: 12.5),
               ),
               const SizedBox(height: 16),
@@ -108,8 +107,7 @@ class _AutomationRulesSheetState extends State<AutomationRulesSheet> {
                       child: CircularProgressIndicator(strokeWidth: 2)),
                 )
               else if (_rules.isEmpty)
-                Text(
-                  'No automation rules configured.',
+                Text(context.l10n.noAutomationRules,
                   style: TextStyle(color: p.textSecondary, fontSize: 13),
                 )
               else

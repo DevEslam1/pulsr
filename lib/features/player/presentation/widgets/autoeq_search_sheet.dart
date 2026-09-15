@@ -1,5 +1,6 @@
 // lib/features/player/presentation/widgets/autoeq_search_sheet.dart
 import 'package:flutter/material.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/services/autoeq_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../data/audio/equalizer_manager.dart';
@@ -70,8 +71,7 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'AutoEQ 2.0 Database',
+              Text(context.l10n.autoEqDatabase,
                 style: TextStyle(
                   color: p.textPrimary,
                   fontSize: 18,
@@ -110,8 +110,7 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
                 ? Center(child: CircularProgressIndicator(color: p.primary))
                 : _results.isEmpty
                     ? Center(
-                        child: Text(
-                          'No matching headphone profiles found',
+                        child: Text(context.l10n.noHpMatch,
                           style: TextStyle(color: p.textSecondary),
                         ),
                       )

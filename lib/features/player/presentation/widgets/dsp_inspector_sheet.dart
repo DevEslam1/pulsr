@@ -1,6 +1,7 @@
 // lib/features/player/presentation/widgets/dsp_inspector_sheet.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -68,7 +69,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('DSP Debug Report copied to clipboard!'),
+          content: Text(context.l10n.dspReportCopied),
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
         ),
@@ -136,16 +137,14 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'DSP Signal Inspector',
+                            Text(context.l10n.dspInspector,
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w800,
                                 color: p.textPrimary,
                               ),
                             ),
-                            Text(
-                              'Real-time Audio Engine & DSP Debugging',
+                            Text(context.l10n.dspInspectorDesc,
                               style: TextStyle(
                                 fontSize: 11.5,
                                 color: p.textSecondary,
@@ -193,8 +192,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
                               // Active Effects Summary Header
                               Row(
                                 children: [
-                                  Text(
-                                    'ACTIVE AUDIO STAGES',
+                                  Text(context.l10n.activeAudioStages,
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w800,
@@ -241,8 +239,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
                                     border: Border.all(color: p.hairline),
                                   ),
                                   child: Center(
-                                    child: Text(
-                                      'No DSP stages reported from platform engine.',
+                                    child: Text(context.l10n.noDspStages,
                                       style: TextStyle(
                                           color: p.textSecondary, fontSize: 12),
                                     ),
@@ -392,8 +389,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
                   const Icon(Icons.info_rounded, size: 16, color: Colors.amber),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      'Dolby Atmos is hijacking the HAL session. Native limiter/crossfeed still run, but EQ needs HAL. Fix: tap below to switch to OEM (lets system handle EQ) or disable Dolby in system Sound settings, then restart track.',
+                    child: Text(context.l10n.dolbyHijackDesc,
                       style: TextStyle(fontSize: 11, height: 1.35, color: p.textSecondary, fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -410,15 +406,15 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
                     final cubit = context.read<SettingsCubit>();
                     await cubit.setDspPreference('oem');
                     if (!mounted) return;
-                    messenger.showSnackBar(const SnackBar(content: Text('Switched DSP Preference → OEM. Restart track to attach.')));
+                    messenger.showSnackBar(SnackBar(content: Text(context.l10n.switchedToOem)));
                     unawaited(_refreshReport());
                   } catch (_) {
                     if (!mounted) return;
-                    messenger.showSnackBar(const SnackBar(content: Text('Failed to switch preference — change in Settings → Audio')));
+                    messenger.showSnackBar(SnackBar(content: Text(context.l10n.switchPrefFailed)));
                   }
                 },
                 icon: const Icon(Icons.tune_rounded, size: 16),
-                label: const Text('Fix: Switch to OEM', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                label: Text(context.l10n.fixSwitchOem, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
                 style: FilledButton.styleFrom(backgroundColor: Colors.amber, foregroundColor: Colors.black, visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(vertical: 10)),
               ),
             ),
@@ -436,11 +432,11 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
                   }
                   // Refresh report after attempt
                   if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Retrying HAL attach… play a track if idle')) );
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10n.retryingHal)) );
                   unawaited(_refreshReport());
                 },
                 icon: const Icon(Icons.refresh_rounded, size: 16),
-                label: const Text('Retry Attach', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                label: Text(context.l10n.retryAttach, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
                 style: OutlinedButton.styleFrom(foregroundColor: p.accent, side: BorderSide(color: p.accent.withValues(alpha: 0.4)), visualDensity: VisualDensity.compact),
               ),
             ),

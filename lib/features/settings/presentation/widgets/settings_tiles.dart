@@ -214,7 +214,7 @@ void showAudioFeatureInfoDialog(
           ],
         ),
       ),
-      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Got it'))],
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text(context.l10n.gotIt))],
     ),
   );
 }

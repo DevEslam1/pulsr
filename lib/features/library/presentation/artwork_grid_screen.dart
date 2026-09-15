@@ -1,5 +1,6 @@
 // lib/features/library/presentation/artwork_grid_screen.dart
 import 'package:flutter/material.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
@@ -59,8 +60,7 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
           backgroundColor: p.surface,
           elevation: 0,
           leading: const PulsrBackButton(),
-          title: Text(
-          'Album Artwork Wall',
+          title: Text(context.l10n.artworkWall,
           style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.bold),
         ),
         actions: [
@@ -94,8 +94,7 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
 
           if (albums.isEmpty) {
             return Center(
-              child: Text(
-                'No albums found in library',
+              child: Text(context.l10n.noAlbumsFound,
                 style: TextStyle(color: p.textSecondary),
               ),
             );

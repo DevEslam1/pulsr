@@ -1963,8 +1963,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        Text(
-                          'Opens Developer Options → Bluetooth Audio Codec',
+                        Text(context.l10n.devOptionsBtCodec,
                           style: TextStyle(color: p.textTertiary, fontSize: 11),
                         ),
                       ],

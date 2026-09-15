@@ -2338,5 +2338,413 @@
   "bitPerfectMode": "Modo Bit-Perfect",
   "@bitPerfectMode": {
     "description": "tranche7 quality"
+  },
+  "ytmSessionExpired": "Sesion de YouTube Music expirada. Inicia sesion de nuevo.",
+  "@ytmSessionExpired": {
+    "description": "tranche8 l10n"
+  },
+  "noOnlineMetadata": "No se encontro metadatos en linea.",
+  "@noOnlineMetadata": {
+    "description": "tranche8 l10n"
+  },
+  "onlineMetadataApplied": "Metadatos aplicados!",
+  "@onlineMetadataApplied": {
+    "description": "tranche8 l10n"
+  },
+  "ytmExplore": "Explorar YouTube Music",
+  "@ytmExplore": {
+    "description": "tranche8 l10n"
+  },
+  "couldNotLoadYear": "No se pudieron cargar las canciones de este ano",
+  "@couldNotLoadYear": {
+    "description": "tranche8 l10n"
+  },
+  "studioAudio": "AUDIO DE ESTUDIO",
+  "@studioAudio": {
+    "description": "tranche8 l10n"
+  },
+  "lyricsLabel": "Letras",
+  "@lyricsLabel": {
+    "description": "tranche8 l10n"
+  },
+  "cloudBackupSync": "Copia y sincronizacion",
+  "@cloudBackupSync": {
+    "description": "tranche8 l10n"
+  },
+  "cloudStorageStatus": "Estado del almacenamiento",
+  "@cloudStorageStatus": {
+    "description": "tranche8 l10n"
+  },
+  "cloudBackupDesc": "Copia cifrada bidireccional entre dispositivos.",
+  "@cloudBackupDesc": {
+    "description": "tranche8 l10n"
+  },
+  "whatGetsSynced": "Que se sincroniza",
+  "@whatGetsSynced": {
+    "description": "tranche8 l10n"
+  },
+  "syncItemsPrefix": "Favoritos, listas, historial y metadatos ",
+  "@syncItemsPrefix": {
+    "description": "tranche8 l10n"
+  },
+  "autoFilterVoiceNotes": "Filtro automatico de notas de voz",
+  "@autoFilterVoiceNotes": {
+    "description": "tranche8 l10n"
+  },
+  "autoFilterVoiceNotesDesc": "Ignora audios de WhatsApp, Telegram y grabaciones.",
+  "@autoFilterVoiceNotesDesc": {
+    "description": "tranche8 l10n"
+  },
+  "shortAudioFilterDesc": "Ignora clips cortos y efectos",
+  "@shortAudioFilterDesc": {
+    "description": "tranche8 l10n"
+  },
+  "minFileSize": "Tamano minimo",
+  "@minFileSize": {
+    "description": "tranche8 l10n"
+  },
+  "minFileSizeDesc": "Excluye fragmentos y archivos danados",
+  "@minFileSizeDesc": {
+    "description": "tranche8 l10n"
+  },
+  "deviceAudioDirectories": "DIRECTORIOS DE AUDIO",
+  "@deviceAudioDirectories": {
+    "description": "tranche8 l10n"
+  },
+  "httpHttps": "HTTP / HTTPS",
+  "@httpHttps": {
+    "description": "tranche8 l10n"
+  },
+  "socks5": "SOCKS5",
+  "@socks5": {
+    "description": "tranche8 l10n"
+  },
+  "scrobblingAnalytics": "Analiticas de scrobbling",
+  "@scrobblingAnalytics": {
+    "description": "tranche8 l10n"
+  },
+  "universalScrobblingEngine": "Motor universal de scrobbling",
+  "@universalScrobblingEngine": {
+    "description": "tranche8 l10n"
+  },
+  "scrobblingServicesDesc": "Conectado a Last.fm, ListenBrainz, Libre.fm y Webhooks.",
+  "@scrobblingServicesDesc": {
+    "description": "tranche8 l10n"
+  },
+  "last7DaysActivity": "Actividad de 7 dias",
+  "@last7DaysActivity": {
+    "description": "tranche8 l10n"
+  },
+  "topScrobbledArtists": "Artistas mas escuchados",
+  "@topScrobbledArtists": {
+    "description": "tranche8 l10n"
+  },
+  "themeModeLabel": "MODO DE TEMA",
+  "@themeModeLabel": {
+    "description": "tranche8 l10n"
+  },
+  "amoledLabel": "AMOLED",
+  "@amoledLabel": {
+    "description": "tranche8 l10n"
+  },
+  "settingsSearchHint": "Prueba buscar \"equalizer\", \"dark mode\", \"crossfade\", \"proxy\", \"cache\" o \"scrobble\".",
+  "@settingsSearchHint": {
+    "description": "tranche8 l10n"
+  },
+  "bitPerfectLabel": "BIT-PERFECT",
+  "@bitPerfectLabel": {
+    "description": "tranche8 l10n"
+  },
+  "automationRules": "Reglas de automatizacion",
+  "@automationRules": {
+    "description": "tranche8 l10n"
+  },
+  "automationRulesDesc": "Aplica un perfil automaticamente cuando ocurre un evento.",
+  "@automationRulesDesc": {
+    "description": "tranche8 l10n"
+  },
+  "noAutomationRules": "Sin reglas configuradas.",
+  "@noAutomationRules": {
+    "description": "tranche8 l10n"
+  },
+  "playbackStopsScreenOff": "Se detiene al apagar la pantalla?",
+  "@playbackStopsScreenOff": {
+    "description": "tranche8 l10n"
+  },
+  "batteryExemptionDesc": "Algunos fabricantes detienen la reproduccion en segundo plano. Concede la exencion de bateria.",
+  "@batteryExemptionDesc": {
+    "description": "tranche8 l10n"
+  },
+  "deviceGuide": "Guia de dispositivos",
+  "@deviceGuide": {
+    "description": "tranche8 l10n"
+  },
+  "sponsorBlockCategoriesLabel": "Categorias de SponsorBlock",
+  "@sponsorBlockCategoriesLabel": {
+    "description": "tranche8 l10n"
+  },
+  "syncedLabel": "SINCRONIZADO",
+  "@syncedLabel": {
+    "description": "tranche8 l10n"
+  },
+  "quickDiscovery": "DESCUBRIMIENTO RAPIDO",
+  "@quickDiscovery": {
+    "description": "tranche8 l10n"
+  },
+  "ytmSearchDesc": "Millones de canciones sin anuncios.",
+  "@ytmSearchDesc": {
+    "description": "tranche8 l10n"
+  },
+  "popularSearches": "BUSQUEDAS POPULARES",
+  "@popularSearches": {
+    "description": "tranche8 l10n"
+  },
+  "quranMode": "Modo Coran",
+  "@quranMode": {
+    "description": "tranche8 l10n"
+  },
+  "managePlaylist": "Gestionar lista",
+  "@managePlaylist": {
+    "description": "tranche8 l10n"
+  },
+  "exportFailedRetry": "Error al exportar. Intenta de nuevo.",
+  "@exportFailedRetry": {
+    "description": "tranche8 l10n"
+  },
+  "appliedGraphicEq": "Curva GraphicEq aplicada",
+  "@appliedGraphicEq": {
+    "description": "tranche8 l10n"
+  },
+  "arbitraryResponseEq": "EQ de respuesta arbitraria",
+  "@arbitraryResponseEq": {
+    "description": "tranche8 l10n"
+  },
+  "graphicEqSpec": "Especificacion GraphicEq",
+  "@graphicEqSpec": {
+    "description": "tranche8 l10n"
+  },
+  "fir512": "Filtro FIR de 512",
+  "@fir512": {
+    "description": "tranche8 l10n"
+  },
+  "applyCurve": "Aplicar curva",
+  "@applyCurve": {
+    "description": "tranche8 l10n"
+  },
+  "presetAcousticTargets": "Objetivos acusticos",
+  "@presetAcousticTargets": {
+    "description": "tranche8 l10n"
+  },
+  "devOptionsBtCodec": "Abre Opciones de desarrollador -> Codec Bluetooth",
+  "@devOptionsBtCodec": {
+    "description": "tranche8 l10n"
+  },
+  "autoEqDatabase": "Base de datos AutoEQ 2.0",
+  "@autoEqDatabase": {
+    "description": "tranche8 l10n"
+  },
+  "noHpMatch": "Sin perfiles coincidentes",
+  "@noHpMatch": {
+    "description": "tranche8 l10n"
+  },
+  "dspReportCopied": "Informe DSP copiado!",
+  "@dspReportCopied": {
+    "description": "tranche8 l10n"
+  },
+  "dspInspectorDesc": "Depuracion del motor de audio y DSP",
+  "@dspInspectorDesc": {
+    "description": "tranche8 l10n"
+  },
+  "activeAudioStages": "ETAPAS ACTIVAS",
+  "@activeAudioStages": {
+    "description": "tranche8 l10n"
+  },
+  "noDspStages": "Sin etapas reportadas por el motor.",
+  "@noDspStages": {
+    "description": "tranche8 l10n"
+  },
+  "dolbyHijackDesc": "Dolby Atmos controla la sesion HAL. Cambia a OEM o desactiva Dolby.",
+  "@dolbyHijackDesc": {
+    "description": "tranche8 l10n"
+  },
+  "switchedToOem": "Cambiado a OEM. Reinicia la pista.",
+  "@switchedToOem": {
+    "description": "tranche8 l10n"
+  },
+  "switchPrefFailed": "Error al cambiar. Hazlo en Ajustes -> Audio",
+  "@switchPrefFailed": {
+    "description": "tranche8 l10n"
+  },
+  "fixSwitchOem": "Solucion: cambiar a OEM",
+  "@fixSwitchOem": {
+    "description": "tranche8 l10n"
+  },
+  "retryingHal": "Reintentando HAL... reproduce una pista",
+  "@retryingHal": {
+    "description": "tranche8 l10n"
+  },
+  "retryAttach": "Reintentar",
+  "@retryAttach": {
+    "description": "tranche8 l10n"
+  },
+  "placeLrcHint": "Coloca un archivo .lrc junto a la pista o incrusta la letra.",
+  "@placeLrcHint": {
+    "description": "tranche8 l10n"
+  },
+  "searchLyrics": "Buscar letras",
+  "@searchLyrics": {
+    "description": "tranche8 l10n"
+  },
+  "queueEmpty": "La cola esta vacia",
+  "@queueEmpty": {
+    "description": "tranche8 l10n"
+  },
+  "skipAction": "Omitir",
+  "@skipAction": {
+    "description": "tranche8 l10n"
+  },
+  "onboardingHeading": "Tu musica, tu privacidad",
+  "@onboardingHeading": {
+    "description": "tranche8 l10n"
+  },
+  "onboardingPrivacyDesc": "Reproduccion 100% local. Sin cuentas ni nube.",
+  "@onboardingPrivacyDesc": {
+    "description": "tranche8 l10n"
+  },
+  "onboardingPowerful": "Reproduccion potente",
+  "@onboardingPowerful": {
+    "description": "tranche8 l10n"
+  },
+  "onboardingPowerfulDesc": "Ecualizador de 10 bandas, crossfade, gapless y temporizador.",
+  "@onboardingPowerfulDesc": {
+    "description": "tranche8 l10n"
+  },
+  "onboardingThemes": "4 TEMAS DE REPRODUCTOR",
+  "@onboardingThemes": {
+    "description": "tranche8 l10n"
+  },
+  "onboardingBeautiful": "Hermoso y personal",
+  "@onboardingBeautiful": {
+    "description": "tranche8 l10n"
+  },
+  "onboardingBeautifulDesc": "Color dinamico del arte y 4 temas unicos.",
+  "@onboardingBeautifulDesc": {
+    "description": "tranche8 l10n"
+  },
+  "artworkWall": "Muro de portadas",
+  "@artworkWall": {
+    "description": "tranche8 l10n"
+  },
+  "noAlbumsFound": "Sin albumes en la biblioteca",
+  "@noAlbumsFound": {
+    "description": "tranche8 l10n"
+  },
+  "listeningStats": "Estadisticas de escucha",
+  "@listeningStats": {
+    "description": "tranche8 l10n"
+  },
+  "audioQualityTiers": "Niveles de calidad",
+  "@audioQualityTiers": {
+    "description": "tranche8 l10n"
+  },
+  "noPlayHistory": "Sin historial aun. Escucha musica!",
+  "@noPlayHistory": {
+    "description": "tranche8 l10n"
+  },
+  "downloadsLabel": "DESCARGAS",
+  "@downloadsLabel": {
+    "description": "tranche8 l10n"
+  },
+  "noMusicIndexed": "Sin archivos indexados",
+  "@noMusicIndexed": {
+    "description": "tranche8 l10n"
+  },
+  "parentDirectory": "Directorio superior",
+  "@parentDirectory": {
+    "description": "tranche8 l10n"
+  },
+  "folderEmpty": "Carpeta vacia",
+  "@folderEmpty": {
+    "description": "tranche8 l10n"
+  },
+  "otherGenres": "Otros generos",
+  "@otherGenres": {
+    "description": "tranche8 l10n"
+  },
+  "couldNotLoadGenre": "No se pudieron cargar las canciones del genero",
+  "@couldNotLoadGenre": {
+    "description": "tranche8 l10n"
+  },
+  "syncAcrossDevices": "Sincroniza favoritos y listas",
+  "@syncAcrossDevices": {
+    "description": "tranche8 l10n"
+  },
+  "continueWithGoogle": "Continuar con Google",
+  "@continueWithGoogle": {
+    "description": "tranche8 l10n"
+  },
+  "orWithEmail": "O CON CORREO",
+  "@orWithEmail": {
+    "description": "tranche8 l10n"
+  },
+  "enterEmailFirst": "Ingresa tu correo primero",
+  "@enterEmailFirst": {
+    "description": "tranche8 l10n"
+  },
+  "forgotPassword": "Olvidaste la contrasena?",
+  "@forgotPassword": {
+    "description": "tranche8 l10n"
+  },
+  "signInGoogleTv": "Iniciar sesion con Google TV",
+  "@signInGoogleTv": {
+    "description": "tranche8 l10n"
+  },
+  "noCaptchaDesc": "Sin captcha - aprueba en otro dispositivo",
+  "@noCaptchaDesc": {
+    "description": "tranche8 l10n"
+  },
+  "tryAgain": "Intentar de nuevo",
+  "@tryAgain": {
+    "description": "tranche8 l10n"
+  },
+  "oauthStep1": "1. Abre esta direccion:",
+  "@oauthStep1": {
+    "description": "tranche8 l10n"
+  },
+  "oauthStep2": "2. Ingresa este codigo:",
+  "@oauthStep2": {
+    "description": "tranche8 l10n"
+  },
+  "copyCode": "Copiar codigo",
+  "@copyCode": {
+    "description": "tranche8 l10n"
+  },
+  "waitingApproval": "Esperando aprobacion...",
+  "@waitingApproval": {
+    "description": "tranche8 l10n"
+  },
+  "aboutArtist": "Acerca del artista",
+  "@aboutArtist": {
+    "description": "tranche8 l10n"
+  },
+  "openingYtmTrack": "Abriendo pista de YouTube Music...",
+  "@openingYtmTrack": {
+    "description": "tranche8 l10n"
+  },
+  "formatNotSupported": "Formato no compatible",
+  "@formatNotSupported": {
+    "description": "tranche8 l10n"
+  },
+  "waveformLabel": "FORMA DE ONDA",
+  "@waveformLabel": {
+    "description": "tranche8 l10n"
+  },
+  "usbBpFailed": "El streaming USB bit-perfect no pudo iniciarse (DAC no compatible).",
+  "@usbBpFailed": {
+    "description": "tranche8 fix"
+  },
+  "cloudSyncItemsDesc": "Favoritos, listas e historial se sincronizan en ambos sentidos. Los ajustes permanecen en este dispositivo.",
+  "@cloudSyncItemsDesc": {
+    "description": "tranche8 final"
   }
 }

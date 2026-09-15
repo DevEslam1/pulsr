@@ -948,8 +948,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'THEME MODE',
+              Text(context.l10n.themeModeLabel,
                 style: TextStyle(
                   color: p.textSecondary,
                   fontSize: 11,
@@ -1027,8 +1026,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     ButtonSegment(
                       value: AppThemeMode.amoled,
-                      label: Text(
-                        'AMOLED',
+                      label: Text(context.l10n.amoledLabel,
                         maxLines: 1,
                         softWrap: false,
                         style: TextStyle(
@@ -1497,8 +1495,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     color: p.success.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: Text(
-                    'ACTIVE',
+                  child: Text(context.l10n.activeLabel,
                     style: TextStyle(
                       color: p.success,
                       fontSize: 10,
@@ -1622,8 +1619,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: 6),
-              Text(
-                'Try searching for "equalizer", "dark mode", "crossfade", "proxy", "cache", or "scrobble".',
+              Text(context.l10n.settingsSearchHint,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: p.textSecondary, fontSize: 12.5),
               ),

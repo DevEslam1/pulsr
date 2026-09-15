@@ -1201,17 +1201,17 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
               child: SegmentedButton<AppProxyType>(
                 showSelectedIcon: false,
                 expandedInsets: EdgeInsets.zero,
-                segments: const [
+                segments: [
                   ButtonSegment(
                     value: AppProxyType.http,
-                    label: Text('HTTP / HTTPS',
+                    label: Text(context.l10n.httpHttps,
                         style: TextStyle(
                             fontWeight: FontWeight.w600, fontSize: 13)),
                     icon: Icon(Icons.http_rounded, size: 18),
                   ),
                   ButtonSegment(
                     value: AppProxyType.socks5,
-                    label: Text('SOCKS5',
+                    label: Text(context.l10n.socks5,
                         style: TextStyle(
                             fontWeight: FontWeight.w600, fontSize: 13)),
                     icon: Icon(Icons.shield_outlined, size: 18),

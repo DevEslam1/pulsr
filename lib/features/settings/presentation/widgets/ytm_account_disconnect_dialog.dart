@@ -62,6 +62,7 @@ class _YtmAccountDisconnectDialogState
 
   Future<void> _disconnect() async {
     if (_busy) return;
+    final disconnectedText = context.l10n.ytmDisconnected;
     setState(() => _busy = true);
     try {
       await widget.account.logout();
@@ -69,7 +70,7 @@ class _YtmAccountDisconnectDialogState
       if (mounted) Navigator.pop(context);
       if (widget.hostContext.mounted) {
         ScaffoldMessenger.of(widget.hostContext).showSnackBar(
-          const SnackBar(content: Text('Disconnected from YouTube Music')),
+          SnackBar(content: Text(disconnectedText)),
         );
       }
     }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:path/path.dart' as p_path;
@@ -28,8 +29,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
         final songs = state.songs;
         if (songs.isEmpty) {
           return Center(
-            child: Text(
-              'No music files indexed',
+            child: Text(context.l10n.noMusicIndexed,
               style: TextStyle(color: p.textSecondary),
             ),
           );
@@ -121,7 +121,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                     ListTile(
                       leading:
                           Icon(Icons.arrow_upward_rounded, color: p.primary),
-                      title: Text('Parent Directory',
+                      title: Text(context.l10n.parentDirectory,
                           style: TextStyle(
                               color: p.textPrimary,
                               fontWeight: FontWeight.w600)),
@@ -182,7 +182,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                     Padding(
                       padding: const EdgeInsets.all(32.0),
                       child: Center(
-                        child: Text('Folder is empty',
+                        child: Text(context.l10n.folderEmpty,
                             style: TextStyle(color: p.textSecondary)),
                       ),
                     ),

@@ -108,8 +108,7 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
           backgroundColor: p.surface,
           elevation: 0,
           leading: const PulsrBackButton(),
-          title: Text(
-          'Scrobbling Analytics',
+          title: Text(context.l10n.scrobblingAnalytics,
           style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.bold),
         ),
       ),
@@ -133,8 +132,7 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
                         children: [
                           Icon(Icons.sync_alt_rounded, color: p.primary),
                           const SizedBox(width: 10),
-                          Text(
-                            'Universal Scrobbling Engine',
+                          Text(context.l10n.universalScrobblingEngine,
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -144,8 +142,7 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        'Connected to Last.fm, ListenBrainz, Libre.fm, and Custom Webhooks.',
+                      Text(context.l10n.scrobblingServicesDesc,
                         style: TextStyle(fontSize: 13, color: p.textSecondary),
                       ),
                       const SizedBox(height: 16),
@@ -199,8 +196,7 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
                           Icon(Icons.bar_chart_rounded,
                               color: p.accent, size: 20),
                           const SizedBox(width: 8),
-                          Text(
-                            'Last 7 Days Activity',
+                          Text(context.l10n.last7DaysActivity,
                             style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.bold,
@@ -243,8 +239,7 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
                             Icon(Icons.leaderboard_rounded,
                                 color: p.primary, size: 20),
                             const SizedBox(width: 8),
-                            Text(
-                              'Top Scrobbled Artists',
+                            Text(context.l10n.topScrobbledArtists,
                               style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.bold,

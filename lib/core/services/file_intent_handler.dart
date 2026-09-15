@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../core/utils/l10n_extensions.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:injectable/injectable.dart';
@@ -93,8 +94,8 @@ class FileIntentHandler {
     final context = rootNavigatorKey.currentContext;
     if (context != null && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Opening YouTube Music track...'),
+        SnackBar(
+          content: Text(context.l10n.openingYtmTrack),
           duration: Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
         ),
@@ -197,8 +198,8 @@ class FileIntentHandler {
         final context = rootNavigatorKey.currentContext;
         if (context != null && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Format not supported on this device'),
+            SnackBar(
+              content: Text(context.l10n.formatNotSupported),
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -278,8 +279,8 @@ class FileIntentHandler {
       final context = rootNavigatorKey.currentContext;
       if (context != null && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Format not supported on this device'),
+          SnackBar(
+            content: Text(context.l10n.formatNotSupported),
             behavior: SnackBarBehavior.floating,
           ),
         );

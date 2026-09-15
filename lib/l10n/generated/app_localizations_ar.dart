@@ -3347,4 +3347,317 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get bitPerfectMode => 'وضع Bit-Perfect';
+
+  @override
+  String get ytmSessionExpired => 'انتهت جلسة يوتيوب ميوزك. سجل الدخول مجددا.';
+
+  @override
+  String get noOnlineMetadata => 'لم يتم العثور على بيانات مطابقة.';
+
+  @override
+  String get onlineMetadataApplied => 'تم تطبيق البيانات بنجاح!';
+
+  @override
+  String get ytmExplore => 'استكشاف يوتيوب ميوزك';
+
+  @override
+  String get couldNotLoadYear => 'تعذر تحميل اغاني هذه السنة';
+
+  @override
+  String get studioAudio => 'صوت الاستوديو';
+
+  @override
+  String get lyricsLabel => 'الكلمات';
+
+  @override
+  String get cloudBackupSync => 'النسخ الاحتياطي والمزامنة';
+
+  @override
+  String get cloudStorageStatus => 'حالة التخزين السحابي';
+
+  @override
+  String get cloudBackupDesc => 'نسخ مشفر ثنائي الاتجاه بين اجهزتك.';
+
+  @override
+  String get whatGetsSynced => 'ما الذي تتم مزامنته';
+
+  @override
+  String get syncItemsPrefix => 'المفضلة والقوائم والسجل والبيانات ';
+
+  @override
+  String get autoFilterVoiceNotes => 'تصفية تلقائية للرسائل الصوتية';
+
+  @override
+  String get autoFilterVoiceNotesDesc =>
+      'يتجاهل ملفات واتساب وتيليجرام والتسجيلات.';
+
+  @override
+  String get shortAudioFilterDesc => 'تجاهل المقاطع القصيرة والمؤثرات';
+
+  @override
+  String get minFileSize => 'الحد الادنى للحجم';
+
+  @override
+  String get minFileSizeDesc => 'استبعد المقاطع الصغيرة والملفات التالفة';
+
+  @override
+  String get deviceAudioDirectories => 'مجلدات الصوت في الجهاز';
+
+  @override
+  String get httpHttps => 'HTTP / HTTPS';
+
+  @override
+  String get socks5 => 'SOCKS5';
+
+  @override
+  String get scrobblingAnalytics => 'تحليلات السكرابلنغ';
+
+  @override
+  String get universalScrobblingEngine => 'محرك سكرابلنغ شامل';
+
+  @override
+  String get scrobblingServicesDesc =>
+      'متصل بـ Last.fm وListenBrainz وLibre.fm وWebhooks.';
+
+  @override
+  String get last7DaysActivity => 'نشاط 7 ايام';
+
+  @override
+  String get topScrobbledArtists => 'اكثر الفنانين سكرابلنغ';
+
+  @override
+  String get themeModeLabel => 'وضع السمة';
+
+  @override
+  String get amoledLabel => 'AMOLED';
+
+  @override
+  String get settingsSearchHint =>
+      'جرب البحث عن equalizer او dark mode او proxy او cache.';
+
+  @override
+  String get bitPerfectLabel => 'BIT-PERFECT';
+
+  @override
+  String get automationRules => 'قواعد الاتمتة';
+
+  @override
+  String get automationRulesDesc => 'طبق ملفا تلقائيا عند وقوع حدث.';
+
+  @override
+  String get noAutomationRules => 'لا توجد قواعد معدّة.';
+
+  @override
+  String get playbackStopsScreenOff => 'هل يتوقف التشغيل عند اطفاء الشاشة؟';
+
+  @override
+  String get batteryExemptionDesc =>
+      'بعض المصنعين يوقفون التشغيل في الخلفية. امنح استثناء البطارية.';
+
+  @override
+  String get deviceGuide => 'دليل الاجهزة';
+
+  @override
+  String get sponsorBlockCategoriesLabel => 'فئات SponsorBlock';
+
+  @override
+  String get syncedLabel => 'متزامن';
+
+  @override
+  String get quickDiscovery => 'اكتشاف سريع';
+
+  @override
+  String get ytmSearchDesc => 'ملايين الاغاني بدون اعلانات.';
+
+  @override
+  String get popularSearches => 'عمليات بحث شائعة';
+
+  @override
+  String get quranMode => 'وضع القرآن';
+
+  @override
+  String get managePlaylist => 'ادارة القائمة';
+
+  @override
+  String get exportFailedRetry => 'فشل التصدير. حاول مجددا.';
+
+  @override
+  String get appliedGraphicEq => 'تم تطبيق منحنى GraphicEq';
+
+  @override
+  String get arbitraryResponseEq => 'معادل استجابة حر';
+
+  @override
+  String get graphicEqSpec => 'مواصفات GraphicEq';
+
+  @override
+  String get fir512 => 'مرشح FIR بـ512';
+
+  @override
+  String get applyCurve => 'تطبيق المنحنى';
+
+  @override
+  String get presetAcousticTargets => 'اهداف صوتية';
+
+  @override
+  String get devOptionsBtCodec => 'يفتح خيارات المطور -> كودك البلوتوث';
+
+  @override
+  String get autoEqDatabase => 'قاعدة بيانات AutoEQ 2.0';
+
+  @override
+  String get noHpMatch => 'لا توجد ملفات مطابقة';
+
+  @override
+  String get dspReportCopied => 'تم نسخ تقرير DSP!';
+
+  @override
+  String get dspInspectorDesc => 'تنقيح محرك الصوت وDSP';
+
+  @override
+  String get activeAudioStages => 'المراحل النشطة';
+
+  @override
+  String get noDspStages => 'لا توجد مراحل من المحرك.';
+
+  @override
+  String get dolbyHijackDesc =>
+      'Dolby Atmos يسيطر على جلسة HAL. بدل الى OEM او عطل Dolby.';
+
+  @override
+  String get switchedToOem => 'تم التبديل الى OEM. اعد تشغيل المسار.';
+
+  @override
+  String get switchPrefFailed => 'فشل التبديل - غيّره من الاعدادات -> الصوت';
+
+  @override
+  String get fixSwitchOem => 'الحل: التبديل الى OEM';
+
+  @override
+  String get retryingHal => 'جار اعادة محاولة HAL... شغل مسارا';
+
+  @override
+  String get retryAttach => 'اعادة المحاولة';
+
+  @override
+  String get placeLrcHint => 'ضع ملف .lrc بجانب المسار او ادمج الكلمات.';
+
+  @override
+  String get searchLyrics => 'البحث عن الكلمات';
+
+  @override
+  String get queueEmpty => 'قائمة الانتظار فارغة';
+
+  @override
+  String get skipAction => 'تخطي';
+
+  @override
+  String get onboardingHeading => 'موسيقاك وخصوصيتك';
+
+  @override
+  String get onboardingPrivacyDesc => 'تشغيل محلي 100%. بلا حسابات او سحابة.';
+
+  @override
+  String get onboardingPowerful => 'تشغيل قوي';
+
+  @override
+  String get onboardingPowerfulDesc =>
+      'معادل 10 نطاقات وتلاشي وتشغيل متصل ومؤقت.';
+
+  @override
+  String get onboardingThemes => '4 سمات للمشغل';
+
+  @override
+  String get onboardingBeautiful => 'جميل وشخصي';
+
+  @override
+  String get onboardingBeautifulDesc => 'الوان ديناميكية من الغلاف و4 سمات.';
+
+  @override
+  String get artworkWall => 'جدار الاغلفة';
+
+  @override
+  String get noAlbumsFound => 'لا توجد البومات';
+
+  @override
+  String get listeningStats => 'احصائيات الاستماع';
+
+  @override
+  String get audioQualityTiers => 'مستويات الجودة';
+
+  @override
+  String get noPlayHistory => 'لا يوجد سجل بعد. استمع للموسيقى!';
+
+  @override
+  String get downloadsLabel => 'التنزيلات';
+
+  @override
+  String get noMusicIndexed => 'لا توجد ملفات مفهرسة';
+
+  @override
+  String get parentDirectory => 'المجلد الاعلى';
+
+  @override
+  String get folderEmpty => 'المجلد فارغ';
+
+  @override
+  String get otherGenres => 'انواع اخرى';
+
+  @override
+  String get couldNotLoadGenre => 'تعذر تحميل اغاني النوع';
+
+  @override
+  String get syncAcrossDevices => 'زامن مفضلاتك وقوائمك';
+
+  @override
+  String get continueWithGoogle => 'المتابعة عبر Google';
+
+  @override
+  String get orWithEmail => 'او بالبريد';
+
+  @override
+  String get enterEmailFirst => 'ادخل بريدك اولا';
+
+  @override
+  String get forgotPassword => 'هل نسيت كلمة المرور؟';
+
+  @override
+  String get signInGoogleTv => 'تسجيل الدخول عبر Google TV';
+
+  @override
+  String get noCaptchaDesc => 'بدون كابتشا - وافق من جهاز اخر';
+
+  @override
+  String get tryAgain => 'حاول مجددا';
+
+  @override
+  String get oauthStep1 => '1. افتح هذا العنوان:';
+
+  @override
+  String get oauthStep2 => '2. ادخل هذا الرمز:';
+
+  @override
+  String get copyCode => 'نسخ الرمز';
+
+  @override
+  String get waitingApproval => 'في انتظار الموافقة...';
+
+  @override
+  String get aboutArtist => 'عن الفنان';
+
+  @override
+  String get openingYtmTrack => 'جار فتح مسار يوتيوب ميوزك...';
+
+  @override
+  String get formatNotSupported => 'الصيغة غير مدعومة';
+
+  @override
+  String get waveformLabel => 'الموجة';
+
+  @override
+  String get usbBpFailed => 'تعذر بدء البث USB bit-perfect (DAC غير مدعوم).';
+
+  @override
+  String get cloudSyncItemsDesc =>
+      'تتم مزامنة المفضلة والقوائم والسجل في الاتجاهين. تبقى الاعدادات على هذا الجهاز.';
 }

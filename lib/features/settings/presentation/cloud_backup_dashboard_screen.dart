@@ -57,8 +57,7 @@ class _CloudBackupDashboardScreenState
           backgroundColor: p.surface,
           elevation: 0,
           leading: const PulsrBackButton(),
-          title: Text(
-          'Cloud Backup & Sync',
+          title: Text(context.l10n.cloudBackupSync,
           style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.bold),
         ),
       ),
@@ -84,8 +83,7 @@ class _CloudBackupDashboardScreenState
                         Icon(Icons.cloud_done_rounded,
                             color: p.primary, size: 24),
                         const SizedBox(width: 10),
-                        Text(
-                          'Cloud Storage Status',
+                        Text(context.l10n.cloudStorageStatus,
                           style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -103,8 +101,7 @@ class _CloudBackupDashboardScreenState
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  'Encrypted bidirectional Firestore backup across all your devices.',
+                Text(context.l10n.cloudBackupDesc,
                   style: TextStyle(fontSize: 13, color: p.textSecondary),
                 ),
                 const SizedBox(height: 14),
@@ -127,8 +124,7 @@ class _CloudBackupDashboardScreenState
           ),
           const SizedBox(height: 24),
 
-          Text(
-            'What gets synced',
+          Text(context.l10n.whatGetsSynced,
             style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
@@ -136,9 +132,7 @@ class _CloudBackupDashboardScreenState
           ),
           const SizedBox(height: 8),
           Text(
-            'Favorites, playlists, play history and library metadata are '
-            'synced in both directions. DSP presets and app settings stay on '
-            'this device.',
+            context.l10n.cloudSyncItemsDesc,
             style: TextStyle(fontSize: 13, color: p.textSecondary),
           ),
           const SizedBox(height: 24),

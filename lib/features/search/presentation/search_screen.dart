@@ -367,8 +367,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        'RECENT SEARCHES',
+                      Text(context.l10n.recentSearches,
                         style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
@@ -408,8 +407,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                   const SizedBox(height: 24),
                 ],
-                Text(
-                  'QUICK DISCOVERY',
+                Text(context.l10n.quickDiscovery,
                   style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
@@ -531,22 +529,19 @@ class _OnlineResults extends StatelessWidget {
                   Icon(Icons.travel_explore_rounded,
                       size: 48, color: p.textTertiary),
                   const SizedBox(height: 12),
-                  Text(
-                    'Search YouTube Music',
+                  Text(context.l10n.searchYtm,
                     style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
                         color: p.textPrimary),
                   ),
                   const SizedBox(height: 6),
-                  Text(
-                    'Stream and download millions of songs from YouTube Music, ad-free.',
+                  Text(context.l10n.ytmSearchDesc,
                     textAlign: TextAlign.center,
                     style: TextStyle(color: p.textSecondary, fontSize: 13),
                   ),
                   const SizedBox(height: 24),
-                  Text(
-                    'POPULAR SEARCHES',
+                  Text(context.l10n.popularSearches,
                     style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,

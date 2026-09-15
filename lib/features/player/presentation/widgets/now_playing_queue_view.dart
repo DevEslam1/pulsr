@@ -1,5 +1,6 @@
 // lib/features/player/presentation/widgets/now_playing_queue_view.dart
 import 'package:flutter/material.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -42,7 +43,7 @@ class NowPlayingQueueView extends StatelessWidget {
                 child: Row(
                   children: [
                     Text(
-                      'Queue',
+                      context.l10n.queue,
                       style: TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 16,
@@ -93,8 +94,7 @@ class NowPlayingQueueView extends StatelessWidget {
               Expanded(
                 child: queue.isEmpty
                     ? Center(
-                        child: Text(
-                          'Queue is empty',
+                        child: Text(context.l10n.queueEmpty,
                           style: TextStyle(color: p.textSecondary),
                         ),
                       )

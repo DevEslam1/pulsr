@@ -1,5 +1,6 @@
 // lib/features/quran_mode/presentation/quran_mode_screen.dart
 import 'package:flutter/material.dart';
+import '../../../core/utils/l10n_extensions.dart';
 
 import '../../../core/theme/aura_theme.dart';
 import '../../player/presentation/widgets/quran_mode_sheet.dart';
@@ -18,7 +19,7 @@ class QuranModeScreen extends StatelessWidget {
         backgroundColor: p.bg,
         foregroundColor: p.textPrimary,
         elevation: 0,
-        title: const Text('Quran Mode',
+        title: Text(context.l10n.quranMode,
             style: TextStyle(fontWeight: FontWeight.w800)),
       ),
       body: const SingleChildScrollView(

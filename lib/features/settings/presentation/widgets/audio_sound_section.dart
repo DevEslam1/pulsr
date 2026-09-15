@@ -250,8 +250,7 @@ class AudioSoundSection extends StatelessWidget {
                                   color: const Color(0xFFFFD700)
                                       .withValues(alpha: 0.6)),
                             ),
-                            child: const Text(
-                              'BIT-PERFECT',
+                            child: Text(context.l10n.bitPerfectLabel,
                               style: TextStyle(
                                 color: Color(0xFFFFD700),
                                 fontWeight: FontWeight.w900,

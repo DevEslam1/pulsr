@@ -406,8 +406,7 @@ class _SponsorBlockSettingTileState extends State<_SponsorBlockSettingTile> {
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(
-                      'SponsorBlock categories',
+                    child: Text(context.l10n.sponsorBlockCategoriesLabel,
                       style: TextStyle(
                         color: p.textPrimary,
                         fontSize: 16,

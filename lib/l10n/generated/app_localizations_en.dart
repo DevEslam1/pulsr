@@ -3369,4 +3369,331 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bitPerfectMode => 'Bit-Perfect Mode';
+
+  @override
+  String get ytmSessionExpired =>
+      'YouTube Music session expired. Sign in again to keep streaming.';
+
+  @override
+  String get noOnlineMetadata => 'No matching online metadata found.';
+
+  @override
+  String get onlineMetadataApplied => 'Online metadata applied successfully!';
+
+  @override
+  String get ytmExplore => 'YouTube Music Explore';
+
+  @override
+  String get couldNotLoadYear => 'Could not load songs for this year';
+
+  @override
+  String get studioAudio => 'STUDIO AUDIO';
+
+  @override
+  String get lyricsLabel => 'Lyrics';
+
+  @override
+  String get cloudBackupSync => 'Cloud Backup & Sync';
+
+  @override
+  String get cloudStorageStatus => 'Cloud Storage Status';
+
+  @override
+  String get cloudBackupDesc =>
+      'Encrypted bidirectional Firestore backup across all your devices.';
+
+  @override
+  String get whatGetsSynced => 'What gets synced';
+
+  @override
+  String get syncItemsPrefix =>
+      'Favorites, playlists, play history and library metadata are ';
+
+  @override
+  String get autoFilterVoiceNotes => 'Auto-Filter Voice Notes & Messengers';
+
+  @override
+  String get autoFilterVoiceNotesDesc =>
+      'Automatically ignores WhatsApp audio, voice notes, Telegram, Call Recordings, and sound recorder files.';
+
+  @override
+  String get shortAudioFilterDesc => 'Ignore short clips and sound effects';
+
+  @override
+  String get minFileSize => 'Min File Size';
+
+  @override
+  String get minFileSizeDesc => 'Exclude small audio snippets & corrupt files';
+
+  @override
+  String get deviceAudioDirectories => 'DEVICE AUDIO DIRECTORIES';
+
+  @override
+  String get httpHttps => 'HTTP / HTTPS';
+
+  @override
+  String get socks5 => 'SOCKS5';
+
+  @override
+  String get scrobblingAnalytics => 'Scrobbling Analytics';
+
+  @override
+  String get universalScrobblingEngine => 'Universal Scrobbling Engine';
+
+  @override
+  String get scrobblingServicesDesc =>
+      'Connected to Last.fm, ListenBrainz, Libre.fm, and Custom Webhooks.';
+
+  @override
+  String get last7DaysActivity => 'Last 7 Days Activity';
+
+  @override
+  String get topScrobbledArtists => 'Top Scrobbled Artists';
+
+  @override
+  String get themeModeLabel => 'THEME MODE';
+
+  @override
+  String get amoledLabel => 'AMOLED';
+
+  @override
+  String get settingsSearchHint =>
+      'Try searching for \"equalizer\", \"dark mode\", \"crossfade\", \"proxy\", \"cache\", or \"scrobble\".';
+
+  @override
+  String get bitPerfectLabel => 'BIT-PERFECT';
+
+  @override
+  String get automationRules => 'Automation Rules';
+
+  @override
+  String get automationRulesDesc =>
+      'Apply a settings profile automatically when a device event fires.';
+
+  @override
+  String get noAutomationRules => 'No automation rules configured.';
+
+  @override
+  String get playbackStopsScreenOff => 'Playback stops when screen is off?';
+
+  @override
+  String get batteryExemptionDesc =>
+      'Some device manufacturers aggressively stop background playback. Granting battery exemption ensures uninterrupted music playback.';
+
+  @override
+  String get deviceGuide => 'Device Guide';
+
+  @override
+  String get sponsorBlockCategoriesLabel => 'SponsorBlock categories';
+
+  @override
+  String get syncedLabel => 'SYNCED';
+
+  @override
+  String get quickDiscovery => 'QUICK DISCOVERY';
+
+  @override
+  String get ytmSearchDesc =>
+      'Stream and download millions of songs from YouTube Music, ad-free.';
+
+  @override
+  String get popularSearches => 'POPULAR SEARCHES';
+
+  @override
+  String get quranMode => 'Quran Mode';
+
+  @override
+  String get managePlaylist => 'Manage Playlist';
+
+  @override
+  String get exportFailedRetry => 'Export failed. Please try again.';
+
+  @override
+  String get appliedGraphicEq => 'Applied EqualizerAPO GraphicEq curve';
+
+  @override
+  String get arbitraryResponseEq => 'Arbitrary Response EQ';
+
+  @override
+  String get graphicEqSpec => 'EqualizerAPO GraphicEq Spec';
+
+  @override
+  String get fir512 => '512-tap FIR Filter';
+
+  @override
+  String get applyCurve => 'Apply Curve';
+
+  @override
+  String get presetAcousticTargets => 'Preset Acoustic Targets';
+
+  @override
+  String get devOptionsBtCodec =>
+      'Opens Developer Options -> Bluetooth Audio Codec';
+
+  @override
+  String get autoEqDatabase => 'AutoEQ 2.0 Database';
+
+  @override
+  String get noHpMatch => 'No matching headphone profiles found';
+
+  @override
+  String get dspReportCopied => 'DSP Debug Report copied to clipboard!';
+
+  @override
+  String get dspInspectorDesc => 'Real-time Audio Engine & DSP Debugging';
+
+  @override
+  String get activeAudioStages => 'ACTIVE AUDIO STAGES';
+
+  @override
+  String get noDspStages => 'No DSP stages reported from platform engine.';
+
+  @override
+  String get dolbyHijackDesc =>
+      'Dolby Atmos is hijacking the HAL session. Native limiter/crossfeed still run, but EQ needs HAL. Fix: tap below to switch to OEM (lets system handle EQ) or disable Dolby in system Sound settings, then restart track.';
+
+  @override
+  String get switchedToOem =>
+      'Switched DSP Preference -> OEM. Restart track to attach.';
+
+  @override
+  String get switchPrefFailed =>
+      'Failed to switch preference - change in Settings -> Audio';
+
+  @override
+  String get fixSwitchOem => 'Fix: Switch to OEM';
+
+  @override
+  String get retryingHal => 'Retrying HAL attach... play a track if idle';
+
+  @override
+  String get retryAttach => 'Retry Attach';
+
+  @override
+  String get placeLrcHint =>
+      'Place a .lrc file in the same folder as your audio track or embed lyrics into file tags.';
+
+  @override
+  String get searchLyrics => 'Search Lyrics';
+
+  @override
+  String get queueEmpty => 'Queue is empty';
+
+  @override
+  String get skipAction => 'Skip';
+
+  @override
+  String get onboardingHeading => 'Your Music, Your Privacy';
+
+  @override
+  String get onboardingPrivacyDesc =>
+      '100% offline local playback. No accounts, no cloud dependencies, zero tracking, and absolute privacy for your music collection.';
+
+  @override
+  String get onboardingPowerful => 'Powerful Playback';
+
+  @override
+  String get onboardingPowerfulDesc =>
+      'Tailor your sound with a 10-band graphic equalizer, smooth crossfade transitions, gapless playback, and smart sleep timers.';
+
+  @override
+  String get onboardingThemes => '4 DISTINCT PLAYER THEMES';
+
+  @override
+  String get onboardingBeautiful => 'Beautiful & Personal';
+
+  @override
+  String get onboardingBeautifulDesc =>
+      'Express your style with real-time dynamic color extraction from album art and switch between 4 unique player themes.';
+
+  @override
+  String get artworkWall => 'Album Artwork Wall';
+
+  @override
+  String get noAlbumsFound => 'No albums found in library';
+
+  @override
+  String get listeningStats => 'Listening & Library Stats';
+
+  @override
+  String get audioQualityTiers => 'Audio Quality Tiers';
+
+  @override
+  String get noPlayHistory =>
+      'No play history recorded yet. Listen to tracks to track your top hits!';
+
+  @override
+  String get downloadsLabel => 'DOWNLOADS';
+
+  @override
+  String get noMusicIndexed => 'No music files indexed';
+
+  @override
+  String get parentDirectory => 'Parent Directory';
+
+  @override
+  String get folderEmpty => 'Folder is empty';
+
+  @override
+  String get otherGenres => 'Other Genres';
+
+  @override
+  String get couldNotLoadGenre => 'Could not load genre songs';
+
+  @override
+  String get syncAcrossDevices =>
+      'Sync your favorites & playlists across devices';
+
+  @override
+  String get continueWithGoogle => 'Continue with Google';
+
+  @override
+  String get orWithEmail => 'OR WITH EMAIL';
+
+  @override
+  String get enterEmailFirst => 'Enter your email first';
+
+  @override
+  String get forgotPassword => 'Forgot Password?';
+
+  @override
+  String get signInGoogleTv => 'Sign in with Google TV';
+
+  @override
+  String get noCaptchaDesc => 'No captcha - approve on another device';
+
+  @override
+  String get tryAgain => 'Try again';
+
+  @override
+  String get oauthStep1 => '1. On your phone or computer, open this address:';
+
+  @override
+  String get oauthStep2 => '2. Enter this code:';
+
+  @override
+  String get copyCode => 'Copy code';
+
+  @override
+  String get waitingApproval => 'Waiting for approval...';
+
+  @override
+  String get aboutArtist => 'About Artist';
+
+  @override
+  String get openingYtmTrack => 'Opening YouTube Music track...';
+
+  @override
+  String get formatNotSupported => 'Format not supported on this device';
+
+  @override
+  String get waveformLabel => 'WAVEFORM';
+
+  @override
+  String get usbBpFailed =>
+      'USB bit-perfect streaming could not start (unsupported DAC or claim failed)';
+
+  @override
+  String get cloudSyncItemsDesc =>
+      'Favorites, playlists, play history and library metadata are synced in both directions. DSP presets and app settings stay on this device.';
 }

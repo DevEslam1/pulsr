@@ -96,9 +96,8 @@ class _UsbDacSectionState extends State<UsbDacSection> {
         final ok = await _service.startStreaming(sampleRate: 48000);
         if (!mounted) return;
         if (!ok) {
-          ScaffoldMessenger.maybeOf(context)?.showSnackBar(const SnackBar(
-            content: Text(
-                'USB bit-perfect streaming could not start (unsupported DAC or claim failed)'),
+          ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+            content: Text(context.l10n.usbBpFailed),
           ));
         }
       } else {

@@ -2623,5 +2623,413 @@
   "bitPerfectMode": "Bit-Perfect Mode",
   "@bitPerfectMode": {
     "description": "tranche7 quality"
+  },
+  "ytmSessionExpired": "YouTube Music session expired. Sign in again to keep streaming.",
+  "@ytmSessionExpired": {
+    "description": "tranche8 l10n"
+  },
+  "noOnlineMetadata": "No matching online metadata found.",
+  "@noOnlineMetadata": {
+    "description": "tranche8 l10n"
+  },
+  "onlineMetadataApplied": "Online metadata applied successfully!",
+  "@onlineMetadataApplied": {
+    "description": "tranche8 l10n"
+  },
+  "ytmExplore": "YouTube Music Explore",
+  "@ytmExplore": {
+    "description": "tranche8 l10n"
+  },
+  "couldNotLoadYear": "Could not load songs for this year",
+  "@couldNotLoadYear": {
+    "description": "tranche8 l10n"
+  },
+  "studioAudio": "STUDIO AUDIO",
+  "@studioAudio": {
+    "description": "tranche8 l10n"
+  },
+  "lyricsLabel": "Lyrics",
+  "@lyricsLabel": {
+    "description": "tranche8 l10n"
+  },
+  "cloudBackupSync": "Cloud Backup & Sync",
+  "@cloudBackupSync": {
+    "description": "tranche8 l10n"
+  },
+  "cloudStorageStatus": "Cloud Storage Status",
+  "@cloudStorageStatus": {
+    "description": "tranche8 l10n"
+  },
+  "cloudBackupDesc": "Encrypted bidirectional Firestore backup across all your devices.",
+  "@cloudBackupDesc": {
+    "description": "tranche8 l10n"
+  },
+  "whatGetsSynced": "What gets synced",
+  "@whatGetsSynced": {
+    "description": "tranche8 l10n"
+  },
+  "syncItemsPrefix": "Favorites, playlists, play history and library metadata are ",
+  "@syncItemsPrefix": {
+    "description": "tranche8 l10n"
+  },
+  "autoFilterVoiceNotes": "Auto-Filter Voice Notes & Messengers",
+  "@autoFilterVoiceNotes": {
+    "description": "tranche8 l10n"
+  },
+  "autoFilterVoiceNotesDesc": "Automatically ignores WhatsApp audio, voice notes, Telegram, Call Recordings, and sound recorder files.",
+  "@autoFilterVoiceNotesDesc": {
+    "description": "tranche8 l10n"
+  },
+  "shortAudioFilterDesc": "Ignore short clips and sound effects",
+  "@shortAudioFilterDesc": {
+    "description": "tranche8 l10n"
+  },
+  "minFileSize": "Min File Size",
+  "@minFileSize": {
+    "description": "tranche8 l10n"
+  },
+  "minFileSizeDesc": "Exclude small audio snippets & corrupt files",
+  "@minFileSizeDesc": {
+    "description": "tranche8 l10n"
+  },
+  "deviceAudioDirectories": "DEVICE AUDIO DIRECTORIES",
+  "@deviceAudioDirectories": {
+    "description": "tranche8 l10n"
+  },
+  "httpHttps": "HTTP / HTTPS",
+  "@httpHttps": {
+    "description": "tranche8 l10n"
+  },
+  "socks5": "SOCKS5",
+  "@socks5": {
+    "description": "tranche8 l10n"
+  },
+  "scrobblingAnalytics": "Scrobbling Analytics",
+  "@scrobblingAnalytics": {
+    "description": "tranche8 l10n"
+  },
+  "universalScrobblingEngine": "Universal Scrobbling Engine",
+  "@universalScrobblingEngine": {
+    "description": "tranche8 l10n"
+  },
+  "scrobblingServicesDesc": "Connected to Last.fm, ListenBrainz, Libre.fm, and Custom Webhooks.",
+  "@scrobblingServicesDesc": {
+    "description": "tranche8 l10n"
+  },
+  "last7DaysActivity": "Last 7 Days Activity",
+  "@last7DaysActivity": {
+    "description": "tranche8 l10n"
+  },
+  "topScrobbledArtists": "Top Scrobbled Artists",
+  "@topScrobbledArtists": {
+    "description": "tranche8 l10n"
+  },
+  "themeModeLabel": "THEME MODE",
+  "@themeModeLabel": {
+    "description": "tranche8 l10n"
+  },
+  "amoledLabel": "AMOLED",
+  "@amoledLabel": {
+    "description": "tranche8 l10n"
+  },
+  "settingsSearchHint": "Try searching for \"equalizer\", \"dark mode\", \"crossfade\", \"proxy\", \"cache\", or \"scrobble\".",
+  "@settingsSearchHint": {
+    "description": "tranche8 l10n"
+  },
+  "bitPerfectLabel": "BIT-PERFECT",
+  "@bitPerfectLabel": {
+    "description": "tranche8 l10n"
+  },
+  "automationRules": "Automation Rules",
+  "@automationRules": {
+    "description": "tranche8 l10n"
+  },
+  "automationRulesDesc": "Apply a settings profile automatically when a device event fires.",
+  "@automationRulesDesc": {
+    "description": "tranche8 l10n"
+  },
+  "noAutomationRules": "No automation rules configured.",
+  "@noAutomationRules": {
+    "description": "tranche8 l10n"
+  },
+  "playbackStopsScreenOff": "Playback stops when screen is off?",
+  "@playbackStopsScreenOff": {
+    "description": "tranche8 l10n"
+  },
+  "batteryExemptionDesc": "Some device manufacturers aggressively stop background playback. Granting battery exemption ensures uninterrupted music playback.",
+  "@batteryExemptionDesc": {
+    "description": "tranche8 l10n"
+  },
+  "deviceGuide": "Device Guide",
+  "@deviceGuide": {
+    "description": "tranche8 l10n"
+  },
+  "sponsorBlockCategoriesLabel": "SponsorBlock categories",
+  "@sponsorBlockCategoriesLabel": {
+    "description": "tranche8 l10n"
+  },
+  "syncedLabel": "SYNCED",
+  "@syncedLabel": {
+    "description": "tranche8 l10n"
+  },
+  "quickDiscovery": "QUICK DISCOVERY",
+  "@quickDiscovery": {
+    "description": "tranche8 l10n"
+  },
+  "ytmSearchDesc": "Stream and download millions of songs from YouTube Music, ad-free.",
+  "@ytmSearchDesc": {
+    "description": "tranche8 l10n"
+  },
+  "popularSearches": "POPULAR SEARCHES",
+  "@popularSearches": {
+    "description": "tranche8 l10n"
+  },
+  "quranMode": "Quran Mode",
+  "@quranMode": {
+    "description": "tranche8 l10n"
+  },
+  "managePlaylist": "Manage Playlist",
+  "@managePlaylist": {
+    "description": "tranche8 l10n"
+  },
+  "exportFailedRetry": "Export failed. Please try again.",
+  "@exportFailedRetry": {
+    "description": "tranche8 l10n"
+  },
+  "appliedGraphicEq": "Applied EqualizerAPO GraphicEq curve",
+  "@appliedGraphicEq": {
+    "description": "tranche8 l10n"
+  },
+  "arbitraryResponseEq": "Arbitrary Response EQ",
+  "@arbitraryResponseEq": {
+    "description": "tranche8 l10n"
+  },
+  "graphicEqSpec": "EqualizerAPO GraphicEq Spec",
+  "@graphicEqSpec": {
+    "description": "tranche8 l10n"
+  },
+  "fir512": "512-tap FIR Filter",
+  "@fir512": {
+    "description": "tranche8 l10n"
+  },
+  "applyCurve": "Apply Curve",
+  "@applyCurve": {
+    "description": "tranche8 l10n"
+  },
+  "presetAcousticTargets": "Preset Acoustic Targets",
+  "@presetAcousticTargets": {
+    "description": "tranche8 l10n"
+  },
+  "devOptionsBtCodec": "Opens Developer Options -> Bluetooth Audio Codec",
+  "@devOptionsBtCodec": {
+    "description": "tranche8 l10n"
+  },
+  "autoEqDatabase": "AutoEQ 2.0 Database",
+  "@autoEqDatabase": {
+    "description": "tranche8 l10n"
+  },
+  "noHpMatch": "No matching headphone profiles found",
+  "@noHpMatch": {
+    "description": "tranche8 l10n"
+  },
+  "dspReportCopied": "DSP Debug Report copied to clipboard!",
+  "@dspReportCopied": {
+    "description": "tranche8 l10n"
+  },
+  "dspInspectorDesc": "Real-time Audio Engine & DSP Debugging",
+  "@dspInspectorDesc": {
+    "description": "tranche8 l10n"
+  },
+  "activeAudioStages": "ACTIVE AUDIO STAGES",
+  "@activeAudioStages": {
+    "description": "tranche8 l10n"
+  },
+  "noDspStages": "No DSP stages reported from platform engine.",
+  "@noDspStages": {
+    "description": "tranche8 l10n"
+  },
+  "dolbyHijackDesc": "Dolby Atmos is hijacking the HAL session. Native limiter/crossfeed still run, but EQ needs HAL. Fix: tap below to switch to OEM (lets system handle EQ) or disable Dolby in system Sound settings, then restart track.",
+  "@dolbyHijackDesc": {
+    "description": "tranche8 l10n"
+  },
+  "switchedToOem": "Switched DSP Preference -> OEM. Restart track to attach.",
+  "@switchedToOem": {
+    "description": "tranche8 l10n"
+  },
+  "switchPrefFailed": "Failed to switch preference - change in Settings -> Audio",
+  "@switchPrefFailed": {
+    "description": "tranche8 l10n"
+  },
+  "fixSwitchOem": "Fix: Switch to OEM",
+  "@fixSwitchOem": {
+    "description": "tranche8 l10n"
+  },
+  "retryingHal": "Retrying HAL attach... play a track if idle",
+  "@retryingHal": {
+    "description": "tranche8 l10n"
+  },
+  "retryAttach": "Retry Attach",
+  "@retryAttach": {
+    "description": "tranche8 l10n"
+  },
+  "placeLrcHint": "Place a .lrc file in the same folder as your audio track or embed lyrics into file tags.",
+  "@placeLrcHint": {
+    "description": "tranche8 l10n"
+  },
+  "searchLyrics": "Search Lyrics",
+  "@searchLyrics": {
+    "description": "tranche8 l10n"
+  },
+  "queueEmpty": "Queue is empty",
+  "@queueEmpty": {
+    "description": "tranche8 l10n"
+  },
+  "skipAction": "Skip",
+  "@skipAction": {
+    "description": "tranche8 l10n"
+  },
+  "onboardingHeading": "Your Music, Your Privacy",
+  "@onboardingHeading": {
+    "description": "tranche8 l10n"
+  },
+  "onboardingPrivacyDesc": "100% offline local playback. No accounts, no cloud dependencies, zero tracking, and absolute privacy for your music collection.",
+  "@onboardingPrivacyDesc": {
+    "description": "tranche8 l10n"
+  },
+  "onboardingPowerful": "Powerful Playback",
+  "@onboardingPowerful": {
+    "description": "tranche8 l10n"
+  },
+  "onboardingPowerfulDesc": "Tailor your sound with a 10-band graphic equalizer, smooth crossfade transitions, gapless playback, and smart sleep timers.",
+  "@onboardingPowerfulDesc": {
+    "description": "tranche8 l10n"
+  },
+  "onboardingThemes": "4 DISTINCT PLAYER THEMES",
+  "@onboardingThemes": {
+    "description": "tranche8 l10n"
+  },
+  "onboardingBeautiful": "Beautiful & Personal",
+  "@onboardingBeautiful": {
+    "description": "tranche8 l10n"
+  },
+  "onboardingBeautifulDesc": "Express your style with real-time dynamic color extraction from album art and switch between 4 unique player themes.",
+  "@onboardingBeautifulDesc": {
+    "description": "tranche8 l10n"
+  },
+  "artworkWall": "Album Artwork Wall",
+  "@artworkWall": {
+    "description": "tranche8 l10n"
+  },
+  "noAlbumsFound": "No albums found in library",
+  "@noAlbumsFound": {
+    "description": "tranche8 l10n"
+  },
+  "listeningStats": "Listening & Library Stats",
+  "@listeningStats": {
+    "description": "tranche8 l10n"
+  },
+  "audioQualityTiers": "Audio Quality Tiers",
+  "@audioQualityTiers": {
+    "description": "tranche8 l10n"
+  },
+  "noPlayHistory": "No play history recorded yet. Listen to tracks to track your top hits!",
+  "@noPlayHistory": {
+    "description": "tranche8 l10n"
+  },
+  "downloadsLabel": "DOWNLOADS",
+  "@downloadsLabel": {
+    "description": "tranche8 l10n"
+  },
+  "noMusicIndexed": "No music files indexed",
+  "@noMusicIndexed": {
+    "description": "tranche8 l10n"
+  },
+  "parentDirectory": "Parent Directory",
+  "@parentDirectory": {
+    "description": "tranche8 l10n"
+  },
+  "folderEmpty": "Folder is empty",
+  "@folderEmpty": {
+    "description": "tranche8 l10n"
+  },
+  "otherGenres": "Other Genres",
+  "@otherGenres": {
+    "description": "tranche8 l10n"
+  },
+  "couldNotLoadGenre": "Could not load genre songs",
+  "@couldNotLoadGenre": {
+    "description": "tranche8 l10n"
+  },
+  "syncAcrossDevices": "Sync your favorites & playlists across devices",
+  "@syncAcrossDevices": {
+    "description": "tranche8 l10n"
+  },
+  "continueWithGoogle": "Continue with Google",
+  "@continueWithGoogle": {
+    "description": "tranche8 l10n"
+  },
+  "orWithEmail": "OR WITH EMAIL",
+  "@orWithEmail": {
+    "description": "tranche8 l10n"
+  },
+  "enterEmailFirst": "Enter your email first",
+  "@enterEmailFirst": {
+    "description": "tranche8 l10n"
+  },
+  "forgotPassword": "Forgot Password?",
+  "@forgotPassword": {
+    "description": "tranche8 l10n"
+  },
+  "signInGoogleTv": "Sign in with Google TV",
+  "@signInGoogleTv": {
+    "description": "tranche8 l10n"
+  },
+  "noCaptchaDesc": "No captcha - approve on another device",
+  "@noCaptchaDesc": {
+    "description": "tranche8 l10n"
+  },
+  "tryAgain": "Try again",
+  "@tryAgain": {
+    "description": "tranche8 l10n"
+  },
+  "oauthStep1": "1. On your phone or computer, open this address:",
+  "@oauthStep1": {
+    "description": "tranche8 l10n"
+  },
+  "oauthStep2": "2. Enter this code:",
+  "@oauthStep2": {
+    "description": "tranche8 l10n"
+  },
+  "copyCode": "Copy code",
+  "@copyCode": {
+    "description": "tranche8 l10n"
+  },
+  "waitingApproval": "Waiting for approval...",
+  "@waitingApproval": {
+    "description": "tranche8 l10n"
+  },
+  "aboutArtist": "About Artist",
+  "@aboutArtist": {
+    "description": "tranche8 l10n"
+  },
+  "openingYtmTrack": "Opening YouTube Music track...",
+  "@openingYtmTrack": {
+    "description": "tranche8 l10n"
+  },
+  "formatNotSupported": "Format not supported on this device",
+  "@formatNotSupported": {
+    "description": "tranche8 l10n"
+  },
+  "waveformLabel": "WAVEFORM",
+  "@waveformLabel": {
+    "description": "tranche8 l10n"
+  },
+  "usbBpFailed": "USB bit-perfect streaming could not start (unsupported DAC or claim failed)",
+  "@usbBpFailed": {
+    "description": "tranche8 fix"
+  },
+  "cloudSyncItemsDesc": "Favorites, playlists, play history and library metadata are synced in both directions. DSP presets and app settings stay on this device.",
+  "@cloudSyncItemsDesc": {
+    "description": "tranche8 final"
   }
 }

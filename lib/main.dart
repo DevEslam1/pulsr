@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'core/utils/l10n_extensions.dart';
 import 'package:flutter/services.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -291,8 +292,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
             ..hideCurrentSnackBar()
             ..showSnackBar(
               SnackBar(
-                content: const Text(
-                    'YouTube Music session expired. Sign in again to keep streaming.'),
+                content: Text(context.l10n.ytmSessionExpired),
                 behavior: SnackBarBehavior.floating,
                 duration: const Duration(seconds: 6),
                 action: SnackBarAction(

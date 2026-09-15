@@ -159,7 +159,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       if (!context.mounted) return;
       if (songs.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cannot export an empty playlist.')),
+          SnackBar(content: Text(context.l10n.cannotExportEmpty)),
         );
         return;
       }
@@ -197,7 +197,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Export failed. Please try again.')),
+          SnackBar(content: Text(context.l10n.exportFailedRetry)),
         );
       }
     }

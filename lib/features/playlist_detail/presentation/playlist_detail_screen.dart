@@ -285,7 +285,7 @@ class PlaylistDetailScreen extends StatelessWidget {
                         Icon(Icons.delete_outline_rounded,
                             color: p.error, size: 20),
                         const SizedBox(width: 12),
-                        Text('Delete Playlist',
+                        Text(context.l10n.deletePlaylist,
                             style: TextStyle(color: p.error)),
                       ],
                     ),

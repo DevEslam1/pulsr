@@ -1,5 +1,6 @@
 // lib/features/library/presentation/widgets/genre_hierarchy_view.dart
 import 'package:flutter/material.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../domain/models/genre_item.dart';
@@ -195,8 +196,7 @@ class GenreHierarchyView extends StatelessWidget {
           ),
           child: Icon(Icons.category_rounded, color: p.accent, size: 20),
         ),
-        title: Text(
-          'Other Genres',
+        title: Text(context.l10n.otherGenres,
           style: TextStyle(
             color: p.textPrimary,
             fontSize: 15,

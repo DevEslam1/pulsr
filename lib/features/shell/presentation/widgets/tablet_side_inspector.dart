@@ -1,5 +1,6 @@
 // lib/features/shell/presentation/widgets/tablet_side_inspector.dart
 import 'package:flutter/material.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../player/cubit/player_cubit.dart';
@@ -131,8 +132,7 @@ class _TabletSideInspectorState extends State<TabletSideInspector> {
                                             : p.textSecondary,
                                       ),
                                       const SizedBox(width: 5),
-                                      Text(
-                                        'Lyrics',
+                                      Text(context.l10n.lyricsLabel,
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: _selectedTabIndex == 1

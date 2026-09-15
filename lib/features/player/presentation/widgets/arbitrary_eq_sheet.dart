@@ -1,5 +1,6 @@
 // lib/features/player/presentation/widgets/arbitrary_eq_sheet.dart
 import 'package:flutter/material.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -47,7 +48,7 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
     if (text.isNotEmpty) {
       context.read<PlayerCubit>().setArbitraryEqEnabled(true, eqString: text);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Applied EqualizerAPO GraphicEq curve')),
+        SnackBar(content: Text(context.l10n.appliedGraphicEq)),
       );
     }
   }
@@ -91,8 +92,7 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                       children: [
                         Icon(Icons.graphic_eq_rounded, color: p.primary),
                         const SizedBox(width: 10),
-                        Text(
-                          'Arbitrary Response EQ',
+                        Text(context.l10n.arbitraryResponseEq,
                           style: TextStyle(
                             color: p.textPrimary,
                             fontSize: 18,
@@ -131,16 +131,14 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'EqualizerAPO GraphicEq Spec',
+                          Text(context.l10n.graphicEqSpec,
                             style: TextStyle(
                               color: p.textSecondary,
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          Text(
-                            '512-tap FIR Filter',
+                          Text(context.l10n.fir512,
                             style: TextStyle(
                               color: p.primary,
                               fontSize: 11,
@@ -188,7 +186,7 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                                   'GraphicEq: 20 0; 1000 0; 20000 0';
                             },
                             icon: const Icon(Icons.clear_rounded, size: 16),
-                            label: const Text('Reset Flat'),
+                            label: Text(context.l10n.resetToFlat),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: p.textSecondary,
                               side: BorderSide(color: p.hairline),
@@ -202,7 +200,7 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                           ElevatedButton.icon(
                             onPressed: () => _apply(context),
                             icon: const Icon(Icons.check_rounded, size: 16),
-                            label: const Text('Apply Curve'),
+                            label: Text(context.l10n.applyCurve),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: p.primary,
                               foregroundColor: Colors.white,
@@ -219,8 +217,7 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                 ),
                 const SizedBox(height: 20),
 
-                Text(
-                  'Preset Acoustic Targets',
+                Text(context.l10n.presetAcousticTargets,
                   style: TextStyle(
                     color: p.textPrimary,
                     fontSize: 14,

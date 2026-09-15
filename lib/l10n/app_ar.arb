@@ -2338,5 +2338,413 @@
   "bitPerfectMode": "وضع Bit-Perfect",
   "@bitPerfectMode": {
     "description": "tranche7 quality"
+  },
+  "ytmSessionExpired": "انتهت جلسة يوتيوب ميوزك. سجل الدخول مجددا.",
+  "@ytmSessionExpired": {
+    "description": "tranche8 l10n"
+  },
+  "noOnlineMetadata": "لم يتم العثور على بيانات مطابقة.",
+  "@noOnlineMetadata": {
+    "description": "tranche8 l10n"
+  },
+  "onlineMetadataApplied": "تم تطبيق البيانات بنجاح!",
+  "@onlineMetadataApplied": {
+    "description": "tranche8 l10n"
+  },
+  "ytmExplore": "استكشاف يوتيوب ميوزك",
+  "@ytmExplore": {
+    "description": "tranche8 l10n"
+  },
+  "couldNotLoadYear": "تعذر تحميل اغاني هذه السنة",
+  "@couldNotLoadYear": {
+    "description": "tranche8 l10n"
+  },
+  "studioAudio": "صوت الاستوديو",
+  "@studioAudio": {
+    "description": "tranche8 l10n"
+  },
+  "lyricsLabel": "الكلمات",
+  "@lyricsLabel": {
+    "description": "tranche8 l10n"
+  },
+  "cloudBackupSync": "النسخ الاحتياطي والمزامنة",
+  "@cloudBackupSync": {
+    "description": "tranche8 l10n"
+  },
+  "cloudStorageStatus": "حالة التخزين السحابي",
+  "@cloudStorageStatus": {
+    "description": "tranche8 l10n"
+  },
+  "cloudBackupDesc": "نسخ مشفر ثنائي الاتجاه بين اجهزتك.",
+  "@cloudBackupDesc": {
+    "description": "tranche8 l10n"
+  },
+  "whatGetsSynced": "ما الذي تتم مزامنته",
+  "@whatGetsSynced": {
+    "description": "tranche8 l10n"
+  },
+  "syncItemsPrefix": "المفضلة والقوائم والسجل والبيانات ",
+  "@syncItemsPrefix": {
+    "description": "tranche8 l10n"
+  },
+  "autoFilterVoiceNotes": "تصفية تلقائية للرسائل الصوتية",
+  "@autoFilterVoiceNotes": {
+    "description": "tranche8 l10n"
+  },
+  "autoFilterVoiceNotesDesc": "يتجاهل ملفات واتساب وتيليجرام والتسجيلات.",
+  "@autoFilterVoiceNotesDesc": {
+    "description": "tranche8 l10n"
+  },
+  "shortAudioFilterDesc": "تجاهل المقاطع القصيرة والمؤثرات",
+  "@shortAudioFilterDesc": {
+    "description": "tranche8 l10n"
+  },
+  "minFileSize": "الحد الادنى للحجم",
+  "@minFileSize": {
+    "description": "tranche8 l10n"
+  },
+  "minFileSizeDesc": "استبعد المقاطع الصغيرة والملفات التالفة",
+  "@minFileSizeDesc": {
+    "description": "tranche8 l10n"
+  },
+  "deviceAudioDirectories": "مجلدات الصوت في الجهاز",
+  "@deviceAudioDirectories": {
+    "description": "tranche8 l10n"
+  },
+  "httpHttps": "HTTP / HTTPS",
+  "@httpHttps": {
+    "description": "tranche8 l10n"
+  },
+  "socks5": "SOCKS5",
+  "@socks5": {
+    "description": "tranche8 l10n"
+  },
+  "scrobblingAnalytics": "تحليلات السكرابلنغ",
+  "@scrobblingAnalytics": {
+    "description": "tranche8 l10n"
+  },
+  "universalScrobblingEngine": "محرك سكرابلنغ شامل",
+  "@universalScrobblingEngine": {
+    "description": "tranche8 l10n"
+  },
+  "scrobblingServicesDesc": "متصل بـ Last.fm وListenBrainz وLibre.fm وWebhooks.",
+  "@scrobblingServicesDesc": {
+    "description": "tranche8 l10n"
+  },
+  "last7DaysActivity": "نشاط 7 ايام",
+  "@last7DaysActivity": {
+    "description": "tranche8 l10n"
+  },
+  "topScrobbledArtists": "اكثر الفنانين سكرابلنغ",
+  "@topScrobbledArtists": {
+    "description": "tranche8 l10n"
+  },
+  "themeModeLabel": "وضع السمة",
+  "@themeModeLabel": {
+    "description": "tranche8 l10n"
+  },
+  "amoledLabel": "AMOLED",
+  "@amoledLabel": {
+    "description": "tranche8 l10n"
+  },
+  "settingsSearchHint": "جرب البحث عن equalizer او dark mode او proxy او cache.",
+  "@settingsSearchHint": {
+    "description": "tranche8 l10n"
+  },
+  "bitPerfectLabel": "BIT-PERFECT",
+  "@bitPerfectLabel": {
+    "description": "tranche8 l10n"
+  },
+  "automationRules": "قواعد الاتمتة",
+  "@automationRules": {
+    "description": "tranche8 l10n"
+  },
+  "automationRulesDesc": "طبق ملفا تلقائيا عند وقوع حدث.",
+  "@automationRulesDesc": {
+    "description": "tranche8 l10n"
+  },
+  "noAutomationRules": "لا توجد قواعد معدّة.",
+  "@noAutomationRules": {
+    "description": "tranche8 l10n"
+  },
+  "playbackStopsScreenOff": "هل يتوقف التشغيل عند اطفاء الشاشة؟",
+  "@playbackStopsScreenOff": {
+    "description": "tranche8 l10n"
+  },
+  "batteryExemptionDesc": "بعض المصنعين يوقفون التشغيل في الخلفية. امنح استثناء البطارية.",
+  "@batteryExemptionDesc": {
+    "description": "tranche8 l10n"
+  },
+  "deviceGuide": "دليل الاجهزة",
+  "@deviceGuide": {
+    "description": "tranche8 l10n"
+  },
+  "sponsorBlockCategoriesLabel": "فئات SponsorBlock",
+  "@sponsorBlockCategoriesLabel": {
+    "description": "tranche8 l10n"
+  },
+  "syncedLabel": "متزامن",
+  "@syncedLabel": {
+    "description": "tranche8 l10n"
+  },
+  "quickDiscovery": "اكتشاف سريع",
+  "@quickDiscovery": {
+    "description": "tranche8 l10n"
+  },
+  "ytmSearchDesc": "ملايين الاغاني بدون اعلانات.",
+  "@ytmSearchDesc": {
+    "description": "tranche8 l10n"
+  },
+  "popularSearches": "عمليات بحث شائعة",
+  "@popularSearches": {
+    "description": "tranche8 l10n"
+  },
+  "quranMode": "وضع القرآن",
+  "@quranMode": {
+    "description": "tranche8 l10n"
+  },
+  "managePlaylist": "ادارة القائمة",
+  "@managePlaylist": {
+    "description": "tranche8 l10n"
+  },
+  "exportFailedRetry": "فشل التصدير. حاول مجددا.",
+  "@exportFailedRetry": {
+    "description": "tranche8 l10n"
+  },
+  "appliedGraphicEq": "تم تطبيق منحنى GraphicEq",
+  "@appliedGraphicEq": {
+    "description": "tranche8 l10n"
+  },
+  "arbitraryResponseEq": "معادل استجابة حر",
+  "@arbitraryResponseEq": {
+    "description": "tranche8 l10n"
+  },
+  "graphicEqSpec": "مواصفات GraphicEq",
+  "@graphicEqSpec": {
+    "description": "tranche8 l10n"
+  },
+  "fir512": "مرشح FIR بـ512",
+  "@fir512": {
+    "description": "tranche8 l10n"
+  },
+  "applyCurve": "تطبيق المنحنى",
+  "@applyCurve": {
+    "description": "tranche8 l10n"
+  },
+  "presetAcousticTargets": "اهداف صوتية",
+  "@presetAcousticTargets": {
+    "description": "tranche8 l10n"
+  },
+  "devOptionsBtCodec": "يفتح خيارات المطور -> كودك البلوتوث",
+  "@devOptionsBtCodec": {
+    "description": "tranche8 l10n"
+  },
+  "autoEqDatabase": "قاعدة بيانات AutoEQ 2.0",
+  "@autoEqDatabase": {
+    "description": "tranche8 l10n"
+  },
+  "noHpMatch": "لا توجد ملفات مطابقة",
+  "@noHpMatch": {
+    "description": "tranche8 l10n"
+  },
+  "dspReportCopied": "تم نسخ تقرير DSP!",
+  "@dspReportCopied": {
+    "description": "tranche8 l10n"
+  },
+  "dspInspectorDesc": "تنقيح محرك الصوت وDSP",
+  "@dspInspectorDesc": {
+    "description": "tranche8 l10n"
+  },
+  "activeAudioStages": "المراحل النشطة",
+  "@activeAudioStages": {
+    "description": "tranche8 l10n"
+  },
+  "noDspStages": "لا توجد مراحل من المحرك.",
+  "@noDspStages": {
+    "description": "tranche8 l10n"
+  },
+  "dolbyHijackDesc": "Dolby Atmos يسيطر على جلسة HAL. بدل الى OEM او عطل Dolby.",
+  "@dolbyHijackDesc": {
+    "description": "tranche8 l10n"
+  },
+  "switchedToOem": "تم التبديل الى OEM. اعد تشغيل المسار.",
+  "@switchedToOem": {
+    "description": "tranche8 l10n"
+  },
+  "switchPrefFailed": "فشل التبديل - غيّره من الاعدادات -> الصوت",
+  "@switchPrefFailed": {
+    "description": "tranche8 l10n"
+  },
+  "fixSwitchOem": "الحل: التبديل الى OEM",
+  "@fixSwitchOem": {
+    "description": "tranche8 l10n"
+  },
+  "retryingHal": "جار اعادة محاولة HAL... شغل مسارا",
+  "@retryingHal": {
+    "description": "tranche8 l10n"
+  },
+  "retryAttach": "اعادة المحاولة",
+  "@retryAttach": {
+    "description": "tranche8 l10n"
+  },
+  "placeLrcHint": "ضع ملف .lrc بجانب المسار او ادمج الكلمات.",
+  "@placeLrcHint": {
+    "description": "tranche8 l10n"
+  },
+  "searchLyrics": "البحث عن الكلمات",
+  "@searchLyrics": {
+    "description": "tranche8 l10n"
+  },
+  "queueEmpty": "قائمة الانتظار فارغة",
+  "@queueEmpty": {
+    "description": "tranche8 l10n"
+  },
+  "skipAction": "تخطي",
+  "@skipAction": {
+    "description": "tranche8 l10n"
+  },
+  "onboardingHeading": "موسيقاك وخصوصيتك",
+  "@onboardingHeading": {
+    "description": "tranche8 l10n"
+  },
+  "onboardingPrivacyDesc": "تشغيل محلي 100%. بلا حسابات او سحابة.",
+  "@onboardingPrivacyDesc": {
+    "description": "tranche8 l10n"
+  },
+  "onboardingPowerful": "تشغيل قوي",
+  "@onboardingPowerful": {
+    "description": "tranche8 l10n"
+  },
+  "onboardingPowerfulDesc": "معادل 10 نطاقات وتلاشي وتشغيل متصل ومؤقت.",
+  "@onboardingPowerfulDesc": {
+    "description": "tranche8 l10n"
+  },
+  "onboardingThemes": "4 سمات للمشغل",
+  "@onboardingThemes": {
+    "description": "tranche8 l10n"
+  },
+  "onboardingBeautiful": "جميل وشخصي",
+  "@onboardingBeautiful": {
+    "description": "tranche8 l10n"
+  },
+  "onboardingBeautifulDesc": "الوان ديناميكية من الغلاف و4 سمات.",
+  "@onboardingBeautifulDesc": {
+    "description": "tranche8 l10n"
+  },
+  "artworkWall": "جدار الاغلفة",
+  "@artworkWall": {
+    "description": "tranche8 l10n"
+  },
+  "noAlbumsFound": "لا توجد البومات",
+  "@noAlbumsFound": {
+    "description": "tranche8 l10n"
+  },
+  "listeningStats": "احصائيات الاستماع",
+  "@listeningStats": {
+    "description": "tranche8 l10n"
+  },
+  "audioQualityTiers": "مستويات الجودة",
+  "@audioQualityTiers": {
+    "description": "tranche8 l10n"
+  },
+  "noPlayHistory": "لا يوجد سجل بعد. استمع للموسيقى!",
+  "@noPlayHistory": {
+    "description": "tranche8 l10n"
+  },
+  "downloadsLabel": "التنزيلات",
+  "@downloadsLabel": {
+    "description": "tranche8 l10n"
+  },
+  "noMusicIndexed": "لا توجد ملفات مفهرسة",
+  "@noMusicIndexed": {
+    "description": "tranche8 l10n"
+  },
+  "parentDirectory": "المجلد الاعلى",
+  "@parentDirectory": {
+    "description": "tranche8 l10n"
+  },
+  "folderEmpty": "المجلد فارغ",
+  "@folderEmpty": {
+    "description": "tranche8 l10n"
+  },
+  "otherGenres": "انواع اخرى",
+  "@otherGenres": {
+    "description": "tranche8 l10n"
+  },
+  "couldNotLoadGenre": "تعذر تحميل اغاني النوع",
+  "@couldNotLoadGenre": {
+    "description": "tranche8 l10n"
+  },
+  "syncAcrossDevices": "زامن مفضلاتك وقوائمك",
+  "@syncAcrossDevices": {
+    "description": "tranche8 l10n"
+  },
+  "continueWithGoogle": "المتابعة عبر Google",
+  "@continueWithGoogle": {
+    "description": "tranche8 l10n"
+  },
+  "orWithEmail": "او بالبريد",
+  "@orWithEmail": {
+    "description": "tranche8 l10n"
+  },
+  "enterEmailFirst": "ادخل بريدك اولا",
+  "@enterEmailFirst": {
+    "description": "tranche8 l10n"
+  },
+  "forgotPassword": "هل نسيت كلمة المرور؟",
+  "@forgotPassword": {
+    "description": "tranche8 l10n"
+  },
+  "signInGoogleTv": "تسجيل الدخول عبر Google TV",
+  "@signInGoogleTv": {
+    "description": "tranche8 l10n"
+  },
+  "noCaptchaDesc": "بدون كابتشا - وافق من جهاز اخر",
+  "@noCaptchaDesc": {
+    "description": "tranche8 l10n"
+  },
+  "tryAgain": "حاول مجددا",
+  "@tryAgain": {
+    "description": "tranche8 l10n"
+  },
+  "oauthStep1": "1. افتح هذا العنوان:",
+  "@oauthStep1": {
+    "description": "tranche8 l10n"
+  },
+  "oauthStep2": "2. ادخل هذا الرمز:",
+  "@oauthStep2": {
+    "description": "tranche8 l10n"
+  },
+  "copyCode": "نسخ الرمز",
+  "@copyCode": {
+    "description": "tranche8 l10n"
+  },
+  "waitingApproval": "في انتظار الموافقة...",
+  "@waitingApproval": {
+    "description": "tranche8 l10n"
+  },
+  "aboutArtist": "عن الفنان",
+  "@aboutArtist": {
+    "description": "tranche8 l10n"
+  },
+  "openingYtmTrack": "جار فتح مسار يوتيوب ميوزك...",
+  "@openingYtmTrack": {
+    "description": "tranche8 l10n"
+  },
+  "formatNotSupported": "الصيغة غير مدعومة",
+  "@formatNotSupported": {
+    "description": "tranche8 l10n"
+  },
+  "waveformLabel": "الموجة",
+  "@waveformLabel": {
+    "description": "tranche8 l10n"
+  },
+  "usbBpFailed": "تعذر بدء البث USB bit-perfect (DAC غير مدعوم).",
+  "@usbBpFailed": {
+    "description": "tranche8 fix"
+  },
+  "cloudSyncItemsDesc": "تتم مزامنة المفضلة والقوائم والسجل في الاتجاهين. تبقى الاعدادات على هذا الجهاز.",
+  "@cloudSyncItemsDesc": {
+    "description": "tranche8 final"
   }
 }

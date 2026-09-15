@@ -594,10 +594,9 @@ void showVisualizerStylePickerSheet(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Text(
-              'Audio Visualizer Style',
+            child: Text(context.l10n.visualizerStyleLabel,
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w900,
@@ -1344,8 +1343,7 @@ void showPrivacyGuaranteeSheet(BuildContext context) {
                 children: [
                   Icon(Icons.security_rounded, color: p.accent, size: 24),
                   const SizedBox(width: 10),
-                  Text(
-                    'Privacy Guarantee',
+                  Text(context.l10n.privacyGuarantee,
                     style: TextStyle(
                       color: p.textPrimary,
                       fontWeight: FontWeight.w800,
@@ -1482,7 +1480,7 @@ void showAboutSheet(BuildContext context) {
                   foregroundColor: p.onAccent,
                 ),
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Close'),
+                child: Text(context.l10n.close),
               ),
             ),
           ],

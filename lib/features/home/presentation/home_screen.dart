@@ -646,8 +646,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Search YouTube Music',
+                        Text(context.l10n.searchYtm,
                           style: TextStyle(
                             color: p.textPrimary,
                             fontWeight: FontWeight.w800,

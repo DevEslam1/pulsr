@@ -407,8 +407,7 @@ class _LyricsViewState extends State<LyricsView> {
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
-                'Place a .lrc file in the same folder as your audio track or embed lyrics into file tags.',
+              Text(context.l10n.placeLrcHint,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                     color: p.textSecondary, fontSize: 13, height: 1.4),
@@ -421,7 +420,7 @@ class _LyricsViewState extends State<LyricsView> {
                   } catch (_) {}
                 },
                 icon: const Icon(Icons.refresh_rounded, size: 16),
-                label: const Text('Search Lyrics',
+                label: Text(context.l10n.searchLyrics,
                     style: TextStyle(fontSize: 12)),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: widget.activeColor,

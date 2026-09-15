@@ -176,8 +176,7 @@ class SettingsHeroCard extends StatelessWidget {
                                           borderRadius:
                                               BorderRadius.circular(6),
                                         ),
-                                        child: Text(
-                                          'SYNCED',
+                                        child: Text(context.l10n.syncedLabel,
                                           style: TextStyle(
                                             color: p.accent,
                                             fontSize: 9.5,

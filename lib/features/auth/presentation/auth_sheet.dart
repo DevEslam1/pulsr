@@ -1,5 +1,6 @@
 // lib/features/auth/presentation/auth_sheet.dart
 import 'package:flutter/material.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
@@ -131,8 +132,7 @@ class _AuthSheetState extends State<AuthSheet> {
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
-                                Text(
-                                  'Sync your favorites & playlists across devices',
+                                Text(context.l10n.syncAcrossDevices,
                                   style: TextStyle(
                                     color: p.textSecondary,
                                     fontSize: 12,
@@ -171,8 +171,7 @@ class _AuthSheetState extends State<AuthSheet> {
                                   color: Colors.black87),
                             ),
                             const SizedBox(width: 12),
-                            const Text(
-                              'Continue with Google',
+                            Text(context.l10n.continueWithGoogle,
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,
@@ -190,8 +189,7 @@ class _AuthSheetState extends State<AuthSheet> {
                           Expanded(child: Divider(color: p.hairline)),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Text(
-                              'OR WITH EMAIL',
+                            child: Text(context.l10n.orWithEmail,
                               style: TextStyle(
                                 color: p.textTertiary,
                                 fontSize: 11,
@@ -295,13 +293,12 @@ class _AuthSheetState extends State<AuthSheet> {
                                 );
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content: Text('Enter your email first')),
+                                  SnackBar(
+                                      content: Text(context.l10n.enterEmailFirst)),
                                 );
                               }
                             },
-                            child: Text(
-                              'Forgot Password?',
+                            child: Text(context.l10n.forgotPassword,
                               style: TextStyle(color: p.accent, fontSize: 12),
                             ),
                           ),

@@ -60,8 +60,7 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
                   children: [
                     Icon(Icons.error_outline_rounded, color: p.error, size: 48),
                     const SizedBox(height: 16),
-                    Text(
-                      'Could not load genre songs',
+                    Text(context.l10n.couldNotLoadGenre,
                       style: TextStyle(
                           color: p.textPrimary,
                           fontWeight: FontWeight.w700,

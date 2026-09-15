@@ -116,7 +116,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Quran Mode',
+                        Text(context.l10n.quranMode,
                             style: TextStyle(
                               color: p.textPrimary,
                               fontSize: 18,

@@ -143,8 +143,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   if (_currentPage < 2)
                     TextButton(
                       onPressed: _skipToFinal,
-                      child: Text(
-                        'Skip',
+                      child: Text(context.l10n.skipAction,
                         style: TextStyle(
                           color: p.textSecondary,
                           fontWeight: FontWeight.w600,
@@ -306,8 +305,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ).animate().scale(duration: 600.ms, curve: Curves.easeOutBack),
           const SizedBox(height: 36),
-          Text(
-            'Your Music, Your Privacy',
+          Text(context.l10n.onboardingHeading,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.w800,
@@ -315,8 +313,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
           ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1, end: 0),
           const SizedBox(height: 16),
-          Text(
-            '100% offline local playback. No accounts, no cloud dependencies, zero tracking, and absolute privacy for your music collection.',
+          Text(context.l10n.onboardingPrivacyDesc,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: p.textSecondary,
@@ -336,8 +333,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 Icon(Icons.lock_rounded, color: p.accent, size: 22),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    '100% Offline • Zero Telemetry • Local Storage',
+                  child: Text(context.l10n.privacyGuarantee,
                     style: TextStyle(
                       color: p.textPrimary,
                       fontSize: 13,
@@ -396,8 +392,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               .fadeIn(duration: 500.ms)
               .scale(begin: const Offset(0.9, 0.9)),
           const SizedBox(height: 36),
-          Text(
-            'Powerful Playback',
+          Text(context.l10n.onboardingPowerful,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.w800,
@@ -405,8 +400,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
           ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1, end: 0),
           const SizedBox(height: 16),
-          Text(
-            'Tailor your sound with a 10-band graphic equalizer (±12 dB, 31Hz–16kHz), smooth crossfade transitions, gapless playback, and smart sleep timers.',
+          Text(context.l10n.onboardingPowerfulDesc,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: p.textSecondary,
@@ -462,8 +456,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   children: [
                     Icon(Icons.palette_rounded, color: p.accent, size: 24),
                     const SizedBox(width: 8),
-                    Text(
-                      '4 DISTINCT PLAYER THEMES',
+                    Text(context.l10n.onboardingThemes,
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
@@ -494,8 +487,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               .fadeIn(duration: 500.ms)
               .scale(begin: const Offset(0.9, 0.9)),
           const SizedBox(height: 36),
-          Text(
-            'Beautiful & Personal',
+          Text(context.l10n.onboardingBeautiful,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.w800,
@@ -503,8 +495,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
           ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1, end: 0),
           const SizedBox(height: 16),
-          Text(
-            'Express your style with real-time dynamic color extraction from album art and switch between 4 unique player themes.',
+          Text(context.l10n.onboardingBeautifulDesc,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: p.textSecondary,

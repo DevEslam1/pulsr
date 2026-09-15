@@ -90,8 +90,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
           backgroundColor: p.surface,
           elevation: 0,
           leading: const PulsrBackButton(),
-          title: const Text(
-          'Recently Played',
+          title: Text(context.l10n.recentlyPlayed,
           style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
         ),
         actions: [
@@ -399,7 +398,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.playlist_add_rounded),
-              title: const Text('Add to playlist'),
+              title: Text(context.l10n.addToPlaylist),
               onTap: () {
                 Navigator.pop(ctx);
                 showModalBottomSheet(
@@ -412,7 +411,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.info_outline_rounded),
-              title: const Text('Song info'),
+              title: Text(context.l10n.songInfo),
               onTap: () {
                 Navigator.pop(ctx);
                 showModalBottomSheet(

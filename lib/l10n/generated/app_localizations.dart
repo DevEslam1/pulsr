@@ -6094,6 +6094,618 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Bit-Perfect Mode'**
   String get bitPerfectMode;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube Music session expired. Sign in again to keep streaming.'**
+  String get ytmSessionExpired;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'No matching online metadata found.'**
+  String get noOnlineMetadata;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Online metadata applied successfully!'**
+  String get onlineMetadataApplied;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube Music Explore'**
+  String get ytmExplore;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load songs for this year'**
+  String get couldNotLoadYear;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'STUDIO AUDIO'**
+  String get studioAudio;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Lyrics'**
+  String get lyricsLabel;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud Backup & Sync'**
+  String get cloudBackupSync;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud Storage Status'**
+  String get cloudStorageStatus;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Encrypted bidirectional Firestore backup across all your devices.'**
+  String get cloudBackupDesc;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'What gets synced'**
+  String get whatGetsSynced;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Favorites, playlists, play history and library metadata are '**
+  String get syncItemsPrefix;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-Filter Voice Notes & Messengers'**
+  String get autoFilterVoiceNotes;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically ignores WhatsApp audio, voice notes, Telegram, Call Recordings, and sound recorder files.'**
+  String get autoFilterVoiceNotesDesc;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Ignore short clips and sound effects'**
+  String get shortAudioFilterDesc;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Min File Size'**
+  String get minFileSize;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Exclude small audio snippets & corrupt files'**
+  String get minFileSizeDesc;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'DEVICE AUDIO DIRECTORIES'**
+  String get deviceAudioDirectories;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'HTTP / HTTPS'**
+  String get httpHttps;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'SOCKS5'**
+  String get socks5;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Scrobbling Analytics'**
+  String get scrobblingAnalytics;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Universal Scrobbling Engine'**
+  String get universalScrobblingEngine;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Connected to Last.fm, ListenBrainz, Libre.fm, and Custom Webhooks.'**
+  String get scrobblingServicesDesc;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Last 7 Days Activity'**
+  String get last7DaysActivity;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Top Scrobbled Artists'**
+  String get topScrobbledArtists;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'THEME MODE'**
+  String get themeModeLabel;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'AMOLED'**
+  String get amoledLabel;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Try searching for \"equalizer\", \"dark mode\", \"crossfade\", \"proxy\", \"cache\", or \"scrobble\".'**
+  String get settingsSearchHint;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'BIT-PERFECT'**
+  String get bitPerfectLabel;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Automation Rules'**
+  String get automationRules;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Apply a settings profile automatically when a device event fires.'**
+  String get automationRulesDesc;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'No automation rules configured.'**
+  String get noAutomationRules;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Playback stops when screen is off?'**
+  String get playbackStopsScreenOff;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Some device manufacturers aggressively stop background playback. Granting battery exemption ensures uninterrupted music playback.'**
+  String get batteryExemptionDesc;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Device Guide'**
+  String get deviceGuide;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'SponsorBlock categories'**
+  String get sponsorBlockCategoriesLabel;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'SYNCED'**
+  String get syncedLabel;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'QUICK DISCOVERY'**
+  String get quickDiscovery;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Stream and download millions of songs from YouTube Music, ad-free.'**
+  String get ytmSearchDesc;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'POPULAR SEARCHES'**
+  String get popularSearches;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Quran Mode'**
+  String get quranMode;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Playlist'**
+  String get managePlaylist;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed. Please try again.'**
+  String get exportFailedRetry;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Applied EqualizerAPO GraphicEq curve'**
+  String get appliedGraphicEq;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Arbitrary Response EQ'**
+  String get arbitraryResponseEq;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'EqualizerAPO GraphicEq Spec'**
+  String get graphicEqSpec;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'512-tap FIR Filter'**
+  String get fir512;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Apply Curve'**
+  String get applyCurve;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Preset Acoustic Targets'**
+  String get presetAcousticTargets;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Opens Developer Options -> Bluetooth Audio Codec'**
+  String get devOptionsBtCodec;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'AutoEQ 2.0 Database'**
+  String get autoEqDatabase;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'No matching headphone profiles found'**
+  String get noHpMatch;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'DSP Debug Report copied to clipboard!'**
+  String get dspReportCopied;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Real-time Audio Engine & DSP Debugging'**
+  String get dspInspectorDesc;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'ACTIVE AUDIO STAGES'**
+  String get activeAudioStages;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'No DSP stages reported from platform engine.'**
+  String get noDspStages;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Dolby Atmos is hijacking the HAL session. Native limiter/crossfeed still run, but EQ needs HAL. Fix: tap below to switch to OEM (lets system handle EQ) or disable Dolby in system Sound settings, then restart track.'**
+  String get dolbyHijackDesc;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Switched DSP Preference -> OEM. Restart track to attach.'**
+  String get switchedToOem;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to switch preference - change in Settings -> Audio'**
+  String get switchPrefFailed;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Fix: Switch to OEM'**
+  String get fixSwitchOem;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Retrying HAL attach... play a track if idle'**
+  String get retryingHal;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Retry Attach'**
+  String get retryAttach;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Place a .lrc file in the same folder as your audio track or embed lyrics into file tags.'**
+  String get placeLrcHint;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Search Lyrics'**
+  String get searchLyrics;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Queue is empty'**
+  String get queueEmpty;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get skipAction;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Your Music, Your Privacy'**
+  String get onboardingHeading;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'100% offline local playback. No accounts, no cloud dependencies, zero tracking, and absolute privacy for your music collection.'**
+  String get onboardingPrivacyDesc;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Powerful Playback'**
+  String get onboardingPowerful;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Tailor your sound with a 10-band graphic equalizer, smooth crossfade transitions, gapless playback, and smart sleep timers.'**
+  String get onboardingPowerfulDesc;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'4 DISTINCT PLAYER THEMES'**
+  String get onboardingThemes;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Beautiful & Personal'**
+  String get onboardingBeautiful;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Express your style with real-time dynamic color extraction from album art and switch between 4 unique player themes.'**
+  String get onboardingBeautifulDesc;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Album Artwork Wall'**
+  String get artworkWall;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'No albums found in library'**
+  String get noAlbumsFound;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Listening & Library Stats'**
+  String get listeningStats;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Audio Quality Tiers'**
+  String get audioQualityTiers;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'No play history recorded yet. Listen to tracks to track your top hits!'**
+  String get noPlayHistory;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'DOWNLOADS'**
+  String get downloadsLabel;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'No music files indexed'**
+  String get noMusicIndexed;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Parent Directory'**
+  String get parentDirectory;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Folder is empty'**
+  String get folderEmpty;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Other Genres'**
+  String get otherGenres;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load genre songs'**
+  String get couldNotLoadGenre;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Sync your favorites & playlists across devices'**
+  String get syncAcrossDevices;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with Google'**
+  String get continueWithGoogle;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'OR WITH EMAIL'**
+  String get orWithEmail;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your email first'**
+  String get enterEmailFirst;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot Password?'**
+  String get forgotPassword;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with Google TV'**
+  String get signInGoogleTv;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'No captcha - approve on another device'**
+  String get noCaptchaDesc;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get tryAgain;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'1. On your phone or computer, open this address:'**
+  String get oauthStep1;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'2. Enter this code:'**
+  String get oauthStep2;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Copy code'**
+  String get copyCode;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for approval...'**
+  String get waitingApproval;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'About Artist'**
+  String get aboutArtist;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Opening YouTube Music track...'**
+  String get openingYtmTrack;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Format not supported on this device'**
+  String get formatNotSupported;
+
+  /// tranche8 l10n
+  ///
+  /// In en, this message translates to:
+  /// **'WAVEFORM'**
+  String get waveformLabel;
+
+  /// tranche8 fix
+  ///
+  /// In en, this message translates to:
+  /// **'USB bit-perfect streaming could not start (unsupported DAC or claim failed)'**
+  String get usbBpFailed;
+
+  /// tranche8 final
+  ///
+  /// In en, this message translates to:
+  /// **'Favorites, playlists, play history and library metadata are synced in both directions. DSP presets and app settings stay on this device.'**
+  String get cloudSyncItemsDesc;
 }
 
 class _AppLocalizationsDelegate

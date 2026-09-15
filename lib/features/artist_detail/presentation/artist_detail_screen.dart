@@ -123,8 +123,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                                 Icon(Icons.info_outline_rounded,
                                     size: 16, color: p.accent),
                                 const SizedBox(width: 6),
-                                Text(
-                                  'About Artist',
+                                Text(context.l10n.aboutArtist,
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,

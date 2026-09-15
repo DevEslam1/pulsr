@@ -60,8 +60,7 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
                   children: [
                     Icon(Icons.error_outline_rounded, color: p.error, size: 48),
                     const SizedBox(height: 16),
-                    Text(
-                      'Could not load songs for this year',
+                    Text(context.l10n.couldNotLoadYear,
                       style: TextStyle(
                           color: p.textPrimary,
                           fontWeight: FontWeight.w700,

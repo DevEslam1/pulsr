@@ -1,5 +1,6 @@
 // lib/features/library/presentation/library_stats_screen.dart
 import 'package:flutter/material.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/di/injection.dart';
@@ -87,8 +88,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
           backgroundColor: p.surface,
           elevation: 0,
           leading: const PulsrBackButton(),
-          title: Text(
-            'Listening & Library Stats',
+          title: Text(context.l10n.listeningStats,
             style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.bold),
           ),
           actions: [
@@ -228,8 +228,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                           Icon(Icons.high_quality_rounded,
                               color: p.primary, size: 22),
                           const SizedBox(width: 8),
-                          Text(
-                            'Audio Quality Tiers',
+                          Text(context.l10n.audioQualityTiers,
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
@@ -309,8 +308,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                       border: Border.all(color: p.hairline),
                     ),
                     child: Center(
-                      child: Text(
-                        'No play history recorded yet. Listen to tracks to track your top hits!',
+                      child: Text(context.l10n.noPlayHistory,
                         textAlign: TextAlign.center,
                         style: TextStyle(color: p.textSecondary, fontSize: 13),
                       ),
