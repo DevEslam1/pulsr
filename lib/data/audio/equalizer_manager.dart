@@ -1628,8 +1628,12 @@ class EqualizerManager {
     int? mode,
   }) async {
     isCrossfeedEnabled = enabled;
-    if (delayUs != null) crossfeedDelayUs = delayUs;
-    if (feedDb != null) crossfeedFeedDb = feedDb;
+    if (delayUs != null) {
+      crossfeedDelayUs = delayUs.clamp(200.0, 700.0);
+    }
+    if (feedDb != null) {
+      crossfeedFeedDb = feedDb.clamp(-15.0, -6.0);
+    }
     if (mode != null) crossfeedMode = mode.clamp(0, 3);
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setCrossfeedParams(
@@ -1706,8 +1710,14 @@ class EqualizerManager {
 
   Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) async {
     isReverbEnabled = enabled;
-    if (preset != null) reverbPreset = preset;
-    if (wetDry != null) reverbWetDry = wetDry;
+    if (preset != null) {
+      // Wire values are ReverbPreset ordinals (0..N); anything else has no
+      // synthesizable IR on the native side, so clamp instead of forwarding
+      // garbage that would silently produce the wrong room.
+      reverbPreset =
+          preset.clamp(0, ReverbPreset.values.length - 1);
+    }
+    if (wetDry != null) reverbWetDry = wetDry.clamp(0.0, 1.0);
     if (PlatformCapabilities.isAndroid) {
       if (preset != null) await _effectsChannel.setReverbPreset(preset);
       // FIX M-7: always sync wet/dry after preset change so DSP is not stale
@@ -1722,6 +1732,13 @@ class EqualizerManager {
   /// side accepted it, so callers never flip the UI to "Custom (Loaded)" on a
   /// failed load.
   Future<bool> loadCustomImpulseResponse(List<double> irSamples) async {
+    if (irSamples.isEmpty) {
+      ErrorLogger.log(
+        'Cannot load an empty impulse response',
+        category: 'EqualizerManager',
+      );
+      return false;
+    }
     if (!PlatformCapabilities.isAndroid) {
       isReverbEnabled = true;
       reverbPreset = ReverbPreset.custom.wireValue;
@@ -1851,8 +1868,21 @@ class EqualizerManager {
     }
     if (_savedLimiterEnabled) await setLookaheadLimiter(true);
     if (_savedViperDdcEnabled) await setViperDdc(true);
-    if (_savedArbitraryEqEnabled) await setArbitraryEq(true);
-    if (_savedLiveProgEnabled) await setLiveProg(true);
+    // Re-pass the stored curves/code: the setters only (re)load native
+    // content when it is supplied, otherwise just the enable flag is pushed
+    // and the stage comes back empty.
+    if (_savedArbitraryEqEnabled) {
+      await setArbitraryEq(
+        true,
+        eqString: arbitraryEqString.isNotEmpty ? arbitraryEqString : null,
+      );
+    }
+    if (_savedLiveProgEnabled) {
+      await setLiveProg(
+        true,
+        code: liveProgCode.isNotEmpty ? liveProgCode : null,
+      );
+    }
     _syncPipeline();
   }
 
@@ -1970,6 +2000,23 @@ class EqualizerManager {
   }
 
   Future<void> setLiveProgSlider(int sliderIndex, double value) async {
+    // Native LiveProg::setSlider only honors 1..8; anything else is dropped
+    // there while the Dart mirror would keep it — reject up front so the two
+    // never diverge.
+    if (sliderIndex < 1 || sliderIndex > 8) {
+      ErrorLogger.log(
+        'Rejected LiveProg slider index $sliderIndex (valid 1..8)',
+        category: 'EqualizerManager',
+      );
+      return;
+    }
+    if (!value.isFinite) {
+      ErrorLogger.log(
+        'Rejected non-finite LiveProg slider value for index $sliderIndex',
+        category: 'EqualizerManager',
+      );
+      return;
+    }
     liveProgSliders[sliderIndex] = value;
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setLiveProgSlider(sliderIndex, value);
@@ -1997,6 +2044,16 @@ class EqualizerManager {
     }
     if (highCrossoverHz != null) {
       stereoWidthHighCrossoverHz = highCrossoverHz.clamp(1000.0, 10000.0);
+    }
+    // The mid band collapses when low >= high; keep a minimum 200 Hz gap so
+    // the three bands always exist.
+    if (stereoWidthLowCrossoverHz >= stereoWidthHighCrossoverHz) {
+      stereoWidthHighCrossoverHz =
+          (stereoWidthLowCrossoverHz + 200.0).clamp(1000.0, 10000.0);
+      if (stereoWidthHighCrossoverHz <= stereoWidthLowCrossoverHz) {
+        stereoWidthLowCrossoverHz =
+            (stereoWidthHighCrossoverHz - 200.0).clamp(40.0, 1000.0);
+      }
     }
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setStereoWidthParams(
@@ -2085,24 +2142,46 @@ class EqualizerManager {
   }
 
   Future<void> setDynamicEqBand(int index, DynamicEqBandConfig band) async {
-    if (index < 0 || index >= dynamicEqBands.length) return;
+    if (index < 0 || index >= dynamicEqBands.length) {
+      ErrorLogger.log(
+        'Rejected DynamicEQ band index $index (0..${dynamicEqBands.length - 1})',
+        category: 'EqualizerManager',
+      );
+      return;
+    }
+    // Sanitize to the ranges the native DynamicEQ stage honors (see
+    // DynamicEQ::setBand) so the stored Dart state never diverges from what
+    // the DSP actually applies.
+    final sanitized = DynamicEqBandConfig(
+      frequency: band.frequency.clamp(20.0, 20000.0),
+      q: band.q.clamp(0.1, 12.0),
+      thresholdDb: band.thresholdDb.clamp(-80.0, 0.0),
+      ratio: band.ratio.clamp(1.0, 20.0),
+      attackMs: band.attackMs.clamp(0.1, 200.0),
+      releaseMs: band.releaseMs.clamp(5.0, 2000.0),
+      maxCutDb: band.maxCutDb.clamp(-24.0, 0.0),
+      maxBoostDb: band.maxBoostDb.clamp(0.0, 24.0),
+      mode: band.mode.clamp(0, 1),
+      filterType: band.filterType.clamp(0, 2),
+      enabled: band.enabled,
+    );
     final bands = List<DynamicEqBandConfig>.from(dynamicEqBands);
-    bands[index] = band;
+    bands[index] = sanitized;
     dynamicEqBands = bands;
     if (PlatformCapabilities.isAndroid && isDynamicEqEnabled) {
       await _effectsChannel.setDynamicEqBand(
         index,
-        frequency: band.frequency,
-        q: band.q,
-        thresholdDb: band.thresholdDb,
-        ratio: band.ratio,
-        attackMs: band.attackMs,
-        releaseMs: band.releaseMs,
-        maxCutDb: band.maxCutDb,
-        maxBoostDb: band.maxBoostDb,
-        mode: band.mode,
-        filterType: band.filterType,
-        enabled: band.enabled,
+        frequency: sanitized.frequency,
+        q: sanitized.q,
+        thresholdDb: sanitized.thresholdDb,
+        ratio: sanitized.ratio,
+        attackMs: sanitized.attackMs,
+        releaseMs: sanitized.releaseMs,
+        maxCutDb: sanitized.maxCutDb,
+        maxBoostDb: sanitized.maxBoostDb,
+        mode: sanitized.mode,
+        filterType: sanitized.filterType,
+        enabled: sanitized.enabled,
       );
     }
     _debouncedSavePreferences();
@@ -2120,7 +2199,13 @@ class EqualizerManager {
   }
 
   Future<void> removeDynamicEqBand(int index) async {
-    if (index < 0 || index >= dynamicEqBands.length) return;
+    if (index < 0 || index >= dynamicEqBands.length) {
+      ErrorLogger.log(
+        'Rejected DynamicEQ band removal at index $index',
+        category: 'EqualizerManager',
+      );
+      return;
+    }
     final bands = List<DynamicEqBandConfig>.from(dynamicEqBands);
     bands.removeAt(index);
     dynamicEqBands = bands;
@@ -2176,6 +2261,26 @@ class EqualizerManager {
     if (f0 != null) multibandCompressorF0 = f0.clamp(40.0, 500.0);
     if (f1 != null) multibandCompressorF1 = f1.clamp(200.0, 4000.0);
     if (f2 != null) multibandCompressorF2 = f2.clamp(1000.0, 16000.0);
+    // Crossovers must stay strictly ordered (f0 < f1 < f2); individual
+    // clamps alone allow inversions such as f0=500 > f1=200.
+    if (multibandCompressorF1 <= multibandCompressorF0) {
+      multibandCompressorF1 =
+          (multibandCompressorF0 + 50.0).clamp(200.0, 4000.0);
+    }
+    if (multibandCompressorF2 <= multibandCompressorF1) {
+      multibandCompressorF2 =
+          (multibandCompressorF1 + 500.0).clamp(1000.0, 16000.0);
+    }
+    // Second pass: the clamps above can themselves collapse the ordering at
+    // the range edges, so pull the lower crossover down instead.
+    if (multibandCompressorF1 <= multibandCompressorF0) {
+      multibandCompressorF0 =
+          (multibandCompressorF1 - 50.0).clamp(40.0, 500.0);
+    }
+    if (multibandCompressorF2 <= multibandCompressorF1) {
+      multibandCompressorF1 =
+          (multibandCompressorF2 - 500.0).clamp(200.0, 4000.0);
+    }
     if (PlatformCapabilities.isAndroid) {
       await _pushMultibandCompressorConfig();
       await _effectsChannel.setMultibandCompressorEnabled(enabled);
@@ -2188,7 +2293,13 @@ class EqualizerManager {
     int index,
     MultibandCompressorBandConfig band,
   ) async {
-    if (index < 0 || index >= multibandCompressorBands.length) return;
+    if (index < 0 || index >= multibandCompressorBands.length) {
+      ErrorLogger.log(
+        'Rejected multiband compressor band index $index',
+        category: 'EqualizerManager',
+      );
+      return;
+    }
     final bands =
         List<MultibandCompressorBandConfig>.from(multibandCompressorBands);
     bands[index] = band;
@@ -2247,6 +2358,17 @@ class EqualizerManager {
     if (strength != null) dynamicBassStrength = strength.clamp(0.0, 8.0);
     if (preset != null) dynamicBassPreset = preset.clamp(0, 9);
     if (dynamicBassPreset > 0) {
+      if (xLow != null ||
+          xHigh != null ||
+          yLow != null ||
+          yHigh != null ||
+          sideGainLow != null ||
+          sideGainHigh != null) {
+        ErrorLogger.log(
+          'Custom DynamicBass values ignored while preset $dynamicBassPreset is active',
+          category: 'EqualizerManager',
+        );
+      }
       final p = DynamicBassConfig.builtinPresets.firstWhere(
         (it) => it.id == dynamicBassPreset,
         orElse: () => DynamicBassConfig.builtinPresets.first,
@@ -2358,13 +2480,18 @@ class EqualizerManager {
   }
 
   Future<int> syncNativeLatency(double sampleRate,
-      {OptimizedDspPipeline? dspPipeline}) async {
+      {OptimizedDspPipeline? dspPipeline, double? outputRate}) async {
     if (!PlatformCapabilities.isAndroid) return 0;
     try {
       final frames = await _effectsChannel.getPipelineLatencyFrames();
-      // Update resampler rates if needed for auto-disable check
-      if (isSincResamplerEnabled) {
-        await _effectsChannel.setSincResamplerRates(sampleRate, sampleRate);
+      // Track-rate -> device-rate conversion. Only push when the device rate
+      // is known: pushing (rate, rate) forces a permanent resampler bypass,
+      // which skips needed 44.1k <-> 48k conversion.
+      if (isSincResamplerEnabled &&
+          outputRate != null &&
+          outputRate > 0 &&
+          sampleRate > 0) {
+        await _effectsChannel.setSincResamplerRates(sampleRate, outputRate);
       }
       (dspPipeline ?? _dspPipeline)
           ?.updateNativeLatency(frames: frames, sampleRate: sampleRate);

@@ -10,6 +10,7 @@ import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
+import '../../../core/widgets/pulsr_dismissible.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/di/injection.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
@@ -168,17 +169,44 @@ class QueueScreen extends StatelessWidget {
                   final song = queue[index];
                   final isCurrent = song.id == currentSong?.id;
 
-                  return Dismissible(
+                  return PulsrDismissible(
                     key: ValueKey('${song.id}-$index'),
-                    direction: DismissDirection.endToStart,
-                    background: Container(
+                    dismissDirection: DismissDirection.endToStart,
+                    endToStartLabel: context.l10n.delete,
+                    secondaryBackgroundBuilder: (context, isConfirming) => Container(
                       alignment: Alignment.centerRight,
                       padding: const EdgeInsets.only(right: 20),
                       margin: const EdgeInsets.symmetric(vertical: 4),
-                      decoration: BoxDecoration(color: p.error.withValues(alpha: 0.15), borderRadius: AppRadii.cardRadius),
-                      child: Icon(Icons.delete_rounded, color: p.error),
+                      decoration: BoxDecoration(
+                        color: p.error.withValues(alpha: isConfirming ? 0.35 : 0.15),
+                        borderRadius: AppRadii.cardRadius,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isConfirming) ...[
+                            Text(
+                              'Confirm Delete',
+                              style: TextStyle(
+                                color: p.error,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          Icon(
+                            isConfirming
+                                ? Icons.delete_forever_rounded
+                                : Icons.delete_rounded,
+                            color: p.error,
+                          ),
+                        ],
+                      ),
                     ),
-                    onDismissed: (_) => context.read<PlayerCubit>().removeQueueItem(index),
+                    onConfirm: (direction) {
+                      context.read<PlayerCubit>().removeQueueItem(index);
+                      return true;
+                    },
                     child: Container(
                       margin: const EdgeInsets.symmetric(vertical: 4),
                       child: Material(

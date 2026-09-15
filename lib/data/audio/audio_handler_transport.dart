@@ -1,0 +1,740 @@
+part of 'audio_handler.dart';
+
+extension PulsrAudioTransport on PulsrAudioHandler {
+  Future<void> play() {
+    _userPlaybackInitiated = true;
+    unawaited(() async {
+      try {
+        final s = await AudioSession.instance;
+        await s.setActive(true);
+      } catch (_) {}
+    }());
+    ErrorLogger.addBreadcrumb('Playback started', category: 'player');
+    // A restored YouTube session in the crossfade engine is left with no source
+    // loaded (see restoreLastPlaybackSession); resolve and start it on the first
+    // play. The gapless engine instead sets a non-preloaded concat at restore,
+    // so play() below prepares and starts it lazily with no special-casing.
+    final pending = _pendingLazyPosition;
+    if (pending != null && currentSong != null && !_gaplessMode) {
+      _pendingLazyPosition = null;
+      return playSongAt(_currentIndex, initialPosition: pending);
+    }
+    final generation = _playGeneration;
+    final player = _activePlayer;
+    try {
+      player.dspClearGainCurve().catchError((_) => false);
+    } catch (_) {}
+    final playFuture = player.play();
+    _scheduleFadeInConvergenceGuard(player, generation);
+    _broadcastState(player.playbackEvent);
+    return playFuture;
+  }
+
+  Future<void> pause() async {
+    // A deliberate pause invalidates any pending interruption snapshot so a
+    // later call can still pause us (B-1); the previous code only cleared the
+    // "was playing" half, leaving the active flag set.
+    _interruption.onUserPause();
+    ErrorLogger.addBreadcrumb('Playback paused', category: 'player');
+    await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
+        restoreVolume: _preCrossfadeVolume ?? _volume);
+    _saveCurrentPosition();
+    // If an online source is still being fetched/loaded (the track is not
+    // playable yet), invalidate the in-flight load cycle so a late resolve — or
+    // the play() at the end of playSongAt — cannot start playback after the
+    // user paused. The position is remembered so a later play() re-runs the
+    // cycle (re-fetches) instead of silently doing nothing.
+    final playerState = _activePlayer.processingState;
+    final stillLoading = playerState == ProcessingState.loading ||
+        playerState == ProcessingState.buffering ||
+        playerState == ProcessingState.idle;
+    if (stillLoading) {
+      _playGeneration++;
+      cancelPrefetches();
+      _pendingLazyPosition = _activePlayer.position;
+    }
+    await _activePlayer.pause();
+  }
+
+  Future<void> seek(Duration position) async {
+    ErrorLogger.addBreadcrumb('Playback seek to ${position.inSeconds}s',
+        category: 'player');
+    // Optimistic UI: emit locally first so the slider feels instant,
+    // then debounce the backend call to avoid jitter during scrubbing.
+    // NOTE: PlayerCubit already throttles scrub floods (100ms). This layer
+    // only coalesces sub-60ms bursts, so a discrete tap passes through a
+    // single layer, not two stacked 100ms windows.
+    _positionSubject.add(position);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastSeekMs < 60) {
+      _pendingSeekPosition = position;
+      _seekDebounceTimer?.cancel();
+      _seekDebounceTimer =
+          Timer(const Duration(milliseconds: 60), () {
+        final pending = _pendingSeekPosition;
+        _pendingSeekPosition = null;
+        if (pending != null) {
+          _performSeek(pending).catchError((Object e, StackTrace st) {
+            ErrorLogger.log('Debounced seek failed',
+                error: e, stackTrace: st, category: 'AudioHandler');
+          });
+        }
+      });
+      return;
+    }
+    _lastSeekMs = now;
+    await _performSeek(position);
+  }
+
+  /// Direct seek without debounce, for discrete user intents (tap-to-seek,
+  /// skip-to-previous-restart). The cubit already throttles scrub floods, so
+  /// routing discrete seeks here avoids the double 100ms window stacking.
+  Future<void> seekDirect(Duration position) async {
+    ErrorLogger.addBreadcrumb('Playback seekDirect to ${position.inSeconds}s',
+        category: 'player');
+    _positionSubject.add(position);
+    _lastSeekMs = DateTime.now().millisecondsSinceEpoch;
+    _pendingSeekPosition = null;
+    _seekDebounceTimer?.cancel();
+    await _performSeek(position);
+  }
+
+  Future<void> _performSeek(Duration position) async {
+    await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
+        restoreVolume: _volume);
+    try {
+      await _activePlayer.seek(position);
+    } catch (_) {
+      // Roll back to the last known good position on failure.
+      _positionSubject.add(_activePlayer.position);
+      rethrow;
+    }
+    _positionSubject.add(position);
+    _saveCurrentPosition();
+  }
+
+  Future<void> skipToQueueItem(int index) async {
+    if (index < 0 || index >= _songs.length) return;
+    await loadQueue(_songs, initialIndex: index, autoPlay: _activePlayer.playing);
+  }
+
+  Future<void> skipToNext() async {
+    ErrorLogger.addBreadcrumb('Playback skipToNext', category: 'player');
+    // Invalidate stale prefetch completions; the manual playSongAt path below
+    // captures its own _playGeneration token (no double-bump here).
+    cancelPrefetches();
+    _isManualSkip = true;
+    // A headset/double-press storm must never queue overlapping skips: each
+    // skip bumps the generation so a slow YouTube resolve from the previous
+    // skip bails instead of clobbering the new track.
+    final wasPlaying = _activePlayer.playing;
+
+    try {
+      if (_crossfadeManager.isCrossfading) {
+        await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
+            restoreVolume: _volume);
+      }
+      if (_gaplessMode && _gaplessLoaded) {
+        // Native advance: invalidate any in-flight manual playSongAt resolve so
+        // a slow YouTube URL fetch cannot clobber the new current item.
+        _playGeneration++;
+        if (_activePlayer.hasNext) {
+          await _activePlayer.seekToNext();
+          if (wasPlaying) {
+            await _activePlayer.play();
+          }
+        } else if (_activePlayer.loopMode == LoopMode.all &&
+            _songs.isNotEmpty) {
+          await _activePlayer.seek(Duration.zero, index: 0);
+          if (wasPlaying) {
+            await _activePlayer.play();
+          }
+        } else {
+          // Native concat says "no next" — but it can desync from _songs
+          // after queue edits. Fall back to the Dart queue before giving up,
+          // otherwise Next on a valid queue pauses + dismisses the
+          // notification ("no action").
+          final fallbackIdx = _getNextIndex();
+          if (fallbackIdx != null) {
+            if (wasPlaying) {
+              await playSongAt(fallbackIdx);
+            } else {
+              await _loadSongPaused(fallbackIdx);
+            }
+          } else {
+            // True end-of-queue: restart the current track instead of
+            // pausing. Pausing here drops the foreground service (and with
+            // stopForegroundOnPause the notification) while the user
+            // explicitly asked to keep listening.
+            await _activePlayer.seek(Duration.zero);
+            if (wasPlaying) {
+              await _activePlayer.play();
+            }
+            _broadcastState(_activePlayer.playbackEvent);
+          }
+        }
+        return;
+      }
+
+      final nextIdx = _getNextIndex();
+      if (nextIdx != null) {
+        if (wasPlaying) {
+          await playSongAt(nextIdx);
+        } else {
+          await _loadSongPaused(nextIdx);
+        }
+      } else {
+        // True end-of-queue: same no-dismiss policy as the gapless path.
+        await _activePlayer.seek(Duration.zero);
+        if (wasPlaying) {
+          await _activePlayer.play();
+        }
+        _broadcastState(_activePlayer.playbackEvent);
+      }
+    } catch (e, st) {
+      // Never let a skip kill the service silently: log, keep the queue
+      // position, and re-broadcast so the notification stays alive.
+      ErrorLogger.log('skipToNext failed',
+          error: e, stackTrace: st, category: 'AudioHandler');
+      try {
+        _broadcastState(_activePlayer.playbackEvent);
+      } catch (_) {}
+    }
+  }
+
+  Future<void> skipToPrevious() async {
+    ErrorLogger.addBreadcrumb('Playback skipToPrevious', category: 'player');
+    cancelPrefetches();
+    _isManualSkip = true;
+    _rapidGaplessChangeCount = 0;
+    _lastGaplessChangeTime = null;
+
+    final now = DateTime.now();
+    final isDoubleTap = _lastPreviousTapTime != null &&
+        now.difference(_lastPreviousTapTime!).inMilliseconds < 2500;
+    _lastPreviousTapTime = now;
+    final wasPlaying = _activePlayer.playing;
+
+    if (_crossfadeManager.isCrossfading) {
+      await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
+          restoreVolume: _volume);
+    }
+    if (_gaplessMode && _gaplessLoaded) {
+      _playGeneration++;
+      if (!isDoubleTap && _activePlayer.position.inSeconds > 3) {
+        await _activePlayer.seek(Duration.zero);
+        if (wasPlaying) {
+          await _activePlayer.play();
+        }
+        _saveCurrentPosition();
+        return;
+      }
+      if (_activePlayer.hasPrevious) {
+        await _activePlayer.seekToPrevious();
+        if (wasPlaying) {
+          await _activePlayer.play();
+        }
+      } else if (_activePlayer.loopMode == LoopMode.all && _songs.isNotEmpty) {
+        await _activePlayer.seek(Duration.zero, index: _songs.length - 1);
+        if (wasPlaying) {
+          await _activePlayer.play();
+        }
+      } else {
+        await _activePlayer.seek(Duration.zero);
+        if (wasPlaying) {
+          await _activePlayer.play();
+        }
+        _saveCurrentPosition();
+      }
+      return;
+    }
+    if (!isDoubleTap && _activePlayer.position.inSeconds > 3) {
+      await _activePlayer.seek(Duration.zero);
+      if (wasPlaying) {
+        await _activePlayer.play();
+      }
+      _saveCurrentPosition();
+      return;
+    }
+    final prevIdx = _getPreviousIndex(forcePrevious: isDoubleTap);
+    if (prevIdx != null) {
+      if (wasPlaying) {
+        await playSongAt(prevIdx);
+      } else {
+        await _loadSongPaused(prevIdx);
+      }
+    } else {
+      await _activePlayer.seek(Duration.zero);
+      if (wasPlaying) {
+        await _activePlayer.play();
+      }
+      _saveCurrentPosition();
+    }
+  }
+
+  Future<void> setShuffleMode(AudioServiceShuffleMode shuffleMode) async {
+    final enable = shuffleMode != AudioServiceShuffleMode.none;
+    await Future.wait([
+      _playerA.setShuffleModeEnabled(enable),
+      _playerB.setShuffleModeEnabled(enable),
+    ]);
+    // In gapless mode the concat's shuffle order drives playback; reshuffle so
+    // enabling shuffle actually reorders upcoming tracks (current stays put).
+    if (enable && _gaplessMode && _gaplessLoaded) {
+      await _activePlayer.shuffle();
+    }
+    // The crossfade engine draws its own random order from _getNextIndex, so no
+    // native reshuffle is needed there.
+    playbackState.add(playbackState.value.copyWith(shuffleMode: shuffleMode));
+    final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
+    await prefs.setBool(PrefsKeys.playbackShuffle,
+        shuffleMode == AudioServiceShuffleMode.all);
+  }
+
+  Future<void> setRepeatMode(AudioServiceRepeatMode repeatMode) async {
+    LoopMode loopMode = switch (repeatMode) {
+      AudioServiceRepeatMode.none => LoopMode.off,
+      AudioServiceRepeatMode.one => LoopMode.one,
+      AudioServiceRepeatMode.all ||
+      AudioServiceRepeatMode.group =>
+        LoopMode.all,
+    };
+
+    await Future.wait([
+      _playerA.setLoopMode(loopMode),
+      _playerB.setLoopMode(loopMode),
+    ]);
+
+    playbackState.add(playbackState.value.copyWith(repeatMode: repeatMode));
+    final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
+    final persistMode = switch (repeatMode) {
+      AudioServiceRepeatMode.all || AudioServiceRepeatMode.group => 'all',
+      AudioServiceRepeatMode.one => 'one',
+      _ => 'none',
+    };
+    await prefs.setString(PrefsKeys.playbackRepeatMode, persistMode);
+  }
+
+  Future<void> click([MediaButton button = MediaButton.media]) async {
+    _headsetClickCount++;
+    _headsetClickTimer?.cancel();
+
+    int windowMs = 350;
+    try {
+      final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
+      windowMs =
+          (prefs.getInt(PrefsKeys.headsetClickWindowMs) ?? 350).clamp(150, 800);
+    } catch (_) {}
+
+    if (_headsetClickCount >= 3) {
+      final count = _headsetClickCount;
+      _headsetClickCount = 0;
+      await _performHeadsetAction(count);
+      return;
+    }
+
+    _headsetClickTimer = Timer(Duration(milliseconds: windowMs), () async {
+      final count = _headsetClickCount;
+      _headsetClickCount = 0;
+      await _performHeadsetAction(count);
+    });
+  }
+
+  Future<void> _performHeadsetAction(int count) async {
+    HeadsetClickAction action = HeadsetClickAction.playPause;
+    int seekSecs = 10;
+    try {
+      final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
+      final key = count <= 1
+          ? PrefsKeys.headsetSingleClick
+          : count == 2
+              ? PrefsKeys.headsetDoubleClick
+              : PrefsKeys.headsetTripleClick;
+      final fallback = count <= 1
+          ? HeadsetClickAction.playPause
+          : count == 2
+              ? HeadsetClickAction.next
+              : HeadsetClickAction.previous;
+      final raw = prefs.getString(key);
+      action = raw == null ? fallback : HeadsetClickAction.fromWire(raw);
+      if (action == HeadsetClickAction.none && raw != 'none') {
+        action = fallback;
+      }
+      seekSecs = (prefs.getInt(PrefsKeys.headsetSeekSeconds) ?? 10).clamp(5, 60);
+    } catch (_) {}
+    switch (action) {
+      case HeadsetClickAction.playPause:
+        if (_activePlayer.playing) {
+          await pause();
+        } else {
+          await play();
+        }
+        break;
+      case HeadsetClickAction.next:
+        await skipToNext();
+        break;
+      case HeadsetClickAction.previous:
+        await skipToPrevious();
+        break;
+      case HeadsetClickAction.stop:
+        await stop();
+        break;
+      case HeadsetClickAction.seekForward:
+        await seekRelative(Duration(seconds: seekSecs));
+        break;
+      case HeadsetClickAction.seekBackward:
+        await seekRelative(Duration(seconds: -seekSecs));
+        break;
+      case HeadsetClickAction.none:
+        break;
+    }
+  }
+
+  /// Relative seek clamped to [0, duration]. Used by headset seek mapping
+  /// and the `seekRelative` custom action (notification/widget long-press).
+  Future<void> seekRelative(Duration offset) async {
+    try {
+      final pos = _activePlayer.position;
+      final dur = _activePlayer.duration;
+      var target = pos + offset;
+      if (target < Duration.zero) target = Duration.zero;
+      if (dur != null && target > dur) target = dur;
+      await seek(target);
+    } catch (_) {}
+  }
+
+  double get minPlaybackSpeed =>
+      _advancedSpeedEnabled ? _minAdvancedPlaybackSpeed : _minPlaybackSpeed;
+
+  double get maxPlaybackSpeed =>
+      _advancedSpeedEnabled ? _maxAdvancedPlaybackSpeed : _maxPlaybackSpeed;
+
+  /// Enables the extended 0.1–8.0 speed range for power users.
+  /// When disabled the stable 0.25–4.0 range is enforced.
+  Future<void> setAdvancedSpeedEnabled(bool enabled) async {
+    _advancedSpeedEnabled = enabled;
+    final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
+    await prefs.setBool(PrefsKeys.advancedPlaybackSpeed, enabled);
+    // Re-clamp the current speed into the newly selected range so both
+    // players stay in sync after the range changes.
+    final current = playbackState.value.speed;
+    final clamped = current.clamp(minPlaybackSpeed, maxPlaybackSpeed);
+    if (clamped != current) {
+      await setSpeed(clamped);
+    }
+  }
+
+  double get pitch => _pitch;
+
+  Future<void> restorePersistedSpeed() async {
+    try {
+      final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
+      _advancedSpeedEnabled =
+          prefs.getBool(PrefsKeys.advancedPlaybackSpeed) ?? false;
+      final saved = prefs.getDouble(PrefsKeys.playbackSpeed);
+      if (saved != null) {
+        final clamped = saved.clamp(minPlaybackSpeed, maxPlaybackSpeed);
+        await Future.wait([
+          _playerA.setSpeed(clamped),
+          _playerB.setSpeed(clamped),
+        ]);
+        playbackState.add(playbackState.value.copyWith(speed: clamped));
+      }
+      final savedPitch = prefs.getDouble(PrefsKeys.playbackPitch);
+      if (savedPitch != null) {
+        final clampedPitch = savedPitch.clamp(0.5, 2.0);
+        _pitch = clampedPitch;
+        await Future.wait([
+          _playerA.setPitch(clampedPitch),
+          _playerB.setPitch(clampedPitch),
+        ]);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> setSpeed(double speed) async {
+    final clamped = speed.clamp(minPlaybackSpeed, maxPlaybackSpeed);
+    await Future.wait([
+      _playerA.setSpeed(clamped),
+      _playerB.setSpeed(clamped),
+    ]);
+    playbackState.add(playbackState.value.copyWith(speed: clamped));
+    try {
+      final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
+      await prefs.setDouble(PrefsKeys.playbackSpeed, clamped);
+    } catch (_) {}
+  }
+
+  Future<void> setPitch(double pitch) async {
+    final clamped = pitch.clamp(0.5, 2.0);
+    _pitch = clamped;
+    await Future.wait([
+      _playerA.setPitch(clamped),
+      _playerB.setPitch(clamped),
+    ]);
+    try {
+      final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
+      await prefs.setDouble(PrefsKeys.playbackPitch, clamped);
+    } catch (_) {}
+  }
+
+  Future<void> validatePlayerState() async {
+    final player = _activePlayer;
+    if (player.processingState == ProcessingState.idle && _songs.isNotEmpty) {
+      ErrorLogger.log('Player in idle state with non-empty queue, recovering',
+          category: 'AudioHandler');
+      await playSongAt(_currentIndex);
+    }
+  }
+
+  Future<dynamic> customAction(String name,
+      [Map<String, dynamic>? extras]) async {
+    switch (name) {
+      case 'toggleFavorite':
+        if (_songs.isNotEmpty && _currentIndex < _songs.length) {
+          final currentSong = _songs[_currentIndex];
+          final result = await _repository.toggleFavorite(currentSong.id);
+          final newFav = result.fold((l) => currentSong.isFavorite, (r) => r);
+          _songs[_currentIndex] = currentSong.copyWith(isFavorite: newFav);
+          final artUri =
+              await ArtworkUriResolver.resolveArtworkUri(_songs[_currentIndex]);
+          mediaItem.add(_songToMediaItem(_songs[_currentIndex], artUri));
+          return newFav;
+        }
+        return false;
+      case 'toggleShuffle':
+        final currentShuffle = _activePlayer.shuffleModeEnabled;
+        await setShuffleMode(currentShuffle
+            ? AudioServiceShuffleMode.none
+            : AudioServiceShuffleMode.all);
+        return !currentShuffle;
+      case 'cycleRepeat':
+      case 'toggleRepeat':
+        final currentLoop = _activePlayer.loopMode;
+        if (currentLoop == LoopMode.off) {
+          await setRepeatMode(AudioServiceRepeatMode.all);
+        } else if (currentLoop == LoopMode.all) {
+          await setRepeatMode(AudioServiceRepeatMode.one);
+        } else {
+          await setRepeatMode(AudioServiceRepeatMode.none);
+        }
+        return true;
+      case 'seekRelative':
+        final secs = (extras?['seconds'] as num?)?.toInt() ?? 10;
+        await seekRelative(Duration(seconds: secs.clamp(-60, 60)));
+        return true;
+      case 'headsetAction':
+        final count = (extras?['count'] as num?)?.toInt() ?? 1;
+        await _performHeadsetAction(count.clamp(1, 3));
+        return true;
+      default:
+        return super.customAction(name, extras);
+    }
+  }
+
+  Future<void> addQueueItem(MediaItem mediaItem) async {
+    if (_songs.length >= maxQueueSize) {
+      ErrorLogger.log('Queue size limit reached ($maxQueueSize)',
+          category: 'AudioHandler');
+      return;
+    }
+    final songId = int.tryParse(mediaItem.id);
+    if (songId != null) {
+      final songRes = await _repository.getSongById(songId);
+      final song = songRes.fold((l) => null, (r) => r);
+      if (song != null) {
+        _songs.add(song);
+        _queueDirty = true;
+        if (_gaplessMode && _gaplessLoaded) {
+          await _activePlayer.addAudioSource(_buildGaplessChild(song));
+        }
+        queue.add(_songs.map(_songToMediaItem).toList());
+        _saveCurrentPosition();
+      }
+    }
+  }
+
+  Future<void> insertNextInQueue(SongsTableData song) async {
+    final existingIdx = _songs.indexWhere((s) => s.id == song.id);
+    if (existingIdx != -1) {
+      if (existingIdx == _currentIndex) {
+        return;
+      }
+      final targetSlot = (_currentIndex + 1).clamp(0, _songs.length - 1);
+      if (existingIdx == targetSlot) {
+        return;
+      }
+      await reorderQueue(
+          existingIdx, targetSlot > existingIdx ? targetSlot + 1 : targetSlot);
+      return;
+    }
+
+    if (_songs.length >= maxQueueSize) {
+      ErrorLogger.log('Queue size limit reached ($maxQueueSize)',
+          category: 'AudioHandler');
+      return;
+    }
+    final insertIdx =
+        _songs.isEmpty ? 0 : (_currentIndex + 1).clamp(0, _songs.length);
+    _songs.insert(insertIdx, song);
+    _streamPreResolver.onTrackEnqueuedOrTapped(song);
+    _queueDirty = true;
+    // Insert sits after the current track, so the playing index never shifts.
+    if (_gaplessMode && _gaplessLoaded) {
+      await _activePlayer.insertAudioSource(
+          insertIdx, _buildGaplessChild(song));
+    }
+    queue.add(_songs.map(_songToMediaItem).toList());
+    _saveCurrentPosition();
+  }
+
+  Future<void> addToQueueEnd(SongsTableData song) async {
+    final existingIdx = _songs.indexWhere((s) => s.id == song.id);
+    if (existingIdx != -1) {
+      if (existingIdx == _currentIndex) {
+        return;
+      }
+      if (existingIdx == _songs.length - 1) {
+        return;
+      }
+      await reorderQueue(existingIdx, _songs.length);
+      return;
+    }
+
+    if (_songs.length >= maxQueueSize) {
+      ErrorLogger.log('Queue size limit reached ($maxQueueSize)',
+          category: 'AudioHandler');
+      return;
+    }
+    _songs.add(song);
+    _streamPreResolver.onTrackEnqueuedOrTapped(song);
+    _queueDirty = true;
+    if (_gaplessMode && _gaplessLoaded) {
+      await _activePlayer.addAudioSource(_buildGaplessChild(song));
+    }
+    queue.add(_songs.map(_songToMediaItem).toList());
+    _saveCurrentPosition();
+  }
+
+  Future<void> clearQueue() async {
+    if (_songs.isEmpty) return;
+    final wasPlaying = _activePlayer.playing;
+    if (_currentIndex >= 0 && _currentIndex < _songs.length) {
+      final current = _songs[_currentIndex];
+      _songs = [current];
+      _currentIndex = 0;
+      if (_gaplessMode && _gaplessLoaded) {
+        await _loadGaplessQueue(preload: wasPlaying);
+      }
+    } else {
+      _songs.clear();
+      _currentIndex = 0;
+      _gaplessLoaded = false;
+      await stop();
+    }
+    _queueDirty = true;
+    queue.add(_songs.map(_songToMediaItem).toList());
+    _saveCurrentPosition();
+  }
+
+  Future<void> removeQueueItemAt(int index) async {
+    if (index < 0 || index >= _songs.length) return;
+
+    final wasPlayingCurrent = index == _currentIndex;
+    final wasGaplessLoaded = _gaplessLoaded;
+    final wasPlaying = _activePlayer.playing;
+
+    _songs.removeAt(index);
+    _queueDirty = true;
+
+    if (_songs.isEmpty) {
+      _currentIndex = 0;
+      _gaplessLoaded = false;
+      queue.add([]);
+      mediaItem.add(null);
+      await stop();
+      return;
+    }
+
+    if (_gaplessMode) {
+      if (wasPlayingCurrent) {
+        // Removing the playing track changes the current song. Rebuild the
+        // playlist at the clamped index so the new current starts cleanly,
+        // rather than leaning on ExoPlayer's silent same-index auto-advance
+        // (which would leave the notification and play history stale).
+        _currentIndex = _currentIndex.clamp(0, _songs.length - 1);
+        if (wasGaplessLoaded && _activePlayer.audioSources.isNotEmpty) {
+          await _loadGaplessQueue(preload: wasPlaying);
+        } else {
+          final nextSong = _songs[_currentIndex];
+          final fastArtUri = nextSong.artworkUri != null
+              ? Uri.tryParse(nextSong.artworkUri!)
+              : null;
+          mediaItem.add(_songToMediaItem(nextSong, fastArtUri));
+        }
+      } else {
+        if (index < _currentIndex) _currentIndex--;
+        // Pre-set so the shift emit from currentIndexStream is a no-op.
+        _lastGaplessIndex = _currentIndex;
+        if (wasGaplessLoaded && index < _activePlayer.audioSources.length) {
+          await _activePlayer.removeAudioSourceAt(index);
+        }
+      }
+    } else {
+      if (index < _currentIndex) {
+        _currentIndex--;
+      } else if (wasPlayingCurrent) {
+        _currentIndex = _currentIndex.clamp(0, _songs.length - 1);
+        if (wasPlaying) {
+          await playSongAt(_currentIndex);
+        } else {
+          await _loadSongPaused(_currentIndex);
+        }
+      }
+    }
+    queue.add(_songs.map(_songToMediaItem).toList());
+    _saveCurrentPosition();
+  }
+
+  Future<void> removeQueueItem(MediaItem mediaItem) async {
+    final index = _songs.indexWhere((s) => s.id.toString() == mediaItem.id);
+    if (index != -1) {
+      await removeQueueItemAt(index);
+    }
+  }
+
+  Future<void> reorderQueue(int oldIndex, int newIndex) async {
+    if (oldIndex < 0 ||
+        oldIndex >= _songs.length ||
+        newIndex < 0 ||
+        newIndex > _songs.length) {
+      return;
+    }
+    if (oldIndex < newIndex) newIndex -= 1;
+    if (oldIndex == newIndex) return;
+
+    final song = _songs.removeAt(oldIndex);
+    _songs.insert(newIndex, song);
+    _queueDirty = true;
+
+    if (_currentIndex == oldIndex) {
+      _currentIndex = newIndex;
+    } else if (oldIndex < _currentIndex && newIndex >= _currentIndex) {
+      _currentIndex--;
+    } else if (oldIndex > _currentIndex && newIndex <= _currentIndex) {
+      _currentIndex++;
+    }
+
+    // moveAudioSource() replays remove(oldIndex)+insert(newIndex) on the playlist's
+    // layout, reaching the same order as _songs. Pre-set _lastGaplessIndex so a
+    // shift emit for the (unchanged) current song is swallowed.
+    if (_gaplessMode && _gaplessLoaded) {
+      _lastGaplessIndex = _currentIndex;
+      await _activePlayer.moveAudioSource(oldIndex, newIndex);
+    }
+
+    queue.add(_songs.map(_songToMediaItem).toList());
+    _saveCurrentPosition();
+  }
+
+}

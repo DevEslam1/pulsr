@@ -499,36 +499,28 @@ class _LibraryScreenState extends State<LibraryScreen>
     }
 
     Widget buildSongItem(SongsTableData song, int index) {
-      return Dismissible(
+      return PulsrDismissible(
         key: ValueKey('song_${song.id}'),
-        direction: PulsrDismissible.direction,
-        dismissThresholds: PulsrDismissible.thresholds,
-        background: Container(
-          color: p.accentContainer,
-          alignment: AlignmentDirectional.centerStart,
-          padding: const EdgeInsetsDirectional.only(start: 24),
-          child: Row(children: [
-            Icon(Icons.playlist_play_rounded, color: p.accent),
-            const SizedBox(width: 8),
-            Text(context.l10n.playNext,
-                style: TextStyle(
-                    color: p.accent, fontWeight: FontWeight.w700))
-          ]),
+        startToEndLabel: context.l10n.playNext,
+        endToStartLabel: context.l10n.favorite,
+        backgroundBuilder: (context, isConfirming) => PulsrDismissible.buildActionBackground(
+          context: context,
+          icon: Icons.playlist_play_rounded,
+          label: context.l10n.playNext,
+          color: p.accent,
+          backgroundColor: p.accentContainer,
+          isConfirming: isConfirming,
         ),
-        secondaryBackground: Container(
-          color: p.favorite.withValues(alpha: 0.2),
-          alignment: AlignmentDirectional.centerEnd,
-          padding: const EdgeInsetsDirectional.only(end: 24),
-          child:
-              Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-            Text(context.l10n.favorite,
-                style: TextStyle(
-                    color: p.favorite, fontWeight: FontWeight.w700)),
-            const SizedBox(width: 8),
-            Icon(Icons.favorite_rounded, color: p.favorite)
-          ]),
+        secondaryBackgroundBuilder: (context, isConfirming) => PulsrDismissible.buildActionBackground(
+          context: context,
+          icon: Icons.favorite_rounded,
+          label: context.l10n.favorite,
+          color: p.favorite,
+          backgroundColor: p.favorite.withValues(alpha: 0.2),
+          isConfirming: isConfirming,
+          isEnd: true,
         ),
-        confirmDismiss: (direction) async {
+        onConfirm: (direction) async {
           if (direction == DismissDirection.startToEnd) {
             playerCubit.playNext(song);
           } else {
@@ -757,38 +749,28 @@ class _LibraryScreenState extends State<LibraryScreen>
                     itemCount: downloaded.length,
                     itemBuilder: (context, index) {
                       final song = downloaded[index];
-                      return Dismissible(
+                      return PulsrDismissible(
                         key: ValueKey('dl_${song.id}'),
-                        direction: PulsrDismissible.direction,
-                        dismissThresholds: PulsrDismissible.thresholds,
-                        background: Container(
-                          color: p.accentContainer,
-                          alignment: Alignment.centerLeft,
-                          padding: const EdgeInsets.only(left: 24),
-                          child: Row(children: [
-                            Icon(Icons.playlist_play_rounded, color: p.accent),
-                            const SizedBox(width: 8),
-                            Text(context.l10n.playNext,
-                                style: TextStyle(
-                                    color: p.accent, fontWeight: FontWeight.w700)),
-                          ]),
+                        startToEndLabel: context.l10n.playNext,
+                        endToStartLabel: context.l10n.favorite,
+                        backgroundBuilder: (context, isConfirming) => PulsrDismissible.buildActionBackground(
+                          context: context,
+                          icon: Icons.playlist_play_rounded,
+                          label: context.l10n.playNext,
+                          color: p.accent,
+                          backgroundColor: p.accentContainer,
+                          isConfirming: isConfirming,
                         ),
-                        secondaryBackground: Container(
-                          color: p.favorite.withValues(alpha: 0.2),
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.only(right: 24),
-                          child: Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                Text(context.l10n.favorite,
-                                    style: TextStyle(
-                                        color: p.favorite,
-                                        fontWeight: FontWeight.w700)),
-                                const SizedBox(width: 8),
-                                Icon(Icons.favorite_rounded, color: p.favorite),
-                              ]),
+                        secondaryBackgroundBuilder: (context, isConfirming) => PulsrDismissible.buildActionBackground(
+                          context: context,
+                          icon: Icons.favorite_rounded,
+                          label: context.l10n.favorite,
+                          color: p.favorite,
+                          backgroundColor: p.favorite.withValues(alpha: 0.2),
+                          isConfirming: isConfirming,
+                          isEnd: true,
                         ),
-                        confirmDismiss: (direction) async {
+                        onConfirm: (direction) async {
                           if (direction == DismissDirection.startToEnd) {
                             playerCubit.playNext(song);
                           } else {
@@ -826,38 +808,28 @@ class _LibraryScreenState extends State<LibraryScreen>
                     itemCount: downloaded.length,
                     itemBuilder: (context, index) {
                       final song = downloaded[index];
-                      return Dismissible(
+                      return PulsrDismissible(
                         key: ValueKey('dl_${song.id}'),
-                        direction: PulsrDismissible.direction,
-                        dismissThresholds: PulsrDismissible.thresholds,
-                        background: Container(
-                          color: p.accentContainer,
-                          alignment: Alignment.centerLeft,
-                          padding: const EdgeInsets.only(left: 24),
-                          child: Row(children: [
-                            Icon(Icons.playlist_play_rounded, color: p.accent),
-                            const SizedBox(width: 8),
-                            Text(context.l10n.playNext,
-                                style: TextStyle(
-                                    color: p.accent, fontWeight: FontWeight.w700)),
-                          ]),
+                        startToEndLabel: context.l10n.playNext,
+                        endToStartLabel: context.l10n.favorite,
+                        backgroundBuilder: (context, isConfirming) => PulsrDismissible.buildActionBackground(
+                          context: context,
+                          icon: Icons.playlist_play_rounded,
+                          label: context.l10n.playNext,
+                          color: p.accent,
+                          backgroundColor: p.accentContainer,
+                          isConfirming: isConfirming,
                         ),
-                        secondaryBackground: Container(
-                          color: p.favorite.withValues(alpha: 0.2),
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.only(right: 24),
-                          child: Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                Text(context.l10n.favorite,
-                                    style: TextStyle(
-                                        color: p.favorite,
-                                        fontWeight: FontWeight.w700)),
-                                const SizedBox(width: 8),
-                                Icon(Icons.favorite_rounded, color: p.favorite),
-                              ]),
+                        secondaryBackgroundBuilder: (context, isConfirming) => PulsrDismissible.buildActionBackground(
+                          context: context,
+                          icon: Icons.favorite_rounded,
+                          label: context.l10n.favorite,
+                          color: p.favorite,
+                          backgroundColor: p.favorite.withValues(alpha: 0.2),
+                          isConfirming: isConfirming,
+                          isEnd: true,
                         ),
-                        confirmDismiss: (direction) async {
+                        onConfirm: (direction) async {
                           if (direction == DismissDirection.startToEnd) {
                             playerCubit.playNext(song);
                           } else {
@@ -1441,44 +1413,28 @@ class _LibraryScreenState extends State<LibraryScreen>
                         itemCount: currentFavorites.length,
                         itemBuilder: (context, index) {
                           final song = currentFavorites[index];
-                          return Dismissible(
+                          return PulsrDismissible(
                             key: ValueKey('fav_${song.id}'),
-                            direction: PulsrDismissible.direction,
-                            dismissThresholds: PulsrDismissible.thresholds,
-                            background: Container(
-                              color: p.accentContainer,
-                              alignment: AlignmentDirectional.centerStart,
-                              padding:
-                                  const EdgeInsetsDirectional.only(start: 24),
-                              child: Row(children: [
-                                Icon(Icons.playlist_play_rounded,
-                                    color: p.accent),
-                                const SizedBox(width: 8),
-                                Text(context.l10n.playNext,
-                                    style: TextStyle(
-                                        color: p.accent,
-                                        fontWeight: FontWeight.w700)),
-                              ]),
+                            startToEndLabel: context.l10n.playNext,
+                            endToStartLabel: context.l10n.delete,
+                            backgroundBuilder: (context, isConfirming) => PulsrDismissible.buildActionBackground(
+                              context: context,
+                              icon: Icons.playlist_play_rounded,
+                              label: context.l10n.playNext,
+                              color: p.accent,
+                              backgroundColor: p.accentContainer,
+                              isConfirming: isConfirming,
                             ),
-                            secondaryBackground: Container(
-                              color: p.error.withValues(alpha: 0.2),
-                              alignment: AlignmentDirectional.centerEnd,
-                              padding:
-                                  const EdgeInsetsDirectional.only(end: 24),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  Text(context.l10n.delete,
-                                      style: TextStyle(
-                                          color: p.error,
-                                          fontWeight: FontWeight.w700)),
-                                  const SizedBox(width: 8),
-                                  Icon(Icons.delete_outline_rounded,
-                                      color: p.error),
-                                ],
-                              ),
+                            secondaryBackgroundBuilder: (context, isConfirming) => PulsrDismissible.buildActionBackground(
+                              context: context,
+                              icon: Icons.delete_outline_rounded,
+                              label: context.l10n.delete,
+                              color: p.error,
+                              backgroundColor: p.error.withValues(alpha: 0.2),
+                              isConfirming: isConfirming,
+                              isEnd: true,
                             ),
-                            confirmDismiss: (direction) async {
+                            onConfirm: (direction) async {
                               if (direction == DismissDirection.startToEnd) {
                                 HapticFeedback.lightImpact();
                                 playerCubit.playNext(song);
