@@ -15,6 +15,7 @@ import '../../domain/models/reverb_preset.dart';
 import 'async_lock.dart';
 import 'audio_effects_channel.dart';
 import 'comparison_slot.dart';
+import 'eq_frequency_validation.dart';
 import 'headphone_profiles_repository.dart';
 import 'ir_file_parser.dart';
 import 'optimized_dsp_pipeline.dart';
@@ -1374,8 +1375,7 @@ class EqualizerManager {
   }
 
   Future<void> setCustomFrequencies(List<double> frequencies) async {
-    if (frequencies.length != 10 ||
-        frequencies.any((f) => !f.isFinite || f <= 0)) {
+    if (!isValidCustomFrequencyList(frequencies, 10)) {
       ErrorLogger.log(
         'Rejected invalid custom frequencies (need 10 finite >0)',
         category: 'EqualizerManager',
@@ -1387,8 +1387,7 @@ class EqualizerManager {
   }
 
   Future<void> setCustom32Frequencies(List<double> frequencies) async {
-    if (frequencies.length != 32 ||
-        frequencies.any((f) => !f.isFinite || f <= 0)) {
+    if (!isValidCustomFrequencyList(frequencies, 32)) {
       ErrorLogger.log(
         'Rejected invalid custom 32-band frequencies (need 32 finite >0)',
         category: 'EqualizerManager',
@@ -1400,8 +1399,7 @@ class EqualizerManager {
   }
 
   Future<void> setCustom64Frequencies(List<double> frequencies) async {
-    if (frequencies.length != 64 ||
-        frequencies.any((f) => !f.isFinite || f <= 0)) {
+    if (!isValidCustomFrequencyList(frequencies, 64)) {
       ErrorLogger.log(
         'Rejected invalid custom 64-band frequencies (need 64 finite >0)',
         category: 'EqualizerManager',

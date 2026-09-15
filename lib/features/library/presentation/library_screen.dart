@@ -30,6 +30,7 @@ import '../cubit/library_state.dart';
 import '../../tag_editor/tag_editor_screen.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
+import 'widgets/category_card.dart';
 import 'widgets/folder_browser_tab.dart';
 import 'widgets/folder_tree_browser_tab.dart';
 import 'widgets/genre_hierarchy_view.dart';
@@ -1154,7 +1155,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                   count: genres.length,
                   builder: (context, i) {
                     final g = genres[i];
-                    return _CategoryCard(
+                    return CategoryCard(
                       icon: Icons.style_rounded,
                       title: g.name,
                       subtitle: Formatters.formatTrackCount(g.songCount),
@@ -1218,7 +1219,7 @@ class _LibraryScreenState extends State<LibraryScreen>
       count: years.length,
       builder: (context, i) {
         final y = years[i];
-        return _CategoryCard(
+        return CategoryCard(
           icon: Icons.calendar_today_rounded,
           title: '${y.year}',
           subtitle: Formatters.formatTrackCount(y.songCount),
@@ -2087,69 +2088,6 @@ class _FavTabButton extends StatelessWidget {
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CategoryCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _CategoryCard(
-      {required this.icon,
-      required this.title,
-      required this.subtitle,
-      required this.color,
-      required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        decoration: BoxDecoration(
-          color: p.surfaceContainer,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: p.hairline),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(9),
-              decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12)),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          color: p.textPrimary,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 14)),
-                  const SizedBox(height: 1),
-                  Text(subtitle,
-                      style: TextStyle(color: p.textSecondary, fontSize: 11.5)),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_right_rounded, color: p.textTertiary, size: 20),
           ],
         ),
       ),

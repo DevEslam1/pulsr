@@ -25,6 +25,7 @@ import '../../../data/scanner/media_scanner_service.dart';
 import '../../../domain/repositories/music_repository_interface.dart';
 import '../../../core/constants/audio_feature_info.dart';
 import '../../player/presentation/widgets/audio_visualizer.dart';
+import 'proxy_endpoint_validator.dart';
 import 'settings_state.dart';
 
 @singleton
@@ -987,26 +988,10 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     _proxyDirty = true;
     final trimmedHost = host.trim();
     if (enabled) {
-      final isIPv4 = RegExp(
-              r'^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$')
-          .hasMatch(trimmedHost);
-      final isIPv6 = RegExp(r'^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}$')
-              .hasMatch(trimmedHost) ||
-          trimmedHost == '::1' ||
-          trimmedHost.startsWith('fe80:');
-      final isHostname = RegExp(
-              r'^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$')
-          .hasMatch(trimmedHost);
-      final isLocalhost =
-          trimmedHost == 'localhost' || trimmedHost == '127.0.0.1';
-      if (trimmedHost.isEmpty ||
-          (!isIPv4 && !isIPv6 && !isHostname && !isLocalhost)) {
-        safeEmit(state.copyWith(errorMessage: 'Invalid proxy host format'));
-        return;
-      }
-      if (port < 1 || port > 65535) {
-        safeEmit(state.copyWith(
-            errorMessage: 'Proxy port must be between 1 and 65535'));
+      final validationError =
+          validateProxyHostAndPort(host: trimmedHost, port: port);
+      if (validationError != null) {
+        safeEmit(state.copyWith(errorMessage: validationError));
         return;
       }
     }
