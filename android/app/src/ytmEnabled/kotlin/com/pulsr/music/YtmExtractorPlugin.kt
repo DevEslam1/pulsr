@@ -989,17 +989,12 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         }
 
         // 2. Fallback: NewPipeExtractor.
-        // Skipped for an egress/bot/rate verdict: those are IP-level, so
-        // NewPipe on the same IP cannot help and only adds its own network
-        // timeouts before the structured signal reaches Dart. NewPipe stays in
-        // play for client-parameter failures (deprecated client, signature
-        // changes) where a different extractor path can genuinely succeed.
-        if (innertubeError is InnertubeClient.InnertubeException &&
-            (innertubeError.signal == YtmBlockSignal.BotChallenge ||
-                innertubeError.signal == YtmBlockSignal.IpBlocked ||
-                innertubeError.signal == YtmBlockSignal.RateLimited)) {
-            throw innertubeError
-        }
+        // Always attempted. NewPipe drives its own client set (freshly scraped
+        // WEB/ANDROID/IOS versions and its own PoTokenProvider), so it can and
+        // does resolve tracks that the pinned native client chain refuses with
+        // BotChallenge/UNPLAYABLE on the same egress. Skipping it on those
+        // verdicts turned a recoverable failure into a hard one: the native
+        // chain's signal reached Dart with no second engine ever tried.
         try {
             val stream = resolveStreamNewPipe(videoId, quality)
             return stream
