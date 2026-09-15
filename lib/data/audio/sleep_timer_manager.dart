@@ -86,7 +86,9 @@ class SleepTimerManager {
       return;
     }
 
-    // 1-second monotonic countdown ticker that ticks when playing
+    final targetEndTime = DateTime.now().add(duration);
+
+    // 1-second wall-clock countdown ticker resilient to Doze mode drift
     _countdownTicker =
         Timer.periodic(const Duration(seconds: 1), (timer) async {
       if (!_isArmed || _sleepFadeToken != currentToken) {
@@ -95,9 +97,11 @@ class SleepTimerManager {
       }
 
       final player = _lastPlayerGetter?.call();
+      final now = DateTime.now();
+      final diff = targetEndTime.difference(now);
 
-      if (_remainingDuration > const Duration(seconds: 1)) {
-        _remainingDuration -= const Duration(seconds: 1);
+      if (diff > Duration.zero) {
+        _remainingDuration = diff;
         if (!_sleepTimerRemainingSubject.isClosed) {
           _sleepTimerRemainingSubject.add(_remainingDuration);
         }

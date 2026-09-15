@@ -653,6 +653,9 @@ class EqualizerManager {
       if (volumeBoost > 0) {
         pendingFutures.add(setVolumeBoost(volumeBoost));
       }
+      if (preampDb != 0.0) {
+        pendingFutures.add(_effectsChannel.setEqPreamp(preampDb));
+      }
       if (isVirtualizerEnabled && _effectsChannel.isVirtualizerSupported) {
         // FIX M-9: skip no-op IPC when virtualizer is not supported
         pendingFutures.add(_effectsChannel.setVirtualizerEnabled(true));

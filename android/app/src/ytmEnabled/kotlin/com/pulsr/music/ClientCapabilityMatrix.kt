@@ -155,6 +155,29 @@ internal object ClientCapabilityMatrix {
     @Volatile
     private var capabilities: Map<InnertubeClient.ClientType, ClientCapability> = defaultCapabilities
 
+    /**
+     * WEB_REMIX `clientVersion`, scraped from music.youtube.com by the Dart
+     * [YtmClientVersionResolver] and pushed over the method channel.
+     *
+     * The pinned literal in `client_capabilities.json` ages out, and YouTube
+     * answers a stale WEB_REMIX version with UNPLAYABLE "Video unavailable" on
+     * every player request — indistinguishable at the client from a rejected
+     * poToken. The synthetic `1.<today>` fallback in
+     * [InnertubeClient.ClientType.effectiveClientVersion] keeps the date fresh
+     * but guesses the build suffix, so the scraped value wins whenever present.
+     */
+    @Volatile
+    private var webMusicClientVersion: String = ""
+
+    fun setWebMusicClientVersion(version: String) {
+        val normalized = version.trim()
+        if (normalized.isEmpty() || normalized == webMusicClientVersion) return
+        webMusicClientVersion = normalized
+        Log.i(TAG, "WEB_REMIX client version updated to $normalized")
+    }
+
+    fun getWebMusicClientVersion(): String = webMusicClientVersion
+
     fun init(context: Context) {
         if (isInitialized) return
         synchronized(this) {

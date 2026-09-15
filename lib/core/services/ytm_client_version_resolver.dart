@@ -1,9 +1,11 @@
 // lib/core/services/ytm_client_version_resolver.dart
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../constants/channels.dart';
 import '../constants/embedded_browser_ua.dart';
 import '../utils/error_logger.dart';
 
@@ -12,6 +14,20 @@ class YtmClientVersionResolver {
   static const String _prefKeyClientVersion = 'ytm_cached_client_version';
   static const String _prefKeyApiKey = 'ytm_cached_api_key';
   static const String _prefKeyLastFetchTime = 'ytm_client_version_fetch_ts';
+
+  /// Native `ClientCapabilityMatrix.setWebMusicClientVersion` sink. Native pins
+  /// a WEB_REMIX version from its asset that ages out; YouTube then answers
+  /// every player request with UNPLAYABLE "Video unavailable". The live scraped
+  /// value is pushed here so the two stay in sync.
+  static const MethodChannel _nativeChannel = MethodChannel(PulsrChannels.ytm);
+
+  static Future<void> _pushToNative(String version) async {
+    if (version.isEmpty) return;
+    try {
+      await _nativeChannel.invokeMethod<bool>(
+          'setClientVersion', {'clientVersion': version});
+    } catch (_) {}
+  }
 
   static const String fallbackClientVersion = String.fromEnvironment(
     'YTM_CLIENT_VERSION',
@@ -43,6 +59,7 @@ class YtmClientVersionResolver {
 
       if (!isStale && savedVersion != null && savedVersion.isNotEmpty) {
         _clientVersion = savedVersion;
+        unawaited(_pushToNative(savedVersion));
       }
       if (!isStale && savedKey != null && savedKey.isNotEmpty) {
         _apiKey = savedKey;
@@ -94,6 +111,7 @@ class YtmClientVersionResolver {
           if (resolvedVersion.isNotEmpty) {
             _clientVersion = resolvedVersion;
             await prefs.setString(_prefKeyClientVersion, resolvedVersion);
+            unawaited(_pushToNative(resolvedVersion));
             debugPrint(
                 '[YTM_VERSION] Resolved Innertube clientVersion: $_clientVersion');
           }

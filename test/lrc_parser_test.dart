@@ -143,5 +143,15 @@ Third line of plain lyric
       LrcParser.clearCache();
       expect(LrcParser.hasCachedLyrics(path: '/path/song.mp3'), isFalse);
     });
+
+    test('parses negative lead-in timestamps without crash, safely clamping to Duration.zero', () {
+      const lrc = '[-00:02.50]Negative intro count\n[00:01.00]Song begins';
+      final lines = LrcParser.parse(lrc);
+      expect(lines.length, 2);
+      expect(lines[0].text, 'Negative intro count');
+      expect(lines[0].timestamp, Duration.zero);
+      expect(lines[1].text, 'Song begins');
+      expect(lines[1].timestamp, const Duration(seconds: 1));
+    });
   });
 }

@@ -232,5 +232,34 @@ void main() {
       expect(importResult.matchedTrackCount, 1);
       expect(repo.addedSongIds, [7]);
     });
+
+    test('normalizes relative paths and strips file:// prefixes from M3U', () async {
+      final subDir = Directory('${tempDir.path}/music/albums')..createSync(recursive: true);
+      final songFile = File('${subDir.path}/track1.mp3')..writeAsStringSync('dummy');
+      final song = _song(id: 99, path: songFile.path);
+      final repo = _FakeRepository([song]);
+      final useCase = PlaylistImportUseCase(repo);
+
+      // Playlist in tempDir/music referencing ./albums/track1.mp3 and file:///...
+      final playlistDir = Directory('${tempDir.path}/music');
+      final m3uFile = File('${playlistDir.path}/test.m3u');
+      await m3uFile.writeAsString(
+        '#EXTM3U\n'
+        '#EXTINF:180,Track 1\n'
+        'albums/track1.mp3\n'
+        '#EXTINF:180,Track 1 Absolute URI\n'
+        'file://${songFile.path}\n',
+      );
+
+      final result = await useCase.importPlaylistFromFile(
+        filePath: m3uFile.path,
+        playlistName: 'Relative Playlist',
+      );
+
+      final importResult = result.getOrElse((_) => throw StateError('failed'));
+      expect(importResult.totalExtractedPaths, 2);
+      expect(importResult.matchedTrackCount, 2);
+      expect(repo.addedSongIds, [99, 99]);
+    });
   });
 }

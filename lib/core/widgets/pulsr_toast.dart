@@ -23,9 +23,17 @@ class PulsrToast {
     _activeEntry?.remove();
     _activeEntry = null;
 
-    HapticFeedback.lightImpact();
+    try {
+      HapticFeedback.lightImpact();
+    } catch (_) {}
 
-    final overlayState = Overlay.of(context, rootOverlay: true);
+    // `Overlay.of` throws when `context` has no Overlay ancestor — e.g. the
+    // root Navigator's own context, whose Overlay is a *child* of that
+    // context, not an ancestor. Prefer a nullable lookup and fall back to
+    // the root navigator's overlay state so app-level listeners can pass
+    // `rootNavigatorKey.currentContext` safely.
+    OverlayState? overlayState = Overlay.maybeOf(context, rootOverlay: true);
+    if (overlayState == null) return;
     final p = context.palette;
 
     late OverlayEntry entry;
@@ -43,11 +51,20 @@ class PulsrToast {
     );
 
     _activeEntry = entry;
-    overlayState.insert(entry);
+    try {
+      overlayState.insert(entry);
+    } catch (_) {
+      _activeEntry = null;
+      return;
+    }
 
     _dismissTimer = Timer(duration, () {
-      if (_activeEntry == entry) {
-        entry.remove();
+      try {
+        if (_activeEntry == entry) {
+          entry.remove();
+          _activeEntry = null;
+        }
+      } catch (_) {
         _activeEntry = null;
       }
     });

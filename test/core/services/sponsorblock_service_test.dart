@@ -103,5 +103,50 @@ void main() {
       expect(offtopicMatch, isNotNull);
       expect(offtopicMatch?.uuid, 'offtopic-1');
     });
+
+    test('merges overlapping and adjacent skip segments into unified intervals', () async {
+      final mockClient = MockClient((request) async {
+        final responseJson = jsonEncode([
+          {
+            'category': 'sponsor',
+            'actionType': 'skip',
+            'segment': [10.0, 20.0],
+            'UUID': 'seg-1',
+          },
+          {
+            'category': 'sponsor',
+            'actionType': 'skip',
+            'segment': [18.0, 30.0], // overlaps seg-1
+            'UUID': 'seg-2',
+          },
+          {
+            'category': 'sponsor',
+            'actionType': 'skip',
+            'segment': [30.0, 35.0], // contiguous with seg-2
+            'UUID': 'seg-3',
+          },
+          {
+            'category': 'outro',
+            'actionType': 'skip',
+            'segment': [100.0, 110.0], // disjoint
+            'UUID': 'seg-4',
+          },
+        ]);
+        return http.Response(responseJson, 200);
+      });
+
+      final service = SponsorBlockService(mockClient);
+      final merged = await service.getSegments('overlap_test');
+
+      // seg-1, seg-2, and seg-3 should be merged into a single segment [10.0, 35.0]
+      expect(merged.length, 2);
+      expect(merged[0].start, const Duration(seconds: 10));
+      expect(merged[0].end, const Duration(seconds: 35));
+      expect(merged[0].category, 'sponsor');
+
+      expect(merged[1].start, const Duration(seconds: 100));
+      expect(merged[1].end, const Duration(seconds: 110));
+      expect(merged[1].category, 'outro');
+    });
   });
 }

@@ -448,6 +448,12 @@ class DsdDecoderHelper {
     int channels = 2,
     int bitsPerSample = 24,
   }) {
+    if (sampleRate != 176400 && sampleRate != 352800 && sampleRate != 705600) {
+      throw ArgumentError(
+        'Invalid DoP sample rate: $sampleRate. '
+        'DoP requires exact 176.4 kHz, 352.8 kHz, or 705.6 kHz carrier rate.',
+      );
+    }
     final int byteCount = dopPcmBytes.length;
     final ByteData byteData = ByteData(44 + byteCount);
 

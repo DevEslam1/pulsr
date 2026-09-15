@@ -39,11 +39,11 @@ class LrcParser {
       }
     }
 
-    // Match tags like [01:23.45] / [01:23.456] / [01:23.4] / [01:23] / [120:00.00]
+    // Match tags like [01:23.45] / [-00:02.50] / [01:23.456] / [01:23.4] / [01:23] / [120:00.00]
     // Also handle comma and colon fraction separators used by some editors:
     // [01:23,45] and [01:23:45].
     final RegExp timeExp =
-        RegExp(r'\[(\d{1,3}):(\d{2})(?:[.,:](\d{1,3}))?\]');
+        RegExp(r'\[(-)?(\d{1,3}):(\d{2})(?:[.,:](\d{1,3}))?\]');
     final RegExp wordTagExp =
         RegExp(r'<(?:\d{1,3}:)?\d{2}(?:[.,:]\d{1,3})?>');
     // Metadata tags to ignore (artist, title, album, etc.)
@@ -64,16 +64,18 @@ class LrcParser {
       final text = line.substring(lastMatch.end).replaceAll(wordTagExp, '').trim();
 
       for (final match in matches) {
-        // FIX-F01: Safely parse timestamp integers, skip malformed entries instead of throwing
-        final minutes = int.tryParse(match.group(1) ?? '');
-        final seconds = int.tryParse(match.group(2) ?? '');
+        final isNegative = match.group(1) == '-';
+        final minutes = int.tryParse(match.group(2) ?? '');
+        final seconds = int.tryParse(match.group(3) ?? '');
         if (minutes == null || seconds == null) continue;
 
-        final fractionStr = match.group(3) ?? '0';
+        final fractionStr = match.group(4) ?? '0';
         final milliseconds =
             int.tryParse(fractionStr.padRight(3, '0').substring(0, 3)) ?? 0;
 
-        var totalMs = minutes * 60000 + seconds * 1000 + milliseconds + offsetMs;
+        var rawMs = minutes * 60000 + seconds * 1000 + milliseconds;
+        if (isNegative) rawMs = -rawMs;
+        var totalMs = rawMs + offsetMs;
         if (totalMs < 0) totalMs = 0;
         final totalDuration = Duration(milliseconds: totalMs);
 
@@ -125,7 +127,13 @@ class LrcParser {
     try {
       final file = File(path);
       if (!await file.exists()) return null;
-      final content = await file.readAsString();
+      String content;
+      final bytes = await file.readAsBytes();
+      try {
+        content = utf8.decode(bytes);
+      } on FormatException {
+        content = latin1.decode(bytes);
+      }
       final lines = parse(content, source: source);
       if (lines.isNotEmpty) return lines;
     } catch (_) {}
@@ -178,7 +186,13 @@ class LrcParser {
             File('${parentDir.path}${Platform.pathSeparator}$genericName');
         if (await genericLrc.exists()) {
           try {
-            final content = await genericLrc.readAsString();
+            String content;
+            final bytes = await genericLrc.readAsBytes();
+            try {
+              content = utf8.decode(bytes);
+            } on FormatException {
+              content = latin1.decode(bytes);
+            }
             final lines = parse(content, source: source);
             if (lines.isNotEmpty) return lines;
             // If not synced, try plain-text fallback from generic file

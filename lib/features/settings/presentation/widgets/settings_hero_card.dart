@@ -1,12 +1,17 @@
 // lib/features/settings/presentation/widgets/settings_hero_card.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../../core/constants/app_radii.dart';
+import '../../../../core/di/injection.dart';
+import '../../../../core/services/ytm_account_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../auth/cubit/auth_cubit.dart';
 import '../../../auth/cubit/auth_state.dart';
 import '../../../auth/presentation/auth_sheet.dart';
+import '../../../auth/presentation/ytm_web_login_sheet.dart';
+import 'ytm_account_disconnect_dialog.dart';
 
 /// A hero card displayed at the top of the Settings screen showing the user's
 /// account identity, real-time Cloud Sync status, and quick sync/sign-out actions.
@@ -83,218 +88,415 @@ class SettingsHeroCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          // Avatar / Icon with online ring
-                          Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              Container(
-                                width: 50,
-                                height: 50,
-                                decoration: BoxDecoration(
-                                  color: user != null
-                                      ? p.accent.withValues(alpha: 0.15)
-                                      : p.surface,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
+                      if (AppConfig.isCloudSyncAllowed) ...[
+                        Row(
+                          children: [
+                            // Avatar / Icon with online ring
+                            Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Container(
+                                  width: 50,
+                                  height: 50,
+                                  decoration: BoxDecoration(
                                     color: user != null
-                                        ? p.accent.withValues(alpha: 0.4)
-                                        : p.hairline,
-                                    width: 1.5,
-                                  ),
-                                ),
-                                child: user?.photoURL != null
-                                    ? ClipOval(
-                                        child: Image.network(
-                                          user!.photoURL!,
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) => Icon(
-                                            Icons.person_rounded,
-                                            color: p.accent,
-                                            size: 26,
-                                          ),
-                                        ),
-                                      )
-                                    : Icon(
-                                        user != null
-                                            ? Icons.person_rounded
-                                            : Icons.cloud_outlined,
-                                        color: p.accent,
-                                        size: 26,
-                                      ),
-                              ),
-                              if (user != null)
-                                Positioned(
-                                  bottom: 0,
-                                  right: 0,
-                                  child: Container(
-                                    width: 14,
-                                    height: 14,
-                                    decoration: BoxDecoration(
-                                      color: isSyncing ? p.accent : p.success,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: p.surfaceContainer,
-                                        width: 2.5,
-                                      ),
+                                        ? p.accent.withValues(alpha: 0.15)
+                                        : p.surface,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: user != null
+                                          ? p.accent.withValues(alpha: 0.4)
+                                          : p.hairline,
+                                      width: 1.5,
                                     ),
                                   ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(width: 14),
-                          // User details
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Flexible(
-                                      child: Text(
-                                        user?.displayName ??
-                                            user?.email ??
-                                            context.l10n.cloudSync,
-                                        style: TextStyle(
-                                          color: p.textPrimary,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w700,
-                                          letterSpacing: -0.2,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    if (user != null) ...[
-                                      const SizedBox(width: 6),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: p.accent.withValues(alpha: 0.15),
-                                          borderRadius:
-                                              BorderRadius.circular(6),
-                                        ),
-                                        child: Text(context.l10n.syncedLabel,
-                                          style: TextStyle(
-                                            color: p.accent,
-                                            fontSize: 9.5,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: 0.5,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  syncSubtitle,
-                                  style: TextStyle(
-                                    color: p.textSecondary,
-                                    fontSize: 12.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          // Action buttons
-                          if (user == null)
-                            FilledButton.icon(
-                              onPressed: () => AuthSheet.show(context),
-                              icon: const Icon(Icons.login_rounded, size: 16),
-                              label: Text(context.l10n.signIn),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: p.accent,
-                                foregroundColor: p.onAccent,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 8),
-                                textStyle: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.button),
-                                ),
-                              ),
-                            )
-                          else
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton.filledTonal(
-                                  tooltip: context.l10n.syncNow,
-                                  style: IconButton.styleFrom(
-                                    backgroundColor:
-                                        p.accent.withValues(alpha: 0.15),
-                                    foregroundColor: p.accent,
-                                    padding: const EdgeInsets.all(8),
-                                  ),
-                                  icon: isSyncing
-                                      ? SizedBox(
-                                          width: 18,
-                                          height: 18,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: p.accent,
+                                  child: user?.photoURL != null
+                                      ? ClipOval(
+                                          child: Image.network(
+                                            user!.photoURL!,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => Icon(
+                                              Icons.person_rounded,
+                                              color: p.accent,
+                                              size: 26,
+                                            ),
                                           ),
                                         )
-                                      : const Icon(Icons.sync_rounded, size: 20),
-                                  onPressed: isSyncing
-                                      ? null
-                                      : () => authCubit.syncNow(),
+                                      : Icon(
+                                          user != null
+                                              ? Icons.person_rounded
+                                              : Icons.cloud_outlined,
+                                          color: p.accent,
+                                          size: 26,
+                                        ),
                                 ),
-                                const SizedBox(width: 4),
-                                IconButton(
-                                  tooltip: context.l10n.signOut,
-                                  icon: Icon(
-                                    Icons.logout_rounded,
-                                    color: p.textTertiary,
-                                    size: 20,
+                                if (user != null)
+                                  Positioned(
+                                    bottom: 0,
+                                    right: 0,
+                                    child: Container(
+                                      width: 14,
+                                      height: 14,
+                                      decoration: BoxDecoration(
+                                        color: isSyncing ? p.accent : p.success,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: p.surfaceContainer,
+                                          width: 2.5,
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                                  onPressed: () => authCubit.signOut(),
+                              ],
+                            ),
+                            const SizedBox(width: 14),
+                            // User details
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          user?.displayName ??
+                                              user?.email ??
+                                              context.l10n.cloudSync,
+                                          style: TextStyle(
+                                            color: p.textPrimary,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: -0.2,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      if (user != null) ...[
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: p.accent.withValues(alpha: 0.15),
+                                            borderRadius:
+                                                BorderRadius.circular(6),
+                                          ),
+                                          child: Text(context.l10n.syncedLabel,
+                                            style: TextStyle(
+                                              color: p.accent,
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: 0.5,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    syncSubtitle,
+                                    style: TextStyle(
+                                      color: p.textSecondary,
+                                      fontSize: 12.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            // Action buttons
+                            if (user == null)
+                              FilledButton.icon(
+                                onPressed: () => AuthSheet.show(context),
+                                icon: const Icon(Icons.login_rounded, size: 16),
+                                label: Text(context.l10n.signIn),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: p.accent,
+                                  foregroundColor: p.onAccent,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 8),
+                                  textStyle: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadii.button),
+                                  ),
+                                ),
+                              )
+                            else
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton.filledTonal(
+                                    tooltip: context.l10n.syncNow,
+                                    style: IconButton.styleFrom(
+                                      backgroundColor:
+                                          p.accent.withValues(alpha: 0.15),
+                                      foregroundColor: p.accent,
+                                      padding: const EdgeInsets.all(8),
+                                    ),
+                                    icon: isSyncing
+                                        ? SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: p.accent,
+                                            ),
+                                          )
+                                        : const Icon(Icons.sync_rounded, size: 20),
+                                    onPressed: isSyncing
+                                        ? null
+                                        : () => authCubit.syncNow(),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  IconButton(
+                                    tooltip: context.l10n.signOut,
+                                    icon: Icon(
+                                      Icons.logout_rounded,
+                                      color: p.textTertiary,
+                                      size: 20,
+                                    ),
+                                    onPressed: () => authCubit.signOut(),
+                                  ),
+                                ],
+                              ),
+                          ],
+                        ),
+                        if (state.syncError != null) ...[
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: p.error.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                  color: p.error.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.error_outline_rounded,
+                                    color: p.error, size: 16),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    state.syncError!,
+                                    style: TextStyle(
+                                      color: p.error,
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
-                        ],
-                      ),
-                      if (state.syncError != null) ...[
-                        const SizedBox(height: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: p.error.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                                color: p.error.withValues(alpha: 0.3)),
                           ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.error_outline_rounded,
-                                  color: p.error, size: 16),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  state.syncError!,
-                                  style: TextStyle(
-                                    color: p.error,
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
+                        ],
+                      ],
+                      if (AppConfig.isCloudSyncAllowed && AppConfig.ytmEnabled) ...[
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Divider(
+                            height: 1,
+                            thickness: 1,
+                            color: p.hairline,
                           ),
                         ),
                       ],
+                      if (AppConfig.ytmEnabled) _buildYtmRow(context, p),
                     ],
                   ),
                 ),
               ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildYtmRow(BuildContext context, PulsrPalette p) {
+    final ytmAccount = getIt<YtmAccountService>();
+    return ValueListenableBuilder<bool>(
+      valueListenable: ytmAccount.loginState,
+      builder: (context, isLoggedIn, _) {
+        final accountName = ytmAccount.accountName;
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () async {
+              if (isLoggedIn) {
+                await showYtmAccountDisconnectDialog(context);
+              } else {
+                final ok = await YtmWebLoginSheet.show(context);
+                if (ok == true && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(context.l10n.ytmConnected),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              }
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: isLoggedIn
+                              ? const Color(0xFFFF0000).withValues(alpha: 0.15)
+                              : p.surface,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isLoggedIn
+                                ? const Color(0xFFFF0000).withValues(alpha: 0.4)
+                                : p.hairline,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.play_circle_fill_rounded,
+                          color: isLoggedIn
+                              ? const Color(0xFFFF0000)
+                              : p.textSecondary,
+                          size: 26,
+                        ),
+                      ),
+                      if (isLoggedIn)
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            width: 14,
+                            height: 14,
+                            decoration: BoxDecoration(
+                              color: p.success,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: p.surfaceContainer,
+                                width: 2.5,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                isLoggedIn
+                                    ? (accountName ?? 'YouTube Music')
+                                    : 'YouTube Music',
+                                style: TextStyle(
+                                  color: p.textPrimary,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.2,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (isLoggedIn) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: p.success.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'CONNECTED',
+                                  style: TextStyle(
+                                    color: Color(0xFF34C759),
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          isLoggedIn
+                              ? 'YouTube Music • Tap to manage'
+                              : context.l10n.connectYtmSubtitle,
+                          style: TextStyle(
+                            color: p.textSecondary,
+                            fontSize: 12.5,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (!isLoggedIn)
+                    FilledButton.icon(
+                      onPressed: () async {
+                        final ok = await YtmWebLoginSheet.show(context);
+                        if (ok == true && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(context.l10n.ytmConnected),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.login_rounded, size: 16),
+                      label: Text(context.l10n.signIn),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFFF0000),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 8),
+                        textStyle: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(AppRadii.button),
+                        ),
+                      ),
+                    )
+                  else
+                    IconButton(
+                      tooltip: 'Manage YouTube Music',
+                      icon: Icon(
+                        Icons.tune_rounded,
+                        color: p.textTertiary,
+                        size: 20,
+                      ),
+                      onPressed: () =>
+                          showYtmAccountDisconnectDialog(context),
+                    ),
+                ],
+              ),
             ),
           ),
         );

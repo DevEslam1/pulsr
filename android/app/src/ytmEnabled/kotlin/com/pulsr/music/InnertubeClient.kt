@@ -126,32 +126,40 @@ internal class InnertubeClient(
         /**
          * Version actually put on the wire.
          *
-         * Web clients synthesise today's date: YouTube rejects a `1.<date>` that
-         * is weeks stale, so a pinned literal here (or in the asset) ages out.
-         * Every other client takes the [ClientCapabilityMatrix] value, which is
-         * what makes `client_capabilities.json` able to bump a version without a
-         * new build — before this the matrix was loaded, logged and then ignored.
+         * WEB_REMIX prefers the version scraped from music.youtube.com by Dart:
+         * a stale one makes YouTube answer every player request with UNPLAYABLE
+         * "Video unavailable", which looks identical to a rejected poToken. Web
+         * clients otherwise synthesise today's date (a pinned `1.<date>` ages
+         * out), and every other client takes the [ClientCapabilityMatrix] value,
+         * which is what makes `client_capabilities.json` able to bump a version
+         * without a new build.
          */
         val effectiveClientVersion: String
-            get() = ClientCapabilityMatrix.getCapability(this)
-                .defaultClientVersion
-                .ifBlank {
-                    when (this) {
-                        WEB_REMIX, WEB_EMBEDDED_PLAYER -> {
-                            val dateStr = SimpleDateFormat("yyyyMMdd", Locale.US).apply {
-                                timeZone = TimeZone.getTimeZone("UTC")
-                            }.format(Date())
-                            "1.$dateStr.01.00"
-                        }
-                        MWEB -> {
-                            val dateStr = SimpleDateFormat("yyyyMMdd", Locale.US).apply {
-                                timeZone = TimeZone.getTimeZone("UTC")
-                            }.format(Date())
-                            "2.$dateStr.01.00"
-                        }
-                        else -> clientVersion
-                    }
+            get() {
+                if (this == WEB_REMIX) {
+                    val scraped = ClientCapabilityMatrix.getWebMusicClientVersion()
+                    if (scraped.isNotEmpty()) return scraped
                 }
+                return ClientCapabilityMatrix.getCapability(this)
+                    .defaultClientVersion
+                    .ifBlank {
+                        when (this) {
+                            WEB_REMIX, WEB_EMBEDDED_PLAYER -> {
+                                val dateStr = SimpleDateFormat("yyyyMMdd", Locale.US).apply {
+                                    timeZone = TimeZone.getTimeZone("UTC")
+                                }.format(Date())
+                                "1.$dateStr.01.00"
+                            }
+                            MWEB -> {
+                                val dateStr = SimpleDateFormat("yyyyMMdd", Locale.US).apply {
+                                    timeZone = TimeZone.getTimeZone("UTC")
+                                }.format(Date())
+                                "2.$dateStr.01.00"
+                            }
+                            else -> clientVersion
+                        }
+                    }
+            }
 
         /** `x-youtube-client-name`, overridable through the capability matrix. */
         val effectiveClientNameId: String
@@ -202,7 +210,21 @@ internal class InnertubeClient(
         val host = runCatching { Uri.parse(url).host ?: "" }.getOrDefault("")
         if (!host.contains("googlevideo.com")) return url
         if (!ClientCapabilityMatrix.getCapability(client).requiresPoToken) return url
-        val token = PoTokenManager.streamingPoToken
+        // GVS (streaming URL) poTokens are session-bound, not content-bound: the
+        // visitorData for a guest, the account's dataSyncId when signed in. The
+        // content-bound /player token minted in buildPlayerBody() must not be
+        // reused here, and vice-versa (yt-dlp: "GVS WebPO Token is bound to
+        // visitor_data / Visitor ID when logged out" and to "data_sync_id /
+        // account Session ID when logged in").
+        val dataSyncId = PoTokenManager.dataSyncId
+        val token = if (client.acceptsSessionAuth &&
+            cookieStore.isSessionValid() &&
+            dataSyncId.isNotEmpty()
+        ) {
+            PoTokenManager.accountPoTokenForSync(dataSyncId)
+        } else {
+            PoTokenManager.streamingPoToken
+        }
         if (token.isEmpty()) return url
         return runCatching {
             val uri = Uri.parse(url)
@@ -255,8 +277,9 @@ internal class InnertubeClient(
         // Track IP-level blocks AND bot challenges to short-circuit early.
         // Previously only IpBlocked was counted, so a full VPN sweep (all clients
         // returning BotChallenge) never short-circuited — 9 clients × ~1s each.
-        // Threshold 4 gives the first 3 clients a chance to prove the VPN exit
-        // is usable while still aborting a doomed sweep before the long tail.
+        // Threshold 6 gives the main chain plus the no-login last-resort tail
+        // (EMBED/MWEB/TV/TESTSUITE) a chance to prove the egress is usable
+        // while still aborting a doomed sweep instead of running all nine.
         val blockSignalCount = java.util.concurrent.atomic.AtomicInteger(0)
         val blockClients = java.util.concurrent.CopyOnWriteArrayList<String>()
         // attemptClient cannot throw the short-circuit itself: its own
@@ -307,8 +330,13 @@ internal class InnertubeClient(
                     // BotChallenge plus several "please sign in" / "no usable
                     // formats" replies. Only BotChallenge/IpBlocked used to count,
                     // so a sweep that was already clearly doomed ran all nine
-                    // clients (~25s) with no exit. Threshold 3 still gives the
-                    // first two clients a chance to prove the exit is usable.
+                    // clients (~25s) with no exit. Threshold 6 lets the full
+                    // main chain plus the no-login last resorts
+                    // (WEB_EMBEDDED_PLAYER, MWEB, TVHTML5_SIMPLY_EMBEDDED_PLAYER,
+                    // ANDROID_TESTSUITE) run before aborting: aborting at 3
+                    // killed the sweep right after VR/MUSIC/CREATOR and the tail
+                    // — the only clients that can succeed on a flagged egress —
+                    // never got tried.
                     val isEgressBlock = parsedSignal == YtmBlockSignal.IpBlocked ||
                         parsedSignal == YtmBlockSignal.BotChallenge ||
                         parsedSignal == YtmBlockSignal.PoTokenInvalid
@@ -325,7 +353,7 @@ internal class InnertubeClient(
                     if (isEgressBlock || guestSignInAsBlock) {
                         blockClients.add(client.name)
                         val count = blockSignalCount.incrementAndGet()
-                        if (count >= 3) {
+                        if (count >= 6) {
                             Log.w(TAG, "[$traceId] Short-circuiting chain: $count block signals ($parsedSignal) from (${blockClients.joinToString()}) for $videoId")
                             shortCircuit.compareAndSet(
                                 null,
@@ -1013,6 +1041,21 @@ internal class InnertubeClient(
             val hasPo = PoTokenManager.isReady ||
                 (!PoTokenManager.webViewBroken && !PoTokenManager.isLimitedMode && PoTokenManager.ensureReadySync())
             if (hasPo) {
+                // Two attestation pairs, kept strictly apart. For a guest request
+                // the `/player` poToken is content-bound: BotGuard must be run with
+                // the videoId as its identifier, not the visitorData (yt-dlp
+                // requires `video_id` for the PLAYER context; NewPipe's
+                // PoTokenProvider mints getWebClientPoToken(videoId) the same way).
+                // The visitorData/account bound token belongs on the streaming URLs
+                // instead, see maybeAppendStreamPot().
+                //
+                // Sending the visitor-bound streamingPoToken here is what made every
+                // guest WEB_REMIX player request answer UNPLAYABLE ("Video
+                // unavailable") even with a token attached, which collapsed the
+                // whole client chain into a BotChallenge cooldown.
+                //
+                // Signed-in WEB_REMIX keeps the account-bound token, matching the
+                // Dart Tier-1 path (YtmAccountService._resolvePlayerStreamInternal).
                 val dataSyncId = PoTokenManager.dataSyncId
                 val poToken = if (clientType.acceptsSessionAuth &&
                     cookieStore.isSessionValid() &&
@@ -1020,10 +1063,7 @@ internal class InnertubeClient(
                 ) {
                     PoTokenManager.accountPoTokenForSync(dataSyncId)
                 } else {
-                    PoTokenManager.streamingPoToken.ifEmpty {
-                        val tokenTarget = PoTokenManager.visitorData
-                        if (tokenTarget.isEmpty()) "" else PoTokenManager.poTokenForSync(tokenTarget)
-                    }
+                    PoTokenManager.poTokenForSync(videoId)
                 }
                 if (poToken.isNotEmpty()) {
                     root.put(
@@ -1031,7 +1071,7 @@ internal class InnertubeClient(
                         JSONObject().put("poToken", poToken),
                     )
                     contentPlaybackContext.put("poToken", poToken)
-                    Log.d(TAG, "[$clientType] Attached poToken (len=${poToken.length}, visitorData=${PoTokenManager.visitorData.take(15)}...)")
+                    Log.d(TAG, "[$clientType] Attached player poToken (len=${poToken.length}, video=$videoId, visitorData=${PoTokenManager.visitorData.take(15)}...)")
                 }
             }
         }

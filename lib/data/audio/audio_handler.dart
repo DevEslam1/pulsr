@@ -158,8 +158,8 @@ class PulsrAudioHandler extends BaseAudioHandler
   double? _preDuckVolume;
   // ignore: unused_field
   double? _preDuckInactiveVolume;
-  // ignore: unused_field, prefer_final_fields
   bool _duckActive = false;
+  int _duckDepthCounter = 0;
   /// Pure, testable interruption bookkeeping (B-1). Replaces the previous pair
   /// of loose booleans whose begin/end bookkeeping was asymmetric.
   final InterruptionStateMachine _interruption = InterruptionStateMachine();
@@ -1461,6 +1461,7 @@ class PulsrAudioHandler extends BaseAudioHandler
                 // Stack-safe: a second duck begin while already ducked must not
                 // clobber the saved pre-duck level. Duck both engines so a
                 // navigation prompt during a crossfade doesn't blast the fade-in.
+                _duckDepthCounter++;
                 if (!_duckActive && _activePlayer.playing) {
                   _duckActive = true;
                   _preDuckVolume = _activePlayer.volume;
@@ -1512,7 +1513,8 @@ class PulsrAudioHandler extends BaseAudioHandler
                 // instead of inheriting a stale half-open pause (B-1).
                 final wasPlayingBeforeDuck =
                     _interruption.end(InterruptionKind.duck);
-                if (_duckActive) {
+                if (_duckDepthCounter > 0) _duckDepthCounter--;
+                if (_duckActive && _duckDepthCounter == 0) {
                   _duckActive = false;
                   // Restore to the CURRENT ReplayGain-compensated target, not
                   // the stale pre-duck snapshot: gain settings or a track
@@ -1573,12 +1575,14 @@ class PulsrAudioHandler extends BaseAudioHandler
                 _preDuckVolume = null;
                 _preDuckInactiveVolume = null;
                 _duckActive = false;
+                _duckDepthCounter = 0;
                 break;
               case AudioInterruptionType.unknown:
                 _interruption.reset();
                 _preDuckVolume = null;
                 _preDuckInactiveVolume = null;
                 _duckActive = false;
+                _duckDepthCounter = 0;
                 break;
             }
           }

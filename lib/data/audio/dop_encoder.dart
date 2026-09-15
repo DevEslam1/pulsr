@@ -24,6 +24,13 @@ class DopEncoder {
     return 0;
   }
 
+  /// Checks whether [sampleRate] matches the standard DoP carrier rate for [dsdRate].
+  /// Enforces exact 176.4 kHz for DSD64, 352.8 kHz for DSD128, 705.6 kHz for DSD256.
+  static bool isValidDopCarrierRate(int sampleRate, int dsdRate) {
+    final expected = dopPcmSampleRate(dsdRate);
+    return expected > 0 && sampleRate == expected;
+  }
+
   /// Encodes 1-bit DSD stereo stream (left & right byte channels) into 24-bit packed PCM or 32-bit aligned PCM.
   /// [dsdLeft] and [dsdRight] must have equal length (in bytes).
   /// Every 2 bytes of DSD (16 bits) are combined with an 8-bit alternating marker to form one 24-bit PCM sample per channel.

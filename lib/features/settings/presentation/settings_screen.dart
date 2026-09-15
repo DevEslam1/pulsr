@@ -685,7 +685,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           right: Adaptive.pagePadding(context),
         ),
         children: [
-          if (AppConfig.isCloudSyncAllowed) const SettingsHeroCard(),
+          if (AppConfig.isCloudSyncAllowed || AppConfig.ytmEnabled)
+            const SettingsHeroCard(),
           _experienceModeCard(context),
           ..._buildCategoryWidgets(context, 'audio', state, cubit),
           ..._buildCategoryWidgets(context, 'playback', state, cubit),
@@ -900,7 +901,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ];
       case 'privacy':
         return [
-          if (AppConfig.isCloudSyncAllowed) const SettingsHeroCard(),
+          if (AppConfig.isCloudSyncAllowed || AppConfig.ytmEnabled)
+            const SettingsHeroCard(),
           _buildPrivacyBackupSection(context),
         ];
       case 'about':

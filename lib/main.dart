@@ -497,10 +497,14 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
               listener: (context, state) {
                 final message = state.errorMessage;
                 if (message != null) {
-                  final ctx = rootNavigatorKey.currentContext;
-                  if (ctx != null && ctx.mounted) {
+                  // rootNavigatorKey.currentContext is the Navigator itself,
+                  // whose Overlay is a *child* — Overlay.of(navigatorContext)
+                  // throws. Use the overlay's own context instead.
+                  final overlayCtx =
+                      rootNavigatorKey.currentState?.overlay?.context;
+                  if (overlayCtx != null && overlayCtx.mounted) {
                     PulsrToast.show(
-                      ctx,
+                      overlayCtx,
                       message: message,
                       icon: Icons.error_outline_rounded,
                       isError: true,

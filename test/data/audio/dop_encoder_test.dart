@@ -53,5 +53,24 @@ void main() {
       expect(dop32[6], equals(0x44));
       expect(dop32[7], equals(0x05));
     });
+
+    test('isValidDopCarrierRate validates correct DoP carrier sample rates', () {
+      // DSD64 requires 176.4 kHz
+      expect(DopEncoder.isValidDopCarrierRate(176400, 64), isTrue);
+      expect(DopEncoder.isValidDopCarrierRate(192000, 64), isFalse);
+      expect(DopEncoder.isValidDopCarrierRate(88200, 64), isFalse);
+
+      // DSD128 requires 352.8 kHz
+      expect(DopEncoder.isValidDopCarrierRate(352800, 128), isTrue);
+      expect(DopEncoder.isValidDopCarrierRate(176400, 128), isFalse);
+
+      // DSD256 requires 705.6 kHz
+      expect(DopEncoder.isValidDopCarrierRate(705600, 256), isTrue);
+      expect(DopEncoder.isValidDopCarrierRate(384000, 256), isFalse);
+
+      // Unsupported rates
+      expect(DopEncoder.isValidDopCarrierRate(176400, 512), isFalse);
+      expect(DopEncoder.isValidDopCarrierRate(44100, 0), isFalse);
+    });
   });
 }

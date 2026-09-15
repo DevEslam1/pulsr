@@ -282,6 +282,22 @@ class _QuranModePanelState extends State<QuranModePanel> {
               child: FutureBuilder<EarbudCapabilities>(
                 future: _capsFuture,
                 builder: (context, snap) {
+                  if (snap.hasError) {
+                    return _card(
+                      p,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Text(
+                          context.l10n.outputHardware,
+                          style: TextStyle(
+                            color: p.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    );
+                  }
                   if (!snap.hasData) {
                     return _card(
                       p,

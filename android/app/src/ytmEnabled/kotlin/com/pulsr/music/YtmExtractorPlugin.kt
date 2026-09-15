@@ -201,6 +201,15 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 }
                 result.success(ClientCapabilityMatrix.remoteState(ctx))
             }
+            "setClientVersion" -> {
+                // Dart's YtmClientVersionResolver scrapes the live WEB_REMIX
+                // version from music.youtube.com. Pushing it here keeps the
+                // pinned asset value from aging into UNPLAYABLE responses.
+                ClientCapabilityMatrix.setWebMusicClientVersion(
+                    call.argument<String>("clientVersion") ?: ""
+                )
+                result.success(true)
+            }
             "clearNetworkCaches" -> {
                 // VPN up/down (or Wi-Fi <-> mobile) moves the egress IP, which
                 // invalidates cached googlevideo edges, throttle verdicts, and

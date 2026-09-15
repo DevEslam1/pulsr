@@ -1,11 +1,16 @@
 // lib/features/auth/presentation/auth_sheet.dart
 import 'package:flutter/material.dart';
-import '../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../core/config/app_config.dart';
+import '../../../core/di/injection.dart';
+import '../../../core/services/ytm_account_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/l10n_extensions.dart';
+import '../../settings/presentation/widgets/ytm_account_disconnect_dialog.dart';
 import '../cubit/auth_cubit.dart';
 import '../cubit/auth_state.dart';
+import 'ytm_web_login_sheet.dart';
 
 class AuthSheet extends StatefulWidget {
   const AuthSheet({super.key});
@@ -361,6 +366,78 @@ class _AuthSheetState extends State<AuthSheet> {
                               TextStyle(color: p.textSecondary, fontSize: 13),
                         ),
                       ),
+
+                      if (AppConfig.ytmEnabled) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(child: Divider(color: p.hairline)),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 12),
+                              child: Text(
+                                'YOUTUBE MUSIC',
+                                style: TextStyle(
+                                  color: p.textTertiary,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                            ),
+                            Expanded(child: Divider(color: p.hairline)),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        ValueListenableBuilder<bool>(
+                          valueListenable: getIt<YtmAccountService>().loginState,
+                          builder: (context, isLoggedIn, _) {
+                            final ytmAccount = getIt<YtmAccountService>();
+                            return OutlinedButton.icon(
+                              onPressed: () async {
+                                if (isLoggedIn) {
+                                  await showYtmAccountDisconnectDialog(context);
+                                } else {
+                                  final ok =
+                                      await YtmWebLoginSheet.show(context);
+                                  if (ok == true && context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content:
+                                            Text(context.l10n.ytmConnected),
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                              icon: const Icon(
+                                Icons.play_circle_fill_rounded,
+                                color: Color(0xFFFF0000),
+                                size: 20,
+                              ),
+                              label: Text(
+                                isLoggedIn
+                                    ? 'YouTube Music: ${ytmAccount.accountName ?? "Connected"}'
+                                    : 'Connect YouTube Music',
+                                style: TextStyle(
+                                  color: p.textPrimary,
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                side: BorderSide(color: p.hairline),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ],
                   ),
                 ),

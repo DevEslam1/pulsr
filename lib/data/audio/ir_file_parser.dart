@@ -109,9 +109,26 @@ class IrFileParser {
         frameVal += chVal;
       }
 
-      // Mix channels to mono
-      final monoVal = (frameVal / numChannels).clamp(-1.0, 1.0);
+      // Mix channels to mono without destructive early clamping
+      final monoVal = frameVal / numChannels;
       samples.add(monoVal);
+    }
+
+    // True peak-normalize samples if any peak exceeds 1.0 (e.g. un-normalized 32-bit float IR)
+    double maxPeak = 0.0;
+    for (int i = 0; i < samples.length; i++) {
+      final absVal = samples[i].abs();
+      if (absVal > maxPeak) maxPeak = absVal;
+    }
+    if (maxPeak > 1.0) {
+      final factor = 1.0 / maxPeak;
+      for (int i = 0; i < samples.length; i++) {
+        samples[i] *= factor;
+      }
+    } else {
+      for (int i = 0; i < samples.length; i++) {
+        samples[i] = samples[i].clamp(-1.0, 1.0);
+      }
     }
 
     return samples;

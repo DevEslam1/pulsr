@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../../core/errors/failures.dart';
@@ -275,12 +276,21 @@ class PlaylistImportUseCase {
 
       for (final rawPath in rawPaths) {
         String path = rawPath;
+        // Strip URI schemes if present (file:///)
+        if (path.startsWith('file://')) {
+          try {
+            path = Uri.parse(path).toFilePath();
+          } catch (_) {
+            path = path.replaceFirst('file://', '');
+          }
+        }
         // Resolve relative paths against playlist parent directory
-        if (!path.startsWith('/') &&
+        if (!p.isAbsolute(path) &&
             !path.contains(':\\') &&
             !path.contains(':/')) {
-          path = '$playlistDir/$path'.replaceAll('\\', '/');
+          path = p.normalize(p.join(playlistDir, path));
         }
+        path = path.replaceAll('\\', '/');
 
         SongsTableData? matchedSong = exactMap[path];
 

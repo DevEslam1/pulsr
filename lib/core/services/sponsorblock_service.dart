@@ -144,8 +144,28 @@ class SponsorBlockService {
           }
 
           segments.sort((a, b) => a.start.compareTo(b.start));
-          _cache[cleanId] = segments;
-          return segments;
+          // Merge overlapping or contiguous intervals to prevent skip bounce loops
+          final merged = <SponsorBlockSegment>[];
+          for (final seg in segments) {
+            if (merged.isEmpty) {
+              merged.add(seg);
+            } else {
+              final last = merged.last;
+              if (seg.start <= last.end) {
+                final maxEnd = seg.end > last.end ? seg.end : last.end;
+                merged[merged.length - 1] = SponsorBlockSegment(
+                  category: last.category,
+                  start: last.start,
+                  end: maxEnd,
+                  uuid: '${last.uuid}_${seg.uuid}',
+                );
+              } else {
+                merged.add(seg);
+              }
+            }
+          }
+          _cache[cleanId] = merged;
+          return merged;
         }
       }
     } catch (e) {
