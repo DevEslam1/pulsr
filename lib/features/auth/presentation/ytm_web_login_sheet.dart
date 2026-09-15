@@ -1231,7 +1231,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                 icon: const Icon(
                                     Icons.arrow_back_ios_new_rounded,
                                     size: 18),
-                                tooltip: 'Back',
+                                tooltip: context.l10n.browseBack,
                                 onPressed: _canGoBack
                                     ? () async {
                                         await _webViewController?.goBack();
@@ -1243,7 +1243,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                 icon: const Icon(
                                     Icons.arrow_forward_ios_rounded,
                                     size: 18),
-                                tooltip: 'Forward',
+                                tooltip: context.l10n.browseForward,
                                 onPressed: _canGoForward
                                     ? () async {
                                         await _webViewController?.goForward();
@@ -1287,12 +1287,12 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                               IconButton(
                                 icon:
                                     const Icon(Icons.refresh_rounded, size: 20),
-                                tooltip: 'Refresh',
+                                tooltip: context.l10n.browseRefresh,
                                 onPressed: () => _webViewController?.reload(),
                               ),
                               IconButton(
                                 icon: const Icon(Icons.close_rounded, size: 20),
-                                tooltip: 'Close',
+                                tooltip: context.l10n.browseClose,
                                 onPressed: () => Navigator.of(context).pop(),
                               ),
                             ],
@@ -1306,28 +1306,28 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                   horizontal: 4, vertical: 2),
                               children: [
                                 _navChip(
-                                  label: 'Home',
+                                  label: context.l10n.browseHome,
                                   icon: Icons.home_rounded,
                                   url: 'https://music.youtube.com/?gl=EG&hl=en',
                                   p: p,
                                 ),
                                 const SizedBox(width: 6),
                                 _navChip(
-                                  label: 'Explore',
+                                  label: context.l10n.browseExplore,
                                   icon: Icons.explore_rounded,
                                   url: 'https://music.youtube.com/explore?gl=EG&hl=en',
                                   p: p,
                                 ),
                                 const SizedBox(width: 6),
                                 _navChip(
-                                  label: 'Library',
+                                  label: context.l10n.navLibrary,
                                   icon: Icons.library_music_rounded,
                                   url: 'https://music.youtube.com/library?gl=EG&hl=en',
                                   p: p,
                                 ),
                                 const SizedBox(width: 6),
                                 _navChip(
-                                  label: 'Liked Music',
+                                  label: context.l10n.likedMusic,
                                   icon: Icons.favorite_rounded,
                                   url:
                                       'https://music.youtube.com/playlist?list=LM&gl=EG&hl=en',
@@ -1335,28 +1335,28 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                 ),
                                 const SizedBox(width: 6),
                                 _navChip(
-                                  label: 'New Releases',
+                                  label: context.l10n.newReleases,
                                   icon: Icons.fiber_new_rounded,
                                   url: 'https://music.youtube.com/new_releases?gl=EG&hl=en',
                                   p: p,
                                 ),
                                 const SizedBox(width: 6),
                                 _navChip(
-                                  label: 'History',
+                                  label: context.l10n.history,
                                   icon: Icons.history_rounded,
                                   url: 'https://music.youtube.com/history?gl=EG&hl=en',
                                   p: p,
                                 ),
                                 const SizedBox(width: 6),
                                 _navChip(
-                                  label: 'YouTube Web',
+                                  label: context.l10n.browseYoutubeWeb,
                                   icon: Icons.video_library_rounded,
                                   url: 'https://www.youtube.com',
                                   p: p,
                                 ),
                                 const SizedBox(width: 6),
                                 _navChip(
-                                  label: 'Egypt Mode',
+                                  label: context.l10n.browseEgyptMode,
                                   icon: Icons.public_rounded,
                                   url: 'https://music.youtube.com/?gl=EG&hl=en',
                                   p: p,
@@ -1373,8 +1373,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                 _isLoggedIn
                                     ? Icons.check_circle_rounded
                                     : Icons.cloud_sync_rounded,
-                                color:
-                                    _isLoggedIn ? p.success : Colors.redAccent,
+                                color: _isLoggedIn ? p.success : p.error,
                                 size: 22,
                               ),
                               const SizedBox(width: 8),
@@ -1385,8 +1384,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                   children: [
                                     Text(
                                       _isLoggedIn
-                                          ? 'Logged In Successfully'
-                                          : 'Sign in to YouTube Music',
+                                          ? context.l10n.browseLoggedInSuccessfully
+                                          : context.l10n.browseSignInToYtm,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
@@ -1398,8 +1397,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                     const SizedBox(height: 1),
                                     Text(
                                       _isLoggedIn
-                                          ? 'Account connected! Tap "Done" to finish.'
-                                          : 'Connect account to sync Liked Music automatically',
+                                          ? context.l10n.browseAccountConnectedDone
+                                          : context.l10n.browseConnectToSync,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
@@ -1477,7 +1476,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                 const SizedBox(width: 2),
                                 IconButton(
                                   icon: const Icon(Icons.refresh_rounded, size: 18),
-                                  tooltip: 'Refresh page',
+                                  tooltip: context.l10n.browseRefreshPage,
                                   padding: const EdgeInsets.all(6),
                                   constraints: const BoxConstraints(),
                                   onPressed: () => _webViewController?.reload(),
@@ -1485,7 +1484,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                 const SizedBox(width: 2),
                                 PopupMenuButton<String>(
                                   icon: const Icon(Icons.more_vert_rounded, size: 18),
-                                  tooltip: 'More options',
+                                  tooltip: context.l10n.browseMoreOptions,
                                   padding: const EdgeInsets.all(6),
                                   constraints: const BoxConstraints(),
                                   onSelected: (action) {
@@ -1541,7 +1540,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                               const SizedBox(width: 2),
                               IconButton(
                                 icon: const Icon(Icons.close_rounded, size: 18),
-                                tooltip: 'Close',
+                                tooltip: context.l10n.browseClose,
                                 padding: const EdgeInsets.all(6),
                                 constraints: const BoxConstraints(),
                                 onPressed: () =>
@@ -1597,8 +1596,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.info_outline_rounded,
-                              size: 18, color: Colors.amber),
+                          Icon(Icons.info_outline_rounded,
+                              size: 18, color: p.warning),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(context.l10n.confirmAccount,
@@ -1662,8 +1661,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.public_off_rounded,
-                                  color: Colors.amber, size: 17),
+                              Icon(Icons.public_off_rounded,
+                                  color: p.warning, size: 17),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(context.l10n.ytmRestricted,
@@ -1997,7 +1996,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        "Google is blocking this sign-in",
+                        context.l10n.browseGoogleBlocking,
                         style: TextStyle(
                             color: p.textPrimary,
                             fontSize: 15,
@@ -2008,19 +2007,13 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  "Google blocks sign-in inside embedded browsers for some "
-                  "accounts, and the automatic retries (clearing cookies and "
-                  "switching the browser identity) didn't get past it.\n\n"
-                  "The reliable fix is to sign in with Google TV below: you "
-                  "approve on your own browser and Google never sees an "
-                  "embedded WebView, so there is no captcha. Pulsr will sync "
-                  "your library and playlists; playback keeps working as usual.",
+                  context.l10n.browseGoogleBlockingBody,
                   style: TextStyle(
                       color: p.textSecondary, fontSize: 12.5, height: 1.4),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Current identity: ${identityLabel(currentIdentity)}',
+                  '${context.l10n.browseCurrentIdentity}: ${identityLabel(currentIdentity)}',
                   style: TextStyle(
                       color: p.textTertiary,
                       fontSize: 11,
@@ -2157,6 +2150,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
   Future<void> _showManualCookieDialog(BuildContext context) async {
     final p = context.palette;
+    final l10n = context.l10n;
     final textController = TextEditingController();
     String? errorText;
     var busy = false;
@@ -2228,7 +2222,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                   : () async {
                       final input = textController.text.trim();
                       if (input.isEmpty) {
-                        setDialogState(() => errorText = 'Please enter cookie text');
+                        setDialogState(
+                            () => errorText = l10n.browsePleaseEnterCookieText);
                         return;
                       }
                       final accountService = getIt<YtmAccountService>();
@@ -2238,8 +2233,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                       // substring trim of `cookie:` left all of that in place.
                       final cookieStr = YtmAccountService.normalizeCookieHeader(input);
                       if (!YtmAccountService.looksLikeSignedInCookies(cookieStr)) {
-                        setDialogState(() => errorText = 'Missing session cookies — the paste needs '
-                            'an SAPISID and a __Secure-3PSID (or 1PSID)');
+                        setDialogState(() =>
+                            errorText = l10n.browseMissingSessionCookies);
                         return;
                       }
                       // Snapshot the jar we may have to put back: saveSession
@@ -2279,16 +2274,14 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                       setDialogState(() {
                         busy = false;
                         errorText = verdict == SessionValidationResult.invalid
-                            ? 'YouTube rejected these cookies — they have expired or '
-                                'belong to a signed-out session'
+                            ? l10n.browseCookiesRejected
                             // `unknown` is a network failure or an IP block, not a
                             // verdict on the cookies: reporting "invalid" here sent
                             // people off to re-copy a jar that was fine.
-                            : 'Could not reach YouTube to verify — the cookies are '
-                                'saved, try again when back online';
+                            : l10n.browseCookieVerifyOffline;
                       });
                     },
-              child: Text(busy ? 'Checking…' : 'Connect'),
+              child: Text(busy ? l10n.browseChecking : l10n.browseConnect),
             ),
           ],
         ),

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../core/constants/app_radii.dart';
+import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
@@ -102,8 +103,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void _nextPage() {
     if (_currentPage < 2) {
       _pageController.nextPage(
-        duration: const Duration(milliseconds: 350),
-        curve: Curves.easeInOut,
+        duration: context.motionMs(350),
+        curve: context.motionCurve(Curves.easeInOut),
       );
     }
   }
@@ -111,8 +112,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void _skipToFinal() {
     _pageController.animateToPage(
       2,
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeInOut,
+      duration: context.motionMs(400),
+      curve: context.motionCurve(Curves.easeInOut),
     );
   }
 
@@ -185,7 +186,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     children: List.generate(3, (index) {
                       final isActive = index == _currentPage;
                       return AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
+                        duration: context.motionMs(300),
                         margin: const EdgeInsets.symmetric(horizontal: 4),
                         height: 8,
                         width: isActive ? 24 : 8,
@@ -303,7 +304,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 animate: true,
               ),
             ),
-          ).animate().scale(duration: 600.ms, curve: Curves.easeOutBack),
+          ).animate().scale(
+              duration: context.motionMs(600),
+              curve: context.motionCurve(Curves.easeOutBack)),
           const SizedBox(height: 36),
           Text(context.l10n.onboardingHeading,
             textAlign: TextAlign.center,
@@ -311,7 +314,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.5,
                 ),
-          ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1, end: 0),
+          ).animate().fadeIn(delay: context.motionMs(200)).slideY(begin: 0.1, end: 0),
           const SizedBox(height: 16),
           Text(context.l10n.onboardingPrivacyDesc,
             textAlign: TextAlign.center,
@@ -319,7 +322,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   color: p.textSecondary,
                   height: 1.5,
                 ),
-          ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.1, end: 0),
+          ).animate().fadeIn(delay: context.motionMs(400)).slideY(begin: 0.1, end: 0),
           const SizedBox(height: 32),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -343,7 +346,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
               ],
             ),
-          ).animate().fadeIn(delay: 500.ms),
+          ).animate().fadeIn(delay: context.motionMs(500)),
           const Spacer(),
         ],
       ),
@@ -379,17 +382,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
+                _buildPlaybackFeatureIcon(Icons.equalizer_rounded,
+                    context.l10n.browseTenBandGraphicEq, p.accent),
                 _buildPlaybackFeatureIcon(
-                    Icons.equalizer_rounded, '10-Band Graphic EQ', p.accent),
+                    Icons.tune_rounded, context.l10n.browseCrossfade, p.accent),
                 _buildPlaybackFeatureIcon(
-                    Icons.tune_rounded, 'Crossfade', p.accent),
-                _buildPlaybackFeatureIcon(
-                    Icons.timer_rounded, 'Sleep Timer', p.accent),
+                    Icons.timer_rounded, context.l10n.sleepTimer, p.accent),
               ],
             ),
           )
               .animate()
-              .fadeIn(duration: 500.ms)
+              .fadeIn(duration: context.motionMs(500))
               .scale(begin: const Offset(0.9, 0.9)),
           const SizedBox(height: 36),
           Text(context.l10n.onboardingPowerful,
@@ -398,7 +401,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.5,
                 ),
-          ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1, end: 0),
+          ).animate().fadeIn(delay: context.motionMs(200)).slideY(begin: 0.1, end: 0),
           const SizedBox(height: 16),
           Text(context.l10n.onboardingPowerfulDesc,
             textAlign: TextAlign.center,
@@ -406,19 +409,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   color: p.textSecondary,
                   height: 1.5,
                 ),
-          ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.1, end: 0),
+          ).animate().fadeIn(delay: context.motionMs(400)).slideY(begin: 0.1, end: 0),
           const SizedBox(height: 24),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             alignment: WrapAlignment.center,
-            children: const [
-              _FeatureBadge(label: '10-Band Graphic EQ'),
-              _FeatureBadge(label: 'Smooth Crossfade'),
-              _FeatureBadge(label: 'Sleep Timer'),
-              _FeatureBadge(label: 'Gapless Playback'),
+            children: [
+              _FeatureBadge(label: context.l10n.browseTenBandGraphicEq),
+              _FeatureBadge(label: context.l10n.browseSmoothCrossfade),
+              _FeatureBadge(label: context.l10n.sleepTimer),
+              _FeatureBadge(label: context.l10n.gaplessPlayback),
             ],
-          ).animate().fadeIn(delay: 500.ms),
+          ).animate().fadeIn(delay: context.motionMs(500)),
           const Spacer(),
         ],
       ),
@@ -484,7 +487,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           )
               .animate()
-              .fadeIn(duration: 500.ms)
+              .fadeIn(duration: context.motionMs(500))
               .scale(begin: const Offset(0.9, 0.9)),
           const SizedBox(height: 36),
           Text(context.l10n.onboardingBeautiful,
@@ -493,7 +496,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.5,
                 ),
-          ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1, end: 0),
+          ).animate().fadeIn(delay: context.motionMs(200)).slideY(begin: 0.1, end: 0),
           const SizedBox(height: 16),
           Text(context.l10n.onboardingBeautifulDesc,
             textAlign: TextAlign.center,
@@ -501,7 +504,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   color: p.textSecondary,
                   height: 1.5,
                 ),
-          ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.1, end: 0),
+          ).animate().fadeIn(delay: context.motionMs(400)).slideY(begin: 0.1, end: 0),
           const Spacer(),
         ],
       ),

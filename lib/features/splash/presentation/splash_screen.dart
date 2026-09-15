@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/l10n_extensions.dart';
 
@@ -68,9 +69,9 @@ class _SplashScreenState extends State<SplashScreen> {
             )
                 .animate()
                 .scale(
-                    duration: const Duration(milliseconds: 800),
-                    curve: Curves.easeOutBack)
-                .fadeIn(duration: const Duration(milliseconds: 600)),
+                    duration: context.motionMs(800),
+                    curve: context.motionCurve(Curves.easeOutBack))
+                .fadeIn(duration: context.motionMs(600)),
             const SizedBox(height: 24),
             Text(
               context.l10n.appTitle,
@@ -82,8 +83,8 @@ class _SplashScreenState extends State<SplashScreen> {
             )
                 .animate()
                 .fadeIn(
-                    delay: const Duration(milliseconds: 300),
-                    duration: const Duration(milliseconds: 600))
+                    delay: context.motionMs(300),
+                    duration: context.motionMs(600))
                 .slideY(begin: 0.2, end: 0),
             const SizedBox(height: 8),
             Text(
@@ -93,8 +94,8 @@ class _SplashScreenState extends State<SplashScreen> {
                     letterSpacing: 0.5,
                   ),
             ).animate().fadeIn(
-                delay: const Duration(milliseconds: 500),
-                duration: const Duration(milliseconds: 600)),
+                delay: context.motionMs(500),
+                duration: context.motionMs(600)),
           ],
         ),
       ),

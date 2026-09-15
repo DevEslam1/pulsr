@@ -64,7 +64,7 @@ class SettingsNavTile extends StatelessWidget {
             if (featureInfo != null)
               IconButton(
                 icon: Icon(Icons.info_outline_rounded, size: 18, color: p.textTertiary),
-                tooltip: 'About $title',
+                tooltip: context.l10n.settingsAboutTitle(title),
                 visualDensity: VisualDensity.compact,
                 onPressed: () => showAudioFeatureInfoDialog(context, featureInfo!, conflictReason: disabledReason),
               ),
@@ -127,7 +127,7 @@ class SettingsSwitchTile extends StatelessWidget {
             if (featureInfo != null)
               IconButton(
                 icon: Icon(Icons.info_outline_rounded, size: 18, color: p.textTertiary),
-                tooltip: 'About $title',
+                tooltip: context.l10n.settingsAboutTitle(title),
                 visualDensity: VisualDensity.compact,
                 onPressed: () => showAudioFeatureInfoDialog(context, featureInfo!, conflictReason: disabledReason),
               ),
@@ -189,7 +189,7 @@ void showAudioFeatureInfoDialog(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 18),
+                    Icon(Icons.warning_amber_rounded, color: p.warning, size: 18),
                     const SizedBox(width: 8),
                     Expanded(child: Text(context.l10n.conflictsWith(info.conflictsWith ?? ''), style: TextStyle(color: p.textSecondary, fontSize: 11, fontWeight: FontWeight.w600))),
                   ],

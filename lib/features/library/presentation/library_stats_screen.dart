@@ -47,11 +47,10 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
   Future<void> _confirmClearHistory(BuildContext context) async {
     final confirmed = await PulsrDialogHelper.showConfirmDialog(
       context,
-      title: 'Clear Play History?',
-      message:
-          'This will reset your recently played list and listening history. Your song files and playlists will not be affected.',
+      title: context.l10n.browseClearPlayHistoryTitle,
+      message: context.l10n.browseClearPlayHistoryMessage,
       icon: Icons.history_rounded,
-      confirmLabel: 'Clear History',
+      confirmLabel: context.l10n.browseClearHistory,
       isDestructive: true,
     );
 
@@ -63,12 +62,13 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
           res.fold(
             (err) => PulsrToast.show(
               context,
-              message: 'Failed to clear history: ${err.message}',
+              message:
+                  '${context.l10n.browseClearHistoryFailed}: ${err.message}',
               isError: true,
             ),
             (_) => PulsrToast.show(
               context,
-              message: 'Listening history cleared',
+              message: context.l10n.browseHistoryCleared,
               icon: Icons.history_rounded,
             ),
           );
@@ -94,7 +94,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
           actions: [
             IconButton(
               icon: Icon(Icons.delete_sweep_rounded, color: p.textSecondary),
-              tooltip: 'Clear Play History',
+              tooltip: context.l10n.browseClearPlayHistory,
               onPressed: () => _confirmClearHistory(context),
             ),
           ],
@@ -165,7 +165,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                       child: _buildMetricCard(
                         context,
                         icon: Icons.music_note_rounded,
-                        title: 'Total Tracks',
+                        title: context.l10n.browseTotalTracks,
                         value: songs.length.toString(),
                         color: p.primary,
                         p: p,
@@ -176,7 +176,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                       child: _buildMetricCard(
                         context,
                         icon: Icons.play_circle_filled_rounded,
-                        title: 'Total Plays',
+                        title: context.l10n.browseTotalPlays,
                         value: totalPlays.toString(),
                         color: p.accent,
                         p: p,
@@ -191,9 +191,9 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                       child: _buildMetricCard(
                         context,
                         icon: Icons.access_time_filled_rounded,
-                        title: 'Listening Time',
-                        value: '$totalHours h',
-                        color: Colors.amber,
+                        title: context.l10n.browseListeningTime,
+                        value: '$totalHours ${context.l10n.browseHoursShort}',
+                        color: p.warning,
                         p: p,
                       ),
                     ),
@@ -202,9 +202,9 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                       child: _buildMetricCard(
                         context,
                         icon: Icons.storage_rounded,
-                        title: 'Disk Storage',
+                        title: context.l10n.browseDiskStorage,
                         value: '$totalGb GB',
-                        color: Colors.tealAccent,
+                        color: p.success,
                         p: p,
                       ),
                     ),
@@ -237,7 +237,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                           ),
                           const Spacer(),
                           Text(
-                            '${albums.length} Albums · ${artists.length} Artists',
+                            '${albums.length} ${context.l10n.albums} · ${artists.length} ${context.l10n.artists}',
                             style:
                                 TextStyle(fontSize: 12, color: p.textSecondary),
                           ),
@@ -272,7 +272,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Lossless / Hi-Res: $losslessCount tracks',
+                            '${context.l10n.browseLosslessHiRes} $losslessCount ${context.l10n.browseTracks}',
                             style: const TextStyle(
                               fontSize: 12,
                               color: Color(0xFF64D2FF),
@@ -280,7 +280,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                             ),
                           ),
                           Text(
-                            'Standard Lossy: $lossyCount tracks',
+                            '${context.l10n.browseStandardLossy} $lossyCount ${context.l10n.browseTracks}',
                             style: TextStyle(
                                 fontSize: 12, color: p.textSecondary),
                           ),
@@ -293,8 +293,8 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
 
                 // Top Played Songs Section
                 _buildSectionHeader(
-                  title: 'Most Played Tracks',
-                  subtitle: 'Your all-time favorites leaderboard',
+                  title: context.l10n.browseMostPlayedTracks,
+                  subtitle: context.l10n.browseMostPlayedTracksSubtitle,
                   icon: Icons.leaderboard_rounded,
                   p: p,
                 ),
@@ -330,8 +330,8 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                 // Top Artists Section
                 if (topArtists.isNotEmpty) ...[
                   _buildSectionHeader(
-                    title: 'Top Artists',
-                    subtitle: 'Ranked by total listening plays',
+                    title: context.l10n.browseTopArtists,
+                    subtitle: context.l10n.browseTopArtistsSubtitle,
                     icon: Icons.person_search_rounded,
                     p: p,
                   ),
@@ -377,7 +377,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                                 ),
                               ),
                               subtitle: Text(
-                                '$trackCount tracks in library',
+                                '$trackCount ${context.l10n.browseTracksInLibrary}',
                                 style: TextStyle(
                                     color: p.textSecondary, fontSize: 12),
                               ),
@@ -389,7 +389,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
-                                  '$plays plays',
+                                  '$plays ${context.l10n.browsePlays}',
                                   style: TextStyle(
                                     color: p.accent,
                                     fontSize: 12,
@@ -415,8 +415,8 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                 // Recently Played Section
                 if (recentlyPlayed.isNotEmpty) ...[
                   _buildSectionHeader(
-                    title: 'Recently Played',
-                    subtitle: 'Latest tracks played on this device',
+                    title: context.l10n.recentlyPlayed,
+                    subtitle: context.l10n.browseLatestTracksSubtitle,
                     icon: Icons.history_rounded,
                     p: p,
                   ),
@@ -575,7 +575,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '${song.playCount} plays',
+                      '${song.playCount} ${context.l10n.browsePlays}',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,

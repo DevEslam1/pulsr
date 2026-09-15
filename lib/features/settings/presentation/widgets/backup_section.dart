@@ -81,7 +81,7 @@ class _BackupSectionState extends State<BackupSection> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(l10n.exportFailedWithError(e.toString())),
-            backgroundColor: Colors.redAccent,
+            backgroundColor: context.palette.error,
           ),
         );
       }
@@ -108,7 +108,7 @@ class _BackupSectionState extends State<BackupSection> {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(context.l10n.backupTooLarge),
-              backgroundColor: Colors.redAccent,
+              backgroundColor: context.palette.error,
             ),
           );
         }
@@ -124,7 +124,7 @@ class _BackupSectionState extends State<BackupSection> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(context.l10n.backupMissing),
-            backgroundColor: Colors.redAccent,
+            backgroundColor: context.palette.error,
           ),
         );
       }
@@ -138,7 +138,7 @@ class _BackupSectionState extends State<BackupSection> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(context.l10n.backupTooLarge),
-            backgroundColor: Colors.redAccent,
+            backgroundColor: context.palette.error,
           ),
         );
       }
@@ -151,7 +151,7 @@ class _BackupSectionState extends State<BackupSection> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(context.l10n.backupInvalid),
-            backgroundColor: Colors.redAccent,
+            backgroundColor: context.palette.error,
           ),
         );
       }
@@ -255,7 +255,7 @@ class _BackupSectionState extends State<BackupSection> {
                 const SizedBox(height: 12),
                 Text(
                   l10n.unmatchedPathsWarning(importResult.unmatchedPaths.length),
-                  style: const TextStyle(color: Colors.amber, fontSize: 12),
+                  style: TextStyle(color: context.palette.warning, fontSize: 12),
                 ),
               ],
             ],
@@ -273,7 +273,7 @@ class _BackupSectionState extends State<BackupSection> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(l10n.importFailedWithError(e.toString())),
-            backgroundColor: Colors.redAccent,
+            backgroundColor: context.palette.error,
           ),
         );
       }

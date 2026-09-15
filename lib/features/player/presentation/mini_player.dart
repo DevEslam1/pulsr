@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/constants/app_radii.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/formatters.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/utils/list_content_diff.dart';
 import '../../../core/widgets/cached_artwork.dart';
@@ -390,8 +391,20 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar> {
                       ? (position.inMilliseconds / widget.duration.inMilliseconds)
                           .clamp(0.0, 1.0)
                       : 0.0);
+              final currentDuration = _dragProgress != null
+                  ? Duration(
+                      milliseconds: (widget.duration.inMilliseconds *
+                              _dragProgress!)
+                          .round())
+                  : position;
+              final valueLabel =
+                  '${Formatters.formatDuration(currentDuration)} / ${Formatters.formatDuration(widget.duration)}';
 
-              return GestureDetector(
+              return Semantics(
+                slider: true,
+                label: 'Seek',
+                value: valueLabel,
+                child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTapDown: (details) {
                   if (trackWidth > 0 && widget.duration.inMilliseconds > 0) {
@@ -478,7 +491,8 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar> {
                     ),
                   ),
                 ),
-              );
+              ),
+            );
             },
           );
         },

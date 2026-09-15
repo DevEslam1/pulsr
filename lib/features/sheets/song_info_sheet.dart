@@ -35,7 +35,8 @@ class SongInfoSheet extends StatelessWidget {
   const SongInfoSheet({super.key, required this.song});
 
   Future<void> _shareSong(BuildContext context) async {
-    final text = 'Check out "${song.title}" by ${song.artist} on Pulsr Music!';
+    final text =
+        '${context.l10n.browseCheckOut} "${song.title}" ${context.l10n.browseBy} ${song.artist} ${context.l10n.browseOnPulsr}';
     if (song.path.isNotEmpty && !song.path.startsWith('ytmusic://')) {
       final exists = await File(song.path).exists();
       if (exists) {
@@ -51,10 +52,10 @@ class SongInfoSheet extends StatelessWidget {
   Future<void> _setRingtone(BuildContext context, String type) async {
     const channel = MethodChannel(PulsrChannels.ringtone);
     final label = type == 'notification'
-        ? 'Notification sound'
+        ? context.l10n.browseNotificationSound
         : type == 'alarm'
-            ? 'Alarm sound'
-            : 'Ringtone';
+            ? context.l10n.browseAlarmSound
+            : context.l10n.ringtone;
 
     try {
       if (Platform.isAndroid) {
@@ -67,7 +68,7 @@ class SongInfoSheet extends StatelessWidget {
             context,
             title: context.l10n.permissionRequired,
             message:
-                'To set $label directly, Android requires the "Modify system settings" permission.',
+                '${context.l10n.browseToSet} $label ${context.l10n.browseRequiresModifySettings}',
             icon: Icons.security_rounded,
             confirmLabel: context.l10n.openSettings,
             cancelLabel: context.l10n.cancel,
@@ -95,7 +96,7 @@ class SongInfoSheet extends StatelessWidget {
           SnackBar(
             content: Text(context.l10n.ringtoneFailed),
             action: SnackBarAction(
-              label: 'Settings',
+              label: context.l10n.settings,
               onPressed: () {
                 channel.invokeMethod('openWriteSettings');
               },
@@ -104,13 +105,15 @@ class SongInfoSheet extends StatelessWidget {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to set ringtone: ${e.message}')),
+          SnackBar(
+              content: Text(
+                  '${context.l10n.ringtoneFailed} ${e.message}')),
         );
       }
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to set ringtone: $e')),
+        SnackBar(content: Text('${context.l10n.ringtoneFailed} $e')),
       );
     }
   }
@@ -469,7 +472,7 @@ class SongInfoSheet extends StatelessWidget {
                                 ? Icons.star_rounded
                                 : Icons.star_outline_rounded,
                             size: 22,
-                            color: isFilled ? Colors.amber : p.textTertiary,
+                            color: isFilled ? p.warning : p.textTertiary,
                           ),
                         ),
                       );
@@ -608,7 +611,7 @@ class SongInfoSheet extends StatelessWidget {
                         children: [
                           Text(
                             currentBpm == null
-                                ? 'Not set'
+                                ? context.l10n.browseNotSet
                                 : '${currentBpm.toStringAsFixed(0)} BPM',
                             style: TextStyle(
                               fontSize: 12,
@@ -935,7 +938,7 @@ class _BpmOverrideDialogState extends State<_BpmOverrideDialog> {
         bpm < BpmOverrideStore.minBpm ||
         bpm > BpmOverrideStore.maxBpm) {
       setState(() {
-        _error = 'Enter a BPM between 40 and 240.';
+        _error = context.l10n.browseEnterBpmRange;
       });
       return;
     }

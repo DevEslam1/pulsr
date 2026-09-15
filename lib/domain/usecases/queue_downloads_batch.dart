@@ -19,9 +19,14 @@ class QueueDownloadsBatchUseCase {
     int? maxConcurrent, // optional override (used by settings screen)
   }) async {
     final results = <Either<AppFailure, String>>[];
-    for (final t in tasks) {
-      // Sequential queuing preserves FIFO order; processor respects maxConcurrent internally
-      final r = await _repository.queueDownload(t);
+    for (var i = 0; i < tasks.length; i++) {
+      // Sequential queuing preserves FIFO order; processor respects maxConcurrent internally.
+      // Small stagger between enqueues keeps resolve bursts under YouTube's
+      // rate limit (first-N-succeed-then-429 pattern).
+      if (i > 0) {
+        await Future.delayed(const Duration(milliseconds: 150));
+      }
+      final r = await _repository.queueDownload(tasks[i]);
       results.add(r);
     }
     return results;

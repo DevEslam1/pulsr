@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -61,9 +62,25 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
       parent: _tonearmController,
       curve: Curves.easeInOutCubic,
     );
+  }
 
-    if (widget.props.state.isPlaying) {
-      _rotationController.repeat();
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _tonearmController.duration = context.motionMs(850);
+    _syncRotation();
+  }
+
+  void _syncRotation() {
+    final shouldSpin = widget.props.state.isPlaying && context.motionEnabled;
+    if (shouldSpin) {
+      if (!_rotationController.isAnimating) {
+        _rotationController.repeat();
+      }
+    } else {
+      if (_rotationController.isAnimating) {
+        _rotationController.stop();
+      }
     }
   }
 
@@ -73,16 +90,11 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
     if (widget.props.state.isPlaying != oldWidget.props.state.isPlaying) {
       if (widget.props.state.isPlaying) {
         _tonearmController.forward();
-        if (!_rotationController.isAnimating) {
-          _rotationController.repeat();
-        }
       } else {
         _tonearmController.reverse();
-        if (_rotationController.isAnimating) {
-          _rotationController.stop();
-        }
       }
     }
+    _syncRotation();
   }
 
   @override
@@ -175,7 +187,13 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                   final armLength = w * 0.46;
 
 
-                  return GestureDetector(
+                  return Semantics(
+                    button: true,
+                    label: state.isPlaying
+                        ? context.l10n.pause
+                        : context.l10n.play,
+                    excludeSemantics: true,
+                    child: GestureDetector(
                     onTap: () => cubit.togglePlayPause(),
                     child: Container(
                       decoration: BoxDecoration(
@@ -404,7 +422,9 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
-                                        state.isPlaying ? '33⅓ RPM' : 'STANDBY',
+                                        state.isPlaying
+                                            ? '33⅓ RPM'
+                                            : context.l10n.dspStandby,
                                         style: TextStyle(
                                           fontSize: 8.5,
                                           fontWeight: FontWeight.w800,
@@ -423,6 +443,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                         ],
                       ),
                     ),
+                    ),
                   );
                 },
               ),
@@ -431,7 +452,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
         );
 
         final centerDisplay = AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
+          duration: context.motionMs(300),
           child: state.isLyricsVisible
               ? LyricsView(
                   key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),

@@ -5,6 +5,7 @@ import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
 
 /// AB-loop / bookmark labels need a placeholder for an unset point; the
@@ -38,11 +39,12 @@ class AdvancedPlaybackBar extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: Material(
-                  color: Colors.amber.withValues(alpha: 0.15),
+                  color: context.palette.warning.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
                   child: ListTile(
                     dense: true,
-                    leading: const Icon(Icons.bookmark, color: Colors.amber),
+                    leading:
+                        Icon(Icons.bookmark, color: context.palette.warning),
                     title: Text(l10n.resumeFromPrompt(
                         _fmt(state.bookmarkPosition))),
                     trailing: Row(
@@ -68,14 +70,14 @@ class AdvancedPlaybackBar extends StatelessWidget {
                   // F1: AB loop
                   IconButton(
                     tooltip: l10n.setLoopPointA(_fmt(state.abPointA)),
-                    color: state.abPointA != null ? Colors.blue : null,
+                    color: state.abPointA != null ? context.palette.info : null,
                     onPressed: cubit.setAbPointA,
                     icon: const Text('A',
                         style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                   IconButton(
                     tooltip: l10n.setLoopPointB(_fmt(state.abPointB)),
-                    color: state.abPointB != null ? Colors.blue : null,
+                    color: state.abPointB != null ? context.palette.info : null,
                     onPressed: cubit.setAbPointB,
                     icon: const Text('B',
                         style: TextStyle(fontWeight: FontWeight.bold)),
@@ -84,7 +86,7 @@ class AdvancedPlaybackBar extends StatelessWidget {
                     tooltip: state.abLoopEnabled
                         ? l10n.disableAbLoop
                         : l10n.enableAbLoop,
-                    color: state.abLoopEnabled ? Colors.green : null,
+                    color: state.abLoopEnabled ? context.palette.success : null,
                     onPressed: (state.abPointA != null &&
                             state.abPointB != null)
                         ? cubit.toggleAbLoop
@@ -157,6 +159,7 @@ class _DelaySheetState extends State<_DelaySheet> {
               max: 2000,
               divisions: 80,
               value: value,
+              semanticLabel: l10n.audioDelayMsLabel(value.round()),
               onChanged: (v) => setState(() => value = v),
               onChangeEnd: (v) => widget.cubit.setTrackDelayMs(v.round()),
             ),

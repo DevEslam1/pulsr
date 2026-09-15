@@ -2,6 +2,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
 
 /// A premium, interactive custom-painted slider with an organic wavy track.
@@ -75,18 +76,26 @@ class _PulsrSliderState extends State<PulsrSlider>
       vsync: this,
       duration: const Duration(milliseconds: 3200),
     );
-    if (widget.isWavy && widget.animateWave && !_isTesting) {
-      _waveController.repeat();
-    }
   }
 
   bool get _isTesting =>
       WidgetsBinding.instance.runtimeType.toString().contains('Test');
 
   @override
-  void didUpdateWidget(PulsrSlider oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.isWavy && widget.animateWave && !_isTesting) {
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Motion decisions must not read MediaQuery during initState.
+    _expandController.duration = context.motionMs(180);
+    _waveController.duration = context.motionMs(3200);
+    _syncWave();
+  }
+
+  void _syncWave() {
+    final shouldAnimate = context.motionEnabled &&
+        widget.isWavy &&
+        widget.animateWave &&
+        !_isTesting;
+    if (shouldAnimate) {
       if (!_waveController.isAnimating) {
         _waveController.repeat();
       }
@@ -95,6 +104,12 @@ class _PulsrSliderState extends State<PulsrSlider>
         _waveController.stop();
       }
     }
+  }
+
+  @override
+  void didUpdateWidget(PulsrSlider oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncWave();
   }
 
   @override
@@ -147,6 +162,7 @@ class _PulsrSliderState extends State<PulsrSlider>
 
     return Semantics(
       label: widget.semanticLabel,
+      slider: true,
       child: SizedBox(
         height: widget.height,
         child: LayoutBuilder(

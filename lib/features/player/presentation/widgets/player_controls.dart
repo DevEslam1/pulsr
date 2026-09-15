@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../cubit/player_state.dart';
@@ -120,7 +121,7 @@ class PlayerControls extends StatelessWidget {
                   onPlayPause();
                 },
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
+                  duration: context.motionMs(200),
                   width: mainButtonSize,
                   height: mainButtonSize,
                   decoration: BoxDecoration(
@@ -153,7 +154,7 @@ class PlayerControls extends StatelessWidget {
                   ),
                   child: Center(
                     child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 180),
+                      duration: context.motionMs(180),
                       transitionBuilder: (child, anim) => ScaleTransition(
                         scale: anim,
                         child: child,
@@ -167,8 +168,8 @@ class PlayerControls extends StatelessWidget {
                     ),
                   ),
                 ).animate(target: isPlaying ? 1 : 0).scale(
-                      duration: 140.ms,
-                      curve: Curves.easeOutBack,
+                      duration: context.motionMs(140),
+                      curve: context.motionCurve(Curves.easeOutBack),
                       begin: const Offset(0.94, 0.94),
                       end: const Offset(1.0, 1.0),
                     ),
@@ -264,7 +265,7 @@ class _ControlButton extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
+                  duration: context.motionMs(200),
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
@@ -280,7 +281,7 @@ class _ControlButton extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
+                  duration: context.motionMs(200),
                   width: isActive ? 4 : 0,
                   height: isActive ? 4 : 0,
                   decoration: BoxDecoration(

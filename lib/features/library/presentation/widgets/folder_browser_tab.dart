@@ -29,7 +29,7 @@ class FolderBrowserTab extends StatelessWidget {
             await cubit.init();
             if (!context.mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Scan complete! $count tracks loaded.')),
+              SnackBar(content: Text(context.l10n.scanComplete(count))),
             );
           }
         }
@@ -44,10 +44,9 @@ class FolderBrowserTab extends StatelessWidget {
                   hasScrollBody: false,
                   child: EmptyStateWidget(
                     icon: Icons.folder_off_rounded,
-                    title: 'No Folders Found',
-                    subtitle:
-                        'Scan device storage to discover music directories and organize by path.',
-                    primaryActionLabel: 'Scan Storage',
+                    title: context.l10n.noFoldersFound,
+                    subtitle: context.l10n.noFoldersSubtitle,
+                    primaryActionLabel: context.l10n.scanStorage,
                     primaryActionIcon: Icons.center_focus_strong_rounded,
                     onPrimaryAction: onRefresh,
                   ),
@@ -161,7 +160,7 @@ class FolderBrowserTab extends StatelessWidget {
                           ],
                         ),
                         subtitle: Text(
-                          '${folder.songCount} audio tracks • ${folder.path}',
+                          '${folder.songCount} ${context.l10n.browseAudioTracks} • ${folder.path}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style:
@@ -177,8 +176,8 @@ class FolderBrowserTab extends StatelessWidget {
                             size: 22,
                           ),
                           tooltip: folder.isExcluded
-                              ? 'Include in Scan'
-                              : 'Exclude from Scan',
+                              ? context.l10n.browseIncludeInScan
+                              : context.l10n.browseExcludeFromScan,
                           onPressed: () {
                             cubit.toggleFolderExclusion(folder.path);
                           },

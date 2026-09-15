@@ -153,9 +153,10 @@ class _LyricsViewState extends State<LyricsView> {
     if (source == LyricsSource.none) return const SizedBox.shrink();
 
     final String label = switch (source) {
-      LyricsSource.embedded => synced ? 'Embedded' : 'Embedded (unsynced)',
+      LyricsSource.embedded =>
+        synced ? context.l10n.dspEmbedded : context.l10n.dspEmbeddedUnsynced,
       LyricsSource.externalLrc => 'LRC File',
-      LyricsSource.lrclib => synced ? 'LRCLIB Synced' : 'LRCLIB',
+      LyricsSource.lrclib => synced ? context.l10n.dspLrcLibSynced : 'LRCLIB',
       LyricsSource.ytmusic => 'YouTube Music',
       LyricsSource.none => '',
     };
@@ -213,6 +214,7 @@ class _LyricsViewState extends State<LyricsView> {
     }
     final song = cubit.state.currentSong;
     if (song == null) return;
+    final l10n = context.l10n;
     final messenger = ScaffoldMessenger.maybeOf(context);
     await showModalBottomSheet<void>(
       context: context,
@@ -228,8 +230,8 @@ class _LyricsViewState extends State<LyricsView> {
           messenger?.showSnackBar(SnackBar(
             behavior: SnackBarBehavior.floating,
             content: Text(persisted
-                ? 'Lyrics saved'
-                : 'Lyrics updated for this session only'),
+                ? l10n.dspLyricsSaved
+                : l10n.dspLyricsSessionOnly),
           ));
         },
       ),
@@ -257,9 +259,9 @@ class _LyricsViewState extends State<LyricsView> {
       children: [
         if (hasSong)
           _headerIconButton(
-              Icons.edit_note_rounded, 'Edit lyrics', _openEditor),
+              Icons.edit_note_rounded, context.l10n.dspEditLyrics, _openEditor),
         _headerIconButton(
-            Icons.fullscreen_rounded, 'Karaoke mode', _openKaraoke),
+            Icons.fullscreen_rounded, context.l10n.dspKaraokeMode, _openKaraoke),
       ],
     );
   }

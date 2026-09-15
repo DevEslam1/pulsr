@@ -14,6 +14,7 @@ import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_slider.dart';
 import '../../auth/presentation/ytm_web_login_sheet.dart';
+import '../cubit/settings_accessibility_ext.dart';
 import '../cubit/settings_cubit.dart';
 import '../cubit/settings_state.dart';
 import 'widgets/audio_sound_section.dart';
@@ -105,8 +106,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           body: SafeArea(
             bottom: false,
             child: isTabletView
-                ? _buildTabletLayout(
-                    context, state, cubit, effectiveCategoryId)
+                ? _buildTabletLayout(context, state, cubit, effectiveCategoryId)
                 : _buildPhoneLayout(context, state, cubit),
           ),
         );
@@ -144,7 +144,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Pulsr v${AppConfig.appVersion} • Audiophile Music Experience',
+                      context.l10n.settingsHeaderTagline(AppConfig.appVersion),
                       style: TextStyle(
                         color: p.textTertiary,
                         fontSize: 12,
@@ -177,7 +177,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 fontWeight: FontWeight.w600,
               ),
               decoration: InputDecoration(
-                hintText: 'Search settings, sound, appearance...',
+                hintText: context.l10n.settingsSearchPlaceholder,
                 hintStyle: TextStyle(
                   color: p.textTertiary,
                   fontSize: 13.5,
@@ -218,71 +218,71 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final categories = <_SettingsCategoryItem>[
       _SettingsCategoryItem(
         id: 'audio',
-        title: 'Audio & Sound',
-        subtitle: 'Equalizer, DSP, Hi-Res, ReplayGain',
+        title: context.l10n.audioAndSound,
+        subtitle: context.l10n.settingsCategoryAudioSubtitle,
         icon: Icons.equalizer_rounded,
         tintColor: const Color(0xFFFF9500),
       ),
       _SettingsCategoryItem(
         id: 'playback',
-        title: 'Playback',
-        subtitle: 'Crossfade, gapless, sleep timer, skip',
+        title: context.l10n.playback,
+        subtitle: context.l10n.settingsCategoryPlaybackSubtitle,
         icon: Icons.play_circle_outline_rounded,
         tintColor: const Color(0xFFAF52DE),
       ),
       _SettingsCategoryItem(
         id: 'appearance',
-        title: 'Appearance',
-        subtitle: 'Theme mode, accent colors, visualizer',
+        title: context.l10n.settingsCategoryAppearance,
+        subtitle: context.l10n.settingsCategoryAppearanceSubtitle,
         icon: Icons.palette_outlined,
         tintColor: const Color(0xFFFF2D55),
       ),
       _SettingsCategoryItem(
         id: 'gestures',
-        title: 'Gestures',
-        subtitle: 'Mini-player swipes, artwork double-tap',
+        title: context.l10n.gestures,
+        subtitle: context.l10n.settingsCategoryGesturesSubtitle,
         icon: Icons.swipe_rounded,
         tintColor: const Color(0xFF007AFF),
       ),
       _SettingsCategoryItem(
         id: 'profiles',
-        title: 'Profiles & Rules',
-        subtitle: 'Hardware DAC mappings, trigger rules',
+        title: context.l10n.settingsCategoryProfiles,
+        subtitle: context.l10n.settingsCategoryProfilesSubtitle,
         icon: Icons.devices_other_rounded,
         tintColor: const Color(0xFF5856D6),
       ),
       _SettingsCategoryItem(
         id: 'library',
-        title: 'Library',
-        subtitle: 'Folders, hidden media, duration filter',
+        title: context.l10n.navLibrary,
+        subtitle: context.l10n.settingsCategoryLibrarySubtitle,
         icon: Icons.library_music_outlined,
         tintColor: const Color(0xFF34C759),
       ),
       _SettingsCategoryItem(
         id: 'online',
-        title: 'Network & YTM',
-        subtitle: 'Audio quality, streaming cache, proxy',
+        title: context.l10n.settingsCategoryOnline,
+        subtitle: context.l10n.settingsCategoryOnlineSubtitle,
         icon: Icons.cloud_outlined,
         tintColor: const Color(0xFF5AC8FA),
       ),
       _SettingsCategoryItem(
         id: 'storage',
-        title: 'Storage & Cache',
-        subtitle: 'Disk usage, cached artwork, cleanup',
+        title: context.l10n.storageAndCache,
+        subtitle: context.l10n.settingsCategoryStorageSubtitle,
         icon: Icons.storage_rounded,
         tintColor: const Color(0xFFFFCC00),
       ),
       _SettingsCategoryItem(
         id: 'privacy',
-        title: 'Privacy & Backup',
-        subtitle: 'Offline guarantee, scrobbling, backups',
+        title: context.l10n.settingsCategoryPrivacy,
+        subtitle: context.l10n.settingsCategoryPrivacySubtitle,
         icon: Icons.shield_outlined,
         tintColor: const Color(0xFF30B0C7),
       ),
       _SettingsCategoryItem(
         id: 'about',
-        title: 'About',
-        subtitle: 'Version ${AppConfig.appVersion}, licenses, specs',
+        title: context.l10n.settingsCategoryAbout,
+        subtitle: context.l10n.settingsCategoryAboutSubtitle(AppConfig.appVersion),
         icon: Icons.info_outline_rounded,
         tintColor: const Color(0xFF8E8E93),
       ),
@@ -303,8 +303,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final p = context.palette;
     final categories = _getCategories(context, pro: state.isProfessional);
     final items = [
-      (id: 'all', title: 'All', icon: Icons.tune_rounded, color: p.accent),
-      ...categories.map((c) => (id: c.id, title: c.title, icon: c.icon, color: c.tintColor)),
+      (id: 'all', title: context.l10n.all, icon: Icons.tune_rounded, color: p.accent),
+      ...categories.map(
+          (c) => (id: c.id, title: c.title, icon: c.icon, color: c.tintColor)),
     ];
 
     return SizedBox(
@@ -312,8 +313,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
-        padding: EdgeInsets.symmetric(
-            horizontal: Adaptive.pagePadding(context)),
+        padding:
+            EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
         itemCount: items.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
@@ -534,7 +535,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 2),
           Text(
-            'Pulsr v${AppConfig.appVersion} • Audiophile Engine',
+            context.l10n.settingsHeaderTaglineShort(AppConfig.appVersion),
             style: TextStyle(
               color: p.textTertiary,
               fontSize: 11.5,
@@ -562,7 +563,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 fontWeight: FontWeight.w600,
               ),
               decoration: InputDecoration(
-                hintText: 'Search settings, sound, appearance...',
+                hintText: context.l10n.settingsSearchPlaceholder,
                 hintStyle: TextStyle(
                   color: p.textTertiary,
                   fontSize: 13,
@@ -736,7 +737,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             _buildCategoryHeroHeader(context, currentCat),
             const SizedBox(height: 14),
-            ..._buildCategoryWidgets(context, _selectedCategoryId, state, cubit),
+            ..._buildCategoryWidgets(
+                context, _selectedCategoryId, state, cubit),
           ],
         ),
       ),
@@ -820,8 +822,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return [
           _section(
             context,
-            'SMART AUDIO',
-            'Automatic headphone correction and best-quality output',
+            context.l10n.smartAudioTitle,
+            context.l10n.settingsSmartAudioSectionSubtitle,
             [
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -836,14 +838,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _catSection(context, 'playback', PlaybackSection(state: state)),
           _section(
             context,
-            'QURAN MODE',
-            'Vocal-optimized recitation profiles',
+            context.l10n.quranMode,
+            context.l10n.reciterDesc,
             [
               _navTile(
                 context,
                 Icons.menu_book_rounded,
-                'Quran Mode',
-                'Vocal EQ, mosque ambience, memorization speed',
+                context.l10n.quranMode,
+                context.l10n.settingsQuranModeSubtitle,
                 onTap: () => context.push('/quran-mode'),
               ),
             ],
@@ -859,8 +861,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return [
           _section(
             context,
-            'DEVICE PROFILES',
-            'Per-output DAC and Bluetooth profile mappings',
+            context.l10n.deviceProfilesTitle,
+            context.l10n.settingsDeviceProfilesSectionSubtitle,
             [
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -871,14 +873,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           _section(
             context,
-            'AUTOMATION RULES',
-            'Trigger profiles automatically on hardware events',
+            context.l10n.automationRules,
+            context.l10n.settingsAutomationSectionSubtitle,
             [
               _navTile(
                 context,
                 Icons.auto_awesome_rounded,
-                'Automation Rules',
-                'Apply profiles on headphone plug, Bluetooth or charge events',
+                context.l10n.automationRules,
+                context.l10n.settingsAutomationTileSubtitle,
                 onTap: () => showAutomationRulesSheet(context),
               ),
             ],
@@ -894,7 +896,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _section(
             context,
             context.l10n.storageAndCache,
-            'Manage disk usage and audio cache',
+            context.l10n.settingsStorageSectionSubtitle,
             [const StorageCacheSection()],
             key: _catById('storage').key,
           ),
@@ -910,13 +912,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _section(
             context,
             context.l10n.about,
-            'Version info, licenses and architecture',
+            context.l10n.settingsAboutSectionSubtitle,
             [
               _navTile(
                 context,
                 Icons.info_outline_rounded,
                 context.l10n.appTitle,
-                'Version ${AppConfig.appVersion} • Open-source Audiophile Engine',
+                context.l10n.settingsAboutVersionSubtitle(AppConfig.appVersion),
                 onTap: () => showAboutSheet(context),
               ),
             ],
@@ -942,7 +944,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return _section(
       context,
       context.l10n.themeAndAppearance,
-      'Theme, accent colors, visualizer and player UI style',
+      context.l10n.settingsAppearanceSectionSubtitle,
       [
         // Theme selector segment
         Padding(
@@ -950,7 +952,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(context.l10n.themeModeLabel,
+              Text(
+                context.l10n.themeModeLabel,
                 style: TextStyle(
                   color: p.textSecondary,
                   fontSize: 11,
@@ -1028,7 +1031,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     ButtonSegment(
                       value: AppThemeMode.amoled,
-                      label: Text(context.l10n.amoledLabel,
+                      label: Text(
+                        context.l10n.amoledLabel,
                         maxLines: 1,
                         softWrap: false,
                         style: TextStyle(
@@ -1097,7 +1101,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             color: color,
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: isSelected ? p.textPrimary : Colors.transparent,
+                              color: isSelected
+                                  ? p.textPrimary
+                                  : Colors.transparent,
                               width: 2.5,
                             ),
                             boxShadow: isSelected
@@ -1133,8 +1139,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _switchTile(
           context,
           Icons.nightlight_round,
-          'Auto Dark Mode by Time',
-          'Follow a 7 PM – 6 AM day/night schedule',
+          context.l10n.settingsAutoDarkModeTitle,
+          context.l10n.settingsAutoDarkModeSubtitle,
           value: state.autoThemeByTime,
           onChanged: cubit.setAutoThemeByTime,
         ),
@@ -1142,39 +1148,123 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _switchTile(
           context,
           Icons.contrast_rounded,
-          'High Contrast',
-          'Boost contrast with an AMOLED-friendly palette',
+          context.l10n.settingsHighContrastTitle,
+          context.l10n.settingsHighContrastSubtitle,
           value: state.highContrast,
           onChanged: cubit.setHighContrast,
+        ),
+        _divider(p),
+        _switchTile(
+          context,
+          Icons.motion_photos_off_rounded,
+          context.l10n.settingsReduceMotionTitle,
+          context.l10n.settingsReduceMotionSubtitle,
+          value: state.reduceMotion,
+          onChanged: cubit.setReduceMotion,
+        ),
+        _divider(p),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.blur_on_rounded, size: 22, color: p.accent),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Builder(
+                          builder: (_) {
+                            final title = context.l10n.settingsLiquidGlassTitle;
+                            return Text(
+                              title,
+                              style: TextStyle(
+                                color: p.textPrimary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 2),
+                        Builder(
+                          builder: (_) {
+                            final subtitle =
+                                context.l10n.settingsLiquidGlassSubtitle;
+                            return Text(
+                              subtitle,
+                              style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: 12.5,
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    '${(state.liquidGlassTint * 100).round()}%',
+                    style: TextStyle(
+                      color: p.accent,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  activeTrackColor: p.accent,
+                  inactiveTrackColor: p.accent.withValues(alpha: 0.15),
+                  thumbColor: p.accent,
+                  overlayColor: p.accent.withValues(alpha: 0.12),
+                  trackHeight: 3,
+                ),
+                child: Slider(
+                  value: state.liquidGlassTint,
+                  min: 0.0,
+                  max: 1.0,
+                  divisions: 20,
+                  onChanged: cubit.setLiquidGlassTint,
+                ),
+              ),
+            ],
+          ),
         ),
         _divider(p),
         _navTile(
           context,
           Icons.art_track_rounded,
           context.l10n.nowPlayingTheme,
-          getThemeModeTitle(state.playerThemeMode),
-          trailingBadge: 'STYLE',
-          onTap: () => showThemePickerSheet(context, cubit, state.playerThemeMode),
+          getThemeModeTitle(state.playerThemeMode, context.l10n),
+          trailingBadge: context.l10n.settingsBadgeStyle,
+          onTap: () =>
+              showThemePickerSheet(context, cubit, state.playerThemeMode),
         ),
         _divider(p),
         _navTile(
           context,
           Icons.graphic_eq_rounded,
           context.l10n.visualizerStyle,
-          getVisualizerStyleTitle(state.visualizerStyle),
-          trailingBadge: 'DSP',
-          onTap: () =>
-              showVisualizerStylePickerSheet(context, cubit, state.visualizerStyle),
+          getVisualizerStyleTitle(state.visualizerStyle, context.l10n),
+          trailingBadge: context.l10n.settingsBadgeDsp,
+          onTap: () => showVisualizerStylePickerSheet(
+              context, cubit, state.visualizerStyle),
         ),
         _divider(p),
         _navTile(
           context,
           Icons.palette_outlined,
           context.l10n.colorSource,
-          getColorSourceTitle(state.themeColorSource),
-          trailingBadge: 'PALETTE',
-          onTap: () =>
-              showColorSourcePickerSheet(context, cubit, state.themeColorSource),
+          getColorSourceTitle(state.themeColorSource, context.l10n),
+          trailingBadge: context.l10n.settingsBadgePalette,
+          onTap: () => showColorSourcePickerSheet(
+              context, cubit, state.themeColorSource),
         ),
         _divider(p),
         _navTile(
@@ -1205,13 +1295,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return _section(
       context,
       context.l10n.gestures,
-      'Configure swipe and double-tap gestures across mini-player and artwork',
+      context.l10n.settingsGesturesSectionSubtitle,
       [
         _navTile(
           context,
           Icons.swipe_left_rounded,
           context.l10n.miniPlayerSwipeLeft,
-          getMiniPlayerSwipeTitle(state.miniPlayerSwipeLeft),
+          getMiniPlayerSwipeTitle(state.miniPlayerSwipeLeft, context.l10n),
           onTap: () => showMiniPlayerSwipePickerSheet(
             context,
             cubit,
@@ -1224,7 +1314,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           context,
           Icons.swipe_right_rounded,
           context.l10n.miniPlayerSwipeRight,
-          getMiniPlayerSwipeTitle(state.miniPlayerSwipeRight),
+          getMiniPlayerSwipeTitle(state.miniPlayerSwipeRight, context.l10n),
           onTap: () => showMiniPlayerSwipePickerSheet(
             context,
             cubit,
@@ -1237,7 +1327,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           context,
           Icons.touch_app_rounded,
           context.l10n.nowPlayingDoubleTap,
-          getNowPlayingDoubleTapTitle(state.nowPlayingDoubleTap),
+          getNowPlayingDoubleTapTitle(state.nowPlayingDoubleTap, context.l10n),
           onTap: () => showNowPlayingDoubleTapPickerSheet(
             context,
             cubit,
@@ -1249,7 +1339,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           context,
           Icons.gesture_rounded,
           context.l10n.artworkSwipe,
-          getNowPlayingArtworkSwipeTitle(state.nowPlayingArtworkSwipe),
+          getNowPlayingArtworkSwipeTitle(state.nowPlayingArtworkSwipe, context.l10n),
           onTap: () => showNowPlayingArtworkSwipePickerSheet(
             context,
             cubit,
@@ -1275,7 +1365,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return _section(
       context,
       context.l10n.libraryAndScanning,
-      'Device media indexing, exclusion rules and cleanup',
+      context.l10n.settingsLibrarySectionSubtitle,
       [
         _navTile(
           context,
@@ -1362,56 +1452,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
       AppConfig.ytmEnabled
           ? context.l10n.youtubeMusicAndOnline
           : context.l10n.networkAndProxy,
-      'Online streams, downloads, proxy routing and quality settings',
+      context.l10n.settingsOnlineSectionSubtitle,
       [
         if (AppConfig.ytmEnabled) ...[
           // Account + web-player entries trigger network; hide them when the
           // user has turned on offline-only mode (Home/Search already do).
           if (!state.offlineOnlyMode) ...[
-          () {
-            final ytmAccount = getIt<YtmAccountService>();
-            return ValueListenableBuilder<bool>(
-              valueListenable: ytmAccount.loginState,
-              builder: (context, isLoggedIn, _) {
-                if (!isLoggedIn) {
-                  return _navTile(
-                    context,
-                    Icons.account_circle_outlined,
-                    context.l10n.connectYtmAccount,
-                    context.l10n.connectYtmSubtitle,
-                    onTap: () async {
-                      final ok = await YtmWebLoginSheet.show(context);
-                      if (ok == true && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(context.l10n.ytmConnected),
-                          ),
-                        );
-                      }
-                    },
-                  );
-                } else {
-                  return _navTile(
-                    context,
-                    Icons.account_circle_rounded,
-                    context.l10n.ytmConnected,
-                    '${ytmAccount.accountName ?? "Connected"} • Tap to manage',
-                    trailingBadge: 'CONNECTED',
-                    onTap: () => showYtmAccountDisconnectDialog(context),
-                  );
-                }
-              },
-            );
-          }(),
-          _divider(p),
-          _navTile(
-            context,
-            Icons.language_rounded,
-            context.l10n.openYtmWeb,
-            context.l10n.openYtmWebSubtitle,
-            onTap: () => showYtmWebOptionsSheet(context),
-          ),
-          _divider(p),
+            () {
+              final ytmAccount = getIt<YtmAccountService>();
+              return ValueListenableBuilder<bool>(
+                valueListenable: ytmAccount.loginState,
+                builder: (context, isLoggedIn, _) {
+                  if (!isLoggedIn) {
+                    return _navTile(
+                      context,
+                      Icons.account_circle_outlined,
+                      context.l10n.connectYtmAccount,
+                      context.l10n.connectYtmSubtitle,
+                      onTap: () async {
+                        final ok = await YtmWebLoginSheet.show(context);
+                        if (ok == true && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(context.l10n.ytmConnected),
+                            ),
+                          );
+                        }
+                      },
+                    );
+                  } else {
+                    return _navTile(
+                      context,
+                      Icons.account_circle_rounded,
+                      context.l10n.ytmConnected,
+                      '${ytmAccount.accountName ?? context.l10n.castConnected} • ${context.l10n.settingsTapToManage}',
+                      trailingBadge: context.l10n.settingsBadgeConnected,
+                      onTap: () => showYtmAccountDisconnectDialog(context),
+                    );
+                  }
+                },
+              );
+            }(),
+            _divider(p),
+            _navTile(
+              context,
+              Icons.language_rounded,
+              context.l10n.openYtmWeb,
+              context.l10n.openYtmWebSubtitle,
+              onTap: () => showYtmWebOptionsSheet(context),
+            ),
+            _divider(p),
           ],
           _switchTile(
             context,
@@ -1444,7 +1534,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               context,
               Icons.wifi_tethering_rounded,
               context.l10n.streamingQuality,
-              getQualityTitle(state.streamingQuality),
+              getQualityTitle(state.streamingQuality, context.l10n),
               trailingBadge: state.streamingQuality.name.toUpperCase(),
               onTap: () => showQualityPickerSheet(
                 context,
@@ -1458,7 +1548,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               context,
               Icons.downloading_rounded,
               context.l10n.downloadQuality,
-              getQualityTitle(state.downloadQuality),
+              getQualityTitle(state.downloadQuality, context.l10n),
               trailingBadge: state.downloadQuality.name.toUpperCase(),
               onTap: () => showQualityPickerSheet(
                 context,
@@ -1471,8 +1561,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _navTile(
               context,
               Icons.folder_zip_rounded,
-              'Downloads',
-              'View and manage offline tracks and downloads',
+              context.l10n.downloadsTitle,
+              context.l10n.settingsDownloadsSubtitle,
               onTap: () => context.push('/downloads'),
             ),
           ],
@@ -1483,8 +1573,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Icons.vpn_lock_rounded,
           context.l10n.proxySettings,
           state.proxyEnabled
-              ? '${state.proxyType.displayName} • ${state.proxyHost.isNotEmpty ? "${state.proxyHost}:${state.proxyPort}" : "Enabled"}'
-              : 'Disabled • Tap to configure HTTP / SOCKS5',
+              ? '${state.proxyType.displayName} • ${state.proxyHost.isNotEmpty ? "${state.proxyHost}:${state.proxyPort}" : context.l10n.settingsProxyEnabled}'
+              : context.l10n.settingsProxyDisabledHint,
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1497,7 +1587,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     color: p.success.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: Text(context.l10n.activeLabel,
+                  child: Text(
+                    context.l10n.activeLabel,
                     style: TextStyle(
                       color: p.success,
                       fontSize: 10,
@@ -1526,23 +1617,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return _section(
       context,
       context.l10n.privacyAndData,
-      'Data sovereignty, database backups and scrobbler integrations',
+      context.l10n.settingsPrivacySectionSubtitle,
       [
         const BackupSection(),
         _divider(p),
         _navTile(
           context,
           Icons.equalizer_outlined,
-          'Scrobbling (Last.fm & ListenBrainz)',
-          'Direct API scrobbling and Now Playing metadata broadcast',
+          context.l10n.settingsScrobblingTitle,
+          context.l10n.settingsScrobblingSubtitle,
           onTap: () => showScrobblerSettingsModal(context),
         ),
         _divider(p),
         _navTile(
           context,
           Icons.bar_chart_rounded,
-          'Scrobble Stats',
-          'Listening history and scrobble analytics overview',
+          context.l10n.settingsScrobbleStatsTitle,
+          context.l10n.settingsScrobbleStatsSubtitle,
           onTap: () => context.push('/scrobble-stats'),
         ),
         if (AppConfig.isCloudSyncAllowed) ...[
@@ -1550,8 +1641,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _navTile(
             context,
             Icons.cloud_sync_rounded,
-            'Cloud Backup Dashboard',
-            'Manage synchronized devices and cloud backup snapshots',
+            context.l10n.settingsCloudBackupDashboard,
+            context.l10n.settingsCloudBackupDashboardSubtitle,
             onTap: () => context.push('/cloud-backup-dashboard'),
           ),
         ],
@@ -1612,7 +1703,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 16),
               Text(
-                'No settings found for "$_searchQuery"',
+                context.l10n.settingsNoSettingsFound(_searchQuery),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: p.textPrimary,
@@ -1621,7 +1712,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: 6),
-              Text(context.l10n.settingsSearchHint,
+              Text(
+                context.l10n.settingsSearchHint,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: p.textSecondary, fontSize: 12.5),
               ),
@@ -1651,49 +1743,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             clipBehavior: Clip.antiAlias,
             child: ListTile(
-            leading: _iconBox(context, r.icon),
-            title: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    r.title,
-                    style: TextStyle(
-                      color: p.textPrimary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
+              leading: _iconBox(context, r.icon),
+              title: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      r.title,
+                      style: TextStyle(
+                        color: p.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: p.accent.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    r.category.toUpperCase(),
-                    style: TextStyle(
-                      color: p.accent,
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.5,
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: p.accent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      r.category.toUpperCase(),
+                      style: TextStyle(
+                        color: p.accent,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
+              subtitle: Text(
+                r.subtitle,
+                style: TextStyle(color: p.textSecondary, fontSize: 12),
+              ),
+              trailing: r.trailing ??
+                  Icon(Icons.chevron_right_rounded,
+                      color: p.textTertiary, size: 20),
+              onTap: r.onTap,
             ),
-            subtitle: Text(
-              r.subtitle,
-              style: TextStyle(color: p.textSecondary, fontSize: 12),
-            ),
-            trailing: r.trailing ??
-                Icon(Icons.chevron_right_rounded,
-                    color: p.textTertiary, size: 20),
-            onTap: r.onTap,
           ),
-        ),
-      );
+        );
       },
     );
   }
@@ -1705,9 +1797,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   ) {
     return [
       _SearchItem(
-        category: 'Appearance',
-        title: 'Theme Mode',
-        subtitle: 'System Default, Light, Dark, or AMOLED high contrast',
+        category: context.l10n.settingsCategoryAppearance,
+        title: context.l10n.settingsSearchThemeModeTitle,
+        subtitle: context.l10n.settingsSearchThemeModeSubtitle,
         icon: Icons.brightness_auto_rounded,
         keywords: ['theme', 'dark', 'light', 'amoled', 'black', 'mode'],
         onTap: () {
@@ -1716,20 +1808,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
         },
       ),
       _SearchItem(
-        category: 'Appearance',
-        title: 'Accent Color',
-        subtitle: 'Custom color accent palette for buttons and active highlights',
+        category: context.l10n.settingsCategoryAppearance,
+        title: context.l10n.settingsSearchAccentColorTitle,
+        subtitle: context.l10n.settingsSearchAccentColorSubtitle,
         icon: Icons.color_lens_rounded,
-        keywords: ['color', 'accent', 'palette', 'tint', 'pink', 'blue', 'orange'],
+        keywords: [
+          'color',
+          'accent',
+          'palette',
+          'tint',
+          'pink',
+          'blue',
+          'orange'
+        ],
         onTap: () {
           _searchController.clear();
           setState(() => _selectedCategoryId = 'appearance');
         },
       ),
       _SearchItem(
-        category: 'Appearance',
-        title: 'Auto Dark Mode by Time',
-        subtitle: 'Follow a 7 PM – 6 AM day/night schedule',
+        category: context.l10n.settingsCategoryAppearance,
+        title: context.l10n.settingsAutoDarkModeTitle,
+        subtitle: context.l10n.settingsAutoDarkModeSubtitle,
         icon: Icons.nightlight_round,
         keywords: ['auto', 'night', 'schedule', 'dark'],
         trailing: Switch.adaptive(
@@ -1738,9 +1838,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
       _SearchItem(
-        category: 'Appearance',
-        title: 'High Contrast Mode',
-        subtitle: 'Boost contrast with an AMOLED-friendly palette',
+        category: context.l10n.settingsCategoryAppearance,
+        title: context.l10n.settingsSearchHighContrastTitle,
+        subtitle: context.l10n.settingsHighContrastSubtitle,
         icon: Icons.contrast_rounded,
         keywords: ['contrast', 'amoled', 'pure black'],
         trailing: Switch.adaptive(
@@ -1749,34 +1849,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
       _SearchItem(
-        category: 'Appearance',
-        title: 'Now Playing Theme Style',
-        subtitle: getThemeModeTitle(state.playerThemeMode),
-        icon: Icons.art_track_rounded,
-        keywords: ['player', 'vinyl', 'cassette', 'waveform', 'card', 'lyrics', 'theme'],
-        onTap: () => showThemePickerSheet(context, cubit, state.playerThemeMode),
+        category: context.l10n.settingsCategoryAppearance,
+        title: context.l10n.settingsReduceMotionTitle,
+        subtitle: context.l10n.settingsReduceMotionSubtitle,
+        icon: Icons.motion_photos_off_rounded,
+        keywords: ['motion', 'animation', 'accessibility', 'reduce'],
+        trailing: Switch.adaptive(
+          value: state.reduceMotion,
+          onChanged: cubit.setReduceMotion,
+        ),
       ),
       _SearchItem(
-        category: 'Appearance',
-        title: 'Visualizer Style',
-        subtitle: getVisualizerStyleTitle(state.visualizerStyle),
+        category: context.l10n.settingsCategoryAppearance,
+        title: context.l10n.settingsSearchNowPlayingThemeTitle,
+        subtitle: getThemeModeTitle(state.playerThemeMode, context.l10n),
+        icon: Icons.art_track_rounded,
+        keywords: [
+          'player',
+          'vinyl',
+          'cassette',
+          'waveform',
+          'card',
+          'lyrics',
+          'theme'
+        ],
+        onTap: () =>
+            showThemePickerSheet(context, cubit, state.playerThemeMode),
+      ),
+      _SearchItem(
+        category: context.l10n.settingsCategoryAppearance,
+        title: context.l10n.settingsSearchVisualizerStyleTitle,
+        subtitle: getVisualizerStyleTitle(state.visualizerStyle, context.l10n),
         icon: Icons.graphic_eq_rounded,
         keywords: ['visualizer', 'spectrum', 'waveform', 'bars', 'frequency'],
         onTap: () => showVisualizerStylePickerSheet(
             context, cubit, state.visualizerStyle),
       ),
       _SearchItem(
-        category: 'Appearance',
-        title: 'Color Source',
-        subtitle: getColorSourceTitle(state.themeColorSource),
+        category: context.l10n.settingsCategoryAppearance,
+        title: context.l10n.colorSource,
+        subtitle: getColorSourceTitle(state.themeColorSource, context.l10n),
         icon: Icons.palette_outlined,
         keywords: ['material you', 'dynamic', 'wallpaper', 'artwork'],
-        onTap: () => showColorSourcePickerSheet(
-            context, cubit, state.themeColorSource),
+        onTap: () =>
+            showColorSourcePickerSheet(context, cubit, state.themeColorSource),
       ),
       _SearchItem(
-        category: 'Appearance',
-        title: 'Language',
+        category: context.l10n.settingsCategoryAppearance,
+        title: context.l10n.language,
         subtitle: getLanguageTitle(state.languageCode, context.l10n),
         icon: Icons.language_rounded,
         keywords: ['language', 'locale', 'arabic', 'english', 'spanish'],
@@ -1784,20 +1904,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
             showLanguagePickerSheet(context, cubit, state.languageCode),
       ),
       _SearchItem(
-        category: 'Audio',
-        title: 'Equalizer & Sound Effects',
-        subtitle: '10-band equalizer, bass boost, virtualizer, reverb',
+        category: context.l10n.settingsSearchCategoryAudio,
+        title: context.l10n.equalizerAndSoundEffects,
+        subtitle: context.l10n.settingsSearchEqualizerSubtitle,
         icon: Icons.equalizer_rounded,
-        keywords: ['eq', 'equalizer', 'bass', 'treble', 'sound', 'dsp', 'reverb'],
+        keywords: [
+          'eq',
+          'equalizer',
+          'bass',
+          'treble',
+          'sound',
+          'dsp',
+          'reverb'
+        ],
         onTap: () {
           _searchController.clear();
           setState(() => _selectedCategoryId = 'audio');
         },
       ),
       _SearchItem(
-        category: 'Audio',
-        title: 'Bit-Perfect & Hi-Res Output',
-        subtitle: 'Direct USB DAC hardware sample-rate matching',
+        category: context.l10n.settingsSearchCategoryAudio,
+        title: context.l10n.settingsSearchBitPerfectTitle,
+        subtitle: context.l10n.settingsSearchBitPerfectSubtitle,
         icon: Icons.album_rounded,
         keywords: ['dac', 'hires', 'bit-perfect', 'sample rate', 'khz', 'usb'],
         pro: true,
@@ -1807,9 +1935,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         },
       ),
       _SearchItem(
-        category: 'Playback',
-        title: 'Crossfade & Gapless',
-        subtitle: 'Seamless transitions and crossfade seconds slider',
+        category: context.l10n.playback,
+        title: context.l10n.settingsSearchCrossfadeTitle,
+        subtitle: context.l10n.settingsSearchCrossfadeSubtitle,
         icon: Icons.play_circle_outline_rounded,
         keywords: ['crossfade', 'gapless', 'transition', 'seconds', 'fade'],
         onTap: () {
@@ -1818,9 +1946,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         },
       ),
       _SearchItem(
-        category: 'Playback',
-        title: 'Sleep Timer',
-        subtitle: 'Automatically stop playback after duration or end of track',
+        category: context.l10n.playback,
+        title: context.l10n.sleepTimer,
+        subtitle: context.l10n.settingsSearchSleepTimerSubtitle,
         icon: Icons.timer_outlined,
         keywords: ['sleep', 'timer', 'stop', 'night'],
         onTap: () {
@@ -1829,9 +1957,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         },
       ),
       _SearchItem(
-        category: 'Gestures',
-        title: 'Mini-Player Swipe Gestures',
-        subtitle: 'Left & Right swipe actions (Skip, Previous, Volume)',
+        category: context.l10n.gestures,
+        title: context.l10n.settingsSearchSwipeTitle,
+        subtitle: context.l10n.settingsSearchSwipeSubtitle,
         icon: Icons.swipe_rounded,
         keywords: ['swipe', 'miniplayer', 'gesture', 'left', 'right', 'volume'],
         onTap: () {
@@ -1840,43 +1968,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
         },
       ),
       _SearchItem(
-        category: 'Library',
-        title: 'Rescan Device Storage',
-        subtitle: 'Discover newly downloaded songs and update metadata',
+        category: context.l10n.navLibrary,
+        title: context.l10n.settingsSearchRescanTitle,
+        subtitle: context.l10n.settingsSearchRescanSubtitle,
         icon: Icons.refresh_rounded,
         keywords: ['scan', 'refresh', 'library', 'songs', 'tracks', 'storage'],
         onTap: () => cubit.rescanLibrary(),
       ),
       _SearchItem(
-        category: 'Library',
-        title: 'Hidden & Excluded Folders',
-        subtitle: 'Exclude voice memos, ringtones, and specific directories',
+        category: context.l10n.navLibrary,
+        title: context.l10n.hiddenAndExcludedFolders,
+        subtitle: context.l10n.settingsSearchHiddenFoldersSubtitle,
         icon: Icons.folder_off_rounded,
         keywords: ['hidden', 'folders', 'exclude', 'voice memos', 'ringtones'],
         onTap: () => context.push('/hidden-folders'),
       ),
       _SearchItem(
-        category: 'Library',
-        title: 'Short Audio Filter',
-        subtitle: 'Ignore files under ${state.minDurationSec} seconds',
+        category: context.l10n.navLibrary,
+        title: context.l10n.shortAudioFilter,
+        subtitle: context.l10n.ignoreFilesUnder(state.minDurationSec),
         icon: Icons.filter_list_rounded,
         keywords: ['filter', 'short', 'duration', 'seconds'],
         onTap: () =>
             _showDurationFilterDialog(context, cubit, state.minDurationSec),
       ),
       _SearchItem(
-        category: 'Network',
-        title: 'Proxy Settings',
-        subtitle: 'HTTP & SOCKS5 proxy routing with latency checks',
+        category: context.l10n.settingsSearchCategoryNetwork,
+        title: context.l10n.proxySettings,
+        subtitle: context.l10n.settingsSearchProxySubtitle,
         icon: Icons.vpn_lock_rounded,
         keywords: ['proxy', 'socks5', 'http', 'ip', 'port', 'vpn'],
         pro: true,
         onTap: () => context.push('/proxy-settings'),
       ),
       _SearchItem(
-        category: 'Network',
-        title: 'Streaming & Download Audio Quality',
-        subtitle: 'Bitrate preferences for online streaming and saved files',
+        category: context.l10n.settingsSearchCategoryNetwork,
+        title: context.l10n.settingsSearchQualityTitle,
+        subtitle: context.l10n.settingsSearchQualitySubtitle,
         icon: Icons.wifi_tethering_rounded,
         keywords: ['quality', 'bitrate', 'streaming', 'download', 'kbps'],
         onTap: () => showQualityPickerSheet(
@@ -1887,9 +2015,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
       _SearchItem(
-        category: 'Storage',
-        title: 'Artwork & Audio Cache',
-        subtitle: 'Clear cached cover artwork and stream chunks',
+        category: context.l10n.settingsSearchCategoryStorage,
+        title: context.l10n.settingsSearchCacheTitle,
+        subtitle: context.l10n.settingsSearchCacheSubtitle,
         icon: Icons.storage_rounded,
         keywords: ['cache', 'storage', 'clear', 'artwork', 'mb', 'disk'],
         onTap: () {
@@ -1898,25 +2026,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
         },
       ),
       _SearchItem(
-        category: 'Privacy',
-        title: 'Scrobbling (Last.fm & ListenBrainz)',
-        subtitle: 'Track listening history and broadcast Now Playing status',
+        category: context.l10n.settingsSearchCategoryPrivacy,
+        title: context.l10n.settingsScrobblingTitle,
+        subtitle: context.l10n.settingsSearchScrobblingSubtitle,
         icon: Icons.equalizer_outlined,
         keywords: ['scrobble', 'lastfm', 'listenbrainz', 'stats', 'history'],
         onTap: () => showScrobblerSettingsModal(context),
       ),
       _SearchItem(
-        category: 'Privacy',
-        title: 'Privacy Guarantee',
-        subtitle: 'Offline-first principles and permissions explanations',
+        category: context.l10n.settingsSearchCategoryPrivacy,
+        title: context.l10n.settingsSearchPrivacyTitle,
+        subtitle: context.l10n.settingsSearchPrivacySubtitle,
         icon: Icons.security_rounded,
         keywords: ['privacy', 'guarantee', 'offline', 'trackers', 'security'],
         onTap: () => showPrivacyGuaranteeSheet(context),
       ),
       _SearchItem(
-        category: 'About',
-        title: 'About Pulsr',
-        subtitle: 'Version ${AppConfig.appVersion}, build details and licenses',
+        category: context.l10n.settingsSearchCategoryAbout,
+        title: context.l10n.about,
+        subtitle: context.l10n.settingsSearchAboutSubtitle(AppConfig.appVersion),
         icon: Icons.info_outline_rounded,
         keywords: ['about', 'version', 'license', 'developer'],
         onTap: () => showAboutSheet(context),
@@ -1947,10 +2075,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final c = _catById(id);
       switch (id) {
         case 'audio':
-          c.title = 'Audio & Sound';
+          c.title = context.l10n.audioAndSound;
           break;
         case 'playback':
-          c.title = 'Playback';
+          c.title = context.l10n.playback;
           break;
         case 'appearance':
           c.title = context.l10n.themeAndAppearance;
@@ -1959,10 +2087,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           c.title = context.l10n.gestures;
           break;
         case 'profiles':
-          c.title = 'Device Profiles';
+          c.title = context.l10n.deviceProfilesTitle;
           break;
         case 'automation':
-          c.title = 'Automation';
+          c.title = context.l10n.settingsAutomationTitle;
           break;
         case 'library':
           c.title = context.l10n.libraryAndScanning;

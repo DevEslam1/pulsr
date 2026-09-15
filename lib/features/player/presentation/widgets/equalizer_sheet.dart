@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../../core/constants/app_radii.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -317,15 +318,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                        color: Colors.amber.withValues(alpha: 0.12),
+                        color: p.warning.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                            color: Colors.amber.withValues(alpha: 0.4))),
+                            color: p.warning.withValues(alpha: 0.4))),
                     child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.warning_amber_rounded,
-                              color: Colors.amber, size: 18),
+                          Icon(Icons.warning_amber_rounded,
+                              color: p.warning, size: 18),
                           const SizedBox(width: 8),
                           Expanded(
                               child: Text(
@@ -417,7 +418,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
 
   Future<void> _showSaveCustomPresetDialog(
       PlayerCubit cubit, PlayerState state) async {
-    final textController = TextEditingController(text: 'My Custom EQ');
+    final textController = TextEditingController(text: context.l10n.dspMyCustomEq);
     final name = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -425,9 +426,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
         content: TextField(
           controller: textController,
           autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Preset Name',
-            hintText: 'e.g. Warm Bass, Vocal Punch',
+          decoration: InputDecoration(
+            labelText: context.l10n.dspPresetName,
+            hintText: context.l10n.dspPresetNameHint,
           ),
         ),
         actions: [
@@ -531,8 +532,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
         ScaffoldMessenger.maybeOf(context)?.showSnackBar(
           SnackBar(
             content: Text(success
-                ? 'EQ Preset imported successfully!'
-                : 'Failed to import preset: invalid JSON format'),
+                ? context.l10n.dspPresetImported
+                : context.l10n.dspPresetImportInvalid),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -573,7 +574,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 if (error != null) ...[
                   const SizedBox(height: 8),
                   Text(error!,
-                      style: const TextStyle(color: Colors.red, fontSize: 12)),
+                      style: TextStyle(color: context.palette.error, fontSize: 12)),
                 ],
                 const SizedBox(height: 8),
                 ConstrainedBox(
@@ -591,7 +592,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                       decimal: true),
                               decoration: InputDecoration(
                                 isDense: true,
-                                labelText: 'Band ${i + 1}',
+                                labelText: context.l10n.eqBandLabel(i + 1),
                                 suffixText: 'Hz',
                                 border: const OutlineInputBorder(),
                               ),
@@ -616,7 +617,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   final v = double.tryParse(c.text.trim());
                   if (v == null) {
                     setDialogState(
-                        () => error = 'Every band needs a valid number.');
+                        () => error = context.l10n.dspEveryBandValidNumber);
                     return;
                   }
                   parsed.add(v);
@@ -624,12 +625,12 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 for (var i = 0; i < parsed.length; i++) {
                   if (parsed[i] < 10 || parsed[i] > 30000) {
                     setDialogState(() =>
-                        error = 'Frequencies must stay within 10-30000 Hz.');
+                        error = context.l10n.dspFreqRange10To30k);
                     return;
                   }
                   if (i > 0 && parsed[i] <= parsed[i - 1]) {
                     setDialogState(() =>
-                        error = 'Frequencies must be strictly ascending.');
+                        error = context.l10n.dspFreqStrictlyAscending);
                     return;
                   }
                 }
@@ -737,8 +738,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
       SnackBar(
         content: Text(loaded
-            ? 'Room-correction FIR loaded into the convolution stage.'
-            : 'The audio engine rejected the FIR export.'),
+            ? context.l10n.dspFirLoaded
+            : context.l10n.dspFirRejected),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -793,7 +794,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               children: [
                 _bandToggle(
                   label: 'M',
-                  tooltip: isMuted ? 'Unmute band' : 'Mute band',
+                  tooltip: isMuted
+                      ? context.l10n.dspUnmuteBand
+                      : context.l10n.dspMuteBand,
                   active: isMuted,
                   activeColor: errorColor,
                   onTap: isEnabled
@@ -817,7 +820,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 const SizedBox(width: 2),
                 _bandToggle(
                   label: 'S',
-                  tooltip: isSoloed ? 'Unsolo band' : 'Solo band',
+                  tooltip: isSoloed
+                      ? context.l10n.dspUnsoloBand
+                      : context.l10n.dspSoloBand,
                   active: isSoloed,
                   activeColor: accentColor,
                   onTap: isEnabled
@@ -994,7 +999,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         child: Row(
                           children: [
                             IconButton(
-                              tooltip: 'Reset all DSP & EQ to defaults',
+                              tooltip: context.l10n.dspResetAllEqTooltip,
                               icon: Icon(Icons.restart_alt_rounded,
                                   color: dspBlockedGlobal != null
                                       ? p.textTertiary.withValues(alpha: 0.4)
@@ -1019,7 +1024,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                             ),
                             const Spacer(),
                             PopupMenuButton<String>(
-                              tooltip: 'Preset Options',
+                              tooltip: context.l10n.dspPresetOptions,
                               icon: Icon(Icons.more_vert_rounded,
                                   color: p.accent, size: 20),
                               color: p.surfaceContainer,
@@ -1177,10 +1182,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                               ),
                                               child: Text(
                                                 dspBlockedGlobal != null
-                                                    ? 'BLOCKED'
+                                                    ? context.l10n.dspBlocked
                                                     : (state.isEqEnabled
-                                                        ? 'ON'
-                                                        : 'OFF'),
+                                                        ? context.l10n.dspStatOn
+                                                        : context.l10n.dspStatOff),
                                                 style: TextStyle(
                                                   fontSize: 9.5,
                                                   fontWeight: FontWeight.w800,
@@ -1198,13 +1203,13 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                         const SizedBox(height: 2),
                                         Text(
                                           dspBlockedGlobal != null
-                                              ? 'Blocked: Bit-Perfect bypass active'
+                                              ? context.l10n.dspBlockedBitPerfect
                                               : (state.isEqEnabled
                                                   ? (state.selectedHeadphoneProfile !=
                                                           null
-                                                      ? 'Tuned for ${state.selectedHeadphoneProfile!.name}'
-                                                      : 'Preset: ${state.eqPreset.name}')
-                                                  : 'Equalizer curves bypassed'),
+                                                      ? '${context.l10n.dspTunedFor} ${state.selectedHeadphoneProfile!.name}'
+                                                      : '${context.l10n.dspPresetLabel} ${state.eqPreset.name}')
+                                                  : context.l10n.dspEqCurvesBypassed),
                                           style: TextStyle(
                                             fontSize: 11,
                                             color: dspBlockedGlobal != null
@@ -1222,7 +1227,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                     icon: Icon(Icons.info_outline_rounded,
                                         size: 16, color: p.textTertiary),
                                     visualDensity: VisualDensity.compact,
-                                    tooltip: 'About Equalizer',
+                                    tooltip: context.l10n.dspAboutEqualizer,
                                     onPressed: () => _showFeatureInfo(
                                       context,
                                       AudioFeatureRegistry.equalizer,
@@ -1321,10 +1326,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                               ),
                                               child: Text(
                                                 dspBlockedGlobal != null
-                                                    ? 'BLOCKED'
+                                                    ? context.l10n.dspBlocked
                                                     : (state.isDspEffectsActive
-                                                        ? 'ON'
-                                                        : 'OFF'),
+                                                        ? context.l10n.dspStatOn
+                                                        : context.l10n.dspStatOff),
                                                 style: TextStyle(
                                                   fontSize: 9.5,
                                                   fontWeight: FontWeight.w800,
@@ -1342,10 +1347,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                         const SizedBox(height: 2),
                                         Text(
                                           dspBlockedGlobal != null
-                                              ? 'Blocked: Bit-Perfect bypass active'
+                                              ? context.l10n.dspBlockedBitPerfect
                                               : (state.isDspEffectsActive
-                                                  ? '${state.activeDspEffectStagesCount} active effects (Reverb, Limiter...)'
-                                                  : 'All DSP effects bypassed'),
+                                                  ? '${state.activeDspEffectStagesCount} ${context.l10n.dspActiveEffects}'
+                                                  : context.l10n.dspAllEffectsBypassed),
                                           style: TextStyle(
                                             fontSize: 11,
                                             color: dspBlockedGlobal != null
@@ -1363,7 +1368,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                     icon: Icon(Icons.info_outline_rounded,
                                         size: 16, color: p.textTertiary),
                                     visualDensity: VisualDensity.compact,
-                                    tooltip: 'About DSP Engine',
+                                    tooltip: context.l10n.dspAboutDspEngine,
                                     onPressed: () => _showFeatureInfo(
                                       context,
                                       AudioFeatureRegistry.spatializer,
@@ -1430,10 +1435,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                         fontWeight: FontWeight.w700,
                                         fontSize: 12),
                                     dividerColor: Colors.transparent,
-                                    tabs: const [
-                                      Tab(text: 'Equalizer'),
+                                    tabs: [
+                                      Tab(text: context.l10n.equalizer),
                                       Tab(text: 'AutoEq'),
-                                      Tab(text: 'Spatial & DSP'),
+                                      Tab(text: context.l10n.dspSpatialTab),
                                     ],
                                   ),
                                 ),
@@ -1921,26 +1926,26 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.amber.withValues(alpha: 0.12),
+                color: p.warning.withValues(alpha: 0.12),
                 borderRadius: AppRadii.cardRadius,
-                border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                border: Border.all(color: p.warning.withValues(alpha: 0.4)),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(Icons.warning_amber_rounded,
-                      color: Colors.amber, size: 20),
+                      color: p.warning, size: 20),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${state.detectedOemEngines.join(", ")} Active',
+                          '${state.detectedOemEngines.join(", ")} ${context.l10n.activeLabel}',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: Colors.amber[300] ?? Colors.amber,
+                            color: p.warning,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -1983,7 +1988,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         ),
                         Text(
                           '${state.selectedHeadphoneProfile!.brand} Ã¢Â€Â¢ '
-                          'Preamp: ${state.selectedHeadphoneProfile!.preampGain.toStringAsFixed(1)} dB',
+                          '${context.l10n.preampLabel}: ${state.selectedHeadphoneProfile!.preampGain.toStringAsFixed(1)} dB',
                           style: TextStyle(fontSize: 10, color: p.textTertiary),
                         ),
                       ],
@@ -2259,7 +2264,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                         dspBlocked != null
                                     ? p.textTertiary.withValues(alpha: 0.35)
                                     : p.accent),
-                            tooltip: 'Reset preamp',
+                            tooltip: context.l10n.dspResetPreamp,
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(
@@ -2378,7 +2383,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                 icon: Icon(Icons.info_outline_rounded,
                                     size: 16, color: p.textTertiary),
                                 visualDensity: VisualDensity.compact,
-                                tooltip: 'About Bass Boost',
+                                tooltip: context.l10n.dspAboutBassBoost,
                                 onPressed: () => _showFeatureInfo(
                                     context, AudioFeatureRegistry.bassBoost,
                                     conflictReason: dspBlocked),
@@ -2414,7 +2419,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           child: Text(
                             preset.bassBoost > 0
                                 ? '${(preset.bassBoost * 100).round()}%'
-                                : 'Off',
+                                : context.l10n.dspOff,
                             style: TextStyle(
                               color: preset.bassBoost > 0
                                   ? p.accent
@@ -2432,7 +2437,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                       dspBlocked != null
                                   ? p.textTertiary.withValues(alpha: 0.35)
                                   : p.accent),
-                          tooltip: 'Reset Bass Enhancer (Off)',
+                          tooltip: context.l10n.dspResetBassEnhancer,
                           visualDensity: VisualDensity.compact,
                           padding: EdgeInsets.zero,
                           constraints:
@@ -2524,7 +2529,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                   icon: Icon(Icons.info_outline_rounded,
                                       size: 16, color: p.textTertiary),
                                   visualDensity: VisualDensity.compact,
-                                  tooltip: 'About Volume Boost',
+                                  tooltip: context.l10n.dspAboutVolumeBoost,
                                   onPressed: () => _showFeatureInfo(
                                       context, AudioFeatureRegistry.volumeBoost,
                                       conflictReason: dspBlocked)),
@@ -2565,7 +2570,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           child: Text(
                             state.volumeBoost > 0
                                 ? '+${(state.volumeBoost * 10).toStringAsFixed(1)} dB'
-                                : 'Off',
+                                : context.l10n.dspOff,
                             style: TextStyle(
                               color: isOverSafe
                                   ? p.error
@@ -2585,7 +2590,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                       dspBlocked != null
                                   ? p.textTertiary.withValues(alpha: 0.35)
                                   : p.accent),
-                          tooltip: 'Reset Volume Boost (Off)',
+                          tooltip: context.l10n.dspResetVolumeBoost,
                           visualDensity: VisualDensity.compact,
                           padding: EdgeInsets.zero,
                           constraints:
@@ -2801,7 +2806,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               },
               style: TextStyle(fontSize: 13, color: p.textPrimary),
               decoration: InputDecoration(
-                hintText: 'Search headphones (e.g. AirPods, Sony, Moondrop)...',
+                hintText: context.l10n.dspSearchHeadphonesHint,
                 hintStyle: TextStyle(fontSize: 12, color: p.textTertiary),
                 prefixIcon:
                     Icon(Icons.search_rounded, color: p.textTertiary, size: 18),
@@ -3023,7 +3028,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                     icon: Icon(Icons.delete_outline_rounded,
                                         size: 18, color: p.error),
                                     visualDensity: VisualDensity.compact,
-                                    tooltip: 'Delete custom preset',
+                                    tooltip: context.l10n.dspDeleteCustomPreset,
                                     onPressed: () async {
                                       await _headphoneRepo
                                           .removeProfile(profile.id);
@@ -3238,7 +3243,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       icon: Icon(Icons.info_outline_rounded,
                           size: 16, color: p.textTertiary),
                       visualDensity: VisualDensity.compact,
-                      tooltip: 'About Spatializer',
+                      tooltip: context.l10n.dspAboutSpatializer,
                       onPressed: () => _showFeatureInfo(
                           context, AudioFeatureRegistry.spatializer,
                           conflictReason: dspBlocked)),
@@ -3320,7 +3325,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         icon: Icon(Icons.info_outline_rounded,
                             size: 16, color: p.textTertiary),
                         visualDensity: VisualDensity.compact,
-                        tooltip: 'About Virtualizer',
+                        tooltip: context.l10n.dspAboutVirtualizer,
                         onPressed: () => _showFeatureInfo(
                             context, AudioFeatureRegistry.virtualizer,
                             conflictReason: dspBlocked)),
@@ -3379,7 +3384,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                             state.virtualizerStrength <= 0.001
                                         ? p.textTertiary.withValues(alpha: 0.35)
                                         : p.accent),
-                                tooltip: 'Reset to default (0%)',
+                                tooltip: context.l10n.dspResetToDefault0,
                                 visualDensity: VisualDensity.compact,
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(
@@ -3477,7 +3482,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         icon: Icon(Icons.info_outline_rounded,
                             size: 16, color: p.textTertiary),
                         visualDensity: VisualDensity.compact,
-                        tooltip: 'About Dynamics',
+                        tooltip: context.l10n.dspAboutDynamics,
                         onPressed: () => _showFeatureInfo(
                             context, AudioFeatureRegistry.dynamics,
                             conflictReason: dspBlocked)),
@@ -3653,7 +3658,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         icon: Icon(Icons.info_outline_rounded,
                             size: 16, color: p.textTertiary),
                         visualDensity: VisualDensity.compact,
-                        tooltip: 'About Crossfeed',
+                        tooltip: context.l10n.dspAboutCrossfeed,
                         onPressed: () => _showFeatureInfo(
                             context, AudioFeatureRegistry.crossfeed,
                             conflictReason: dspBlocked ??
@@ -3700,7 +3705,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     runSpacing: 6,
                     children: [
                       ChoiceChip(
-                        label: const Text('Default (700Hz / 4.5dB)'),
+                        label: Text(context.l10n.dspCrossfeedDefault),
                         selected: state.crossfeedMode == 0,
                         selectedColor: p.accent.withValues(alpha: 0.22),
                         backgroundColor: p.surface,
@@ -3718,7 +3723,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         onSelected: (_) => cubit.setCrossfeedMode(0),
                       ),
                       ChoiceChip(
-                        label: const Text('Chu Moy (700Hz / 6dB)'),
+                        label: Text(context.l10n.dspCrossfeedChuMoy),
                         selected: state.crossfeedMode == 1,
                         selectedColor: p.accent.withValues(alpha: 0.22),
                         backgroundColor: p.surface,
@@ -3736,7 +3741,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         onSelected: (_) => cubit.setCrossfeedMode(1),
                       ),
                       ChoiceChip(
-                        label: const Text('Jan Meier (650Hz / 9.5dB)'),
+                        label: Text(context.l10n.dspCrossfeedJanMeier),
                         selected: state.crossfeedMode == 2,
                         selectedColor: p.accent.withValues(alpha: 0.22),
                         backgroundColor: p.surface,
@@ -3827,7 +3832,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                           1.0
                                       ? p.textTertiary.withValues(alpha: 0.35)
                                       : p.accent),
-                              tooltip: 'Reset to default (350 µs)',
+                              tooltip: context.l10n.dspResetToDefault350us,
                               visualDensity: VisualDensity.compact,
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(
@@ -3888,7 +3893,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                           0.05
                                       ? p.textTertiary.withValues(alpha: 0.35)
                                       : p.accent),
-                              tooltip: 'Reset to default (-9.0 dB)',
+                              tooltip: context.l10n.dspResetToDefault9db,
                               visualDensity: VisualDensity.compact,
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(
@@ -3983,7 +3988,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         icon: Icon(Icons.info_outline_rounded,
                             size: 16, color: p.textTertiary),
                         visualDensity: VisualDensity.compact,
-                        tooltip: 'About Limiter',
+                        tooltip: context.l10n.dspAboutLimiter,
                         onPressed: () => _showFeatureInfo(
                             context, AudioFeatureRegistry.limiter,
                             conflictReason: dspBlocked)),
@@ -4035,7 +4040,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                             0.05
                                         ? p.textTertiary.withValues(alpha: 0.35)
                                         : p.accent),
-                            tooltip: 'Reset to default (-0.2 dBFS)',
+                            tooltip: context.l10n.dspResetToDefault02dbfs,
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(
@@ -4094,7 +4099,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                     (state.limiterReleaseMs - 50.0).abs() < 0.5
                                         ? p.textTertiary.withValues(alpha: 0.35)
                                         : p.accent),
-                            tooltip: 'Reset to default (50 ms)',
+                            tooltip: context.l10n.dspResetToDefault50ms,
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(
@@ -4180,7 +4185,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                         icon: Icon(Icons.info_outline_rounded,
                                             size: 16, color: p.textTertiary),
                                         visualDensity: VisualDensity.compact,
-                                        tooltip: 'About Stereo Balance',
+                                        tooltip: context.l10n.dspAboutStereoBalance,
                                         onPressed: () => _showFeatureInfo(
                                             context,
                                             AudioFeatureRegistry.panner,
@@ -4282,7 +4287,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                       state.stereoBalance.abs() < 0.01
                                   ? p.textTertiary.withValues(alpha: 0.35)
                                   : p.accent),
-                          tooltip: 'Reset Balance to Center',
+                          tooltip: context.l10n.dspResetBalanceCenter,
                           visualDensity: VisualDensity.compact,
                           padding: EdgeInsets.zero,
                           constraints:
@@ -4386,7 +4391,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         icon: Icon(Icons.info_outline_rounded,
                             size: 16, color: p.textTertiary),
                         visualDensity: VisualDensity.compact,
-                        tooltip: 'About Reverb',
+                        tooltip: context.l10n.dspAboutReverb,
                         onPressed: () => _showFeatureInfo(
                             context, AudioFeatureRegistry.reverb,
                             conflictReason: dspBlocked ??
@@ -4463,7 +4468,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                 color: (state.reverbWetDry - 0.20).abs() < 0.01
                                     ? p.textTertiary.withValues(alpha: 0.35)
                                     : p.accent),
-                            tooltip: 'Reset to default (20% Wet)',
+                            tooltip: context.l10n.dspResetToDefault20wet,
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(
@@ -4626,7 +4631,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         color: isDefault
                             ? p.textTertiary.withValues(alpha: 0.35)
                             : p.accent),
-                    tooltip: 'Reset to default',
+                    tooltip: context.l10n.dspResetToDefault,
                     visualDensity: VisualDensity.compact,
                     padding: EdgeInsets.zero,
                     constraints:
@@ -5290,7 +5295,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 _buildDspSliderRow(
                   context: context,
                   p: p,
-                  label: 'Q / Bandwidth',
+                  label: context.l10n.dspQBandwidth,
                   valueText: band.q.toStringAsFixed(2),
                   value: band.q,
                   min: 0.5,
@@ -5370,7 +5375,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   _buildDspSliderRow(
                     context: context,
                     p: p,
-                    label: 'Max Boost',
+                    label: context.l10n.dspMaxBoost,
                     valueText: '${band.maxBoostDb.toStringAsFixed(0)} dB',
                     value: band.maxBoostDb,
                     min: 0.0,
@@ -5472,7 +5477,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             _buildDspSliderRow(
               context: context,
               p: p,
-              label: 'Intensity',
+              label: context.l10n.dspLoudnessIntensity,
               valueText: '${(state.loudnessContourIntensity * 100).round()}%',
               value: state.loudnessContourIntensity,
               min: 0.0,
@@ -5721,7 +5726,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           _buildDeviceTypeChip(
-            label: 'Headset',
+            label: context.l10n.dspHeadset,
             icon: Icons.headphones_rounded,
             isActive: isWired,
             p: p,
@@ -5732,7 +5737,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             },
           ),
           _buildDeviceTypeChip(
-            label: 'Speaker',
+            label: context.l10n.dspSpeaker,
             icon: Icons.volume_up_rounded,
             isActive: isSpeaker,
             p: p,
@@ -5780,7 +5785,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+        duration: context.motionMs(200),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color:
@@ -6333,7 +6338,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             _buildDspSliderRow(
               context: context,
               p: p,
-              label: 'Bass Strength',
+              label: context.l10n.dspBassStrength,
               valueText: '${(state.dynamicBassStrength * 100).round()}%',
               value: state.dynamicBassStrength.clamp(1.0, 8.0),
               min: 1.0,

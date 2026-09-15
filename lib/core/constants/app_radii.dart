@@ -28,4 +28,54 @@ abstract class AppRadii {
       BorderRadius.all(Radius.circular(dialog));
   static const BorderRadius full =
       BorderRadius.all(Radius.circular(999.0));
+
+  // ── Continuous Curvature / Squircles (iOS HIG) ──────────────────────────
+  /// Multiplier to match visual curvature of continuous superellipses to circular radii.
+  static const double squircleMultiplier = 2.2;
+
+  static ShapeBorder squircle(double radius, {BorderSide side = BorderSide.none}) =>
+      ContinuousRectangleBorder(
+        borderRadius: BorderRadius.circular(radius * squircleMultiplier),
+        side: side,
+      );
+
+  static const ContinuousRectangleBorder squircleTile =
+      ContinuousRectangleBorder(
+    borderRadius: BorderRadius.all(Radius.circular(tile * squircleMultiplier)),
+  );
+
+  static const ContinuousRectangleBorder squircleCard =
+      ContinuousRectangleBorder(
+    borderRadius: BorderRadius.all(Radius.circular(card * squircleMultiplier)),
+  );
+
+  static const ContinuousRectangleBorder squircleArtwork =
+      ContinuousRectangleBorder(
+    borderRadius:
+        BorderRadius.all(Radius.circular(artwork * squircleMultiplier)),
+  );
+
+  static const ContinuousRectangleBorder squircleMiniPlayer =
+      ContinuousRectangleBorder(
+    borderRadius:
+        BorderRadius.all(Radius.circular(miniPlayer * squircleMultiplier)),
+  );
+
+  static const ContinuousRectangleBorder squircleDialog =
+      ContinuousRectangleBorder(
+    borderRadius:
+        BorderRadius.all(Radius.circular(dialog * squircleMultiplier)),
+  );
+
+  static const ContinuousRectangleBorder squircleBottomSheet =
+      ContinuousRectangleBorder(
+    borderRadius: BorderRadius.vertical(
+      top: Radius.circular(bottomSheet * squircleMultiplier),
+    ),
+  );
+
+  static const ContinuousRectangleBorder squirclePill =
+      ContinuousRectangleBorder(
+    borderRadius: BorderRadius.all(Radius.circular(999.0)),
+  );
 }

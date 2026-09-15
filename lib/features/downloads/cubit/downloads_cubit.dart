@@ -267,6 +267,31 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     _applyActionResult(result);
   }
 
+  /// Re-queues every failed task with pacing, for one-tap recovery after a
+  /// batch hit rate limits or lost connectivity. Permanent failures
+  /// (unavailable/geo/auth) will fail again individually; transient ones get
+  /// the staggered spacing they need. Returns the number re-queued.
+  Future<int> retryAllFailed({int delayMs = 500}) async {
+    final failed = state.tasks.values
+        .where((t) => t.status == DownloadStatus.failed)
+        .toList();
+    var queued = 0;
+    for (var i = 0; i < failed.length; i++) {
+      if (isClosed) break;
+      if (i > 0 && delayMs > 0) {
+        await Future.delayed(Duration(milliseconds: delayMs));
+      }
+      if (isClosed) break;
+      final result = await _retryDownloadUseCase(failed[i].videoId);
+      if (result.isRight()) queued++;
+    }
+    if (!isClosed && failed.isNotEmpty && queued == 0) {
+      safeEmit(state.copyWith(
+          errorMessage: 'Could not retry failed downloads'));
+    }
+    return queued;
+  }
+
   // FIX-A13: Cancel download by pausing and removing task
   Future<void> cancelDownload(String videoId) async {
     await pauseDownload(videoId);

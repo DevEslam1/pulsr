@@ -8,6 +8,7 @@ import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/pulsr_logo.dart';
 import '../../../core/widgets/section_header.dart';
+import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
 import '../../../data/scanner/media_scanner_service.dart';
@@ -194,6 +195,37 @@ class _HomeScreenState extends State<HomeScreen> {
     return context.l10n.goodEvening;
   }
 
+  String _categoryLabel(BuildContext context, String category) {
+    switch (category) {
+      case 'Recommended For You':
+        return context.l10n.browseRecommendedForYou;
+      case 'Trending Egypt':
+        return context.l10n.browseTrendingEgypt;
+      case 'Mahraganat':
+        return context.l10n.browseMahraganat;
+      case 'Arabic Pop':
+        return context.l10n.browseArabicPop;
+      case 'Global Top Hits':
+        return context.l10n.browseGlobalTopHits;
+      case 'New Releases':
+        return context.l10n.newReleases;
+      case 'Chill & Lo-Fi':
+        return context.l10n.browseChillLofi;
+      case 'Pop Mix':
+        return context.l10n.browsePopMix;
+      case 'Hip-Hop':
+        return context.l10n.browseHipHop;
+      case 'Workout Energy':
+        return context.l10n.browseWorkoutEnergy;
+      case 'Rock & Metal':
+        return context.l10n.browseRockMetal;
+      case 'Acoustic':
+        return context.l10n.browseAcoustic;
+      default:
+        return category;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
@@ -340,62 +372,41 @@ class _HomeScreenState extends State<HomeScreen> {
                         if (AppConfig.ytmEnabled) ...[
                           _DiscoveryChip(
                             icon: Icons.explore_rounded,
-                            label: 'Explore YTM',
+                            label: context.l10n.ytmExplore,
                             iconColor: p.primary,
                             onTap: () => context.push('/ytm-explore'),
                           ),
                           const SizedBox(width: 8),
                         ],
                         _DiscoveryChip(
-                          icon: Icons.grid_view_rounded,
-                          label: 'Artwork Wall',
-                          iconColor: p.accent,
-                          onTap: () => context.push('/artwork-grid'),
-                        ),
-                        const SizedBox(width: 8),
-                        _DiscoveryChip(
-                          icon: Icons.insights_rounded,
-                          label: 'Library Stats',
-                          iconColor: Colors.amber,
-                          onTap: () => context.push('/library-stats'),
-                        ),
-                        const SizedBox(width: 8),
-                        _DiscoveryChip(
-                          icon: Icons.cleaning_services_rounded,
-                          label: 'Duplicate Cleaner',
-                          iconColor: Colors.tealAccent,
-                          onTap: () => context.push('/duplicate-finder'),
-                        ),
-                        const SizedBox(width: 8),
-                        _DiscoveryChip(
-                          icon: Icons.palette_rounded,
-                          label: 'Theme Studio',
-                          iconColor: Colors.pinkAccent,
-                          onTap: () => context.push('/theme-studio'),
+                          icon: Icons.radio_rounded,
+                          label: context.l10n.radioTitle,
+                          iconColor: p.warning,
+                          onTap: () => context.push('/radio'),
                         ),
                         const SizedBox(width: 8),
                         _DiscoveryChip(
                           icon: Icons.queue_music_rounded,
-                          label: 'Queue',
-                          iconColor: Colors.lightBlueAccent,
+                          label: context.l10n.queue,
+                          iconColor: p.info,
                           onTap: () => context.push('/queue'),
-                        ),
-                        const SizedBox(width: 8),
-                        _DiscoveryChip(
-                          icon: Icons.radio_rounded,
-                          label: context.l10n.radioTitle,
-                          iconColor: Colors.deepOrangeAccent,
-                          onTap: () => context.push('/radio'),
                         ),
                         if (AppConfig.ytmEnabled) ...[
                           const SizedBox(width: 8),
                           _DiscoveryChip(
                             icon: Icons.downloading_rounded,
-                            label: 'Downloads',
-                            iconColor: Colors.greenAccent,
+                            label: context.l10n.downloadsTitle,
+                            iconColor: p.success,
                             onTap: () => context.push('/downloads'),
                           ),
                         ],
+                        const SizedBox(width: 8),
+                        _DiscoveryChip(
+                          icon: Icons.apps_rounded,
+                          label: context.l10n.browseMoreTools,
+                          iconColor: p.textSecondary,
+                          onTap: () => _showDiscoveryToolsSheet(context),
+                        ),
                       ],
                     ),
                   ),
@@ -461,6 +472,96 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  /// Keeps Home focused on playback while still exposing the library "power
+  /// tools" one tap away. Restraint borrowed from Apple Music: a short primary
+  /// row plus a single overflow entry instead of a dozen equal-weight chips.
+  void _showDiscoveryToolsSheet(BuildContext context) {
+    final p = context.palette;
+    final tools = <({
+      IconData icon,
+      String label,
+      Color color,
+      VoidCallback onTap
+    })>[
+      (
+        icon: Icons.grid_view_rounded,
+        label: context.l10n.artworkWall,
+        color: p.accent,
+        onTap: () => context.push('/artwork-grid'),
+      ),
+      (
+        icon: Icons.insights_rounded,
+        label: context.l10n.browseLibraryStats,
+        color: p.warning,
+        onTap: () => context.push('/library-stats'),
+      ),
+      (
+        icon: Icons.cleaning_services_rounded,
+        label: context.l10n.duplicateCleaner,
+        color: p.success,
+        onTap: () => context.push('/duplicate-finder'),
+      ),
+      (
+        icon: Icons.palette_rounded,
+        label: context.l10n.themeStudio,
+        color: p.favorite,
+        onTap: () => context.push('/theme-studio'),
+      ),
+    ];
+    showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final sp = sheetContext.palette;
+        return SafeArea(
+          child: Container(
+            margin: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: sp.surface,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: sp.hairline),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 38,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: sp.hairline,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                for (final tool in tools)
+                  ListTile(
+                    leading: Icon(tool.icon, color: tool.color),
+                    title: Text(
+                      tool.label,
+                      style: TextStyle(
+                        color: sp.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      tool.onTap();
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -678,9 +779,12 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Row(
             children: [
               _QuickCard(
-                title: _ytmAccountService.isLoggedIn ? 'For You' : 'Top Hits',
-                subtitle:
-                    _ytmAccountService.isLoggedIn ? 'Personalized' : 'Trending',
+                title: _ytmAccountService.isLoggedIn
+                    ? context.l10n.browseForYou
+                    : context.l10n.browseTopHits,
+                subtitle: _ytmAccountService.isLoggedIn
+                    ? context.l10n.browsePersonalized
+                    : context.l10n.browseTrending,
                 icon: _ytmAccountService.isLoggedIn
                     ? Icons.auto_awesome_rounded
                     : Icons.local_fire_department_rounded,
@@ -694,8 +798,8 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(width: 10),
               _QuickCard(
-                title: 'Top Hits',
-                subtitle: 'Trending',
+                title: context.l10n.browseTopHits,
+                subtitle: context.l10n.browseTrending,
                 icon: Icons.local_fire_department_rounded,
                 color: const Color(0xFFFF5252),
                 onTap: () =>
@@ -703,8 +807,8 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(width: 10),
               _QuickCard(
-                title: 'Chill & Lo-Fi',
-                subtitle: 'Relaxing',
+                title: context.l10n.browseChillLofi,
+                subtitle: context.l10n.browseRelaxing,
                 icon: Icons.spa_rounded,
                 color: const Color(0xFF7C4DFF),
                 onTap: () =>
@@ -735,7 +839,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ? p.onAccent
                                 : p.accent)
                         : null,
-                    label: Text(cat),
+                    label: Text(_categoryLabel(context, cat)),
                     selected: _selectedOnlineCategory == cat,
                     onSelected: (selected) {
                       if (selected) {
@@ -771,10 +875,10 @@ class _HomeScreenState extends State<HomeScreen> {
         _OnlineCategorySection(
           key: ValueKey(_selectedOnlineCategory),
           title: _selectedOnlineCategory == 'Recommended For You'
-              ? '✨ Recommended For You (YouTube Music)'
+              ? context.l10n.browseRecommendedYtmTitle
               : (_selectedOnlineCategory == 'Trending Egypt'
-                  ? 'Trending in Egypt 🇪🇬'
-                  : 'Popular: $_selectedOnlineCategory'),
+                  ? context.l10n.browseTrendingInEgypt
+                  : '${context.l10n.browsePopular}: ${_categoryLabel(context, _selectedOnlineCategory)}'),
           future: _getCategoryFuture(_selectedOnlineCategory),
           playerCubit: playerCubit,
           onRetry: () => _retryCategory(_selectedOnlineCategory),
@@ -827,40 +931,11 @@ class _OnlineCategorySection extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: size,
-                            height: size,
-                            decoration: BoxDecoration(
-                              color: p.surfaceContainer.withValues(alpha: 0.6),
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(color: p.hairline),
-                            ),
-                            child: Center(
-                              child: Icon(
-                                Icons.music_note_rounded,
-                                size: 36,
-                                color: p.textTertiary.withValues(alpha: 0.3),
-                              ),
-                            ),
-                          ),
+                          SkeletonBox(width: size, height: size, radius: 18),
                           const SizedBox(height: 9),
-                          Container(
-                            width: size * 0.75,
-                            height: 12,
-                            decoration: BoxDecoration(
-                              color: p.surfaceContainer.withValues(alpha: 0.5),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                          ),
+                          SkeletonLine(width: size * 0.75, height: 12),
                           const SizedBox(height: 5),
-                          Container(
-                            width: size * 0.45,
-                            height: 10,
-                            decoration: BoxDecoration(
-                              color: p.surfaceContainer.withValues(alpha: 0.35),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                          ),
+                          SkeletonLine(width: size * 0.45, height: 10),
                         ],
                       ),
                     ),
@@ -921,7 +996,9 @@ class _OnlineCategorySection extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              SectionHeader(title: 'Top Charts & Songs (${songs.length})'),
+              SectionHeader(
+                  title:
+                      '${context.l10n.browseTopChartsSongs} (${songs.length})'),
               if (context.trackGridColumns > 1)
                 GridView.builder(
                   shrinkWrap: true,
@@ -1287,7 +1364,7 @@ class _RecentlyPlayedSectionState extends State<_RecentlyPlayedSection> {
           children: [
             SectionHeader(
               title: context.l10n.recentlyPlayed,
-              actionLabel: 'See All',
+              actionLabel: context.l10n.browseSeeAll,
               onAction: () => context.push('/recents'),
             ),
             SizedBox(
@@ -1507,7 +1584,9 @@ class _EmptyLibraryState extends State<_EmptyLibrary> {
               icon: Icon(_isScanning
                   ? Icons.hourglass_top_rounded
                   : Icons.refresh_rounded),
-              label: Text(_isScanning ? 'Scanning...' : 'Scan Device Storage'),
+              label: Text(_isScanning
+                  ? context.l10n.scanning
+                  : context.l10n.scanStorage),
               onPressed: _isScanning ? null : _scan,
             ),
           ],

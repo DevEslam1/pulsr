@@ -126,13 +126,13 @@ class _UsbDacSectionState extends State<UsbDacSection> {
         settingsCardDivider(p),
         SettingsSwitchTile(
           Icons.usb_rounded,
-          'USB DAC Hardware Volume',
+          context.l10n.settingsUsbDacHardwareVolume,
           _status.permitted
-              ? 'Drives the ${_status.uacLabel} DAC\'s own volume stage directly '
-                  '(lower distortion at low volume). ${_status.deviceName ?? ''}'
-              : 'Grant USB access to control the DAC\'s hardware volume directly',
+              ? context.l10n.settingsUsbHwVolumeDesc(
+                  _status.uacLabel, _status.deviceName ?? '')
+              : context.l10n.settingsUsbHwVolumeGrant,
           value: enabled && hasHwVolume,
-          disabledReason: hasHwVolume ? null : 'DAC exposes no UAC Volume control',
+          disabledReason: hasHwVolume ? null : context.l10n.settingsDacNoUacVolume,
           onChanged: hasHwVolume ? _onToggle : (v) {},
         ),
         if (enabled && hasHwVolume)
@@ -165,14 +165,13 @@ class _UsbDacSectionState extends State<UsbDacSection> {
           ),
         SettingsSwitchTile(
           Icons.lock_rounded,
-          'Exclusive USB Interface',
+          context.l10n.settingsExclusiveUsb,
           _status.exclusiveActive
-              ? 'Streaming interface claimed exclusively'
-              : 'Claims the AudioStreaming interface when the kernel driver releases '
-                  'it. Non-forced: never detaches Android\'s audio driver',
+              ? context.l10n.settingsStreamingClaimed
+              : context.l10n.settingsExclusiveUsbDesc,
           value: _status.exclusiveActive,
           disabledReason:
-              _status.exclusiveSupported ? null : 'Requires a UAC DAC with volume control',
+              _status.exclusiveSupported ? null : context.l10n.settingsRequiresUacDac,
           onChanged: _status.exclusiveSupported
               ? (v) async {
                   await _service.setExclusive(v);
@@ -183,14 +182,12 @@ class _UsbDacSectionState extends State<UsbDacSection> {
         if (_status.streamingSupported)
           SettingsSwitchTile(
             Icons.graphic_eq_rounded,
-            'USB Bit-Perfect Streaming (Experimental)',
+            context.l10n.settingsUsbBitPerfectStreaming,
             _status.streamingActive
-                ? 'Raw UAC2 isochronous streaming is active'
-                : 'Claims the DAC exclusively and streams processed PCM directly over '
-                    'USB isochronous URBs. Unvalidated on hardware; falls back safely '
-                    'if the claim or endpoint setup fails',
+                ? context.l10n.settingsUsbStreamingActive
+                : context.l10n.settingsUsbStreamingDesc,
             value: _status.streamingActive,
-            disabledReason: _streamingBusy ? 'Starting…' : null,
+            disabledReason: _streamingBusy ? context.l10n.settingsStarting : null,
             onChanged: _streamingBusy ? (v) {} : _toggleStreaming,
           ),
       ],

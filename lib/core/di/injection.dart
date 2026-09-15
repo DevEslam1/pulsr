@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 
 import 'package:pulsr/core/services/file_intent_handler.dart';
+import 'package:pulsr/core/utils/error_logger.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
 import 'package:pulsr/data/audio/per_song_eq_store.dart';
 import 'package:pulsr/data/audio/per_song_volume_store.dart';
@@ -28,7 +29,10 @@ Future<void> configureDependencies() async {
   } catch (_) {}
   try {
     await getIt.getAsync<PlayerCubit>().timeout(const Duration(seconds: 5));
-  } catch (_) {}
+  } catch (e, st) {
+    ErrorLogger.log('PlayerCubit DI warm-up timed out or failed',
+        error: e, stackTrace: st, category: 'DI');
+  }
   try {
     await getIt
         .getAsync<YtmDownloadCubit>()

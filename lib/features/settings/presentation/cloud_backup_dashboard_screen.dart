@@ -35,8 +35,8 @@ class _CloudBackupDashboardScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(success
-              ? 'Cloud backup & sync completed!'
-              : 'Sync failed. Please check internet connection.'),
+              ? context.l10n.settingsCloudSyncCompleted
+              : context.l10n.settingsCloudSyncFailed),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -48,7 +48,7 @@ class _CloudBackupDashboardScreenState
     final p = context.palette;
     final lastSync = _syncService.lastSyncTime;
     final lastSyncStr =
-        lastSync != null ? '${lastSync.toLocal()}'.split('.').first : 'Never';
+        lastSync != null ? '${lastSync.toLocal()}'.split('.').first : context.l10n.settingsNeverLabel;
 
     return PulsrPagePopScope(
       child: Scaffold(
@@ -148,7 +148,7 @@ class _CloudBackupDashboardScreenState
               ),
               icon: Icon(Icons.sync_rounded, color: Colors.black),
               label: Text(
-                _isSyncing ? 'Syncing...' : 'Sync Now',
+                _isSyncing ? context.l10n.settingsSyncing : context.l10n.syncNow,
                 style: TextStyle(
                     color: Colors.black,
                     fontWeight: FontWeight.bold,

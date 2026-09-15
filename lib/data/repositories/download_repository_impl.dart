@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/channels.dart';
 import '../../core/errors/failures.dart';
+import '../../core/errors/ytm_error_classifier.dart';
 import '../../core/services/yt_download_service.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/models/download_task.dart';
@@ -507,6 +508,27 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     // which is true while the service is still finishing the last transfer.
   }
 
+  /// Failures worth an automatic retry (network blip, rate limit, bot
+  /// challenge, timeout, YouTube 5xx). Permanent ones (video gone, geo block,
+  /// auth required) fail immediately so a dead track doesn't hold a slot.
+  static bool _isTransientFailure(AppFailure failure) {
+    final cause = failure.error;
+    final info = YtmErrorClassifier.classify(cause ?? failure.message);
+    switch (info.recoveryAction) {
+      case YtmRecoveryAction.retryWithBackoff:
+      case YtmRecoveryAction.refreshPoTokenAndRetry:
+      case YtmRecoveryAction.invalidatePoTokenAndRetry:
+      case YtmRecoveryAction.rotateIdentity:
+      case YtmRecoveryAction.rotatePath:
+        return true;
+      case YtmRecoveryAction.none:
+      case YtmRecoveryAction.showLoginPrompt:
+      case YtmRecoveryAction.skipToNextTrack:
+      case YtmRecoveryAction.limitedMode:
+        return false;
+    }
+  }
+
   Future<void> _executeTask(DownloadTask task) async {
     final videoId = task.videoId;
     final completer = Completer<void>();
@@ -514,38 +536,57 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     _updateTask(task.copyWith(status: DownloadStatus.downloading));
 
     try {
-      // FIX-A05: Replace hardcoded Duration(minutes: 3) with actual duration from YtmStream.duration after resolution, falling back to Duration(minutes: 3) only when duration is zero.
-      Duration trackDuration = const Duration(minutes: 3);
-      try {
-        final stream = await _ytDownloadService.resolveDownloadStream(videoId);
-        if (stream.duration > Duration.zero) {
-          trackDuration = stream.duration;
-        }
-      } catch (_) {}
-
+      // No upfront resolve: YtDownloadService.download() resolves internally
+      // and caches the stream (getResolvedStream). Resolving here first
+      // doubled resolve QPS and tripped 429/bot cooldowns after a few tracks,
+      // after which every queued track failed fast and the batch "stopped".
       final synthTrack = YtmTrack(
         videoId: videoId,
         title: task.title,
         artist: task.artist,
-        duration: trackDuration, // FIX-A05
+        duration: Duration.zero,
         artworkUrl: task.artworkUrl,
       );
       final songRow = synthTrack.toSongData();
 
-      final result = await _ytDownloadService.download(
-        songRow,
-        onProgress: (p) {
-          if (_pausedVideoIds.contains(videoId)) return;
-
-          final progressTask = _tasks[videoId] ?? task;
-          _updateTask(progressTask.copyWith(
+      Either<AppFailure, int>? result;
+      // One initial attempt + up to 2 transient retries with backoff.
+      for (var attempt = 0; attempt < 3; attempt++) {
+        if (_pausedVideoIds.contains(videoId) || !_tasks.containsKey(videoId)) {
+          break;
+        }
+        if (attempt > 0) {
+          // Exponential backoff with ~20% jitter: ~2s, ~4s.
+          final backoffMs = (2000 << (attempt - 1)) + DateTime.now().millisecond % 400;
+          await Future.delayed(Duration(milliseconds: backoffMs));
+          if (_pausedVideoIds.contains(videoId) || !_tasks.containsKey(videoId)) {
+            break;
+          }
+          final current = _tasks[videoId] ?? task;
+          _updateTask(current.copyWith(
             status: DownloadStatus.downloading,
-            progress: p.fraction ?? progressTask.progress,
-            speedKbps: p.speedKbps,
-            etaSeconds: p.etaSeconds,
+            error: null,
           ));
-        },
-      );
+        }
+        result = await _ytDownloadService.download(
+          songRow,
+          onProgress: (p) {
+            if (_pausedVideoIds.contains(videoId)) return;
+
+            final progressTask = _tasks[videoId] ?? task;
+            _updateTask(progressTask.copyWith(
+              status: DownloadStatus.downloading,
+              progress: p.fraction ?? progressTask.progress,
+              speedKbps: p.speedKbps,
+              etaSeconds: p.etaSeconds,
+            ));
+          },
+        );
+        final failure = result.getLeft().toNullable();
+        if (failure == null) break; // success
+        if (!_isTransientFailure(failure)) break; // permanent: don't burn retries
+      }
+      result ??= const Left(DownloadFailure('Download cancelled'));
 
       if (_pausedVideoIds.contains(videoId)) {
         _activeVideoIds.remove(videoId);

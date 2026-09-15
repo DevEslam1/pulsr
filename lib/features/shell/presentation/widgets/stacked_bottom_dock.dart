@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../player/cubit/player_cubit.dart';
@@ -32,12 +33,12 @@ class _ModalGate extends StatelessWidget {
     return ValueListenableBuilder<bool>(
       valueListenable: PulsrModalTracker.isModalOpen,
       builder: (context, modalOpen, _) => AnimatedSlide(
-        duration: const Duration(milliseconds: 260),
-        curve: Curves.easeInOutCubic,
+        duration: context.motionMs(260),
+        curve: context.motionCurve(Curves.easeInOutCubic),
         offset: modalOpen ? const Offset(0, 1.4) : Offset.zero,
         child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOut,
+          duration: context.motionMs(220),
+          curve: context.motionCurve(Curves.easeOut),
           opacity: modalOpen ? 0.0 : 1.0,
           child: IgnorePointer(ignoring: modalOpen, child: child),
         ),
@@ -103,6 +104,8 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final animDuration = context.motion(_animDuration);
+    final animCurve = context.motionCurve(_animCurve);
     final isTablet = Adaptive.isTablet(context);
     final double maxPlayerWidth = isTablet ? 640.0 : 560.0;
     final double maxBarWidth = isTablet ? 620.0 : 540.0;
@@ -239,19 +242,19 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
 
         final Widget miniPlayerCard = AnimatedPositioned(
           key: const ValueKey('dock_mini_player_positioned'),
-          duration: _animDuration,
-          curve: _animCurve,
+          duration: animDuration,
+          curve: animCurve,
           left: 0,
           right: 0,
           bottom: miniPlayerBottom,
           child: AnimatedScale(
-            duration: _animDuration,
-            curve: _animCurve,
+            duration: animDuration,
+            curve: animCurve,
             scale: miniPlayerScale,
             alignment: Alignment.bottomCenter,
             child: AnimatedOpacity(
-              duration: _animDuration,
-              curve: _animCurve,
+              duration: animDuration,
+              curve: animCurve,
               opacity: miniPlayerOpacity,
               child: Center(
                 child: ConstrainedBox(
@@ -292,19 +295,19 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
 
         final Widget navBarCard = AnimatedPositioned(
           key: const ValueKey('dock_nav_bar_positioned'),
-          duration: _animDuration,
-          curve: _animCurve,
+          duration: animDuration,
+          curve: animCurve,
           left: 0,
           right: 0,
           bottom: navBarBottom,
           child: AnimatedScale(
-            duration: _animDuration,
-            curve: _animCurve,
+            duration: animDuration,
+            curve: animCurve,
             scale: navBarScale,
             alignment: Alignment.bottomCenter,
             child: AnimatedOpacity(
-              duration: _animDuration,
-              curve: _animCurve,
+              duration: animDuration,
+              curve: animCurve,
               opacity: navBarOpacity,
               child: Center(
                 child: ConstrainedBox(
@@ -342,8 +345,8 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
             },
             onVerticalDragCancel: () => dockDragDy = 0,
             child: AnimatedContainer(
-              duration: _animDuration,
-              curve: _animCurve,
+              duration: animDuration,
+              curve: animCurve,
               height: dockHeight,
               child: Stack(
                 clipBehavior: Clip.none,

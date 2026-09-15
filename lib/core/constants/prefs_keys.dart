@@ -280,4 +280,23 @@ class PrefsKeys {
 
   // UI complexity: 'normal' (default, curated) | 'professional' (full controls).
   static const String experienceMode = 'setting_experience_mode';
+
+  // Headset / earbuds controls + background service behavior.
+  // Auto-resume after a becoming-noisy pause when the same (or a new)
+  // headset/BT route reconnects within [autoResumeTimeoutSec].
+  static const String autoResumeOnReconnect =
+      'setting_auto_resume_on_reconnect';
+  static const String autoResumeTimeoutSec =
+      'setting_auto_resume_timeout_sec';
+  // When true the media notification is kept after pause (requires app
+  // restart: AudioServiceConfig is init-time only).
+  static const String keepNotificationOnPause =
+      'setting_keep_notification_on_pause';
+  // Headset click mapping: 'playPause' | 'next' | 'previous' | 'stop' |
+  // 'seekForward' | 'seekBackward' | 'none'.
+  static const String headsetSingleClick = 'setting_headset_single_click';
+  static const String headsetDoubleClick = 'setting_headset_double_click';
+  static const String headsetTripleClick = 'setting_headset_triple_click';
+  static const String headsetClickWindowMs = 'setting_headset_click_window_ms';
+  static const String headsetSeekSeconds = 'setting_headset_seek_seconds';
 }

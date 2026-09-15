@@ -20,6 +20,7 @@ enum EarbudCodec {
   ldac('LDAC', 'Ultra', false),
   lhdc('LHDC', 'Ultra', false),
   lc3('LC3 / LE Audio', 'Low latency', false),
+  opus('Opus', 'Good', false),
   wired('Wired', 'Lossless', true),
   usbDac('USB DAC', 'Lossless', true),
   unknown('Unknown', '—', true);
@@ -121,6 +122,7 @@ class EarbudOptimizationService {
         gains[8] += 0.5; // 8 kHz
         break;
       case EarbudCodec.aac:
+      case EarbudCodec.opus:
         gains[7] += 0.3;
         break;
       default:
@@ -142,9 +144,24 @@ class EarbudOptimizationService {
     return out;
   }
 
-  String describe(EarbudCapabilities caps) {
+  /// True when codec info could not be read because the runtime
+  /// BLUETOOTH_CONNECT permission is missing (Android 12+).
+  static bool needsBluetoothPermission(AudioOutputInfo? info) {
+    if (info == null || !info.isBluetooth) return false;
+    return !info.btCodecConnected &&
+        (info.btReason == 'permission_required' ||
+            (info.btCodecName?.isEmpty ?? true));
+  }
+
+  String describe(EarbudCapabilities caps, [AudioOutputInfo? info]) {
     if (!caps.isBluetooth) {
       return '${caps.deviceName} • wired/USB • ${caps.sampleRateHz ~/ 1000} kHz';
+    }
+    if (caps.codec == EarbudCodec.unknown) {
+      final hint = info != null && needsBluetoothPermission(info)
+          ? ' • grant Nearby-devices permission for codec details'
+          : ' • codec unavailable';
+      return '${caps.deviceName} • Bluetooth$hint • ~${caps.latencyMs} ms';
     }
     final rate = caps.sampleRateHz ~/ 1000;
     return '${caps.deviceName} • ${caps.codec.label} • '
@@ -164,6 +181,7 @@ class EarbudOptimizationService {
     if (name.contains('lc3')) return EarbudCodec.lc3;
     if (name.contains('sbc')) return EarbudCodec.sbc;
     if (name.contains('aac')) return EarbudCodec.aac;
+    if (name.contains('opus')) return EarbudCodec.opus;
     return EarbudCodec.unknown;
   }
 }

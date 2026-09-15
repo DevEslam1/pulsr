@@ -199,7 +199,7 @@ class AddToPlaylistSheet extends StatelessWidget {
                                   if (context.mounted) {
                                     Navigator.pop(context);
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text(_allSongs.length == 1 ? 'Added to ${playlist.name}' : 'Added ${_allSongs.length} tracks to ${playlist.name}')),
+                                      SnackBar(content: Text(_allSongs.length == 1 ? '${context.l10n.browseAdded} ${playlist.name}' : '${context.l10n.browseAdded} ${_allSongs.length} ${context.l10n.browseTracksTo} ${playlist.name}')),
                                     );
                                   }
                                 },

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -48,19 +49,32 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
       vsync: this,
       duration: const Duration(seconds: 4),
     );
-    if (widget.props.state.isPlaying) {
-      _waveController.repeat();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _waveController.duration = context.motionMs(4000);
+    _syncWave();
+  }
+
+  void _syncWave() {
+    final shouldAnimate = widget.props.state.isPlaying && context.motionEnabled;
+    if (shouldAnimate) {
+      if (!_waveController.isAnimating) {
+        _waveController.repeat();
+      }
+    } else {
+      if (_waveController.isAnimating) {
+        _waveController.stop();
+      }
     }
   }
 
   @override
   void didUpdateWidget(covariant WaveformPlayerTheme oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.props.state.isPlaying && !_waveController.isAnimating) {
-      _waveController.repeat();
-    } else if (!widget.props.state.isPlaying && _waveController.isAnimating) {
-      _waveController.stop();
-    }
+    _syncWave();
   }
 
   @override
@@ -85,8 +99,8 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
             (song.remoteId != null && song.remoteId!.isNotEmpty));
 
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeInOut,
+      duration: context.motionMs(400),
+      curve: context.motionCurve(Curves.easeInOut),
       decoration: BoxDecoration(
         gradient: RadialGradient(
           center: const Alignment(0, -0.2),
@@ -169,7 +183,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                 }
               },
               child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
+                duration: context.motionMs(300),
                 child: state.isLyricsVisible
                     ? LyricsView(
                         key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
@@ -341,7 +355,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                                       size: 11, color: activeColor),
                                   const SizedBox(width: 3),
                                   Text(
-                                    'WAVEFORM',
+                                    context.l10n.waveformLabel,
                                     style: TextStyle(
                                       fontSize: 9,
                                       fontWeight: FontWeight.w900,

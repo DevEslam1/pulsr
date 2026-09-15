@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/formatters.dart';
@@ -377,8 +378,8 @@ class AudioQualitySheet extends StatelessWidget {
                       children: [
                         _buildSpecItem(
                           context,
-                          icon: Icons.audio_file_rounded,
-                          label: 'Audio Format & Codec',
+                            icon: Icons.audio_file_rounded,
+                            label: context.l10n.dspAudioFormatCodec,
                           value: info.format,
                           subValue: info.codecName,
                           p: p,
@@ -387,21 +388,21 @@ class AudioQualitySheet extends StatelessWidget {
                         _buildSpecItem(
                           context,
                           icon: Icons.speed_rounded,
-                          label: 'Source Bitrate',
+                          label: context.l10n.dspSourceBitrate,
                           value: info.bitrateKbps != null
                               ? '${info.bitrateKbps} kbps'
-                              : 'Variable Bitrate',
+                              : context.l10n.dspVariableBitrate,
                           subValue:
                               info.tier == AudioQualityTier.hiResLossless ||
                                       info.tier == AudioQualityTier.lossless
-                                  ? 'Bit-perfect Lossless Stream'
-                                  : 'Compressed Audio Stream',
+                                  ? context.l10n.dspBitPerfectLosslessStream
+                                  : context.l10n.dspCompressedStream,
                           p: p,
                         ),
                         _buildSpecItem(
                           context,
                           icon: Icons.tune_rounded,
-                          label: 'Source Sample Rate & Depth',
+                          label: context.l10n.dspSourceSampleRateDepth,
                           value: '${info.bitDepth} / ${info.sampleRate}',
                           subValue: info.channels,
                           p: p,
@@ -409,22 +410,22 @@ class AudioQualitySheet extends StatelessWidget {
                         _buildSpecItem(
                           context,
                           icon: Icons.folder_zip_rounded,
-                          label: 'File Size & Duration',
+                          label: context.l10n.dspFileSizeDuration,
                           value: song.fileSize != null
                               ? '${(song.fileSize! / (1024 * 1024)).toStringAsFixed(2)} MB'
-                              : 'Unknown',
+                              : context.l10n.dspUnknown,
                           subValue:
-                              'Duration: ${Formatters.formatDuration(Duration(milliseconds: song.durationMs))}',
+                              '${context.l10n.duration}: ${Formatters.formatDuration(Duration(milliseconds: song.durationMs))}',
                           p: p,
                         ),
                         _buildSpecItem(
                           context,
                           icon: Icons.graphic_eq_rounded,
-                          label: 'Dynamic Range (LRA)',
+                          label: context.l10n.dspDynamicRangeLra,
                           value: song.loudnessRange != null
-                              ? '${song.loudnessRange!.toStringAsFixed(1)} LU (${song.loudnessRange! >= 12 ? "DR 12+ Audiophile" : (song.loudnessRange! >= 7 ? "DR High Dynamic" : "DR Standard")})'
-                              : 'Standard Dynamic Range',
-                          subValue: 'EBU R128 Loudness Range Analysis',
+                              ? '${song.loudnessRange!.toStringAsFixed(1)} LU (${song.loudnessRange! >= 12 ? context.l10n.dspDr12Audiophile : (song.loudnessRange! >= 7 ? context.l10n.dspDrHighDynamic : context.l10n.dspDrStandard)})'
+                              : context.l10n.dspStandardDynamicRange,
+                          subValue: context.l10n.dspEbuR128,
                           p: p,
                           isLast: true,
                         ),
@@ -556,7 +557,7 @@ class AudioQualitySheet extends StatelessWidget {
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
+              duration: context.motionMs(180),
               decoration: BoxDecoration(
                 color: isSelected
                     ? activeColor.withValues(alpha: 0.12)
@@ -631,7 +632,7 @@ class AudioQualitySheet extends StatelessWidget {
                           ),
                         ),
                         AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 150),
+                          duration: context.motionMs(150),
                           child: isSelected
                               ? Icon(
                                   Icons.check_circle_rounded,
@@ -849,7 +850,7 @@ class AudioQualitySheet extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
+          duration: context.motionMs(200),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             color: isBitPerfectEnabled
@@ -978,7 +979,7 @@ class AudioQualitySheet extends StatelessWidget {
                             color: p.textTertiary,
                           ),
                           visualDensity: VisualDensity.compact,
-                          tooltip: 'About Bit-Perfect',
+                          tooltip: context.l10n.dspAboutBitPerfect,
                           onPressed: () {
                             showDialog<void>(
                               context: context,
@@ -1205,7 +1206,7 @@ class AudioQualitySheet extends StatelessWidget {
           ],
           _buildSignalChainNode(
             step: 1,
-            title: 'SOURCE FILE',
+            title: context.l10n.dspSourceFile,
             detail: sourceLabel,
             icon: Icons.music_note_rounded,
             color: info.badgeColor,
@@ -1214,7 +1215,7 @@ class AudioQualitySheet extends StatelessWidget {
           _buildSignalChainConnector(p),
           _buildSignalChainNode(
             step: 2,
-            title: 'DSP PROCESSING',
+            title: context.l10n.dspDspProcessing,
             detail: dspLabel,
             icon: isBitPerfect
                 ? Icons.do_not_disturb_on_rounded
@@ -1226,26 +1227,26 @@ class AudioQualitySheet extends StatelessWidget {
           _buildSignalChainConnector(p),
           _buildSignalChainNode(
             step: 3,
-            title: 'RESAMPLING ENGINE',
+            title: context.l10n.dspResamplingEngine,
             detail: resamplerLabel,
             icon: Icons.transform_rounded,
-            color: isBitPerfect ? Colors.grey : Colors.cyanAccent,
+            color: isBitPerfect ? Colors.grey : p.success,
             p: p,
             isDimmed: isBitPerfect,
           ),
           _buildSignalChainConnector(p),
           _buildSignalChainNode(
             step: 4,
-            title: 'OUTPUT DRIVER',
+            title: context.l10n.dspOutputDriver,
             detail: driverLabel,
             icon: Icons.cable_rounded,
-            color: isBitPerfect ? const Color(0xFFFFD700) : Colors.orangeAccent,
+            color: isBitPerfect ? const Color(0xFFFFD700) : p.warning,
             p: p,
           ),
           _buildSignalChainConnector(p),
           _buildSignalChainNode(
             step: 5,
-            title: 'HARDWARE ENDPOINT',
+            title: context.l10n.dspHardwareEndpoint,
             detail:
                 '$dacLabel (${outputDevice != null && outputDevice.targetSampleRate > 0 ? "${outputDevice.targetSampleRate ~/ 1000} kHz" : (outputDevice != null ? "${outputDevice.sampleRate ~/ 1000} kHz" : "48 kHz")} / ${outputDevice?.bitDepth ?? 24}-bit)',
             icon: outputDevice?.isUsbDac == true
@@ -1357,8 +1358,8 @@ class _OptionPill extends StatelessWidget {
     return Opacity(
       opacity: isEnabled ? 1.0 : 0.45,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOutCubic,
+        duration: context.motionMs(180),
+        curve: context.motionCurve(Curves.easeOutCubic),
         decoration: BoxDecoration(
           color: isSelected
               ? activeColor.withValues(alpha: 0.16)
@@ -1498,7 +1499,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
     final selectableCodecs = outputDevice?.btSelectableCodecs ?? const [];
     final isLdac = codecName == 'LDAC';
 
-    const allCodecs = ['SBC', 'AAC', 'aptX', 'aptX HD', 'LDAC', 'LC3'];
+    const allCodecs = ['SBC', 'AAC', 'aptX', 'aptX HD', 'LDAC', 'LC3', 'Opus'];
     final visibleCodecs =
         selectableCodecs.isNotEmpty ? selectableCodecs : allCodecs;
 

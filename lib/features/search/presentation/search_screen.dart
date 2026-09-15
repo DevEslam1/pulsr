@@ -431,7 +431,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       'Electronic'
                     ])
                       ActionChip(
-                        label: Text(tag),
+                        label: Text(_localizedTag(context, tag)),
                         backgroundColor: p.surfaceContainer,
                         side: BorderSide(color: p.hairline),
                         labelStyle: TextStyle(
@@ -503,9 +503,9 @@ class _OnlineResults extends StatelessWidget {
         if (state.errorMessage != null) {
           return EmptyStateWidget(
             icon: Icons.cloud_off_rounded,
-            title: 'Search Failed',
+            title: context.l10n.browseSearchFailed,
             subtitle: state.errorMessage!,
-            primaryActionLabel: 'Try Again',
+            primaryActionLabel: context.l10n.tryAgain,
             primaryActionIcon: Icons.refresh_rounded,
             onPrimaryAction: context.read<YtmSearchCubit>().retry,
           );
@@ -515,8 +515,9 @@ class _OnlineResults extends StatelessWidget {
           if (state.hasSearched) {
             return EmptyStateWidget(
               icon: Icons.search_off_rounded,
-              title: 'No Results Found',
-              subtitle: 'No YouTube Music matches for "${state.query.trim()}".',
+              title: context.l10n.browseNoResultsFound,
+              subtitle:
+                  '${context.l10n.browseNoYtmMatchesFor} "${state.query.trim()}".',
             );
           }
 
@@ -565,7 +566,7 @@ class _OnlineResults extends StatelessWidget {
                         'Electronic'
                       ])
                         ActionChip(
-                          label: Text(tag),
+                          label: Text(_localizedTag(context, tag)),
                           backgroundColor: p.surfaceContainer,
                           side: BorderSide(color: p.hairline),
                           labelStyle: TextStyle(
@@ -598,5 +599,38 @@ class _OnlineResults extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+String _localizedTag(BuildContext context, String tag) {
+  switch (tag) {
+    case 'Rock':
+      return context.l10n.browseRock;
+    case 'Pop':
+      return context.l10n.browsePop;
+    case 'Hip-Hop':
+      return context.l10n.browseHipHop;
+    case 'Acoustic':
+      return context.l10n.browseAcoustic;
+    case 'FLAC':
+      return context.l10n.browseFlac;
+    case 'Lossless':
+      return context.l10n.browseLossless;
+    case 'Jazz':
+      return context.l10n.browseJazz;
+    case 'Electronic':
+      return context.l10n.browseElectronic;
+    case 'Top Hits':
+      return context.l10n.browseTopHits;
+    case 'Trending':
+      return context.l10n.browseTrending;
+    case 'Lo-Fi Beats':
+      return context.l10n.browseLofiBeats;
+    case 'Rock Classics':
+      return context.l10n.browseRockClassics;
+    case 'Chillout':
+      return context.l10n.browseChillout;
+    default:
+      return tag;
   }
 }

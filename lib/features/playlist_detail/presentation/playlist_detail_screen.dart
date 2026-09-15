@@ -68,8 +68,8 @@ class PlaylistDetailScreen extends StatelessWidget {
         SnackBar(
           content: Text(
             hasOnlineTracks
-                ? 'All online tracks are already downloaded or in progress.'
-                : 'All tracks in this playlist are already offline local files.',
+                ? context.l10n.browseAllOnlineTracksDownloaded
+                : context.l10n.browseAllTracksOfflineLocal,
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -106,9 +106,10 @@ class PlaylistDetailScreen extends StatelessWidget {
       );
       return;
     }
+    final sharePrefix = context.l10n.browsePlaylistSharePrefix;
 
     // Primary path: PlaylistShareService's portable JSON bundle.
-    if (await _sharePlaylistBundle(playlist.name, songs)) return;
+    if (await _sharePlaylistBundle(context, playlist.name, songs)) return;
 
     // Graceful fallback: existing M3U share.
     final exportUseCase = getIt<PlaylistExportUseCase>();
@@ -117,7 +118,7 @@ class PlaylistDetailScreen extends StatelessWidget {
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile(file.path, mimeType: 'audio/x-mpegurl')],
-          text: 'Playlist: ${playlist.name}',
+          text: '$sharePrefix ${playlist.name}',
         ),
       );
     } finally {
@@ -133,7 +134,8 @@ class PlaylistDetailScreen extends StatelessWidget {
   /// false when the service cannot produce/validate it, so the caller can fall
   /// back to the M3U share.
   Future<bool> _sharePlaylistBundle(
-      String name, List<SongsTableData> songs) async {
+      BuildContext context, String name, List<SongsTableData> songs) async {
+    final sharePrefix = context.l10n.browsePlaylistSharePrefix;
     try {
       final shareService = getIt<PlaylistShareService>();
       final json = shareService.exportPlaylist(name, songs);
@@ -149,7 +151,7 @@ class PlaylistDetailScreen extends StatelessWidget {
         await SharePlus.instance.share(
           ShareParams(
             files: [XFile(bundle.path, mimeType: 'application/json')],
-            text: 'Playlist: $name',
+            text: '$sharePrefix $name',
           ),
         );
         return true;
@@ -205,7 +207,7 @@ class PlaylistDetailScreen extends StatelessWidget {
                 )
               else
                 IconButton(
-                  tooltip: 'Manage Songs',
+                  tooltip: context.l10n.manageSongs,
                   icon: Icon(Icons.playlist_add_check_rounded, color: p.accent),
                   onPressed: () =>
                       context.push('/playlist/manage', extra: playlist),
@@ -305,10 +307,10 @@ class PlaylistDetailScreen extends StatelessWidget {
                           icon: playlist.isSmart
                               ? Icons.auto_awesome_rounded
                               : Icons.queue_music_rounded,
-                          title: 'No Tracks',
+                          title: context.l10n.browseNoTracks,
                           subtitle: playlist.isSmart
-                              ? 'No tracks match the rules for this smart playlist.'
-                              : 'No tracks in this playlist yet.',
+                              ? context.l10n.browseNoTracksMatchSmartRules
+                              : context.l10n.emptyPlaylist,
                         )
                       : ListView.builder(
                           padding: const EdgeInsets.only(bottom: 160),
@@ -362,7 +364,7 @@ class PlaylistDetailScreen extends StatelessWidget {
                                           foregroundColor: p.accent,
                                         ),
                                         tooltip:
-                                            'Download all offline (3 active downloads)',
+                                            context.l10n.browseDownloadAllOfflineActive,
                                       ),
                                     ],
                                   ],

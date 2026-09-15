@@ -267,7 +267,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                               Padding(
                                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                                 child: Text(
-                                  'Disc ${song.discNumber ?? 1}',
+                                  '${context.l10n.browseDisc} ${song.discNumber ?? 1}',
                                   style: TextStyle(
                                       color: p.textSecondary,
                                       fontSize: 12,

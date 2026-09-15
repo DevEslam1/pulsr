@@ -296,7 +296,7 @@ class _AddStationDialogState extends State<_AddStationDialog> {
               decoration: InputDecoration(
                 labelText: context.l10n.radioStationName,
                 labelStyle: TextStyle(color: p.textSecondary),
-                hintText: 'e.g. Chillhop Radio',
+                hintText: context.l10n.browseRadioNameHint,
                 hintStyle: TextStyle(color: p.textTertiary),
                 filled: true,
                 fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),

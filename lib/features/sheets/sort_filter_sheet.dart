@@ -26,11 +26,11 @@ class SortFilterSheet extends StatelessWidget {
       {'key': 'album', 'label': context.l10n.albums},
       {'key': 'dateAdded', 'label': context.l10n.recentlyAdded},
       {'key': 'duration', 'label': context.l10n.duration},
-      {'key': 'playCount', 'label': 'Most Played'},
-      {'key': 'rating', 'label': 'Top Rated'},
-      {'key': 'lastPlayed', 'label': 'Recently Played'},
-      {'key': 'fileSize', 'label': 'File Size'},
-      {'key': 'year', 'label': 'Release Year'},
+      {'key': 'playCount', 'label': context.l10n.mostPlayed},
+      {'key': 'rating', 'label': context.l10n.browseTopRated},
+      {'key': 'lastPlayed', 'label': context.l10n.recentlyPlayed},
+      {'key': 'fileSize', 'label': context.l10n.fileSize},
+      {'key': 'year', 'label': context.l10n.browseReleaseYear},
     ];
 
     return GestureDetector(

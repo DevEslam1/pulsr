@@ -46,7 +46,7 @@ class _TagEditorView extends StatelessWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.isBatchMode
-                  ? 'Updated ${state.batchSongs.length} tracks successfully!'
+                  ? '${context.l10n.browseUpdatedPrefix} ${state.batchSongs.length} ${context.l10n.browseTracksSuccessfully}'
                   : context.l10n.tagsSavedSuccess),
               backgroundColor: context.palette.accent,
             ),
@@ -57,7 +57,7 @@ class _TagEditorView extends StatelessWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.errorMessage ?? context.l10n.tagsSaveError),
-              backgroundColor: Colors.redAccent,
+              backgroundColor: p.error,
             ),
           );
         }
@@ -77,7 +77,7 @@ class _TagEditorView extends StatelessWidget {
               leading: const PulsrBackButton(),
               title: Text(
               state.isBatchMode
-                  ? 'Batch Edit (${state.batchSongs.length} Tracks)'
+                  ? '${context.l10n.browseBatchEdit} (${state.batchSongs.length} ${context.l10n.browseTracks})'
                   : context.l10n.tagEditor,
               style: TextStyle(
                 color: p.textPrimary,
@@ -139,7 +139,9 @@ class _TagEditorView extends StatelessWidget {
                                       const SizedBox(width: 10),
                                       Expanded(
                                         child: Text(
-                                          'Batch editing ${state.batchSongs.length} tracks. Common tags and cover art will be updated on all selected files.',
+                                          context.l10n
+                                              .browseBatchEditingBody(
+                                                  state.batchSongs.length),
                                           style: TextStyle(
                                               fontSize: 12,
                                               color: p.textPrimary,
@@ -220,7 +222,7 @@ class _TagEditorView extends StatelessWidget {
                                                                 .fromLTRB(
                                                                 20, 16, 20, 8),
                                                         child: Text(
-                                                          'Select Best Match (${matches.length})',
+                                                          '${context.l10n.browseSelectBestMatch} (${matches.length})',
                                                           style: TextStyle(
                                                             color:
                                                                 p.textPrimary,
@@ -334,8 +336,9 @@ class _TagEditorView extends StatelessWidget {
                                             size: 18, color: p.accent),
                                     label: Text(
                                       isAutoFetching
-                                          ? 'Searching Online Metadata...'
-                                          : 'Auto-Fetch Tags & Cover Art',
+                                          ? context.l10n
+                                              .browseSearchingOnlineMetadata
+                                          : context.l10n.browseAutoFetchTags,
                                       style: TextStyle(
                                         color: p.accent,
                                         fontWeight: FontWeight.w600,
@@ -408,7 +411,7 @@ class _TagEditorView extends StatelessWidget {
                               ),
                               if (!state.isBatchMode)
                                 TagFieldWidget(
-                                  label: 'Disc Number',
+                                  label: context.l10n.browseDiscNumber,
                                   initialValue: state.discNumber,
                                   icon: Icons.album_outlined,
                                   keyboardType: TextInputType.number,
@@ -416,7 +419,7 @@ class _TagEditorView extends StatelessWidget {
                                   onChanged: cubit.updateDiscNumber,
                                 ),
                               TagFieldWidget(
-                                label: 'Comment',
+                                label: context.l10n.browseComment,
                                 initialValue: state.comment,
                                 icon: Icons.comment_outlined,
                                 onChanged: cubit.updateComment,
@@ -427,7 +430,7 @@ class _TagEditorView extends StatelessWidget {
                                   initialValue: state.lyrics,
                                   icon: Icons.lyrics_outlined,
                                   maxLines: 4,
-                                  hintText: 'Enter song lyrics...',
+                                  hintText: context.l10n.browseEnterLyrics,
                                   onChanged: cubit.updateLyrics,
                                 ),
                               const SizedBox(height: 32),

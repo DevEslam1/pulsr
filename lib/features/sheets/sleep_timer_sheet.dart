@@ -84,11 +84,10 @@ class SleepTimerSheet extends StatelessWidget {
                                       cubit.cancelSleepTimer();
                                       Navigator.pop(context);
                                     },
-                                    icon: const Icon(Icons.cancel_rounded,
-                                        color: Colors.redAccent, size: 18),
+                                    icon: Icon(Icons.cancel_rounded,
+                                        color: p.error, size: 18),
                                     label: Text(context.l10n.turnOff,
-                                        style: const TextStyle(
-                                            color: Colors.redAccent)),
+                                        style: TextStyle(color: p.error)),
                                   ),
                               ],
                             ),

@@ -76,7 +76,7 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
       if (!mounted || _cancelled) return;
       if (!ok) {
         setState(() {
-          _error = 'The code expired before it was approved. Try again.';
+          _error = context.l10n.browseOauthExpired;
           _busy = false;
         });
         return;
@@ -93,14 +93,14 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
       if (!mounted) return;
       setState(() {
         _error = e.code == 'access_denied'
-            ? 'Access was denied on the Google page.'
-            : 'Google returned an error: ${e.code}';
+            ? context.l10n.browseOauthAccessDenied
+            : '${context.l10n.browseOauthGoogleError}: ${e.code}';
         _busy = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Could not start the Google sign-in. Check your connection.';
+        _error = context.l10n.browseOauthStartFailed;
         _busy = false;
       });
     }
@@ -111,7 +111,7 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$label copied'),
+          content: Text('$label ${context.l10n.browseCopied}'),
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
         ),
@@ -187,7 +187,7 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
                 const SizedBox(height: 20),
                 if (_success)
                   _statusTile(p, Icons.check_circle_rounded, p.accent,
-                      'Signed in. Loading your library…')
+                      context.l10n.browseSignedInLoading)
                 else if (_error != null)
                   _errorBody(p)
                 else
@@ -259,7 +259,7 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
           style: TextStyle(color: p.textSecondary, fontSize: 13),
         ),
         const SizedBox(height: 8),
-        _copyRow(p, code.verificationUrl, 'Address'),
+        _copyRow(p, code.verificationUrl, context.l10n.browseAddress),
         const SizedBox(height: 18),
         Text(context.l10n.oauthStep2,
           style: TextStyle(color: p.textSecondary, fontSize: 13),
@@ -286,7 +286,7 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
         ),
         const SizedBox(height: 10),
         OutlinedButton.icon(
-          onPressed: () => _copy(code.userCode, 'Code'),
+          onPressed: () => _copy(code.userCode, context.l10n.browseCode),
           icon: const Icon(Icons.copy_rounded, size: 18),
           label: Text(context.l10n.copyCode,
               style: TextStyle(fontWeight: FontWeight.w700)),
@@ -337,7 +337,7 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
           IconButton(
             onPressed: () => _copy(value, label),
             icon: Icon(Icons.copy_rounded, color: p.accent, size: 20),
-            tooltip: 'Copy',
+            tooltip: context.l10n.browseCopy,
           ),
         ],
       ),

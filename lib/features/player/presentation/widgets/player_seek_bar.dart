@@ -24,6 +24,7 @@ class PlayerSeekBar extends StatefulWidget {
   final Color activeColor;
   final int? songId;
   final String? filePath;
+  final String semanticLabel;
 
   const PlayerSeekBar({
     super.key,
@@ -33,6 +34,7 @@ class PlayerSeekBar extends StatefulWidget {
     this.activeColor = Colors.white,
     this.songId,
     this.filePath,
+    this.semanticLabel = 'Seek',
   });
 
   @override
@@ -85,6 +87,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                   onSeek: widget.onSeek,
                   samples: snapshot.data!,
                   activeColor: widget.activeColor,
+                  semanticLabel: widget.semanticLabel,
                 ));
           }
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -95,6 +98,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                   onSeek: widget.onSeek,
                   samples: _loadingWaveformSamples,
                   activeColor: widget.activeColor.withValues(alpha: 0.45),
+                  semanticLabel: widget.semanticLabel,
                 ));
           }
           if (snapshot.hasError) {
@@ -131,6 +135,11 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
       final double currentPos = position.inMilliseconds.toDouble();
       final double effectiveValue = (_dragValue ?? currentPos)
           .clamp(0.0, maxDuration > 0 ? maxDuration : 1.0);
+      final currentDuration = _dragValue != null
+          ? Duration(milliseconds: _dragValue!.round())
+          : position;
+      final valueLabel =
+          '${Formatters.formatDuration(currentDuration)} / ${Formatters.formatDuration(widget.duration)}';
       return Directionality(
         textDirection: TextDirection.ltr,
         child: RepaintBoundary(
@@ -140,27 +149,31 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Modern wavy gesture-driven scrubber
-                PulsrSlider(
-                  value: effectiveValue,
-                  min: 0.0,
-                  max: maxDuration > 0 ? maxDuration : 1.0,
-                  height: 32,
-                  activeColor: widget.activeColor,
-                  inactiveColor: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.white.withValues(alpha: 0.14)
-                      : context.palette.hairline.withValues(alpha: 0.8),
-                  isWavy: true,
-                  animateWave: true,
-                  onChangeStart: (val) {
-                    setState(() => _dragValue = val);
-                  },
-                  onChanged: (val) {
-                    setState(() => _dragValue = val);
-                  },
-                  onChangeEnd: (val) {
-                    widget.onSeek(Duration(milliseconds: val.round()));
-                    setState(() => _dragValue = null);
-                  },
+                Semantics(
+                  value: valueLabel,
+                  child: PulsrSlider(
+                    value: effectiveValue,
+                    min: 0.0,
+                    max: maxDuration > 0 ? maxDuration : 1.0,
+                    height: 32,
+                    semanticLabel: widget.semanticLabel,
+                    activeColor: widget.activeColor,
+                    inactiveColor: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white.withValues(alpha: 0.14)
+                        : context.palette.hairline.withValues(alpha: 0.8),
+                    isWavy: true,
+                    animateWave: true,
+                    onChangeStart: (val) {
+                      setState(() => _dragValue = val);
+                    },
+                    onChanged: (val) {
+                      setState(() => _dragValue = val);
+                    },
+                    onChangeEnd: (val) {
+                      widget.onSeek(Duration(milliseconds: val.round()));
+                      setState(() => _dragValue = null);
+                    },
+                  ),
                 ),
                 const SizedBox(height: 2),
                 // Timestamps

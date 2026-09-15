@@ -18,10 +18,10 @@ class GenreHierarchyView extends StatelessWidget {
 
   const GenreHierarchyView({super.key, required this.genres});
 
-  static const List<GenreCategory> _categories = [
-    GenreCategory('Rock & Metal', Icons.electric_bolt_rounded,
+  List<GenreCategory> _categories(BuildContext context) => [
+    GenreCategory(context.l10n.browseGenreRockMetal, Icons.electric_bolt_rounded,
         ['rock', 'metal', 'grunge', 'punk', 'alternative', 'روك', 'ميتال']),
-    GenreCategory('Electronic & Dance', Icons.album_rounded, [
+    GenreCategory(context.l10n.browseGenreElectronicDance, Icons.album_rounded, [
       'electronic',
       'techno',
       'house',
@@ -33,7 +33,7 @@ class GenreHierarchyView extends StatelessWidget {
       'هاوس',
       'تكنو'
     ]),
-    GenreCategory('Hip-Hop & R&B', Icons.mic_external_on_rounded, [
+    GenreCategory(context.l10n.browseGenreHipHopRnb, Icons.mic_external_on_rounded, [
       'hip hop',
       'hip-hop',
       'rap',
@@ -45,9 +45,9 @@ class GenreHierarchyView extends StatelessWidget {
       'تراب',
       'مهرجانات'
     ]),
-    GenreCategory('Jazz & Blues', Icons.music_note_rounded,
+    GenreCategory(context.l10n.browseGenreJazzBlues, Icons.music_note_rounded,
         ['jazz', 'blues', 'swing', 'bebop', 'جاز', 'بلوز']),
-    GenreCategory('Classical & Instrumental', Icons.piano_rounded, [
+    GenreCategory(context.l10n.browseGenreClassicalInstrumental, Icons.piano_rounded, [
       'classical',
       'instrumental',
       'soundtrack',
@@ -58,7 +58,7 @@ class GenreHierarchyView extends StatelessWidget {
       'أوركسترا',
       'موسيقى تصويرية'
     ]),
-    GenreCategory('Pop & Acoustic', Icons.star_rounded, [
+    GenreCategory(context.l10n.browseGenrePopAcoustic, Icons.star_rounded, [
       'pop',
       'acoustic',
       'indie',
@@ -69,7 +69,7 @@ class GenreHierarchyView extends StatelessWidget {
       'أكوستيك',
       'فولك'
     ]),
-    GenreCategory('Arabic & Regional', Icons.queue_music_rounded, [
+    GenreCategory(context.l10n.browseGenreArabicRegional, Icons.queue_music_rounded, [
       'طرب',
       'عربي',
       'خليجي',
@@ -93,7 +93,7 @@ class GenreHierarchyView extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
       children: [
-        for (final category in _categories) ...[
+        for (final category in _categories(context)) ...[
           _buildCategoryGroup(context, category, p),
           const SizedBox(height: 12),
         ],
@@ -138,7 +138,7 @@ class GenreHierarchyView extends StatelessWidget {
           ),
         ),
         subtitle: Text(
-          '${matching.length} sub-genres • ${matching.fold<int>(0, (sum, g) => sum + g.songCount)} songs',
+          '${matching.length} ${context.l10n.browseSubGenres} • ${matching.fold<int>(0, (sum, g) => sum + g.songCount)} ${context.l10n.songs}',
           style: TextStyle(color: p.textSecondary, fontSize: 12),
         ),
         children: [
@@ -174,7 +174,7 @@ class GenreHierarchyView extends StatelessWidget {
   Widget _buildUncategorizedGroup(BuildContext context, PulsrPalette p) {
     final uncategorized = genres.where((g) {
       final name = g.name.toLowerCase();
-      return !_categories
+      return !_categories(context)
           .any((cat) => cat.keywords.any((kw) => name.contains(kw)));
     }).toList();
 
@@ -204,7 +204,7 @@ class GenreHierarchyView extends StatelessWidget {
           ),
         ),
         subtitle: Text(
-          '${uncategorized.length} genres',
+          '${uncategorized.length} ${context.l10n.genres}',
           style: TextStyle(color: p.textSecondary, fontSize: 12),
         ),
         children: [

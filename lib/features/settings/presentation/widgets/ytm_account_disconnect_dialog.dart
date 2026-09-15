@@ -83,8 +83,7 @@ class _YtmAccountDisconnectDialogState
       title: Text(context.l10n.ytmAccount,
           style: TextStyle(color: widget.titleColor)),
       content: Text(
-        'Connected as: ${widget.account.accountName ?? "User"}\n\n'
-        'Manage your YouTube Music account or disconnect from this device.',
+        context.l10n.settingsConnectedAs(widget.account.accountName ?? "User"),
         style: TextStyle(color: widget.bodyColor),
       ),
       actions: [

@@ -1,6 +1,7 @@
 // lib/features/tag_editor/tag_field_widget.dart
 import 'package:flutter/material.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/l10n_extensions.dart';
 
 class TagFieldWidget extends StatelessWidget {
   final String label;
@@ -50,7 +51,7 @@ class TagFieldWidget extends StatelessWidget {
               fontWeight: FontWeight.w500,
             ),
             decoration: InputDecoration(
-              hintText: hintText ?? 'Enter $label',
+              hintText: hintText ?? '${context.l10n.browseEnter} $label',
               hintStyle: TextStyle(
                 color: p.textSecondary,
                 fontSize: 13,

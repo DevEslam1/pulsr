@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
@@ -72,8 +73,8 @@ class LandscapeSidebar extends StatelessWidget {
     ];
 
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 240),
-      curve: Curves.easeOutCubic,
+      duration: context.motionMs(240),
+      curve: context.motionCurve(Curves.easeOutCubic),
       width: width,
       clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
@@ -366,8 +367,8 @@ class _SidebarNavItem extends StatelessWidget {
               splashColor: activeColor.withValues(alpha: 0.15),
               highlightColor: Colors.transparent,
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOutCubic,
+                duration: context.motionMs(200),
+                curve: context.motionCurve(Curves.easeOutCubic),
                 height: 46,
                 width: 46,
                 decoration: BoxDecoration(
@@ -394,7 +395,7 @@ class _SidebarNavItem extends StatelessWidget {
                 child: Center(
                   child: AnimatedScale(
                     scale: isSelected ? 1.08 : 1.0,
-                    duration: const Duration(milliseconds: 180),
+                    duration: context.motionMs(180),
                     child: Icon(
                       isSelected ? activeIcon : icon,
                       size: 23,
@@ -417,8 +418,8 @@ class _SidebarNavItem extends StatelessWidget {
         splashColor: activeColor.withValues(alpha: 0.12),
         highlightColor: Colors.transparent,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutCubic,
+          duration: context.motionMs(200),
+          curve: context.motionCurve(Curves.easeOutCubic),
           height: 44,
           padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
@@ -438,7 +439,7 @@ class _SidebarNavItem extends StatelessWidget {
               children: [
                 // Indicator Bar
                 AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
+                  duration: context.motionMs(180),
                   width: 3.5,
                   height: isSelected ? 18 : 0,
                   decoration: BoxDecoration(
@@ -459,7 +460,7 @@ class _SidebarNavItem extends StatelessWidget {
                 // Icon
                 AnimatedScale(
                   scale: isSelected ? 1.06 : 1.0,
-                  duration: const Duration(milliseconds: 180),
+                  duration: context.motionMs(180),
                   child: Icon(
                     isSelected ? activeIcon : icon,
                     size: 21,

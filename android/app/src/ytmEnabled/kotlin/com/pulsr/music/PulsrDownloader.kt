@@ -99,6 +99,9 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
             }
 
             val stream = if (code >= 400) connection.errorStream else connection.inputStream
+            // This Downloader serves API JSON/HTML only (search/browse/player,
+            // base.js scrapes) — never raw media segments. Cap the buffered
+            // body so a misrouted bucket or hostile server can't OOM us.
             val body = stream?.let { raw ->
                 val isGzip = connection.contentEncoding?.equals("gzip", ignoreCase = true) == true
                 val decoded = if (isGzip) {
@@ -106,7 +109,7 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
                 } else {
                     raw
                 }
-                decoded.use { it.readBytes().toString(Charsets.UTF_8) }
+                decoded.use { readCappedBytes(it, MAX_BODY_BYTES).toString(Charsets.UTF_8) }
             }
 
             // Bot-detection body scan, restricted to failed responses.
@@ -197,6 +200,29 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
         private const val CONNECT_TIMEOUT_MS = 15_000
         private const val READ_TIMEOUT_MS = 30_000
         private const val HTTP_TOO_MANY_REQUESTS = 429
+
+        /**
+         * API bodies are KBs (JSON) to ~1MB (base.js). Anything larger means
+         * this Downloader was misrouted to raw media — fail fast, not OOM.
+         */
+        const val MAX_BODY_BYTES = 8 * 1024 * 1024
+
+        @Throws(IOException::class)
+        fun readCappedBytes(input: java.io.InputStream, maxBytes: Int): ByteArray {
+            val out = java.io.ByteArrayOutputStream(32 * 1024)
+            val buf = ByteArray(8 * 1024)
+            var total = 0
+            while (true) {
+                val n = input.read(buf)
+                if (n < 0) break
+                total += n
+                if (total > maxBytes) {
+                    throw IOException("Response body exceeds $maxBytes bytes; refusing to buffer (not a media downloader)")
+                }
+                out.write(buf, 0, n)
+            }
+            return out.toByteArray()
+        }
 
         // Phrases that only appear on a genuine interstitial. Deliberately no
         // bare "recaptcha" or "LOGIN_REQUIRED": both occur in ordinary

@@ -523,7 +523,8 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                 AppThemeMode themeMode,
                 Color customAccent,
                 String languageCode,
-                bool highContrast
+                bool highContrast,
+                bool reduceMotion
               })>(
             selector: (state) => (
               colorSource: state.themeColorSource,
@@ -531,6 +532,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
               customAccent: state.customAccentColor,
               languageCode: state.languageCode,
               highContrast: state.highContrast,
+              reduceMotion: state.reduceMotion,
             ),
             builder: (context, settingsConfig) {
               return BlocSelector<DynamicThemeCubit, DynamicThemeState,
@@ -559,20 +561,26 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                         }
                       }
 
-                      final lightTheme = settingsConfig.highContrast
+                      final isHighContrast = settingsConfig.highContrast ||
+                          MediaQuery.highContrastOf(context);
+                      final isBoldText = MediaQuery.boldTextOf(context);
+
+                      final lightTheme = isHighContrast
                           ? AuraTheme.highContrastTheme
                           : AuraTheme.customTheme(
                               resolveAccent(lightDynamic?.primary),
                               brightness: Brightness.light,
+                              isBoldText: isBoldText,
                             );
 
-                      final darkTheme = settingsConfig.highContrast
+                      final darkTheme = isHighContrast
                           ? AuraTheme.highContrastTheme
                           : AuraTheme.customTheme(
                               resolveAccent(darkDynamic?.primary),
                               brightness: Brightness.dark,
                               isAmoled: settingsConfig.themeMode ==
                                   AppThemeMode.amoled,
+                              isBoldText: isBoldText,
                             );
 
                       final ThemeMode flutterThemeMode;
@@ -589,7 +597,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                           break;
                       }
 
-                      final isDarkTheme = settingsConfig.highContrast ||
+                      final isDarkTheme = isHighContrast ||
                           flutterThemeMode == ThemeMode.dark ||
                           (flutterThemeMode == ThemeMode.system &&
                               MediaQuery.platformBrightnessOf(context) ==
@@ -610,6 +618,26 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                           themeMode: flutterThemeMode,
                           theme: lightTheme,
                           darkTheme: darkTheme,
+                          builder: (context, child) {
+                            // Honour both the in-app toggle and the OS
+                            // "Reduce motion" / "Remove animations" setting.
+                            // Overriding `disableAnimations` here makes every
+                            // `PulsrMotion` call site collapse app-wide without
+                            // each widget reading settings directly.
+                            final media = MediaQuery.of(context);
+                            final reduceMotion = settingsConfig.reduceMotion ||
+                                media.disableAnimations;
+                            return MediaQuery(
+                              data: media.copyWith(
+                                disableAnimations: reduceMotion,
+                              ),
+                              child: MediaQuery.withClampedTextScaling(
+                                minScaleFactor: 0.8,
+                                maxScaleFactor: 1.3,
+                                child: child ?? const SizedBox.shrink(),
+                              ),
+                            );
+                          },
                           locale: settingsConfig.languageCode == 'system'
                               ? null
                               : Locale(settingsConfig.languageCode),

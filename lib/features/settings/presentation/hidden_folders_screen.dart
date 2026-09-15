@@ -113,7 +113,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
             actions: [
               IconButton(
                 icon: const Icon(Icons.create_new_folder_outlined),
-                tooltip: 'Add Custom Folder',
+                tooltip: context.l10n.settingsAddCustomFolder,
                 onPressed: () => _showAddCustomFolderDialog(context, p),
               ),
             ],
@@ -139,8 +139,8 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                     : const Icon(Icons.sync_rounded),
                 label: Text(
                   state.isScanning
-                      ? 'Rescanning library…'
-                      : 'Apply & Rescan Library',
+                      ? context.l10n.settingsRescanningLibrary
+                      : context.l10n.settingsApplyRescanLibrary,
                   style: const TextStyle(
                       fontWeight: FontWeight.w700, fontSize: 14),
                 ),
@@ -152,7 +152,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                                 content: Text(
-                                    'Library updated! $count tracks loaded.')),
+                                    context.l10n.settingsLibraryUpdated(count))),
                           );
                         }
                       },
@@ -261,7 +261,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                     child: Text(
                                       state.minDurationSec > 0
                                           ? '${state.minDurationSec}s'
-                                          : 'Off',
+                                          : context.l10n.rgOff,
                                       style: TextStyle(
                                         color: p.accent,
                                         fontWeight: FontWeight.w800,
@@ -276,7 +276,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                         color: state.minDurationSec == 30
                                             ? p.textTertiary.withValues(alpha: 0.4)
                                             : p.accent),
-                                    tooltip: 'Reset to default (30s)',
+                                    tooltip: context.l10n.resetToDefault30s,
                                     visualDensity: VisualDensity.compact,
                                     padding: EdgeInsets.zero,
                                     constraints: const BoxConstraints(
@@ -362,7 +362,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                     ? (_minFileSizeKb >= 1024
                                         ? '${(_minFileSizeKb / 1024).toStringAsFixed(0)}MB'
                                         : '${_minFileSizeKb}KB')
-                                    : 'Off',
+                                    : context.l10n.rgOff,
                                 style: TextStyle(
                                   color: p.accent,
                                   fontWeight: FontWeight.w800,
@@ -379,7 +379,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                           children: [0, 50, 100, 200, 500, 1024].map((kb) {
                             final isSelected = _minFileSizeKb == kb;
                             final label = kb == 0
-                                ? 'Off'
+                                ? context.l10n.rgOff
                                 : kb >= 1024
                                     ? '1 MB'
                                     : '$kb KB';
@@ -430,7 +430,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                 color: p.error.withValues(alpha: 0.3)),
                           ),
                           child: Text(
-                            '$hiddenCount Hidden',
+                            context.l10n.settingsHiddenCount(hiddenCount),
                             style: TextStyle(
                                 color: p.error,
                                 fontSize: 11,
@@ -460,7 +460,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                       },
                       style: TextStyle(fontSize: 13, color: p.textPrimary),
                       decoration: InputDecoration(
-                        hintText: 'Search directories by name or path...',
+                        hintText: context.l10n.settingsSearchDirectoriesHint,
                         hintStyle:
                             TextStyle(fontSize: 12, color: p.textTertiary),
                         prefixIcon: Icon(Icons.search_rounded,
@@ -502,8 +502,8 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                       child: Center(
                         child: Text(
                           _searchQuery.isNotEmpty
-                              ? 'No directories match "$_searchQuery"'
-                              : 'No audio folders discovered yet. Scan storage to populate.',
+                              ? context.l10n.settingsNoDirectoriesMatch(_searchQuery)
+                              : context.l10n.settingsNoAudioFolders,
                           style: TextStyle(color: p.textTertiary, fontSize: 13),
                           textAlign: TextAlign.center,
                         ),
@@ -565,7 +565,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                             subtitle: Padding(
                               padding: const EdgeInsets.only(top: 2),
                               child: Text(
-                                '${folder.songCount} tracks • ${folder.path}',
+                                '${context.l10n.tracksCountPlural(folder.songCount)} • ${folder.path}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
@@ -595,7 +595,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                 size: 15,
                               ),
                               label: Text(
-                                isHidden ? 'Unhide' : 'Hide',
+                                isHidden ? context.l10n.settingsUnhide : context.l10n.settingsHide,
                                 style: const TextStyle(
                                     fontWeight: FontWeight.w700,
                                     fontSize: 11.5),

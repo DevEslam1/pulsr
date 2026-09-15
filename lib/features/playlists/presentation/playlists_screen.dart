@@ -126,11 +126,11 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       BuildContext context, PlaylistCubit cubit, PlaylistsTableData pl) async {
     final name = await PulsrDialogHelper.showInputDialog(
       context,
-      title: 'Rename Playlist',
+      title: context.l10n.browseRenamePlaylist,
       initialText: pl.name,
       icon: Icons.drive_file_rename_outline_rounded,
-      confirmLabel: 'Save',
-      cancelLabel: 'Cancel',
+      confirmLabel: context.l10n.save,
+      cancelLabel: context.l10n.cancel,
     );
     if (name != null && name.isNotEmpty) {
       await cubit.renamePlaylist(pl.id, name);
@@ -145,6 +145,9 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     bool share = false,
     PlaylistFormat format = PlaylistFormat.m3u,
   }) async {
+    final sharePrefix = context.l10n.browsePlaylistSharePrefix;
+    final exportedSuccess = context.l10n.browsePlaylistExportedSuccess;
+    final tracksLabel = context.l10n.browseTracks;
     try {
       final useCases = getIt<PlaylistUseCases>();
       final List<SongsTableData> songs;
@@ -179,7 +182,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
           await SharePlus.instance.share(
             ShareParams(
               files: [XFile(file.path, mimeType: 'audio/x-mpegurl')],
-              text: 'Playlist: ${pl.name}',
+              text: '$sharePrefix ${pl.name}',
             ),
           );
         } finally {
@@ -191,7 +194,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(
-                  'Playlist exported successfully (${songs.length} tracks).')),
+                  '$exportedSuccess (${songs.length} $tracksLabel).')),
         );
       }
     } catch (_) {
@@ -244,6 +247,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
   /// M3U share) when the service cannot produce or validate a bundle.
   Future<bool> _sharePlaylistBundle(
       String name, List<SongsTableData> songs) async {
+    final sharePrefix = context.l10n.browsePlaylistSharePrefix;
     try {
       final shareService = getIt<PlaylistShareService>();
       final json = shareService.exportPlaylist(name, songs);
@@ -259,7 +263,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
         await SharePlus.instance.share(
           ShareParams(
             files: [XFile(bundle.path, mimeType: 'application/json')],
-            text: 'Playlist: $name',
+            text: '$sharePrefix $name',
           ),
         );
         return true;
@@ -277,8 +281,8 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       BuildContext context, PlaylistCubit cubit, PlaylistsTableData pl) async {
     final confirmed = await PulsrDialogHelper.showConfirmDialog(
       context,
-      title: 'Delete "${pl.name}"?',
-      message: 'This cannot be undone.',
+      title: '${context.l10n.delete} "${pl.name}"?',
+      message: context.l10n.browseCannotBeUndone,
       icon: Icons.delete_outline_rounded,
       confirmLabel: context.l10n.delete,
       isDestructive: true,
@@ -342,7 +346,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     final url = await PulsrDialogHelper.showInputDialog(
       context,
       title: context.l10n.addYouTubePlaylist,
-      message: 'Paste a YouTube or YouTube Music playlist link.',
+      message: context.l10n.browsePastePlaylistLinkHint,
       hintText: 'https://www.youtube.com/playlist?list=PLxxx',
       icon: Icons.cloud_download_rounded,
       confirmLabel: context.l10n.confirm,
@@ -617,7 +621,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                   return _PlaylistCard(
                     name: pl.name,
                     subtitle:
-                        '${context.l10n.tracksCount(count)} • Smart',
+                        '${context.l10n.tracksCount(count)} • ${context.l10n.browseSmart}',
                     icon: Icons.auto_awesome_rounded,
                     gradient: [
                       p.accent.withValues(alpha: 0.65),
@@ -728,7 +732,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                 primaryActionIcon: Icons.add_rounded,
                 onPrimaryAction: () =>
                     _showCreateDialog(context, cubit),
-                secondaryActionLabel: 'Import M3U',
+                secondaryActionLabel: context.l10n.importM3u,
                 secondaryActionIcon: Icons.file_upload_rounded,
                 onSecondaryAction: () => _importPlaylist(context),
               )
@@ -751,7 +755,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                     final pl = userPlaylists[index];
                     return _PlaylistCard(
                       name: pl.name,
-                      subtitle: 'Offline playlist',
+                      subtitle: context.l10n.browseOfflinePlaylist,
                       icon: Icons.queue_music_rounded,
                       gradient: [
                         p.surfaceContainerHigh,
@@ -821,10 +825,12 @@ class _OnlinePlaylistsContent extends StatelessWidget {
   ) async {
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     // Capture localized strings before async gaps (avoid context-across-gap).
-    final loadFailedText = context.l10n.playlistLoadFailed;
+    final l10n = context.l10n;
+    final loadFailedText = l10n.playlistLoadFailed;
     scaffoldMessenger.showSnackBar(
       SnackBar(
-        content: Text('Fetching "${playlist.title}" for download…'),
+        content: Text(
+            '${l10n.browseFetching} "${playlist.title}" ${l10n.browseForDownload}…'),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -841,8 +847,8 @@ class _OnlinePlaylistsContent extends StatelessWidget {
           SnackBar(
             content: Text(
               queuedCount > 0
-                  ? 'Queued $queuedCount tracks from "${playlist.title}" for download (3 active downloads)...'
-                  : 'All tracks from "${playlist.title}" are already downloaded offline.',
+                  ? '${l10n.browseQueued} $queuedCount ${l10n.browseTracksFrom} "${playlist.title}" ${l10n.browseForDownload} ${l10n.browseActiveDownloadsSuffix}'
+                  : '${l10n.browseAllTracksFrom} "${playlist.title}" ${l10n.browseAlreadyDownloadedOffline}',
             ),
             behavior: SnackBarBehavior.floating,
           ),
@@ -878,8 +884,8 @@ class _OnlinePlaylistsContent extends StatelessWidget {
       SnackBar(
         content: Text(
           queuedCount > 0
-              ? 'Queued $queuedCount tracks from "${entry.title}" for download (3 active downloads)...'
-              : 'All tracks from "${entry.title}" are already downloaded offline.',
+              ? '${context.l10n.browseQueued} $queuedCount ${context.l10n.browseTracksFrom} "${entry.title}" ${context.l10n.browseForDownload} ${context.l10n.browseActiveDownloadsSuffix}'
+              : '${context.l10n.browseAllTracksFrom} "${entry.title}" ${context.l10n.browseAlreadyDownloadedOffline}',
         ),
         behavior: SnackBarBehavior.floating,
       ),
@@ -904,8 +910,8 @@ class _OnlinePlaylistsContent extends StatelessWidget {
       SnackBar(
         content: Text(
           queuedCount > 0
-              ? 'Queued $queuedCount liked songs for download (3 active downloads)...'
-              : 'All liked songs are already downloaded offline.',
+              ? '${context.l10n.browseQueued} $queuedCount ${context.l10n.browseLikedSongsForDownload} ${context.l10n.browseActiveDownloadsSuffix}'
+              : context.l10n.browseAllLikedSongsDownloadedOffline,
         ),
         behavior: SnackBarBehavior.floating,
       ),
@@ -1012,7 +1018,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                         '/online-playlist',
                         extra: OnlinePlaylistDetailArgs(
                           playlistId: 'VLLM',
-                          title: 'Liked Music',
+                          title: context.l10n.likedMusic,
                           subtitle: 'YouTube Music',
                           initialTracks: online.likedTracks,
                         ),
@@ -1095,7 +1101,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 online.accountError ??
-                                    'Failed to load account playlists',
+                                    context.l10n.browseFailedToLoadAccountPlaylists,
                                 style: TextStyle(
                                     color: p.textSecondary, fontSize: 12.5),
                               ),
@@ -1389,16 +1395,17 @@ class _LikedMusicOnlineCard extends StatelessWidget {
     String subtitle;
     switch (status) {
       case YtmFetchStatus.idle:
-        subtitle = 'Tap to sync from YouTube Music';
+        subtitle = context.l10n.browseTapToSyncYtm;
         break;
       case YtmFetchStatus.loading:
-        subtitle = 'Syncing liked songs…';
+        subtitle = context.l10n.browseSyncingLikedSongs;
         break;
       case YtmFetchStatus.done:
-        subtitle = '$trackCount songs synced • Tap to play or download';
+        subtitle =
+            '$trackCount ${context.l10n.songs} ${context.l10n.browseSynced} • ${context.l10n.browseTapToPlayOrDownload}';
         break;
       case YtmFetchStatus.error:
-        subtitle = error ?? 'Failed to fetch';
+        subtitle = error ?? context.l10n.browseFailedToFetch;
         break;
     }
 

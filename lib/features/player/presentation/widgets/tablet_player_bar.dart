@@ -310,6 +310,12 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                         BlocSelector<PlayerCubit, PlayerState, Duration>(
                           selector: (s) => s.position,
                           builder: (context, position) {
+                            final currentDuration = _dragSeekValue != null
+                                ? Duration(
+                                    milliseconds: _dragSeekValue!.toInt())
+                                : position;
+                            final valueLabel =
+                                '${Formatters.formatDuration(currentDuration)} / ${Formatters.formatDuration(state.duration)}';
                             return Row(
                               children: [
                                 Text(
@@ -330,37 +336,42 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
-                                  child: PulsrSlider(
-                                    min: 0.0,
-                                    max: state.duration.inMilliseconds
-                                                .toDouble() >
-                                            0
-                                        ? state.duration.inMilliseconds
-                                            .toDouble()
-                                        : 1.0,
-                                    value: (_dragSeekValue ??
-                                            position.inMilliseconds
-                                                .toDouble())
-                                        .clamp(
-                                      0.0,
-                                      state.duration.inMilliseconds.toDouble() >
+                                  child: Semantics(
+                                    value: valueLabel,
+                                    child: PulsrSlider(
+                                      min: 0.0,
+                                      max: state.duration.inMilliseconds
+                                                  .toDouble() >
                                               0
                                           ? state.duration.inMilliseconds
                                               .toDouble()
                                           : 1.0,
+                                      value: (_dragSeekValue ??
+                                              position.inMilliseconds
+                                                  .toDouble())
+                                          .clamp(
+                                        0.0,
+                                        state.duration.inMilliseconds
+                                                    .toDouble() >
+                                                0
+                                            ? state.duration.inMilliseconds
+                                                .toDouble()
+                                            : 1.0,
+                                      ),
+                                      semanticLabel: 'Seek',
+                                      activeColor: activeColor,
+                                      onChangeStart: (val) {
+                                        setState(() => _dragSeekValue = val);
+                                      },
+                                      onChanged: (val) {
+                                        setState(() => _dragSeekValue = val);
+                                      },
+                                      onChangeEnd: (val) {
+                                        cubit.seek(
+                                            Duration(milliseconds: val.toInt()));
+                                        setState(() => _dragSeekValue = null);
+                                      },
                                     ),
-                                    activeColor: activeColor,
-                                    onChangeStart: (val) {
-                                      setState(() => _dragSeekValue = val);
-                                    },
-                                    onChanged: (val) {
-                                      setState(() => _dragSeekValue = val);
-                                    },
-                                    onChangeEnd: (val) {
-                                      cubit.seek(
-                                          Duration(milliseconds: val.toInt()));
-                                      setState(() => _dragSeekValue = null);
-                                    },
                                   ),
                                 ),
                                 const SizedBox(width: 8),

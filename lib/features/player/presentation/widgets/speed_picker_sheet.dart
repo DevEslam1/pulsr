@@ -225,7 +225,7 @@ class SpeedPickerSheet extends StatelessWidget {
                           const SizedBox(height: 6),
                           Text(
                             (currentPitch - 1.0).abs() < 0.01
-                                ? 'Original Pitch (1.00x)'
+                                ? context.l10n.dspOriginalPitch
                                 : '${semitones > 0 ? '+' : ''}$semitones semitones (${currentPitch.toStringAsFixed(2)}x)',
                             style:
                                 TextStyle(color: p.textSecondary, fontSize: 13),
@@ -236,6 +236,7 @@ class SpeedPickerSheet extends StatelessWidget {
                             min: 0.5,
                             max: 2.0,
                             divisions: 30,
+                            semanticLabel: context.l10n.pitchShift,
                             onChanged: (value) {
                               cubit.setPlaybackPitch(value);
                             },
@@ -256,7 +257,7 @@ class SpeedPickerSheet extends StatelessWidget {
                                 final isSelected =
                                     (currentPitch - pitch).abs() < 0.02;
                                 final label = pitch == 1.0
-                                    ? 'Normal'
+                                    ? context.l10n.dspNormal
                                     : '${pitch > 1.0 ? '+' : ''}${((pitch - 1.0) * 100).round()}%';
                                 return Padding(
                                   padding: const EdgeInsets.only(right: 8.0),

@@ -120,14 +120,14 @@ class DownloadTile extends StatelessWidget {
                   IconButton(
                     icon: Icon(Icons.close_rounded,
                         color: p.textSecondary, size: 20),
-                    tooltip: 'Cancel',
+                    tooltip: l10n.cancel,
                     visualDensity: VisualDensity.compact,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                     onPressed: () => cubit.cancelDownload(task.videoId),
                   ),
                 Semantics(
-                  label: 'Download actions for ${task.title}',
+                  label: '${l10n.browseDownloadActionsFor} ${task.title}',
                   button: true,
                   child: PopupMenuButton<String>(
                     icon: Icon(Icons.more_vert_rounded,
@@ -232,7 +232,7 @@ class DownloadTile extends StatelessWidget {
                     ),
                   if (task.etaSeconds != null && task.etaSeconds! > 0)
                     Text(
-                      'ETA: ${task.etaSeconds}s',
+                      '${l10n.browseEta} ${task.etaSeconds}s',
                       style: TextStyle(color: p.textTertiary, fontSize: 12),
                     ),
                 ],

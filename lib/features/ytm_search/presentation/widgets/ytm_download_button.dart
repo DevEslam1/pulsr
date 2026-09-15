@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/db/app_database.dart';
 import '../../cubit/ytm_download_cubit.dart';
 
@@ -95,7 +96,7 @@ class YtmDownloadButton extends StatelessWidget {
           case YtDownloadStatus.canceled:
           case YtDownloadStatus.idle:
             return IconButton(
-              tooltip: 'Download offline',
+              tooltip: context.l10n.browseDownloadOffline,
               icon: Icon(Icons.download_rounded,
                   size: iconSize, color: baseColor),
               onPressed: () => cubit.download(song),

@@ -454,7 +454,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
             ),
             actions: [
               IconButton(
-                tooltip: 'Import / Paste Proxies',
+                tooltip: context.l10n.settingsImportPasteProxies,
                 icon: Icon(Icons.file_upload_outlined, color: p.accent),
                 onPressed: () => _showImportDialog(),
               ),
@@ -526,8 +526,8 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                           : const Icon(Icons.speed_rounded),
                       label: Text(
                         _isTesting
-                            ? 'Testing Proxy Connectivity...'
-                            : 'Test Active Proxy Connection',
+                            ? context.l10n.settingsTestingProxyConnectivity
+                            : context.l10n.testProxy,
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       style: FilledButton.styleFrom(
@@ -613,7 +613,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            _enabled ? 'ACTIVE' : 'DISABLED',
+                            _enabled ? context.l10n.settingsActiveBadge : context.l10n.settingsDisabledBadge,
                             style: TextStyle(
                               color: _enabled ? p.success : p.textTertiary,
                               fontSize: 9,
@@ -627,8 +627,8 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                     const SizedBox(height: 3),
                     Text(
                       _enabled
-                          ? 'Traffic routes through configured proxy'
-                          : 'Direct connection (proxy disabled)',
+                          ? context.l10n.settingsProxyActiveDesc
+                          : context.l10n.settingsProxyInactiveDesc,
                       style: TextStyle(color: p.textSecondary, fontSize: 12),
                     ),
                   ],
@@ -801,7 +801,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                               )
                             : const Icon(Icons.speed_rounded, size: 16),
                         label: Text(
-                          isTestingAll ? 'Testing All...' : 'Test All Speeds',
+                          isTestingAll ? context.l10n.settingsTestingAll : context.l10n.settingsTestAllSpeeds,
                           style: const TextStyle(
                               fontSize: 12, fontWeight: FontWeight.w600),
                         ),
@@ -995,7 +995,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                     height: 32,
                     child: IconButton(
                       padding: EdgeInsets.zero,
-                      tooltip: 'Test latency',
+                      tooltip: context.l10n.settingsTestLatency,
                       icon: item.isTesting
                           ? SizedBox(
                               width: 14,
@@ -1019,7 +1019,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                     height: 32,
                     child: IconButton(
                       padding: EdgeInsets.zero,
-                      tooltip: 'Remove proxy',
+                      tooltip: context.l10n.settingsRemoveProxy,
                       icon: Icon(Icons.close_rounded,
                           size: 16, color: p.textTertiary),
                       onPressed: () => context
@@ -1046,7 +1046,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        item.type == AppProxyType.socks5 ? 'SOCKS5' : 'HTTP',
+                        item.type == AppProxyType.socks5 ? context.l10n.socks5 : context.l10n.settingsHttpLabel,
                         style: TextStyle(
                           color: p.textSecondary,
                           fontSize: 10,
@@ -1120,7 +1120,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
       final latency = item.latencyMs!;
       final Color color = latency < 3000
           ? p.success
-          : (latency < 6000 ? Colors.orange : p.error);
+          : (latency < 6000 ? p.warning : p.error);
 
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
@@ -1190,7 +1190,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
   Widget _buildProtocolSection(PulsrPalette p) {
     return _buildSection(
       p: p,
-      title: 'ACTIVE PROXY PROTOCOL',
+      title: context.l10n.settingsActiveProxyProtocol,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -1257,8 +1257,8 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                 Expanded(
                   child: Text(
                     _type == AppProxyType.http
-                        ? 'Routes standard HTTP & HTTPS web and stream extraction traffic.'
-                        : 'Routes network packets via SOCKS5 (recommended for Tor, Clash, Shadowsocks). Note: SOCKS5 applies on the native stream layer; in-app Dart API calls (search, artwork, lyrics) fall back to DIRECT when SOCKS5 is active.',
+                        ? context.l10n.settingsProxyHttpDesc
+                        : context.l10n.settingsProxySocksDesc,
                     style: TextStyle(color: p.textTertiary, fontSize: 12),
                   ),
                 ),
@@ -1273,7 +1273,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
   Widget _buildServerConfigSection(PulsrPalette p) {
     return _buildSection(
       p: p,
-      title: 'ACTIVE SERVER CONFIGURATION',
+      title: context.l10n.settingsActiveServerConfig,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -1287,8 +1287,8 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                   controller: _hostController,
                   style: TextStyle(color: p.textPrimary, fontSize: 14),
                   decoration: InputDecoration(
-                    labelText: 'Server Host / IP Address',
-                    hintText: 'e.g. 127.0.0.1 or proxy.example.com',
+                    labelText: context.l10n.settingsServerHost,
+                    hintText: context.l10n.settingsServerHostHint,
                     labelStyle: TextStyle(color: p.textSecondary),
                     hintStyle: TextStyle(color: p.textTertiary),
                     prefixIcon:
@@ -1312,7 +1312,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                   ),
                   validator: (value) {
                     if (_enabled && (value == null || value.trim().isEmpty)) {
-                      return 'Please enter a proxy host';
+                      return context.l10n.settingsEnterProxyHost;
                     }
                     return null;
                   },
@@ -1324,8 +1324,8 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   decoration: InputDecoration(
-                    labelText: 'Port',
-                    hintText: 'e.g. 8080',
+                    labelText: context.l10n.settingsPortLabel,
+                    hintText: context.l10n.settingsPortHint,
                     labelStyle: TextStyle(color: p.textSecondary),
                     hintStyle: TextStyle(color: p.textTertiary),
                     prefixIcon:
@@ -1351,7 +1351,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                     if (_enabled) {
                       final port = int.tryParse(value?.trim() ?? '');
                       if (port == null || port <= 0 || port > 65535) {
-                        return 'Invalid port (1-65535)';
+                        return context.l10n.settingsInvalidPort;
                       }
                     }
                     return null;
@@ -1462,7 +1462,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
   Widget _buildAuthSection(PulsrPalette p) {
     return _buildSection(
       p: p,
-      title: 'AUTHENTICATION (OPTIONAL)',
+      title: context.l10n.settingsAuthenticationOptional,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: LayoutBuilder(
@@ -1473,8 +1473,8 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
               controller: _usernameController,
               style: TextStyle(color: p.textPrimary, fontSize: 14),
               decoration: InputDecoration(
-                labelText: 'Username',
-                hintText: 'Leave blank if unauthenticated',
+                labelText: context.l10n.settingsUsernameLabel,
+                hintText: context.l10n.settingsLeaveBlankAuth,
                 labelStyle: TextStyle(color: p.textSecondary),
                 hintStyle: TextStyle(color: p.textTertiary),
                 prefixIcon: Icon(Icons.person_outline_rounded,
@@ -1503,8 +1503,8 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
               style: TextStyle(color: p.textPrimary, fontSize: 14),
               obscureText: _obscurePassword,
               decoration: InputDecoration(
-                labelText: 'Password',
-                hintText: 'Leave blank if unauthenticated',
+                labelText: context.l10n.settingsPasswordLabel,
+                hintText: context.l10n.settingsLeaveBlankAuth,
                 labelStyle: TextStyle(color: p.textSecondary),
                 hintStyle: TextStyle(color: p.textTertiary),
                 prefixIcon:
@@ -1566,7 +1566,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
   Widget _buildBypassSection(PulsrPalette p) {
     return _buildSection(
       p: p,
-      title: 'BYPASS HOSTS',
+      title: context.l10n.proxyBypass,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -1576,7 +1576,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
               controller: _bypassController,
               style: TextStyle(color: p.textPrimary, fontSize: 14),
               decoration: InputDecoration(
-                labelText: 'Bypass List (comma-separated)',
+                labelText: context.l10n.settingsBypassList,
                 hintText: 'localhost, 127.0.0.1, *.local',
                 labelStyle: TextStyle(color: p.textSecondary),
                 hintStyle: TextStyle(color: p.textTertiary),
@@ -1753,7 +1753,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isSuccess ? 'Connection Successful' : 'Connection Failed',
+                  isSuccess ? context.l10n.settingsConnectionSuccessful : context.l10n.settingsConnectionFailed,
                   style: TextStyle(
                     color: color,
                     fontWeight: FontWeight.w700,
@@ -1763,8 +1763,8 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                 const SizedBox(height: 4),
                 Text(
                   isSuccess
-                      ? 'Latency: ${result.latencyMs} ms'
-                      : (result.error ?? 'Unknown connection failure'),
+                      ? context.l10n.settingsLatencyMs(result.latencyMs)
+                      : (result.error ?? context.l10n.settingsUnknownConnectionFailure),
                   style: TextStyle(
                     color: p.textSecondary,
                     fontSize: 12,

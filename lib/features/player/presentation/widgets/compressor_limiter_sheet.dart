@@ -154,7 +154,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
 
             // Threshold Slider
             _buildParamRow(
-              title: 'Threshold',
+              title: context.l10n.dspThreshold,
               valueDisplay: '${_thresholdDb.toStringAsFixed(1)} dB',
               value: _thresholdDb,
               min: -30.0,
@@ -169,7 +169,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
 
             // Ratio Slider (HAL DynamicsProcessing only)
             _buildParamRow(
-              title: 'Ratio',
+              title: context.l10n.dspRatio,
               valueDisplay: '${_ratio.toStringAsFixed(1)}:1',
               value: _ratio,
               min: 1.0,
@@ -184,7 +184,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
 
             // Attack Slider (HAL DynamicsProcessing only)
             _buildParamRow(
-              title: 'Attack Time',
+              title: context.l10n.dspAttackTime,
               valueDisplay: '${_attackMs.toStringAsFixed(0)} ms',
               value: _attackMs,
               min: 1.0,
@@ -199,7 +199,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
 
             // Release Slider
             _buildParamRow(
-              title: 'Release Time',
+              title: context.l10n.releaseTime,
               valueDisplay: '${_releaseMs.toStringAsFixed(0)} ms',
               value: _releaseMs,
               min: 10.0,
@@ -214,7 +214,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
 
             // Makeup Gain Slider (HAL DynamicsProcessing only)
             _buildParamRow(
-              title: 'Makeup Gain',
+              title: context.l10n.dspMakeupGain,
               valueDisplay: '+${_makeupGainDb.toStringAsFixed(1)} dB',
               value: _makeupGainDb,
               min: 0.0,
@@ -286,7 +286,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
             ),
             const SizedBox(height: 12),
             _buildParamRow(
-              title: 'Crossover 1 (Low)',
+              title: context.l10n.dspCrossoverLow,
               valueDisplay: '${_mbcF0.toStringAsFixed(0)} Hz',
               value: _mbcF0,
               min: 40.0,
@@ -299,7 +299,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
               },
             ),
             _buildParamRow(
-              title: 'Crossover 2 (Mid)',
+              title: context.l10n.dspCrossoverMid,
               valueDisplay: '${_mbcF1.toStringAsFixed(0)} Hz',
               value: _mbcF1,
               min: 200.0,
@@ -312,7 +312,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
               },
             ),
             _buildParamRow(
-              title: 'Crossover 3 (High)',
+              title: context.l10n.dspCrossoverHigh,
               valueDisplay: '${_mbcF2.toStringAsFixed(0)} Hz',
               value: _mbcF2,
               min: 1000.0,
@@ -377,7 +377,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                           color: isDefault || !enabled
                               ? p.textSecondary.withValues(alpha: 0.35)
                               : p.primary),
-                      tooltip: 'Reset to default',
+                      tooltip: context.l10n.dspResetToDefault,
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
                       constraints:

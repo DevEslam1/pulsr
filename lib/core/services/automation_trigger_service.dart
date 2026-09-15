@@ -97,10 +97,21 @@ class AutomationTriggerService with WidgetsBindingObserver {
     }
   }
 
+  /// Wired-like routes that should count as "headphones plugged".
+  /// Covers wired headsets, USB DACs/dongles, AUX/line-out and HDMI sinks —
+  /// the old check only matched `wired`/`hearing_aid` and missed USB/HDMI.
   static bool _isWiredHeadphones(AudioOutputInfo info) {
     if (info.isBluetooth) return false;
+    if (info.isUsbDac) return true;
     final type = info.activeDeviceType.trim().toLowerCase();
-    return type == 'wired' || type == 'hearing_aid';
+    return type == 'wired' ||
+        type == 'wired_headset' ||
+        type == 'headset' ||
+        type == 'usb' ||
+        type == 'aux' ||
+        type == 'line_out' ||
+        type == 'hdmi' ||
+        type == 'hearing_aid';
   }
 
   Future<void> _fire(AutomationTrigger trigger) async {

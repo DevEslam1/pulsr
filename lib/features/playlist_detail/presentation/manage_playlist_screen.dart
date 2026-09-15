@@ -148,7 +148,9 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
                     size: 18,
                   ),
                   label: Text(
-                    isAllSelected ? 'Deselect' : 'Select All',
+                    isAllSelected
+                        ? context.l10n.browseDeselect
+                        : context.l10n.selectAllAction,
                     style: TextStyle(
                       color: p.accent,
                       fontWeight: FontWeight.w700,
@@ -179,8 +181,8 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
                                     const SizedBox(height: 12),
                                     Text(
                                       _searchQuery.isEmpty
-                                          ? 'No songs in library'
-                                          : 'No songs matching "$_searchQuery"',
+                                          ? context.l10n.browseNoSongsInLibrary
+                                          : '${context.l10n.browseNoSongsMatch} "$_searchQuery"',
                                       style: TextStyle(
                                         color: p.textSecondary,
                                         fontSize: 14,
@@ -335,7 +337,7 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
                 },
                 style: TextStyle(color: p.textPrimary, fontSize: 14),
                 decoration: InputDecoration(
-                  hintText: 'Search songs by title or artist...',
+                  hintText: context.l10n.browseSearchSongsHint,
                   hintStyle: TextStyle(color: p.textTertiary, fontSize: 13.5),
                   border: InputBorder.none,
                   isDense: true,
@@ -383,7 +385,7 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Will add: $toAdd track${toAdd == 1 ? '' : 's'} • Will remove: $toRemove track${toRemove == 1 ? '' : 's'}',
+                '${context.l10n.browseWillAdd}: $toAdd ${context.l10n.browseTracks} • ${context.l10n.browseWillRemove}: $toRemove ${context.l10n.browseTracks}',
                 style: TextStyle(
                   color: p.textPrimary,
                   fontSize: 12.5,
@@ -431,8 +433,8 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
               : const Icon(Icons.check_circle_outline_rounded, size: 20),
           label: Text(
             hasChanges
-                ? 'Apply Changes (+$toAdd / -$toRemove)'
-                : 'No Changes to Save',
+                ? '${context.l10n.browseApplyChanges} (+$toAdd / -$toRemove)'
+                : context.l10n.browseNoChangesToSave,
             style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
           ),
           style: ElevatedButton.styleFrom(
@@ -468,7 +470,7 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
       PulsrToast.show(
         context,
         message:
-            'Playlist updated (+${toAdd.length}, -${toRemove.length})',
+            '${context.l10n.browsePlaylistUpdated} (+${toAdd.length}, -${toRemove.length})',
         icon: Icons.check_circle_rounded,
       );
     }

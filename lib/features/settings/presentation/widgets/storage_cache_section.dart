@@ -128,11 +128,11 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: Colors.redAccent.withValues(alpha: 0.15),
+                color: p.error.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(11),
               ),
-              child: const Icon(Icons.cloud_download_rounded,
-                  color: Colors.redAccent, size: 20),
+              child: Icon(Icons.cloud_download_rounded,
+                  color: p.error, size: 20),
             ),
             title: Text(
               context.l10n.youtubeStreamDiskCache,
@@ -232,7 +232,7 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
                   final isSelected = manager.maxCacheSizeMb == limit;
                   return ListTile(
                     title: Text(
-                      '$limit MB',
+                      context.l10n.mbValue(limit),
                       style: TextStyle(
                         color: isSelected ? p.accent : p.textPrimary,
                         fontWeight:

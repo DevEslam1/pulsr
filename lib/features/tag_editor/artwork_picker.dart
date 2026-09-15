@@ -126,7 +126,7 @@ class ArtworkPicker extends StatelessWidget {
                   icon: const Icon(Icons.delete_outline, size: 18),
                   label: Text(context.l10n.removeCover),
                   style: TextButton.styleFrom(
-                    foregroundColor: Colors.redAccent,
+                    foregroundColor: p.error,
                   ),
                 ),
               ],

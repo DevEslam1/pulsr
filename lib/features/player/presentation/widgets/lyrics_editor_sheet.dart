@@ -159,12 +159,12 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                   IconButton(
                     icon: Icon(Icons.sort_rounded, color: p.primary),
                     onPressed: _sortLines,
-                    tooltip: 'Sort by time',
+                    tooltip: context.l10n.dspSortByTime,
                   ),
                   IconButton(
                     icon: Icon(Icons.add_rounded, color: p.primary),
                     onPressed: _addNewLine,
-                    tooltip: 'Add Line',
+                    tooltip: context.l10n.dspAddLine,
                   ),
                   FilledButton(
                     style: FilledButton.styleFrom(
@@ -257,7 +257,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                         icon: const Icon(Icons.delete_outline_rounded, size: 16),
                         color: p.textSecondary,
                         onPressed: () => _deleteLine(index),
-                        tooltip: 'Delete line',
+                        tooltip: context.l10n.dspDeleteLine,
                       ),
                     ],
                   ),

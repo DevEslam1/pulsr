@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
@@ -55,7 +56,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
       child: Scaffold(
         appBar: AppBar(
           leading: const PulsrBackButton(),
-          title: const Text('YouTube Music'),
+          title: Text(context.l10n.browseYouTubeMusic),
         ),
       body: SafeArea(
         top: false,
@@ -80,7 +81,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                         textInputAction: TextInputAction.search,
                         onChanged: cubit.onQueryChanged,
                         decoration: InputDecoration(
-                          hintText: 'Songs on YouTube Music…',
+                          hintText: context.l10n.browseSongsOnYtm,
                           prefixIcon:
                               Icon(Icons.search_rounded, color: p.textTertiary),
                           suffixIcon: state.query.isNotEmpty
@@ -124,9 +125,9 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
     if (state.errorMessage != null) {
       return EmptyStateWidget(
         icon: Icons.cloud_off_rounded,
-        title: 'Search Failed',
+        title: context.l10n.browseSearchFailed,
         subtitle: state.errorMessage!,
-        primaryActionLabel: 'Try Again',
+        primaryActionLabel: context.l10n.tryAgain,
         primaryActionIcon: Icons.refresh_rounded,
         onPrimaryAction: cubit.retry,
       );
@@ -136,14 +137,14 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
       return state.hasSearched
           ? EmptyStateWidget(
               icon: Icons.search_off_rounded,
-              title: 'No Results Found',
-              subtitle: 'No YouTube Music matches for "${state.query.trim()}".',
-            )
-          : const EmptyStateWidget(
-              icon: Icons.travel_explore_rounded,
-              title: 'Search YouTube Music',
+              title: context.l10n.browseNoResultsFound,
               subtitle:
-                  'Stream and download songs from YouTube Music, ad-free.',
+                  '${context.l10n.browseNoYtmMatchesFor} "${state.query.trim()}".',
+            )
+          : EmptyStateWidget(
+              icon: Icons.travel_explore_rounded,
+              title: context.l10n.searchYtm,
+              subtitle: context.l10n.browseYtmSearchScreenDesc,
             );
     }
 

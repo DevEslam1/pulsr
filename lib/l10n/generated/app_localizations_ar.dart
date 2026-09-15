@@ -3823,4 +3823,2201 @@ class AppLocalizationsAr extends AppLocalizations {
   String unmatchedPathsWarning(int count) {
     return '⚠️ تعذر مطابقة $count من مسارات الأغاني في مكتبتك الحالية.';
   }
+
+  @override
+  String settingsHeaderTagline(String version) {
+    return 'Pulsr v$version • تجربة موسيقية لعشاق الصوت';
+  }
+
+  @override
+  String settingsHeaderTaglineShort(String version) {
+    return 'Pulsr v$version • محرّك صوتي احترافي';
+  }
+
+  @override
+  String get settingsSearchPlaceholder => 'ابحث في الإعدادات والصوت والمظهر...';
+
+  @override
+  String get settingsCategoryAudioSubtitle =>
+      'المُعادل، DSP، الدقة العالية، ReplayGain';
+
+  @override
+  String get settingsCategoryPlaybackSubtitle =>
+      'الانتقال، التشغيل المتصل، مؤقت النوم، التخطي';
+
+  @override
+  String get settingsCategoryAppearanceSubtitle =>
+      'وضع السمة، ألوان التمييز، المُصوّر';
+
+  @override
+  String get settingsCategoryGesturesSubtitle =>
+      'سحب المشغّل المصغّر، النقر المزدوج على الغلاف';
+
+  @override
+  String get settingsCategoryProfiles => 'الملفات والقواعد';
+
+  @override
+  String get settingsCategoryProfilesSubtitle => 'ربط أجهزة DAC وقواعد التشغيل';
+
+  @override
+  String get settingsCategoryLibrarySubtitle =>
+      'المجلدات، الوسائط المخفية، مرشّح المدة';
+
+  @override
+  String get settingsCategoryOnline => 'الشبكة ويوتيوب';
+
+  @override
+  String get settingsCategoryOnlineSubtitle =>
+      'جودة الصوت، ذاكرة البث، البروكسي';
+
+  @override
+  String get settingsCategoryStorageSubtitle =>
+      'استخدام القرص، الأغلفة المخزّنة، التنظيف';
+
+  @override
+  String get settingsCategoryPrivacy => 'الخصوصية والنسخ الاحتياطي';
+
+  @override
+  String get settingsCategoryPrivacySubtitle =>
+      'ضمان العمل دون اتصال، التسجيل، النسخ الاحتياطي';
+
+  @override
+  String get settingsCategoryAbout => 'حول';
+
+  @override
+  String settingsCategoryAboutSubtitle(String version) {
+    return 'الإصدار $version، التراخيص، المواصفات';
+  }
+
+  @override
+  String get settingsCategoryAppearance => 'المظهر';
+
+  @override
+  String get settingsAutomationTitle => 'الأتمتة';
+
+  @override
+  String get settingsSmartAudioSectionSubtitle =>
+      'تصحيح تلقائي لسماعات الرأس وأفضل جودة إخراج';
+
+  @override
+  String get settingsQuranModeSubtitle =>
+      'معادل صوتي للترتيل، أجواء المسجد، سرعة الحفظ';
+
+  @override
+  String get settingsDeviceProfilesSectionSubtitle =>
+      'ربط ملفات DAC وبلوتوث لكل مخرج';
+
+  @override
+  String get settingsAutomationSectionSubtitle =>
+      'تفعيل الملفات تلقائياً عند أحداث الأجهزة';
+
+  @override
+  String get settingsAutomationTileSubtitle =>
+      'تطبيق الملفات عند توصيل السماعات أو البلوتوث أو الشحن';
+
+  @override
+  String get settingsStorageSectionSubtitle =>
+      'إدارة استخدام القرص وذاكرة الصوت المؤقتة';
+
+  @override
+  String get settingsAboutSectionSubtitle =>
+      'معلومات الإصدار والتراخيص والبنية';
+
+  @override
+  String settingsAboutVersionSubtitle(String version) {
+    return 'الإصدار $version • محرّك صوتي احترافي مفتوح المصدر';
+  }
+
+  @override
+  String get settingsAppearanceSectionSubtitle =>
+      'السمة، ألوان التمييز، المُصوّر ومظهر المشغّل';
+
+  @override
+  String get settingsAutoDarkModeTitle => 'الوضع الداكن التلقائي حسب الوقت';
+
+  @override
+  String get settingsAutoDarkModeSubtitle =>
+      'اتّبع جدولاً من 7 مساءً حتى 6 صباحاً';
+
+  @override
+  String get settingsHighContrastTitle => 'تباين عالٍ';
+
+  @override
+  String get settingsHighContrastSubtitle =>
+      'زيد التباين بلوحة ألوان مناسبة لـ AMOLED';
+
+  @override
+  String get settingsReduceMotionTitle => 'تقليل الحركة';
+
+  @override
+  String get settingsReduceMotionSubtitle =>
+      'تشغيل الحركات فورًا بدلًا من انتقالها التدريجي';
+
+  @override
+  String get settingsLiquidGlassTitle => 'صبغة الزجاج السائل';
+
+  @override
+  String get settingsLiquidGlassSubtitle =>
+      'اضبط الانكسار بين الوضوح الفائق (0٪) والتلوين (100٪)';
+
+  @override
+  String get settingsBadgeStyle => 'النمط';
+
+  @override
+  String get settingsBadgeDsp => 'DSP';
+
+  @override
+  String get settingsBadgePalette => 'اللوحة';
+
+  @override
+  String get settingsGesturesSectionSubtitle =>
+      'اضبط إيماءات السحب والنقر المزدوج في المشغّل المصغّر والغلاف';
+
+  @override
+  String get settingsLibrarySectionSubtitle =>
+      'فهرسة الوسائط وقواعد الاستبعاد والتنظيف';
+
+  @override
+  String get settingsOnlineSectionSubtitle =>
+      'البث والتنزيلات وتوجيه البروكسي وإعدادات الجودة';
+
+  @override
+  String get settingsTapToManage => 'انقر للإدارة';
+
+  @override
+  String get settingsBadgeConnected => 'متصل';
+
+  @override
+  String get settingsDownloadsSubtitle =>
+      'عرض وإدارة المسارات والتنزيلات دون اتصال';
+
+  @override
+  String get settingsProxyEnabled => 'ممكّن';
+
+  @override
+  String get settingsProxyDisabledHint => 'معطّل • انقر لإعداد HTTP / SOCKS5';
+
+  @override
+  String get settingsPrivacySectionSubtitle =>
+      'سيادة البيانات والنسخ الاحتياطي وتكامل خدمات التسجيل';
+
+  @override
+  String get settingsScrobblingTitle => 'التسجيل (Last.fm وListenBrainz)';
+
+  @override
+  String get settingsScrobblingSubtitle =>
+      'التسجيل المباشر عبر API وبث بيانات التشغيل';
+
+  @override
+  String get settingsScrobbleStatsTitle => 'إحصاءات التسجيل';
+
+  @override
+  String get settingsScrobbleStatsSubtitle =>
+      'سجل الاستماع ونظرة تحليلية على التسجيل';
+
+  @override
+  String get settingsCloudBackupDashboard => 'لوحة النسخ الاحتياطي السحابي';
+
+  @override
+  String get settingsCloudBackupDashboardSubtitle =>
+      'إدارة الأجهزة المتزامنة ولقطات النسخ الاحتياطي السحابي';
+
+  @override
+  String settingsNoSettingsFound(String query) {
+    return 'لا توجد إعدادات مطابقة لـ \"$query\"';
+  }
+
+  @override
+  String get settingsCloudSyncCompleted =>
+      'اكتمل النسخ الاحتياطي والمزامنة السحابية!';
+
+  @override
+  String get settingsCloudSyncFailed =>
+      'فشلت المزامنة. تحقّق من اتصال الإنترنت.';
+
+  @override
+  String get settingsNeverLabel => 'أبداً';
+
+  @override
+  String get settingsSyncing => 'جارٍ المزامنة...';
+
+  @override
+  String get settingsAddCustomFolder => 'إضافة مجلد مخصّص';
+
+  @override
+  String get settingsRescanningLibrary => 'جارٍ إعادة فحص المكتبة…';
+
+  @override
+  String get settingsApplyRescanLibrary => 'تطبيق وإعادة فحص المكتبة';
+
+  @override
+  String settingsLibraryUpdated(int count) {
+    return 'تم تحديث المكتبة! تم تحميل $count مساراً.';
+  }
+
+  @override
+  String settingsHiddenCount(int count) {
+    return '$count مخفي';
+  }
+
+  @override
+  String get settingsSearchDirectoriesHint =>
+      'ابحث في المجلدات بالاسم أو المسار...';
+
+  @override
+  String settingsNoDirectoriesMatch(String query) {
+    return 'لا توجد مجلدات مطابقة لـ $query';
+  }
+
+  @override
+  String get settingsNoAudioFolders =>
+      'لم يتم العثور على مجلدات صوتية بعد. افحص مساحة التخزين.';
+
+  @override
+  String get settingsUnhide => 'إظهار';
+
+  @override
+  String get settingsHide => 'إخفاء';
+
+  @override
+  String settingsPlaysCount(int count) {
+    return '$count تشغيلات';
+  }
+
+  @override
+  String settingsManufacturerBackgroundGuide(String manufacturer) {
+    return 'دليل الخلفية لـ $manufacturer';
+  }
+
+  @override
+  String settingsAggressiveBatteryGuide(String url) {
+    return 'يشتهر مصنّع جهازك بإيقاف العمليات في الخلفية بقوة.\n\nزر $url لضبط شاشة القفل وإعدادات البطارية.';
+  }
+
+  @override
+  String settingsApplyProfileName(String name) {
+    return 'تطبيق: $name';
+  }
+
+  @override
+  String get settingsArabicNative => 'العربية (من اليمين لليسار)';
+
+  @override
+  String get settingsArtworkSwipeDisabled => 'معطّل';
+
+  @override
+  String get settingsArtworkSwipeIgnoreDesc =>
+      'تجاهل السحب الأفقي على غلاف الألبوم';
+
+  @override
+  String get settingsArtworkSwipeNextPrev => 'المسار التالي / السابق';
+
+  @override
+  String get settingsArtworkSwipeNextPrevDesc =>
+      'اسحب لليسار للمسار التالي، ولليمين للسابق';
+
+  @override
+  String get settingsAudioNormalization => 'تطبيع الصوت';
+
+  @override
+  String get settingsAudioNormalizationSubtitle =>
+      'وحّد مستوى الصوت للمسارات بدون وسوم ReplayGain';
+
+  @override
+  String get settingsAudioOutputDevice => 'جهاز إخراج الصوت';
+
+  @override
+  String get settingsAuthenticationOptional => 'المصادقة (اختياري)';
+
+  @override
+  String get settingsBitPerfectBtUnavailable =>
+      'غير متاح: البلوتوث يعيد الترميز — استخدم USB / DAC سلكي';
+
+  @override
+  String get settingsBitPerfectUsb => 'تمرير USB بت مثالي';
+
+  @override
+  String get settingsBitPerfectUsbDesc =>
+      'بث مباشر إلى USB / DAC سلكي (يتجاوز مُعيد أخذ العينات في أندرويد)';
+
+  @override
+  String get settingsBpmSyncCrossfade => 'انتقال متزامن مع BPM';
+
+  @override
+  String get settingsBpmSyncCrossfadeDesc =>
+      'يضبط مدة الانتقال على أقرب 2/4/8/16/32 نبضة من المسار القادم عند معرفة BPM (يُضبط لكل مسار في معلومات الأغنية)؛ وإلا تُستخدم المدة المُعدّة';
+
+  @override
+  String get settingsBypassDspBitPerfect => 'تجاوز DSP في الوضع بت المثالي';
+
+  @override
+  String get settingsBypassDspBitPerfectDesc =>
+      'يتجاوز المعادل والمُجسّم لإرسال تدفّق صوتي نقي دون تلوين إلى DAC';
+
+  @override
+  String get settingsBypassList => 'قائمة التجاوز (مفصولة بفواصل)';
+
+  @override
+  String get settingsCalibrateBtLatency => 'معايرة زمن استجابة البلوتوث';
+
+  @override
+  String settingsCalibrateBtLatencySubtitle(int ms) {
+    return 'إزاحة الكشف التلقائي (حالياً $ms مللي ثانية)';
+  }
+
+  @override
+  String get settingsCastFailed => 'فشل البث';
+
+  @override
+  String settingsCastingTitle(String title) {
+    return 'جارٍ بث $title';
+  }
+
+  @override
+  String settingsCastingTo(String device) {
+    return 'جارٍ البث إلى $device';
+  }
+
+  @override
+  String get settingsCastNoSdkDesc =>
+      'تتطلب جلسات Cast حزمة SDK الخاصة بـ Play Services (في إصدارات dev/ytm فقط). يظهر هنا اكتشاف الأجهزة.';
+
+  @override
+  String get settingsCastSdkDesc =>
+      'يستخدم مستقبل الوسائط الافتراضي من Google. تُقدَّم الملفات المحلية عبر شبكتك المحلية؛ وتُبثّ الأغلفة/الروابط البعيدة مباشرة.';
+
+  @override
+  String get settingsColorSourceArtwork => 'غلاف الألبوم';
+
+  @override
+  String get settingsColorSourceArtworkDesc =>
+      'يكيّف الألوان من غلاف المسار الحالي (يتغيّر لكل أغنية)';
+
+  @override
+  String get settingsColorSourceCustom => 'تمييز مخصّص';
+
+  @override
+  String get settingsColorSourceCustomDesc =>
+      'استخدم لون التمييز الثابت الذي تختاره في الإعدادات';
+
+  @override
+  String get settingsColorSourceSystemDesc =>
+      'اتّبع لوحة خلفية النظام في Android 12+ • يعود إلى غلاف الألبوم في الأجهزة الأقدم';
+
+  @override
+  String get settingsColorSourceWallpaper => 'Material You (خلفية الشاشة)';
+
+  @override
+  String settingsConnectedAs(String name) {
+    return 'متصل باسم: $name\n\nأدِر حساب YouTube Music أو افصل الاتصال بهذا الجهاز.';
+  }
+
+  @override
+  String get settingsConnectedDeviceQuality => 'الجهاز المتصل وجودة الصوت';
+
+  @override
+  String get settingsConnectionFailed => 'فشل الاتصال';
+
+  @override
+  String get settingsConnectionSuccessful => 'نجح الاتصال';
+
+  @override
+  String get settingsDacNoUacVolume => 'لا يوفّر DAC تحكّماً بمستوى صوت UAC';
+
+  @override
+  String get settingsDisableBitPerfectBypass => 'تعطيل تجاوز الوضع بت المثالي';
+
+  @override
+  String get settingsDisabledBadge => 'معطّل';
+
+  @override
+  String get settingsDoubleTapDisabled => 'معطّل';
+
+  @override
+  String get settingsDoubleTapFavoriteDesc =>
+      'أضف الأغنية النشطة إلى المفضّلة أو أزلها';
+
+  @override
+  String get settingsDoubleTapIgnoreDesc => 'تجاهل إيماءة النقر المزدوج';
+
+  @override
+  String get settingsDoubleTapLyricsDesc =>
+      'أظهر أو أخفِ تراكب الكلمات المتزامنة';
+
+  @override
+  String get settingsDoubleTapToggleFavorite => 'تبديل المفضّلة';
+
+  @override
+  String get settingsDoubleTapToggleLyrics => 'تبديل تراكب الكلمات';
+
+  @override
+  String get settingsDspAutoDesc =>
+      'تجاوز مؤثرات المصنّع تلقائياً عند تفعيل DSP';
+
+  @override
+  String get settingsDspInspectorDesc =>
+      'افحص مراحل DSP النشطة ومؤثرات HAL وحالة المحرّك';
+
+  @override
+  String get settingsDspNativeDesc =>
+      'DSP أصلي آني بدقة 64 بت وبزمن استجابة صفري';
+
+  @override
+  String get settingsDspOemDesc =>
+      'مؤثرات صوتية على مستوى النظام/المصنّع (Dolby وDirac وغيرها)';
+
+  @override
+  String get settingsDuckLevel => 'مستوى الخفض';
+
+  @override
+  String get settingsDuckOnNavigation => 'خفض الصوت عند التنقّل';
+
+  @override
+  String get settingsDuckOnNavigationSubtitle =>
+      'اخفض الموسيقى بدل إيقافها مؤقتاً عند التنبيهات';
+
+  @override
+  String get settingsDvcDesc =>
+      'يثبّت تدفّق وسائط أندرويد على الحد الأقصى ويطبّق الصوت في مسار DSP العائم، لمدى ديناميكي أعلى وتشويش أقل عند الصوت المنخفض. غير متاح أثناء التشغيل بت المثالي وعلى مسار إخراج AAudio المباشر';
+
+  @override
+  String get settingsDvcTitle => 'تحكّم مباشر بمستوى الصوت (DVC)';
+
+  @override
+  String get settingsEnableBitPerfectFirst => 'فعّل تمرير USB بت مثالي أولاً';
+
+  @override
+  String get settingsEnglishNative => 'الإنجليزية (أمريكي/بريطاني)';
+
+  @override
+  String get settingsEnterProxyHost => 'يرجى إدخال مضيف البروكسي';
+
+  @override
+  String get settingsExclusiveUsb => 'واجهة USB حصرية';
+
+  @override
+  String get settingsExclusiveUsbDesc =>
+      'يحجز واجهة AudioStreaming عندما يحرّرها مشغّل النواة. غير قسري: لا يفصل مشغّل صوت أندرويد أبداً';
+
+  @override
+  String get settingsExportSessionLogs => 'تصدير سجلات جلسة الصوت';
+
+  @override
+  String get settingsExportSessionLogsDesc =>
+      'شارك سجل JSONL على الجهاز لجلسات التشغيل الأخيرة';
+
+  @override
+  String get settingsExtendedSpeedRange => 'نطاق سرعة موسّع';
+
+  @override
+  String get settingsExtendedSpeedRangeSubtitle =>
+      'اسمح بسرعة تشغيل من 0.1x إلى 8.0x (الافتراضي 0.25x–4.0x)';
+
+  @override
+  String get settingsFloatDspDesc =>
+      'الدقة العالية أولاً: يغذّي سلسلة DSP الأصلية بعينات float32 للحفاظ على عمق المصادر 24/32 بت (المحتوى 16 بت غير متأثر). الأجهزة غير المدعومة تتراجع بأمان إلى 16 بت';
+
+  @override
+  String get settingsFloatDspPath => 'مسار DSP عائم 24/32 بت';
+
+  @override
+  String get settingsGoogleCast => 'Google Cast';
+
+  @override
+  String get settingsHardwareAudioOutput => 'إخراج الصوت العتادي';
+
+  @override
+  String get settingsHedgedStreaming => 'بث احتياطي';
+
+  @override
+  String get settingsHedgedStreamingSubtitle =>
+      'سابِق بين محلّلين واختر أسرع رابط';
+
+  @override
+  String get settingsHttpLabel => 'HTTP';
+
+  @override
+  String get settingsImportPasteProxies => 'استيراد / لصق البروكسيات';
+
+  @override
+  String get settingsInteractionLabel => 'تنبيهات التفاعل';
+
+  @override
+  String get settingsInternalUsbDac => 'داخلي / DAC USB';
+
+  @override
+  String get settingsIntroLabel => 'المقدمات / الفواصل';
+
+  @override
+  String get settingsInvalidPort => 'منفذ غير صالح (1-65535)';
+
+  @override
+  String settingsLatencyMs(int ms) {
+    return 'زمن الاستجابة: $ms مللي ثانية';
+  }
+
+  @override
+  String get settingsLeaveBlankAuth => 'اتركه فارغاً إذا لم تكن هناك مصادقة';
+
+  @override
+  String get settingsLowerVolume => 'خفض مستوى صوت التشغيل';
+
+  @override
+  String get settingsManageYtm => 'إدارة YouTube Music';
+
+  @override
+  String get settingsMasterAudioEngine => 'محرّك الصوت الرئيسي';
+
+  @override
+  String get settingsNoneSelectedAutoSkip =>
+      'لم يتم تحديد أي منها — التخطّي التلقائي معطّل';
+
+  @override
+  String get settingsNonMusicLabel => 'مقاطع غير موسيقية';
+
+  @override
+  String get settingsNotAvailablePlatform => 'غير متاح على هذه المنصّة';
+
+  @override
+  String get settingsNotDetectable => 'غير قابل للكشف على هذه المنصّة';
+
+  @override
+  String get settingsNothingToCast => 'لا يوجد شيء قيد التشغيل للبث';
+
+  @override
+  String get settingsOutputAudioQuality => 'الإخراج وجودة الصوت';
+
+  @override
+  String settingsOutputDeviceConfigHint(int rate, int bits) {
+    return 'انقر لإعداد جهاز الإخراج • معدّل العينات ($rate kHz) • عمق البت ($bits بت)';
+  }
+
+  @override
+  String get settingsOutroLabel => 'الختام / بطاقات النهاية';
+
+  @override
+  String get settingsPasswordLabel => 'كلمة المرور';
+
+  @override
+  String get settingsPerAlbumEqMemory => 'ذاكرة المعادل لكل ألبوم';
+
+  @override
+  String get settingsPerAlbumEqMemorySubtitle =>
+      'استعادة لقطة المعادل لكل ألبوم/فنان';
+
+  @override
+  String get settingsPerTrackFormatDesc =>
+      'الدقة العالية أولاً: يطلب معدّل العينات/عمق البت الأصلي لكل مسار من جهاز الإخراج (محدود بالجهاز). يحتفظ الوضع بت المثالي بصيغته الحصرية. أوقفه لاستخدام صيغة يدوية واحدة';
+
+  @override
+  String get settingsPerTrackFormatNegotiation =>
+      'التفاوض على صيغة الإخراج لكل مسار';
+
+  @override
+  String get settingsPortHint => 'مثلاً 8080';
+
+  @override
+  String get settingsPortLabel => 'المنفذ';
+
+  @override
+  String get settingsPreampWithoutRg => 'مضخّم أولي (بدون وسم RG)';
+
+  @override
+  String get settingsPreampWithRg => 'مضخّم أولي (مع وسم RG)';
+
+  @override
+  String get settingsPrivacyControlBody =>
+      'يمكن تعطيل المزامنة السحابية والبيانات الوصفية البعيدة. تُخزَّن قواعد الأتمتة وملفات الأجهزة محلياً.';
+
+  @override
+  String get settingsPrivacyControlTitle => 'أنت من يتحكّم';
+
+  @override
+  String get settingsPrivacyNoTrackersBody =>
+      'إصدارات Pure (متجر Play) تأتي دون صلاحية INTERNET أو حزم تحليلات أو معرّفات إعلانية.';
+
+  @override
+  String get settingsPrivacyNoTrackersTitle => 'لا متعقّبات في Pure';
+
+  @override
+  String get settingsPrivacyOfflineBody =>
+      'مكتبتك والتشغيل والإعدادات على هذا الجهاز. لا يُرفع شيء إلا إذا سجّلت الدخول للمزامنة السحابية.';
+
+  @override
+  String get settingsPrivacyOfflineTitle => 'العمل دون اتصال أولاً';
+
+  @override
+  String get settingsPrivacyPermissionsBody =>
+      'يُستخدم الوصول إلى التخزين/الوسائط فقط لفحص وتشغيل صوتك المحلي. ويُطلب الوصول إلى البلوتوث والإشعارات فقط لميزات الصوت المتصل وعناصر التحكم بالتشغيل.';
+
+  @override
+  String get settingsPrivacyPermissionsTitle => 'الأذونات محدّدة الغرض';
+
+  @override
+  String get settingsProxyActiveDesc => 'توجَّه الحركة عبر البروكسي المُعدّ';
+
+  @override
+  String get settingsProxyHttpDesc =>
+      'يوجّه حركة الويب القياسية HTTP وHTTPS واستخراج البث.';
+
+  @override
+  String get settingsProxyInactiveDesc => 'اتصال مباشر (البروكسي معطّل)';
+
+  @override
+  String get settingsProxySocksDesc =>
+      'يوجّه حزم الشبكة عبر SOCKS5 (موصى به لـ Tor وClash وShadowsocks). ملاحظة: يُطبَّق SOCKS5 على طبقة البث الأصلية؛ وتعود استدعاءات Dart داخل التطبيق (البحث، الأغلفة، الكلمات) إلى DIRECT عند تفعيل SOCKS5.';
+
+  @override
+  String get settingsQualityHigh => 'عالية (~160+ kbps • الأفضل)';
+
+  @override
+  String get settingsQualityHighDownloadDesc =>
+      'ملفات صوتية بأعلى جودة (~160+ kbps M4A)';
+
+  @override
+  String get settingsQualityHighStreamDesc =>
+      'أعلى معدّل بت متاح (~160+ kbps) لصوت نقي';
+
+  @override
+  String get settingsQualityLow => 'منخفضة (~64 kbps • موفّر البيانات)';
+
+  @override
+  String get settingsQualityLowDownloadDesc => 'أصغر حجم ملف (~64 kbps)';
+
+  @override
+  String get settingsQualityLowStreamDesc =>
+      'استهلاك بيانات أقل (~64 kbps) للاتصالات البطيئة';
+
+  @override
+  String get settingsQualityMedium => 'متوسطة (~128 kbps)';
+
+  @override
+  String get settingsQualityMediumDownloadDesc =>
+      'حجم وجودة قياسيان (~128 kbps M4A)';
+
+  @override
+  String get settingsQualityMediumStreamDesc =>
+      'معدّل بت قياسي (~128 kbps) مع استهلاك متوازن للبيانات';
+
+  @override
+  String get settingsRaiseVolume => 'رفع مستوى صوت التشغيل';
+
+  @override
+  String get settingsRemoveProxy => 'إزالة البروكسي';
+
+  @override
+  String get settingsReplayGainDesc =>
+      'ربح المسار/الألبوم من الوسوم، يُطبَّق أثناء التشغيل';
+
+  @override
+  String get settingsRequiresUacDac =>
+      'يتطلب DAC من نوع UAC مع تحكّم بمستوى الصوت';
+
+  @override
+  String get settingsResamplerFast => 'سريع (خطي)';
+
+  @override
+  String get settingsResamplerHigh => 'عالٍ (32 منقّحاً)';
+
+  @override
+  String get settingsResamplerQuality => 'جودة مُعيد أخذ العينات';
+
+  @override
+  String get settingsResamplerQualityDesc =>
+      'جودة تحويل معدّل العينات. Ultra هو sync متعدّد الأطوار كامل بـ64 منقّحاً (الافتراضي التاريخي)؛ السريع هو استيفاء خطي لأقل استخدام للمعالج';
+
+  @override
+  String get settingsResamplerStandard => 'قياسي (16 منقّحاً)';
+
+  @override
+  String get settingsResamplerUltra => 'فائق (64 منقّحاً)';
+
+  @override
+  String settingsResetToDefaultValue(String value) {
+    return 'إعادة الضبط إلى الافتراضي ($value)';
+  }
+
+  @override
+  String settingsResolvedCrossfade(String seconds) {
+    return 'تم الحل: إيقاف التشغيل المتصل — ضبط الانتقال على $seconds ثانية';
+  }
+
+  @override
+  String get settingsResolvedGapless => 'تم الحل: تم تعطيل التشغيل المتصل';
+
+  @override
+  String settingsSearchAboutSubtitle(String version) {
+    return 'الإصدار $version وتفاصيل البناء والتراخيص';
+  }
+
+  @override
+  String get settingsSearchAccentColorSubtitle =>
+      'لوحة ألوان تمييز مخصّصة للأزرار والعناصر النشطة';
+
+  @override
+  String get settingsSearchAccentColorTitle => 'لون التمييز';
+
+  @override
+  String get settingsSearchBitPerfectSubtitle =>
+      'مطابقة معدّل العينات مع DAC USB مباشر';
+
+  @override
+  String get settingsSearchBitPerfectTitle => 'إخراج بت مثالي وعالي الدقة';
+
+  @override
+  String get settingsSearchCacheSubtitle =>
+      'مسح الأغلفة ومقاطع البث المخزّنة مؤقتاً';
+
+  @override
+  String get settingsSearchCacheTitle => 'ذاكرة الأغلفة والصوت المؤقتة';
+
+  @override
+  String get settingsSearchCategoryAbout => 'حول';
+
+  @override
+  String get settingsSearchCategoryAudio => 'الصوت';
+
+  @override
+  String get settingsSearchCategoryNetwork => 'الشبكة';
+
+  @override
+  String get settingsSearchCategoryPrivacy => 'الخصوصية';
+
+  @override
+  String get settingsSearchCategoryStorage => 'التخزين';
+
+  @override
+  String get settingsSearchCrossfadeSubtitle =>
+      'انتقالات سلسة وشريط ثواني الانتقال';
+
+  @override
+  String get settingsSearchCrossfadeTitle => 'الانتقال والتشغيل المتصل';
+
+  @override
+  String get settingsSearchEqualizerSubtitle =>
+      'معادل 10 نطاقات، تعزيز الجهير، مُجسّم، صدى';
+
+  @override
+  String get settingsSearchHiddenFoldersSubtitle =>
+      'استثنِ المذكرات الصوتية والنغمات ومجلدات محدّدة';
+
+  @override
+  String get settingsSearchHighContrastTitle => 'وضع التباين العالي';
+
+  @override
+  String get settingsSearchNowPlayingThemeTitle => 'نمط شاشة التشغيل';
+
+  @override
+  String get settingsSearchPrivacySubtitle =>
+      'مبادئ العمل دون اتصال وتفسير الأذونات';
+
+  @override
+  String get settingsSearchPrivacyTitle => 'ضمان الخصوصية';
+
+  @override
+  String get settingsSearchProxySubtitle =>
+      'توجيه بروكسي HTTP وSOCKS5 مع فحص زمن الاستجابة';
+
+  @override
+  String get settingsSearchQualitySubtitle =>
+      'تفضيلات معدّل البت للبث والملفات المحفوظة';
+
+  @override
+  String get settingsSearchQualityTitle => 'جودة صوت البث والتنزيل';
+
+  @override
+  String get settingsSearchRescanSubtitle =>
+      'اكتشاف الأغاني المحمّلة حديثاً وتحديث البيانات الوصفية';
+
+  @override
+  String get settingsSearchRescanTitle => 'إعادة فحص مساحة التخزين';
+
+  @override
+  String get settingsSearchScrobblingSubtitle =>
+      'تتبّع سجل الاستماع وبثّ حالة التشغيل';
+
+  @override
+  String get settingsSearchSleepTimerSubtitle =>
+      'أوقف التشغيل تلقائياً بعد مدة أو عند انتهاء المسار';
+
+  @override
+  String get settingsSearchSwipeSubtitle =>
+      'إجراءات السحب يميناً ويساراً (تخطٍّ، سابق، حجم)';
+
+  @override
+  String get settingsSearchSwipeTitle => 'إيماءات سحب المشغّل المصغّر';
+
+  @override
+  String get settingsSearchThemeModeSubtitle =>
+      'النظام أو الفاتح أو الداكن أو AMOLED عالي التباين';
+
+  @override
+  String get settingsSearchThemeModeTitle => 'وضع السمة';
+
+  @override
+  String get settingsSearchVisualizerStyleTitle => 'نمط المُصوّر';
+
+  @override
+  String get settingsSelfPromoLabel => 'الترويج الذاتي';
+
+  @override
+  String get settingsServerHost => 'مضيف الخادم / عنوان IP';
+
+  @override
+  String get settingsServerHostHint => 'مثلاً 127.0.0.1 أو proxy.example.com';
+
+  @override
+  String get settingsSessionDiagnostics => 'تشخيص صوت الجلسة';
+
+  @override
+  String get settingsSessionDiagnosticsDesc =>
+      'يسجّل سجلاً واحداً لكل مسار: نوع المسار، ترميز البلوتوث، معدّل العينات/عمق البت المتفاوض عليه، المقاطعات وعدد الانقطاعات';
+
+  @override
+  String get settingsSessionLogsShareText => 'سجلات جلسة صوت Pulsr';
+
+  @override
+  String get settingsSilenceSkipSensitivity => 'حساسية تخطّي الصمت';
+
+  @override
+  String get settingsSkipCategories => 'فئات التخطّي';
+
+  @override
+  String get settingsSpanishNative => 'الإسبانية';
+
+  @override
+  String get settingsSpeakerBluetooth => 'مكبّر الصوت + بلوتوث';
+
+  @override
+  String get settingsSpeakerBluetoothSubtitle =>
+      'إخراج متزامن بأفضل جهد ممكن (يتراجع بسلاسة)';
+
+  @override
+  String get settingsSponsorBlock => 'SponsorBlock';
+
+  @override
+  String get settingsSponsorBlockSubtitle =>
+      'تخطَّ تلقائياً مقاطع الرعاية وغير الموسيقى في مسارات يوتيوب';
+
+  @override
+  String get settingsSponsorLabel => 'الرعاة';
+
+  @override
+  String get settingsStarting => 'جارٍ البدء…';
+
+  @override
+  String settingsStatusLabel(String status) {
+    return 'الحالة: $status';
+  }
+
+  @override
+  String get settingsStreamingClaimed => 'تم حجز واجهة البث حصرياً';
+
+  @override
+  String get settingsSwipeAdjustVolume => 'ضبط مستوى الصوت';
+
+  @override
+  String get settingsSwipeDisabled => 'معطّل';
+
+  @override
+  String get settingsSwipeIgnoreDesc => 'تجاهل إيماءة السحب';
+
+  @override
+  String get settingsSwipeLeftAction => 'إجراء السحب لليسار في المشغّل المصغّر';
+
+  @override
+  String get settingsSwipeNextDesc => 'تخطَّ إلى الأغنية التالية في القائمة';
+
+  @override
+  String get settingsSwipeNextTrack => 'المسار التالي';
+
+  @override
+  String get settingsSwipePrevDesc =>
+      'تخطَّ إلى الأغنية السابقة أو أعد تشغيل المسار';
+
+  @override
+  String get settingsSwipePreviousTrack => 'المسار السابق';
+
+  @override
+  String get settingsSwipeRightAction =>
+      'إجراء السحب لليمين في المشغّل المصغّر';
+
+  @override
+  String get settingsSyncingLibrary => 'جارٍ مزامنة مكتبتك...';
+
+  @override
+  String get settingsSyncOffset => 'إزاحة المزامنة';
+
+  @override
+  String get settingsTestAllSpeeds => 'اختبار كل السرعات';
+
+  @override
+  String get settingsTestingAll => 'جارٍ اختبار الجميع...';
+
+  @override
+  String get settingsTestingProxyConnectivity =>
+      'جارٍ اختبار اتصال البروكسي...';
+
+  @override
+  String get settingsTestLatency => 'اختبار زمن الاستجابة';
+
+  @override
+  String get settingsThemeCardGlass => 'بطاقة زجاجية متراكبة';
+
+  @override
+  String get settingsThemeCardGlassDesc =>
+      'غلاف خلفي بكامل الشاشة مع أدوات زجاجية مصنفرة';
+
+  @override
+  String get settingsThemeClassicStandard => 'قياسي كلاسيكي';
+
+  @override
+  String get settingsThemeClassicStandardDesc =>
+      'تصميم تقليدي عالي الدقة مع توهّج محيطي';
+
+  @override
+  String get settingsThemeFullBleed => 'شكل موجي بكامل الشاشة';
+
+  @override
+  String get settingsThemeFullBleedDesc =>
+      'خلفية مُصوّر موجي متوهّج يتفاعل مع الصوت بكامل الشاشة';
+
+  @override
+  String get settingsThemeKaraoke => 'انغماس كلمات الكاريوكي';
+
+  @override
+  String get settingsThemeKaraokeDesc =>
+      'واجهة مشغّل كاريوكي بالكلمات المتزامنة المكبّرة';
+
+  @override
+  String get settingsThemeMinimalist => 'شكل موجي بسيط';
+
+  @override
+  String get settingsThemeMinimalistDesc =>
+      'تركيز استوديو واسع على مُصوّر الموجة الصوتية الديناميكي';
+
+  @override
+  String get settingsThemeRetroCassette => 'مشغّل كاسيت كلاسيكي';
+
+  @override
+  String get settingsThemeRetroCassetteDesc =>
+      'شريط كاسيت قديم ببكرات دوّارة وعدّاد شريط مغناطيسي';
+
+  @override
+  String get settingsThemeVinylCircle => 'دائرة أسطوانة (تدور)';
+
+  @override
+  String get settingsThemeVinylCircleDesc =>
+      'غلاف دائري في الوسط مع حركة دوران مستمرة';
+
+  @override
+  String get settingsThemeVinylTurntable => 'استوديو أسطوانة دوّارة';
+
+  @override
+  String get settingsThemeVinylTurntableDesc =>
+      'أسطوانة فينيل حقيقية بأخاديد واقعية وملصق مركزي وذراع';
+
+  @override
+  String get settingsTurnOffGapless => 'إيقاف التشغيل المتصل';
+
+  @override
+  String get settingsTurnOffGaplessEnableCrossfade =>
+      'أوقف التشغيل المتصل وفعّل الانتقال';
+
+  @override
+  String get settingsUnavailableAaudio =>
+      'غير متاح أثناء تمكين إخراج AAudio المباشر';
+
+  @override
+  String get settingsUnknownConnectionFailure => 'فشل اتصال غير معروف';
+
+  @override
+  String get settingsUsbBitPerfectStreaming => 'بث بت مثالي عبر USB (تجريبي)';
+
+  @override
+  String get settingsUsbDacHardwareVolume => 'مستوى صوت الجهاز لـ DAC USB';
+
+  @override
+  String settingsUsbHwVolumeDesc(String uac, String device) {
+    return 'يتحكّم مباشرة بمرحلة الصوت في DAC $uac (تشويش أقل عند الصوت المنخفض). $device';
+  }
+
+  @override
+  String get settingsUsbHwVolumeGrant =>
+      'امنح صلاحية USB للتحكم بمستوى صوت DAC مباشرة';
+
+  @override
+  String get settingsUsbStreamingActive => 'البث المتزامن UAC2 الخام نشط';
+
+  @override
+  String get settingsUsbStreamingDesc =>
+      'يحجز DAC حصرياً ويبثّ PCM المعالج مباشرة عبر URBs متزامنة USB. غير مُتحقّق منه على العتاد؛ يتراجع بأمان إذا فشل الحجز أو إعداد النقطة الطرفية';
+
+  @override
+  String get settingsUsernameLabel => 'اسم المستخدم';
+
+  @override
+  String get settingsVisualizerAlbumReactive => 'توهّج يتفاعل مع غلاف الألبوم';
+
+  @override
+  String get settingsVisualizerBarClassic => 'أشرطة (طيف تردد كلاسيكي)';
+
+  @override
+  String get settingsVisualizerCircular => 'دائري (طيف شعاعي)';
+
+  @override
+  String get settingsVisualizerCustomJson => 'مُصوّر JSON مخصّص';
+
+  @override
+  String get settingsVisualizerMilkdrop => 'مُصوّر إعدادات Milkdrop';
+
+  @override
+  String get settingsVisualizerOff => 'معطّل';
+
+  @override
+  String get settingsVisualizerParticles => 'جزيئات (حقل صوتي)';
+
+  @override
+  String get settingsVisualizerTerrain3d => 'تضاريس ثلاثية الأبعاد (جبل شبكي)';
+
+  @override
+  String get settingsVisualizerWaveSmooth => 'موجة (طيف خطي سلس)';
+
+  @override
+  String get settingsVizBarDesc =>
+      'أشرطة تردد عمودية كلاسيكية مع حركة ارتفاع سلسة';
+
+  @override
+  String get settingsVizCircularDesc =>
+      'أشرطة تردد شعاعية مستقبلية حول غلاف الألبوم';
+
+  @override
+  String get settingsVizCustomDesc =>
+      'إعداد JSON من المستخدم: أشرطة / موجة / شعاعي / جزيئات / ليساجو';
+
+  @override
+  String get settingsVizLabelBar => 'أشرطة';
+
+  @override
+  String get settingsVizLabelCircular => 'دائري';
+
+  @override
+  String get settingsVizLabelCustom => 'مخصّص (JSON)';
+
+  @override
+  String get settingsVizLabelMilkdrop => 'MILKDROP';
+
+  @override
+  String get settingsVizLabelOff => 'إيقاف';
+
+  @override
+  String get settingsVizLabelWave => 'موجة';
+
+  @override
+  String get settingsVizOffDesc => 'تعطيل حركة طيف مُصوّر الصوت';
+
+  @override
+  String get settingsVizWaveDesc => 'خط موجي بيزيه مستمر وسلس مع تعبئة متدرّجة';
+
+  @override
+  String settingsAboutTitle(String title) {
+    return 'حول $title';
+  }
+
+  @override
+  String get settingsActiveBadge => 'نشط';
+
+  @override
+  String get settingsActiveProxyProtocol => 'بروتوكول البروكسي النشط';
+
+  @override
+  String get settingsActiveServerConfig => 'إعدادات الخادم النشط';
+
+  @override
+  String get settingsAdaptiveQuality => 'جودة تكيفية';
+
+  @override
+  String get settingsAdaptiveQualitySubtitle =>
+      'خفّض/ارفع معدّل البت أثناء التوقّف';
+
+  @override
+  String get settingsAaudioBufferSize => 'حجم مخزن AAudio المؤقت';
+
+  @override
+  String get settingsAaudioBufferSizeDesc =>
+      'تلميح سعة مخزن البث بالمللي ثانية. أقل = زمن استجابة أقل (سلكي)، أعلى = مقاومة أكبر للتوقّف';
+
+  @override
+  String get settingsAaudioDirect => 'إخراج AAudio مباشر (بت مثالي)';
+
+  @override
+  String get settingsAaudioDirectDesc =>
+      'يتجاوز مازج النظام بتدفّق AAudio أصلي يُفتح عند معدّل كل مسار (محاولة EXCLUSIVE، وتراجع SHARED). تتعطّل سلسلة DSP وأدوات السرعة/النغمة في هذا الوضع؛ يُطبَّق على المشغّلات المُنشأة حديثاً';
+
+  @override
+  String get dspAboutBassBoost => 'حول تعزيز الجهير';
+
+  @override
+  String get dspAboutBitPerfect => 'حول Bit-Perfect';
+
+  @override
+  String get dspAboutCrossfeed => 'حول التغذية المتبادلة';
+
+  @override
+  String get dspAboutDspEngine => 'حول محرك DSP';
+
+  @override
+  String get dspAboutDynamics => 'حول الديناميكيات';
+
+  @override
+  String get dspAboutEqualizer => 'حول المُعادل';
+
+  @override
+  String get dspAboutLimiter => 'حول المحدد';
+
+  @override
+  String get dspAboutReverb => 'حول الصدى';
+
+  @override
+  String get dspAboutSpatializer => 'حول المجسّم الصوتي';
+
+  @override
+  String get dspAboutStereoBalance => 'حول توازن الاستيريو';
+
+  @override
+  String get dspAboutVirtualizer => 'حول المُحاكي الافتراضي';
+
+  @override
+  String get dspAboutVolumeBoost => 'حول تعزيز مستوى الصوت';
+
+  @override
+  String get dspActiveEffects => 'تأثيرات نشطة (الصدى، المحدد...)';
+
+  @override
+  String get dspAddLine => 'إضافة سطر';
+
+  @override
+  String get dspAllEffectsBypassed => 'تم تجاوز جميع تأثيرات DSP';
+
+  @override
+  String get dspAppliedProfile => 'الملف المطبق:';
+
+  @override
+  String get dspAttackTime => 'زمن الهجوم';
+
+  @override
+  String get dspAudioFormatCodec => 'تنسيق الصوت وبرنامج الترميز';
+
+  @override
+  String get dspAutoEqVerified => 'AutoEQ تم التحقق منه';
+
+  @override
+  String get dspBassStrength => 'قوة الجهير';
+
+  @override
+  String get dspBitPerfectLosslessStream => 'بث بلا فقدان bit-perfect';
+
+  @override
+  String get dspBlocked => 'محظور';
+
+  @override
+  String get dspBlockedBitPerfect => 'محظور: تجاوز Bit-Perfect نشط';
+
+  @override
+  String get dspBluetoothCompensationDesc =>
+      'يحصل البلوتوث منخفض الجودة على تعويض طفيف للحضور وذيل صدى أقصر.';
+
+  @override
+  String get dspCodec => 'برنامج الترميز';
+
+  @override
+  String get dspCompressedStream => 'بث صوتي مضغوط';
+
+  @override
+  String get dspCrossfeedChuMoy => 'Chu Moy (700Hz / 6dB)';
+
+  @override
+  String get dspCrossfeedDefault => 'افتراضي (700Hz / 4.5dB)';
+
+  @override
+  String get dspCrossfeedJanMeier => 'Jan Meier (650Hz / 9.5dB)';
+
+  @override
+  String get dspCrossoverHigh => 'التقاطع 3 (عالٍ)';
+
+  @override
+  String get dspCrossoverLow => 'التقاطع 1 (منخفض)';
+
+  @override
+  String get dspCrossoverMid => 'التقاطع 2 (متوسط)';
+
+  @override
+  String get dspDeleteCustomPreset => 'حذف الإعداد المسبق المخصص';
+
+  @override
+  String get dspDeleteLine => 'حذف السطر';
+
+  @override
+  String get dspDevice => 'الجهاز';
+
+  @override
+  String get dspDr12Audiophile => 'DR 12+ للصوتيات';
+
+  @override
+  String get dspDrHighDynamic => 'DR ديناميكي عالٍ';
+
+  @override
+  String get dspDrStandard => 'DR قياسي';
+
+  @override
+  String get dspDspProcessing => 'معالجة DSP';
+
+  @override
+  String get dspDynamicRangeLra => 'المدى الديناميكي (LRA)';
+
+  @override
+  String get dspEbuR128 => 'تحليل مدى الجهارة EBU R128';
+
+  @override
+  String get dspEditLyrics => 'تعديل الكلمات';
+
+  @override
+  String get dspEmbedded => 'مضمّنة';
+
+  @override
+  String get dspEmbeddedUnsynced => 'مضمّنة (غير متزامنة)';
+
+  @override
+  String get dspEqCurvesBypassed => 'تم تجاوز منحنيات المُعادل';
+
+  @override
+  String get dspEveryBandValidNumber => 'تحتاج كل نطاق إلى رقم صالح.';
+
+  @override
+  String get dspExportThemeJson => 'تصدير JSON للسمة';
+
+  @override
+  String get dspFileSizeDuration => 'حجم الملف ومدته';
+
+  @override
+  String get dspFirLoaded => 'تم تحميل FIR لتصحيح الغرفة في مرحلة الالتفاف.';
+
+  @override
+  String get dspFirRejected => 'رفض محرك الصوت تصدير FIR.';
+
+  @override
+  String get dspFreqRange10To30k => 'يجب أن تبقى الترددات ضمن 10-30000 هرتز.';
+
+  @override
+  String get dspFreqStrictlyAscending =>
+      'يجب أن تكون الترددات تصاعدية بشكل صارم.';
+
+  @override
+  String get dspHardwareEndpoint => 'نقطة نهاية العتاد';
+
+  @override
+  String get dspHeadset => 'سماعة رأس';
+
+  @override
+  String get dspKaraokeMode => 'وضع الكاريوكي';
+
+  @override
+  String get dspLatency => 'زمن الاستجابة';
+
+  @override
+  String get dspLoadingLyrics => 'جارٍ تحميل الكلمات…';
+
+  @override
+  String get dspLrcLibSynced => 'LRCLIB متزامن';
+
+  @override
+  String get dspLyricsSaved => 'تم حفظ الكلمات';
+
+  @override
+  String get dspLyricsSessionOnly => 'تم تحديث الكلمات لهذه الجلسة فقط';
+
+  @override
+  String get dspMakeupGain => 'كسب التعويض';
+
+  @override
+  String get dspMaxBoost => 'أقصى تعزيز';
+
+  @override
+  String get dspMosqueAmbience => 'أجواء المسجد';
+
+  @override
+  String get dspMosqueAmbienceDesc => 'صدى التفاف لمكان يشبه القاعة';
+
+  @override
+  String get dspMuteBand => 'كتم النطاق';
+
+  @override
+  String get dspMyCustomEq => 'المُعادل المخصص الخاص بي';
+
+  @override
+  String get dspNoProfileLoaded => 'لم يتم تحميل أي ملف';
+
+  @override
+  String get dspNormal => 'عادي';
+
+  @override
+  String get dspOff => 'إيقاف';
+
+  @override
+  String get dspOriginalPitch => 'النغمة الأصلية (1.00x)';
+
+  @override
+  String get dspOutputDriver => 'برنامج تشغيل الإخراج';
+
+  @override
+  String get dspPresetImportInvalid =>
+      'فشل استيراد الإعداد المسبق: تنسيق JSON غير صالح';
+
+  @override
+  String get dspPresetImported => 'تم استيراد الإعداد المسبق للمُعادل بنجاح!';
+
+  @override
+  String get dspPresetLabel => 'الإعداد المسبق:';
+
+  @override
+  String get dspPresetName => 'اسم الإعداد المسبق';
+
+  @override
+  String get dspPresetNameHint => 'مثال: جهير دافئ، ضربة صوتية';
+
+  @override
+  String get dspPresetOptions => 'خيارات الإعداد المسبق';
+
+  @override
+  String get dspPulsrAudiophileEdition => 'Pulsr إصدار الصوتيات';
+
+  @override
+  String get dspQBandwidth => 'Q / عرض النطاق';
+
+  @override
+  String get dspQuranModeOff => 'وضع القرآن: إيقاف';
+
+  @override
+  String get dspQuranModeOn => 'وضع القرآن: تشغيل';
+
+  @override
+  String get dspRatio => 'النسبة';
+
+  @override
+  String get dspResamplingEngine => 'محرك إعادة أخذ العينات';
+
+  @override
+  String get dspResetAllEqTooltip =>
+      'إعادة ضبط كل إعدادات DSP وEQ إلى الافتراضي';
+
+  @override
+  String get dspResetBalanceCenter => 'إعادة التوازن إلى الوسط';
+
+  @override
+  String get dspResetBassEnhancer => 'إعادة تعزيز الجهير (إيقاف)';
+
+  @override
+  String get dspResetPreamp => 'إعادة ضبط المضخم المسبق';
+
+  @override
+  String get dspResetToDefault => 'إعادة الضبط إلى الافتراضي';
+
+  @override
+  String get dspResetToDefault0 => 'إعادة الضبط إلى الافتراضي (0%)';
+
+  @override
+  String get dspResetToDefault02dbfs => 'إعادة الضبط إلى الافتراضي (-0.2 dBFS)';
+
+  @override
+  String get dspResetToDefault20wet => 'إعادة الضبط إلى الافتراضي (20% رطب)';
+
+  @override
+  String get dspResetToDefault350us =>
+      'إعادة الضبط إلى الافتراضي (350 ميكروثانية)';
+
+  @override
+  String get dspResetToDefault50ms =>
+      'إعادة الضبط إلى الافتراضي (50 مللي ثانية)';
+
+  @override
+  String get dspResetToDefault9db => 'إعادة الضبط إلى الافتراضي (-9.0 dB)';
+
+  @override
+  String get dspResetVolumeBoost => 'إعادة تعزيز مستوى الصوت (إيقاف)';
+
+  @override
+  String get dspSearchHeadphones =>
+      'ابحث عن سماعات (Sony، Sennheiser، Apple...)';
+
+  @override
+  String get dspSearchHeadphonesHint =>
+      'ابحث عن سماعات (مثل AirPods وSony وMoondrop)...';
+
+  @override
+  String get dspSlider1Label => 'slider1 (المعدل / الدفع)';
+
+  @override
+  String get dspSlider2Label => 'slider2 (العمق / المزيج)';
+
+  @override
+  String get dspSoloBand => 'عزل النطاق';
+
+  @override
+  String get dspSortByTime => 'الترتيب حسب الوقت';
+
+  @override
+  String get dspSourceBitrate => 'معدل بت المصدر';
+
+  @override
+  String get dspSourceFile => 'الملف المصدر';
+
+  @override
+  String get dspSourceSampleRateDepth => 'معدل أخذ العينات وعمق البت للمصدر';
+
+  @override
+  String get dspSpatialTab => 'المكاني و DSP';
+
+  @override
+  String get dspSpeaker => 'مكبر الصوت';
+
+  @override
+  String get dspStandardDynamicRange => 'المدى الديناميكي القياسي';
+
+  @override
+  String get dspStandby => 'وضع الاستعداد';
+
+  @override
+  String get dspTapeLoaded => 'تم تحميل الشريط';
+
+  @override
+  String get dspTarget => 'الهدف:';
+
+  @override
+  String get dspThreshold => 'العتبة';
+
+  @override
+  String get dspTunedFor => 'مضبوط لـ';
+
+  @override
+  String get dspUnknown => 'غير معروف';
+
+  @override
+  String get dspUnmuteBand => 'إلغاء كتم النطاق';
+
+  @override
+  String get dspUnsoloBand => 'إلغاء عزل النطاق';
+
+  @override
+  String get dspVariableBitrate => 'معدل بت متغير';
+
+  @override
+  String get dspVocalWarmth => 'دفء الصوت';
+
+  @override
+  String get dspVocalWarmthDesc => 'ثراء توافقي في صوت القارئ';
+
+  @override
+  String get dspWiredCompensationDesc =>
+      'يُترك إخراج السلك / USB دون تعويض من العتاد.';
+
+  @override
+  String get browseAccountConnectedDone =>
+      'تم ربط الحساب! اضغط \"تم\" للإنهاء.';
+
+  @override
+  String get browseAcoustic => 'أكوستيك';
+
+  @override
+  String get browseActiveDownloadsSuffix => '(3 تنزيلات نشطة)...';
+
+  @override
+  String get browseAdded => 'تمت الإضافة';
+
+  @override
+  String get browseAddress => 'العنوان';
+
+  @override
+  String get browseAlarmSound => 'صوت المنبّه';
+
+  @override
+  String get browseAllLikedSongsDownloadedOffline =>
+      'كل الأغاني المفضلة تم تنزيلها بالفعل دون اتصال.';
+
+  @override
+  String get browseAllOnlineLikedDownloaded =>
+      'كل الأغاني المفضلة عبر الإنترنت تم تنزيلها بالفعل أو قيد التنزيل.';
+
+  @override
+  String get browseAllOnlineTracksDownloaded =>
+      'كل المقاطع عبر الإنترنت تم تنزيلها بالفعل أو قيد التنزيل.';
+
+  @override
+  String get browseAllSongsOffline =>
+      'كل الأغاني في هذه القائمة هي مقاطع محلية دون اتصال بالفعل.';
+
+  @override
+  String get browseAllTracksAlreadyDownloaded =>
+      'كل المقاطع تم تنزيلها بالفعل أو محلية';
+
+  @override
+  String get browseAllTracksFrom => 'كل المقاطع من';
+
+  @override
+  String get browseAllTracksOfflineLocal =>
+      'كل المقاطع في قائمة التشغيل هذه هي ملفات محلية دون اتصال بالفعل.';
+
+  @override
+  String get browseAlreadyDownloadedOffline => 'تم تنزيلها بالفعل دون اتصال.';
+
+  @override
+  String get browseAlreadyHaveAccount => 'لديك حساب بالفعل؟ تسجيل الدخول';
+
+  @override
+  String get browseApplyChanges => 'تطبيق التغييرات';
+
+  @override
+  String get browseArabicPop => 'بوب عربي';
+
+  @override
+  String get browseAudioTracks => 'مقاطع صوتية';
+
+  @override
+  String get browseAutoFetchTags => 'جلب الوسوم وصورة الغلاف تلقائيًا';
+
+  @override
+  String get browseBack => 'رجوع';
+
+  @override
+  String get browseBatchEdit => 'تحرير جماعي';
+
+  @override
+  String browseBatchEditingBody(int count) {
+    return 'جارٍ تحرير $count مقطعًا. سيتم تحديث الوسوم المشتركة وصورة الغلاف في جميع الملفات المحددة.';
+  }
+
+  @override
+  String get browseBatchEditTags => 'تحرير الوسوم جماعيًا';
+
+  @override
+  String get browseBy => 'لـ';
+
+  @override
+  String get browseCannotBeUndone => 'لا يمكن التراجع عن هذا.';
+
+  @override
+  String get browseCategories => 'فئات';
+
+  @override
+  String get browseChecking => 'جارٍ التحقق…';
+
+  @override
+  String get browseCheckOut => 'استمع إلى';
+
+  @override
+  String get browseChillLofi => 'هادئ ولو-فاي';
+
+  @override
+  String get browseChillout => 'استرخاء';
+
+  @override
+  String get browseClearHistory => 'مسح السجل';
+
+  @override
+  String get browseClearHistoryFailed => 'فشل مسح السجل';
+
+  @override
+  String get browseClearListeningHistoryMessage =>
+      'سيؤدي هذا إلى إزالة كل المقاطع من سجل الاستماع الأخير. لن تتأثر ملفات الصوت وقوائم التشغيل.';
+
+  @override
+  String get browseClearListeningHistoryTitle => 'مسح سجل الاستماع؟';
+
+  @override
+  String get browseClearPlayHistory => 'مسح سجل التشغيل';
+
+  @override
+  String get browseClearPlayHistoryMessage =>
+      'سيؤدي هذا إلى إعادة تعيين قائمة التشغيل الأخيرة وسجل الاستماع. لن تتأثر ملفات الأغاني وقوائم التشغيل.';
+
+  @override
+  String get browseClearPlayHistoryTitle => 'مسح سجل التشغيل؟';
+
+  @override
+  String get browseClose => 'إغلاق';
+
+  @override
+  String get browseCode => 'الرمز';
+
+  @override
+  String get browseComment => 'تعليق';
+
+  @override
+  String get browseConnect => 'ربط';
+
+  @override
+  String get browseConnectToSync =>
+      'اربط الحساب لمزامنة الموسيقى المفضلة تلقائيًا';
+
+  @override
+  String get browseCookiesRejected =>
+      'رفض YouTube ملفات تعريف الارتباط هذه — انتهت صلاحيتها أو تنتمي إلى جلسة مسجّلة الخروج';
+
+  @override
+  String get browseCookieVerifyOffline =>
+      'تعذّر الوصول إلى YouTube للتحقق — تم حفظ ملفات تعريف الارتباط، حاول مجددًا عند عودة الاتصال';
+
+  @override
+  String get browseCopied => 'تم النسخ';
+
+  @override
+  String get browseCopy => 'نسخ';
+
+  @override
+  String get browseCouldNotLoadAlbums => 'تعذّر تحميل الألبومات.';
+
+  @override
+  String get browseCouldNotLoadTopTracks => 'تعذّر تحميل المقاطع الأكثر شهرة.';
+
+  @override
+  String get browseCouldNotLoadTracks =>
+      'تعذّر تحميل مقاطع قائمة التشغيل هذه. تحقق من اتصالك بالإنترنت أو الرابط.';
+
+  @override
+  String get browseCreateCloudAccount => 'إنشاء حساب سحابي';
+
+  @override
+  String get browseCrossfade => 'تلاشٍ متقاطع';
+
+  @override
+  String get browseCurrentIdentity => 'الهوية الحالية';
+
+  @override
+  String get browseDeselect => 'إلغاء التحديد';
+
+  @override
+  String get browseDisc => 'قرص';
+
+  @override
+  String get browseDiscNumber => 'رقم القرص';
+
+  @override
+  String get browseDiskStorage => 'مساحة التخزين';
+
+  @override
+  String get browseDontHaveAccount => 'ليس لديك حساب؟ إنشاء حساب';
+
+  @override
+  String get browseDownloadActionsFor => 'إجراءات التنزيل لـ';
+
+  @override
+  String get browseDownloadAllLikedSongs => 'تنزيل كل الأغاني المفضلة';
+
+  @override
+  String get browseDownloadAllOfflineActive =>
+      'تنزيل الكل دون اتصال (3 تنزيلات نشطة)';
+
+  @override
+  String get browseDownloadAllOnlineFavorites =>
+      'تنزيل كل المفضلة عبر الإنترنت';
+
+  @override
+  String get browseDownloadOffline => 'تنزيل دون اتصال';
+
+  @override
+  String get browseEgyptMode => 'وضع مصر';
+
+  @override
+  String get browseElectronic => 'إلكترونية';
+
+  @override
+  String get browseEmailAddress => 'البريد الإلكتروني';
+
+  @override
+  String get browseEnter => 'أدخل';
+
+  @override
+  String get browseEnterBpmRange => 'أدخل قيمة BPM بين 40 و240.';
+
+  @override
+  String get browseEnterLyrics => 'أدخل كلمات الأغنية...';
+
+  @override
+  String get browseEnterPlaylistUrl => 'أدخل رابط قائمة تشغيل أو معرّفها';
+
+  @override
+  String get browseEta => 'الوقت المتبقي:';
+
+  @override
+  String get browseExcludeFromScan => 'استبعاد من الفحص';
+
+  @override
+  String get browseExplore => 'استكشاف';
+
+  @override
+  String get browseFailedLoadFeed =>
+      'فشل تحميل المحتوى. تحقق من الاتصال وأعد المحاولة.';
+
+  @override
+  String get browseFailedToFetch => 'فشل الجلب';
+
+  @override
+  String get browseFailedToLoadAccountPlaylists =>
+      'فشل تحميل قوائم تشغيل الحساب';
+
+  @override
+  String get browseFetching => 'جارٍ الجلب';
+
+  @override
+  String get browseFlac => 'FLAC';
+
+  @override
+  String get browseFlat => 'مسطّح';
+
+  @override
+  String get browseForDownload => 'للتنزيل';
+
+  @override
+  String get browseForward => 'تقدّم';
+
+  @override
+  String get browseForYou => 'من أجلك';
+
+  @override
+  String get browseGenreArabicRegional => 'عربي وإقليمي';
+
+  @override
+  String get browseGenreClassicalInstrumental => 'كلاسيكي وآلي';
+
+  @override
+  String get browseGenreElectronicDance => 'إلكتروني ورقص';
+
+  @override
+  String get browseGenreHipHopRnb => 'هيب هوب وريذم أند بلوز';
+
+  @override
+  String get browseGenreJazzBlues => 'جاز وبلوز';
+
+  @override
+  String get browseGenrePopAcoustic => 'بوب وأكوستيك';
+
+  @override
+  String get browseGenreRockMetal => 'روك وميتال';
+
+  @override
+  String get browseGlobalTopHits => 'أشهر الأغاني عالميًا';
+
+  @override
+  String get browseGoogleBlocking => 'Google يمنع تسجيل الدخول هذا';
+
+  @override
+  String get browseGoogleBlockingBody =>
+      'يحظر Google تسجيل الدخول داخل المتصفحات المدمجة لبعض الحسابات، ولم تتجاوز المحاولات التلقائية (مسح ملفات تعريف الارتباط وتبديل هوية المتصفح) ذلك.\n\nاستخدم الخيار الموثوق بالأسفل لتسجيل الدخول عبر Google TV: وافِق من متصفحك الخاص ولن يرى Google أي WebView مدمج، لذا لا يوجد اختبار كابتشا. سيزامن Pulsr مكتبتك وقوائم التشغيل؛ ويظل التشغيل يعمل كالمعتاد.';
+
+  @override
+  String get browseHipHop => 'هيب هوب';
+
+  @override
+  String get browseHistoryCleared => 'تم مسح سجل الاستماع';
+
+  @override
+  String get browseHome => 'الرئيسية';
+
+  @override
+  String get browseHoursShort => 'س';
+
+  @override
+  String get browseIncludeInScan => 'تضمين في الفحص';
+
+  @override
+  String get browseInvalidEmail => 'بريد إلكتروني غير صالح';
+
+  @override
+  String get browseJazz => 'جاز';
+
+  @override
+  String get browseLatestTracksSubtitle =>
+      'أحدث المقاطع المشغّلة على هذا الجهاز';
+
+  @override
+  String get browseLibraryStats => 'إحصاءات المكتبة';
+
+  @override
+  String get browseLikedSongsForDownload => 'أغانٍ مفضلة للتنزيل';
+
+  @override
+  String get browseList => 'قائمة';
+
+  @override
+  String get browseListeningTime => 'مدة الاستماع';
+
+  @override
+  String get browseLofiBeats => 'إيقاعات لو-فاي';
+
+  @override
+  String get browseLoggedInSuccessfully => 'تم تسجيل الدخول بنجاح';
+
+  @override
+  String get browseLossless => 'بدون فقدان';
+
+  @override
+  String get browseLosslessHiRes => 'بدون فقدان / عالي الدقة:';
+
+  @override
+  String get browseMahraganat => 'مهرجانات';
+
+  @override
+  String get browseMissingSessionCookies =>
+      'ملفات تعريف ارتباط الجلسة مفقودة — يحتاج النص الملصوق إلى SAPISID و__Secure-3PSID (أو 1PSID)';
+
+  @override
+  String get browseMoreOptions => 'خيارات أكثر';
+
+  @override
+  String get browseMoreTools => 'أدوات إضافية';
+
+  @override
+  String get browseMostPlayedTracks => 'المقاطع الأكثر تشغيلًا';
+
+  @override
+  String get browseMostPlayedTracksSubtitle => 'قائمة المفضلة على الإطلاق';
+
+  @override
+  String get browseNoArtistsFound => 'لا يوجد فنانون';
+
+  @override
+  String get browseNoChangesToSave => 'لا توجد تغييرات للحفظ';
+
+  @override
+  String get browseNoGenresFound => 'لا توجد أنواع';
+
+  @override
+  String get browseNoRecommendations => 'لا توجد توصيات الآن.';
+
+  @override
+  String get browseNoResultsFound => 'لا توجد نتائج';
+
+  @override
+  String get browseNoSongsInLibrary => 'لا توجد أغانٍ في المكتبة';
+
+  @override
+  String get browseNoSongsMatch => 'لا توجد أغانٍ تطابق';
+
+  @override
+  String get browseNotificationSound => 'صوت الإشعار';
+
+  @override
+  String get browseNoTracks => 'لا توجد مقاطع';
+
+  @override
+  String get browseNoTracksFound => 'لم يتم العثور على مقاطع';
+
+  @override
+  String get browseNoTracksInFolder =>
+      'لم يتم العثور على مقاطع صوتية قابلة للتشغيل في هذا المجلد.';
+
+  @override
+  String get browseNoTracksInGenre => 'لم يتم العثور على مقاطع في هذا النوع.';
+
+  @override
+  String get browseNoTracksInYear => 'لم يتم العثور على مقاطع لهذا العام.';
+
+  @override
+  String get browseNoTracksMatchSmartRules =>
+      'لا توجد مقاطع تطابق قواعد قائمة التشغيل الذكية هذه.';
+
+  @override
+  String get browseNoTracksPrivateLiked =>
+      'لم يتم العثور على مقاطع. إذا كانت هذه موسيقاك المفضلة الخاصة، فتأكد من تسجيل الدخول أو اضغط \"مزامنة\".';
+
+  @override
+  String get browseNotSet => 'غير محدد';
+
+  @override
+  String get browseNoYearsFound => 'لا توجد سنوات';
+
+  @override
+  String get browseNoYtmMatchesFor =>
+      'لا توجد نتائج مطابقة في YouTube Music لـ';
+
+  @override
+  String get browseOauthAccessDenied => 'تم رفض الوصول في صفحة Google.';
+
+  @override
+  String get browseOauthExpired =>
+      'انتهت صلاحية الرمز قبل الموافقة عليه. حاول مجددًا.';
+
+  @override
+  String get browseOauthGoogleError => 'أعاد Google خطأ';
+
+  @override
+  String get browseOauthStartFailed =>
+      'تعذّر بدء تسجيل الدخول عبر Google. تحقق من اتصالك.';
+
+  @override
+  String get browseOfflinePlaylist => 'قائمة تشغيل دون اتصال';
+
+  @override
+  String get browseOnPulsr => 'على Pulsr Music!';
+
+  @override
+  String get browseOpenFolderDetails => 'فتح تفاصيل المجلد';
+
+  @override
+  String get browsePassword => 'كلمة المرور';
+
+  @override
+  String get browsePasswordMinChars =>
+      'يجب أن تتكوّن كلمة المرور من 6 أحرف على الأقل';
+
+  @override
+  String get browsePasswordResetSent =>
+      'تم إرسال رابط إعادة تعيين كلمة المرور إلى';
+
+  @override
+  String get browsePasteFromClipboard => 'لصق من الحافظة';
+
+  @override
+  String get browsePastePlaylistLinkHint =>
+      'الصق رابط قائمة تشغيل من YouTube أو YouTube Music.';
+
+  @override
+  String get browsePersonalized => 'مخصّص';
+
+  @override
+  String get browsePlaylistExportedSuccess => 'تم تصدير قائمة التشغيل بنجاح';
+
+  @override
+  String get browsePlaylistHasNoSongs =>
+      'لا تحتوي قائمة التشغيل هذه على أغانٍ.';
+
+  @override
+  String get browsePlaylistSharePrefix => 'قائمة التشغيل:';
+
+  @override
+  String get browsePlaylistUpdated => 'تم تحديث قائمة التشغيل';
+
+  @override
+  String get browsePlays => 'مرات التشغيل';
+
+  @override
+  String get browsePleaseEnterCookieText =>
+      'الرجاء إدخال نص ملفات تعريف الارتباط';
+
+  @override
+  String get browsePleaseEnterEmail => 'الرجاء إدخال البريد الإلكتروني';
+
+  @override
+  String get browsePop => 'بوب';
+
+  @override
+  String get browsePopMix => 'مزيج بوب';
+
+  @override
+  String get browsePopular => 'شائع';
+
+  @override
+  String get browseQueued => 'في قائمة الانتظار';
+
+  @override
+  String get browseRadioNameHint => 'مثال: Chillhop Radio';
+
+  @override
+  String get browseRecentSongs => 'أغانٍ حديثة';
+
+  @override
+  String get browseRecommendedForYou => 'مقترح لك';
+
+  @override
+  String get browseRecommendedYtmTitle => '✨ مقترح لك (YouTube Music)';
+
+  @override
+  String get browseRefresh => 'تحديث';
+
+  @override
+  String get browseRefreshPage => 'تحديث الصفحة';
+
+  @override
+  String get browseRefreshPlaylist => 'تحديث قائمة التشغيل';
+
+  @override
+  String get browseRelaxing => 'مريح';
+
+  @override
+  String get browseReleaseYear => 'سنة الإصدار';
+
+  @override
+  String get browseRenamePlaylist => 'إعادة تسمية قائمة التشغيل';
+
+  @override
+  String get browseRequiresModifySettings =>
+      'مباشرةً، يتطلب Android إذن \"تعديل إعدادات النظام\".';
+
+  @override
+  String get browseRock => 'روك';
+
+  @override
+  String get browseRockClassics => 'كلاسيكيات الروك';
+
+  @override
+  String get browseRockMetal => 'روك وميتال';
+
+  @override
+  String get browseScanForAlbums => 'افحص مكتبة الوسائط لعرض ألبوماتك.';
+
+  @override
+  String get browseScanForArtists => 'افحص مكتبة الوسائط لعرض كل الفنانين.';
+
+  @override
+  String get browseScanForGenres => 'افحص مكتبة الوسائط لعرض كل أنواع الأغاني.';
+
+  @override
+  String get browseScanForYears => 'افحص مكتبة الوسائط لعرض سنوات الإصدار.';
+
+  @override
+  String get browseSearchFailed => 'فشل البحث';
+
+  @override
+  String get browseSearchingOnlineMetadata =>
+      'جارٍ البحث عن البيانات الوصفية عبر الإنترنت...';
+
+  @override
+  String get browseSearchSongsHint =>
+      'ابحث عن الأغاني حسب العنوان أو الفنان...';
+
+  @override
+  String get browseSearchWithinPlaylist => 'ابحث داخل قائمة التشغيل…';
+
+  @override
+  String get browseSeeAll => 'عرض الكل';
+
+  @override
+  String get browseSelectBestMatch => 'اختر أفضل تطابق';
+
+  @override
+  String get browseSignedInLoading => 'تم تسجيل الدخول. جارٍ تحميل مكتبتك…';
+
+  @override
+  String get browseSignInToCloud => 'تسجيل الدخول إلى السحابة';
+
+  @override
+  String get browseSignInToYtm => 'تسجيل الدخول إلى YouTube Music';
+
+  @override
+  String get browseSignUp => 'إنشاء حساب';
+
+  @override
+  String get browseSmart => 'ذكية';
+
+  @override
+  String get browseSmoothCrossfade => 'تلاشٍ متقاطع سلس';
+
+  @override
+  String get browseSongsOnYtm => 'أغانٍ على YouTube Music…';
+
+  @override
+  String get browseStandardLossy => 'قياسي مع فقدان:';
+
+  @override
+  String get browseSubGenres => 'أنواع فرعية';
+
+  @override
+  String get browseSynced => 'تمت مزامنتها';
+
+  @override
+  String get browseSyncingLikedSongs => 'جارٍ مزامنة الأغاني المفضلة…';
+
+  @override
+  String get browseSyncPullSubtitle =>
+      'اضغط مزامنة بالأسفل لجلب أحدث مكتبة أغانٍ مفضلة من YouTube Music.';
+
+  @override
+  String get browseTapToPlayOrDownload => 'اضغط للتشغيل أو التنزيل';
+
+  @override
+  String get browseTapToSyncYtm => 'اضغط للمزامنة من YouTube Music';
+
+  @override
+  String get browseTenBandGraphicEq => 'مُعادل صوتي رسومي بـ10 نطاقات';
+
+  @override
+  String get browseTopArtists => 'أبرز الفنانين';
+
+  @override
+  String get browseTopArtistsSubtitle => 'مرتّبون حسب إجمالي مرات الاستماع';
+
+  @override
+  String get browseTopChartsSongs => 'أبرز القوائم والأغاني';
+
+  @override
+  String get browseTopHits => 'الأكثر رواجًا';
+
+  @override
+  String get browseTopRated => 'الأعلى تقييمًا';
+
+  @override
+  String get browseTopTracks => 'أبرز المقاطع';
+
+  @override
+  String get browseToSet => 'لتعيين';
+
+  @override
+  String get browseTotalPlays => 'إجمالي مرات التشغيل';
+
+  @override
+  String get browseTotalTracks => 'إجمالي المقاطع';
+
+  @override
+  String get browseTracks => 'مقاطع';
+
+  @override
+  String get browseTracksForDownload => 'مقاطع للتنزيل';
+
+  @override
+  String get browseTracksFrom => 'مقاطع من';
+
+  @override
+  String get browseTracksInLibrary => 'مقاطع في المكتبة';
+
+  @override
+  String get browseTracksSuccessfully => 'مقطعًا بنجاح!';
+
+  @override
+  String get browseTracksTo => 'مقاطع إلى';
+
+  @override
+  String get browseTree => 'شجرة';
+
+  @override
+  String get browseTrending => 'رائج';
+
+  @override
+  String get browseTrendingEgypt => 'رائج في مصر';
+
+  @override
+  String get browseTrendingInEgypt => 'رائج في مصر 🇪🇬';
+
+  @override
+  String get browseUpdatedPrefix => 'تم تحديث';
+
+  @override
+  String get browseUser => 'مستخدم';
+
+  @override
+  String get browseWillAdd => 'سيتم إضافة';
+
+  @override
+  String get browseWillRemove => 'سيتم إزالة';
+
+  @override
+  String get browseWorkoutEnergy => 'طاقة التمرين';
+
+  @override
+  String get browseYouTubeMusic => 'YouTube Music';
+
+  @override
+  String get browseYoutubeWeb => 'ويب YouTube';
+
+  @override
+  String get browseYtmSearchScreenDesc =>
+      'شغّل ونزّل الأغاني من YouTube Music دون إعلانات.';
 }

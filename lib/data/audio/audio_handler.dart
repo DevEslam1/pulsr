@@ -69,6 +69,7 @@ import 'playback_bookmark_store.dart';
 import 'silence_skip_controller.dart';
 import 'track_delay_manager.dart';
 import 'audio_handler_lifecycle_observer.dart';
+import 'headset_control_config.dart';
 
 @singleton
 class PulsrAudioHandler extends BaseAudioHandler
@@ -86,6 +87,14 @@ class PulsrAudioHandler extends BaseAudioHandler
     // adopts it instead of constructing a second, unbound handler, so a late
     // init success binds the very instance the UI drives (B-2/B-6).
     PulsrAudioHandler? fallback;
+    // User preference: keep the media notification after pause so playback
+    // can be resumed from the shade. AudioServiceConfig is init-time only,
+    // so this takes effect on the next cold start after the toggle changes.
+    bool keepOnPause = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      keepOnPause = prefs.getBool(PrefsKeys.keepNotificationOnPause) ?? false;
+    } catch (_) {}
     final initFuture = AudioService.init(
       builder: () {
         built = fallback ?? PulsrAudioHandler(repository, ytmService);
@@ -98,14 +107,14 @@ class PulsrAudioHandler extends BaseAudioHandler
       // different language than the system one, and Android only applies a
       // channel's name when the channel is first created, so a later re-resolve
       // could not fix it anyway.
-      config: const AudioServiceConfig(
+      config: AudioServiceConfig(
         androidNotificationChannelId: 'com.pulsr.music.audio',
         androidNotificationChannelName: 'Pulsr Audio Playback',
         androidNotificationChannelDescription:
             'Playback controls and now-playing information for Pulsr Music.',
         androidNotificationOngoing: true,
         androidNotificationClickStartsActivity: true,
-        androidStopForegroundOnPause: true,
+        androidStopForegroundOnPause: !keepOnPause,
         androidResumeOnClick: true,
         androidNotificationIcon: 'drawable/ic_notification',
       ),
@@ -165,6 +174,10 @@ class PulsrAudioHandler extends BaseAudioHandler
   final InterruptionStateMachine _interruption = InterruptionStateMachine();
   // ignore: unused_field
   DateTime? _lastNoisyTime;
+  // Auto-resume bookkeeping: a becoming-noisy pause arms a one-shot resume
+  // window; a reconnect on a headset/BT/USB route within the timeout resumes.
+  DateTime? _noisyPauseTime;
+  bool _pausedForNoisy = false;
   int _consecutiveFailures = 0;
   DateTime? _lastGaplessChangeTime;
   int _rapidGaplessChangeCount = 0;
@@ -423,6 +436,53 @@ class PulsrAudioHandler extends BaseAudioHandler
       final info = await getIt<HiResAudioService>().getAudioOutputInfo();
       _equalizerManager.isBluetoothRoute = info.isBluetooth;
     } catch (_) {}
+  }
+
+  /// One-shot auto-resume after a becoming-noisy pause.
+  /// Fires only when the user opted in, the pause was noisy-triggered, the
+  /// timeout has not elapsed, the player is still paused, and the new route
+  /// is a headset-like output (BT / wired / USB / HDMI).
+  Future<void> _maybeAutoResumeOnReconnect() async {
+    if (!_pausedForNoisy) return;
+    try {
+      final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
+      if (!(prefs.getBool(PrefsKeys.autoResumeOnReconnect) ?? false)) {
+        _pausedForNoisy = false;
+        return;
+      }
+      final timeoutSec = prefs.getInt(PrefsKeys.autoResumeTimeoutSec) ?? 90;
+      final pausedAt = _noisyPauseTime;
+      if (pausedAt == null ||
+          DateTime.now().difference(pausedAt).inSeconds > timeoutSec) {
+        _pausedForNoisy = false;
+        return;
+      }
+      if (_activePlayer.playing || _songs.isEmpty) {
+        _pausedForNoisy = false;
+        return;
+      }
+      final info = getIt.isRegistered<HiResAudioService>()
+          ? getIt<HiResAudioService>().currentOutputInfo
+          : null;
+      if (info == null) return;
+      final type = info.activeDeviceType.trim().toLowerCase();
+      final isHeadsetLike = info.isBluetooth ||
+          info.isUsbDac ||
+          type == 'wired' ||
+          type == 'wired_headset' ||
+          type == 'headset' ||
+          type == 'usb' ||
+          type == 'aux' ||
+          type == 'line_out' ||
+          type == 'hdmi' ||
+          type == 'hearing_aid' ||
+          type == 'ble';
+      if (!isHeadsetLike) return;
+      _pausedForNoisy = false;
+      await play();
+    } catch (_) {
+      _pausedForNoisy = false;
+    }
   }
 
   // ── Per-session audio telemetry (pure Dart, best-effort) ───────────────
@@ -1608,6 +1668,10 @@ class PulsrAudioHandler extends BaseAudioHandler
             await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
                 restoreVolume: _preCrossfadeVolume ?? _volume);
           }
+          // Arm the auto-resume window before pausing so a quick reconnect
+          // can pick up where the unplug interrupted.
+          _noisyPauseTime = now;
+          _pausedForNoisy = true;
           await pause();
         }),
       );
@@ -1618,6 +1682,7 @@ class PulsrAudioHandler extends BaseAudioHandler
           _audioSessionIdRouter.handleRouteChanged();
           unawaited(_refreshBluetoothRoute());
           unawaited(_recordSessionRouteChange());
+          unawaited(_maybeAutoResumeOnReconnect());
         }),
       );
     } catch (e, st) {
@@ -4312,30 +4377,97 @@ class PulsrAudioHandler extends BaseAudioHandler
   Timer? _headsetClickTimer;
   int _headsetClickCount = 0;
 
+  /// Headset hook button with user-configurable mapping (see
+  /// HeadsetControlConfig). 1x/2x/3x clicks resolve after [clickWindowMs];
+  /// 3+ clicks collapse to the triple action so fast multi-presses never
+  /// get swallowed.
   @override
   Future<void> click([MediaButton button = MediaButton.media]) async {
     _headsetClickCount++;
     _headsetClickTimer?.cancel();
 
+    int windowMs = 350;
+    try {
+      final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
+      windowMs =
+          (prefs.getInt(PrefsKeys.headsetClickWindowMs) ?? 350).clamp(150, 800);
+    } catch (_) {}
+
     if (_headsetClickCount >= 3) {
+      final count = _headsetClickCount;
       _headsetClickCount = 0;
-      await skipToPrevious();
+      await _performHeadsetAction(count);
       return;
     }
 
-    _headsetClickTimer = Timer(const Duration(milliseconds: 350), () async {
+    _headsetClickTimer = Timer(Duration(milliseconds: windowMs), () async {
       final count = _headsetClickCount;
       _headsetClickCount = 0;
-      if (count == 1) {
+      await _performHeadsetAction(count);
+    });
+  }
+
+  Future<void> _performHeadsetAction(int count) async {
+    HeadsetClickAction action = HeadsetClickAction.playPause;
+    int seekSecs = 10;
+    try {
+      final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
+      final key = count <= 1
+          ? PrefsKeys.headsetSingleClick
+          : count == 2
+              ? PrefsKeys.headsetDoubleClick
+              : PrefsKeys.headsetTripleClick;
+      final fallback = count <= 1
+          ? HeadsetClickAction.playPause
+          : count == 2
+              ? HeadsetClickAction.next
+              : HeadsetClickAction.previous;
+      final raw = prefs.getString(key);
+      action = raw == null ? fallback : HeadsetClickAction.fromWire(raw);
+      if (action == HeadsetClickAction.none && raw != 'none') {
+        action = fallback;
+      }
+      seekSecs = (prefs.getInt(PrefsKeys.headsetSeekSeconds) ?? 10).clamp(5, 60);
+    } catch (_) {}
+    switch (action) {
+      case HeadsetClickAction.playPause:
         if (_activePlayer.playing) {
           await pause();
         } else {
           await play();
         }
-      } else if (count == 2) {
+        break;
+      case HeadsetClickAction.next:
         await skipToNext();
-      }
-    });
+        break;
+      case HeadsetClickAction.previous:
+        await skipToPrevious();
+        break;
+      case HeadsetClickAction.stop:
+        await stop();
+        break;
+      case HeadsetClickAction.seekForward:
+        await seekRelative(Duration(seconds: seekSecs));
+        break;
+      case HeadsetClickAction.seekBackward:
+        await seekRelative(Duration(seconds: -seekSecs));
+        break;
+      case HeadsetClickAction.none:
+        break;
+    }
+  }
+
+  /// Relative seek clamped to [0, duration]. Used by headset seek mapping
+  /// and the `seekRelative` custom action (notification/widget long-press).
+  Future<void> seekRelative(Duration offset) async {
+    try {
+      final pos = _activePlayer.position;
+      final dur = _activePlayer.duration;
+      var target = pos + offset;
+      if (target < Duration.zero) target = Duration.zero;
+      if (dur != null && target > dur) target = dur;
+      await seek(target);
+    } catch (_) {}
   }
 
   static const int maxQueueSize = 500;
@@ -4463,6 +4595,14 @@ class PulsrAudioHandler extends BaseAudioHandler
         } else {
           await setRepeatMode(AudioServiceRepeatMode.none);
         }
+        return true;
+      case 'seekRelative':
+        final secs = (extras?['seconds'] as num?)?.toInt() ?? 10;
+        await seekRelative(Duration(seconds: secs.clamp(-60, 60)));
+        return true;
+      case 'headsetAction':
+        final count = (extras?['count'] as num?)?.toInt() ?? 1;
+        await _performHeadsetAction(count.clamp(1, 3));
         return true;
       default:
         return super.customAction(name, extras);

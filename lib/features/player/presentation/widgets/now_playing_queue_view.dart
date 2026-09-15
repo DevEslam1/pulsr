@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/song_tile.dart';
@@ -59,7 +60,7 @@ class NowPlayingQueueView extends StatelessWidget {
                           onTap: () => cubit.switchQueueSlot(slotIndex),
                           borderRadius: BorderRadius.circular(10),
                           child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
+                            duration: context.motionMs(180),
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 5),
                             decoration: BoxDecoration(

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -49,8 +50,8 @@ class LyricsPlayerTheme extends StatelessWidget {
             (song.remoteId != null && song.remoteId!.isNotEmpty));
 
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeInOut,
+      duration: context.motionMs(400),
+      curve: context.motionCurve(Curves.easeInOut),
       color: bgColor,
       child: SafeArea(
         child: LayoutBuilder(
@@ -124,7 +125,7 @@ class LyricsPlayerTheme extends StatelessWidget {
                 }
               },
               child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
+                duration: context.motionMs(300),
                 child: state.isLyricsVisible
                     ? Container(
                         key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
@@ -354,7 +355,7 @@ class LyricsPlayerTheme extends StatelessWidget {
                                       size: 11, color: activeColor),
                                   const SizedBox(width: 3),
                                   Text(
-                                    'LYRICS',
+                                    context.l10n.lyrics,
                                     style: TextStyle(
                                       fontSize: 9,
                                       fontWeight: FontWeight.w900,

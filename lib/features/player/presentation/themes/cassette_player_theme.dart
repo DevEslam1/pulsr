@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -46,19 +47,32 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
       vsync: this,
       duration: const Duration(seconds: 4),
     );
-    if (widget.props.state.isPlaying) {
-      _spoolController.repeat();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _spoolController.duration = context.motionMs(4000);
+    _syncSpool();
+  }
+
+  void _syncSpool() {
+    final shouldAnimate = widget.props.state.isPlaying && context.motionEnabled;
+    if (shouldAnimate) {
+      if (!_spoolController.isAnimating) {
+        _spoolController.repeat();
+      }
+    } else {
+      if (_spoolController.isAnimating) {
+        _spoolController.stop();
+      }
     }
   }
 
   @override
   void didUpdateWidget(covariant CassettePlayerTheme oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.props.state.isPlaying && !_spoolController.isAnimating) {
-      _spoolController.repeat();
-    } else if (!widget.props.state.isPlaying && _spoolController.isAnimating) {
-      _spoolController.stop();
-    }
+    _syncSpool();
   }
 
   @override
@@ -226,7 +240,7 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
 
                     // Track Title on Cassette Body
                     Text(
-                      song?.title ?? 'Tape Loaded',
+                      song?.title ?? context.l10n.dspTapeLoaded,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -243,7 +257,7 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
         );
 
         final centerDisplay = AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
+          duration: context.motionMs(300),
           child: state.isLyricsVisible
               ? LyricsView(
                   key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),

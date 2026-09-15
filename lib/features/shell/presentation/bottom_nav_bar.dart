@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
@@ -209,8 +210,8 @@ class _NavTabItem extends StatelessWidget {
           splashColor: p.accent.withValues(alpha: 0.12),
           highlightColor: Colors.transparent,
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOutCubic,
+            duration: context.motionMs(250),
+            curve: context.motionCurve(Curves.easeOutCubic),
             padding: EdgeInsets.symmetric(
               horizontal: isTablet ? 10 : 6,
               vertical: 4,
@@ -249,8 +250,8 @@ class _NavTabItem extends StatelessWidget {
               children: [
                 AnimatedScale(
                   scale: isSelected ? 1.08 : 1.0,
-                  duration: const Duration(milliseconds: 220),
-                  curve: Curves.easeOutBack,
+                  duration: context.motionMs(220),
+                  curve: context.motionCurve(Curves.easeOutBack),
                   child: Icon(
                     isSelected ? item.activeIcon : item.icon,
                     size: iconSize,
@@ -259,7 +260,7 @@ class _NavTabItem extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 AnimatedDefaultTextStyle(
-                  duration: const Duration(milliseconds: 200),
+                  duration: context.motionMs(200),
                   style: TextStyle(
                     fontSize: isTablet ? 11.5 : 10.5,
                     fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,

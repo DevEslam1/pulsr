@@ -54,7 +54,7 @@ class _AuthSheetState extends State<AuthSheet> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                    'Signed in as ${state.user?.email ?? state.user?.displayName ?? 'User'}'),
+                    '${context.l10n.signedInAs} ${state.user?.email ?? state.user?.displayName ?? context.l10n.browseUser}'),
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -129,8 +129,8 @@ class _AuthSheetState extends State<AuthSheet> {
                               children: [
                                 Text(
                                   _isSignUp
-                                      ? 'Create Cloud Account'
-                                      : 'Sign in to Cloud',
+                                      ? context.l10n.browseCreateCloudAccount
+                                      : context.l10n.browseSignInToCloud,
                                   style: TextStyle(
                                     color: p.textPrimary,
                                     fontSize: 18,
@@ -214,7 +214,7 @@ class _AuthSheetState extends State<AuthSheet> {
                         keyboardType: TextInputType.emailAddress,
                         style: TextStyle(color: p.textPrimary),
                         decoration: InputDecoration(
-                          hintText: 'Email address',
+                          hintText: context.l10n.browseEmailAddress,
                           hintStyle: TextStyle(color: p.textTertiary),
                           prefixIcon: Icon(Icons.email_outlined,
                               color: p.textTertiary, size: 20),
@@ -231,10 +231,10 @@ class _AuthSheetState extends State<AuthSheet> {
                         ),
                         validator: (val) {
                           if (val == null || val.trim().isEmpty) {
-                            return 'Please enter email';
+                            return context.l10n.browsePleaseEnterEmail;
                           }
                           if (!val.contains('@')) {
-                            return 'Invalid email address';
+                            return context.l10n.browseInvalidEmail;
                           }
                           return null;
                         },
@@ -247,7 +247,7 @@ class _AuthSheetState extends State<AuthSheet> {
                         obscureText: _obscurePassword,
                         style: TextStyle(color: p.textPrimary),
                         decoration: InputDecoration(
-                          hintText: 'Password',
+                          hintText: context.l10n.browsePassword,
                           hintStyle: TextStyle(color: p.textTertiary),
                           prefixIcon: Icon(Icons.lock_outline_rounded,
                               color: p.textTertiary, size: 20),
@@ -275,7 +275,7 @@ class _AuthSheetState extends State<AuthSheet> {
                         ),
                         validator: (val) {
                           if (val == null || val.length < 6) {
-                            return 'Password must be at least 6 characters';
+                            return context.l10n.browsePasswordMinChars;
                           }
                           return null;
                         },
@@ -294,7 +294,7 @@ class _AuthSheetState extends State<AuthSheet> {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                       content: Text(
-                                          'Password reset link sent to $email')),
+                                          '${context.l10n.browsePasswordResetSent} $email')),
                                 );
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -347,7 +347,9 @@ class _AuthSheetState extends State<AuthSheet> {
                                     strokeWidth: 2, color: Colors.white),
                               )
                             : Text(
-                                _isSignUp ? 'Sign Up' : 'Sign In',
+                                _isSignUp
+                                    ? context.l10n.browseSignUp
+                                    : context.l10n.signIn,
                                 style: const TextStyle(
                                     fontSize: 15, fontWeight: FontWeight.w600),
                               ),
@@ -360,8 +362,8 @@ class _AuthSheetState extends State<AuthSheet> {
                         onPressed: () => setState(() => _isSignUp = !_isSignUp),
                         child: Text(
                           _isSignUp
-                              ? 'Already have an account? Sign In'
-                              : "Don't have an account? Sign Up",
+                              ? context.l10n.browseAlreadyHaveAccount
+                              : context.l10n.browseDontHaveAccount,
                           style:
                               TextStyle(color: p.textSecondary, fontSize: 13),
                         ),
@@ -376,7 +378,7 @@ class _AuthSheetState extends State<AuthSheet> {
                               padding:
                                   const EdgeInsets.symmetric(horizontal: 12),
                               child: Text(
-                                'YOUTUBE MUSIC',
+                                context.l10n.ytmHeader,
                                 style: TextStyle(
                                   color: p.textTertiary,
                                   fontSize: 10,
@@ -418,8 +420,8 @@ class _AuthSheetState extends State<AuthSheet> {
                               ),
                               label: Text(
                                 isLoggedIn
-                                    ? 'YouTube Music: ${ytmAccount.accountName ?? "Connected"}'
-                                    : 'Connect YouTube Music',
+                                    ? '${context.l10n.browseYouTubeMusic}: ${ytmAccount.accountName ?? context.l10n.ytmConnected}'
+                                    : context.l10n.connectYtm,
                                 style: TextStyle(
                                   color: p.textPrimary,
                                   fontSize: 13.5,

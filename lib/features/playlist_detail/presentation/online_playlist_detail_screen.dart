@@ -114,8 +114,7 @@ class _OnlinePlaylistDetailScreenState
       if (fetchedTracks.isEmpty) {
         setState(() {
           _isLoading = false;
-          _errorMessage =
-              'Could not load tracks for this playlist. Please check your internet connection or URL.';
+          _errorMessage = context.l10n.browseCouldNotLoadTracks;
         });
         return;
       }
@@ -141,7 +140,7 @@ class _OnlinePlaylistDetailScreenState
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Failed to load playlist: $e';
+        _errorMessage = '${context.l10n.playlistLoadFailed} $e';
       });
     }
   }
@@ -342,7 +341,7 @@ class _OnlinePlaylistDetailScreenState
                 controller: _searchController,
                 onChanged: (val) => setState(() => _searchQuery = val),
                 decoration: InputDecoration(
-                  hintText: 'Search within playlist…',
+                  hintText: context.l10n.browseSearchWithinPlaylist,
                   prefixIcon: const Icon(Icons.search_rounded, size: 20),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
@@ -422,8 +421,8 @@ class _OnlinePlaylistDetailScreenState
               child: Center(
                 child: Text(
                   _searchQuery.isNotEmpty
-                      ? 'No songs matching "$_searchQuery"'
-                      : 'This playlist has no songs.',
+                      ? '${context.l10n.browseNoSongsMatch} "$_searchQuery"'
+                      : context.l10n.browsePlaylistHasNoSongs,
                   style: TextStyle(color: p.textTertiary, fontSize: 14),
                 ),
               ),
@@ -489,7 +488,7 @@ class _OnlinePlaylistDetailScreenState
           actions: [
             IconButton(
               icon: const Icon(Icons.refresh_rounded),
-              tooltip: 'Refresh playlist',
+              tooltip: context.l10n.browseRefreshPlaylist,
               onPressed: _fetchTracks,
             ),
           ],
@@ -621,7 +620,12 @@ class _OnlinePlaylistDetailScreenState
                     ),
                     if (totalDurationMs > 0) ...[
                       const SizedBox(width: 10),
-                      Text('•', style: TextStyle(color: p.textTertiary)),
+                      Builder(
+                        builder: (_) {
+                          const bullet = '•';
+                          return Text(bullet, style: TextStyle(color: p.textTertiary));
+                        },
+                      ),
                       const SizedBox(width: 10),
                       Icon(Icons.schedule_rounded,
                           size: 14, color: p.textTertiary),

@@ -120,9 +120,9 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard> {
                       context: context,
                       builder: (ctx) => AlertDialog(
                         title: Text(
-                            '${_manufacturer.toUpperCase()} Background Guide'),
+                            context.l10n.settingsManufacturerBackgroundGuide(_manufacturer.toUpperCase())),
                         content: Text(
-                          'Your device manufacturer is known for aggressive background process killing.\n\nVisit $guideUrl to configure lock screen and battery settings.',
+                          context.l10n.settingsAggressiveBatteryGuide(guideUrl),
                         ),
                         actions: [
                           TextButton(

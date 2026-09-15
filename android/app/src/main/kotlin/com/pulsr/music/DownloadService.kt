@@ -68,6 +68,17 @@ class DownloadService : Service() {
          */
         var onDownloadDegradedListener: ((String) -> Unit)? = null
 
+        /**
+         * Timeout-paused ids that survive [stopForegroundAndSelf]/[onDestroy].
+         * onTimeout() must stop the service (Android 15 dataSync budget), which
+         * wipes instance maps — without this, the "paused" mark fired to Dart
+         * would be lost to any later native read. Dart remains the owner of
+         * pause state; this only lets the next service instance know the job
+         * was timeout-paused. Guarded by its own monitor (synchronizedSet).
+         */
+        val timeoutPausedIds: MutableSet<String> =
+            java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
         private fun notifyDegraded(context: Context, stage: String, cause: Throwable?) {
             android.util.Log.w(TAG, "Download continues without foreground protection ($stage)", cause)
             try {
@@ -143,15 +154,20 @@ class DownloadService : Service() {
         }
     }
 
-    private var activeDownloads = mutableMapOf<String, Int>() // videoId -> progress 0..100
-    private var downloadTitles = mutableMapOf<String, String>() // videoId -> title
-    private val pausedDownloads = mutableSetOf<String>() // videoId
+    // Concurrent collections: onStartCommand is normally serialized on the main
+    // thread, but binder/background callers and listener re-entry must never
+    // throw ConcurrentModificationException during iteration (render/timeout).
+    private var activeDownloads = java.util.concurrent.ConcurrentHashMap<String, Int>() // videoId -> progress 0..100
+    private var downloadTitles = java.util.concurrent.ConcurrentHashMap<String, String>() // videoId -> title
+    private val pausedDownloads: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet<String>() // videoId
     private var foregroundStarted = false
     private var degraded = false
 
     override fun onCreate() {
         super.onCreate()
         createChannel()
+        // Restore timeout-paused marks wiped with the previous instance.
+        pausedDownloads.addAll(timeoutPausedIds)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -163,6 +179,7 @@ class DownloadService : Service() {
                 activeDownloads[vid] = 0
                 downloadTitles[vid] = title
                 pausedDownloads.remove(vid)
+                timeoutPausedIds.remove(vid)
                 renderCurrentNotification(vid)
             }
             ACTION_UPDATE -> {
@@ -177,6 +194,7 @@ class DownloadService : Service() {
                     activeDownloads.remove(vid)
                     downloadTitles.remove(vid)
                     pausedDownloads.remove(vid)
+                    timeoutPausedIds.remove(vid)
                 }
                 if (activeDownloads.isEmpty()) {
                     stopForegroundAndSelf()
@@ -190,6 +208,7 @@ class DownloadService : Service() {
                     activeDownloads.remove(vid)
                     downloadTitles.remove(vid)
                     pausedDownloads.remove(vid)
+                    timeoutPausedIds.remove(vid)
                     try { onDownloadCancelledListener?.invoke(vid) } catch (_: Exception) {}
                 }
                 renderCurrentNotification(activeDownloads.keys.firstOrNull())
@@ -207,6 +226,7 @@ class DownloadService : Service() {
                 val vid = intent.getStringExtra(EXTRA_VIDEO_ID)
                 if (vid != null) {
                     pausedDownloads.remove(vid)
+                    timeoutPausedIds.remove(vid)
                     renderCurrentNotification(vid)
                     try { onDownloadResumedListener?.invoke(vid) } catch (_: Exception) {}
                 }
@@ -215,7 +235,10 @@ class DownloadService : Service() {
                 val vid = intent.getStringExtra(EXTRA_VIDEO_ID)
                 val paused = intent.getBooleanExtra(EXTRA_PAUSED, false)
                 if (vid != null) {
-                    if (paused) pausedDownloads.add(vid) else pausedDownloads.remove(vid)
+                    if (paused) pausedDownloads.add(vid) else {
+                        pausedDownloads.remove(vid)
+                        timeoutPausedIds.remove(vid)
+                    }
                     renderCurrentNotification(vid)
                 }
             }
@@ -429,14 +452,23 @@ class DownloadService : Service() {
      */
     override fun onTimeout(startId: Int, fgsType: Int) {
         android.util.Log.w(TAG, "dataSync foreground-time budget exhausted; pausing downloads")
-        val target = activeDownloads.keys.firstOrNull()
+        // Snapshot before stopForegroundAndSelf() wipes instance maps below —
+        // listeners and the timeout notice must see consistent state, and the
+        // paused mark must survive the stop via timeoutPausedIds (Dart owns it
+        // from the callback onward; native keeps a copy for the next instance).
+        val snapshotIds = activeDownloads.keys.toList()
+        val target = snapshotIds.firstOrNull()
+        val snapshotTitles = snapshotIds.mapNotNull { id ->
+            downloadTitles[id]?.let { id to it }
+        }.toMap()
         if (target != null) {
             pausedDownloads.add(target)
+            timeoutPausedIds.add(target)
             try { onDownloadPausedListener?.invoke(target) } catch (_: Exception) {}
         }
         degraded = true
         notifyDegraded(this, "timeout", null)
-        val title = downloadTitles.values.firstOrNull()
+        val title = snapshotTitles.values.firstOrNull()
             ?: getString(R.string.download_notification_downloads)
         // Stop the FGS first so its ongoing notification cannot come back, then
         // leave a dismissible notice (separate id) explaining the pause.
@@ -463,6 +495,4 @@ class DownloadService : Service() {
         if (openIntent != null) builder.setContentIntent(openIntent)
         return builder.build()
     }
-
-    private fun Iterable<Int>.average(): Double = if (none()) 0.0 else sum().toDouble() / count()
 }

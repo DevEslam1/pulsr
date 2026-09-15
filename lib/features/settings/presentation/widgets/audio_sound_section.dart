@@ -50,13 +50,14 @@ class AudioSoundSection extends StatelessWidget {
   Future<void> _autoCalibrateBluetoothLatency(
       BuildContext context, SettingsCubit cubit) async {
     final messenger = ScaffoldMessenger.maybeOf(context);
+    final l10n = context.l10n;
     final codec = state.currentOutputDevice?.btCodecName;
     final result =
         await BluetoothLatencyCalibrator().calibrate(codecName: codec);
     await cubit.setBluetoothLatencyOffsetMs(result.offsetMs);
     messenger?.showSnackBar(SnackBar(
       content: Text(
-        'Bluetooth latency calibrated to ${result.offsetMs} ms'
+        '${l10n.btCalibrated(result.offsetMs)}'
         '${codec != null && codec.isNotEmpty ? ' ($codec)' : ''}',
       ),
     ));
@@ -69,7 +70,7 @@ class AudioSoundSection extends StatelessWidget {
     final p = context.palette;
     final device = state.currentOutputDevice;
     final deviceLabel = device == null
-        ? 'Connected device & audio quality'
+        ? context.l10n.settingsConnectedDeviceQuality
         : '${device.deviceName}  •  '
             '${(device.sampleRate ~/ 1000)} kHz / ${device.bitDepth}-bit'
             '${device.isBluetooth ? '  •  Bluetooth' : ''}';
@@ -82,7 +83,7 @@ class AudioSoundSection extends StatelessWidget {
           context.l10n.equalizerAndSoundEffects,
           PlatformCapabilities.hasEqualizer
               ? context.l10n.equalizerSubtitle
-              : 'Not available on this platform',
+              : context.l10n.settingsNotAvailablePlatform,
           onTap: PlatformCapabilities.hasEqualizer
               ? () => showModalBottomSheet<void>(
                   context: context,
@@ -95,15 +96,15 @@ class AudioSoundSection extends StatelessWidget {
         settingsCardDivider(p),
         SettingsNavTile(
           Icons.speaker_rounded,
-          'Output & Audio Quality',
+          context.l10n.settingsOutputAudioQuality,
           deviceLabel,
           onTap: () {
             final currentSong = context.read<PlayerCubit>().state.currentSong ??
-                const SongsTableData(
+                SongsTableData(
                   id: 0,
-                  title: 'Hardware Audio Output',
-                  artist: 'Master Audio Engine',
-                  album: 'Internal / USB DAC',
+                  title: context.l10n.settingsHardwareAudioOutput,
+                  artist: context.l10n.settingsMasterAudioEngine,
+                  album: context.l10n.settingsInternalUsbDac,
                   durationMs: 0,
                   path: '',
                   source: SongSource.local,
@@ -134,7 +135,7 @@ class AudioSoundSection extends StatelessWidget {
     // channel truthfully reports "not applied"; disable the controls here instead
     // of letting them silently no-op and leave the UI looking enabled.
     final isAndroid = PlatformCapabilities.isAndroid;
-    const unsupported = 'Not available on this platform';
+    final unsupported = context.l10n.settingsNotAvailablePlatform;
     return SettingsSection(
       icon: Icons.graphic_eq_rounded,
       title: context.l10n.audioAndSound,
@@ -144,7 +145,7 @@ class AudioSoundSection extends StatelessWidget {
           context.l10n.equalizerAndSoundEffects,
           PlatformCapabilities.hasEqualizer
               ? context.l10n.equalizerSubtitle
-              : 'Not available on this platform',
+              : context.l10n.settingsNotAvailablePlatform,
           onTap: PlatformCapabilities.hasEqualizer
               ? () => showModalBottomSheet<void>(
                   context: context,
@@ -183,11 +184,11 @@ class AudioSoundSection extends StatelessWidget {
               onTap: () {
                 final playerState = context.read<PlayerCubit>().state;
                 final currentSong = playerState.currentSong ??
-                    const SongsTableData(
+                    SongsTableData(
                       id: 0,
-                      title: 'Hardware Audio Output',
-                      artist: 'Master Audio Engine',
-                      album: 'Internal / USB DAC',
+                      title: context.l10n.settingsHardwareAudioOutput,
+                      artist: context.l10n.settingsMasterAudioEngine,
+                      album: context.l10n.settingsInternalUsbDac,
                       durationMs: 0,
                       path: '',
                       source: SongSource.local,
@@ -205,7 +206,7 @@ class AudioSoundSection extends StatelessWidget {
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
                     color: state.currentOutputDevice?.isUsbDac == true
-                        ? const Color(0xFFFFD700).withValues(alpha: 0.5)
+                        ? p.warning.withValues(alpha: 0.5)
                         : p.hairline,
                   ),
                 ),
@@ -219,7 +220,7 @@ class AudioSoundSection extends StatelessWidget {
                               ? Icons.usb_rounded
                               : Icons.headphones_rounded,
                           color: state.currentOutputDevice?.isUsbDac == true
-                              ? const Color(0xFFFFD700)
+                              ? p.warning
                               : p.accent,
                           size: 18,
                         ),
@@ -227,7 +228,7 @@ class AudioSoundSection extends StatelessWidget {
                         Expanded(
                           child: Text(
                             state.currentOutputDevice?.deviceName ??
-                                'Audio Output Device',
+                                context.l10n.settingsAudioOutputDevice,
                             style: TextStyle(
                               color: p.textPrimary,
                               fontWeight: FontWeight.w800,
@@ -252,7 +253,7 @@ class AudioSoundSection extends StatelessWidget {
                             ),
                             child: Text(context.l10n.bitPerfectLabel,
                               style: TextStyle(
-                                color: Color(0xFFFFD700),
+                                color: p.warning,
                                 fontWeight: FontWeight.w900,
                                 fontSize: 9,
                                 letterSpacing: 0.5,
@@ -266,7 +267,7 @@ class AudioSoundSection extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Tap to configure Output Device • Sample Rate (${(state.currentOutputDevice?.sampleRate ?? 44100) ~/ 1000} kHz) • Bit Depth (${state.currentOutputDevice?.bitDepth ?? 16}-bit)',
+                      context.l10n.settingsOutputDeviceConfigHint((state.currentOutputDevice?.sampleRate ?? 44100) ~/ 1000, state.currentOutputDevice?.bitDepth ?? 16),
                       style: TextStyle(
                         color: p.textSecondary,
                         fontSize: 11,
@@ -292,12 +293,12 @@ class AudioSoundSection extends StatelessWidget {
                 SettingsConflictCard(reason: bpBlock),
               SettingsSwitchTile(
                 Icons.album_rounded,
-                'Bit-Perfect USB Pass-Through',
+                context.l10n.settingsBitPerfectUsb,
                 !isAndroid
                     ? unsupported
                     : state.currentOutputDevice?.isBluetooth == true
-                        ? 'Unavailable: Bluetooth transcodes — use USB / wired DAC'
-                        : 'Direct hardware streaming to USB / wired DACs (bypasses Android resampler)',
+                        ? context.l10n.settingsBitPerfectBtUnavailable
+                        : context.l10n.settingsBitPerfectUsbDesc,
                 value: isAndroid && state.bitPerfectOutput,
                 featureInfo: AudioFeatureRegistry.bitPerfect,
                 disabledReason: bpBlock,
@@ -310,15 +311,15 @@ class AudioSoundSection extends StatelessWidget {
         settingsCardDivider(p),
         SettingsSwitchTile(
           Icons.tune_rounded,
-          'Bypass DSP in Bit-Perfect Mode',
-          'Bypasses Equalizer and virtualizer for an uncolored, pure audio bitstream to the DAC',
+          context.l10n.settingsBypassDspBitPerfect,
+          context.l10n.settingsBypassDspBitPerfectDesc,
           value:
               isAndroid && state.bitPerfectOutput && state.bypassDspOnBitPerfect,
           featureInfo: AudioFeatureRegistry.bypassDsp,
           disabledReason: !isAndroid
               ? unsupported
               : !state.bitPerfectOutput
-                  ? 'Enable Bit-Perfect USB Pass-Through first'
+                  ? context.l10n.settingsEnableBitPerfectFirst
                   : null,
           onChanged: !isAndroid || !state.bitPerfectOutput
               ? (v) {}
@@ -410,7 +411,7 @@ class AudioSoundSection extends StatelessWidget {
                   IconButton(
                     icon: Icon(Icons.info_outline_rounded,
                         size: 18, color: p.textTertiary),
-                    tooltip: 'About ${context.l10n.dsdOutputModeTitle}',
+                    tooltip: context.l10n.settingsAboutTitle(context.l10n.dsdOutputModeTitle),
                     visualDensity: VisualDensity.compact,
                     onPressed: () => showAudioFeatureInfoDialog(
                       context,
@@ -528,7 +529,7 @@ class AudioSoundSection extends StatelessWidget {
                           ),
                           Text(
                             rgBlocked ??
-                                'Track / album gain from tags, applied during playback',
+                                context.l10n.settingsReplayGainDesc,
                             style: TextStyle(
                               color: rgBlocked != null ? p.error : p.textSecondary,
                               fontSize: 12,
@@ -547,7 +548,7 @@ class AudioSoundSection extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 8),
                     child: SettingsConflictCard(
                       reason: rgBlocked,
-                      resolveLabel: 'Disable Bit-Perfect bypass',
+                      resolveLabel: context.l10n.settingsDisableBitPerfectBypass,
                       onResolve: () =>
                           _resolveReplayGainConflict(context, cubit),
                     ),
@@ -604,7 +605,7 @@ class AudioSoundSection extends StatelessWidget {
                   // Defaults: with-RG preamp 0.0 dB, without-RG preamp -3.0 dB
                   // (SettingsState.replayGainPreampWithRg / …WithoutRg).
                   SettingSliderRow(
-                    label: 'Preamp (With RG tag)',
+                    label: context.l10n.settingsPreampWithRg,
                     value: state.replayGainPreampWithRg,
                     min: -12.0,
                     max: 12.0,
@@ -615,7 +616,7 @@ class AudioSoundSection extends StatelessWidget {
                     onChanged: cubit.setReplayGainPreampWithRg,
                   ),
                   SettingSliderRow(
-                    label: 'Preamp (Without RG tag fallback)',
+                    label: context.l10n.settingsPreampWithoutRg,
                     value: state.replayGainPreampWithoutRg,
                     min: -12.0,
                     max: 12.0,
@@ -835,7 +836,7 @@ class AudioSoundSection extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           isAndroid
-                              ? 'Inspect live active DSP stages, HAL effects & engine state'
+                              ? context.l10n.settingsDspInspectorDesc
                               : unsupported,
                           style: TextStyle(
                             color: p.textSecondary,
@@ -889,11 +890,11 @@ class AudioSoundSection extends StatelessWidget {
                         'active' => context.l10n.systemEffectsSubtitleActive,
                         'unsupportedDevice' =>
                           context.l10n.systemEffectsSubtitleUnsupported,
-                        _ => 'Status: ${state.systemEffectsStatus}',
+                        _ => context.l10n.settingsStatusLabel(state.systemEffectsStatus),
                       },
                 style: TextStyle(
                   color: state.systemEffectsStatus == 'bypassed'
-                      ? Colors.greenAccent
+                      ? p.success
                       : p.textSecondary,
                   fontSize: 12,
                 ),
@@ -969,7 +970,7 @@ class AudioSoundSection extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               SettingSliderRow(
-                label: 'Sync Offset',
+                label: context.l10n.settingsSyncOffset,
                 value: state.bluetoothLatencyOffsetMs.toDouble(),
                 enabled: isAndroid,
                 min: 0.0,
@@ -998,10 +999,8 @@ class AudioSoundSection extends StatelessWidget {
         // requests its native rate/depth, capped by the active route's device.
         SettingsSwitchTile(
           Icons.sync_alt_rounded,
-          'Per-Track Output Format Negotiation',
-          'Hi-res first: requests each track\'s native sample rate / bit depth '
-              'from the output device (device-capped). Bit-Perfect keeps its '
-              'exclusive format. Turn off to use one manual output format',
+          context.l10n.settingsPerTrackFormatNegotiation,
+          context.l10n.settingsPerTrackFormatDesc,
           value: isAndroid && state.outputFormatNegotiationEnabled,
           disabledReason: isAndroid ? null : unsupported,
           onChanged: !isAndroid
@@ -1013,10 +1012,8 @@ class AudioSoundSection extends StatelessWidget {
         // truncated to 16-bit; 16-bit content is unaffected.
         SettingsSwitchTile(
           Icons.graphic_eq_rounded,
-          '24/32-bit Float DSP Path',
-          'Hi-res first: feeds the native DSP chain float32 samples so 24/32-bit '
-              'sources keep their depth (16-bit content is unaffected). '
-              'Unsupported devices safely fall back to 16-bit',
+          context.l10n.settingsFloatDspPath,
+          context.l10n.settingsFloatDspDesc,
           value: isAndroid && state.floatOutputEnabled,
           disabledReason: isAndroid ? null : unsupported,
           onChanged:
@@ -1029,11 +1026,8 @@ class AudioSoundSection extends StatelessWidget {
         // fallback) and the DSP chain is bypassed for bit-perfect output.
         SettingsSwitchTile(
           Icons.surround_sound_rounded,
-          'AAudio Direct Output (Bit-Perfect)',
-          'Bypasses the system mixer with a native AAudio stream opened at '
-              'each track rate (EXCLUSIVE attempt, SHARED fallback). The DSP '
-              'chain and speed/pitch controls are inactive in this mode; '
-              'applies to newly built players',
+          context.l10n.settingsAaudioDirect,
+          context.l10n.settingsAaudioDirectDesc,
           value: isAndroid && state.aaudioOutputEnabled,
           disabledReason: isAndroid ? null : unsupported,
           onChanged:
@@ -1041,9 +1035,8 @@ class AudioSoundSection extends StatelessWidget {
         ),
         // AAudio stream buffer capacity (Direct output only).
         SettingSliderRow(
-          label: 'AAudio Buffer Size',
-          subtitle: 'Stream buffer capacity hint in milliseconds. Lower = '
-              'lower latency (wired), higher = more stall resistance',
+          label: context.l10n.settingsAaudioBufferSize,
+          subtitle: context.l10n.settingsAaudioBufferSizeDesc,
           value: state.aaudioTargetBufferMs.toDouble(),
           min: 20,
           max: 500,
@@ -1060,16 +1053,13 @@ class AudioSoundSection extends StatelessWidget {
         // dynamic range at low hardware volumes.
         SettingsSwitchTile(
           Icons.volume_up_rounded,
-          'Direct Volume Control (DVC)',
-          'Pins the Android media stream to maximum and applies volume in the '
-              'native float DSP path, for higher dynamic range and lower '
-              'distortion at low volumes. Unavailable during Bit-Perfect '
-              'playback and on the AAudio Direct output path',
+          context.l10n.settingsDvcTitle,
+          context.l10n.settingsDvcDesc,
           value: isAndroid && state.dvcEnabled && !state.aaudioOutputEnabled,
           disabledReason: !isAndroid
               ? unsupported
               : (state.aaudioOutputEnabled
-                  ? 'Unavailable while AAudio Direct output is enabled'
+                  ? context.l10n.settingsUnavailableAaudio
                   : null),
           onChanged: !isAndroid || state.aaudioOutputEnabled
               ? (v) {}
@@ -1082,10 +1072,8 @@ class AudioSoundSection extends StatelessWidget {
         settingsCardDivider(p),
         // Resampler quality: Fast (linear) .. Ultra (full 64-tap polyphase).
         SettingSliderRow(
-          label: 'Resampler Quality',
-          subtitle: 'Sample-rate conversion quality. Ultra is the full '
-              '64-tap polyphase sinc (historical default); Fast is linear '
-              'interpolation for minimal CPU on battery',
+          label: context.l10n.settingsResamplerQuality,
+          subtitle: context.l10n.settingsResamplerQualityDesc,
           value: state.sincResamplerQuality.toDouble(),
           min: 0,
           max: 3,
@@ -1094,13 +1082,13 @@ class AudioSoundSection extends StatelessWidget {
           formatValue: (v) {
             switch (v.round()) {
               case 0:
-                return 'Fast (Linear)';
+                return context.l10n.settingsResamplerFast;
               case 1:
-                return 'Standard (16-tap)';
+                return context.l10n.settingsResamplerStandard;
               case 2:
-                return 'High (32-tap)';
+                return context.l10n.settingsResamplerHigh;
               default:
-                return 'Ultra (64-tap)';
+                return context.l10n.settingsResamplerUltra;
             }
           },
           onChanged: (v) => cubit.setSincResamplerQuality(v.round()),
@@ -1110,10 +1098,8 @@ class AudioSoundSection extends StatelessWidget {
         // incoming track when a BPM value is known for it.
         SettingsSwitchTile(
           Icons.music_note_rounded,
-          'BPM-Synced Crossfade',
-          'Aligns the crossfade duration to the nearest 2/4/8/16/32 beats of '
-              'the incoming track when its BPM is known (set per track in '
-              'Song Info); otherwise the configured duration is used',
+          context.l10n.settingsBpmSyncCrossfade,
+          context.l10n.settingsBpmSyncCrossfadeDesc,
           value: state.bpmSyncCrossfadeEnabled,
           onChanged: cubit.setBpmSyncCrossfadeEnabled,
         ),
@@ -1121,16 +1107,15 @@ class AudioSoundSection extends StatelessWidget {
         // Per-session audio diagnostics (pure Dart; works on every platform).
         SettingsSwitchTile(
           Icons.monitor_heart_rounded,
-          'Session Audio Diagnostics',
-          'Records one log per track: route type, Bluetooth codec, negotiated '
-              'sample rate / bit depth, interruptions and dropout counts',
+          context.l10n.settingsSessionDiagnostics,
+          context.l10n.settingsSessionDiagnosticsDesc,
           value: state.sessionLogEnabled,
           onChanged: cubit.setSessionLogEnabled,
         ),
         SettingsNavTile(
           Icons.ios_share_rounded,
-          'Export audio session logs',
-          'Share the on-device JSONL log of your recent playback sessions',
+          context.l10n.settingsExportSessionLogs,
+          context.l10n.settingsExportSessionLogsDesc,
           trailing: Icon(Icons.chevron_right_rounded, color: p.textSecondary),
           onTap: () => _exportSessionLogs(context),
         ),
@@ -1146,6 +1131,7 @@ class AudioSoundSection extends StatelessWidget {
     // Captured before async gaps (no context-across-gap).
     final noLogsText = context.l10n.noSessionLogs;
     final exportFailedText = context.l10n.exportFailed;
+    final shareText = context.l10n.settingsSessionLogsShareText;
     try {
       final file = await AudioSessionLog.instance.exportToFile();
       if (file == null || await file.length() == 0) {
@@ -1155,7 +1141,7 @@ class AudioSoundSection extends StatelessWidget {
       }
       await SharePlus.instance.share(ShareParams(
         files: [XFile(file.path, mimeType: 'application/x-ndjson')],
-        text: 'Pulsr audio session logs',
+        text: shareText,
       ));
     } catch (_) {
       messenger?.showSnackBar(
@@ -1168,9 +1154,9 @@ class AudioSoundSection extends StatelessWidget {
       BuildContext context, SettingsCubit cubit, String currentPref) {
     final p = context.palette;
     final options = [
-      ('native', context.l10n.dspEngineNative, '64-bit float, zero-latency real-time native DSP'),
-      ('oem', context.l10n.dspEngineOem, 'System / vendor-level sound effects (Dolby, Dirac, etc.)'),
-      ('auto', context.l10n.dspEngineAuto, 'Automatically bypass OEM sound effects when DSP active'),
+      ('native', context.l10n.dspEngineNative, context.l10n.settingsDspNativeDesc),
+      ('oem', context.l10n.dspEngineOem, context.l10n.settingsDspOemDesc),
+      ('auto', context.l10n.dspEngineAuto, context.l10n.settingsDspAutoDesc),
     ];
 
     showModalBottomSheet<void>(

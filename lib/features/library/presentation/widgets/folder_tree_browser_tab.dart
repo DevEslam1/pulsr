@@ -150,7 +150,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                             IconButton(
                               icon: Icon(Icons.open_in_new_rounded,
                                   color: p.textSecondary, size: 18),
-                              tooltip: 'Open folder details',
+                              tooltip: context.l10n.browseOpenFolderDetails,
                               onPressed: () {
                                 final item = folderItemFor(sub);
                                 if (item != null) {

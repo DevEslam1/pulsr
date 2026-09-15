@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -48,20 +49,32 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
       vsync: this,
       duration: const Duration(seconds: 15),
     );
-    if (widget.props.state.isPlaying) {
-      _rotationController.repeat();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _rotationController.duration = context.motionMs(15000);
+    _syncRotation();
+  }
+
+  void _syncRotation() {
+    final shouldAnimate = widget.props.state.isPlaying && context.motionEnabled;
+    if (shouldAnimate) {
+      if (!_rotationController.isAnimating) {
+        _rotationController.repeat();
+      }
+    } else {
+      if (_rotationController.isAnimating) {
+        _rotationController.stop();
+      }
     }
   }
 
   @override
   void didUpdateWidget(covariant CirclePlayerTheme oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.props.state.isPlaying && !_rotationController.isAnimating) {
-      _rotationController.repeat();
-    } else if (!widget.props.state.isPlaying &&
-        _rotationController.isAnimating) {
-      _rotationController.stop();
-    }
+    _syncRotation();
   }
 
   @override
@@ -86,8 +99,8 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
             (song.remoteId != null && song.remoteId!.isNotEmpty));
 
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeInOut,
+      duration: context.motionMs(400),
+      curve: context.motionCurve(Curves.easeInOut),
       decoration: BoxDecoration(
         gradient: RadialGradient(
           center: const Alignment(0, -0.3),
@@ -170,7 +183,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                 }
               },
               child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
+                duration: context.motionMs(300),
                 child: state.isLyricsVisible
                     ? LyricsView(
                         key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),

@@ -100,9 +100,10 @@ class _CastSectionState extends State<CastSection> {
 
   Future<void> _castCurrent() async {
     if (_busy) return;
+    final l10n = context.l10n;
     final song = context.read<PlayerCubit>().state.currentSong;
     if (song == null) {
-      _snack('Nothing is playing to cast');
+      _snack(l10n.settingsNothingToCast);
       return;
     }
     setState(() => _busy = true);
@@ -116,8 +117,8 @@ class _CastSectionState extends State<CastSection> {
         mime: _mimeFor(song.path),
       );
       _snack(result.success
-          ? 'Casting "${song.title}"'
-          : (result.error ?? 'Cast failed'));
+          ? l10n.settingsCastingTitle(song.title)
+          : (result.error ?? l10n.settingsCastFailed));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -129,10 +130,11 @@ class _CastSectionState extends State<CastSection> {
   }
 
   Future<void> _fallbackCast(CastDevice d) async {
+    final l10n = context.l10n;
     final result = await _service.castTo(d.id);
     _snack(result.success
-        ? 'Casting to ${d.name}'
-        : (result.message ?? 'Cast failed'));
+        ? l10n.settingsCastingTo(d.name)
+        : (result.message ?? l10n.settingsCastFailed));
   }
 
   @override
@@ -145,7 +147,7 @@ class _CastSectionState extends State<CastSection> {
 
     return SettingsSection(
       icon: Icons.cast_rounded,
-      title: 'Google Cast',
+      title: context.l10n.settingsGoogleCast,
       children: [
         if (_sdk) ...[
           if (_session.connected) ...[
@@ -233,10 +235,8 @@ class _CastSectionState extends State<CastSection> {
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
           child: Text(
             _sdk
-                ? 'Uses Google\'s Default Media Receiver. Local files are served '
-                    'over your LAN; remote artwork/URLs are cast directly.'
-                : 'Cast sessions require the Play Services Cast SDK (only in the '
-                    'dev/ytm builds). Device discovery is shown here.',
+                ? context.l10n.settingsCastSdkDesc
+                : context.l10n.settingsCastNoSdkDesc,
             style: TextStyle(fontSize: 12, color: textSecondary),
           ),
         ),

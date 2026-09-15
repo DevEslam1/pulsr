@@ -58,11 +58,10 @@ class _RecentsScreenState extends State<RecentsScreen> {
   Future<void> _showClearConfirmation(BuildContext context) async {
     final confirmed = await PulsrDialogHelper.showConfirmDialog(
       context,
-      title: 'Clear Listening History?',
-      message:
-          'This will remove all tracks from your Recently Played history. Your actual audio files and playlists will not be affected.',
+      title: context.l10n.browseClearListeningHistoryTitle,
+      message: context.l10n.browseClearListeningHistoryMessage,
       icon: Icons.history_rounded,
-      confirmLabel: 'Clear History',
+      confirmLabel: context.l10n.browseClearHistory,
       isDestructive: true,
     );
 
@@ -70,9 +69,11 @@ class _RecentsScreenState extends State<RecentsScreen> {
       final res = await _getSongsUseCase.clearRecentlyPlayed();
       res.fold(
         (err) => PulsrToast.show(context,
-            message: 'Failed to clear history: ${err.message}', isError: true),
+            message:
+                '${context.l10n.browseClearHistoryFailed}: ${err.message}',
+            isError: true),
         (_) => PulsrToast.show(context,
-            message: 'Listening history cleared',
+            message: context.l10n.browseHistoryCleared,
             icon: Icons.history_rounded),
       );
     }
@@ -95,7 +96,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
         ),
         actions: [
           IconButton(
-            tooltip: 'Clear History',
+            tooltip: context.l10n.browseClearHistory,
             icon: const Icon(Icons.delete_sweep_outlined),
             onPressed: () => _showClearConfirmation(context),
           ),
@@ -168,7 +169,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                                     color: p.textPrimary, fontSize: 14),
                                 decoration: InputDecoration(
                                   hintText:
-                                      'Search ${allRecents.length} recent songs...',
+                                      '${context.l10n.search} ${allRecents.length} ${context.l10n.browseRecentSongs}...',
                                   hintStyle: TextStyle(
                                       color: p.textTertiary, fontSize: 13.5),
                                   border: InputBorder.none,

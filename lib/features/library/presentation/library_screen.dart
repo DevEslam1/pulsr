@@ -161,7 +161,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                         onPressed: () => cubit.selectAllSongs()),
                     IconButton(
                       icon: const Icon(Icons.playlist_add_rounded),
-                      tooltip: 'Add to Playlist',
+                      tooltip: context.l10n.addToPlaylist,
                       onPressed: () async {
                         final selected = await cubit.getSelectedSongs();
                         if (!context.mounted) return;
@@ -182,7 +182,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                     ),
                     IconButton(
                       icon: const Icon(Icons.edit_note_rounded),
-                      tooltip: 'Batch Edit Tags',
+                      tooltip: context.l10n.browseBatchEditTags,
                       onPressed: () async {
                         final selected = await cubit.getSelectedSongs();
                         if (!context.mounted) return;
@@ -201,7 +201,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                     ),
                     IconButton(
                       icon: const Icon(Icons.queue_music_rounded),
-                      tooltip: 'Add to Queue',
+                      tooltip: context.l10n.addToQueue,
                       onPressed: () async {
                         final selected = await cubit.getSelectedSongs();
                         if (!context.mounted) return;
@@ -902,8 +902,8 @@ class _LibraryScreenState extends State<LibraryScreen>
     final albums = state.albums;
     if (albums.isEmpty) {
       return _buildEmpty(context,
-          title: 'No Albums Found',
-          subtitle: 'Scan your media library to view your albums.',
+          title: context.l10n.noAlbumsFound,
+          subtitle: context.l10n.browseScanForAlbums,
           icon: Icons.album_rounded);
     }
 
@@ -1009,8 +1009,8 @@ class _LibraryScreenState extends State<LibraryScreen>
     final artists = state.artists;
     if (artists.isEmpty) {
       return _buildEmpty(context,
-          title: 'No Artists Found',
-          subtitle: 'Scan your media library to view all artists.',
+          title: context.l10n.browseNoArtistsFound,
+          subtitle: context.l10n.browseScanForArtists,
           icon: Icons.person_rounded);
     }
 
@@ -1112,8 +1112,8 @@ class _LibraryScreenState extends State<LibraryScreen>
         _buildLayoutToggleHeader(
           context,
           hierarchySelected: _folderTree,
-          flatLabel: 'List',
-          hierarchyLabel: 'Tree',
+          flatLabel: context.l10n.browseList,
+          hierarchyLabel: context.l10n.browseTree,
           flatIcon: Icons.view_list_rounded,
           hierarchyIcon: Icons.account_tree_rounded,
           onChanged: _setFolderTree,
@@ -1132,8 +1132,8 @@ class _LibraryScreenState extends State<LibraryScreen>
     final genres = state.genres;
     if (genres.isEmpty) {
       return _buildEmpty(context,
-          title: 'No Genres Found',
-          subtitle: 'Scan your media library to view all song genres.',
+          title: context.l10n.browseNoGenresFound,
+          subtitle: context.l10n.browseScanForGenres,
           icon: Icons.style_rounded);
     }
     return Column(
@@ -1141,8 +1141,8 @@ class _LibraryScreenState extends State<LibraryScreen>
         _buildLayoutToggleHeader(
           context,
           hierarchySelected: _genreHierarchy,
-          flatLabel: 'Flat',
-          hierarchyLabel: 'Categories',
+          flatLabel: context.l10n.browseFlat,
+          hierarchyLabel: context.l10n.browseCategories,
           flatIcon: Icons.grid_view_rounded,
           hierarchyIcon: Icons.category_rounded,
           onChanged: _setGenreHierarchy,
@@ -1210,8 +1210,8 @@ class _LibraryScreenState extends State<LibraryScreen>
     final years = state.years;
     if (years.isEmpty) {
       return _buildEmpty(context,
-          title: 'No Years Found',
-          subtitle: 'Scan your media library to view release years.',
+          title: context.l10n.browseNoYearsFound,
+          subtitle: context.l10n.browseScanForYears,
           icon: Icons.calendar_today_rounded);
     }
     return _chipCategoryGrid(
@@ -1367,7 +1367,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                         backgroundColor: p.accent.withValues(alpha: 0.15),
                         foregroundColor: p.accent,
                       ),
-                      tooltip: 'Download All Liked Songs',
+                      tooltip: context.l10n.browseDownloadAllLikedSongs,
                     ),
                   ],
                   if (_favTabFilter == 1 && AppConfig.ytmEnabled) ...[
@@ -1493,7 +1493,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                                           .removedFavorite(song.title)),
                                       duration: const Duration(seconds: 4),
                                       action: SnackBarAction(
-                                        label: 'UNDO',
+                                        label: context.l10n.undo,
                                         onPressed: () {
                                           cubit.toggleFavorite(song.id);
                                         },
@@ -1563,7 +1563,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                 ? context.l10n.ytmConnected
                 : context.l10n.noOnlineFavorites,
             subtitle: isYtmLoggedIn
-                ? 'Tap sync below to pull your latest YouTube Music Liked Songs library.'
+                ? context.l10n.browseSyncPullSubtitle
                 : context.l10n.connectYtmSubtitle,
             primaryActionLabel: AppConfig.ytmEnabled
                 ? (isYtmLoggedIn
@@ -1631,8 +1631,8 @@ class _LibraryScreenState extends State<LibraryScreen>
         SnackBar(
           content: Text(
             hasOnlineTracks
-                ? 'All online liked songs are already downloaded or in progress.'
-                : 'All songs in this list are already offline local tracks.',
+                ? context.l10n.browseAllOnlineLikedDownloaded
+                : context.l10n.browseAllSongsOffline,
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -1700,7 +1700,7 @@ class _LibraryScreenState extends State<LibraryScreen>
               content: Text(context.l10n.sessionExpired),
               behavior: SnackBarBehavior.floating,
               action: SnackBarAction(
-                label: 'Sign In',
+                label: context.l10n.signIn,
                 onPressed: () => YtmWebLoginSheet.show(context),
               ),
             ),
@@ -1801,7 +1801,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                     suffixIcon: IconButton(
                       icon: Icon(Icons.content_paste_rounded,
                           color: p.accent, size: 18),
-                      tooltip: 'Paste from clipboard',
+                      tooltip: context.l10n.browsePasteFromClipboard,
                       onPressed: () async {
                         final data = await Clipboard.getData('text/plain');
                         if (data?.text != null) {
@@ -1837,7 +1837,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                           final text = controller.text.trim();
                           if (text.isEmpty) {
                             setSheetState(() => errorText =
-                                'Please enter a playlist URL or ID');
+                                context.l10n.browseEnterPlaylistUrl);
                             return;
                           }
                           setSheetState(() {
@@ -1867,7 +1867,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                               setSheetState(() {
                                 isLoading = false;
                                 errorText =
-                                    'No tracks found. If this is your private Liked Music, please ensure you are signed in or tap "Sync".';
+                                    context.l10n.browseNoTracksPrivateLiked;
                               });
                               return;
                             }
@@ -1896,7 +1896,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                           } catch (e) {
                             setSheetState(() {
                               isLoading = false;
-                              errorText = 'Failed to load playlist: $e';
+                              errorText =
+                                  '${context.l10n.playlistLoadFailed} $e';
                             });
                           }
                         },

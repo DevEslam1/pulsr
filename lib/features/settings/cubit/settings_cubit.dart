@@ -48,6 +48,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
   static const String _keyThemeMode = 'setting_theme_mode';
   static const String _keyAutoThemeByTime = 'setting_auto_theme_by_time';
   static const String _keyHighContrast = 'setting_high_contrast';
+  static const String _keyLiquidGlassTint = 'setting_liquid_glass_tint';
   static const String _keyLanguageCode = PrefsKeys.languageCode;
   static const String _keyCustomAccent = 'setting_custom_accent';
   static const String _keyPlayerThemeMode = 'setting_player_theme_mode';
@@ -486,6 +487,9 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
         autoThemeByTime:
             prefs.getBool(_keyAutoThemeByTime) ?? state.autoThemeByTime,
         highContrast: prefs.getBool(_keyHighContrast) ?? state.highContrast,
+        reduceMotion: prefs.getBool('setting_reduce_motion') ?? state.reduceMotion,
+        liquidGlassTint:
+            prefs.getDouble(_keyLiquidGlassTint) ?? state.liquidGlassTint,
         languageCode: prefs.getString(_keyLanguageCode) ?? state.languageCode,
         customAccentColorValue: customAccentValue,
         playerThemeMode: playerThemeMode,
@@ -828,6 +832,13 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     safeEmit(state.copyWith(highContrast: value));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyHighContrast, value);
+  }
+
+  Future<void> setLiquidGlassTint(double value) async {
+    final clamped = value.clamp(0.0, 1.0);
+    safeEmit(state.copyWith(liquidGlassTint: clamped));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_keyLiquidGlassTint, clamped);
   }
 
   /// Keeps the Android status/nav bars in sync with the app theme so a

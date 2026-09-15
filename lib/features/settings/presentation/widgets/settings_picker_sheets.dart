@@ -16,58 +16,58 @@ import '../../cubit/settings_state.dart';
 // Title formatters
 // ============================================================================
 
-String getThemeModeTitle(PlayerThemeMode mode) {
+String getThemeModeTitle(PlayerThemeMode mode, AppLocalizations l10n) {
   switch (mode) {
     case PlayerThemeMode.classic:
-      return 'Classic Standard';
+      return l10n.settingsThemeClassicStandard;
     case PlayerThemeMode.card:
-      return 'Card Glass Overlay';
+      return l10n.settingsThemeCardGlass;
     case PlayerThemeMode.circle:
-      return 'Vinyl Circle (Spinning)';
+      return l10n.settingsThemeVinylCircle;
     case PlayerThemeMode.minimal:
-      return 'Minimalist Waveform';
+      return l10n.settingsThemeMinimalist;
     case PlayerThemeMode.vinyl:
-      return 'Vinyl Turntable Studio';
+      return l10n.settingsThemeVinylTurntable;
     case PlayerThemeMode.cassette:
-      return 'Retro Cassette Deck';
+      return l10n.settingsThemeRetroCassette;
     case PlayerThemeMode.waveform:
-      return 'Full-Bleed Waveform';
+      return l10n.settingsThemeFullBleed;
     case PlayerThemeMode.lyricsFocus:
-      return 'Karaoke Lyrics Immersion';
+      return l10n.settingsThemeKaraoke;
   }
 }
 
-String getVisualizerStyleTitle(VisualizerStyle style) {
+String getVisualizerStyleTitle(VisualizerStyle style, AppLocalizations l10n) {
   switch (style) {
     case VisualizerStyle.off:
-      return 'Disabled';
+      return l10n.settingsVisualizerOff;
     case VisualizerStyle.bar:
-      return 'Bar (Classic Frequency Spectrum)';
+      return l10n.settingsVisualizerBarClassic;
     case VisualizerStyle.wave:
-      return 'Wave (Smooth Line Spectrum)';
+      return l10n.settingsVisualizerWaveSmooth;
     case VisualizerStyle.circular:
-      return 'Circular (Radial Spectrum)';
+      return l10n.settingsVisualizerCircular;
     case VisualizerStyle.particles:
-      return 'Particles (Audio Field)';
+      return l10n.settingsVisualizerParticles;
     case VisualizerStyle.terrain3D:
-      return '3D Terrain (Wireframe Mountain)';
+      return l10n.settingsVisualizerTerrain3d;
     case VisualizerStyle.albumArtReactive:
-      return 'Album Art Reactive Glow';
+      return l10n.settingsVisualizerAlbumReactive;
     case VisualizerStyle.custom:
-      return 'Custom JSON Visualizer';
+      return l10n.settingsVisualizerCustomJson;
     case VisualizerStyle.milkdrop:
-      return 'Milkdrop Preset Visualizer';
+      return l10n.settingsVisualizerMilkdrop;
   }
 }
 
-String getColorSourceTitle(ThemeColorSource source) {
+String getColorSourceTitle(ThemeColorSource source, AppLocalizations l10n) {
   switch (source) {
     case ThemeColorSource.system:
-      return 'Material You (Wallpaper)';
+      return l10n.settingsColorSourceWallpaper;
     case ThemeColorSource.artwork:
-      return 'Album Artwork';
+      return l10n.settingsColorSourceArtwork;
     case ThemeColorSource.custom:
-      return 'Custom Accent';
+      return l10n.settingsColorSourceCustom;
   }
 }
 
@@ -84,47 +84,47 @@ String getLanguageTitle(String code, AppLocalizations l10n) {
   }
 }
 
-String getMiniPlayerSwipeTitle(MiniPlayerSwipeAction action) {
+String getMiniPlayerSwipeTitle(MiniPlayerSwipeAction action, AppLocalizations l10n) {
   switch (action) {
     case MiniPlayerSwipeAction.next:
-      return 'Next Track';
+      return l10n.settingsSwipeNextTrack;
     case MiniPlayerSwipeAction.prev:
-      return 'Previous Track';
+      return l10n.settingsSwipePreviousTrack;
     case MiniPlayerSwipeAction.volume:
-      return 'Adjust Volume';
+      return l10n.settingsSwipeAdjustVolume;
     case MiniPlayerSwipeAction.none:
-      return 'Disabled';
+      return l10n.settingsSwipeDisabled;
   }
 }
 
-String getNowPlayingDoubleTapTitle(NowPlayingDoubleTapAction action) {
+String getNowPlayingDoubleTapTitle(NowPlayingDoubleTapAction action, AppLocalizations l10n) {
   switch (action) {
     case NowPlayingDoubleTapAction.toggleFavorite:
-      return 'Toggle Favorite';
+      return l10n.settingsDoubleTapToggleFavorite;
     case NowPlayingDoubleTapAction.toggleLyrics:
-      return 'Toggle Lyrics Overlay';
+      return l10n.settingsDoubleTapToggleLyrics;
     case NowPlayingDoubleTapAction.none:
-      return 'Disabled';
+      return l10n.settingsDoubleTapDisabled;
   }
 }
 
-String getNowPlayingArtworkSwipeTitle(NowPlayingArtworkSwipeAction action) {
+String getNowPlayingArtworkSwipeTitle(NowPlayingArtworkSwipeAction action, AppLocalizations l10n) {
   switch (action) {
     case NowPlayingArtworkSwipeAction.nextPrev:
-      return 'Next / Previous Track';
+      return l10n.settingsArtworkSwipeNextPrev;
     case NowPlayingArtworkSwipeAction.none:
-      return 'Disabled';
+      return l10n.settingsArtworkSwipeDisabled;
   }
 }
 
-String getQualityTitle(YtmAudioQuality quality) {
+String getQualityTitle(YtmAudioQuality quality, AppLocalizations l10n) {
   switch (quality) {
     case YtmAudioQuality.high:
-      return 'High (~160+ kbps • Best)';
+      return l10n.settingsQualityHigh;
     case YtmAudioQuality.medium:
-      return 'Medium (~128 kbps)';
+      return l10n.settingsQualityMedium;
     case YtmAudioQuality.low:
-      return 'Low (~64 kbps • Data Saver)';
+      return l10n.settingsQualityLow;
   }
 }
 
@@ -150,53 +150,50 @@ void showThemePickerSheet(
   final themes = [
     (
       mode: PlayerThemeMode.classic,
-      title: 'Classic Standard',
-      subtitle: 'Traditional high-definition layout with ambient glow',
+      title: context.l10n.settingsThemeClassicStandard,
+      subtitle: context.l10n.settingsThemeClassicStandardDesc,
       icon: Icons.square_outlined,
     ),
     (
       mode: PlayerThemeMode.card,
-      title: 'Card Glass Overlay',
-      subtitle: 'Full-bleed background artwork with frosted glass controls',
+      title: context.l10n.settingsThemeCardGlass,
+      subtitle: context.l10n.settingsThemeCardGlassDesc,
       icon: Icons.layers_rounded,
     ),
     (
       mode: PlayerThemeMode.circle,
-      title: 'Vinyl Circle',
-      subtitle: 'Centered circular artwork with continuous spinning animation',
+      title: context.l10n.settingsThemeVinylCircle,
+      subtitle: context.l10n.settingsThemeVinylCircleDesc,
       icon: Icons.album_rounded,
     ),
     (
       mode: PlayerThemeMode.minimal,
-      title: 'Minimalist Waveform',
-      subtitle: 'Spacious studio focus on dynamic audio waveform visualizer',
+      title: context.l10n.settingsThemeMinimalist,
+      subtitle: context.l10n.settingsThemeMinimalistDesc,
       icon: Icons.graphic_eq_rounded,
     ),
     (
       mode: PlayerThemeMode.vinyl,
-      title: 'Vinyl Turntable Studio',
-      subtitle:
-          'True vinyl record with realistic grooves, center label & tonearm',
+      title: context.l10n.settingsThemeVinylTurntable,
+      subtitle: context.l10n.settingsThemeVinylTurntableDesc,
       icon: Icons.album_rounded,
     ),
     (
       mode: PlayerThemeMode.cassette,
-      title: 'Retro Cassette Deck',
-      subtitle:
-          'Vintage cassette tape with spinning spools & magnetic tape counter',
+      title: context.l10n.settingsThemeRetroCassette,
+      subtitle: context.l10n.settingsThemeRetroCassetteDesc,
       icon: Icons.radio_rounded,
     ),
     (
       mode: PlayerThemeMode.waveform,
-      title: 'Full-Bleed Waveform',
-      subtitle:
-          'Full screen audio-reactive glowing waveform visualizer backdrop',
+      title: context.l10n.settingsThemeFullBleed,
+      subtitle: context.l10n.settingsThemeFullBleedDesc,
       icon: Icons.waves_rounded,
     ),
     (
       mode: PlayerThemeMode.lyricsFocus,
-      title: 'Karaoke Lyrics Immersion',
-      subtitle: 'Magnified synchronized lyrics-first karaoke player interface',
+      title: context.l10n.settingsThemeKaraoke,
+      subtitle: context.l10n.settingsThemeKaraokeDesc,
       icon: Icons.mic_rounded,
     ),
   ];
@@ -319,26 +316,26 @@ void showLanguagePickerSheet(
   final languages = [
     (
       code: 'system',
-      name: 'System Default',
+      name: context.l10n.systemDefault,
       nativeName: 'الافتراضي للنظام / Predeterminado',
       flag: Icons.settings_suggest_rounded
     ),
     (
       code: 'en',
-      name: 'English',
-      nativeName: 'English (US/UK)',
+      name: context.l10n.english,
+      nativeName: context.l10n.settingsEnglishNative,
       flag: Icons.language_rounded
     ),
     (
       code: 'ar',
-      name: 'العربية',
-      nativeName: 'Arabic (RTL)',
+      name: context.l10n.arabic,
+      nativeName: context.l10n.settingsArabicNative,
       flag: Icons.translate_rounded
     ),
     (
       code: 'es',
-      name: 'Español',
-      nativeName: 'Spanish',
+      name: context.l10n.spanish,
+      nativeName: context.l10n.settingsSpanishNative,
       flag: Icons.public_rounded
     ),
   ];
@@ -433,22 +430,20 @@ void showColorSourcePickerSheet(
   final sources = [
     (
       source: ThemeColorSource.system,
-      title: 'Material You (Wallpaper)',
-      subtitle:
-          'Follow the system wallpaper palette on Android 12+ • falls back to album art on older devices',
+      title: context.l10n.settingsColorSourceWallpaper,
+      subtitle: context.l10n.settingsColorSourceSystemDesc,
       icon: Icons.wallpaper_rounded,
     ),
     (
       source: ThemeColorSource.artwork,
-      title: 'Album Artwork',
-      subtitle:
-          'Adapt colors from the current track\'s album art (changes per song)',
+      title: context.l10n.settingsColorSourceArtwork,
+      subtitle: context.l10n.settingsColorSourceArtworkDesc,
       icon: Icons.album_rounded,
     ),
     (
       source: ThemeColorSource.custom,
-      title: 'Custom Accent',
-      subtitle: 'Use the fixed accent color you pick in settings',
+      title: context.l10n.settingsColorSourceCustom,
+      subtitle: context.l10n.settingsColorSourceCustomDesc,
       icon: Icons.color_lens_rounded,
     ),
   ];
@@ -542,41 +537,38 @@ void showVisualizerStylePickerSheet(
   final styles = [
     (
       style: VisualizerStyle.bar,
-      title: 'BAR',
-      subtitle: 'Classic vertical frequency bars with smooth height animation',
+      title: context.l10n.settingsVizLabelBar,
+      subtitle: context.l10n.settingsVizBarDesc,
       icon: Icons.bar_chart_rounded,
     ),
     (
       style: VisualizerStyle.wave,
-      title: 'WAVE',
-      subtitle:
-          'Smooth continuous Bézier waveform line with ambient gradient fill',
+      title: context.l10n.settingsVizLabelWave,
+      subtitle: context.l10n.settingsVizWaveDesc,
       icon: Icons.waves_rounded,
     ),
     (
       style: VisualizerStyle.circular,
-      title: 'CIRCULAR',
-      subtitle:
-          'Futuristic radial frequency bars surrounding album centerpiece',
+      title: context.l10n.settingsVizLabelCircular,
+      subtitle: context.l10n.settingsVizCircularDesc,
       icon: Icons.motion_photos_on_rounded,
     ),
     (
       style: VisualizerStyle.off,
-      title: 'OFF',
-      subtitle: 'Disable audio visualizer spectrum animation',
+      title: context.l10n.settingsVizLabelOff,
+      subtitle: context.l10n.settingsVizOffDesc,
       icon: Icons.align_vertical_bottom_rounded,
     ),
     (
       style: VisualizerStyle.milkdrop,
-      title: 'MILKDROP',
+      title: context.l10n.settingsVizLabelMilkdrop,
       subtitle: context.l10n.milkRendererDesc,
       icon: Icons.blur_on_rounded,
     ),
     (
       style: VisualizerStyle.custom,
-      title: 'CUSTOM (JSON)',
-      subtitle:
-          'User-authored JSON preset: bars / wave / radial / particles / lissajous',
+      title: context.l10n.settingsVizLabelCustom,
+      subtitle: context.l10n.settingsVizCustomDesc,
       icon: Icons.data_object_rounded,
     ),
   ];
@@ -741,26 +733,26 @@ void showMiniPlayerSwipePickerSheet(
   final options = [
     (
       action: MiniPlayerSwipeAction.next,
-      title: 'Next Track',
-      subtitle: 'Skip to the next song in the queue',
+      title: context.l10n.settingsSwipeNextTrack,
+      subtitle: context.l10n.settingsSwipeNextDesc,
       icon: Icons.skip_next_rounded,
     ),
     (
       action: MiniPlayerSwipeAction.prev,
-      title: 'Previous Track',
-      subtitle: 'Skip to the previous song or restart track',
+      title: context.l10n.settingsSwipePreviousTrack,
+      subtitle: context.l10n.settingsSwipePrevDesc,
       icon: Icons.skip_previous_rounded,
     ),
     (
       action: MiniPlayerSwipeAction.volume,
-      title: 'Adjust Volume',
-      subtitle: isLeft ? 'Lower playback volume' : 'Raise playback volume',
+      title: context.l10n.settingsSwipeAdjustVolume,
+      subtitle: isLeft ? context.l10n.settingsLowerVolume : context.l10n.settingsRaiseVolume,
       icon: isLeft ? Icons.volume_down_rounded : Icons.volume_up_rounded,
     ),
     (
       action: MiniPlayerSwipeAction.none,
-      title: 'Disabled',
-      subtitle: 'Ignore swipe gesture',
+      title: context.l10n.settingsSwipeDisabled,
+      subtitle: context.l10n.settingsSwipeIgnoreDesc,
       icon: Icons.block_rounded,
     ),
   ];
@@ -782,8 +774,8 @@ void showMiniPlayerSwipePickerSheet(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: Text(
               isLeft
-                  ? 'MiniPlayer Swipe Left Action'
-                  : 'MiniPlayer Swipe Right Action',
+                  ? context.l10n.settingsSwipeLeftAction
+                  : context.l10n.settingsSwipeRightAction,
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
             ),
           ),
@@ -851,20 +843,20 @@ void showNowPlayingDoubleTapPickerSheet(
   final options = [
     (
       action: NowPlayingDoubleTapAction.toggleFavorite,
-      title: 'Toggle Favorite',
-      subtitle: 'Add or remove active song from favorites',
+      title: context.l10n.settingsDoubleTapToggleFavorite,
+      subtitle: context.l10n.settingsDoubleTapFavoriteDesc,
       icon: Icons.favorite_rounded,
     ),
     (
       action: NowPlayingDoubleTapAction.toggleLyrics,
-      title: 'Toggle Lyrics',
-      subtitle: 'Show or hide synchronized lyrics overlay',
+      title: context.l10n.settingsDoubleTapToggleLyrics,
+      subtitle: context.l10n.settingsDoubleTapLyricsDesc,
       icon: Icons.lyrics_rounded,
     ),
     (
       action: NowPlayingDoubleTapAction.none,
-      title: 'Disabled',
-      subtitle: 'Ignore double-tap gesture',
+      title: context.l10n.settingsDoubleTapDisabled,
+      subtitle: context.l10n.settingsDoubleTapIgnoreDesc,
       icon: Icons.block_rounded,
     ),
   ];
@@ -948,14 +940,14 @@ void showNowPlayingArtworkSwipePickerSheet(
   final options = [
     (
       action: NowPlayingArtworkSwipeAction.nextPrev,
-      title: 'Next / Previous Track',
-      subtitle: 'Swipe left for next track, swipe right for previous track',
+      title: context.l10n.settingsArtworkSwipeNextPrev,
+      subtitle: context.l10n.settingsArtworkSwipeNextPrevDesc,
       icon: Icons.swipe_rounded,
     ),
     (
       action: NowPlayingArtworkSwipeAction.none,
-      title: 'Disabled',
-      subtitle: 'Ignore horizontal swipe on album artwork',
+      title: context.l10n.settingsArtworkSwipeDisabled,
+      subtitle: context.l10n.settingsArtworkSwipeIgnoreDesc,
       icon: Icons.block_rounded,
     ),
   ];
@@ -1040,26 +1032,26 @@ void showQualityPickerSheet(
   final options = [
     (
       quality: YtmAudioQuality.high,
-      title: 'High Quality',
+      title: context.l10n.settingsQualityHigh,
       subtitle: isStreaming
-          ? 'Highest available bitrate (~160+ kbps) for crystal clear sound'
-          : 'Highest quality audio files (~160+ kbps M4A)',
+          ? context.l10n.settingsQualityHighStreamDesc
+          : context.l10n.settingsQualityHighDownloadDesc,
       icon: Icons.high_quality_rounded,
     ),
     (
       quality: YtmAudioQuality.medium,
-      title: 'Medium Quality',
+      title: context.l10n.settingsQualityMedium,
       subtitle: isStreaming
-          ? 'Standard bitrate (~128 kbps) with balanced data usage'
-          : 'Standard file size and quality (~128 kbps M4A)',
+          ? context.l10n.settingsQualityMediumStreamDesc
+          : context.l10n.settingsQualityMediumDownloadDesc,
       icon: Icons.graphic_eq_rounded,
     ),
     (
       quality: YtmAudioQuality.low,
-      title: 'Low / Data Saver',
+      title: context.l10n.settingsQualityLow,
       subtitle: isStreaming
-          ? 'Reduced data usage (~64 kbps) for slow connections'
-          : 'Smallest file size (~64 kbps)',
+          ? context.l10n.settingsQualityLowStreamDesc
+          : context.l10n.settingsQualityLowDownloadDesc,
       icon: Icons.data_saver_on_rounded,
     ),
   ];
@@ -1081,8 +1073,8 @@ void showQualityPickerSheet(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: Text(
               isStreaming
-                  ? 'Streaming Audio Quality'
-                  : 'Download Audio Quality',
+                  ? context.l10n.streamingQuality
+                  : context.l10n.downloadQuality,
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
             ),
           ),
@@ -1356,26 +1348,26 @@ void showPrivacyGuaranteeSheet(BuildContext context) {
               _privacyPoint(
                 context,
                 Icons.offline_bolt_rounded,
-                'Offline-first',
-                'Your library, playback and settings live on this device. Nothing is uploaded unless you explicitly sign in for cloud sync.',
+                context.l10n.settingsPrivacyOfflineTitle,
+                context.l10n.settingsPrivacyOfflineBody,
               ),
               _privacyPoint(
                 context,
                 Icons.visibility_off_rounded,
-                'No trackers in Pure',
-                'Pure (Play Store) builds ship without the INTERNET permission, analytics SDKs or advertising identifiers.',
+                context.l10n.settingsPrivacyNoTrackersTitle,
+                context.l10n.settingsPrivacyNoTrackersBody,
               ),
               _privacyPoint(
                 context,
                 Icons.folder_shared_rounded,
-                'Permissions are purposeful',
-                'Storage/media access is used only to scan and play your local audio. Bluetooth and notification access are requested only for connected-audio features and playback controls.',
+                context.l10n.settingsPrivacyPermissionsTitle,
+                context.l10n.settingsPrivacyPermissionsBody,
               ),
               _privacyPoint(
                 context,
                 Icons.cloud_off_rounded,
-                'You stay in control',
-                'Cloud sync and remote metadata can be disabled. Automation rules and device profiles are stored locally.',
+                context.l10n.settingsPrivacyControlTitle,
+                context.l10n.settingsPrivacyControlBody,
               ),
             ],
           ),
@@ -1459,7 +1451,7 @@ void showAboutSheet(BuildContext context) {
             ),
             const SizedBox(height: 4),
             Text(
-              'Version ${AppConfig.appVersion}',
+              '${context.l10n.version} ${AppConfig.appVersion}',
               style: TextStyle(color: p.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 16),

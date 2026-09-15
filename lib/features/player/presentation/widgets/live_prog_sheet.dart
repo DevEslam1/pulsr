@@ -247,7 +247,7 @@ if (pan_pos > 2 * 3.141592653589793) pan_pos = pan_pos - 2 * 3.141592653589793;'
                 ),
                 const SizedBox(height: 8),
                 _buildSlider(
-                  label: 'slider1 (Rate / Drive)',
+                  label: context.l10n.dspSlider1Label,
                   value: _sliderValues[1] ?? 5.0,
                   min: 0.1,
                   max: 20.0,
@@ -258,7 +258,7 @@ if (pan_pos > 2 * 3.141592653589793) pan_pos = pan_pos - 2 * 3.141592653589793;'
                   p: p,
                 ),
                 _buildSlider(
-                  label: 'slider2 (Depth / Mix)',
+                  label: context.l10n.dspSlider2Label,
                   value: _sliderValues[2] ?? 0.5,
                   min: 0.0,
                   max: 1.0,

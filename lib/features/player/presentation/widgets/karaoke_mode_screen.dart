@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../../domain/models/lyrics_line.dart';
 import '../../../settings/cubit/settings_cubit.dart';
@@ -82,7 +83,7 @@ class KaraokeModeScreen extends StatelessWidget {
               onPressed: () => Navigator.pop(context),
             ),
             title: Text(
-              song?.title ?? 'Karaoke Mode',
+              song?.title ?? context.l10n.dspKaraokeMode,
               style: const TextStyle(
                   color: Colors.white, fontWeight: FontWeight.bold),
             ),
@@ -120,8 +121,8 @@ class KaraokeModeScreen extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 32),
                   child: Text(
                     state.isLoadingLyrics
-                        ? 'Loading lyrics…'
-                        : 'No lyrics found for this track',
+                        ? context.l10n.dspLoadingLyrics
+                        : context.l10n.noLyricsFound,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 16,

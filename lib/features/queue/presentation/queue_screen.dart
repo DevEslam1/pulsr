@@ -121,7 +121,7 @@ class QueueScreen extends StatelessWidget {
                 PopupMenuItem(value: 'shuffle', child: Row(children: [const Icon(Icons.shuffle), const SizedBox(width: 8), Text(context.l10n.shuffle)])),
                 PopupMenuItem(value: 'save', child: Row(children: [const Icon(Icons.playlist_add), const SizedBox(width: 8), Text(context.l10n.saveAsPlaylist)])),
                 const PopupMenuDivider(),
-                PopupMenuItem(value: 'clear', child: Row(children: [const Icon(Icons.clear_all, color: Colors.red), const SizedBox(width: 8), Text(context.l10n.clearQueueConfirm.split('?').first, style: const TextStyle(color: Colors.red))])),
+                PopupMenuItem(value: 'clear', child: Row(children: [Icon(Icons.clear_all, color: p.error), const SizedBox(width: 8), Text(context.l10n.clearQueueConfirm.split('?').first, style: TextStyle(color: p.error))])),
               ],
             );
           }),
@@ -176,7 +176,7 @@ class QueueScreen extends StatelessWidget {
                       padding: const EdgeInsets.only(right: 20),
                       margin: const EdgeInsets.symmetric(vertical: 4),
                       decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.15), borderRadius: AppRadii.cardRadius),
-                      child: const Icon(Icons.delete_rounded, color: Colors.red),
+                      child: Icon(Icons.delete_rounded, color: p.error),
                     ),
                     onDismissed: (_) => context.read<PlayerCubit>().removeQueueItem(index),
                     child: Container(

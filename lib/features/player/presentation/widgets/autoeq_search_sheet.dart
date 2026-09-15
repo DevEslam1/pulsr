@@ -90,7 +90,7 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
             onChanged: _performSearch,
             style: TextStyle(color: p.textPrimary, fontSize: 14),
             decoration: InputDecoration(
-              hintText: 'Search headphones (Sony, Sennheiser, Apple...)',
+              hintText: context.l10n.dspSearchHeadphones,
               hintStyle:
                   TextStyle(color: p.textSecondary.withValues(alpha: 0.6)),
               prefixIcon: Icon(Icons.search, color: p.primary),
@@ -132,8 +132,8 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
                                 Navigator.pop(context);
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content:
-                                        Text('Applied ${item.name} profile'),
+                                    content: Text(
+                                        '${context.l10n.dspAppliedProfile} ${item.name}'),
                                     duration: const Duration(seconds: 2),
                                   ),
                                 );
@@ -179,7 +179,7 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
-                                          'Target: ${item.target} • AutoEQ Verified',
+                                          '${context.l10n.dspTarget} ${item.target} • ${context.l10n.dspAutoEqVerified}',
                                           style: TextStyle(
                                             color: p.textSecondary,
                                             fontSize: 12,

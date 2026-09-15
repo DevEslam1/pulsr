@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../cubit/player_cubit.dart';
 import 'quran_mode_sheet.dart';
 
@@ -25,22 +27,28 @@ class QuranModeDockButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final isActive =
         context.select<PlayerCubit, bool>((c) => c.state.isQuranModeEnabled);
+    final label =
+        isActive ? context.l10n.dspQuranModeOn : context.l10n.dspQuranModeOff;
 
-    return InkWell(
+    return Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: InkWell(
       onTap: () {
         HapticFeedback.lightImpact();
         QuranModeSheet.show(context);
       },
       borderRadius: BorderRadius.circular(20),
       child: Tooltip(
-        message: isActive ? 'Quran Mode: On' : 'Quran Mode: Off',
+        message: label,
         child: Center(
           child: Stack(
             clipBehavior: Clip.none,
             alignment: Alignment.center,
             children: [
               AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
+                duration: context.motionMs(200),
                 padding: EdgeInsets.all(isTablet ? 8 : 6),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
@@ -63,6 +71,7 @@ class QuranModeDockButton extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

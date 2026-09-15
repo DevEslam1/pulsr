@@ -157,6 +157,8 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
 
   /// Queues multiple songs for download in batch.
   /// Downloads are processed concurrently according to the service limit (3 active).
+  /// Starts are staggered (~500ms apart) so N simultaneous resolves don't trip
+  /// YouTube's 429/bot throttles — the "first few succeed, rest fail" pattern.
   /// Returns the number of songs newly queued.
   int downloadAll(Iterable<SongsTableData> songs, {int maxBatch = 50}) {
     int queuedCount = 0;
@@ -176,8 +178,16 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
         continue;
       }
 
-      download(song);
+      final index = queuedCount;
       queuedCount++;
+      if (index == 0) {
+        download(song);
+      } else {
+        // Staggered start; unawaited by design (fire-and-forget batch).
+        Future.delayed(Duration(milliseconds: 500 * index), () {
+          if (!isClosed) download(song);
+        });
+      }
     }
     return queuedCount;
   }

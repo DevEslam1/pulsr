@@ -307,7 +307,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
               ? const Color(0xFFFFD700).withValues(alpha: 0.4)
               : (isAttached
                   ? p.accent.withValues(alpha: 0.3)
-                  : (isPendingNoSession || isOemSoftDetached ? Colors.amber.withValues(alpha: 0.35) : p.hairline)),
+                  : (isPendingNoSession || isOemSoftDetached ? p.warning.withValues(alpha: 0.35) : p.hairline)),
         ),
       ),
       child: Column(
@@ -327,7 +327,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
                     ? const Color(0xFFFFD700)
                     : (isAttached
                         ? const Color(0xFF10B981)
-                        : (isPendingNoSession || isOemSoftDetached ? Colors.amber : p.error)),
+                        : (isPendingNoSession || isOemSoftDetached ? p.warning : p.error)),
                 size: 20,
               ),
               const SizedBox(width: 8),
@@ -345,7 +345,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
                     fontWeight: FontWeight.w800,
                     color: isBypassed
                         ? const Color(0xFFFFD700)
-                        : (isAttached ? p.textPrimary : (isPendingNoSession || isOemSoftDetached ? Colors.amber : p.error)),
+                        : (isAttached ? p.textPrimary : (isPendingNoSession || isOemSoftDetached ? p.warning : p.error)),
                   ),
                 ),
               ),
@@ -356,7 +356,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
                       ? const Color(0xFFFFD700).withValues(alpha: 0.15)
                       : (isAttached
                           ? const Color(0xFF10B981).withValues(alpha: 0.15)
-                          : (isPendingNoSession || isOemSoftDetached ? Colors.amber.withValues(alpha: 0.15) : p.error.withValues(alpha: 0.15))),
+                          : (isPendingNoSession || isOemSoftDetached ? p.warning.withValues(alpha: 0.15) : p.error.withValues(alpha: 0.15))),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
@@ -370,7 +370,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
                     fontWeight: FontWeight.w800,
                     color: isBypassed
                         ? const Color(0xFFFFD700)
-                        : (isAttached ? const Color(0xFF10B981) : (isPendingNoSession || isOemSoftDetached ? Colors.amber : p.error)),
+                        : (isAttached ? const Color(0xFF10B981) : (isPendingNoSession || isOemSoftDetached ? p.warning : p.error)),
                   ),
                 ),
               ),
@@ -381,13 +381,13 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.amber.withValues(alpha: 0.1),
+                color: p.warning.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.amber.withValues(alpha: 0.35)),
+                border: Border.all(color: p.warning.withValues(alpha: 0.35)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info_rounded, size: 16, color: Colors.amber),
+                  Icon(Icons.info_rounded, size: 16, color: p.warning),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(context.l10n.dolbyHijackDesc,
@@ -416,7 +416,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
                 },
                 icon: const Icon(Icons.tune_rounded, size: 16),
                 label: Text(context.l10n.fixSwitchOem, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                style: FilledButton.styleFrom(backgroundColor: Colors.amber, foregroundColor: Colors.black, visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(vertical: 10)),
+                style: FilledButton.styleFrom(backgroundColor: p.warning, foregroundColor: Colors.black, visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(vertical: 10)),
               ),
             ),
           ],
@@ -499,14 +499,14 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: isWarning
-            ? Colors.amber.withValues(alpha: 0.12)
+            ? p.warning.withValues(alpha: 0.12)
             : (isHighlight
                 ? p.accent.withValues(alpha: 0.12)
                 : p.surfaceContainerHigh),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: isWarning
-              ? Colors.amber.withValues(alpha: 0.4)
+              ? p.warning.withValues(alpha: 0.4)
               : (isHighlight
                   ? p.accent.withValues(alpha: 0.3)
                   : p.hairline),
@@ -529,7 +529,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
               fontSize: 10.5,
               fontWeight: FontWeight.w800,
               color: isWarning
-                  ? Colors.amber
+                  ? p.warning
                   : (isHighlight ? p.accent : p.textPrimary),
             ),
           ),

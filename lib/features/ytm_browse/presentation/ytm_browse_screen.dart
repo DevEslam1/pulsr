@@ -43,14 +43,15 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
         setState(() {
           _sections = sections;
           _isLoading = false;
-          _error = sections.isEmpty ? 'No recommendations right now.' : null;
+          _error =
+              sections.isEmpty ? context.l10n.browseNoRecommendations : null;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _error = 'Failed to load feed. Check connection and retry.';
+          _error = context.l10n.browseFailedLoadFeed;
         });
       }
     }

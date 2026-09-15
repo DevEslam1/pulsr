@@ -44,7 +44,6 @@ import 'package:pulsr/core/services/yt_download_service.dart' as _i742;
 import 'package:pulsr/core/services/ytm_account_service.dart' as _i631;
 import 'package:pulsr/core/services/ytm_browse_service.dart' as _i222;
 import 'package:pulsr/core/services/ytm_cache_manager.dart' as _i498;
-import 'package:pulsr/core/services/ytm_circuit_breaker.dart' as _i664;
 import 'package:pulsr/core/services/ytm_client_version_resolver.dart' as _i169;
 import 'package:pulsr/core/services/ytm_service.dart' as _i391;
 import 'package:pulsr/core/services/ytm_url_cache.dart' as _i492;
@@ -141,7 +140,6 @@ extension GetItInjectableX on _i174.GetIt {
     gh.singleton<_i991.ThemeSchedulerService>(
         () => _i991.ThemeSchedulerService());
     gh.singleton<_i498.YtmCacheManager>(() => _i498.YtmCacheManager());
-    gh.singleton<_i664.YtmCircuitBreaker>(() => _i664.YtmCircuitBreaker());
     gh.singleton<_i169.YtmClientVersionResolver>(
         () => _i169.YtmClientVersionResolver());
     gh.singleton<_i391.YtmService>(

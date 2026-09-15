@@ -99,7 +99,7 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
             .toString()
             .split('.')
             .first
-        : 'Never';
+        : context.l10n.settingsNeverLabel;
 
     return PulsrPagePopScope(
       child: Scaffold(
@@ -274,7 +274,7 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
                                   ),
                                 ),
                                 Text(
-                                  '${_topArtists[i].value} plays',
+                                  context.l10n.settingsPlaysCount(_topArtists[i].value),
                                   style: TextStyle(
                                       color: p.textSecondary, fontSize: 12),
                                 ),

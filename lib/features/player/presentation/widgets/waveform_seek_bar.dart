@@ -16,6 +16,7 @@ class WaveformSeekBar extends StatefulWidget {
   final List<Duration>? chapterMarkers;
   final Duration? loopPointA;
   final Duration? loopPointB;
+  final String semanticLabel;
 
   const WaveformSeekBar({
     super.key,
@@ -29,6 +30,7 @@ class WaveformSeekBar extends StatefulWidget {
     this.chapterMarkers,
     this.loopPointA,
     this.loopPointB,
+    this.semanticLabel = 'Seek',
   });
 
   @override
@@ -54,7 +56,17 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
             ? Colors.white.withValues(alpha: 0.22)
             : p.hairline.withValues(alpha: 0.8));
 
-    return Directionality(
+    final currentDuration = _dragValue != null
+        ? Duration(milliseconds: _dragValue!.round())
+        : widget.position;
+    final valueLabel =
+        '${Formatters.formatDuration(currentDuration)} / ${Formatters.formatDuration(widget.duration)}';
+
+    return Semantics(
+      slider: true,
+      label: widget.semanticLabel,
+      value: valueLabel,
+      child: Directionality(
       textDirection: TextDirection.ltr,
       child: RepaintBoundary(
         child: Padding(
@@ -163,6 +175,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
               ),
             ],
           ),
+        ),
         ),
       ),
     );

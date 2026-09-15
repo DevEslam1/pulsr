@@ -158,7 +158,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                   builder: (context, snapshot) {
                     if (snapshot.hasError) {
                       return _ErrorSection(
-                        title: 'Albums',
+                        title: context.l10n.albums,
+                        message: context.l10n.browseCouldNotLoadAlbums,
                         onRetry: () => setState(() {}),
                       );
                     }
@@ -170,7 +171,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SectionHeader(title: 'Albums'),
+                        SectionHeader(title: context.l10n.albums),
                         SizedBox(
                           height: 175,
                           child: ListView.builder(
@@ -229,7 +230,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                   builder: (context, snapshot) {
                     if (snapshot.hasError) {
                       return _ErrorSection(
-                        title: 'Top Tracks',
+                        title: context.l10n.browseTopTracks,
+                        message: context.l10n.browseCouldNotLoadTopTracks,
                         onRetry: () => setState(() {}),
                       );
                     }
@@ -241,7 +243,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SectionHeader(title: 'Top Tracks'),
+                        SectionHeader(title: context.l10n.browseTopTracks),
                         for (int i = 0; i < songs.length; i++)
                           SongTile(
                             song: songs[i],
@@ -270,9 +272,11 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
 
 class _ErrorSection extends StatelessWidget {
   final String title;
+  final String message;
   final VoidCallback onRetry;
 
-  const _ErrorSection({required this.title, required this.onRetry});
+  const _ErrorSection(
+      {required this.title, required this.message, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -297,7 +301,7 @@ class _ErrorSection extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Could not load ${title.toLowerCase()}.',
+                    message,
                     style: TextStyle(color: p.textSecondary, fontSize: 13),
                   ),
                 ),

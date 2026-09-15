@@ -170,12 +170,12 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
           actions: [
             IconButton(
               icon: Icon(Icons.file_upload_outlined, color: p.textSecondary),
-              tooltip: 'Import Theme JSON',
+              tooltip: context.l10n.importThemeJson,
               onPressed: _showImportDialog,
             ),
             IconButton(
               icon: Icon(Icons.share_rounded, color: p.textSecondary),
-              tooltip: 'Export Theme JSON',
+              tooltip: context.l10n.dspExportThemeJson,
               onPressed: _exportTheme,
             ),
           ],
@@ -230,7 +230,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Pulsr Audiophile Edition',
+                              context.l10n.dspPulsrAudiophileEdition,
                               style: TextStyle(
                                   color: Colors.white.withValues(alpha: 0.7),
                                   fontSize: 12),

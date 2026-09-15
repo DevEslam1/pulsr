@@ -192,8 +192,8 @@ class _QuranModePanelState extends State<QuranModePanel> {
             // Tuning sliders
             _QuranSliderTile(
               icon: Icons.church_rounded,
-              title: 'Mosque Ambience',
-              subtitle: 'Convolution reverb for a hall-like space',
+              title: context.l10n.dspMosqueAmbience,
+              subtitle: context.l10n.dspMosqueAmbienceDesc,
               value: state.reverbWetDry.clamp(0.0, 0.6),
               max: 0.6,
               enabled: enabled,
@@ -202,8 +202,8 @@ class _QuranModePanelState extends State<QuranModePanel> {
             ),
             _QuranSliderTile(
               icon: Icons.local_fire_department_rounded,
-              title: 'Vocal Warmth',
-              subtitle: 'Harmonic richness on the reciter\'s voice',
+              title: context.l10n.dspVocalWarmth,
+              subtitle: context.l10n.dspVocalWarmthDesc,
               value: state.saturationMix.clamp(0.0, 0.6),
               max: 0.6,
               enabled: enabled,
@@ -319,26 +319,24 @@ class _QuranModePanelState extends State<QuranModePanel> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _kv(p, 'Device', caps.deviceName),
-                        _kv(p, 'Codec',
+                        _kv(p, context.l10n.dspDevice, caps.deviceName),
+                        _kv(p, context.l10n.dspCodec,
                             '${caps.codec.label} (${caps.codec.quality})'),
                         _kv(
                             p,
-                            'Format',
+                            context.l10n.format,
                             '${caps.bitDepth}-bit • '
                                 '${caps.sampleRateHz ~/ 1000} kHz'),
                         _kv(
                           p,
-                          'Latency',
+                          context.l10n.dspLatency,
                           caps.isBluetooth ? '~${caps.latencyMs} ms' : '—',
                         ),
                         const SizedBox(height: 6),
                         Text(
                           caps.isBluetooth
-                              ? 'Lossy Bluetooth gets a small presence '
-                                  'compensation and a shorter reverb tail.'
-                              : 'Wired / USB output is left untouched by '
-                                  'hardware compensation.',
+                              ? context.l10n.dspBluetoothCompensationDesc
+                              : context.l10n.dspWiredCompensationDesc,
                           style:
                               TextStyle(color: p.textTertiary, fontSize: 11),
                         ),

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 
 /// A labeled settings slider with a trailing "restore default" affordance.
 ///
@@ -95,7 +96,7 @@ class SettingSliderRow extends StatelessWidget {
                     color: _isDefault || !enabled
                         ? p.textTertiary.withValues(alpha: 0.5)
                         : p.accent),
-                tooltip: 'Reset to default (${_fmt(defaultValue)})',
+                tooltip: context.l10n.settingsResetToDefaultValue(_fmt(defaultValue)),
                 visualDensity: VisualDensity.compact,
                 onPressed:
                     _isDefault || !enabled ? null : () => onChanged(defaultValue),

@@ -165,7 +165,7 @@ class _AutomationRulesSheetState extends State<AutomationRulesSheet> {
           ),
         ),
         subtitle: Text(
-          supported ? 'Apply: $profileName' : 'Not detectable on this platform',
+          supported ? context.l10n.settingsApplyProfileName(profileName) : context.l10n.settingsNotDetectable,
           style: TextStyle(
             color: supported ? p.textSecondary : p.error,
             fontSize: 12,

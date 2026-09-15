@@ -13,6 +13,7 @@ import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
 import '../../../sheets/sleep_timer_sheet.dart';
 import 'settings_conflict_card.dart';
+import 'headset_controls_section.dart';
 import 'settings_section.dart';
 import 'settings_slider_row.dart';
 import 'settings_tiles.dart';
@@ -33,8 +34,8 @@ class PlaybackSection extends StatelessWidget {
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
       behavior: SnackBarBehavior.floating,
       content: Text(crossfade > 0.01
-          ? 'Resolved: Gapless off — Crossfade set to ${crossfade.toStringAsFixed(1)}s'
-          : 'Resolved: Gapless disabled'),
+          ? context.l10n.settingsResolvedCrossfade(crossfade.toStringAsFixed(1))
+          : context.l10n.settingsResolvedGapless),
     ));
   }
 
@@ -103,8 +104,8 @@ class PlaybackSection extends StatelessWidget {
           SettingsConflictCard(
             reason: AudioConflicts.crossfadeBlockedByGapless(true)!,
             resolveLabel: state.crossfadeSeconds > 0.01
-                ? 'Turn off Gapless & enable Crossfade'
-                : 'Turn off Gapless',
+                ? context.l10n.settingsTurnOffGaplessEnableCrossfade
+                : context.l10n.settingsTurnOffGapless,
             onResolve: () => _resolveCrossfadeConflict(
                 context, cubit, state.crossfadeSeconds),
           ),
@@ -112,13 +113,15 @@ class PlaybackSection extends StatelessWidget {
         _switchTile(
           context,
           Icons.volume_down_outlined,
-          'Duck on navigation',
-          'Lower music instead of pausing for prompts',
+          context.l10n.settingsDuckOnNavigation,
+          context.l10n.settingsDuckOnNavigationSubtitle,
           value: state.duckingMode == 'duck',
           onChanged: (v) => cubit.setDuckingMode(v ? 'duck' : 'pause'),
         ),
         settingsCardDivider(p),
         const _AudioNormalizationSettingTile(),
+        settingsCardDivider(p),
+        const HeadsetControlsSection(),
       ],
     );
   }
@@ -199,8 +202,8 @@ class PlaybackSection extends StatelessWidget {
           SettingsConflictCard(
             reason: AudioConflicts.crossfadeBlockedByGapless(true)!,
             resolveLabel: state.crossfadeSeconds > 0.01
-                ? 'Turn off Gapless & enable Crossfade'
-                : 'Turn off Gapless',
+                ? context.l10n.settingsTurnOffGaplessEnableCrossfade
+                : context.l10n.settingsTurnOffGapless,
             onResolve: () =>
                 _resolveCrossfadeConflict(context, cubit, state.crossfadeSeconds),
           ),
@@ -209,8 +212,8 @@ class PlaybackSection extends StatelessWidget {
         _switchTile(
           context,
           Icons.bolt_outlined,
-          'Hedged streaming',
-          'Race two resolvers, take the fastest URL',
+          context.l10n.settingsHedgedStreaming,
+          context.l10n.settingsHedgedStreamingSubtitle,
           value: state.hedgedResolutionEnabled,
           onChanged: cubit.setHedgedResolutionEnabled,
         ),
@@ -219,22 +222,22 @@ class PlaybackSection extends StatelessWidget {
         _switchTile(
           context,
           Icons.auto_graph_outlined,
-          'Adaptive quality',
-          'Step bitrate down/up mid-track on stalls',
+          context.l10n.settingsAdaptiveQuality,
+          context.l10n.settingsAdaptiveQualitySubtitle,
           value: state.adaptiveQualityEnabled,
           onChanged: cubit.setAdaptiveQualityEnabled,
         ),
         settingsCardDivider(p),
         // F10: silence-skip sensitivity slider (0 = off).
         SettingSliderRow(
-          label: 'Silence-skip sensitivity',
+          label: context.l10n.settingsSilenceSkipSensitivity,
           value: state.silenceSkipSensitivity.toDouble(),
           min: 0,
           max: 100,
           divisions: 20,
           defaultValue: 0.0,
           formatValue: (v) =>
-              v < 0.5 ? 'Off' : '${v.round()}%',
+              v < 0.5 ? context.l10n.rgOff : '${v.round()}%',
           onChanged: (v) => cubit.setSilenceSkipSensitivity(v.round()),
         ),
         settingsCardDivider(p),
@@ -242,13 +245,13 @@ class PlaybackSection extends StatelessWidget {
         _switchTile(
           context,
           Icons.volume_down_outlined,
-          'Duck on navigation',
-          'Lower music instead of pausing for prompts',
+          context.l10n.settingsDuckOnNavigation,
+          context.l10n.settingsDuckOnNavigationSubtitle,
           value: state.duckingMode == 'duck',
           onChanged: (v) => cubit.setDuckingMode(v ? 'duck' : 'pause'),
         ),
         SettingSliderRow(
-          label: 'Duck level',
+          label: context.l10n.settingsDuckLevel,
           value: state.duckingLevel,
           min: 0.05,
           max: 1.0,
@@ -262,8 +265,8 @@ class PlaybackSection extends StatelessWidget {
         _switchTile(
           context,
           Icons.speaker_group_outlined,
-          'Speaker + Bluetooth',
-          'Best-effort simultaneous output (falls back gracefully)',
+          context.l10n.settingsSpeakerBluetooth,
+          context.l10n.settingsSpeakerBluetoothSubtitle,
           value: state.multiOutputMode == 'speakerAndBluetooth',
           onChanged: (v) => cubit.setMultiOutputMode(
               v ? 'speakerAndBluetooth' : 'systemDefault'),
@@ -273,8 +276,8 @@ class PlaybackSection extends StatelessWidget {
         _switchTile(
           context,
           Icons.save_as_outlined,
-          'Per-album EQ memory',
-          'Restore EQ snapshot per album/artist',
+          context.l10n.settingsPerAlbumEqMemory,
+          context.l10n.settingsPerAlbumEqMemorySubtitle,
           value: state.dspSnapshotEnabled,
           onChanged: cubit.setDspSnapshotEnabled,
         ),
@@ -283,8 +286,8 @@ class PlaybackSection extends StatelessWidget {
         _navTile(
           context,
           Icons.bluetooth_searching_outlined,
-          'Calibrate Bluetooth latency',
-          'Auto-probe offset (currently ${state.bluetoothLatencyOffsetMs} ms)',
+          context.l10n.settingsCalibrateBtLatency,
+          context.l10n.settingsCalibrateBtLatencySubtitle(state.bluetoothLatencyOffsetMs),
           onTap: () async {
             final ms = await cubit.autoCalibrateBluetoothLatency();
             if (!context.mounted) return;
@@ -303,6 +306,8 @@ class PlaybackSection extends StatelessWidget {
         settingsCardDivider(p),
         // F-27: manual loudness normalization.
         const _AudioNormalizationSettingTile(),
+        settingsCardDivider(p),
+        const HeadsetControlsSection(),
       ],
     );
   }
@@ -336,13 +341,13 @@ class _SponsorBlockSettingTile extends StatefulWidget {
 }
 
 class _SponsorBlockSettingTileState extends State<_SponsorBlockSettingTile> {
-  static const Map<String, String> _labels = {
-    'sponsor': 'Sponsors',
-    'selfpromo': 'Self-promotion',
-    'interaction': 'Interaction reminders',
-    'intro': 'Intros / intermissions',
-    'outro': 'Outros / endcards',
-    'music_offtopic': 'Non-music sections',
+  Map<String, String> _labels(BuildContext context) => {
+    'sponsor': context.l10n.settingsSponsorLabel,
+    'selfpromo': context.l10n.settingsSelfPromoLabel,
+    'interaction': context.l10n.settingsInteractionLabel,
+    'intro': context.l10n.settingsIntroLabel,
+    'outro': context.l10n.settingsOutroLabel,
+    'music_offtopic': context.l10n.settingsNonMusicLabel,
   };
 
   bool _enabled = true;
@@ -421,7 +426,7 @@ class _SponsorBlockSettingTileState extends State<_SponsorBlockSettingTile> {
                       activeColor: p.accent,
                       value: selected.contains(category),
                       title: Text(
-                        _labels[category] ?? category,
+                        _labels(context)[category] ?? category,
                         style: TextStyle(color: p.textPrimary, fontSize: 14),
                       ),
                       onChanged: (checked) {
@@ -463,24 +468,24 @@ class _SponsorBlockSettingTileState extends State<_SponsorBlockSettingTile> {
     final p = context.palette;
     final categorySummary = SponsorBlockService.supportedCategories
         .where(_categories.contains)
-        .map((c) => _labels[c] ?? c)
+        .map((c) => _labels(context)[c] ?? c)
         .join(', ');
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         SettingsSwitchTile(
           Icons.fast_forward_rounded,
-          'SponsorBlock',
-          'Auto-skip sponsor and non-music segments in YouTube tracks',
+          context.l10n.settingsSponsorBlock,
+          context.l10n.settingsSponsorBlockSubtitle,
           value: _enabled,
           onChanged: _setEnabled,
         ),
         settingsCardDivider(p),
         SettingsNavTile(
           Icons.category_outlined,
-          'Skip categories',
+          context.l10n.settingsSkipCategories,
           categorySummary.isEmpty
-              ? 'None selected — auto-skip disabled'
+              ? context.l10n.settingsNoneSelectedAutoSkip
               : categorySummary,
           onTap: _openCategoryPicker,
         ),
@@ -533,8 +538,8 @@ class _AdvancedSpeedSettingTileState extends State<_AdvancedSpeedSettingTile> {
   Widget build(BuildContext context) {
     return SettingsSwitchTile(
       Icons.speed_rounded,
-      'Extended speed range',
-      'Allow 0.1x–8.0x playback speed (default 0.25x–4.0x)',
+      context.l10n.settingsExtendedSpeedRange,
+      context.l10n.settingsExtendedSpeedRangeSubtitle,
       value: _value,
       onChanged: _onChanged,
     );
@@ -593,8 +598,8 @@ class _AudioNormalizationSettingTileState
   Widget build(BuildContext context) {
     return SettingsSwitchTile(
       Icons.volume_up_outlined,
-      'Audio normalization',
-      'Even out loudness for tracks without ReplayGain tags',
+      context.l10n.settingsAudioNormalization,
+      context.l10n.settingsAudioNormalizationSubtitle,
       value: _value,
       onChanged: _onChanged,
     );

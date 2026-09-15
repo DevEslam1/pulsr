@@ -6964,6 +6964,3984 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'⚠️ {count} song paths could not be matched in your current library.'**
   String unmatchedPathsWarning(int count);
+
+  /// No description provided for @settingsHeaderTagline.
+  ///
+  /// In en, this message translates to:
+  /// **'Pulsr v{version} • Audiophile Music Experience'**
+  String settingsHeaderTagline(String version);
+
+  /// No description provided for @settingsHeaderTaglineShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Pulsr v{version} • Audiophile Engine'**
+  String settingsHeaderTaglineShort(String version);
+
+  /// No description provided for @settingsSearchPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Search settings, sound, appearance...'**
+  String get settingsSearchPlaceholder;
+
+  /// No description provided for @settingsCategoryAudioSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Equalizer, DSP, Hi-Res, ReplayGain'**
+  String get settingsCategoryAudioSubtitle;
+
+  /// No description provided for @settingsCategoryPlaybackSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Crossfade, gapless, sleep timer, skip'**
+  String get settingsCategoryPlaybackSubtitle;
+
+  /// No description provided for @settingsCategoryAppearanceSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme mode, accent colors, visualizer'**
+  String get settingsCategoryAppearanceSubtitle;
+
+  /// No description provided for @settingsCategoryGesturesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Mini-player swipes, artwork double-tap'**
+  String get settingsCategoryGesturesSubtitle;
+
+  /// No description provided for @settingsCategoryProfiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Profiles & Rules'**
+  String get settingsCategoryProfiles;
+
+  /// No description provided for @settingsCategoryProfilesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hardware DAC mappings, trigger rules'**
+  String get settingsCategoryProfilesSubtitle;
+
+  /// No description provided for @settingsCategoryLibrarySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Folders, hidden media, duration filter'**
+  String get settingsCategoryLibrarySubtitle;
+
+  /// No description provided for @settingsCategoryOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'Network & YTM'**
+  String get settingsCategoryOnline;
+
+  /// No description provided for @settingsCategoryOnlineSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio quality, streaming cache, proxy'**
+  String get settingsCategoryOnlineSubtitle;
+
+  /// No description provided for @settingsCategoryStorageSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Disk usage, cached artwork, cleanup'**
+  String get settingsCategoryStorageSubtitle;
+
+  /// No description provided for @settingsCategoryPrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy & Backup'**
+  String get settingsCategoryPrivacy;
+
+  /// No description provided for @settingsCategoryPrivacySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline guarantee, scrobbling, backups'**
+  String get settingsCategoryPrivacySubtitle;
+
+  /// No description provided for @settingsCategoryAbout.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get settingsCategoryAbout;
+
+  /// No description provided for @settingsCategoryAboutSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version}, licenses, specs'**
+  String settingsCategoryAboutSubtitle(String version);
+
+  /// No description provided for @settingsCategoryAppearance.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get settingsCategoryAppearance;
+
+  /// No description provided for @settingsAutomationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Automation'**
+  String get settingsAutomationTitle;
+
+  /// No description provided for @settingsSmartAudioSectionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic headphone correction and best-quality output'**
+  String get settingsSmartAudioSectionSubtitle;
+
+  /// No description provided for @settingsQuranModeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Vocal EQ, mosque ambience, memorization speed'**
+  String get settingsQuranModeSubtitle;
+
+  /// No description provided for @settingsDeviceProfilesSectionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Per-output DAC and Bluetooth profile mappings'**
+  String get settingsDeviceProfilesSectionSubtitle;
+
+  /// No description provided for @settingsAutomationSectionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Trigger profiles automatically on hardware events'**
+  String get settingsAutomationSectionSubtitle;
+
+  /// No description provided for @settingsAutomationTileSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply profiles on headphone plug, Bluetooth or charge events'**
+  String get settingsAutomationTileSubtitle;
+
+  /// No description provided for @settingsStorageSectionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage disk usage and audio cache'**
+  String get settingsStorageSectionSubtitle;
+
+  /// No description provided for @settingsAboutSectionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Version info, licenses and architecture'**
+  String get settingsAboutSectionSubtitle;
+
+  /// No description provided for @settingsAboutVersionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} • Open-source Audiophile Engine'**
+  String settingsAboutVersionSubtitle(String version);
+
+  /// No description provided for @settingsAppearanceSectionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme, accent colors, visualizer and player UI style'**
+  String get settingsAppearanceSectionSubtitle;
+
+  /// No description provided for @settingsAutoDarkModeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto Dark Mode by Time'**
+  String get settingsAutoDarkModeTitle;
+
+  /// No description provided for @settingsAutoDarkModeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow a 7 PM – 6 AM day/night schedule'**
+  String get settingsAutoDarkModeSubtitle;
+
+  /// No description provided for @settingsHighContrastTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'High Contrast'**
+  String get settingsHighContrastTitle;
+
+  /// No description provided for @settingsHighContrastSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Boost contrast with an AMOLED-friendly palette'**
+  String get settingsHighContrastSubtitle;
+
+  /// No description provided for @settingsReduceMotionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reduce Motion'**
+  String get settingsReduceMotionTitle;
+
+  /// No description provided for @settingsReduceMotionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Snap animations instead of tweening them'**
+  String get settingsReduceMotionSubtitle;
+
+  /// No description provided for @settingsLiquidGlassTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Liquid Glass Tint'**
+  String get settingsLiquidGlassTitle;
+
+  /// No description provided for @settingsLiquidGlassSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjust refraction between Ultra Clear (0%) and Tinted (100%)'**
+  String get settingsLiquidGlassSubtitle;
+
+  /// No description provided for @settingsBadgeStyle.
+  ///
+  /// In en, this message translates to:
+  /// **'STYLE'**
+  String get settingsBadgeStyle;
+
+  /// No description provided for @settingsBadgeDsp.
+  ///
+  /// In en, this message translates to:
+  /// **'DSP'**
+  String get settingsBadgeDsp;
+
+  /// No description provided for @settingsBadgePalette.
+  ///
+  /// In en, this message translates to:
+  /// **'PALETTE'**
+  String get settingsBadgePalette;
+
+  /// No description provided for @settingsGesturesSectionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure swipe and double-tap gestures across mini-player and artwork'**
+  String get settingsGesturesSectionSubtitle;
+
+  /// No description provided for @settingsLibrarySectionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Device media indexing, exclusion rules and cleanup'**
+  String get settingsLibrarySectionSubtitle;
+
+  /// No description provided for @settingsOnlineSectionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Online streams, downloads, proxy routing and quality settings'**
+  String get settingsOnlineSectionSubtitle;
+
+  /// No description provided for @settingsTapToManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to manage'**
+  String get settingsTapToManage;
+
+  /// No description provided for @settingsBadgeConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'CONNECTED'**
+  String get settingsBadgeConnected;
+
+  /// No description provided for @settingsDownloadsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'View and manage offline tracks and downloads'**
+  String get settingsDownloadsSubtitle;
+
+  /// No description provided for @settingsProxyEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled'**
+  String get settingsProxyEnabled;
+
+  /// No description provided for @settingsProxyDisabledHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled • Tap to configure HTTP / SOCKS5'**
+  String get settingsProxyDisabledHint;
+
+  /// No description provided for @settingsPrivacySectionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Data sovereignty, database backups and scrobbler integrations'**
+  String get settingsPrivacySectionSubtitle;
+
+  /// No description provided for @settingsScrobblingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scrobbling (Last.fm & ListenBrainz)'**
+  String get settingsScrobblingTitle;
+
+  /// No description provided for @settingsScrobblingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct API scrobbling and Now Playing metadata broadcast'**
+  String get settingsScrobblingSubtitle;
+
+  /// No description provided for @settingsScrobbleStatsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scrobble Stats'**
+  String get settingsScrobbleStatsTitle;
+
+  /// No description provided for @settingsScrobbleStatsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Listening history and scrobble analytics overview'**
+  String get settingsScrobbleStatsSubtitle;
+
+  /// No description provided for @settingsCloudBackupDashboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud Backup Dashboard'**
+  String get settingsCloudBackupDashboard;
+
+  /// No description provided for @settingsCloudBackupDashboardSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage synchronized devices and cloud backup snapshots'**
+  String get settingsCloudBackupDashboardSubtitle;
+
+  /// No description provided for @settingsNoSettingsFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No settings found for \"{query}\"'**
+  String settingsNoSettingsFound(String query);
+
+  /// No description provided for @settingsCloudSyncCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud backup & sync completed!'**
+  String get settingsCloudSyncCompleted;
+
+  /// No description provided for @settingsCloudSyncFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync failed. Please check internet connection.'**
+  String get settingsCloudSyncFailed;
+
+  /// No description provided for @settingsNeverLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Never'**
+  String get settingsNeverLabel;
+
+  /// No description provided for @settingsSyncing.
+  ///
+  /// In en, this message translates to:
+  /// **'Syncing...'**
+  String get settingsSyncing;
+
+  /// No description provided for @settingsAddCustomFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Custom Folder'**
+  String get settingsAddCustomFolder;
+
+  /// No description provided for @settingsRescanningLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Rescanning library…'**
+  String get settingsRescanningLibrary;
+
+  /// No description provided for @settingsApplyRescanLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply & Rescan Library'**
+  String get settingsApplyRescanLibrary;
+
+  /// No description provided for @settingsLibraryUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Library updated! {count} tracks loaded.'**
+  String settingsLibraryUpdated(int count);
+
+  /// No description provided for @settingsHiddenCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} Hidden'**
+  String settingsHiddenCount(int count);
+
+  /// No description provided for @settingsSearchDirectoriesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search directories by name or path...'**
+  String get settingsSearchDirectoriesHint;
+
+  /// No description provided for @settingsNoDirectoriesMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'No directories match {query}'**
+  String settingsNoDirectoriesMatch(String query);
+
+  /// No description provided for @settingsNoAudioFolders.
+  ///
+  /// In en, this message translates to:
+  /// **'No audio folders discovered yet. Scan storage to populate.'**
+  String get settingsNoAudioFolders;
+
+  /// No description provided for @settingsUnhide.
+  ///
+  /// In en, this message translates to:
+  /// **'Unhide'**
+  String get settingsUnhide;
+
+  /// No description provided for @settingsHide.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide'**
+  String get settingsHide;
+
+  /// No description provided for @settingsPlaysCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} plays'**
+  String settingsPlaysCount(int count);
+
+  /// No description provided for @settingsManufacturerBackgroundGuide.
+  ///
+  /// In en, this message translates to:
+  /// **'{manufacturer} Background Guide'**
+  String settingsManufacturerBackgroundGuide(String manufacturer);
+
+  /// No description provided for @settingsAggressiveBatteryGuide.
+  ///
+  /// In en, this message translates to:
+  /// **'Your device manufacturer is known for aggressive background process killing.\n\nVisit {url} to configure lock screen and battery settings.'**
+  String settingsAggressiveBatteryGuide(String url);
+
+  /// No description provided for @settingsApplyProfileName.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply: {name}'**
+  String settingsApplyProfileName(String name);
+
+  /// No description provided for @settingsArabicNative.
+  ///
+  /// In en, this message translates to:
+  /// **'Arabic (RTL)'**
+  String get settingsArabicNative;
+
+  /// No description provided for @settingsArtworkSwipeDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get settingsArtworkSwipeDisabled;
+
+  /// No description provided for @settingsArtworkSwipeIgnoreDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Ignore horizontal swipe on album artwork'**
+  String get settingsArtworkSwipeIgnoreDesc;
+
+  /// No description provided for @settingsArtworkSwipeNextPrev.
+  ///
+  /// In en, this message translates to:
+  /// **'Next / Previous Track'**
+  String get settingsArtworkSwipeNextPrev;
+
+  /// No description provided for @settingsArtworkSwipeNextPrevDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe left for next track, swipe right for previous track'**
+  String get settingsArtworkSwipeNextPrevDesc;
+
+  /// No description provided for @settingsAudioNormalization.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio normalization'**
+  String get settingsAudioNormalization;
+
+  /// No description provided for @settingsAudioNormalizationSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Even out loudness for tracks without ReplayGain tags'**
+  String get settingsAudioNormalizationSubtitle;
+
+  /// No description provided for @settingsAudioOutputDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio Output Device'**
+  String get settingsAudioOutputDevice;
+
+  /// No description provided for @settingsAuthenticationOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'AUTHENTICATION (OPTIONAL)'**
+  String get settingsAuthenticationOptional;
+
+  /// No description provided for @settingsBitPerfectBtUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable: Bluetooth transcodes — use USB / wired DAC'**
+  String get settingsBitPerfectBtUnavailable;
+
+  /// No description provided for @settingsBitPerfectUsb.
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-Perfect USB Pass-Through'**
+  String get settingsBitPerfectUsb;
+
+  /// No description provided for @settingsBitPerfectUsbDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct hardware streaming to USB / wired DACs (bypasses Android resampler)'**
+  String get settingsBitPerfectUsbDesc;
+
+  /// No description provided for @settingsBpmSyncCrossfade.
+  ///
+  /// In en, this message translates to:
+  /// **'BPM-Synced Crossfade'**
+  String get settingsBpmSyncCrossfade;
+
+  /// No description provided for @settingsBpmSyncCrossfadeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Aligns the crossfade duration to the nearest 2/4/8/16/32 beats of the incoming track when its BPM is known (set per track in Song Info); otherwise the configured duration is used'**
+  String get settingsBpmSyncCrossfadeDesc;
+
+  /// No description provided for @settingsBypassDspBitPerfect.
+  ///
+  /// In en, this message translates to:
+  /// **'Bypass DSP in Bit-Perfect Mode'**
+  String get settingsBypassDspBitPerfect;
+
+  /// No description provided for @settingsBypassDspBitPerfectDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Bypasses Equalizer and virtualizer for an uncolored, pure audio bitstream to the DAC'**
+  String get settingsBypassDspBitPerfectDesc;
+
+  /// No description provided for @settingsBypassList.
+  ///
+  /// In en, this message translates to:
+  /// **'Bypass List (comma-separated)'**
+  String get settingsBypassList;
+
+  /// No description provided for @settingsCalibrateBtLatency.
+  ///
+  /// In en, this message translates to:
+  /// **'Calibrate Bluetooth latency'**
+  String get settingsCalibrateBtLatency;
+
+  /// No description provided for @settingsCalibrateBtLatencySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-probe offset (currently {ms} ms)'**
+  String settingsCalibrateBtLatencySubtitle(int ms);
+
+  /// No description provided for @settingsCastFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Cast failed'**
+  String get settingsCastFailed;
+
+  /// No description provided for @settingsCastingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Casting {title}'**
+  String settingsCastingTitle(String title);
+
+  /// No description provided for @settingsCastingTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Casting to {device}'**
+  String settingsCastingTo(String device);
+
+  /// No description provided for @settingsCastNoSdkDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Cast sessions require the Play Services Cast SDK (only in the dev/ytm builds). Device discovery is shown here.'**
+  String get settingsCastNoSdkDesc;
+
+  /// No description provided for @settingsCastSdkDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses Google\'s Default Media Receiver. Local files are served over your LAN; remote artwork/URLs are cast directly.'**
+  String get settingsCastSdkDesc;
+
+  /// No description provided for @settingsColorSourceArtwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Album Artwork'**
+  String get settingsColorSourceArtwork;
+
+  /// No description provided for @settingsColorSourceArtworkDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Adapt colors from the current track\'s album art (changes per song)'**
+  String get settingsColorSourceArtworkDesc;
+
+  /// No description provided for @settingsColorSourceCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Accent'**
+  String get settingsColorSourceCustom;
+
+  /// No description provided for @settingsColorSourceCustomDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the fixed accent color you pick in settings'**
+  String get settingsColorSourceCustomDesc;
+
+  /// No description provided for @settingsColorSourceSystemDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow the system wallpaper palette on Android 12+ • falls back to album art on older devices'**
+  String get settingsColorSourceSystemDesc;
+
+  /// No description provided for @settingsColorSourceWallpaper.
+  ///
+  /// In en, this message translates to:
+  /// **'Material You (Wallpaper)'**
+  String get settingsColorSourceWallpaper;
+
+  /// No description provided for @settingsConnectedAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected as: {name}\n\nManage your YouTube Music account or disconnect from this device.'**
+  String settingsConnectedAs(String name);
+
+  /// No description provided for @settingsConnectedDeviceQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected device & audio quality'**
+  String get settingsConnectedDeviceQuality;
+
+  /// No description provided for @settingsConnectionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection Failed'**
+  String get settingsConnectionFailed;
+
+  /// No description provided for @settingsConnectionSuccessful.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection Successful'**
+  String get settingsConnectionSuccessful;
+
+  /// No description provided for @settingsDacNoUacVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'DAC exposes no UAC Volume control'**
+  String get settingsDacNoUacVolume;
+
+  /// No description provided for @settingsDisableBitPerfectBypass.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable Bit-Perfect bypass'**
+  String get settingsDisableBitPerfectBypass;
+
+  /// No description provided for @settingsDisabledBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'DISABLED'**
+  String get settingsDisabledBadge;
+
+  /// No description provided for @settingsDoubleTapDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get settingsDoubleTapDisabled;
+
+  /// No description provided for @settingsDoubleTapFavoriteDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Add or remove active song from favorites'**
+  String get settingsDoubleTapFavoriteDesc;
+
+  /// No description provided for @settingsDoubleTapIgnoreDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Ignore double-tap gesture'**
+  String get settingsDoubleTapIgnoreDesc;
+
+  /// No description provided for @settingsDoubleTapLyricsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Show or hide synchronized lyrics overlay'**
+  String get settingsDoubleTapLyricsDesc;
+
+  /// No description provided for @settingsDoubleTapToggleFavorite.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle Favorite'**
+  String get settingsDoubleTapToggleFavorite;
+
+  /// No description provided for @settingsDoubleTapToggleLyrics.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle Lyrics Overlay'**
+  String get settingsDoubleTapToggleLyrics;
+
+  /// No description provided for @settingsDspAutoDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically bypass OEM sound effects when DSP active'**
+  String get settingsDspAutoDesc;
+
+  /// No description provided for @settingsDspInspectorDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Inspect live active DSP stages, HAL effects & engine state'**
+  String get settingsDspInspectorDesc;
+
+  /// No description provided for @settingsDspNativeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'64-bit float, zero-latency real-time native DSP'**
+  String get settingsDspNativeDesc;
+
+  /// No description provided for @settingsDspOemDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'System / vendor-level sound effects (Dolby, Dirac, etc.)'**
+  String get settingsDspOemDesc;
+
+  /// No description provided for @settingsDuckLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Duck level'**
+  String get settingsDuckLevel;
+
+  /// No description provided for @settingsDuckOnNavigation.
+  ///
+  /// In en, this message translates to:
+  /// **'Duck on navigation'**
+  String get settingsDuckOnNavigation;
+
+  /// No description provided for @settingsDuckOnNavigationSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Lower music instead of pausing for prompts'**
+  String get settingsDuckOnNavigationSubtitle;
+
+  /// No description provided for @settingsDvcDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Pins the Android media stream to maximum and applies volume in the native float DSP path, for higher dynamic range and lower distortion at low volumes. Unavailable during Bit-Perfect playback and on the AAudio Direct output path'**
+  String get settingsDvcDesc;
+
+  /// No description provided for @settingsDvcTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct Volume Control (DVC)'**
+  String get settingsDvcTitle;
+
+  /// No description provided for @settingsEnableBitPerfectFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Bit-Perfect USB Pass-Through first'**
+  String get settingsEnableBitPerfectFirst;
+
+  /// No description provided for @settingsEnglishNative.
+  ///
+  /// In en, this message translates to:
+  /// **'English (US/UK)'**
+  String get settingsEnglishNative;
+
+  /// No description provided for @settingsEnterProxyHost.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a proxy host'**
+  String get settingsEnterProxyHost;
+
+  /// No description provided for @settingsExclusiveUsb.
+  ///
+  /// In en, this message translates to:
+  /// **'Exclusive USB Interface'**
+  String get settingsExclusiveUsb;
+
+  /// No description provided for @settingsExclusiveUsbDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Claims the AudioStreaming interface when the kernel driver releases it. Non-forced: never detaches Android\'s audio driver'**
+  String get settingsExclusiveUsbDesc;
+
+  /// No description provided for @settingsExportSessionLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Export audio session logs'**
+  String get settingsExportSessionLogs;
+
+  /// No description provided for @settingsExportSessionLogsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Share the on-device JSONL log of your recent playback sessions'**
+  String get settingsExportSessionLogsDesc;
+
+  /// No description provided for @settingsExtendedSpeedRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Extended speed range'**
+  String get settingsExtendedSpeedRange;
+
+  /// No description provided for @settingsExtendedSpeedRangeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow 0.1x–8.0x playback speed (default 0.25x–4.0x)'**
+  String get settingsExtendedSpeedRangeSubtitle;
+
+  /// No description provided for @settingsFloatDspDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Hi-res first: feeds the native DSP chain float32 samples so 24/32-bit sources keep their depth (16-bit content is unaffected). Unsupported devices safely fall back to 16-bit'**
+  String get settingsFloatDspDesc;
+
+  /// No description provided for @settingsFloatDspPath.
+  ///
+  /// In en, this message translates to:
+  /// **'24/32-bit Float DSP Path'**
+  String get settingsFloatDspPath;
+
+  /// No description provided for @settingsGoogleCast.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Cast'**
+  String get settingsGoogleCast;
+
+  /// No description provided for @settingsHardwareAudioOutput.
+  ///
+  /// In en, this message translates to:
+  /// **'Hardware Audio Output'**
+  String get settingsHardwareAudioOutput;
+
+  /// No description provided for @settingsHedgedStreaming.
+  ///
+  /// In en, this message translates to:
+  /// **'Hedged streaming'**
+  String get settingsHedgedStreaming;
+
+  /// No description provided for @settingsHedgedStreamingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Race two resolvers, take the fastest URL'**
+  String get settingsHedgedStreamingSubtitle;
+
+  /// No description provided for @settingsHttpLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'HTTP'**
+  String get settingsHttpLabel;
+
+  /// No description provided for @settingsImportPasteProxies.
+  ///
+  /// In en, this message translates to:
+  /// **'Import / Paste Proxies'**
+  String get settingsImportPasteProxies;
+
+  /// No description provided for @settingsInteractionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Interaction reminders'**
+  String get settingsInteractionLabel;
+
+  /// No description provided for @settingsInternalUsbDac.
+  ///
+  /// In en, this message translates to:
+  /// **'Internal / USB DAC'**
+  String get settingsInternalUsbDac;
+
+  /// No description provided for @settingsIntroLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Intros / intermissions'**
+  String get settingsIntroLabel;
+
+  /// No description provided for @settingsInvalidPort.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid port (1-65535)'**
+  String get settingsInvalidPort;
+
+  /// No description provided for @settingsLatencyMs.
+  ///
+  /// In en, this message translates to:
+  /// **'Latency: {ms} ms'**
+  String settingsLatencyMs(int ms);
+
+  /// No description provided for @settingsLeaveBlankAuth.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave blank if unauthenticated'**
+  String get settingsLeaveBlankAuth;
+
+  /// No description provided for @settingsLowerVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Lower playback volume'**
+  String get settingsLowerVolume;
+
+  /// No description provided for @settingsManageYtm.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage YouTube Music'**
+  String get settingsManageYtm;
+
+  /// No description provided for @settingsMasterAudioEngine.
+  ///
+  /// In en, this message translates to:
+  /// **'Master Audio Engine'**
+  String get settingsMasterAudioEngine;
+
+  /// No description provided for @settingsNoneSelectedAutoSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'None selected — auto-skip disabled'**
+  String get settingsNoneSelectedAutoSkip;
+
+  /// No description provided for @settingsNonMusicLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Non-music sections'**
+  String get settingsNonMusicLabel;
+
+  /// No description provided for @settingsNotAvailablePlatform.
+  ///
+  /// In en, this message translates to:
+  /// **'Not available on this platform'**
+  String get settingsNotAvailablePlatform;
+
+  /// No description provided for @settingsNotDetectable.
+  ///
+  /// In en, this message translates to:
+  /// **'Not detectable on this platform'**
+  String get settingsNotDetectable;
+
+  /// No description provided for @settingsNothingToCast.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing is playing to cast'**
+  String get settingsNothingToCast;
+
+  /// No description provided for @settingsOutputAudioQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'Output & Audio Quality'**
+  String get settingsOutputAudioQuality;
+
+  /// No description provided for @settingsOutputDeviceConfigHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to configure Output Device • Sample Rate ({rate} kHz) • Bit Depth ({bits}-bit)'**
+  String settingsOutputDeviceConfigHint(int rate, int bits);
+
+  /// No description provided for @settingsOutroLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Outros / endcards'**
+  String get settingsOutroLabel;
+
+  /// No description provided for @settingsPasswordLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get settingsPasswordLabel;
+
+  /// No description provided for @settingsPerAlbumEqMemory.
+  ///
+  /// In en, this message translates to:
+  /// **'Per-album EQ memory'**
+  String get settingsPerAlbumEqMemory;
+
+  /// No description provided for @settingsPerAlbumEqMemorySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore EQ snapshot per album/artist'**
+  String get settingsPerAlbumEqMemorySubtitle;
+
+  /// No description provided for @settingsPerTrackFormatDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Hi-res first: requests each track\'s native sample rate / bit depth from the output device (device-capped). Bit-Perfect keeps its exclusive format. Turn off to use one manual output format'**
+  String get settingsPerTrackFormatDesc;
+
+  /// No description provided for @settingsPerTrackFormatNegotiation.
+  ///
+  /// In en, this message translates to:
+  /// **'Per-Track Output Format Negotiation'**
+  String get settingsPerTrackFormatNegotiation;
+
+  /// No description provided for @settingsPortHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 8080'**
+  String get settingsPortHint;
+
+  /// No description provided for @settingsPortLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Port'**
+  String get settingsPortLabel;
+
+  /// No description provided for @settingsPreampWithoutRg.
+  ///
+  /// In en, this message translates to:
+  /// **'Preamp (Without RG tag fallback)'**
+  String get settingsPreampWithoutRg;
+
+  /// No description provided for @settingsPreampWithRg.
+  ///
+  /// In en, this message translates to:
+  /// **'Preamp (With RG tag)'**
+  String get settingsPreampWithRg;
+
+  /// No description provided for @settingsPrivacyControlBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud sync and remote metadata can be disabled. Automation rules and device profiles are stored locally.'**
+  String get settingsPrivacyControlBody;
+
+  /// No description provided for @settingsPrivacyControlTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'You stay in control'**
+  String get settingsPrivacyControlTitle;
+
+  /// No description provided for @settingsPrivacyNoTrackersBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Pure (Play Store) builds ship without the INTERNET permission, analytics SDKs or advertising identifiers.'**
+  String get settingsPrivacyNoTrackersBody;
+
+  /// No description provided for @settingsPrivacyNoTrackersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No trackers in Pure'**
+  String get settingsPrivacyNoTrackersTitle;
+
+  /// No description provided for @settingsPrivacyOfflineBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your library, playback and settings live on this device. Nothing is uploaded unless you explicitly sign in for cloud sync.'**
+  String get settingsPrivacyOfflineBody;
+
+  /// No description provided for @settingsPrivacyOfflineTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline-first'**
+  String get settingsPrivacyOfflineTitle;
+
+  /// No description provided for @settingsPrivacyPermissionsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage/media access is used only to scan and play your local audio. Bluetooth and notification access are requested only for connected-audio features and playback controls.'**
+  String get settingsPrivacyPermissionsBody;
+
+  /// No description provided for @settingsPrivacyPermissionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Permissions are purposeful'**
+  String get settingsPrivacyPermissionsTitle;
+
+  /// No description provided for @settingsProxyActiveDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Traffic routes through configured proxy'**
+  String get settingsProxyActiveDesc;
+
+  /// No description provided for @settingsProxyHttpDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Routes standard HTTP & HTTPS web and stream extraction traffic.'**
+  String get settingsProxyHttpDesc;
+
+  /// No description provided for @settingsProxyInactiveDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct connection (proxy disabled)'**
+  String get settingsProxyInactiveDesc;
+
+  /// No description provided for @settingsProxySocksDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Routes network packets via SOCKS5 (recommended for Tor, Clash, Shadowsocks). Note: SOCKS5 applies on the native stream layer; in-app Dart API calls (search, artwork, lyrics) fall back to DIRECT when SOCKS5 is active.'**
+  String get settingsProxySocksDesc;
+
+  /// No description provided for @settingsQualityHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'High (~160+ kbps • Best)'**
+  String get settingsQualityHigh;
+
+  /// No description provided for @settingsQualityHighDownloadDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Highest quality audio files (~160+ kbps M4A)'**
+  String get settingsQualityHighDownloadDesc;
+
+  /// No description provided for @settingsQualityHighStreamDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Highest available bitrate (~160+ kbps) for crystal clear sound'**
+  String get settingsQualityHighStreamDesc;
+
+  /// No description provided for @settingsQualityLow.
+  ///
+  /// In en, this message translates to:
+  /// **'Low (~64 kbps • Data Saver)'**
+  String get settingsQualityLow;
+
+  /// No description provided for @settingsQualityLowDownloadDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Smallest file size (~64 kbps)'**
+  String get settingsQualityLowDownloadDesc;
+
+  /// No description provided for @settingsQualityLowStreamDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Reduced data usage (~64 kbps) for slow connections'**
+  String get settingsQualityLowStreamDesc;
+
+  /// No description provided for @settingsQualityMedium.
+  ///
+  /// In en, this message translates to:
+  /// **'Medium (~128 kbps)'**
+  String get settingsQualityMedium;
+
+  /// No description provided for @settingsQualityMediumDownloadDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard file size and quality (~128 kbps M4A)'**
+  String get settingsQualityMediumDownloadDesc;
+
+  /// No description provided for @settingsQualityMediumStreamDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard bitrate (~128 kbps) with balanced data usage'**
+  String get settingsQualityMediumStreamDesc;
+
+  /// No description provided for @settingsRaiseVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Raise playback volume'**
+  String get settingsRaiseVolume;
+
+  /// No description provided for @settingsRemoveProxy.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove proxy'**
+  String get settingsRemoveProxy;
+
+  /// No description provided for @settingsReplayGainDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Track / album gain from tags, applied during playback'**
+  String get settingsReplayGainDesc;
+
+  /// No description provided for @settingsRequiresUacDac.
+  ///
+  /// In en, this message translates to:
+  /// **'Requires a UAC DAC with volume control'**
+  String get settingsRequiresUacDac;
+
+  /// No description provided for @settingsResamplerFast.
+  ///
+  /// In en, this message translates to:
+  /// **'Fast (Linear)'**
+  String get settingsResamplerFast;
+
+  /// No description provided for @settingsResamplerHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'High (32-tap)'**
+  String get settingsResamplerHigh;
+
+  /// No description provided for @settingsResamplerQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'Resampler Quality'**
+  String get settingsResamplerQuality;
+
+  /// No description provided for @settingsResamplerQualityDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Sample-rate conversion quality. Ultra is the full 64-tap polyphase sinc (historical default); Fast is linear interpolation for minimal CPU on battery'**
+  String get settingsResamplerQualityDesc;
+
+  /// No description provided for @settingsResamplerStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard (16-tap)'**
+  String get settingsResamplerStandard;
+
+  /// No description provided for @settingsResamplerUltra.
+  ///
+  /// In en, this message translates to:
+  /// **'Ultra (64-tap)'**
+  String get settingsResamplerUltra;
+
+  /// No description provided for @settingsResetToDefaultValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to default ({value})'**
+  String settingsResetToDefaultValue(String value);
+
+  /// No description provided for @settingsResolvedCrossfade.
+  ///
+  /// In en, this message translates to:
+  /// **'Resolved: Gapless off — Crossfade set to {seconds}s'**
+  String settingsResolvedCrossfade(String seconds);
+
+  /// No description provided for @settingsResolvedGapless.
+  ///
+  /// In en, this message translates to:
+  /// **'Resolved: Gapless disabled'**
+  String get settingsResolvedGapless;
+
+  /// No description provided for @settingsSearchAboutSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version}, build details and licenses'**
+  String settingsSearchAboutSubtitle(String version);
+
+  /// No description provided for @settingsSearchAccentColorSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom color accent palette for buttons and active highlights'**
+  String get settingsSearchAccentColorSubtitle;
+
+  /// No description provided for @settingsSearchAccentColorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Accent Color'**
+  String get settingsSearchAccentColorTitle;
+
+  /// No description provided for @settingsSearchBitPerfectSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct USB DAC hardware sample-rate matching'**
+  String get settingsSearchBitPerfectSubtitle;
+
+  /// No description provided for @settingsSearchBitPerfectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-Perfect & Hi-Res Output'**
+  String get settingsSearchBitPerfectTitle;
+
+  /// No description provided for @settingsSearchCacheSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear cached cover artwork and stream chunks'**
+  String get settingsSearchCacheSubtitle;
+
+  /// No description provided for @settingsSearchCacheTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Artwork & Audio Cache'**
+  String get settingsSearchCacheTitle;
+
+  /// No description provided for @settingsSearchCategoryAbout.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get settingsSearchCategoryAbout;
+
+  /// No description provided for @settingsSearchCategoryAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio'**
+  String get settingsSearchCategoryAudio;
+
+  /// No description provided for @settingsSearchCategoryNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Network'**
+  String get settingsSearchCategoryNetwork;
+
+  /// No description provided for @settingsSearchCategoryPrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy'**
+  String get settingsSearchCategoryPrivacy;
+
+  /// No description provided for @settingsSearchCategoryStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage'**
+  String get settingsSearchCategoryStorage;
+
+  /// No description provided for @settingsSearchCrossfadeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Seamless transitions and crossfade seconds slider'**
+  String get settingsSearchCrossfadeSubtitle;
+
+  /// No description provided for @settingsSearchCrossfadeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Crossfade & Gapless'**
+  String get settingsSearchCrossfadeTitle;
+
+  /// No description provided for @settingsSearchEqualizerSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'10-band equalizer, bass boost, virtualizer, reverb'**
+  String get settingsSearchEqualizerSubtitle;
+
+  /// No description provided for @settingsSearchHiddenFoldersSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Exclude voice memos, ringtones, and specific directories'**
+  String get settingsSearchHiddenFoldersSubtitle;
+
+  /// No description provided for @settingsSearchHighContrastTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'High Contrast Mode'**
+  String get settingsSearchHighContrastTitle;
+
+  /// No description provided for @settingsSearchNowPlayingThemeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Now Playing Theme Style'**
+  String get settingsSearchNowPlayingThemeTitle;
+
+  /// No description provided for @settingsSearchPrivacySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline-first principles and permissions explanations'**
+  String get settingsSearchPrivacySubtitle;
+
+  /// No description provided for @settingsSearchPrivacyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy Guarantee'**
+  String get settingsSearchPrivacyTitle;
+
+  /// No description provided for @settingsSearchProxySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'HTTP & SOCKS5 proxy routing with latency checks'**
+  String get settingsSearchProxySubtitle;
+
+  /// No description provided for @settingsSearchQualitySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bitrate preferences for online streaming and saved files'**
+  String get settingsSearchQualitySubtitle;
+
+  /// No description provided for @settingsSearchQualityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Streaming & Download Audio Quality'**
+  String get settingsSearchQualityTitle;
+
+  /// No description provided for @settingsSearchRescanSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Discover newly downloaded songs and update metadata'**
+  String get settingsSearchRescanSubtitle;
+
+  /// No description provided for @settingsSearchRescanTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rescan Device Storage'**
+  String get settingsSearchRescanTitle;
+
+  /// No description provided for @settingsSearchScrobblingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Track listening history and broadcast Now Playing status'**
+  String get settingsSearchScrobblingSubtitle;
+
+  /// No description provided for @settingsSearchSleepTimerSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically stop playback after duration or end of track'**
+  String get settingsSearchSleepTimerSubtitle;
+
+  /// No description provided for @settingsSearchSwipeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Left & Right swipe actions (Skip, Previous, Volume)'**
+  String get settingsSearchSwipeSubtitle;
+
+  /// No description provided for @settingsSearchSwipeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Mini-Player Swipe Gestures'**
+  String get settingsSearchSwipeTitle;
+
+  /// No description provided for @settingsSearchThemeModeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'System Default, Light, Dark, or AMOLED high contrast'**
+  String get settingsSearchThemeModeSubtitle;
+
+  /// No description provided for @settingsSearchThemeModeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme Mode'**
+  String get settingsSearchThemeModeTitle;
+
+  /// No description provided for @settingsSearchVisualizerStyleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Visualizer Style'**
+  String get settingsSearchVisualizerStyleTitle;
+
+  /// No description provided for @settingsSelfPromoLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Self-promotion'**
+  String get settingsSelfPromoLabel;
+
+  /// No description provided for @settingsServerHost.
+  ///
+  /// In en, this message translates to:
+  /// **'Server Host / IP Address'**
+  String get settingsServerHost;
+
+  /// No description provided for @settingsServerHostHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 127.0.0.1 or proxy.example.com'**
+  String get settingsServerHostHint;
+
+  /// No description provided for @settingsSessionDiagnostics.
+  ///
+  /// In en, this message translates to:
+  /// **'Session Audio Diagnostics'**
+  String get settingsSessionDiagnostics;
+
+  /// No description provided for @settingsSessionDiagnosticsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Records one log per track: route type, Bluetooth codec, negotiated sample rate / bit depth, interruptions and dropout counts'**
+  String get settingsSessionDiagnosticsDesc;
+
+  /// No description provided for @settingsSessionLogsShareText.
+  ///
+  /// In en, this message translates to:
+  /// **'Pulsr audio session logs'**
+  String get settingsSessionLogsShareText;
+
+  /// No description provided for @settingsSilenceSkipSensitivity.
+  ///
+  /// In en, this message translates to:
+  /// **'Silence-skip sensitivity'**
+  String get settingsSilenceSkipSensitivity;
+
+  /// No description provided for @settingsSkipCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip categories'**
+  String get settingsSkipCategories;
+
+  /// No description provided for @settingsSpanishNative.
+  ///
+  /// In en, this message translates to:
+  /// **'Spanish'**
+  String get settingsSpanishNative;
+
+  /// No description provided for @settingsSpeakerBluetooth.
+  ///
+  /// In en, this message translates to:
+  /// **'Speaker + Bluetooth'**
+  String get settingsSpeakerBluetooth;
+
+  /// No description provided for @settingsSpeakerBluetoothSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Best-effort simultaneous output (falls back gracefully)'**
+  String get settingsSpeakerBluetoothSubtitle;
+
+  /// No description provided for @settingsSponsorBlock.
+  ///
+  /// In en, this message translates to:
+  /// **'SponsorBlock'**
+  String get settingsSponsorBlock;
+
+  /// No description provided for @settingsSponsorBlockSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-skip sponsor and non-music segments in YouTube tracks'**
+  String get settingsSponsorBlockSubtitle;
+
+  /// No description provided for @settingsSponsorLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sponsors'**
+  String get settingsSponsorLabel;
+
+  /// No description provided for @settingsStarting.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting…'**
+  String get settingsStarting;
+
+  /// No description provided for @settingsStatusLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Status: {status}'**
+  String settingsStatusLabel(String status);
+
+  /// No description provided for @settingsStreamingClaimed.
+  ///
+  /// In en, this message translates to:
+  /// **'Streaming interface claimed exclusively'**
+  String get settingsStreamingClaimed;
+
+  /// No description provided for @settingsSwipeAdjustVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjust Volume'**
+  String get settingsSwipeAdjustVolume;
+
+  /// No description provided for @settingsSwipeDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get settingsSwipeDisabled;
+
+  /// No description provided for @settingsSwipeIgnoreDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Ignore swipe gesture'**
+  String get settingsSwipeIgnoreDesc;
+
+  /// No description provided for @settingsSwipeLeftAction.
+  ///
+  /// In en, this message translates to:
+  /// **'MiniPlayer Swipe Left Action'**
+  String get settingsSwipeLeftAction;
+
+  /// No description provided for @settingsSwipeNextDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip to the next song in the queue'**
+  String get settingsSwipeNextDesc;
+
+  /// No description provided for @settingsSwipeNextTrack.
+  ///
+  /// In en, this message translates to:
+  /// **'Next Track'**
+  String get settingsSwipeNextTrack;
+
+  /// No description provided for @settingsSwipePrevDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip to the previous song or restart track'**
+  String get settingsSwipePrevDesc;
+
+  /// No description provided for @settingsSwipePreviousTrack.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous Track'**
+  String get settingsSwipePreviousTrack;
+
+  /// No description provided for @settingsSwipeRightAction.
+  ///
+  /// In en, this message translates to:
+  /// **'MiniPlayer Swipe Right Action'**
+  String get settingsSwipeRightAction;
+
+  /// No description provided for @settingsSyncingLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Syncing your library...'**
+  String get settingsSyncingLibrary;
+
+  /// No description provided for @settingsSyncOffset.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync Offset'**
+  String get settingsSyncOffset;
+
+  /// No description provided for @settingsTestAllSpeeds.
+  ///
+  /// In en, this message translates to:
+  /// **'Test All Speeds'**
+  String get settingsTestAllSpeeds;
+
+  /// No description provided for @settingsTestingAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Testing All...'**
+  String get settingsTestingAll;
+
+  /// No description provided for @settingsTestingProxyConnectivity.
+  ///
+  /// In en, this message translates to:
+  /// **'Testing Proxy Connectivity...'**
+  String get settingsTestingProxyConnectivity;
+
+  /// No description provided for @settingsTestLatency.
+  ///
+  /// In en, this message translates to:
+  /// **'Test latency'**
+  String get settingsTestLatency;
+
+  /// No description provided for @settingsThemeCardGlass.
+  ///
+  /// In en, this message translates to:
+  /// **'Card Glass Overlay'**
+  String get settingsThemeCardGlass;
+
+  /// No description provided for @settingsThemeCardGlassDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Full-bleed background artwork with frosted glass controls'**
+  String get settingsThemeCardGlassDesc;
+
+  /// No description provided for @settingsThemeClassicStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Classic Standard'**
+  String get settingsThemeClassicStandard;
+
+  /// No description provided for @settingsThemeClassicStandardDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Traditional high-definition layout with ambient glow'**
+  String get settingsThemeClassicStandardDesc;
+
+  /// No description provided for @settingsThemeFullBleed.
+  ///
+  /// In en, this message translates to:
+  /// **'Full-Bleed Waveform'**
+  String get settingsThemeFullBleed;
+
+  /// No description provided for @settingsThemeFullBleedDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Full screen audio-reactive glowing waveform visualizer backdrop'**
+  String get settingsThemeFullBleedDesc;
+
+  /// No description provided for @settingsThemeKaraoke.
+  ///
+  /// In en, this message translates to:
+  /// **'Karaoke Lyrics Immersion'**
+  String get settingsThemeKaraoke;
+
+  /// No description provided for @settingsThemeKaraokeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Magnified synchronized lyrics-first karaoke player interface'**
+  String get settingsThemeKaraokeDesc;
+
+  /// No description provided for @settingsThemeMinimalist.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimalist Waveform'**
+  String get settingsThemeMinimalist;
+
+  /// No description provided for @settingsThemeMinimalistDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Spacious studio focus on dynamic audio waveform visualizer'**
+  String get settingsThemeMinimalistDesc;
+
+  /// No description provided for @settingsThemeRetroCassette.
+  ///
+  /// In en, this message translates to:
+  /// **'Retro Cassette Deck'**
+  String get settingsThemeRetroCassette;
+
+  /// No description provided for @settingsThemeRetroCassetteDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Vintage cassette tape with spinning spools & magnetic tape counter'**
+  String get settingsThemeRetroCassetteDesc;
+
+  /// No description provided for @settingsThemeVinylCircle.
+  ///
+  /// In en, this message translates to:
+  /// **'Vinyl Circle (Spinning)'**
+  String get settingsThemeVinylCircle;
+
+  /// No description provided for @settingsThemeVinylCircleDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Centered circular artwork with continuous spinning animation'**
+  String get settingsThemeVinylCircleDesc;
+
+  /// No description provided for @settingsThemeVinylTurntable.
+  ///
+  /// In en, this message translates to:
+  /// **'Vinyl Turntable Studio'**
+  String get settingsThemeVinylTurntable;
+
+  /// No description provided for @settingsThemeVinylTurntableDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'True vinyl record with realistic grooves, center label & tonearm'**
+  String get settingsThemeVinylTurntableDesc;
+
+  /// No description provided for @settingsTurnOffGapless.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off Gapless'**
+  String get settingsTurnOffGapless;
+
+  /// No description provided for @settingsTurnOffGaplessEnableCrossfade.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off Gapless & enable Crossfade'**
+  String get settingsTurnOffGaplessEnableCrossfade;
+
+  /// No description provided for @settingsUnavailableAaudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable while AAudio Direct output is enabled'**
+  String get settingsUnavailableAaudio;
+
+  /// No description provided for @settingsUnknownConnectionFailure.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown connection failure'**
+  String get settingsUnknownConnectionFailure;
+
+  /// No description provided for @settingsUsbBitPerfectStreaming.
+  ///
+  /// In en, this message translates to:
+  /// **'USB Bit-Perfect Streaming (Experimental)'**
+  String get settingsUsbBitPerfectStreaming;
+
+  /// No description provided for @settingsUsbDacHardwareVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'USB DAC Hardware Volume'**
+  String get settingsUsbDacHardwareVolume;
+
+  /// No description provided for @settingsUsbHwVolumeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Drives the {uac} DAC\'s own volume stage directly (lower distortion at low volume). {device}'**
+  String settingsUsbHwVolumeDesc(String uac, String device);
+
+  /// No description provided for @settingsUsbHwVolumeGrant.
+  ///
+  /// In en, this message translates to:
+  /// **'Grant USB access to control the DAC\'s hardware volume directly'**
+  String get settingsUsbHwVolumeGrant;
+
+  /// No description provided for @settingsUsbStreamingActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Raw UAC2 isochronous streaming is active'**
+  String get settingsUsbStreamingActive;
+
+  /// No description provided for @settingsUsbStreamingDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Claims the DAC exclusively and streams processed PCM directly over USB isochronous URBs. Unvalidated on hardware; falls back safely if the claim or endpoint setup fails'**
+  String get settingsUsbStreamingDesc;
+
+  /// No description provided for @settingsUsernameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Username'**
+  String get settingsUsernameLabel;
+
+  /// No description provided for @settingsVisualizerAlbumReactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Album Art Reactive Glow'**
+  String get settingsVisualizerAlbumReactive;
+
+  /// No description provided for @settingsVisualizerBarClassic.
+  ///
+  /// In en, this message translates to:
+  /// **'Bar (Classic Frequency Spectrum)'**
+  String get settingsVisualizerBarClassic;
+
+  /// No description provided for @settingsVisualizerCircular.
+  ///
+  /// In en, this message translates to:
+  /// **'Circular (Radial Spectrum)'**
+  String get settingsVisualizerCircular;
+
+  /// No description provided for @settingsVisualizerCustomJson.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom JSON Visualizer'**
+  String get settingsVisualizerCustomJson;
+
+  /// No description provided for @settingsVisualizerMilkdrop.
+  ///
+  /// In en, this message translates to:
+  /// **'Milkdrop Preset Visualizer'**
+  String get settingsVisualizerMilkdrop;
+
+  /// No description provided for @settingsVisualizerOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get settingsVisualizerOff;
+
+  /// No description provided for @settingsVisualizerParticles.
+  ///
+  /// In en, this message translates to:
+  /// **'Particles (Audio Field)'**
+  String get settingsVisualizerParticles;
+
+  /// No description provided for @settingsVisualizerTerrain3d.
+  ///
+  /// In en, this message translates to:
+  /// **'3D Terrain (Wireframe Mountain)'**
+  String get settingsVisualizerTerrain3d;
+
+  /// No description provided for @settingsVisualizerWaveSmooth.
+  ///
+  /// In en, this message translates to:
+  /// **'Wave (Smooth Line Spectrum)'**
+  String get settingsVisualizerWaveSmooth;
+
+  /// No description provided for @settingsVizBarDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Classic vertical frequency bars with smooth height animation'**
+  String get settingsVizBarDesc;
+
+  /// No description provided for @settingsVizCircularDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Futuristic radial frequency bars surrounding album centerpiece'**
+  String get settingsVizCircularDesc;
+
+  /// No description provided for @settingsVizCustomDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'User-authored JSON preset: bars / wave / radial / particles / lissajous'**
+  String get settingsVizCustomDesc;
+
+  /// No description provided for @settingsVizLabelBar.
+  ///
+  /// In en, this message translates to:
+  /// **'BAR'**
+  String get settingsVizLabelBar;
+
+  /// No description provided for @settingsVizLabelCircular.
+  ///
+  /// In en, this message translates to:
+  /// **'CIRCULAR'**
+  String get settingsVizLabelCircular;
+
+  /// No description provided for @settingsVizLabelCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'CUSTOM (JSON)'**
+  String get settingsVizLabelCustom;
+
+  /// No description provided for @settingsVizLabelMilkdrop.
+  ///
+  /// In en, this message translates to:
+  /// **'MILKDROP'**
+  String get settingsVizLabelMilkdrop;
+
+  /// No description provided for @settingsVizLabelOff.
+  ///
+  /// In en, this message translates to:
+  /// **'OFF'**
+  String get settingsVizLabelOff;
+
+  /// No description provided for @settingsVizLabelWave.
+  ///
+  /// In en, this message translates to:
+  /// **'WAVE'**
+  String get settingsVizLabelWave;
+
+  /// No description provided for @settingsVizOffDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable audio visualizer spectrum animation'**
+  String get settingsVizOffDesc;
+
+  /// No description provided for @settingsVizWaveDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Smooth continuous Bézier waveform line with ambient gradient fill'**
+  String get settingsVizWaveDesc;
+
+  /// No description provided for @settingsAboutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'About {title}'**
+  String settingsAboutTitle(String title);
+
+  /// No description provided for @settingsActiveBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'ACTIVE'**
+  String get settingsActiveBadge;
+
+  /// No description provided for @settingsActiveProxyProtocol.
+  ///
+  /// In en, this message translates to:
+  /// **'ACTIVE PROXY PROTOCOL'**
+  String get settingsActiveProxyProtocol;
+
+  /// No description provided for @settingsActiveServerConfig.
+  ///
+  /// In en, this message translates to:
+  /// **'ACTIVE SERVER CONFIGURATION'**
+  String get settingsActiveServerConfig;
+
+  /// No description provided for @settingsAdaptiveQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'Adaptive quality'**
+  String get settingsAdaptiveQuality;
+
+  /// No description provided for @settingsAdaptiveQualitySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Step bitrate down/up mid-track on stalls'**
+  String get settingsAdaptiveQualitySubtitle;
+
+  /// No description provided for @settingsAaudioBufferSize.
+  ///
+  /// In en, this message translates to:
+  /// **'AAudio Buffer Size'**
+  String get settingsAaudioBufferSize;
+
+  /// No description provided for @settingsAaudioBufferSizeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Stream buffer capacity hint in milliseconds. Lower = lower latency (wired), higher = more stall resistance'**
+  String get settingsAaudioBufferSizeDesc;
+
+  /// No description provided for @settingsAaudioDirect.
+  ///
+  /// In en, this message translates to:
+  /// **'AAudio Direct Output (Bit-Perfect)'**
+  String get settingsAaudioDirect;
+
+  /// No description provided for @settingsAaudioDirectDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Bypasses the system mixer with a native AAudio stream opened at each track rate (EXCLUSIVE attempt, SHARED fallback). The DSP chain and speed/pitch controls are inactive in this mode; applies to newly built players'**
+  String get settingsAaudioDirectDesc;
+
+  /// No description provided for @dspAboutBassBoost.
+  ///
+  /// In en, this message translates to:
+  /// **'About Bass Boost'**
+  String get dspAboutBassBoost;
+
+  /// No description provided for @dspAboutBitPerfect.
+  ///
+  /// In en, this message translates to:
+  /// **'About Bit-Perfect'**
+  String get dspAboutBitPerfect;
+
+  /// No description provided for @dspAboutCrossfeed.
+  ///
+  /// In en, this message translates to:
+  /// **'About Crossfeed'**
+  String get dspAboutCrossfeed;
+
+  /// No description provided for @dspAboutDspEngine.
+  ///
+  /// In en, this message translates to:
+  /// **'About DSP Engine'**
+  String get dspAboutDspEngine;
+
+  /// No description provided for @dspAboutDynamics.
+  ///
+  /// In en, this message translates to:
+  /// **'About Dynamics'**
+  String get dspAboutDynamics;
+
+  /// No description provided for @dspAboutEqualizer.
+  ///
+  /// In en, this message translates to:
+  /// **'About Equalizer'**
+  String get dspAboutEqualizer;
+
+  /// No description provided for @dspAboutLimiter.
+  ///
+  /// In en, this message translates to:
+  /// **'About Limiter'**
+  String get dspAboutLimiter;
+
+  /// No description provided for @dspAboutReverb.
+  ///
+  /// In en, this message translates to:
+  /// **'About Reverb'**
+  String get dspAboutReverb;
+
+  /// No description provided for @dspAboutSpatializer.
+  ///
+  /// In en, this message translates to:
+  /// **'About Spatializer'**
+  String get dspAboutSpatializer;
+
+  /// No description provided for @dspAboutStereoBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'About Stereo Balance'**
+  String get dspAboutStereoBalance;
+
+  /// No description provided for @dspAboutVirtualizer.
+  ///
+  /// In en, this message translates to:
+  /// **'About Virtualizer'**
+  String get dspAboutVirtualizer;
+
+  /// No description provided for @dspAboutVolumeBoost.
+  ///
+  /// In en, this message translates to:
+  /// **'About Volume Boost'**
+  String get dspAboutVolumeBoost;
+
+  /// No description provided for @dspActiveEffects.
+  ///
+  /// In en, this message translates to:
+  /// **'active effects (Reverb, Limiter...)'**
+  String get dspActiveEffects;
+
+  /// No description provided for @dspAddLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Line'**
+  String get dspAddLine;
+
+  /// No description provided for @dspAllEffectsBypassed.
+  ///
+  /// In en, this message translates to:
+  /// **'All DSP effects bypassed'**
+  String get dspAllEffectsBypassed;
+
+  /// No description provided for @dspAppliedProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied profile:'**
+  String get dspAppliedProfile;
+
+  /// No description provided for @dspAttackTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Attack Time'**
+  String get dspAttackTime;
+
+  /// No description provided for @dspAudioFormatCodec.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio Format & Codec'**
+  String get dspAudioFormatCodec;
+
+  /// No description provided for @dspAutoEqVerified.
+  ///
+  /// In en, this message translates to:
+  /// **'AutoEQ Verified'**
+  String get dspAutoEqVerified;
+
+  /// No description provided for @dspBassStrength.
+  ///
+  /// In en, this message translates to:
+  /// **'Bass Strength'**
+  String get dspBassStrength;
+
+  /// No description provided for @dspBitPerfectLosslessStream.
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-perfect Lossless Stream'**
+  String get dspBitPerfectLosslessStream;
+
+  /// No description provided for @dspBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'BLOCKED'**
+  String get dspBlocked;
+
+  /// No description provided for @dspBlockedBitPerfect.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked: Bit-Perfect bypass active'**
+  String get dspBlockedBitPerfect;
+
+  /// No description provided for @dspBluetoothCompensationDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Lossy Bluetooth gets a small presence compensation and a shorter reverb tail.'**
+  String get dspBluetoothCompensationDesc;
+
+  /// No description provided for @dspCodec.
+  ///
+  /// In en, this message translates to:
+  /// **'Codec'**
+  String get dspCodec;
+
+  /// No description provided for @dspCompressedStream.
+  ///
+  /// In en, this message translates to:
+  /// **'Compressed Audio Stream'**
+  String get dspCompressedStream;
+
+  /// No description provided for @dspCrossfeedChuMoy.
+  ///
+  /// In en, this message translates to:
+  /// **'Chu Moy (700Hz / 6dB)'**
+  String get dspCrossfeedChuMoy;
+
+  /// No description provided for @dspCrossfeedDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default (700Hz / 4.5dB)'**
+  String get dspCrossfeedDefault;
+
+  /// No description provided for @dspCrossfeedJanMeier.
+  ///
+  /// In en, this message translates to:
+  /// **'Jan Meier (650Hz / 9.5dB)'**
+  String get dspCrossfeedJanMeier;
+
+  /// No description provided for @dspCrossoverHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'Crossover 3 (High)'**
+  String get dspCrossoverHigh;
+
+  /// No description provided for @dspCrossoverLow.
+  ///
+  /// In en, this message translates to:
+  /// **'Crossover 1 (Low)'**
+  String get dspCrossoverLow;
+
+  /// No description provided for @dspCrossoverMid.
+  ///
+  /// In en, this message translates to:
+  /// **'Crossover 2 (Mid)'**
+  String get dspCrossoverMid;
+
+  /// No description provided for @dspDeleteCustomPreset.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete custom preset'**
+  String get dspDeleteCustomPreset;
+
+  /// No description provided for @dspDeleteLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete line'**
+  String get dspDeleteLine;
+
+  /// No description provided for @dspDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Device'**
+  String get dspDevice;
+
+  /// No description provided for @dspDr12Audiophile.
+  ///
+  /// In en, this message translates to:
+  /// **'DR 12+ Audiophile'**
+  String get dspDr12Audiophile;
+
+  /// No description provided for @dspDrHighDynamic.
+  ///
+  /// In en, this message translates to:
+  /// **'DR High Dynamic'**
+  String get dspDrHighDynamic;
+
+  /// No description provided for @dspDrStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'DR Standard'**
+  String get dspDrStandard;
+
+  /// No description provided for @dspDspProcessing.
+  ///
+  /// In en, this message translates to:
+  /// **'DSP PROCESSING'**
+  String get dspDspProcessing;
+
+  /// No description provided for @dspDynamicRangeLra.
+  ///
+  /// In en, this message translates to:
+  /// **'Dynamic Range (LRA)'**
+  String get dspDynamicRangeLra;
+
+  /// No description provided for @dspEbuR128.
+  ///
+  /// In en, this message translates to:
+  /// **'EBU R128 Loudness Range Analysis'**
+  String get dspEbuR128;
+
+  /// No description provided for @dspEditLyrics.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit lyrics'**
+  String get dspEditLyrics;
+
+  /// No description provided for @dspEmbedded.
+  ///
+  /// In en, this message translates to:
+  /// **'Embedded'**
+  String get dspEmbedded;
+
+  /// No description provided for @dspEmbeddedUnsynced.
+  ///
+  /// In en, this message translates to:
+  /// **'Embedded (unsynced)'**
+  String get dspEmbeddedUnsynced;
+
+  /// No description provided for @dspEqCurvesBypassed.
+  ///
+  /// In en, this message translates to:
+  /// **'Equalizer curves bypassed'**
+  String get dspEqCurvesBypassed;
+
+  /// No description provided for @dspEveryBandValidNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Every band needs a valid number.'**
+  String get dspEveryBandValidNumber;
+
+  /// No description provided for @dspExportThemeJson.
+  ///
+  /// In en, this message translates to:
+  /// **'Export Theme JSON'**
+  String get dspExportThemeJson;
+
+  /// No description provided for @dspFileSizeDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'File Size & Duration'**
+  String get dspFileSizeDuration;
+
+  /// No description provided for @dspFirLoaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Room-correction FIR loaded into the convolution stage.'**
+  String get dspFirLoaded;
+
+  /// No description provided for @dspFirRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'The audio engine rejected the FIR export.'**
+  String get dspFirRejected;
+
+  /// No description provided for @dspFreqRange10To30k.
+  ///
+  /// In en, this message translates to:
+  /// **'Frequencies must stay within 10-30000 Hz.'**
+  String get dspFreqRange10To30k;
+
+  /// No description provided for @dspFreqStrictlyAscending.
+  ///
+  /// In en, this message translates to:
+  /// **'Frequencies must be strictly ascending.'**
+  String get dspFreqStrictlyAscending;
+
+  /// No description provided for @dspHardwareEndpoint.
+  ///
+  /// In en, this message translates to:
+  /// **'HARDWARE ENDPOINT'**
+  String get dspHardwareEndpoint;
+
+  /// No description provided for @dspHeadset.
+  ///
+  /// In en, this message translates to:
+  /// **'Headset'**
+  String get dspHeadset;
+
+  /// No description provided for @dspKaraokeMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Karaoke Mode'**
+  String get dspKaraokeMode;
+
+  /// No description provided for @dspLatency.
+  ///
+  /// In en, this message translates to:
+  /// **'Latency'**
+  String get dspLatency;
+
+  /// No description provided for @dspLoadingLyrics.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading lyrics…'**
+  String get dspLoadingLyrics;
+
+  /// No description provided for @dspLrcLibSynced.
+  ///
+  /// In en, this message translates to:
+  /// **'LRCLIB Synced'**
+  String get dspLrcLibSynced;
+
+  /// No description provided for @dspLyricsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Lyrics saved'**
+  String get dspLyricsSaved;
+
+  /// No description provided for @dspLyricsSessionOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Lyrics updated for this session only'**
+  String get dspLyricsSessionOnly;
+
+  /// No description provided for @dspMakeupGain.
+  ///
+  /// In en, this message translates to:
+  /// **'Makeup Gain'**
+  String get dspMakeupGain;
+
+  /// No description provided for @dspMaxBoost.
+  ///
+  /// In en, this message translates to:
+  /// **'Max Boost'**
+  String get dspMaxBoost;
+
+  /// No description provided for @dspMosqueAmbience.
+  ///
+  /// In en, this message translates to:
+  /// **'Mosque Ambience'**
+  String get dspMosqueAmbience;
+
+  /// No description provided for @dspMosqueAmbienceDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Convolution reverb for a hall-like space'**
+  String get dspMosqueAmbienceDesc;
+
+  /// No description provided for @dspMuteBand.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute band'**
+  String get dspMuteBand;
+
+  /// No description provided for @dspMyCustomEq.
+  ///
+  /// In en, this message translates to:
+  /// **'My Custom EQ'**
+  String get dspMyCustomEq;
+
+  /// No description provided for @dspNoProfileLoaded.
+  ///
+  /// In en, this message translates to:
+  /// **'No profile loaded'**
+  String get dspNoProfileLoaded;
+
+  /// No description provided for @dspNormal.
+  ///
+  /// In en, this message translates to:
+  /// **'Normal'**
+  String get dspNormal;
+
+  /// No description provided for @dspOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get dspOff;
+
+  /// No description provided for @dspOriginalPitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Original Pitch (1.00x)'**
+  String get dspOriginalPitch;
+
+  /// No description provided for @dspOutputDriver.
+  ///
+  /// In en, this message translates to:
+  /// **'OUTPUT DRIVER'**
+  String get dspOutputDriver;
+
+  /// No description provided for @dspPresetImportInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to import preset: invalid JSON format'**
+  String get dspPresetImportInvalid;
+
+  /// No description provided for @dspPresetImported.
+  ///
+  /// In en, this message translates to:
+  /// **'EQ Preset imported successfully!'**
+  String get dspPresetImported;
+
+  /// No description provided for @dspPresetLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Preset:'**
+  String get dspPresetLabel;
+
+  /// No description provided for @dspPresetName.
+  ///
+  /// In en, this message translates to:
+  /// **'Preset Name'**
+  String get dspPresetName;
+
+  /// No description provided for @dspPresetNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Warm Bass, Vocal Punch'**
+  String get dspPresetNameHint;
+
+  /// No description provided for @dspPresetOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Preset Options'**
+  String get dspPresetOptions;
+
+  /// No description provided for @dspPulsrAudiophileEdition.
+  ///
+  /// In en, this message translates to:
+  /// **'Pulsr Audiophile Edition'**
+  String get dspPulsrAudiophileEdition;
+
+  /// No description provided for @dspQBandwidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Q / Bandwidth'**
+  String get dspQBandwidth;
+
+  /// No description provided for @dspQuranModeOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Quran Mode: Off'**
+  String get dspQuranModeOff;
+
+  /// No description provided for @dspQuranModeOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Quran Mode: On'**
+  String get dspQuranModeOn;
+
+  /// No description provided for @dspRatio.
+  ///
+  /// In en, this message translates to:
+  /// **'Ratio'**
+  String get dspRatio;
+
+  /// No description provided for @dspResamplingEngine.
+  ///
+  /// In en, this message translates to:
+  /// **'RESAMPLING ENGINE'**
+  String get dspResamplingEngine;
+
+  /// No description provided for @dspResetAllEqTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset all DSP & EQ to defaults'**
+  String get dspResetAllEqTooltip;
+
+  /// No description provided for @dspResetBalanceCenter.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Balance to Center'**
+  String get dspResetBalanceCenter;
+
+  /// No description provided for @dspResetBassEnhancer.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Bass Enhancer (Off)'**
+  String get dspResetBassEnhancer;
+
+  /// No description provided for @dspResetPreamp.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset preamp'**
+  String get dspResetPreamp;
+
+  /// No description provided for @dspResetToDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to default'**
+  String get dspResetToDefault;
+
+  /// No description provided for @dspResetToDefault0.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to default (0%)'**
+  String get dspResetToDefault0;
+
+  /// No description provided for @dspResetToDefault02dbfs.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to default (-0.2 dBFS)'**
+  String get dspResetToDefault02dbfs;
+
+  /// No description provided for @dspResetToDefault20wet.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to default (20% Wet)'**
+  String get dspResetToDefault20wet;
+
+  /// No description provided for @dspResetToDefault350us.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to default (350 µs)'**
+  String get dspResetToDefault350us;
+
+  /// No description provided for @dspResetToDefault50ms.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to default (50 ms)'**
+  String get dspResetToDefault50ms;
+
+  /// No description provided for @dspResetToDefault9db.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to default (-9.0 dB)'**
+  String get dspResetToDefault9db;
+
+  /// No description provided for @dspResetVolumeBoost.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Volume Boost (Off)'**
+  String get dspResetVolumeBoost;
+
+  /// No description provided for @dspSearchHeadphones.
+  ///
+  /// In en, this message translates to:
+  /// **'Search headphones (Sony, Sennheiser, Apple...)'**
+  String get dspSearchHeadphones;
+
+  /// No description provided for @dspSearchHeadphonesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search headphones (e.g. AirPods, Sony, Moondrop)...'**
+  String get dspSearchHeadphonesHint;
+
+  /// No description provided for @dspSlider1Label.
+  ///
+  /// In en, this message translates to:
+  /// **'slider1 (Rate / Drive)'**
+  String get dspSlider1Label;
+
+  /// No description provided for @dspSlider2Label.
+  ///
+  /// In en, this message translates to:
+  /// **'slider2 (Depth / Mix)'**
+  String get dspSlider2Label;
+
+  /// No description provided for @dspSoloBand.
+  ///
+  /// In en, this message translates to:
+  /// **'Solo band'**
+  String get dspSoloBand;
+
+  /// No description provided for @dspSortByTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort by time'**
+  String get dspSortByTime;
+
+  /// No description provided for @dspSourceBitrate.
+  ///
+  /// In en, this message translates to:
+  /// **'Source Bitrate'**
+  String get dspSourceBitrate;
+
+  /// No description provided for @dspSourceFile.
+  ///
+  /// In en, this message translates to:
+  /// **'SOURCE FILE'**
+  String get dspSourceFile;
+
+  /// No description provided for @dspSourceSampleRateDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'Source Sample Rate & Depth'**
+  String get dspSourceSampleRateDepth;
+
+  /// No description provided for @dspSpatialTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Spatial & DSP'**
+  String get dspSpatialTab;
+
+  /// No description provided for @dspSpeaker.
+  ///
+  /// In en, this message translates to:
+  /// **'Speaker'**
+  String get dspSpeaker;
+
+  /// No description provided for @dspStandardDynamicRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard Dynamic Range'**
+  String get dspStandardDynamicRange;
+
+  /// No description provided for @dspStandby.
+  ///
+  /// In en, this message translates to:
+  /// **'STANDBY'**
+  String get dspStandby;
+
+  /// No description provided for @dspTapeLoaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Tape Loaded'**
+  String get dspTapeLoaded;
+
+  /// No description provided for @dspTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'Target:'**
+  String get dspTarget;
+
+  /// No description provided for @dspThreshold.
+  ///
+  /// In en, this message translates to:
+  /// **'Threshold'**
+  String get dspThreshold;
+
+  /// No description provided for @dspTunedFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Tuned for'**
+  String get dspTunedFor;
+
+  /// No description provided for @dspUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get dspUnknown;
+
+  /// No description provided for @dspUnmuteBand.
+  ///
+  /// In en, this message translates to:
+  /// **'Unmute band'**
+  String get dspUnmuteBand;
+
+  /// No description provided for @dspUnsoloBand.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsolo band'**
+  String get dspUnsoloBand;
+
+  /// No description provided for @dspVariableBitrate.
+  ///
+  /// In en, this message translates to:
+  /// **'Variable Bitrate'**
+  String get dspVariableBitrate;
+
+  /// No description provided for @dspVocalWarmth.
+  ///
+  /// In en, this message translates to:
+  /// **'Vocal Warmth'**
+  String get dspVocalWarmth;
+
+  /// No description provided for @dspVocalWarmthDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Harmonic richness on the reciter\'s voice'**
+  String get dspVocalWarmthDesc;
+
+  /// No description provided for @dspWiredCompensationDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Wired / USB output is left untouched by hardware compensation.'**
+  String get dspWiredCompensationDesc;
+
+  /// No description provided for @browseAccountConnectedDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Account connected! Tap \"Done\" to finish.'**
+  String get browseAccountConnectedDone;
+
+  /// No description provided for @browseAcoustic.
+  ///
+  /// In en, this message translates to:
+  /// **'Acoustic'**
+  String get browseAcoustic;
+
+  /// No description provided for @browseActiveDownloadsSuffix.
+  ///
+  /// In en, this message translates to:
+  /// **'(3 active downloads)...'**
+  String get browseActiveDownloadsSuffix;
+
+  /// No description provided for @browseAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Added'**
+  String get browseAdded;
+
+  /// No description provided for @browseAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Address'**
+  String get browseAddress;
+
+  /// No description provided for @browseAlarmSound.
+  ///
+  /// In en, this message translates to:
+  /// **'Alarm sound'**
+  String get browseAlarmSound;
+
+  /// No description provided for @browseAllLikedSongsDownloadedOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'All liked songs are already downloaded offline.'**
+  String get browseAllLikedSongsDownloadedOffline;
+
+  /// No description provided for @browseAllOnlineLikedDownloaded.
+  ///
+  /// In en, this message translates to:
+  /// **'All online liked songs are already downloaded or in progress.'**
+  String get browseAllOnlineLikedDownloaded;
+
+  /// No description provided for @browseAllOnlineTracksDownloaded.
+  ///
+  /// In en, this message translates to:
+  /// **'All online tracks are already downloaded or in progress.'**
+  String get browseAllOnlineTracksDownloaded;
+
+  /// No description provided for @browseAllSongsOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'All songs in this list are already offline local tracks.'**
+  String get browseAllSongsOffline;
+
+  /// No description provided for @browseAllTracksAlreadyDownloaded.
+  ///
+  /// In en, this message translates to:
+  /// **'All tracks are already downloaded or local'**
+  String get browseAllTracksAlreadyDownloaded;
+
+  /// No description provided for @browseAllTracksFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'All tracks from'**
+  String get browseAllTracksFrom;
+
+  /// No description provided for @browseAllTracksOfflineLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'All tracks in this playlist are already offline local files.'**
+  String get browseAllTracksOfflineLocal;
+
+  /// No description provided for @browseAlreadyDownloadedOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'are already downloaded offline.'**
+  String get browseAlreadyDownloadedOffline;
+
+  /// No description provided for @browseAlreadyHaveAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Already have an account? Sign In'**
+  String get browseAlreadyHaveAccount;
+
+  /// No description provided for @browseApplyChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply Changes'**
+  String get browseApplyChanges;
+
+  /// No description provided for @browseArabicPop.
+  ///
+  /// In en, this message translates to:
+  /// **'Arabic Pop'**
+  String get browseArabicPop;
+
+  /// No description provided for @browseAudioTracks.
+  ///
+  /// In en, this message translates to:
+  /// **'audio tracks'**
+  String get browseAudioTracks;
+
+  /// No description provided for @browseAutoFetchTags.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-Fetch Tags & Cover Art'**
+  String get browseAutoFetchTags;
+
+  /// No description provided for @browseBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get browseBack;
+
+  /// No description provided for @browseBatchEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch Edit'**
+  String get browseBatchEdit;
+
+  /// No description provided for @browseBatchEditingBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch editing {count} tracks. Common tags and cover art will be updated on all selected files.'**
+  String browseBatchEditingBody(int count);
+
+  /// No description provided for @browseBatchEditTags.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch Edit Tags'**
+  String get browseBatchEditTags;
+
+  /// No description provided for @browseBy.
+  ///
+  /// In en, this message translates to:
+  /// **'by'**
+  String get browseBy;
+
+  /// No description provided for @browseCannotBeUndone.
+  ///
+  /// In en, this message translates to:
+  /// **'This cannot be undone.'**
+  String get browseCannotBeUndone;
+
+  /// No description provided for @browseCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Categories'**
+  String get browseCategories;
+
+  /// No description provided for @browseChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking…'**
+  String get browseChecking;
+
+  /// No description provided for @browseCheckOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Check out'**
+  String get browseCheckOut;
+
+  /// No description provided for @browseChillLofi.
+  ///
+  /// In en, this message translates to:
+  /// **'Chill & Lo-Fi'**
+  String get browseChillLofi;
+
+  /// No description provided for @browseChillout.
+  ///
+  /// In en, this message translates to:
+  /// **'Chillout'**
+  String get browseChillout;
+
+  /// No description provided for @browseClearHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear History'**
+  String get browseClearHistory;
+
+  /// No description provided for @browseClearHistoryFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to clear history'**
+  String get browseClearHistoryFailed;
+
+  /// No description provided for @browseClearListeningHistoryMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This will remove all tracks from your Recently Played history. Your actual audio files and playlists will not be affected.'**
+  String get browseClearListeningHistoryMessage;
+
+  /// No description provided for @browseClearListeningHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Listening History?'**
+  String get browseClearListeningHistoryTitle;
+
+  /// No description provided for @browseClearPlayHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Play History'**
+  String get browseClearPlayHistory;
+
+  /// No description provided for @browseClearPlayHistoryMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This will reset your recently played list and listening history. Your song files and playlists will not be affected.'**
+  String get browseClearPlayHistoryMessage;
+
+  /// No description provided for @browseClearPlayHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Play History?'**
+  String get browseClearPlayHistoryTitle;
+
+  /// No description provided for @browseClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get browseClose;
+
+  /// No description provided for @browseCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get browseCode;
+
+  /// No description provided for @browseComment.
+  ///
+  /// In en, this message translates to:
+  /// **'Comment'**
+  String get browseComment;
+
+  /// No description provided for @browseConnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect'**
+  String get browseConnect;
+
+  /// No description provided for @browseConnectToSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect account to sync Liked Music automatically'**
+  String get browseConnectToSync;
+
+  /// No description provided for @browseCookiesRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube rejected these cookies — they have expired or belong to a signed-out session'**
+  String get browseCookiesRejected;
+
+  /// No description provided for @browseCookieVerifyOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not reach YouTube to verify — the cookies are saved, try again when back online'**
+  String get browseCookieVerifyOffline;
+
+  /// No description provided for @browseCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'copied'**
+  String get browseCopied;
+
+  /// No description provided for @browseCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get browseCopy;
+
+  /// No description provided for @browseCouldNotLoadAlbums.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load albums.'**
+  String get browseCouldNotLoadAlbums;
+
+  /// No description provided for @browseCouldNotLoadTopTracks.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load top tracks.'**
+  String get browseCouldNotLoadTopTracks;
+
+  /// No description provided for @browseCouldNotLoadTracks.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load tracks for this playlist. Please check your internet connection or URL.'**
+  String get browseCouldNotLoadTracks;
+
+  /// No description provided for @browseCreateCloudAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Cloud Account'**
+  String get browseCreateCloudAccount;
+
+  /// No description provided for @browseCrossfade.
+  ///
+  /// In en, this message translates to:
+  /// **'Crossfade'**
+  String get browseCrossfade;
+
+  /// No description provided for @browseCurrentIdentity.
+  ///
+  /// In en, this message translates to:
+  /// **'Current identity'**
+  String get browseCurrentIdentity;
+
+  /// No description provided for @browseDeselect.
+  ///
+  /// In en, this message translates to:
+  /// **'Deselect'**
+  String get browseDeselect;
+
+  /// No description provided for @browseDisc.
+  ///
+  /// In en, this message translates to:
+  /// **'Disc'**
+  String get browseDisc;
+
+  /// No description provided for @browseDiscNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Disc Number'**
+  String get browseDiscNumber;
+
+  /// No description provided for @browseDiskStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Disk Storage'**
+  String get browseDiskStorage;
+
+  /// No description provided for @browseDontHaveAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t have an account? Sign Up'**
+  String get browseDontHaveAccount;
+
+  /// No description provided for @browseDownloadActionsFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Download actions for'**
+  String get browseDownloadActionsFor;
+
+  /// No description provided for @browseDownloadAllLikedSongs.
+  ///
+  /// In en, this message translates to:
+  /// **'Download All Liked Songs'**
+  String get browseDownloadAllLikedSongs;
+
+  /// No description provided for @browseDownloadAllOfflineActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Download all offline (3 active downloads)'**
+  String get browseDownloadAllOfflineActive;
+
+  /// No description provided for @browseDownloadAllOnlineFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'Download All Online Favorites'**
+  String get browseDownloadAllOnlineFavorites;
+
+  /// No description provided for @browseDownloadOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Download offline'**
+  String get browseDownloadOffline;
+
+  /// No description provided for @browseEgyptMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Egypt Mode'**
+  String get browseEgyptMode;
+
+  /// No description provided for @browseElectronic.
+  ///
+  /// In en, this message translates to:
+  /// **'Electronic'**
+  String get browseElectronic;
+
+  /// No description provided for @browseEmailAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Email address'**
+  String get browseEmailAddress;
+
+  /// No description provided for @browseEnter.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter'**
+  String get browseEnter;
+
+  /// No description provided for @browseEnterBpmRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a BPM between 40 and 240.'**
+  String get browseEnterBpmRange;
+
+  /// No description provided for @browseEnterLyrics.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter song lyrics...'**
+  String get browseEnterLyrics;
+
+  /// No description provided for @browseEnterPlaylistUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a playlist URL or ID'**
+  String get browseEnterPlaylistUrl;
+
+  /// No description provided for @browseEta.
+  ///
+  /// In en, this message translates to:
+  /// **'ETA:'**
+  String get browseEta;
+
+  /// No description provided for @browseExcludeFromScan.
+  ///
+  /// In en, this message translates to:
+  /// **'Exclude from Scan'**
+  String get browseExcludeFromScan;
+
+  /// No description provided for @browseExplore.
+  ///
+  /// In en, this message translates to:
+  /// **'Explore'**
+  String get browseExplore;
+
+  /// No description provided for @browseFailedLoadFeed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load feed. Check connection and retry.'**
+  String get browseFailedLoadFeed;
+
+  /// No description provided for @browseFailedToFetch.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to fetch'**
+  String get browseFailedToFetch;
+
+  /// No description provided for @browseFailedToLoadAccountPlaylists.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load account playlists'**
+  String get browseFailedToLoadAccountPlaylists;
+
+  /// No description provided for @browseFetching.
+  ///
+  /// In en, this message translates to:
+  /// **'Fetching'**
+  String get browseFetching;
+
+  /// No description provided for @browseFlac.
+  ///
+  /// In en, this message translates to:
+  /// **'FLAC'**
+  String get browseFlac;
+
+  /// No description provided for @browseFlat.
+  ///
+  /// In en, this message translates to:
+  /// **'Flat'**
+  String get browseFlat;
+
+  /// No description provided for @browseForDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'for download'**
+  String get browseForDownload;
+
+  /// No description provided for @browseForward.
+  ///
+  /// In en, this message translates to:
+  /// **'Forward'**
+  String get browseForward;
+
+  /// No description provided for @browseForYou.
+  ///
+  /// In en, this message translates to:
+  /// **'For You'**
+  String get browseForYou;
+
+  /// No description provided for @browseGenreArabicRegional.
+  ///
+  /// In en, this message translates to:
+  /// **'Arabic & Regional'**
+  String get browseGenreArabicRegional;
+
+  /// No description provided for @browseGenreClassicalInstrumental.
+  ///
+  /// In en, this message translates to:
+  /// **'Classical & Instrumental'**
+  String get browseGenreClassicalInstrumental;
+
+  /// No description provided for @browseGenreElectronicDance.
+  ///
+  /// In en, this message translates to:
+  /// **'Electronic & Dance'**
+  String get browseGenreElectronicDance;
+
+  /// No description provided for @browseGenreHipHopRnb.
+  ///
+  /// In en, this message translates to:
+  /// **'Hip-Hop & R&B'**
+  String get browseGenreHipHopRnb;
+
+  /// No description provided for @browseGenreJazzBlues.
+  ///
+  /// In en, this message translates to:
+  /// **'Jazz & Blues'**
+  String get browseGenreJazzBlues;
+
+  /// No description provided for @browseGenrePopAcoustic.
+  ///
+  /// In en, this message translates to:
+  /// **'Pop & Acoustic'**
+  String get browseGenrePopAcoustic;
+
+  /// No description provided for @browseGenreRockMetal.
+  ///
+  /// In en, this message translates to:
+  /// **'Rock & Metal'**
+  String get browseGenreRockMetal;
+
+  /// No description provided for @browseGlobalTopHits.
+  ///
+  /// In en, this message translates to:
+  /// **'Global Top Hits'**
+  String get browseGlobalTopHits;
+
+  /// No description provided for @browseGoogleBlocking.
+  ///
+  /// In en, this message translates to:
+  /// **'Google is blocking this sign-in'**
+  String get browseGoogleBlocking;
+
+  /// No description provided for @browseGoogleBlockingBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Google blocks sign-in inside embedded browsers for some accounts, and the automatic retries (clearing cookies and switching the browser identity) didn\'t get past it.\n\nUse the reliable option below to sign in with Google TV: approve on your own browser and Google never sees an embedded WebView, so there is no captcha. Pulsr will sync your library and playlists; playback keeps working as usual.'**
+  String get browseGoogleBlockingBody;
+
+  /// No description provided for @browseHipHop.
+  ///
+  /// In en, this message translates to:
+  /// **'Hip-Hop'**
+  String get browseHipHop;
+
+  /// No description provided for @browseHistoryCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Listening history cleared'**
+  String get browseHistoryCleared;
+
+  /// No description provided for @browseHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Home'**
+  String get browseHome;
+
+  /// No description provided for @browseHoursShort.
+  ///
+  /// In en, this message translates to:
+  /// **'h'**
+  String get browseHoursShort;
+
+  /// No description provided for @browseIncludeInScan.
+  ///
+  /// In en, this message translates to:
+  /// **'Include in Scan'**
+  String get browseIncludeInScan;
+
+  /// No description provided for @browseInvalidEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid email address'**
+  String get browseInvalidEmail;
+
+  /// No description provided for @browseJazz.
+  ///
+  /// In en, this message translates to:
+  /// **'Jazz'**
+  String get browseJazz;
+
+  /// No description provided for @browseLatestTracksSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Latest tracks played on this device'**
+  String get browseLatestTracksSubtitle;
+
+  /// No description provided for @browseLibraryStats.
+  ///
+  /// In en, this message translates to:
+  /// **'Library Stats'**
+  String get browseLibraryStats;
+
+  /// No description provided for @browseLikedSongsForDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'liked songs for download'**
+  String get browseLikedSongsForDownload;
+
+  /// No description provided for @browseList.
+  ///
+  /// In en, this message translates to:
+  /// **'List'**
+  String get browseList;
+
+  /// No description provided for @browseListeningTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Listening Time'**
+  String get browseListeningTime;
+
+  /// No description provided for @browseLofiBeats.
+  ///
+  /// In en, this message translates to:
+  /// **'Lo-Fi Beats'**
+  String get browseLofiBeats;
+
+  /// No description provided for @browseLoggedInSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Logged In Successfully'**
+  String get browseLoggedInSuccessfully;
+
+  /// No description provided for @browseLossless.
+  ///
+  /// In en, this message translates to:
+  /// **'Lossless'**
+  String get browseLossless;
+
+  /// No description provided for @browseLosslessHiRes.
+  ///
+  /// In en, this message translates to:
+  /// **'Lossless / Hi-Res:'**
+  String get browseLosslessHiRes;
+
+  /// No description provided for @browseMahraganat.
+  ///
+  /// In en, this message translates to:
+  /// **'Mahraganat'**
+  String get browseMahraganat;
+
+  /// No description provided for @browseMissingSessionCookies.
+  ///
+  /// In en, this message translates to:
+  /// **'Missing session cookies — the paste needs an SAPISID and a __Secure-3PSID (or 1PSID)'**
+  String get browseMissingSessionCookies;
+
+  /// No description provided for @browseMoreOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'More options'**
+  String get browseMoreOptions;
+
+  /// No description provided for @browseMoreTools.
+  ///
+  /// In en, this message translates to:
+  /// **'More tools'**
+  String get browseMoreTools;
+
+  /// No description provided for @browseMostPlayedTracks.
+  ///
+  /// In en, this message translates to:
+  /// **'Most Played Tracks'**
+  String get browseMostPlayedTracks;
+
+  /// No description provided for @browseMostPlayedTracksSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your all-time favorites leaderboard'**
+  String get browseMostPlayedTracksSubtitle;
+
+  /// No description provided for @browseNoArtistsFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No Artists Found'**
+  String get browseNoArtistsFound;
+
+  /// No description provided for @browseNoChangesToSave.
+  ///
+  /// In en, this message translates to:
+  /// **'No Changes to Save'**
+  String get browseNoChangesToSave;
+
+  /// No description provided for @browseNoGenresFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No Genres Found'**
+  String get browseNoGenresFound;
+
+  /// No description provided for @browseNoRecommendations.
+  ///
+  /// In en, this message translates to:
+  /// **'No recommendations right now.'**
+  String get browseNoRecommendations;
+
+  /// No description provided for @browseNoResultsFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No Results Found'**
+  String get browseNoResultsFound;
+
+  /// No description provided for @browseNoSongsInLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'No songs in library'**
+  String get browseNoSongsInLibrary;
+
+  /// No description provided for @browseNoSongsMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'No songs match'**
+  String get browseNoSongsMatch;
+
+  /// No description provided for @browseNotificationSound.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification sound'**
+  String get browseNotificationSound;
+
+  /// No description provided for @browseNoTracks.
+  ///
+  /// In en, this message translates to:
+  /// **'No Tracks'**
+  String get browseNoTracks;
+
+  /// No description provided for @browseNoTracksFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No Tracks Found'**
+  String get browseNoTracksFound;
+
+  /// No description provided for @browseNoTracksInFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'No playable audio tracks found in this directory.'**
+  String get browseNoTracksInFolder;
+
+  /// No description provided for @browseNoTracksInGenre.
+  ///
+  /// In en, this message translates to:
+  /// **'No tracks found in this genre.'**
+  String get browseNoTracksInGenre;
+
+  /// No description provided for @browseNoTracksInYear.
+  ///
+  /// In en, this message translates to:
+  /// **'No tracks found for this year.'**
+  String get browseNoTracksInYear;
+
+  /// No description provided for @browseNoTracksMatchSmartRules.
+  ///
+  /// In en, this message translates to:
+  /// **'No tracks match the rules for this smart playlist.'**
+  String get browseNoTracksMatchSmartRules;
+
+  /// No description provided for @browseNoTracksPrivateLiked.
+  ///
+  /// In en, this message translates to:
+  /// **'No tracks found. If this is your private Liked Music, please ensure you are signed in or tap \"Sync\".'**
+  String get browseNoTracksPrivateLiked;
+
+  /// No description provided for @browseNotSet.
+  ///
+  /// In en, this message translates to:
+  /// **'Not set'**
+  String get browseNotSet;
+
+  /// No description provided for @browseNoYearsFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No Years Found'**
+  String get browseNoYearsFound;
+
+  /// No description provided for @browseNoYtmMatchesFor.
+  ///
+  /// In en, this message translates to:
+  /// **'No YouTube Music matches for'**
+  String get browseNoYtmMatchesFor;
+
+  /// No description provided for @browseOauthAccessDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Access was denied on the Google page.'**
+  String get browseOauthAccessDenied;
+
+  /// No description provided for @browseOauthExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'The code expired before it was approved. Try again.'**
+  String get browseOauthExpired;
+
+  /// No description provided for @browseOauthGoogleError.
+  ///
+  /// In en, this message translates to:
+  /// **'Google returned an error'**
+  String get browseOauthGoogleError;
+
+  /// No description provided for @browseOauthStartFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not start the Google sign-in. Check your connection.'**
+  String get browseOauthStartFailed;
+
+  /// No description provided for @browseOfflinePlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline playlist'**
+  String get browseOfflinePlaylist;
+
+  /// No description provided for @browseOnPulsr.
+  ///
+  /// In en, this message translates to:
+  /// **'on Pulsr Music!'**
+  String get browseOnPulsr;
+
+  /// No description provided for @browseOpenFolderDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Open folder details'**
+  String get browseOpenFolderDetails;
+
+  /// No description provided for @browsePassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get browsePassword;
+
+  /// No description provided for @browsePasswordMinChars.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must be at least 6 characters'**
+  String get browsePasswordMinChars;
+
+  /// No description provided for @browsePasswordResetSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Password reset link sent to'**
+  String get browsePasswordResetSent;
+
+  /// No description provided for @browsePasteFromClipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste from clipboard'**
+  String get browsePasteFromClipboard;
+
+  /// No description provided for @browsePastePlaylistLinkHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste a YouTube or YouTube Music playlist link.'**
+  String get browsePastePlaylistLinkHint;
+
+  /// No description provided for @browsePersonalized.
+  ///
+  /// In en, this message translates to:
+  /// **'Personalized'**
+  String get browsePersonalized;
+
+  /// No description provided for @browsePlaylistExportedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Playlist exported successfully'**
+  String get browsePlaylistExportedSuccess;
+
+  /// No description provided for @browsePlaylistHasNoSongs.
+  ///
+  /// In en, this message translates to:
+  /// **'This playlist has no songs.'**
+  String get browsePlaylistHasNoSongs;
+
+  /// No description provided for @browsePlaylistSharePrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Playlist:'**
+  String get browsePlaylistSharePrefix;
+
+  /// No description provided for @browsePlaylistUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Playlist updated'**
+  String get browsePlaylistUpdated;
+
+  /// No description provided for @browsePlays.
+  ///
+  /// In en, this message translates to:
+  /// **'plays'**
+  String get browsePlays;
+
+  /// No description provided for @browsePleaseEnterCookieText.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter cookie text'**
+  String get browsePleaseEnterCookieText;
+
+  /// No description provided for @browsePleaseEnterEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter email'**
+  String get browsePleaseEnterEmail;
+
+  /// No description provided for @browsePop.
+  ///
+  /// In en, this message translates to:
+  /// **'Pop'**
+  String get browsePop;
+
+  /// No description provided for @browsePopMix.
+  ///
+  /// In en, this message translates to:
+  /// **'Pop Mix'**
+  String get browsePopMix;
+
+  /// No description provided for @browsePopular.
+  ///
+  /// In en, this message translates to:
+  /// **'Popular'**
+  String get browsePopular;
+
+  /// No description provided for @browseQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'Queued'**
+  String get browseQueued;
+
+  /// No description provided for @browseRadioNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Chillhop Radio'**
+  String get browseRadioNameHint;
+
+  /// No description provided for @browseRecentSongs.
+  ///
+  /// In en, this message translates to:
+  /// **'recent songs'**
+  String get browseRecentSongs;
+
+  /// No description provided for @browseRecommendedForYou.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended For You'**
+  String get browseRecommendedForYou;
+
+  /// No description provided for @browseRecommendedYtmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'✨ Recommended For You (YouTube Music)'**
+  String get browseRecommendedYtmTitle;
+
+  /// No description provided for @browseRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get browseRefresh;
+
+  /// No description provided for @browseRefreshPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh page'**
+  String get browseRefreshPage;
+
+  /// No description provided for @browseRefreshPlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh playlist'**
+  String get browseRefreshPlaylist;
+
+  /// No description provided for @browseRelaxing.
+  ///
+  /// In en, this message translates to:
+  /// **'Relaxing'**
+  String get browseRelaxing;
+
+  /// No description provided for @browseReleaseYear.
+  ///
+  /// In en, this message translates to:
+  /// **'Release Year'**
+  String get browseReleaseYear;
+
+  /// No description provided for @browseRenamePlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename Playlist'**
+  String get browseRenamePlaylist;
+
+  /// No description provided for @browseRequiresModifySettings.
+  ///
+  /// In en, this message translates to:
+  /// **'directly, Android requires the \"Modify system settings\" permission.'**
+  String get browseRequiresModifySettings;
+
+  /// No description provided for @browseRock.
+  ///
+  /// In en, this message translates to:
+  /// **'Rock'**
+  String get browseRock;
+
+  /// No description provided for @browseRockClassics.
+  ///
+  /// In en, this message translates to:
+  /// **'Rock Classics'**
+  String get browseRockClassics;
+
+  /// No description provided for @browseRockMetal.
+  ///
+  /// In en, this message translates to:
+  /// **'Rock & Metal'**
+  String get browseRockMetal;
+
+  /// No description provided for @browseScanForAlbums.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan your media library to view your albums.'**
+  String get browseScanForAlbums;
+
+  /// No description provided for @browseScanForArtists.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan your media library to view all artists.'**
+  String get browseScanForArtists;
+
+  /// No description provided for @browseScanForGenres.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan your media library to view all song genres.'**
+  String get browseScanForGenres;
+
+  /// No description provided for @browseScanForYears.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan your media library to view release years.'**
+  String get browseScanForYears;
+
+  /// No description provided for @browseSearchFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Search Failed'**
+  String get browseSearchFailed;
+
+  /// No description provided for @browseSearchingOnlineMetadata.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching Online Metadata...'**
+  String get browseSearchingOnlineMetadata;
+
+  /// No description provided for @browseSearchSongsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search songs by title or artist...'**
+  String get browseSearchSongsHint;
+
+  /// No description provided for @browseSearchWithinPlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'Search within playlist…'**
+  String get browseSearchWithinPlaylist;
+
+  /// No description provided for @browseSeeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'See All'**
+  String get browseSeeAll;
+
+  /// No description provided for @browseSelectBestMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Best Match'**
+  String get browseSelectBestMatch;
+
+  /// No description provided for @browseSignedInLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in. Loading your library…'**
+  String get browseSignedInLoading;
+
+  /// No description provided for @browseSignInToCloud.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to Cloud'**
+  String get browseSignInToCloud;
+
+  /// No description provided for @browseSignInToYtm.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to YouTube Music'**
+  String get browseSignInToYtm;
+
+  /// No description provided for @browseSignUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign Up'**
+  String get browseSignUp;
+
+  /// No description provided for @browseSmart.
+  ///
+  /// In en, this message translates to:
+  /// **'Smart'**
+  String get browseSmart;
+
+  /// No description provided for @browseSmoothCrossfade.
+  ///
+  /// In en, this message translates to:
+  /// **'Smooth Crossfade'**
+  String get browseSmoothCrossfade;
+
+  /// No description provided for @browseSongsOnYtm.
+  ///
+  /// In en, this message translates to:
+  /// **'Songs on YouTube Music…'**
+  String get browseSongsOnYtm;
+
+  /// No description provided for @browseStandardLossy.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard Lossy:'**
+  String get browseStandardLossy;
+
+  /// No description provided for @browseSubGenres.
+  ///
+  /// In en, this message translates to:
+  /// **'sub-genres'**
+  String get browseSubGenres;
+
+  /// No description provided for @browseSynced.
+  ///
+  /// In en, this message translates to:
+  /// **'synced'**
+  String get browseSynced;
+
+  /// No description provided for @browseSyncingLikedSongs.
+  ///
+  /// In en, this message translates to:
+  /// **'Syncing liked songs…'**
+  String get browseSyncingLikedSongs;
+
+  /// No description provided for @browseSyncPullSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap sync below to pull your latest YouTube Music Liked Songs library.'**
+  String get browseSyncPullSubtitle;
+
+  /// No description provided for @browseTapToPlayOrDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to play or download'**
+  String get browseTapToPlayOrDownload;
+
+  /// No description provided for @browseTapToSyncYtm.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to sync from YouTube Music'**
+  String get browseTapToSyncYtm;
+
+  /// No description provided for @browseTenBandGraphicEq.
+  ///
+  /// In en, this message translates to:
+  /// **'10-Band Graphic EQ'**
+  String get browseTenBandGraphicEq;
+
+  /// No description provided for @browseTopArtists.
+  ///
+  /// In en, this message translates to:
+  /// **'Top Artists'**
+  String get browseTopArtists;
+
+  /// No description provided for @browseTopArtistsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Ranked by total listening plays'**
+  String get browseTopArtistsSubtitle;
+
+  /// No description provided for @browseTopChartsSongs.
+  ///
+  /// In en, this message translates to:
+  /// **'Top Charts & Songs'**
+  String get browseTopChartsSongs;
+
+  /// No description provided for @browseTopHits.
+  ///
+  /// In en, this message translates to:
+  /// **'Top Hits'**
+  String get browseTopHits;
+
+  /// No description provided for @browseTopRated.
+  ///
+  /// In en, this message translates to:
+  /// **'Top Rated'**
+  String get browseTopRated;
+
+  /// No description provided for @browseTopTracks.
+  ///
+  /// In en, this message translates to:
+  /// **'Top Tracks'**
+  String get browseTopTracks;
+
+  /// No description provided for @browseToSet.
+  ///
+  /// In en, this message translates to:
+  /// **'To set'**
+  String get browseToSet;
+
+  /// No description provided for @browseTotalPlays.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Plays'**
+  String get browseTotalPlays;
+
+  /// No description provided for @browseTotalTracks.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Tracks'**
+  String get browseTotalTracks;
+
+  /// No description provided for @browseTracks.
+  ///
+  /// In en, this message translates to:
+  /// **'tracks'**
+  String get browseTracks;
+
+  /// No description provided for @browseTracksForDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'tracks for download'**
+  String get browseTracksForDownload;
+
+  /// No description provided for @browseTracksFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'tracks from'**
+  String get browseTracksFrom;
+
+  /// No description provided for @browseTracksInLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'tracks in library'**
+  String get browseTracksInLibrary;
+
+  /// No description provided for @browseTracksSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'tracks successfully!'**
+  String get browseTracksSuccessfully;
+
+  /// No description provided for @browseTracksTo.
+  ///
+  /// In en, this message translates to:
+  /// **'tracks to'**
+  String get browseTracksTo;
+
+  /// No description provided for @browseTree.
+  ///
+  /// In en, this message translates to:
+  /// **'Tree'**
+  String get browseTree;
+
+  /// No description provided for @browseTrending.
+  ///
+  /// In en, this message translates to:
+  /// **'Trending'**
+  String get browseTrending;
+
+  /// No description provided for @browseTrendingEgypt.
+  ///
+  /// In en, this message translates to:
+  /// **'Trending Egypt'**
+  String get browseTrendingEgypt;
+
+  /// No description provided for @browseTrendingInEgypt.
+  ///
+  /// In en, this message translates to:
+  /// **'Trending in Egypt 🇪🇬'**
+  String get browseTrendingInEgypt;
+
+  /// No description provided for @browseUpdatedPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated'**
+  String get browseUpdatedPrefix;
+
+  /// No description provided for @browseUser.
+  ///
+  /// In en, this message translates to:
+  /// **'User'**
+  String get browseUser;
+
+  /// No description provided for @browseWillAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Will add'**
+  String get browseWillAdd;
+
+  /// No description provided for @browseWillRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Will remove'**
+  String get browseWillRemove;
+
+  /// No description provided for @browseWorkoutEnergy.
+  ///
+  /// In en, this message translates to:
+  /// **'Workout Energy'**
+  String get browseWorkoutEnergy;
+
+  /// No description provided for @browseYouTubeMusic.
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube Music'**
+  String get browseYouTubeMusic;
+
+  /// No description provided for @browseYoutubeWeb.
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube Web'**
+  String get browseYoutubeWeb;
+
+  /// No description provided for @browseYtmSearchScreenDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Stream and download songs from YouTube Music, ad-free.'**
+  String get browseYtmSearchScreenDesc;
 }
 
 class _AppLocalizationsDelegate

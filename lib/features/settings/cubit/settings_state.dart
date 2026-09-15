@@ -75,6 +75,12 @@ abstract class SettingsState with _$SettingsState {
     @Default(AppThemeMode.dark) AppThemeMode themeMode,
     @Default(false) bool autoThemeByTime,
     @Default(false) bool highContrast,
+    // Accessibility: when true the app forces reduced motion app-wide (all
+    // animations snap to their end state). When false the OS "Reduce motion" /
+    // "Remove animations" setting is still honoured — this toggle only ever
+    // adds reduction, never removes it.
+    @Default(false) bool reduceMotion,
+    @Default(0.80) double liquidGlassTint,
     @Default('system') String languageCode,
     @Default(0xFF9B9EF5) int customAccentColorValue,
     @Default(PlayerThemeMode.classic) PlayerThemeMode playerThemeMode,

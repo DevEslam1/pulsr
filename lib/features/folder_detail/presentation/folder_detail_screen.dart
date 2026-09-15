@@ -60,8 +60,9 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                   : Icons.visibility_rounded,
               color: _isExcluded ? p.error : p.textSecondary,
             ),
-            tooltip:
-                _isExcluded ? 'Include in Scan' : 'Exclude from Scan',
+            tooltip: _isExcluded
+                ? context.l10n.browseIncludeInScan
+                : context.l10n.browseExcludeFromScan,
             onPressed: () async {
               final newExcluded = !_isExcluded;
               setState(() => _isExcluded = newExcluded);
@@ -240,13 +241,12 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
 
                   // Songs List
                   if (songs.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(32),
+                    Padding(
+                      padding: const EdgeInsets.all(32),
                       child: EmptyStateWidget(
                         icon: Icons.music_off_rounded,
-                        title: 'No Tracks Found',
-                        subtitle:
-                            'No playable audio tracks found in this directory.',
+                        title: context.l10n.browseNoTracksFound,
+                        subtitle: context.l10n.browseNoTracksInFolder,
                       ),
                     )
                   else

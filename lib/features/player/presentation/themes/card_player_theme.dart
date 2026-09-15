@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -167,7 +168,7 @@ class CardPlayerTheme extends StatelessWidget {
                   }
                 },
                 child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
+                  duration: context.motionMs(300),
                   child: state.isLyricsVisible
                       ? LyricsView(
                           key: ValueKey(

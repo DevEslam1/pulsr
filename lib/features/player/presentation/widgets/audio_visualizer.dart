@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../../core/constants/channels.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../data/visualizer/milkdrop_preset_store.dart';
@@ -115,10 +116,18 @@ class _AudioVisualizerState extends State<AudioVisualizer>
     } else if (widget.style == VisualizerStyle.custom) {
       _loadCustomPreset();
     }
+    _initVisualizer();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Motion decisions must not read MediaQuery during initState.
     if (widget.isPlaying && widget.style != VisualizerStyle.off) {
       _startAnimation();
+    } else {
+      _stopAnimation();
     }
-    _initVisualizer();
   }
 
   /// Loads the GPU Milkdrop warp shader. Falls back to the Canvas painter if the
@@ -172,6 +181,10 @@ class _AudioVisualizerState extends State<AudioVisualizer>
   }
 
   void _startAnimation() {
+    if (!context.motionEnabled) {
+      _stopAnimation();
+      return;
+    }
     if (!_animController.isAnimating) {
       _animController.repeat();
     }

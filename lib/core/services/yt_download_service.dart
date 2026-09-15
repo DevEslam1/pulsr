@@ -716,7 +716,9 @@ class YtDownloadService {
   }) async {
     var currentStream = stream;
     var attempts = 0;
-    const maxAttempts = 3;
+    // 5 attempts: transient blips (dropped socket, 5xx, timeout) are common
+    // on mobile, and the repository adds its own outer retries on top.
+    const maxAttempts = 5;
 
     while (true) {
       try {
@@ -783,9 +785,34 @@ class YtDownloadService {
           // next lines used to run unconditionally — invalidated a working
           // poToken and paid for a fresh BotGuard round every time a socket
           // hiccuped.
-          await Future.delayed(
-              Duration(milliseconds: 400 * (1 << (attempts - 1))));
+          await Future.delayed(Duration(
+              milliseconds: (400 * (1 << (attempts - 1))).clamp(400, 8000)));
           continue;
+        }
+
+        // Burned URL: honour any active rate-limit cooldown BEFORE
+        // re-resolving, otherwise the fresh resolve fails fast against the
+        // cooldown and burns through all attempts in milliseconds — the
+        // "first N succeed, rest fail instantly" batch pattern.
+        final cooldown = YtmRateLimiter.shared.cooldownRemaining;
+        if (cooldown > Duration.zero) {
+          // Cap the wait so one 429 doesn't wedge a slot for minutes; the
+          // outer repository retry covers longer blocks.
+          final wait = cooldown <= const Duration(seconds: 30)
+              ? cooldown
+              : const Duration(seconds: 30);
+          await Future.delayed(wait);
+          if (task.isCanceled || _canceledVideoIds.contains(videoId)) {
+            rethrow;
+          }
+        } else if (_ytmService.isBotCoolingDown) {
+          // Egress/bot block with no rate-limiter window: back off briefly so
+          // the re-resolve below doesn't slam straight into the fail-fast.
+          await Future.delayed(Duration(
+              milliseconds: (1000 * (1 << (attempts - 1))).clamp(1000, 8000)));
+          if (task.isCanceled || _canceledVideoIds.contains(videoId)) {
+            rethrow;
+          }
         }
 
         final signal = YtmErrorClassifier.classify(e).signal;

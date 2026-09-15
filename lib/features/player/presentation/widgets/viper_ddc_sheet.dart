@@ -190,7 +190,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                             Text(
                               state.viperDdcProfileName.isNotEmpty
                                   ? state.viperDdcProfileName
-                                  : 'No profile loaded',
+                                  : context.l10n.dspNoProfileLoaded,
                               style: TextStyle(
                                 color: state.viperDdcProfileName.isNotEmpty
                                     ? p.textPrimary

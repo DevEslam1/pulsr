@@ -143,6 +143,8 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                 }.start()
             }
             "getFreeDiskSpace" -> {
+                // Returns available bytes, or -1L when unknown. Dart callers
+                // treat <= 0 as "unknown, don't block" (guarded by `> 0`).
                 try {
                     val musicDir = currentContext.getExternalFilesDir(Environment.DIRECTORY_MUSIC)
                         ?: currentContext.filesDir
@@ -269,6 +271,9 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
         }
 
         // Pre-Q: write straight into the public Music dir, then index it.
+        // Mirrors the Q+ rollback: a failed copy deletes the partial file, and
+        // a failed index cleans up its row (and the orphan file) — never leave
+        // a partial file or a dangling MediaStore row behind.
         @Suppress("DEPRECATION")
         val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
         if (!musicDir.exists()) musicDir.mkdirs()
@@ -283,20 +288,37 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                 i++
             }
         }
-        FileInputStream(source).use { input ->
-            FileOutputStream(dest).use { out -> input.copyTo(out) }
+        try {
+            FileInputStream(source).use { input ->
+                FileOutputStream(dest).use { out -> input.copyTo(out) }
+            }
+        } catch (e: Exception) {
+            try { if (dest.exists()) dest.delete() } catch (_: Exception) {}
+            throw e
         }
 
-        val values = ContentValues().apply {
-            put(MediaStore.Audio.Media.DISPLAY_NAME, dest.name)
-            put(MediaStore.Audio.Media.TITLE, title)
-            put(MediaStore.Audio.Media.MIME_TYPE, mimeType)
-            put(MediaStore.Audio.Media.IS_MUSIC, true)
-            @Suppress("DEPRECATION")
-            put(MediaStore.Audio.Media.DATA, dest.absolutePath)
+        var insertedUri: android.net.Uri? = null
+        try {
+            val values = ContentValues().apply {
+                put(MediaStore.Audio.Media.DISPLAY_NAME, dest.name)
+                put(MediaStore.Audio.Media.TITLE, title)
+                put(MediaStore.Audio.Media.MIME_TYPE, mimeType)
+                put(MediaStore.Audio.Media.IS_MUSIC, true)
+                @Suppress("DEPRECATION")
+                put(MediaStore.Audio.Media.DATA, dest.absolutePath)
+            }
+            insertedUri = resolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values)
+            if (insertedUri == null) {
+                // Index refused the row but the file itself is complete — keep
+                // it usable via the scanner rather than deleting user data.
+                android.util.Log.w("YtDownloadPlugin", "MediaStore insert returned null; keeping file at ${dest.absolutePath}")
+            }
+            MediaScannerConnection.scanFile(context, arrayOf(dest.absolutePath), arrayOf(mimeType), null)
+            return dest.absolutePath
+        } catch (e: Exception) {
+            try { insertedUri?.let { resolver.delete(it, null, null) } } catch (_: Exception) {}
+            try { if (dest.exists()) dest.delete() } catch (_: Exception) {}
+            throw e
         }
-        resolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values)
-        MediaScannerConnection.scanFile(context, arrayOf(dest.absolutePath), arrayOf(mimeType), null)
-        return dest.absolutePath
     }
 }

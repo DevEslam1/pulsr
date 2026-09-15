@@ -3860,4 +3860,2208 @@ class AppLocalizationsEn extends AppLocalizations {
   String unmatchedPathsWarning(int count) {
     return '⚠️ $count song paths could not be matched in your current library.';
   }
+
+  @override
+  String settingsHeaderTagline(String version) {
+    return 'Pulsr v$version • Audiophile Music Experience';
+  }
+
+  @override
+  String settingsHeaderTaglineShort(String version) {
+    return 'Pulsr v$version • Audiophile Engine';
+  }
+
+  @override
+  String get settingsSearchPlaceholder =>
+      'Search settings, sound, appearance...';
+
+  @override
+  String get settingsCategoryAudioSubtitle =>
+      'Equalizer, DSP, Hi-Res, ReplayGain';
+
+  @override
+  String get settingsCategoryPlaybackSubtitle =>
+      'Crossfade, gapless, sleep timer, skip';
+
+  @override
+  String get settingsCategoryAppearanceSubtitle =>
+      'Theme mode, accent colors, visualizer';
+
+  @override
+  String get settingsCategoryGesturesSubtitle =>
+      'Mini-player swipes, artwork double-tap';
+
+  @override
+  String get settingsCategoryProfiles => 'Profiles & Rules';
+
+  @override
+  String get settingsCategoryProfilesSubtitle =>
+      'Hardware DAC mappings, trigger rules';
+
+  @override
+  String get settingsCategoryLibrarySubtitle =>
+      'Folders, hidden media, duration filter';
+
+  @override
+  String get settingsCategoryOnline => 'Network & YTM';
+
+  @override
+  String get settingsCategoryOnlineSubtitle =>
+      'Audio quality, streaming cache, proxy';
+
+  @override
+  String get settingsCategoryStorageSubtitle =>
+      'Disk usage, cached artwork, cleanup';
+
+  @override
+  String get settingsCategoryPrivacy => 'Privacy & Backup';
+
+  @override
+  String get settingsCategoryPrivacySubtitle =>
+      'Offline guarantee, scrobbling, backups';
+
+  @override
+  String get settingsCategoryAbout => 'About';
+
+  @override
+  String settingsCategoryAboutSubtitle(String version) {
+    return 'Version $version, licenses, specs';
+  }
+
+  @override
+  String get settingsCategoryAppearance => 'Appearance';
+
+  @override
+  String get settingsAutomationTitle => 'Automation';
+
+  @override
+  String get settingsSmartAudioSectionSubtitle =>
+      'Automatic headphone correction and best-quality output';
+
+  @override
+  String get settingsQuranModeSubtitle =>
+      'Vocal EQ, mosque ambience, memorization speed';
+
+  @override
+  String get settingsDeviceProfilesSectionSubtitle =>
+      'Per-output DAC and Bluetooth profile mappings';
+
+  @override
+  String get settingsAutomationSectionSubtitle =>
+      'Trigger profiles automatically on hardware events';
+
+  @override
+  String get settingsAutomationTileSubtitle =>
+      'Apply profiles on headphone plug, Bluetooth or charge events';
+
+  @override
+  String get settingsStorageSectionSubtitle =>
+      'Manage disk usage and audio cache';
+
+  @override
+  String get settingsAboutSectionSubtitle =>
+      'Version info, licenses and architecture';
+
+  @override
+  String settingsAboutVersionSubtitle(String version) {
+    return 'Version $version • Open-source Audiophile Engine';
+  }
+
+  @override
+  String get settingsAppearanceSectionSubtitle =>
+      'Theme, accent colors, visualizer and player UI style';
+
+  @override
+  String get settingsAutoDarkModeTitle => 'Auto Dark Mode by Time';
+
+  @override
+  String get settingsAutoDarkModeSubtitle =>
+      'Follow a 7 PM – 6 AM day/night schedule';
+
+  @override
+  String get settingsHighContrastTitle => 'High Contrast';
+
+  @override
+  String get settingsHighContrastSubtitle =>
+      'Boost contrast with an AMOLED-friendly palette';
+
+  @override
+  String get settingsReduceMotionTitle => 'Reduce Motion';
+
+  @override
+  String get settingsReduceMotionSubtitle =>
+      'Snap animations instead of tweening them';
+
+  @override
+  String get settingsLiquidGlassTitle => 'Liquid Glass Tint';
+
+  @override
+  String get settingsLiquidGlassSubtitle =>
+      'Adjust refraction between Ultra Clear (0%) and Tinted (100%)';
+
+  @override
+  String get settingsBadgeStyle => 'STYLE';
+
+  @override
+  String get settingsBadgeDsp => 'DSP';
+
+  @override
+  String get settingsBadgePalette => 'PALETTE';
+
+  @override
+  String get settingsGesturesSectionSubtitle =>
+      'Configure swipe and double-tap gestures across mini-player and artwork';
+
+  @override
+  String get settingsLibrarySectionSubtitle =>
+      'Device media indexing, exclusion rules and cleanup';
+
+  @override
+  String get settingsOnlineSectionSubtitle =>
+      'Online streams, downloads, proxy routing and quality settings';
+
+  @override
+  String get settingsTapToManage => 'Tap to manage';
+
+  @override
+  String get settingsBadgeConnected => 'CONNECTED';
+
+  @override
+  String get settingsDownloadsSubtitle =>
+      'View and manage offline tracks and downloads';
+
+  @override
+  String get settingsProxyEnabled => 'Enabled';
+
+  @override
+  String get settingsProxyDisabledHint =>
+      'Disabled • Tap to configure HTTP / SOCKS5';
+
+  @override
+  String get settingsPrivacySectionSubtitle =>
+      'Data sovereignty, database backups and scrobbler integrations';
+
+  @override
+  String get settingsScrobblingTitle => 'Scrobbling (Last.fm & ListenBrainz)';
+
+  @override
+  String get settingsScrobblingSubtitle =>
+      'Direct API scrobbling and Now Playing metadata broadcast';
+
+  @override
+  String get settingsScrobbleStatsTitle => 'Scrobble Stats';
+
+  @override
+  String get settingsScrobbleStatsSubtitle =>
+      'Listening history and scrobble analytics overview';
+
+  @override
+  String get settingsCloudBackupDashboard => 'Cloud Backup Dashboard';
+
+  @override
+  String get settingsCloudBackupDashboardSubtitle =>
+      'Manage synchronized devices and cloud backup snapshots';
+
+  @override
+  String settingsNoSettingsFound(String query) {
+    return 'No settings found for \"$query\"';
+  }
+
+  @override
+  String get settingsCloudSyncCompleted => 'Cloud backup & sync completed!';
+
+  @override
+  String get settingsCloudSyncFailed =>
+      'Sync failed. Please check internet connection.';
+
+  @override
+  String get settingsNeverLabel => 'Never';
+
+  @override
+  String get settingsSyncing => 'Syncing...';
+
+  @override
+  String get settingsAddCustomFolder => 'Add Custom Folder';
+
+  @override
+  String get settingsRescanningLibrary => 'Rescanning library…';
+
+  @override
+  String get settingsApplyRescanLibrary => 'Apply & Rescan Library';
+
+  @override
+  String settingsLibraryUpdated(int count) {
+    return 'Library updated! $count tracks loaded.';
+  }
+
+  @override
+  String settingsHiddenCount(int count) {
+    return '$count Hidden';
+  }
+
+  @override
+  String get settingsSearchDirectoriesHint =>
+      'Search directories by name or path...';
+
+  @override
+  String settingsNoDirectoriesMatch(String query) {
+    return 'No directories match $query';
+  }
+
+  @override
+  String get settingsNoAudioFolders =>
+      'No audio folders discovered yet. Scan storage to populate.';
+
+  @override
+  String get settingsUnhide => 'Unhide';
+
+  @override
+  String get settingsHide => 'Hide';
+
+  @override
+  String settingsPlaysCount(int count) {
+    return '$count plays';
+  }
+
+  @override
+  String settingsManufacturerBackgroundGuide(String manufacturer) {
+    return '$manufacturer Background Guide';
+  }
+
+  @override
+  String settingsAggressiveBatteryGuide(String url) {
+    return 'Your device manufacturer is known for aggressive background process killing.\n\nVisit $url to configure lock screen and battery settings.';
+  }
+
+  @override
+  String settingsApplyProfileName(String name) {
+    return 'Apply: $name';
+  }
+
+  @override
+  String get settingsArabicNative => 'Arabic (RTL)';
+
+  @override
+  String get settingsArtworkSwipeDisabled => 'Disabled';
+
+  @override
+  String get settingsArtworkSwipeIgnoreDesc =>
+      'Ignore horizontal swipe on album artwork';
+
+  @override
+  String get settingsArtworkSwipeNextPrev => 'Next / Previous Track';
+
+  @override
+  String get settingsArtworkSwipeNextPrevDesc =>
+      'Swipe left for next track, swipe right for previous track';
+
+  @override
+  String get settingsAudioNormalization => 'Audio normalization';
+
+  @override
+  String get settingsAudioNormalizationSubtitle =>
+      'Even out loudness for tracks without ReplayGain tags';
+
+  @override
+  String get settingsAudioOutputDevice => 'Audio Output Device';
+
+  @override
+  String get settingsAuthenticationOptional => 'AUTHENTICATION (OPTIONAL)';
+
+  @override
+  String get settingsBitPerfectBtUnavailable =>
+      'Unavailable: Bluetooth transcodes — use USB / wired DAC';
+
+  @override
+  String get settingsBitPerfectUsb => 'Bit-Perfect USB Pass-Through';
+
+  @override
+  String get settingsBitPerfectUsbDesc =>
+      'Direct hardware streaming to USB / wired DACs (bypasses Android resampler)';
+
+  @override
+  String get settingsBpmSyncCrossfade => 'BPM-Synced Crossfade';
+
+  @override
+  String get settingsBpmSyncCrossfadeDesc =>
+      'Aligns the crossfade duration to the nearest 2/4/8/16/32 beats of the incoming track when its BPM is known (set per track in Song Info); otherwise the configured duration is used';
+
+  @override
+  String get settingsBypassDspBitPerfect => 'Bypass DSP in Bit-Perfect Mode';
+
+  @override
+  String get settingsBypassDspBitPerfectDesc =>
+      'Bypasses Equalizer and virtualizer for an uncolored, pure audio bitstream to the DAC';
+
+  @override
+  String get settingsBypassList => 'Bypass List (comma-separated)';
+
+  @override
+  String get settingsCalibrateBtLatency => 'Calibrate Bluetooth latency';
+
+  @override
+  String settingsCalibrateBtLatencySubtitle(int ms) {
+    return 'Auto-probe offset (currently $ms ms)';
+  }
+
+  @override
+  String get settingsCastFailed => 'Cast failed';
+
+  @override
+  String settingsCastingTitle(String title) {
+    return 'Casting $title';
+  }
+
+  @override
+  String settingsCastingTo(String device) {
+    return 'Casting to $device';
+  }
+
+  @override
+  String get settingsCastNoSdkDesc =>
+      'Cast sessions require the Play Services Cast SDK (only in the dev/ytm builds). Device discovery is shown here.';
+
+  @override
+  String get settingsCastSdkDesc =>
+      'Uses Google\'s Default Media Receiver. Local files are served over your LAN; remote artwork/URLs are cast directly.';
+
+  @override
+  String get settingsColorSourceArtwork => 'Album Artwork';
+
+  @override
+  String get settingsColorSourceArtworkDesc =>
+      'Adapt colors from the current track\'s album art (changes per song)';
+
+  @override
+  String get settingsColorSourceCustom => 'Custom Accent';
+
+  @override
+  String get settingsColorSourceCustomDesc =>
+      'Use the fixed accent color you pick in settings';
+
+  @override
+  String get settingsColorSourceSystemDesc =>
+      'Follow the system wallpaper palette on Android 12+ • falls back to album art on older devices';
+
+  @override
+  String get settingsColorSourceWallpaper => 'Material You (Wallpaper)';
+
+  @override
+  String settingsConnectedAs(String name) {
+    return 'Connected as: $name\n\nManage your YouTube Music account or disconnect from this device.';
+  }
+
+  @override
+  String get settingsConnectedDeviceQuality =>
+      'Connected device & audio quality';
+
+  @override
+  String get settingsConnectionFailed => 'Connection Failed';
+
+  @override
+  String get settingsConnectionSuccessful => 'Connection Successful';
+
+  @override
+  String get settingsDacNoUacVolume => 'DAC exposes no UAC Volume control';
+
+  @override
+  String get settingsDisableBitPerfectBypass => 'Disable Bit-Perfect bypass';
+
+  @override
+  String get settingsDisabledBadge => 'DISABLED';
+
+  @override
+  String get settingsDoubleTapDisabled => 'Disabled';
+
+  @override
+  String get settingsDoubleTapFavoriteDesc =>
+      'Add or remove active song from favorites';
+
+  @override
+  String get settingsDoubleTapIgnoreDesc => 'Ignore double-tap gesture';
+
+  @override
+  String get settingsDoubleTapLyricsDesc =>
+      'Show or hide synchronized lyrics overlay';
+
+  @override
+  String get settingsDoubleTapToggleFavorite => 'Toggle Favorite';
+
+  @override
+  String get settingsDoubleTapToggleLyrics => 'Toggle Lyrics Overlay';
+
+  @override
+  String get settingsDspAutoDesc =>
+      'Automatically bypass OEM sound effects when DSP active';
+
+  @override
+  String get settingsDspInspectorDesc =>
+      'Inspect live active DSP stages, HAL effects & engine state';
+
+  @override
+  String get settingsDspNativeDesc =>
+      '64-bit float, zero-latency real-time native DSP';
+
+  @override
+  String get settingsDspOemDesc =>
+      'System / vendor-level sound effects (Dolby, Dirac, etc.)';
+
+  @override
+  String get settingsDuckLevel => 'Duck level';
+
+  @override
+  String get settingsDuckOnNavigation => 'Duck on navigation';
+
+  @override
+  String get settingsDuckOnNavigationSubtitle =>
+      'Lower music instead of pausing for prompts';
+
+  @override
+  String get settingsDvcDesc =>
+      'Pins the Android media stream to maximum and applies volume in the native float DSP path, for higher dynamic range and lower distortion at low volumes. Unavailable during Bit-Perfect playback and on the AAudio Direct output path';
+
+  @override
+  String get settingsDvcTitle => 'Direct Volume Control (DVC)';
+
+  @override
+  String get settingsEnableBitPerfectFirst =>
+      'Enable Bit-Perfect USB Pass-Through first';
+
+  @override
+  String get settingsEnglishNative => 'English (US/UK)';
+
+  @override
+  String get settingsEnterProxyHost => 'Please enter a proxy host';
+
+  @override
+  String get settingsExclusiveUsb => 'Exclusive USB Interface';
+
+  @override
+  String get settingsExclusiveUsbDesc =>
+      'Claims the AudioStreaming interface when the kernel driver releases it. Non-forced: never detaches Android\'s audio driver';
+
+  @override
+  String get settingsExportSessionLogs => 'Export audio session logs';
+
+  @override
+  String get settingsExportSessionLogsDesc =>
+      'Share the on-device JSONL log of your recent playback sessions';
+
+  @override
+  String get settingsExtendedSpeedRange => 'Extended speed range';
+
+  @override
+  String get settingsExtendedSpeedRangeSubtitle =>
+      'Allow 0.1x–8.0x playback speed (default 0.25x–4.0x)';
+
+  @override
+  String get settingsFloatDspDesc =>
+      'Hi-res first: feeds the native DSP chain float32 samples so 24/32-bit sources keep their depth (16-bit content is unaffected). Unsupported devices safely fall back to 16-bit';
+
+  @override
+  String get settingsFloatDspPath => '24/32-bit Float DSP Path';
+
+  @override
+  String get settingsGoogleCast => 'Google Cast';
+
+  @override
+  String get settingsHardwareAudioOutput => 'Hardware Audio Output';
+
+  @override
+  String get settingsHedgedStreaming => 'Hedged streaming';
+
+  @override
+  String get settingsHedgedStreamingSubtitle =>
+      'Race two resolvers, take the fastest URL';
+
+  @override
+  String get settingsHttpLabel => 'HTTP';
+
+  @override
+  String get settingsImportPasteProxies => 'Import / Paste Proxies';
+
+  @override
+  String get settingsInteractionLabel => 'Interaction reminders';
+
+  @override
+  String get settingsInternalUsbDac => 'Internal / USB DAC';
+
+  @override
+  String get settingsIntroLabel => 'Intros / intermissions';
+
+  @override
+  String get settingsInvalidPort => 'Invalid port (1-65535)';
+
+  @override
+  String settingsLatencyMs(int ms) {
+    return 'Latency: $ms ms';
+  }
+
+  @override
+  String get settingsLeaveBlankAuth => 'Leave blank if unauthenticated';
+
+  @override
+  String get settingsLowerVolume => 'Lower playback volume';
+
+  @override
+  String get settingsManageYtm => 'Manage YouTube Music';
+
+  @override
+  String get settingsMasterAudioEngine => 'Master Audio Engine';
+
+  @override
+  String get settingsNoneSelectedAutoSkip =>
+      'None selected — auto-skip disabled';
+
+  @override
+  String get settingsNonMusicLabel => 'Non-music sections';
+
+  @override
+  String get settingsNotAvailablePlatform => 'Not available on this platform';
+
+  @override
+  String get settingsNotDetectable => 'Not detectable on this platform';
+
+  @override
+  String get settingsNothingToCast => 'Nothing is playing to cast';
+
+  @override
+  String get settingsOutputAudioQuality => 'Output & Audio Quality';
+
+  @override
+  String settingsOutputDeviceConfigHint(int rate, int bits) {
+    return 'Tap to configure Output Device • Sample Rate ($rate kHz) • Bit Depth ($bits-bit)';
+  }
+
+  @override
+  String get settingsOutroLabel => 'Outros / endcards';
+
+  @override
+  String get settingsPasswordLabel => 'Password';
+
+  @override
+  String get settingsPerAlbumEqMemory => 'Per-album EQ memory';
+
+  @override
+  String get settingsPerAlbumEqMemorySubtitle =>
+      'Restore EQ snapshot per album/artist';
+
+  @override
+  String get settingsPerTrackFormatDesc =>
+      'Hi-res first: requests each track\'s native sample rate / bit depth from the output device (device-capped). Bit-Perfect keeps its exclusive format. Turn off to use one manual output format';
+
+  @override
+  String get settingsPerTrackFormatNegotiation =>
+      'Per-Track Output Format Negotiation';
+
+  @override
+  String get settingsPortHint => 'e.g. 8080';
+
+  @override
+  String get settingsPortLabel => 'Port';
+
+  @override
+  String get settingsPreampWithoutRg => 'Preamp (Without RG tag fallback)';
+
+  @override
+  String get settingsPreampWithRg => 'Preamp (With RG tag)';
+
+  @override
+  String get settingsPrivacyControlBody =>
+      'Cloud sync and remote metadata can be disabled. Automation rules and device profiles are stored locally.';
+
+  @override
+  String get settingsPrivacyControlTitle => 'You stay in control';
+
+  @override
+  String get settingsPrivacyNoTrackersBody =>
+      'Pure (Play Store) builds ship without the INTERNET permission, analytics SDKs or advertising identifiers.';
+
+  @override
+  String get settingsPrivacyNoTrackersTitle => 'No trackers in Pure';
+
+  @override
+  String get settingsPrivacyOfflineBody =>
+      'Your library, playback and settings live on this device. Nothing is uploaded unless you explicitly sign in for cloud sync.';
+
+  @override
+  String get settingsPrivacyOfflineTitle => 'Offline-first';
+
+  @override
+  String get settingsPrivacyPermissionsBody =>
+      'Storage/media access is used only to scan and play your local audio. Bluetooth and notification access are requested only for connected-audio features and playback controls.';
+
+  @override
+  String get settingsPrivacyPermissionsTitle => 'Permissions are purposeful';
+
+  @override
+  String get settingsProxyActiveDesc =>
+      'Traffic routes through configured proxy';
+
+  @override
+  String get settingsProxyHttpDesc =>
+      'Routes standard HTTP & HTTPS web and stream extraction traffic.';
+
+  @override
+  String get settingsProxyInactiveDesc => 'Direct connection (proxy disabled)';
+
+  @override
+  String get settingsProxySocksDesc =>
+      'Routes network packets via SOCKS5 (recommended for Tor, Clash, Shadowsocks). Note: SOCKS5 applies on the native stream layer; in-app Dart API calls (search, artwork, lyrics) fall back to DIRECT when SOCKS5 is active.';
+
+  @override
+  String get settingsQualityHigh => 'High (~160+ kbps • Best)';
+
+  @override
+  String get settingsQualityHighDownloadDesc =>
+      'Highest quality audio files (~160+ kbps M4A)';
+
+  @override
+  String get settingsQualityHighStreamDesc =>
+      'Highest available bitrate (~160+ kbps) for crystal clear sound';
+
+  @override
+  String get settingsQualityLow => 'Low (~64 kbps • Data Saver)';
+
+  @override
+  String get settingsQualityLowDownloadDesc => 'Smallest file size (~64 kbps)';
+
+  @override
+  String get settingsQualityLowStreamDesc =>
+      'Reduced data usage (~64 kbps) for slow connections';
+
+  @override
+  String get settingsQualityMedium => 'Medium (~128 kbps)';
+
+  @override
+  String get settingsQualityMediumDownloadDesc =>
+      'Standard file size and quality (~128 kbps M4A)';
+
+  @override
+  String get settingsQualityMediumStreamDesc =>
+      'Standard bitrate (~128 kbps) with balanced data usage';
+
+  @override
+  String get settingsRaiseVolume => 'Raise playback volume';
+
+  @override
+  String get settingsRemoveProxy => 'Remove proxy';
+
+  @override
+  String get settingsReplayGainDesc =>
+      'Track / album gain from tags, applied during playback';
+
+  @override
+  String get settingsRequiresUacDac => 'Requires a UAC DAC with volume control';
+
+  @override
+  String get settingsResamplerFast => 'Fast (Linear)';
+
+  @override
+  String get settingsResamplerHigh => 'High (32-tap)';
+
+  @override
+  String get settingsResamplerQuality => 'Resampler Quality';
+
+  @override
+  String get settingsResamplerQualityDesc =>
+      'Sample-rate conversion quality. Ultra is the full 64-tap polyphase sinc (historical default); Fast is linear interpolation for minimal CPU on battery';
+
+  @override
+  String get settingsResamplerStandard => 'Standard (16-tap)';
+
+  @override
+  String get settingsResamplerUltra => 'Ultra (64-tap)';
+
+  @override
+  String settingsResetToDefaultValue(String value) {
+    return 'Reset to default ($value)';
+  }
+
+  @override
+  String settingsResolvedCrossfade(String seconds) {
+    return 'Resolved: Gapless off — Crossfade set to ${seconds}s';
+  }
+
+  @override
+  String get settingsResolvedGapless => 'Resolved: Gapless disabled';
+
+  @override
+  String settingsSearchAboutSubtitle(String version) {
+    return 'Version $version, build details and licenses';
+  }
+
+  @override
+  String get settingsSearchAccentColorSubtitle =>
+      'Custom color accent palette for buttons and active highlights';
+
+  @override
+  String get settingsSearchAccentColorTitle => 'Accent Color';
+
+  @override
+  String get settingsSearchBitPerfectSubtitle =>
+      'Direct USB DAC hardware sample-rate matching';
+
+  @override
+  String get settingsSearchBitPerfectTitle => 'Bit-Perfect & Hi-Res Output';
+
+  @override
+  String get settingsSearchCacheSubtitle =>
+      'Clear cached cover artwork and stream chunks';
+
+  @override
+  String get settingsSearchCacheTitle => 'Artwork & Audio Cache';
+
+  @override
+  String get settingsSearchCategoryAbout => 'About';
+
+  @override
+  String get settingsSearchCategoryAudio => 'Audio';
+
+  @override
+  String get settingsSearchCategoryNetwork => 'Network';
+
+  @override
+  String get settingsSearchCategoryPrivacy => 'Privacy';
+
+  @override
+  String get settingsSearchCategoryStorage => 'Storage';
+
+  @override
+  String get settingsSearchCrossfadeSubtitle =>
+      'Seamless transitions and crossfade seconds slider';
+
+  @override
+  String get settingsSearchCrossfadeTitle => 'Crossfade & Gapless';
+
+  @override
+  String get settingsSearchEqualizerSubtitle =>
+      '10-band equalizer, bass boost, virtualizer, reverb';
+
+  @override
+  String get settingsSearchHiddenFoldersSubtitle =>
+      'Exclude voice memos, ringtones, and specific directories';
+
+  @override
+  String get settingsSearchHighContrastTitle => 'High Contrast Mode';
+
+  @override
+  String get settingsSearchNowPlayingThemeTitle => 'Now Playing Theme Style';
+
+  @override
+  String get settingsSearchPrivacySubtitle =>
+      'Offline-first principles and permissions explanations';
+
+  @override
+  String get settingsSearchPrivacyTitle => 'Privacy Guarantee';
+
+  @override
+  String get settingsSearchProxySubtitle =>
+      'HTTP & SOCKS5 proxy routing with latency checks';
+
+  @override
+  String get settingsSearchQualitySubtitle =>
+      'Bitrate preferences for online streaming and saved files';
+
+  @override
+  String get settingsSearchQualityTitle => 'Streaming & Download Audio Quality';
+
+  @override
+  String get settingsSearchRescanSubtitle =>
+      'Discover newly downloaded songs and update metadata';
+
+  @override
+  String get settingsSearchRescanTitle => 'Rescan Device Storage';
+
+  @override
+  String get settingsSearchScrobblingSubtitle =>
+      'Track listening history and broadcast Now Playing status';
+
+  @override
+  String get settingsSearchSleepTimerSubtitle =>
+      'Automatically stop playback after duration or end of track';
+
+  @override
+  String get settingsSearchSwipeSubtitle =>
+      'Left & Right swipe actions (Skip, Previous, Volume)';
+
+  @override
+  String get settingsSearchSwipeTitle => 'Mini-Player Swipe Gestures';
+
+  @override
+  String get settingsSearchThemeModeSubtitle =>
+      'System Default, Light, Dark, or AMOLED high contrast';
+
+  @override
+  String get settingsSearchThemeModeTitle => 'Theme Mode';
+
+  @override
+  String get settingsSearchVisualizerStyleTitle => 'Visualizer Style';
+
+  @override
+  String get settingsSelfPromoLabel => 'Self-promotion';
+
+  @override
+  String get settingsServerHost => 'Server Host / IP Address';
+
+  @override
+  String get settingsServerHostHint => 'e.g. 127.0.0.1 or proxy.example.com';
+
+  @override
+  String get settingsSessionDiagnostics => 'Session Audio Diagnostics';
+
+  @override
+  String get settingsSessionDiagnosticsDesc =>
+      'Records one log per track: route type, Bluetooth codec, negotiated sample rate / bit depth, interruptions and dropout counts';
+
+  @override
+  String get settingsSessionLogsShareText => 'Pulsr audio session logs';
+
+  @override
+  String get settingsSilenceSkipSensitivity => 'Silence-skip sensitivity';
+
+  @override
+  String get settingsSkipCategories => 'Skip categories';
+
+  @override
+  String get settingsSpanishNative => 'Spanish';
+
+  @override
+  String get settingsSpeakerBluetooth => 'Speaker + Bluetooth';
+
+  @override
+  String get settingsSpeakerBluetoothSubtitle =>
+      'Best-effort simultaneous output (falls back gracefully)';
+
+  @override
+  String get settingsSponsorBlock => 'SponsorBlock';
+
+  @override
+  String get settingsSponsorBlockSubtitle =>
+      'Auto-skip sponsor and non-music segments in YouTube tracks';
+
+  @override
+  String get settingsSponsorLabel => 'Sponsors';
+
+  @override
+  String get settingsStarting => 'Starting…';
+
+  @override
+  String settingsStatusLabel(String status) {
+    return 'Status: $status';
+  }
+
+  @override
+  String get settingsStreamingClaimed =>
+      'Streaming interface claimed exclusively';
+
+  @override
+  String get settingsSwipeAdjustVolume => 'Adjust Volume';
+
+  @override
+  String get settingsSwipeDisabled => 'Disabled';
+
+  @override
+  String get settingsSwipeIgnoreDesc => 'Ignore swipe gesture';
+
+  @override
+  String get settingsSwipeLeftAction => 'MiniPlayer Swipe Left Action';
+
+  @override
+  String get settingsSwipeNextDesc => 'Skip to the next song in the queue';
+
+  @override
+  String get settingsSwipeNextTrack => 'Next Track';
+
+  @override
+  String get settingsSwipePrevDesc =>
+      'Skip to the previous song or restart track';
+
+  @override
+  String get settingsSwipePreviousTrack => 'Previous Track';
+
+  @override
+  String get settingsSwipeRightAction => 'MiniPlayer Swipe Right Action';
+
+  @override
+  String get settingsSyncingLibrary => 'Syncing your library...';
+
+  @override
+  String get settingsSyncOffset => 'Sync Offset';
+
+  @override
+  String get settingsTestAllSpeeds => 'Test All Speeds';
+
+  @override
+  String get settingsTestingAll => 'Testing All...';
+
+  @override
+  String get settingsTestingProxyConnectivity =>
+      'Testing Proxy Connectivity...';
+
+  @override
+  String get settingsTestLatency => 'Test latency';
+
+  @override
+  String get settingsThemeCardGlass => 'Card Glass Overlay';
+
+  @override
+  String get settingsThemeCardGlassDesc =>
+      'Full-bleed background artwork with frosted glass controls';
+
+  @override
+  String get settingsThemeClassicStandard => 'Classic Standard';
+
+  @override
+  String get settingsThemeClassicStandardDesc =>
+      'Traditional high-definition layout with ambient glow';
+
+  @override
+  String get settingsThemeFullBleed => 'Full-Bleed Waveform';
+
+  @override
+  String get settingsThemeFullBleedDesc =>
+      'Full screen audio-reactive glowing waveform visualizer backdrop';
+
+  @override
+  String get settingsThemeKaraoke => 'Karaoke Lyrics Immersion';
+
+  @override
+  String get settingsThemeKaraokeDesc =>
+      'Magnified synchronized lyrics-first karaoke player interface';
+
+  @override
+  String get settingsThemeMinimalist => 'Minimalist Waveform';
+
+  @override
+  String get settingsThemeMinimalistDesc =>
+      'Spacious studio focus on dynamic audio waveform visualizer';
+
+  @override
+  String get settingsThemeRetroCassette => 'Retro Cassette Deck';
+
+  @override
+  String get settingsThemeRetroCassetteDesc =>
+      'Vintage cassette tape with spinning spools & magnetic tape counter';
+
+  @override
+  String get settingsThemeVinylCircle => 'Vinyl Circle (Spinning)';
+
+  @override
+  String get settingsThemeVinylCircleDesc =>
+      'Centered circular artwork with continuous spinning animation';
+
+  @override
+  String get settingsThemeVinylTurntable => 'Vinyl Turntable Studio';
+
+  @override
+  String get settingsThemeVinylTurntableDesc =>
+      'True vinyl record with realistic grooves, center label & tonearm';
+
+  @override
+  String get settingsTurnOffGapless => 'Turn off Gapless';
+
+  @override
+  String get settingsTurnOffGaplessEnableCrossfade =>
+      'Turn off Gapless & enable Crossfade';
+
+  @override
+  String get settingsUnavailableAaudio =>
+      'Unavailable while AAudio Direct output is enabled';
+
+  @override
+  String get settingsUnknownConnectionFailure => 'Unknown connection failure';
+
+  @override
+  String get settingsUsbBitPerfectStreaming =>
+      'USB Bit-Perfect Streaming (Experimental)';
+
+  @override
+  String get settingsUsbDacHardwareVolume => 'USB DAC Hardware Volume';
+
+  @override
+  String settingsUsbHwVolumeDesc(String uac, String device) {
+    return 'Drives the $uac DAC\'s own volume stage directly (lower distortion at low volume). $device';
+  }
+
+  @override
+  String get settingsUsbHwVolumeGrant =>
+      'Grant USB access to control the DAC\'s hardware volume directly';
+
+  @override
+  String get settingsUsbStreamingActive =>
+      'Raw UAC2 isochronous streaming is active';
+
+  @override
+  String get settingsUsbStreamingDesc =>
+      'Claims the DAC exclusively and streams processed PCM directly over USB isochronous URBs. Unvalidated on hardware; falls back safely if the claim or endpoint setup fails';
+
+  @override
+  String get settingsUsernameLabel => 'Username';
+
+  @override
+  String get settingsVisualizerAlbumReactive => 'Album Art Reactive Glow';
+
+  @override
+  String get settingsVisualizerBarClassic => 'Bar (Classic Frequency Spectrum)';
+
+  @override
+  String get settingsVisualizerCircular => 'Circular (Radial Spectrum)';
+
+  @override
+  String get settingsVisualizerCustomJson => 'Custom JSON Visualizer';
+
+  @override
+  String get settingsVisualizerMilkdrop => 'Milkdrop Preset Visualizer';
+
+  @override
+  String get settingsVisualizerOff => 'Disabled';
+
+  @override
+  String get settingsVisualizerParticles => 'Particles (Audio Field)';
+
+  @override
+  String get settingsVisualizerTerrain3d => '3D Terrain (Wireframe Mountain)';
+
+  @override
+  String get settingsVisualizerWaveSmooth => 'Wave (Smooth Line Spectrum)';
+
+  @override
+  String get settingsVizBarDesc =>
+      'Classic vertical frequency bars with smooth height animation';
+
+  @override
+  String get settingsVizCircularDesc =>
+      'Futuristic radial frequency bars surrounding album centerpiece';
+
+  @override
+  String get settingsVizCustomDesc =>
+      'User-authored JSON preset: bars / wave / radial / particles / lissajous';
+
+  @override
+  String get settingsVizLabelBar => 'BAR';
+
+  @override
+  String get settingsVizLabelCircular => 'CIRCULAR';
+
+  @override
+  String get settingsVizLabelCustom => 'CUSTOM (JSON)';
+
+  @override
+  String get settingsVizLabelMilkdrop => 'MILKDROP';
+
+  @override
+  String get settingsVizLabelOff => 'OFF';
+
+  @override
+  String get settingsVizLabelWave => 'WAVE';
+
+  @override
+  String get settingsVizOffDesc =>
+      'Disable audio visualizer spectrum animation';
+
+  @override
+  String get settingsVizWaveDesc =>
+      'Smooth continuous Bézier waveform line with ambient gradient fill';
+
+  @override
+  String settingsAboutTitle(String title) {
+    return 'About $title';
+  }
+
+  @override
+  String get settingsActiveBadge => 'ACTIVE';
+
+  @override
+  String get settingsActiveProxyProtocol => 'ACTIVE PROXY PROTOCOL';
+
+  @override
+  String get settingsActiveServerConfig => 'ACTIVE SERVER CONFIGURATION';
+
+  @override
+  String get settingsAdaptiveQuality => 'Adaptive quality';
+
+  @override
+  String get settingsAdaptiveQualitySubtitle =>
+      'Step bitrate down/up mid-track on stalls';
+
+  @override
+  String get settingsAaudioBufferSize => 'AAudio Buffer Size';
+
+  @override
+  String get settingsAaudioBufferSizeDesc =>
+      'Stream buffer capacity hint in milliseconds. Lower = lower latency (wired), higher = more stall resistance';
+
+  @override
+  String get settingsAaudioDirect => 'AAudio Direct Output (Bit-Perfect)';
+
+  @override
+  String get settingsAaudioDirectDesc =>
+      'Bypasses the system mixer with a native AAudio stream opened at each track rate (EXCLUSIVE attempt, SHARED fallback). The DSP chain and speed/pitch controls are inactive in this mode; applies to newly built players';
+
+  @override
+  String get dspAboutBassBoost => 'About Bass Boost';
+
+  @override
+  String get dspAboutBitPerfect => 'About Bit-Perfect';
+
+  @override
+  String get dspAboutCrossfeed => 'About Crossfeed';
+
+  @override
+  String get dspAboutDspEngine => 'About DSP Engine';
+
+  @override
+  String get dspAboutDynamics => 'About Dynamics';
+
+  @override
+  String get dspAboutEqualizer => 'About Equalizer';
+
+  @override
+  String get dspAboutLimiter => 'About Limiter';
+
+  @override
+  String get dspAboutReverb => 'About Reverb';
+
+  @override
+  String get dspAboutSpatializer => 'About Spatializer';
+
+  @override
+  String get dspAboutStereoBalance => 'About Stereo Balance';
+
+  @override
+  String get dspAboutVirtualizer => 'About Virtualizer';
+
+  @override
+  String get dspAboutVolumeBoost => 'About Volume Boost';
+
+  @override
+  String get dspActiveEffects => 'active effects (Reverb, Limiter...)';
+
+  @override
+  String get dspAddLine => 'Add Line';
+
+  @override
+  String get dspAllEffectsBypassed => 'All DSP effects bypassed';
+
+  @override
+  String get dspAppliedProfile => 'Applied profile:';
+
+  @override
+  String get dspAttackTime => 'Attack Time';
+
+  @override
+  String get dspAudioFormatCodec => 'Audio Format & Codec';
+
+  @override
+  String get dspAutoEqVerified => 'AutoEQ Verified';
+
+  @override
+  String get dspBassStrength => 'Bass Strength';
+
+  @override
+  String get dspBitPerfectLosslessStream => 'Bit-perfect Lossless Stream';
+
+  @override
+  String get dspBlocked => 'BLOCKED';
+
+  @override
+  String get dspBlockedBitPerfect => 'Blocked: Bit-Perfect bypass active';
+
+  @override
+  String get dspBluetoothCompensationDesc =>
+      'Lossy Bluetooth gets a small presence compensation and a shorter reverb tail.';
+
+  @override
+  String get dspCodec => 'Codec';
+
+  @override
+  String get dspCompressedStream => 'Compressed Audio Stream';
+
+  @override
+  String get dspCrossfeedChuMoy => 'Chu Moy (700Hz / 6dB)';
+
+  @override
+  String get dspCrossfeedDefault => 'Default (700Hz / 4.5dB)';
+
+  @override
+  String get dspCrossfeedJanMeier => 'Jan Meier (650Hz / 9.5dB)';
+
+  @override
+  String get dspCrossoverHigh => 'Crossover 3 (High)';
+
+  @override
+  String get dspCrossoverLow => 'Crossover 1 (Low)';
+
+  @override
+  String get dspCrossoverMid => 'Crossover 2 (Mid)';
+
+  @override
+  String get dspDeleteCustomPreset => 'Delete custom preset';
+
+  @override
+  String get dspDeleteLine => 'Delete line';
+
+  @override
+  String get dspDevice => 'Device';
+
+  @override
+  String get dspDr12Audiophile => 'DR 12+ Audiophile';
+
+  @override
+  String get dspDrHighDynamic => 'DR High Dynamic';
+
+  @override
+  String get dspDrStandard => 'DR Standard';
+
+  @override
+  String get dspDspProcessing => 'DSP PROCESSING';
+
+  @override
+  String get dspDynamicRangeLra => 'Dynamic Range (LRA)';
+
+  @override
+  String get dspEbuR128 => 'EBU R128 Loudness Range Analysis';
+
+  @override
+  String get dspEditLyrics => 'Edit lyrics';
+
+  @override
+  String get dspEmbedded => 'Embedded';
+
+  @override
+  String get dspEmbeddedUnsynced => 'Embedded (unsynced)';
+
+  @override
+  String get dspEqCurvesBypassed => 'Equalizer curves bypassed';
+
+  @override
+  String get dspEveryBandValidNumber => 'Every band needs a valid number.';
+
+  @override
+  String get dspExportThemeJson => 'Export Theme JSON';
+
+  @override
+  String get dspFileSizeDuration => 'File Size & Duration';
+
+  @override
+  String get dspFirLoaded =>
+      'Room-correction FIR loaded into the convolution stage.';
+
+  @override
+  String get dspFirRejected => 'The audio engine rejected the FIR export.';
+
+  @override
+  String get dspFreqRange10To30k => 'Frequencies must stay within 10-30000 Hz.';
+
+  @override
+  String get dspFreqStrictlyAscending =>
+      'Frequencies must be strictly ascending.';
+
+  @override
+  String get dspHardwareEndpoint => 'HARDWARE ENDPOINT';
+
+  @override
+  String get dspHeadset => 'Headset';
+
+  @override
+  String get dspKaraokeMode => 'Karaoke Mode';
+
+  @override
+  String get dspLatency => 'Latency';
+
+  @override
+  String get dspLoadingLyrics => 'Loading lyrics…';
+
+  @override
+  String get dspLrcLibSynced => 'LRCLIB Synced';
+
+  @override
+  String get dspLyricsSaved => 'Lyrics saved';
+
+  @override
+  String get dspLyricsSessionOnly => 'Lyrics updated for this session only';
+
+  @override
+  String get dspMakeupGain => 'Makeup Gain';
+
+  @override
+  String get dspMaxBoost => 'Max Boost';
+
+  @override
+  String get dspMosqueAmbience => 'Mosque Ambience';
+
+  @override
+  String get dspMosqueAmbienceDesc =>
+      'Convolution reverb for a hall-like space';
+
+  @override
+  String get dspMuteBand => 'Mute band';
+
+  @override
+  String get dspMyCustomEq => 'My Custom EQ';
+
+  @override
+  String get dspNoProfileLoaded => 'No profile loaded';
+
+  @override
+  String get dspNormal => 'Normal';
+
+  @override
+  String get dspOff => 'Off';
+
+  @override
+  String get dspOriginalPitch => 'Original Pitch (1.00x)';
+
+  @override
+  String get dspOutputDriver => 'OUTPUT DRIVER';
+
+  @override
+  String get dspPresetImportInvalid =>
+      'Failed to import preset: invalid JSON format';
+
+  @override
+  String get dspPresetImported => 'EQ Preset imported successfully!';
+
+  @override
+  String get dspPresetLabel => 'Preset:';
+
+  @override
+  String get dspPresetName => 'Preset Name';
+
+  @override
+  String get dspPresetNameHint => 'e.g. Warm Bass, Vocal Punch';
+
+  @override
+  String get dspPresetOptions => 'Preset Options';
+
+  @override
+  String get dspPulsrAudiophileEdition => 'Pulsr Audiophile Edition';
+
+  @override
+  String get dspQBandwidth => 'Q / Bandwidth';
+
+  @override
+  String get dspQuranModeOff => 'Quran Mode: Off';
+
+  @override
+  String get dspQuranModeOn => 'Quran Mode: On';
+
+  @override
+  String get dspRatio => 'Ratio';
+
+  @override
+  String get dspResamplingEngine => 'RESAMPLING ENGINE';
+
+  @override
+  String get dspResetAllEqTooltip => 'Reset all DSP & EQ to defaults';
+
+  @override
+  String get dspResetBalanceCenter => 'Reset Balance to Center';
+
+  @override
+  String get dspResetBassEnhancer => 'Reset Bass Enhancer (Off)';
+
+  @override
+  String get dspResetPreamp => 'Reset preamp';
+
+  @override
+  String get dspResetToDefault => 'Reset to default';
+
+  @override
+  String get dspResetToDefault0 => 'Reset to default (0%)';
+
+  @override
+  String get dspResetToDefault02dbfs => 'Reset to default (-0.2 dBFS)';
+
+  @override
+  String get dspResetToDefault20wet => 'Reset to default (20% Wet)';
+
+  @override
+  String get dspResetToDefault350us => 'Reset to default (350 µs)';
+
+  @override
+  String get dspResetToDefault50ms => 'Reset to default (50 ms)';
+
+  @override
+  String get dspResetToDefault9db => 'Reset to default (-9.0 dB)';
+
+  @override
+  String get dspResetVolumeBoost => 'Reset Volume Boost (Off)';
+
+  @override
+  String get dspSearchHeadphones =>
+      'Search headphones (Sony, Sennheiser, Apple...)';
+
+  @override
+  String get dspSearchHeadphonesHint =>
+      'Search headphones (e.g. AirPods, Sony, Moondrop)...';
+
+  @override
+  String get dspSlider1Label => 'slider1 (Rate / Drive)';
+
+  @override
+  String get dspSlider2Label => 'slider2 (Depth / Mix)';
+
+  @override
+  String get dspSoloBand => 'Solo band';
+
+  @override
+  String get dspSortByTime => 'Sort by time';
+
+  @override
+  String get dspSourceBitrate => 'Source Bitrate';
+
+  @override
+  String get dspSourceFile => 'SOURCE FILE';
+
+  @override
+  String get dspSourceSampleRateDepth => 'Source Sample Rate & Depth';
+
+  @override
+  String get dspSpatialTab => 'Spatial & DSP';
+
+  @override
+  String get dspSpeaker => 'Speaker';
+
+  @override
+  String get dspStandardDynamicRange => 'Standard Dynamic Range';
+
+  @override
+  String get dspStandby => 'STANDBY';
+
+  @override
+  String get dspTapeLoaded => 'Tape Loaded';
+
+  @override
+  String get dspTarget => 'Target:';
+
+  @override
+  String get dspThreshold => 'Threshold';
+
+  @override
+  String get dspTunedFor => 'Tuned for';
+
+  @override
+  String get dspUnknown => 'Unknown';
+
+  @override
+  String get dspUnmuteBand => 'Unmute band';
+
+  @override
+  String get dspUnsoloBand => 'Unsolo band';
+
+  @override
+  String get dspVariableBitrate => 'Variable Bitrate';
+
+  @override
+  String get dspVocalWarmth => 'Vocal Warmth';
+
+  @override
+  String get dspVocalWarmthDesc => 'Harmonic richness on the reciter\'s voice';
+
+  @override
+  String get dspWiredCompensationDesc =>
+      'Wired / USB output is left untouched by hardware compensation.';
+
+  @override
+  String get browseAccountConnectedDone =>
+      'Account connected! Tap \"Done\" to finish.';
+
+  @override
+  String get browseAcoustic => 'Acoustic';
+
+  @override
+  String get browseActiveDownloadsSuffix => '(3 active downloads)...';
+
+  @override
+  String get browseAdded => 'Added';
+
+  @override
+  String get browseAddress => 'Address';
+
+  @override
+  String get browseAlarmSound => 'Alarm sound';
+
+  @override
+  String get browseAllLikedSongsDownloadedOffline =>
+      'All liked songs are already downloaded offline.';
+
+  @override
+  String get browseAllOnlineLikedDownloaded =>
+      'All online liked songs are already downloaded or in progress.';
+
+  @override
+  String get browseAllOnlineTracksDownloaded =>
+      'All online tracks are already downloaded or in progress.';
+
+  @override
+  String get browseAllSongsOffline =>
+      'All songs in this list are already offline local tracks.';
+
+  @override
+  String get browseAllTracksAlreadyDownloaded =>
+      'All tracks are already downloaded or local';
+
+  @override
+  String get browseAllTracksFrom => 'All tracks from';
+
+  @override
+  String get browseAllTracksOfflineLocal =>
+      'All tracks in this playlist are already offline local files.';
+
+  @override
+  String get browseAlreadyDownloadedOffline =>
+      'are already downloaded offline.';
+
+  @override
+  String get browseAlreadyHaveAccount => 'Already have an account? Sign In';
+
+  @override
+  String get browseApplyChanges => 'Apply Changes';
+
+  @override
+  String get browseArabicPop => 'Arabic Pop';
+
+  @override
+  String get browseAudioTracks => 'audio tracks';
+
+  @override
+  String get browseAutoFetchTags => 'Auto-Fetch Tags & Cover Art';
+
+  @override
+  String get browseBack => 'Back';
+
+  @override
+  String get browseBatchEdit => 'Batch Edit';
+
+  @override
+  String browseBatchEditingBody(int count) {
+    return 'Batch editing $count tracks. Common tags and cover art will be updated on all selected files.';
+  }
+
+  @override
+  String get browseBatchEditTags => 'Batch Edit Tags';
+
+  @override
+  String get browseBy => 'by';
+
+  @override
+  String get browseCannotBeUndone => 'This cannot be undone.';
+
+  @override
+  String get browseCategories => 'Categories';
+
+  @override
+  String get browseChecking => 'Checking…';
+
+  @override
+  String get browseCheckOut => 'Check out';
+
+  @override
+  String get browseChillLofi => 'Chill & Lo-Fi';
+
+  @override
+  String get browseChillout => 'Chillout';
+
+  @override
+  String get browseClearHistory => 'Clear History';
+
+  @override
+  String get browseClearHistoryFailed => 'Failed to clear history';
+
+  @override
+  String get browseClearListeningHistoryMessage =>
+      'This will remove all tracks from your Recently Played history. Your actual audio files and playlists will not be affected.';
+
+  @override
+  String get browseClearListeningHistoryTitle => 'Clear Listening History?';
+
+  @override
+  String get browseClearPlayHistory => 'Clear Play History';
+
+  @override
+  String get browseClearPlayHistoryMessage =>
+      'This will reset your recently played list and listening history. Your song files and playlists will not be affected.';
+
+  @override
+  String get browseClearPlayHistoryTitle => 'Clear Play History?';
+
+  @override
+  String get browseClose => 'Close';
+
+  @override
+  String get browseCode => 'Code';
+
+  @override
+  String get browseComment => 'Comment';
+
+  @override
+  String get browseConnect => 'Connect';
+
+  @override
+  String get browseConnectToSync =>
+      'Connect account to sync Liked Music automatically';
+
+  @override
+  String get browseCookiesRejected =>
+      'YouTube rejected these cookies — they have expired or belong to a signed-out session';
+
+  @override
+  String get browseCookieVerifyOffline =>
+      'Could not reach YouTube to verify — the cookies are saved, try again when back online';
+
+  @override
+  String get browseCopied => 'copied';
+
+  @override
+  String get browseCopy => 'Copy';
+
+  @override
+  String get browseCouldNotLoadAlbums => 'Could not load albums.';
+
+  @override
+  String get browseCouldNotLoadTopTracks => 'Could not load top tracks.';
+
+  @override
+  String get browseCouldNotLoadTracks =>
+      'Could not load tracks for this playlist. Please check your internet connection or URL.';
+
+  @override
+  String get browseCreateCloudAccount => 'Create Cloud Account';
+
+  @override
+  String get browseCrossfade => 'Crossfade';
+
+  @override
+  String get browseCurrentIdentity => 'Current identity';
+
+  @override
+  String get browseDeselect => 'Deselect';
+
+  @override
+  String get browseDisc => 'Disc';
+
+  @override
+  String get browseDiscNumber => 'Disc Number';
+
+  @override
+  String get browseDiskStorage => 'Disk Storage';
+
+  @override
+  String get browseDontHaveAccount => 'Don\'t have an account? Sign Up';
+
+  @override
+  String get browseDownloadActionsFor => 'Download actions for';
+
+  @override
+  String get browseDownloadAllLikedSongs => 'Download All Liked Songs';
+
+  @override
+  String get browseDownloadAllOfflineActive =>
+      'Download all offline (3 active downloads)';
+
+  @override
+  String get browseDownloadAllOnlineFavorites =>
+      'Download All Online Favorites';
+
+  @override
+  String get browseDownloadOffline => 'Download offline';
+
+  @override
+  String get browseEgyptMode => 'Egypt Mode';
+
+  @override
+  String get browseElectronic => 'Electronic';
+
+  @override
+  String get browseEmailAddress => 'Email address';
+
+  @override
+  String get browseEnter => 'Enter';
+
+  @override
+  String get browseEnterBpmRange => 'Enter a BPM between 40 and 240.';
+
+  @override
+  String get browseEnterLyrics => 'Enter song lyrics...';
+
+  @override
+  String get browseEnterPlaylistUrl => 'Please enter a playlist URL or ID';
+
+  @override
+  String get browseEta => 'ETA:';
+
+  @override
+  String get browseExcludeFromScan => 'Exclude from Scan';
+
+  @override
+  String get browseExplore => 'Explore';
+
+  @override
+  String get browseFailedLoadFeed =>
+      'Failed to load feed. Check connection and retry.';
+
+  @override
+  String get browseFailedToFetch => 'Failed to fetch';
+
+  @override
+  String get browseFailedToLoadAccountPlaylists =>
+      'Failed to load account playlists';
+
+  @override
+  String get browseFetching => 'Fetching';
+
+  @override
+  String get browseFlac => 'FLAC';
+
+  @override
+  String get browseFlat => 'Flat';
+
+  @override
+  String get browseForDownload => 'for download';
+
+  @override
+  String get browseForward => 'Forward';
+
+  @override
+  String get browseForYou => 'For You';
+
+  @override
+  String get browseGenreArabicRegional => 'Arabic & Regional';
+
+  @override
+  String get browseGenreClassicalInstrumental => 'Classical & Instrumental';
+
+  @override
+  String get browseGenreElectronicDance => 'Electronic & Dance';
+
+  @override
+  String get browseGenreHipHopRnb => 'Hip-Hop & R&B';
+
+  @override
+  String get browseGenreJazzBlues => 'Jazz & Blues';
+
+  @override
+  String get browseGenrePopAcoustic => 'Pop & Acoustic';
+
+  @override
+  String get browseGenreRockMetal => 'Rock & Metal';
+
+  @override
+  String get browseGlobalTopHits => 'Global Top Hits';
+
+  @override
+  String get browseGoogleBlocking => 'Google is blocking this sign-in';
+
+  @override
+  String get browseGoogleBlockingBody =>
+      'Google blocks sign-in inside embedded browsers for some accounts, and the automatic retries (clearing cookies and switching the browser identity) didn\'t get past it.\n\nUse the reliable option below to sign in with Google TV: approve on your own browser and Google never sees an embedded WebView, so there is no captcha. Pulsr will sync your library and playlists; playback keeps working as usual.';
+
+  @override
+  String get browseHipHop => 'Hip-Hop';
+
+  @override
+  String get browseHistoryCleared => 'Listening history cleared';
+
+  @override
+  String get browseHome => 'Home';
+
+  @override
+  String get browseHoursShort => 'h';
+
+  @override
+  String get browseIncludeInScan => 'Include in Scan';
+
+  @override
+  String get browseInvalidEmail => 'Invalid email address';
+
+  @override
+  String get browseJazz => 'Jazz';
+
+  @override
+  String get browseLatestTracksSubtitle =>
+      'Latest tracks played on this device';
+
+  @override
+  String get browseLibraryStats => 'Library Stats';
+
+  @override
+  String get browseLikedSongsForDownload => 'liked songs for download';
+
+  @override
+  String get browseList => 'List';
+
+  @override
+  String get browseListeningTime => 'Listening Time';
+
+  @override
+  String get browseLofiBeats => 'Lo-Fi Beats';
+
+  @override
+  String get browseLoggedInSuccessfully => 'Logged In Successfully';
+
+  @override
+  String get browseLossless => 'Lossless';
+
+  @override
+  String get browseLosslessHiRes => 'Lossless / Hi-Res:';
+
+  @override
+  String get browseMahraganat => 'Mahraganat';
+
+  @override
+  String get browseMissingSessionCookies =>
+      'Missing session cookies — the paste needs an SAPISID and a __Secure-3PSID (or 1PSID)';
+
+  @override
+  String get browseMoreOptions => 'More options';
+
+  @override
+  String get browseMoreTools => 'More tools';
+
+  @override
+  String get browseMostPlayedTracks => 'Most Played Tracks';
+
+  @override
+  String get browseMostPlayedTracksSubtitle =>
+      'Your all-time favorites leaderboard';
+
+  @override
+  String get browseNoArtistsFound => 'No Artists Found';
+
+  @override
+  String get browseNoChangesToSave => 'No Changes to Save';
+
+  @override
+  String get browseNoGenresFound => 'No Genres Found';
+
+  @override
+  String get browseNoRecommendations => 'No recommendations right now.';
+
+  @override
+  String get browseNoResultsFound => 'No Results Found';
+
+  @override
+  String get browseNoSongsInLibrary => 'No songs in library';
+
+  @override
+  String get browseNoSongsMatch => 'No songs match';
+
+  @override
+  String get browseNotificationSound => 'Notification sound';
+
+  @override
+  String get browseNoTracks => 'No Tracks';
+
+  @override
+  String get browseNoTracksFound => 'No Tracks Found';
+
+  @override
+  String get browseNoTracksInFolder =>
+      'No playable audio tracks found in this directory.';
+
+  @override
+  String get browseNoTracksInGenre => 'No tracks found in this genre.';
+
+  @override
+  String get browseNoTracksInYear => 'No tracks found for this year.';
+
+  @override
+  String get browseNoTracksMatchSmartRules =>
+      'No tracks match the rules for this smart playlist.';
+
+  @override
+  String get browseNoTracksPrivateLiked =>
+      'No tracks found. If this is your private Liked Music, please ensure you are signed in or tap \"Sync\".';
+
+  @override
+  String get browseNotSet => 'Not set';
+
+  @override
+  String get browseNoYearsFound => 'No Years Found';
+
+  @override
+  String get browseNoYtmMatchesFor => 'No YouTube Music matches for';
+
+  @override
+  String get browseOauthAccessDenied => 'Access was denied on the Google page.';
+
+  @override
+  String get browseOauthExpired =>
+      'The code expired before it was approved. Try again.';
+
+  @override
+  String get browseOauthGoogleError => 'Google returned an error';
+
+  @override
+  String get browseOauthStartFailed =>
+      'Could not start the Google sign-in. Check your connection.';
+
+  @override
+  String get browseOfflinePlaylist => 'Offline playlist';
+
+  @override
+  String get browseOnPulsr => 'on Pulsr Music!';
+
+  @override
+  String get browseOpenFolderDetails => 'Open folder details';
+
+  @override
+  String get browsePassword => 'Password';
+
+  @override
+  String get browsePasswordMinChars => 'Password must be at least 6 characters';
+
+  @override
+  String get browsePasswordResetSent => 'Password reset link sent to';
+
+  @override
+  String get browsePasteFromClipboard => 'Paste from clipboard';
+
+  @override
+  String get browsePastePlaylistLinkHint =>
+      'Paste a YouTube or YouTube Music playlist link.';
+
+  @override
+  String get browsePersonalized => 'Personalized';
+
+  @override
+  String get browsePlaylistExportedSuccess => 'Playlist exported successfully';
+
+  @override
+  String get browsePlaylistHasNoSongs => 'This playlist has no songs.';
+
+  @override
+  String get browsePlaylistSharePrefix => 'Playlist:';
+
+  @override
+  String get browsePlaylistUpdated => 'Playlist updated';
+
+  @override
+  String get browsePlays => 'plays';
+
+  @override
+  String get browsePleaseEnterCookieText => 'Please enter cookie text';
+
+  @override
+  String get browsePleaseEnterEmail => 'Please enter email';
+
+  @override
+  String get browsePop => 'Pop';
+
+  @override
+  String get browsePopMix => 'Pop Mix';
+
+  @override
+  String get browsePopular => 'Popular';
+
+  @override
+  String get browseQueued => 'Queued';
+
+  @override
+  String get browseRadioNameHint => 'e.g. Chillhop Radio';
+
+  @override
+  String get browseRecentSongs => 'recent songs';
+
+  @override
+  String get browseRecommendedForYou => 'Recommended For You';
+
+  @override
+  String get browseRecommendedYtmTitle =>
+      '✨ Recommended For You (YouTube Music)';
+
+  @override
+  String get browseRefresh => 'Refresh';
+
+  @override
+  String get browseRefreshPage => 'Refresh page';
+
+  @override
+  String get browseRefreshPlaylist => 'Refresh playlist';
+
+  @override
+  String get browseRelaxing => 'Relaxing';
+
+  @override
+  String get browseReleaseYear => 'Release Year';
+
+  @override
+  String get browseRenamePlaylist => 'Rename Playlist';
+
+  @override
+  String get browseRequiresModifySettings =>
+      'directly, Android requires the \"Modify system settings\" permission.';
+
+  @override
+  String get browseRock => 'Rock';
+
+  @override
+  String get browseRockClassics => 'Rock Classics';
+
+  @override
+  String get browseRockMetal => 'Rock & Metal';
+
+  @override
+  String get browseScanForAlbums =>
+      'Scan your media library to view your albums.';
+
+  @override
+  String get browseScanForArtists =>
+      'Scan your media library to view all artists.';
+
+  @override
+  String get browseScanForGenres =>
+      'Scan your media library to view all song genres.';
+
+  @override
+  String get browseScanForYears =>
+      'Scan your media library to view release years.';
+
+  @override
+  String get browseSearchFailed => 'Search Failed';
+
+  @override
+  String get browseSearchingOnlineMetadata => 'Searching Online Metadata...';
+
+  @override
+  String get browseSearchSongsHint => 'Search songs by title or artist...';
+
+  @override
+  String get browseSearchWithinPlaylist => 'Search within playlist…';
+
+  @override
+  String get browseSeeAll => 'See All';
+
+  @override
+  String get browseSelectBestMatch => 'Select Best Match';
+
+  @override
+  String get browseSignedInLoading => 'Signed in. Loading your library…';
+
+  @override
+  String get browseSignInToCloud => 'Sign in to Cloud';
+
+  @override
+  String get browseSignInToYtm => 'Sign in to YouTube Music';
+
+  @override
+  String get browseSignUp => 'Sign Up';
+
+  @override
+  String get browseSmart => 'Smart';
+
+  @override
+  String get browseSmoothCrossfade => 'Smooth Crossfade';
+
+  @override
+  String get browseSongsOnYtm => 'Songs on YouTube Music…';
+
+  @override
+  String get browseStandardLossy => 'Standard Lossy:';
+
+  @override
+  String get browseSubGenres => 'sub-genres';
+
+  @override
+  String get browseSynced => 'synced';
+
+  @override
+  String get browseSyncingLikedSongs => 'Syncing liked songs…';
+
+  @override
+  String get browseSyncPullSubtitle =>
+      'Tap sync below to pull your latest YouTube Music Liked Songs library.';
+
+  @override
+  String get browseTapToPlayOrDownload => 'Tap to play or download';
+
+  @override
+  String get browseTapToSyncYtm => 'Tap to sync from YouTube Music';
+
+  @override
+  String get browseTenBandGraphicEq => '10-Band Graphic EQ';
+
+  @override
+  String get browseTopArtists => 'Top Artists';
+
+  @override
+  String get browseTopArtistsSubtitle => 'Ranked by total listening plays';
+
+  @override
+  String get browseTopChartsSongs => 'Top Charts & Songs';
+
+  @override
+  String get browseTopHits => 'Top Hits';
+
+  @override
+  String get browseTopRated => 'Top Rated';
+
+  @override
+  String get browseTopTracks => 'Top Tracks';
+
+  @override
+  String get browseToSet => 'To set';
+
+  @override
+  String get browseTotalPlays => 'Total Plays';
+
+  @override
+  String get browseTotalTracks => 'Total Tracks';
+
+  @override
+  String get browseTracks => 'tracks';
+
+  @override
+  String get browseTracksForDownload => 'tracks for download';
+
+  @override
+  String get browseTracksFrom => 'tracks from';
+
+  @override
+  String get browseTracksInLibrary => 'tracks in library';
+
+  @override
+  String get browseTracksSuccessfully => 'tracks successfully!';
+
+  @override
+  String get browseTracksTo => 'tracks to';
+
+  @override
+  String get browseTree => 'Tree';
+
+  @override
+  String get browseTrending => 'Trending';
+
+  @override
+  String get browseTrendingEgypt => 'Trending Egypt';
+
+  @override
+  String get browseTrendingInEgypt => 'Trending in Egypt 🇪🇬';
+
+  @override
+  String get browseUpdatedPrefix => 'Updated';
+
+  @override
+  String get browseUser => 'User';
+
+  @override
+  String get browseWillAdd => 'Will add';
+
+  @override
+  String get browseWillRemove => 'Will remove';
+
+  @override
+  String get browseWorkoutEnergy => 'Workout Energy';
+
+  @override
+  String get browseYouTubeMusic => 'YouTube Music';
+
+  @override
+  String get browseYoutubeWeb => 'YouTube Web';
+
+  @override
+  String get browseYtmSearchScreenDesc =>
+      'Stream and download songs from YouTube Music, ad-free.';
 }

@@ -59,8 +59,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       SnackBar(
         content: Text(
           queuedCount > 0
-              ? 'Queued $queuedCount tracks for download'
-              : 'All tracks are already downloaded or local',
+              ? '${context.l10n.browseQueued} $queuedCount ${context.l10n.browseTracksForDownload}'
+              : context.l10n.browseAllTracksAlreadyDownloaded,
         ),
         behavior: SnackBarBehavior.floating,
       ),
@@ -249,7 +249,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                     ),
                                     icon: const Icon(Icons.download_rounded,
                                         size: 20),
-                                    tooltip: 'Download All Online Favorites',
+                                    tooltip:
+                                        context.l10n.browseDownloadAllOnlineFavorites,
                                     onPressed: () =>
                                         _downloadFavorites(context, songs),
                                   ),
@@ -364,7 +365,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                         padding: const EdgeInsets.all(32),
                         child: Center(
                           child: Text(
-                            'No songs match "$_searchQuery"',
+                            '${context.l10n.browseNoSongsMatch} "$_searchQuery"',
                             style: TextStyle(color: p.textSecondary),
                           ),
                         ),

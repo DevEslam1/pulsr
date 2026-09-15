@@ -13,6 +13,8 @@ abstract class AppColors {
   static const Color error = Color(0xFFFF5252);
   static const Color success = Color(0xFF4CAF50);
   static const Color favorite = Color(0xFFFF5C7A);
+  static const Color warning = Color(0xFFFFB300);
+  static const Color info = Color(0xFF40A9FF);
 
   // Dark surfaces (kept for legacy widgets)
   static const Color background = Color(0xFF0A0C12);

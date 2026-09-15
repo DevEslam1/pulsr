@@ -16,6 +16,22 @@ import '../../data/db/app_database.dart';
 class WidgetService {
   static const String androidWidgetName = 'NowPlayingWidget';
   static const String qualifiedAndroidName = 'com.pulsr.music.NowPlayingWidget';
+  static const String iOSWidgetName = 'PulsrWidget';
+  static const String appGroupId = 'group.com.pulsr.music';
+
+  bool _appGroupConfigured = false;
+  Future<void> _ensureAppGroup() async {
+    if (_appGroupConfigured) return;
+    if (Platform.isIOS) {
+      try {
+        await HomeWidget.setAppGroupId(appGroupId);
+      } catch (e) {
+        ErrorLogger.log('Failed to set iOS app group ID',
+            error: e, category: 'WidgetService');
+      }
+    }
+    _appGroupConfigured = true;
+  }
 
   final OnAudioQuery _audioQuery = OnAudioQuery();
   final Map<int, String> _artworkCache = {};
@@ -69,6 +85,7 @@ class WidgetService {
     List<String>? nextQueueTitles,
   }) async {
     try {
+      await _ensureAppGroup();
       final hasSong = song != null;
 
       await HomeWidget.saveWidgetData<String>(
@@ -128,6 +145,7 @@ class WidgetService {
         name: androidWidgetName,
         androidName: androidWidgetName,
         qualifiedAndroidName: qualifiedAndroidName,
+        iOSName: iOSWidgetName,
       );
     } catch (e, st) {
       ErrorLogger.log('Failed to update home screen widget state',
@@ -159,6 +177,7 @@ class WidgetService {
           name: androidWidgetName,
           androidName: androidWidgetName,
           qualifiedAndroidName: qualifiedAndroidName,
+          iOSName: iOSWidgetName,
         );
       } else {
         // FIX-G03: Push empty string on resolution failure so widget doesn't stay stuck on stale artwork
@@ -172,6 +191,7 @@ class WidgetService {
           name: androidWidgetName,
           androidName: androidWidgetName,
           qualifiedAndroidName: qualifiedAndroidName,
+          iOSName: iOSWidgetName,
         );
       }
     } catch (e, st) {
@@ -185,8 +205,12 @@ class WidgetService {
           name: androidWidgetName,
           androidName: androidWidgetName,
           qualifiedAndroidName: qualifiedAndroidName,
+          iOSName: iOSWidgetName,
         );
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Reset artwork on error failed',
+            error: e, stackTrace: st, category: 'WidgetService');
+      }
     }
   }
 
@@ -198,6 +222,7 @@ class WidgetService {
     Duration duration = Duration.zero,
   }) async {
     try {
+      await _ensureAppGroup();
       await HomeWidget.saveWidgetData<bool>('isPlaying', isPlaying);
       await HomeWidget.saveWidgetData<int>(
           'positionMs', position.inMilliseconds);
@@ -208,6 +233,7 @@ class WidgetService {
         name: androidWidgetName,
         androidName: androidWidgetName,
         qualifiedAndroidName: qualifiedAndroidName,
+        iOSName: iOSWidgetName,
       );
     } catch (e, st) {
       ErrorLogger.log('updateProgress failed', error: e, stackTrace: st, category: 'WidgetService');

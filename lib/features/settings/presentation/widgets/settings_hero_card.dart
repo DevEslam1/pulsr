@@ -31,7 +31,7 @@ class SettingsHeroCard extends StatelessWidget {
         String syncSubtitle = context.l10n.cloudSyncSubtitle;
         if (user != null) {
           if (isSyncing) {
-            syncSubtitle = 'Syncing your library...';
+            syncSubtitle = context.l10n.settingsSyncingLibrary;
           } else if (state.lastSyncedAt != null) {
             final diff = DateTime.now().difference(state.lastSyncedAt!);
             if (diff.inMinutes < 1) {
@@ -178,11 +178,13 @@ class SettingsHeroCard extends StatelessWidget {
                                           padding: const EdgeInsets.symmetric(
                                               horizontal: 6, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: p.accent.withValues(alpha: 0.15),
+                                            color: p.accent
+                                                .withValues(alpha: 0.15),
                                             borderRadius:
                                                 BorderRadius.circular(6),
                                           ),
-                                          child: Text(context.l10n.syncedLabel,
+                                          child: Text(
+                                            context.l10n.syncedLabel,
                                             style: TextStyle(
                                               color: p.accent,
                                               fontSize: 9.5,
@@ -248,7 +250,8 @@ class SettingsHeroCard extends StatelessWidget {
                                               color: p.accent,
                                             ),
                                           )
-                                        : const Icon(Icons.sync_rounded, size: 20),
+                                        : const Icon(Icons.sync_rounded,
+                                            size: 20),
                                     onPressed: isSyncing
                                         ? null
                                         : () => authCubit.syncNow(),
@@ -298,7 +301,8 @@ class SettingsHeroCard extends StatelessWidget {
                           ),
                         ],
                       ],
-                      if (AppConfig.isCloudSyncAllowed && AppConfig.ytmEnabled) ...[
+                      if (AppConfig.isCloudSyncAllowed &&
+                          AppConfig.ytmEnabled) ...[
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           child: Divider(
@@ -425,14 +429,19 @@ class SettingsHeroCard extends StatelessWidget {
                                   color: p.success.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
-                                child: const Text(
-                                  'CONNECTED',
-                                  style: TextStyle(
-                                    color: Color(0xFF34C759),
-                                    fontSize: 9.5,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 0.5,
-                                  ),
+                                child: Builder(
+                                  builder: (_) {
+                                    final status = context.l10n.settingsBadgeConnected;
+                                    return Text(
+                                      status,
+                                      style: TextStyle(
+                                        color: p.success,
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    );
+                                  },
                                 ),
                               ),
                             ],
@@ -441,7 +450,7 @@ class SettingsHeroCard extends StatelessWidget {
                         const SizedBox(height: 3),
                         Text(
                           isLoggedIn
-                              ? 'YouTube Music • Tap to manage'
+                              ? 'YouTube Music • ${context.l10n.settingsTapToManage}'
                               : context.l10n.connectYtmSubtitle,
                           style: TextStyle(
                             color: p.textSecondary,
@@ -479,21 +488,19 @@ class SettingsHeroCard extends StatelessWidget {
                           fontSize: 13,
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(AppRadii.button),
+                          borderRadius: BorderRadius.circular(AppRadii.button),
                         ),
                       ),
                     )
                   else
                     IconButton(
-                      tooltip: 'Manage YouTube Music',
+                      tooltip: context.l10n.settingsManageYtm,
                       icon: Icon(
                         Icons.tune_rounded,
                         color: p.textTertiary,
                         size: 20,
                       ),
-                      onPressed: () =>
-                          showYtmAccountDisconnectDialog(context),
+                      onPressed: () => showYtmAccountDisconnectDialog(context),
                     ),
                 ],
               ),

@@ -10,6 +10,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../settings/cubit/settings_state.dart';
@@ -127,8 +128,8 @@ class PlayerSwitcherItem extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(20),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOutCubic,
+            duration: context.motionMs(200),
+            curve: context.motionCurve(Curves.easeOutCubic),
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: isSelected
@@ -229,7 +230,7 @@ class PlayerAnimatedFavoriteButton extends StatelessWidget {
           },
           child: Center(
             child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 240),
+              duration: context.motionMs(240),
               transitionBuilder: (child, anim) => ScaleTransition(
                 scale: anim,
                 child: child,
@@ -283,7 +284,7 @@ class PlayerDockIconButton extends StatelessWidget {
         alignment: Alignment.center,
         children: [
           AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
+            duration: context.motionMs(200),
             padding: EdgeInsets.all(style.paddingFor(isTablet)),
             decoration: BoxDecoration(
               shape: BoxShape.circle,

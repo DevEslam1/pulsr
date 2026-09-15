@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../constants/app_colors.dart';
@@ -22,6 +23,8 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
     required this.favorite,
     required this.success,
     required this.error,
+    this.warning = AppColors.warning,
+    this.info = AppColors.info,
     required this.isDark,
   });
 
@@ -40,6 +43,8 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
   final Color favorite;
   final Color success;
   final Color error;
+  final Color warning; // attention / caution semantic role
+  final Color info; // informational / neutral highlight role
   final bool isDark;
 
   Color get background => bg;
@@ -64,6 +69,8 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
     Color? favorite,
     Color? success,
     Color? error,
+    Color? warning,
+    Color? info,
     bool? isDark,
   }) {
     return PulsrPalette(
@@ -82,6 +89,8 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
       favorite: favorite ?? this.favorite,
       success: success ?? this.success,
       error: error ?? this.error,
+      warning: warning ?? this.warning,
+      info: info ?? this.info,
       isDark: isDark ?? this.isDark,
     );
   }
@@ -112,6 +121,8 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
       favorite: Color.lerp(favorite, other.favorite, t) ?? favorite,
       success: Color.lerp(success, other.success, t) ?? success,
       error: Color.lerp(error, other.error, t) ?? error,
+      warning: Color.lerp(warning, other.warning, t) ?? warning,
+      info: Color.lerp(info, other.info, t) ?? info,
       isDark: t < 0.5 ? isDark : other.isDark,
     );
   }
@@ -206,11 +217,17 @@ class AuraTheme {
     Color accent, {
     Brightness brightness = Brightness.dark,
     bool isAmoled = false,
+    bool isBoldText = false,
   }) {
     final p = _palette(accent, brightness, isAmoled);
     final isDark = p.isDark;
     const fontFamily = 'Manrope';
     const fontFallbacks = [
+      '.SF Pro Text',
+      '.SF Pro Display',
+      '.SF UI Text',
+      'SF Pro',
+      '-apple-system',
       'Noto Sans Arabic',
       'Segoe UI',
       'Roboto',
@@ -227,62 +244,65 @@ class AuraTheme {
     final textTheme = baseTextTheme.copyWith(
       displayLarge: baseTextTheme.displayLarge?.copyWith(
           color: p.textPrimary,
-          fontWeight: FontWeight.w800,
+          fontWeight: isBoldText ? FontWeight.w900 : FontWeight.w800,
           letterSpacing: -1.2,
           fontFamily: fontFamily,
           fontFamilyFallback: fontFallbacks),
       displayMedium: baseTextTheme.displayMedium?.copyWith(
           color: p.textPrimary,
-          fontWeight: FontWeight.w800,
+          fontWeight: isBoldText ? FontWeight.w900 : FontWeight.w800,
           letterSpacing: -0.8,
           fontFamily: fontFamily,
           fontFamilyFallback: fontFallbacks),
       headlineMedium: baseTextTheme.headlineMedium?.copyWith(
           color: p.textPrimary,
-          fontWeight: FontWeight.w800,
+          fontWeight: isBoldText ? FontWeight.w900 : FontWeight.w800,
           letterSpacing: -0.6,
           fontFamily: fontFamily,
           fontFamilyFallback: fontFallbacks),
       headlineSmall: baseTextTheme.headlineSmall?.copyWith(
           color: p.textPrimary,
-          fontWeight: FontWeight.w800,
+          fontWeight: isBoldText ? FontWeight.w900 : FontWeight.w800,
           letterSpacing: -0.4,
           fontFamily: fontFamily,
           fontFamilyFallback: fontFallbacks),
       titleLarge: baseTextTheme.titleLarge?.copyWith(
           color: p.textPrimary,
-          fontWeight: FontWeight.w700,
+          fontWeight: isBoldText ? FontWeight.w800 : FontWeight.w700,
           letterSpacing: -0.2,
           fontFamily: fontFamily,
           fontFamilyFallback: fontFallbacks),
       titleMedium: baseTextTheme.titleMedium?.copyWith(
           color: p.textPrimary,
-          fontWeight: FontWeight.w700,
+          fontWeight: isBoldText ? FontWeight.w800 : FontWeight.w700,
           fontFamily: fontFamily,
           fontFamilyFallback: fontFallbacks),
       titleSmall: baseTextTheme.titleSmall?.copyWith(
           color: p.textSecondary,
-          fontWeight: FontWeight.w600,
+          fontWeight: isBoldText ? FontWeight.w700 : FontWeight.w600,
           fontFamily: fontFamily,
           fontFamilyFallback: fontFallbacks),
       bodyLarge: baseTextTheme.bodyLarge?.copyWith(
           color: p.textPrimary,
           fontSize: 16,
+          fontWeight: isBoldText ? FontWeight.w600 : FontWeight.w400,
           fontFamily: fontFamily,
           fontFamilyFallback: fontFallbacks),
       bodyMedium: baseTextTheme.bodyMedium?.copyWith(
           color: p.textSecondary,
           fontSize: 14,
+          fontWeight: isBoldText ? FontWeight.w600 : FontWeight.w400,
           fontFamily: fontFamily,
           fontFamilyFallback: fontFallbacks),
       bodySmall: baseTextTheme.bodySmall?.copyWith(
           color: p.textTertiary,
           fontSize: 12,
+          fontWeight: isBoldText ? FontWeight.w600 : FontWeight.w400,
           fontFamily: fontFamily,
           fontFamilyFallback: fontFallbacks),
       labelLarge: baseTextTheme.labelLarge?.copyWith(
           color: p.onAccent,
-          fontWeight: FontWeight.w700,
+          fontWeight: isBoldText ? FontWeight.w800 : FontWeight.w700,
           fontSize: 14,
           fontFamily: fontFamily,
           fontFamilyFallback: fontFallbacks),
@@ -306,6 +326,21 @@ class AuraTheme {
       fontFamilyFallback: fontFallbacks,
       brightness: brightness,
       scaffoldBackgroundColor: p.bg,
+      cupertinoOverrideTheme: CupertinoThemeData(
+        brightness: brightness,
+        primaryColor: p.accent,
+        primaryContrastingColor: p.onAccent,
+        scaffoldBackgroundColor: p.bg,
+        barBackgroundColor: p.surface.withValues(alpha: 0.82),
+        textTheme: CupertinoTextThemeData(
+          primaryColor: p.textPrimary,
+          textStyle: TextStyle(
+            color: p.textPrimary,
+            fontFamily: fontFamily,
+            fontFamilyFallback: fontFallbacks,
+          ),
+        ),
+      ),
       extensions: [p],
       colorScheme: ColorScheme(
         brightness: brightness,

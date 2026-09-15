@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../constants/app_radii.dart';
+import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
 
 class EmptyStateWidget extends StatelessWidget {
@@ -58,13 +59,16 @@ class EmptyStateWidget extends StatelessWidget {
                   ),
                 )
                     .animate(
-                        onPlay: (controller) =>
-                            controller.repeat(reverse: true))
+                        onPlay: (controller) {
+                          if (context.motionEnabled) {
+                            controller.repeat(reverse: true);
+                          }
+                        })
                     .scaleXY(
                         begin: 0.9,
                         end: 1.15,
-                        duration: 2500.ms,
-                        curve: Curves.easeInOut),
+                        duration: context.motionMs(2500),
+                        curve: context.motionCurve(Curves.easeInOut)),
 
                 // Inner Glass Circle Container
                 Container(
@@ -92,7 +96,9 @@ class EmptyStateWidget extends StatelessWidget {
                       color: effectiveIconColor,
                     ),
                   ),
-                ).animate().scale(duration: 500.ms, curve: Curves.easeOutBack),
+                ).animate().scale(
+                    duration: context.motionMs(500),
+                    curve: context.motionCurve(Curves.easeOutBack)),
               ],
             ),
             const SizedBox(height: 24),
@@ -106,7 +112,7 @@ class EmptyStateWidget extends StatelessWidget {
                     letterSpacing: -0.3,
                     fontSize: 20,
                   ),
-            ).animate().fadeIn(delay: 150.ms).slideY(begin: 0.15, end: 0),
+            ).animate().fadeIn(delay: context.motionMs(150)).slideY(begin: 0.15, end: 0),
             const SizedBox(height: 8),
 
             // Subtitle
@@ -121,7 +127,7 @@ class EmptyStateWidget extends StatelessWidget {
                   height: 1.45,
                 ),
               ),
-            ).animate().fadeIn(delay: 250.ms).slideY(begin: 0.15, end: 0),
+            ).animate().fadeIn(delay: context.motionMs(250)).slideY(begin: 0.15, end: 0),
 
             if (primaryActionLabel != null && onPrimaryAction != null) ...[
               const SizedBox(height: 28),
@@ -162,7 +168,7 @@ class EmptyStateWidget extends StatelessWidget {
                           ],
                         ),
                 ),
-              ).animate().fadeIn(delay: 350.ms).slideY(begin: 0.2, end: 0),
+              ).animate().fadeIn(delay: context.motionMs(350)).slideY(begin: 0.2, end: 0),
             ],
 
             if (secondaryActionLabel != null && onSecondaryAction != null) ...[
@@ -192,7 +198,7 @@ class EmptyStateWidget extends StatelessWidget {
                     ),
                   ],
                 ),
-              ).animate().fadeIn(delay: 450.ms),
+              ).animate().fadeIn(delay: context.motionMs(450)),
             ],
           ],
         ),

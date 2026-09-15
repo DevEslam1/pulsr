@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -60,8 +61,8 @@ class ClassicPlayerTheme extends StatelessWidget {
         // 1. Dynamic Ambient Backdrop
         Positioned.fill(
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 500),
-            curve: Curves.easeInOut,
+            duration: context.motionMs(500),
+            curve: context.motionCurve(Curves.easeInOut),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
@@ -85,7 +86,7 @@ class ClassicPlayerTheme extends StatelessWidget {
           height: isTablet ? 540 : 420,
           child: IgnorePointer(
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 500),
+              duration: context.motionMs(500),
               decoration: BoxDecoration(
                 gradient: RadialGradient(
                   center: Alignment.center,
@@ -110,7 +111,7 @@ class ClassicPlayerTheme extends StatelessWidget {
           height: isTablet ? 420 : 320,
           child: IgnorePointer(
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 500),
+              duration: context.motionMs(500),
               decoration: BoxDecoration(
                 gradient: RadialGradient(
                   center: Alignment.center,
@@ -345,7 +346,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                         }
                       },
                       child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 300),
+                        duration: context.motionMs(300),
                         child: state.isLyricsVisible
                             ? LyricsView(
                                 key: ValueKey(
@@ -363,17 +364,17 @@ class ClassicPlayerTheme extends StatelessWidget {
                                     key: const ValueKey('artwork_view'),
                                     child: AnimatedScale(
                                       scale: state.isPlaying ? 1.0 : 0.97,
-                                      duration:
-                                          const Duration(milliseconds: 320),
-                                      curve: Curves.easeOutCubic,
+                                      duration: context.motionMs(320),
+                                      curve: context
+                                          .motionCurve(Curves.easeOutCubic),
                                       child: AspectRatio(
                                         aspectRatio: 1.0,
                                         child: Hero(
                                           tag: 'now_playing_art_full',
                                           child: AnimatedContainer(
-                                            duration: const Duration(
-                                                milliseconds: 320),
-                                            curve: Curves.easeOutCubic,
+                                            duration: context.motionMs(320),
+                                            curve: context
+                                                .motionCurve(Curves.easeOutCubic),
                                             decoration: BoxDecoration(
                                               borderRadius:
                                                   BorderRadius.circular(28),

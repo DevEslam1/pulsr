@@ -175,12 +175,12 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
 
                   // Songs List
                   if (songs.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(32),
+                    Padding(
+                      padding: const EdgeInsets.all(32),
                       child: EmptyStateWidget(
                         icon: Icons.music_off_rounded,
-                        title: 'No Tracks',
-                        subtitle: 'No tracks found in this genre.',
+                        title: context.l10n.browseNoTracks,
+                        subtitle: context.l10n.browseNoTracksInGenre,
                       ),
                     )
                   else

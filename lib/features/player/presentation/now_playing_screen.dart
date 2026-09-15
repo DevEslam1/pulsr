@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/theme/dynamic_theme_cubit.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../settings/cubit/settings_cubit.dart';
@@ -190,6 +191,12 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
         _dragOffset = _anim.value;
       });
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _animController.duration = context.motionMs(240);
   }
 
   @override
