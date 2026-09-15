@@ -2527,6 +2527,46 @@
   "@fir512": {
     "description": "tranche8 l10n"
   },
+  "linearPhaseFir": "FIR de fase lineal",
+  "@linearPhaseFir": {
+    "description": "Arbitrary EQ linear-phase toggle title"
+  },
+  "linearPhaseOnDesc": "Retardo constante, fase exacta (posible pre-eco)",
+  "@linearPhaseOnDesc": {
+    "description": "Arbitrary EQ linear-phase enabled subtitle"
+  },
+  "linearPhaseOffDesc": "Fase mínima, sin retardo extra (predeterminado)",
+  "@linearPhaseOffDesc": {
+    "description": "Arbitrary EQ minimum-phase subtitle"
+  },
+  "dopContainer": "Contenedor DoP",
+  "@dopContainer": {
+    "description": "DSD DoP PCM container width label"
+  },
+  "mbcPerBandTitle": "Dinámica por banda",
+  "@mbcPerBandTitle": {
+    "description": "Multiband compressor per-band section title"
+  },
+  "mbcPerBandSubtitle": "Umbral, relación y ganancia de compensación para cada una de las 4 bandas LR4.",
+  "@mbcPerBandSubtitle": {
+    "description": "Multiband compressor per-band section subtitle"
+  },
+  "mbcBandLow": "Banda 1 · Graves",
+  "@mbcBandLow": {
+    "description": "Multiband compressor band 1 name"
+  },
+  "mbcBandLowMid": "Banda 2 · Medios-graves",
+  "@mbcBandLowMid": {
+    "description": "Multiband compressor band 2 name"
+  },
+  "mbcBandHighMid": "Banda 3 · Medios-agudos",
+  "@mbcBandHighMid": {
+    "description": "Multiband compressor band 3 name"
+  },
+  "mbcBandHigh": "Banda 4 · Agudos",
+  "@mbcBandHigh": {
+    "description": "Multiband compressor band 4 name"
+  },
   "applyCurve": "Aplicar curva",
   "@applyCurve": {
     "description": "tranche8 l10n"
@@ -3313,6 +3353,12 @@
   "settingsVizLabelMilkdrop": "MILKDROP",
   "settingsVizLabelOff": "APAGADO",
   "settingsVizLabelWave": "ONDA",
+  "settingsVizLabelParticles": "PARTÍCULAS",
+  "settingsVizParticlesDesc": "Campo de partículas GPU que pulsa con la energía de los graves",
+  "settingsVizLabelTerrain": "TERRENO 3D",
+  "settingsVizTerrainDesc": "Paisaje de terreno 3D esculpido por el espectro",
+  "settingsVizLabelAlbumReactive": "REACTIVO AL ÁLBUM",
+  "settingsVizAlbumReactiveDesc": "La portada del álbum respira con la música",
   "settingsVizOffDesc": "Desactiva la animación del espectro del visualizador",
   "settingsVizWaveDesc": "Línea de onda Bézier continua y suave con relleno degradado",
   "settingsAboutTitle": "Acerca de {title}",
@@ -3664,5 +3710,51 @@
   "browseWorkoutEnergy": "Energía para entrenar",
   "browseYouTubeMusic": "YouTube Music",
   "browseYoutubeWeb": "YouTube Web",
-  "browseYtmSearchScreenDesc": "Reproduce y descarga canciones de YouTube Music sin anuncios."
+  "browseYtmSearchScreenDesc": "Reproduce y descarga canciones de YouTube Music sin anuncios.",
+  "dspPreampClipWarning": "Preamp {preamp} dB con pico de EQ +{boost} dB puede saturar. Baja el preamp.",
+  "dspVolumeClipWarning": "Combinado con preamp de EQ (+{preamp} dB), la ganancia total puede saturar. Considera reducir el refuerzo.",
+  "errSaveQueue": "No se pudo guardar la cola",
+  "errClearQueue": "No se pudo vaciar la cola",
+  "errReorderQueue": "No se pudo reordenar la cola",
+  "errRemoveTrack": "No se pudo quitar la pista",
+  "errQueueSlotEmpty": "La ranura de cola está vacía",
+  "errSwitchQueueSlot": "No se pudo cambiar de ranura",
+  "errInvalidStreamUrl": "URL de stream no válida",
+  "errPitchFailed": "No se pudo cambiar el tono",
+  "errPlaybackActionFailed": "Falló la acción de reproducción",
+  "errSpeedFailed": "No se pudo cambiar la velocidad",
+  "errVolumeFailed": "No se pudo cambiar el volumen",
+  "errShuffleFailed": "Falló el modo aleatorio",
+  "errRepeatFailed": "Falló la repetición",
+  "errSkipFailed": "No se pudo saltar",
+  "errSeekFailed": "Falló la búsqueda, posición restaurada",
+  "errIrRejected": "Respuesta de impulso rechazada por el motor de audio",
+  "errLocalMatchStreaming": "Sin coincidencia local, transmitiendo en línea",
+  "errPlayFailed": "No se pudo reproducir \"{title}\"",
+  "errAddFailed": "No se pudo añadir \"{title}\"",
+  "errQueueFull": "La cola está llena ({max}) — no se puede añadir más",
+  "errAudioSettingFailed": "No se pudo aplicar el ajuste de audio: {detail}",
+  "errYtmNoConnection": "Sin conexión. Revisa tu red.",
+  "errYtmPlaybackFailed": "Falló la reproducción. Inténtalo de nuevo.",
+  "errYtmGeneric": "Algo salió mal con YouTube Music.",
+  "errYtmRegionRestricted": "Esta pista está restringida en tu región.",
+  "errYtmUnavailable": "Esta pista no está disponible.",
+  "errYtmSessionExpired": "Sesión de YouTube caducada. Toca para reconectar.",
+  "errYtmNotInBuild": "YouTube Music no está disponible en esta compilación.",
+  "errYtmProxyAuth": "Falló la autenticación del proxy.",
+  "errYtmSigFail": "Descifrado de firma no disponible para este formato.",
+  "errYtmBusy": "YouTube está ocupado. Enfriando.",
+  "errYtmTrouble": "YouTube tiene problemas. Reintentando.",
+  "errYtmExtractFail": "Falló la extracción. Cambiando de ruta.",
+  "errYtmVerify": "YouTube necesita verificación. Probando ruta alternativa.",
+  "errSignInFailed": "Error al iniciar sesión. Inténtalo de nuevo.",
+  "errSignUpFailed": "Error al registrarse. Inténtalo de nuevo.",
+  "errLoadDownloads": "No se pudieron cargar las descargas",
+  "errRetryDownloads": "No se pudieron reintentar las descargas fallidas",
+  "errYtmNotSignedIn": "No has iniciado sesión en YouTube Music",
+  "errYtmSyncLikes": "No se pudieron sincronizar los favoritos",
+  "dspMultibandLabel": "Multibanda",
+  "dspBandLow": "Bajo (<160 Hz)",
+  "dspBandMid": "Medios",
+  "dspBandHigh": "Altos"
 }

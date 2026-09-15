@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/di/injection.dart';
+import '../../../core/errors/error_message_resolver.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
@@ -66,7 +67,8 @@ class _AuthSheetState extends State<AuthSheet> {
             state.errorMessage != null) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(state.errorMessage!),
+              content: Text(
+                  resolveUiErrorMessage(context, state.errorMessage!)),
               backgroundColor: p.error,
               behavior: SnackBarBehavior.floating,
             ),

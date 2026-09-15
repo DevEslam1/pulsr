@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/errors/error_message_resolver.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -76,6 +77,10 @@ bool dspSheetRebuildGate(PlayerState a, PlayerState b) {
       a.saturationTilt != b.saturationTilt ||
       a.isStereoWidthEnabled != b.isStereoWidthEnabled ||
       a.stereoWidth != b.stereoWidth ||
+      a.stereoWidthMultiband != b.stereoWidthMultiband ||
+      a.stereoWidthLow != b.stereoWidthLow ||
+      a.stereoWidthMid != b.stereoWidthMid ||
+      a.stereoWidthHigh != b.stereoWidthHigh ||
       a.isLoudnessContourEnabled != b.isLoudnessContourEnabled ||
       a.loudnessContourIntensity != b.loudnessContourIntensity ||
       a.isSubCrossoverEnabled != b.isSubCrossoverEnabled ||
@@ -762,8 +767,13 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     return BlocSelector<PlayerCubit, PlayerState, double>(
       selector: (s) =>
           index < s.eqPreset.gains.length ? s.eqPreset.gains[index] : 0.0,
-      builder: (context, gain) => RepaintBoundary(
-        child: Column(
+      builder: (context, gain) => Semantics(
+        slider: true,
+        label: context.l10n.eqBandLabel(index + 1),
+        value:
+            '${gain > 0 ? '+' : ''}${gain.toStringAsFixed(1)} dB',
+        child: RepaintBoundary(
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             _VerticalEqSlider(
@@ -846,6 +856,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               ],
             ),
           ],
+          ),
         ),
       ),
     );
@@ -943,7 +954,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
         final msg = state.errorMessage;
         if (msg != null && msg.isNotEmpty) {
           ScaffoldMessenger.maybeOf(ctx)?.showSnackBar(SnackBar(
-              content: Text(msg),
+              content: Text(resolveUiErrorMessage(ctx, msg)),
               backgroundColor: Theme.of(ctx).colorScheme.error,
               behavior: SnackBarBehavior.floating));
           ctx.read<PlayerCubit>().clearError();
@@ -2284,33 +2295,39 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         ],
                       ),
                       const SizedBox(height: 6),
-                      SliderTheme(
-                        data: SliderTheme.of(context).copyWith(
-                          trackHeight: 4,
-                          thumbShape: const RoundSliderThumbShape(
-                              enabledThumbRadius: 6),
-                          overlayShape:
-                              const RoundSliderOverlayShape(overlayRadius: 14),
-                          activeTrackColor: clipRisk ? p.error : p.accent,
-                          inactiveTrackColor: p.surface,
-                          thumbColor: clipRisk ? p.error : p.accent,
-                        ),
-                        child: Slider(
-                          value: currentPreamp.clamp(-12.0, 12.0),
-                          min: -12.0,
-                          max: 12.0,
-                          divisions: 48,
-                          onChanged: dspBlocked != null
-                              ? null
-                              : (val) {
-                                  if (!state.isEqEnabled) {
-                                    cubit.setEqualizerEnabled(true);
-                                  }
-                                  final rounded =
-                                      (val * 10).roundToDouble() / 10.0;
-                                  manager?.setPreamp(rounded);
-                                  setCardState(() {});
-                                },
+                      Semantics(
+                        slider: true,
+                        label: context.l10n.preampLabel,
+                        value:
+                            '${currentPreamp > 0 ? '+' : ''}${currentPreamp.toStringAsFixed(1)} dB',
+                        child: SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: 4,
+                            thumbShape: const RoundSliderThumbShape(
+                                enabledThumbRadius: 6),
+                            overlayShape: const RoundSliderOverlayShape(
+                                overlayRadius: 14),
+                            activeTrackColor: clipRisk ? p.error : p.accent,
+                            inactiveTrackColor: p.surface,
+                            thumbColor: clipRisk ? p.error : p.accent,
+                          ),
+                          child: Slider(
+                            value: currentPreamp.clamp(-12.0, 12.0),
+                            min: -12.0,
+                            max: 12.0,
+                            divisions: 48,
+                            onChanged: dspBlocked != null
+                                ? null
+                                : (val) {
+                                    if (!state.isEqEnabled) {
+                                      cubit.setEqualizerEnabled(true);
+                                    }
+                                    final rounded =
+                                        (val * 10).roundToDouble() / 10.0;
+                                    manager?.setPreamp(rounded);
+                                    setCardState(() {});
+                                  },
+                          ),
                         ),
                       ),
                       if (clipRisk)
@@ -2323,8 +2340,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
-                                  'Preamp ${currentPreamp > 0 ? '+' : ''}${currentPreamp.toStringAsFixed(1)} dB with peak EQ '
-                                  '+${maxBoost.toStringAsFixed(1)} dB may clip. Lower the preamp.',
+                                  context.l10n.dspPreampClipWarning(
+                                    '${currentPreamp > 0 ? '+' : ''}${currentPreamp.toStringAsFixed(1)}',
+                                    maxBoost.toStringAsFixed(1),
+                                  ),
                                   style: TextStyle(
                                       color: p.error,
                                       fontSize: 10,
@@ -2464,18 +2483,22 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     inactiveTrackColor: p.surface,
                     thumbColor: p.accent,
                   ),
-                  child: Slider(
-                    value: preset.bassBoost.clamp(0.0, 1.0),
-                    min: 0.0,
-                    max: 1.0,
-                    onChanged: dspBlocked != null || !state.isBassBoostSupported
-                        ? null
-                        : (val) {
-                            if (!state.isEqEnabled) {
-                              cubit.setEqualizerEnabled(true);
-                            }
-                            cubit.setBassBoost(val);
-                          },
+                  child: Semantics(
+                    slider: true,
+                    label: context.l10n.bassEnhancer,
+                    child: Slider(
+                      value: preset.bassBoost.clamp(0.0, 1.0),
+                      min: 0.0,
+                      max: 1.0,
+                      onChanged: dspBlocked != null || !state.isBassBoostSupported
+                          ? null
+                          : (val) {
+                              if (!state.isEqEnabled) {
+                                cubit.setEqualizerEnabled(true);
+                              }
+                              cubit.setBassBoost(val);
+                            },
+                    ),
                   ),
                 ),
                 _effectNotAppliedNotice('bassBoost', p),
@@ -2617,19 +2640,23 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     inactiveTrackColor: p.surface,
                     thumbColor: isOverSafe ? p.error : p.accent,
                   ),
-                  child: Slider(
-                    value: state.volumeBoost.clamp(0.0, 1.0),
-                    min: 0.0,
-                    max: 1.0,
-                    onChanged:
-                        dspBlocked != null || !state.isVolumeBoostSupported
-                            ? null
-                            : (val) {
-                                if (!state.isEqEnabled) {
-                                  cubit.setEqualizerEnabled(true);
-                                }
-                                cubit.setVolumeBoost(val);
-                              },
+                  child: Semantics(
+                    slider: true,
+                    label: context.l10n.volumeBoost,
+                    child: Slider(
+                      value: state.volumeBoost.clamp(0.0, 1.0),
+                      min: 0.0,
+                      max: 1.0,
+                      onChanged:
+                          dspBlocked != null || !state.isVolumeBoostSupported
+                              ? null
+                              : (val) {
+                                  if (!state.isEqEnabled) {
+                                    cubit.setEqualizerEnabled(true);
+                                  }
+                                  cubit.setVolumeBoost(val);
+                                },
+                    ),
                   ),
                 ),
                 if (isOverSafe)
@@ -2642,7 +2669,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            'Combined with EQ preamp (+${preampDb.toStringAsFixed(1)} dB), total gain may clip. Consider reducing boost.',
+                            context.l10n.dspVolumeClipWarning(
+                                preampDb.toStringAsFixed(1)),
                             style: TextStyle(
                                 color: p.error,
                                 fontSize: 10,
@@ -3408,14 +3436,18 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           inactiveTrackColor: p.surface,
                           thumbColor: p.accent,
                         ),
-                        child: Slider(
-                          value: state.virtualizerStrength.clamp(0.0, 1.0),
-                          min: 0.0,
-                          max: 1.0,
-                          onChanged: state.isVirtualizerEnabled &&
-                                  state.isVirtualizerSupported
-                              ? (val) => cubit.setVirtualizerStrength(val)
-                              : null,
+                        child: Semantics(
+                          slider: true,
+                          label: context.l10n.width,
+                          child: Slider(
+                            value: state.virtualizerStrength.clamp(0.0, 1.0),
+                            min: 0.0,
+                            max: 1.0,
+                            onChanged: state.isVirtualizerEnabled &&
+                                    state.isVirtualizerSupported
+                                ? (val) => cubit.setVirtualizerStrength(val)
+                                : null,
+                          ),
                         ),
                       ),
                     ],
@@ -3856,13 +3888,17 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         inactiveTrackColor: p.surface,
                         thumbColor: p.accent,
                       ),
-                      child: Slider(
-                        value: state.crossfeedDelayUs.clamp(200.0, 700.0),
-                        min: 200.0,
-                        max: 700.0,
-                        divisions: 50,
-                        onChanged: (val) =>
-                            cubit.setCrossfeed(true, delayUs: val),
+                      child: Semantics(
+                        slider: true,
+                        label: context.l10n.delayTime,
+                        child: Slider(
+                          value: state.crossfeedDelayUs.clamp(200.0, 700.0),
+                          min: 200.0,
+                          max: 700.0,
+                          divisions: 50,
+                          onChanged: (val) =>
+                              cubit.setCrossfeed(true, delayUs: val),
+                        ),
                       ),
                     ),
                     // Feed Level slider
@@ -3917,13 +3953,17 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         inactiveTrackColor: p.surface,
                         thumbColor: p.accent,
                       ),
-                      child: Slider(
-                        value: state.crossfeedFeedDb.clamp(-15.0, -6.0),
-                        min: -15.0,
-                        max: -6.0,
-                        divisions: 18,
-                        onChanged: (val) =>
-                            cubit.setCrossfeed(true, feedDb: val),
+                      child: Semantics(
+                        slider: true,
+                        label: context.l10n.oppositeEarBleed,
+                        child: Slider(
+                          value: state.crossfeedFeedDb.clamp(-15.0, -6.0),
+                          min: -15.0,
+                          max: -6.0,
+                          divisions: 18,
+                          onChanged: (val) =>
+                              cubit.setCrossfeed(true, feedDb: val),
+                        ),
                       ),
                     ),
                   ],
@@ -4064,13 +4104,17 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       inactiveTrackColor: p.surface,
                       thumbColor: p.accent,
                     ),
-                    child: Slider(
-                      value: state.limiterThresholdDb.clamp(-6.0, 0.0),
-                      min: -6.0,
-                      max: 0.0,
-                      divisions: 60,
-                      onChanged: (val) =>
-                          cubit.setLookaheadLimiter(true, thresholdDb: val),
+                    child: Semantics(
+                      slider: true,
+                      label: context.l10n.ceilingThreshold,
+                      child: Slider(
+                        value: state.limiterThresholdDb.clamp(-6.0, 0.0),
+                        min: -6.0,
+                        max: 0.0,
+                        divisions: 60,
+                        onChanged: (val) =>
+                            cubit.setLookaheadLimiter(true, thresholdDb: val),
+                      ),
                     ),
                   ),
                   Row(
@@ -4123,13 +4167,17 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       inactiveTrackColor: p.surface,
                       thumbColor: p.accent,
                     ),
-                    child: Slider(
-                      value: state.limiterReleaseMs.clamp(10.0, 200.0),
-                      min: 10.0,
-                      max: 200.0,
-                      divisions: 38,
-                      onChanged: (val) =>
-                          cubit.setLookaheadLimiter(true, releaseMs: val),
+                    child: Semantics(
+                      slider: true,
+                      label: context.l10n.releaseTime,
+                      child: Slider(
+                        value: state.limiterReleaseMs.clamp(10.0, 200.0),
+                        min: 10.0,
+                        max: 200.0,
+                        divisions: 38,
+                        onChanged: (val) =>
+                            cubit.setLookaheadLimiter(true, releaseMs: val),
+                      ),
                     ),
                   ),
                 ],
@@ -4311,24 +4359,35 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                     : p.textSecondary))),
                   ],
                 ),
-                SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    trackHeight: 4,
-                    thumbShape:
-                        const RoundSliderThumbShape(enabledThumbRadius: 6),
-                    activeTrackColor:
-                        dspBlocked != null ? p.textTertiary : p.accent,
-                    inactiveTrackColor: p.surface,
-                    thumbColor: dspBlocked != null ? p.textTertiary : p.accent,
-                  ),
-                  child: Slider(
-                    value: state.stereoBalance.clamp(-1.0, 1.0),
-                    min: -1.0,
-                    max: 1.0,
-                    divisions: 40,
-                    onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
-                        ? null
-                        : (val) => cubit.setStereoBalance(val),
+                Semantics(
+                  slider: true,
+                  label: context.l10n.stereoBalanceMono,
+                  value: state.stereoBalance.abs() < 0.05
+                      ? 'Center'
+                      : (state.stereoBalance < 0
+                          ? 'Left ${(-state.stereoBalance * 100).round()}%'
+                          : 'Right ${(state.stereoBalance * 100).round()}%'),
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 4,
+                      thumbShape:
+                          const RoundSliderThumbShape(enabledThumbRadius: 6),
+                      activeTrackColor:
+                          dspBlocked != null ? p.textTertiary : p.accent,
+                      inactiveTrackColor: p.surface,
+                      thumbColor:
+                          dspBlocked != null ? p.textTertiary : p.accent,
+                    ),
+                    child: Slider(
+                      value: state.stereoBalance.clamp(-1.0, 1.0),
+                      min: -1.0,
+                      max: 1.0,
+                      divisions: 40,
+                      onChanged:
+                          dspBlocked != null || !_nativePcmEffectsAvailable
+                              ? null
+                              : (val) => cubit.setStereoBalance(val),
+                    ),
                   ),
                 ),
               ],
@@ -4490,11 +4549,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       inactiveTrackColor: p.surface,
                       thumbColor: p.accent,
                     ),
-                    child: Slider(
-                      value: state.reverbWetDry.clamp(0.0, 1.0),
-                      min: 0.0,
-                      max: 1.0,
-                      onChanged: (val) => cubit.setReverb(true, wetDry: val),
+                    child: Semantics(
+                      slider: true,
+                      label: context.l10n.wetDryMix,
+                      child: Slider(
+                        value: state.reverbWetDry.clamp(0.0, 1.0),
+                        min: 0.0,
+                        max: 1.0,
+                        onChanged: (val) => cubit.setReverb(true, wetDry: val),
+                      ),
                     ),
                   ),
                 ],
@@ -4651,12 +4714,17 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             inactiveTrackColor: p.surface,
             thumbColor: p.accent,
           ),
-          child: Slider(
-            value: value.clamp(min, max),
-            min: min,
-            max: max,
-            divisions: divisions,
-            onChanged: onChanged,
+          child: Semantics(
+            slider: true,
+            label: label,
+            value: valueText,
+            child: Slider(
+              value: value.clamp(min, max),
+              min: min,
+              max: max,
+              divisions: divisions,
+              onChanged: onChanged,
+            ),
           ),
         ),
       ],
@@ -4918,6 +4986,62 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               divisions: 40,
               onChanged: (val) => cubit.setStereoWidth(true, width: val),
             ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(context.l10n.dspMultibandLabel,
+                    style: TextStyle(fontSize: 12, color: p.textSecondary)),
+                Switch.adaptive(
+                  value: state.stereoWidthMultiband,
+                  activeTrackColor: p.accent,
+                  activeThumbColor: p.onAccent,
+                  onChanged: (val) =>
+                      cubit.setStereoWidth(true, multiband: val),
+                ),
+              ],
+            ),
+            if (state.stereoWidthMultiband) ...[
+              _buildDspSliderRow(
+                context: context,
+                p: p,
+                label: context.l10n.dspBandLow,
+                valueText: state.stereoWidthLow.toStringAsFixed(2),
+                value: state.stereoWidthLow,
+                min: 0.0,
+                max: 2.0,
+                defaultValue: 1.0,
+                divisions: 40,
+                onChanged: (val) =>
+                    cubit.setStereoWidth(true, lowWidth: val),
+              ),
+              _buildDspSliderRow(
+                context: context,
+                p: p,
+                label: context.l10n.dspBandMid,
+                valueText: state.stereoWidthMid.toStringAsFixed(2),
+                value: state.stereoWidthMid,
+                min: 0.0,
+                max: 2.0,
+                defaultValue: 1.0,
+                divisions: 40,
+                onChanged: (val) =>
+                    cubit.setStereoWidth(true, midWidth: val),
+              ),
+              _buildDspSliderRow(
+                context: context,
+                p: p,
+                label: context.l10n.dspBandHigh,
+                valueText: state.stereoWidthHigh.toStringAsFixed(2),
+                value: state.stereoWidthHigh,
+                min: 0.0,
+                max: 2.0,
+                defaultValue: 1.0,
+                divisions: 40,
+                onChanged: (val) =>
+                    cubit.setStereoWidth(true, highWidth: val),
+              ),
+            ],
           ],
         ],
       ),

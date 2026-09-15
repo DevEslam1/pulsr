@@ -161,7 +161,7 @@ class AudioFeatureRegistry {
     title: 'DSD (PCM Decode / DoP Output)',
     subtitle: 'PCM by default — DoP only with a compatible USB DAC',
     description:
-        'DSD files (DSF/DFF) decode to PCM through the native DSD decoder by default and follow the normal DSP pipeline. When the user selects DoP output and a USB DAC that can carry it is connected, the raw DSD bitstream is framed as DSD over PCM (alternating 0x05/0xFA markers) at DSD rate / 16 (DSD64 → 176.4 kHz, DSD128 → 352.8 kHz, DSD256 → 705.6 kHz) so the DAC streams native DSD. DoP is never enabled automatically and stays unavailable when no compatible USB DAC is detected. Direct native-DSD streaming that bypasses DoP is not implemented in this build, so native-DSD capability is never claimed beyond the detected USB DAC.',
+        'DSD files (DSF/DFF) decode to PCM through the native DSD decoder by default and follow the normal DSP pipeline. When the user selects DoP output and a USB DAC that can carry it is connected, the raw DSD bitstream is framed as DSD over PCM (alternating 0x05/0xFA markers) at DSD rate / 16 (DSD64 → 176.4 kHz, DSD128 → 352.8 kHz, DSD256 → 705.6 kHz) so the DAC streams native DSD, in 24-bit or zero-padded 32-bit containers (selectable for DACs that require 32-bit USB frames). DoP is never enabled automatically and stays unavailable when no compatible USB DAC is detected. Direct native-DSD streaming that bypasses DoP is not implemented in this build, so native-DSD capability is never claimed beyond the detected USB DAC.',
   );
 
   static const mqa = AudioFeatureInfo(
@@ -193,9 +193,9 @@ class AudioFeatureRegistry {
   static const replayGain = AudioFeatureInfo(
     id: 'replayGain',
     title: 'ReplayGain Normalization',
-    subtitle: 'Track / album gain tags applied at playback',
+    subtitle: 'Track / album gain tags in native pre-gain',
     description:
-        'Software volume leveling based on Track/Album Gain tags. Applies multiplier with 0.5 dB inter-sample headroom. Conflicts with Bit-Perfect bypass (software gain would alter bits). Set to Off for true exclusive.',
+        'Bit-transparent native pre-gain driven by Track/Album Gain tags (20 ms smoothing, 0.5 dB inter-sample headroom, clipping-safe). The Dart mixer then carries only user volume so the gain is never applied twice; DoP and non-Android fall back to Dart math. Conflicts with Bit-Perfect bypass (any gain would alter bits). Set to Off for true exclusive.',
     conflictsWith: 'Bit-Perfect bypass',
   );
 
@@ -293,7 +293,7 @@ class AudioFeatureRegistry {
     title: 'Arbitrary Response EQ (GraphicEq)',
     subtitle: 'EqualizerAPO graphic response curve parser & 512-tap FIR filter',
     description:
-        'Parses standard EqualizerAPO "GraphicEq: <freq> <gain>; ..." curve specifications. Computes log-frequency interpolated frequency response and synthesizes a minimum-latency 512-tap windowed FIR impulse response for exact acoustic matching. Disabled during Bit-Perfect.',
+        'Parses standard EqualizerAPO "GraphicEq: <freq> <gain>; ..." curve specifications. Computes log-frequency interpolated frequency response and synthesizes a 512-tap windowed FIR impulse response for exact acoustic matching. Minimum-phase by default (zero extra delay); enable Linear-phase FIR for constant group delay and exact phase at the cost of pre-ringing. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
   );
 

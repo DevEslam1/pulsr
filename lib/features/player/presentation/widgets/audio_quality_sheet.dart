@@ -1220,7 +1220,7 @@ class AudioQualitySheet extends StatelessWidget {
             icon: isBitPerfect
                 ? Icons.do_not_disturb_on_rounded
                 : Icons.tune_rounded,
-            color: isBitPerfect ? Colors.grey : activeColor,
+            color: isBitPerfect ? p.textTertiary : activeColor,
             p: p,
             isDimmed: isBitPerfect,
           ),

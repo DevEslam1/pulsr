@@ -55,6 +55,36 @@ spl0 = spl0 * (0.5 * (1.0 - pan));
 spl1 = spl1 * (0.5 * (1.0 + pan));
 pan_pos = pan_pos + (2 * 3.141592653589793 * rate / srate);
 if (pan_pos > 2 * 3.141592653589793) pan_pos = pan_pos - 2 * 3.141592653589793;''',
+
+    'Gentle Bitcrusher': '''@init
+
+@sample
+bits = slider1;
+steps = pow(2, bits);
+spl0 = floor(spl0 * steps + 0.5) / steps;
+spl1 = floor(spl1 * steps + 0.5) / steps;''',
+
+    'Slapback Echo': '''@init
+pos = 0;
+buf0_0 = 0; buf0_1 = 0; buf0_2 = 0; buf0_3 = 0;
+buf1_0 = 0; buf1_1 = 0; buf1_2 = 0; buf1_3 = 0;
+
+@sample
+mix = slider2;
+spl0 = spl0 + (buf0_0 + buf0_1 + buf0_2 + buf0_3) * 0.125 * mix;
+spl1 = spl1 + (buf1_0 + buf1_1 + buf1_2 + buf1_3) * 0.125 * mix;
+buf0_3 = buf0_2; buf0_2 = buf0_1; buf0_1 = buf0_0; buf0_0 = spl0;
+buf1_3 = buf1_2; buf1_2 = buf1_1; buf1_1 = buf1_0; buf1_0 = spl1;''',
+
+    'Bass Lift': '''@init
+lp0 = 0; lp1 = 0;
+
+@sample
+amount = slider2;
+lp0 = lp0 + 0.08 * (spl0 - lp0);
+lp1 = lp1 + 0.08 * (spl1 - lp1);
+spl0 = spl0 + lp0 * amount;
+spl1 = spl1 + lp1 * amount;''',
   };
 
   @override

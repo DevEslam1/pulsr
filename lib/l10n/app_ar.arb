@@ -2527,6 +2527,46 @@
   "@fir512": {
     "description": "tranche8 l10n"
   },
+  "linearPhaseFir": "FIR خطي الطور",
+  "@linearPhaseFir": {
+    "description": "Arbitrary EQ linear-phase toggle title"
+  },
+  "linearPhaseOnDesc": "تأخير ثابت وطور دقيق (احتمال رنين مسبق)",
+  "@linearPhaseOnDesc": {
+    "description": "Arbitrary EQ linear-phase enabled subtitle"
+  },
+  "linearPhaseOffDesc": "طور أدنى، بدون تأخير إضافي (افتراضي)",
+  "@linearPhaseOffDesc": {
+    "description": "Arbitrary EQ minimum-phase subtitle"
+  },
+  "dopContainer": "حاوية DoP",
+  "@dopContainer": {
+    "description": "DSD DoP PCM container width label"
+  },
+  "mbcPerBandTitle": "ديناميكية لكل نطاق",
+  "@mbcPerBandTitle": {
+    "description": "Multiband compressor per-band section title"
+  },
+  "mbcPerBandSubtitle": "العتبة والنسبة وكسب التعويض لكل نطاق من نطاقات LR4 الأربعة.",
+  "@mbcPerBandSubtitle": {
+    "description": "Multiband compressor per-band section subtitle"
+  },
+  "mbcBandLow": "النطاق 1 · منخفض",
+  "@mbcBandLow": {
+    "description": "Multiband compressor band 1 name"
+  },
+  "mbcBandLowMid": "النطاق 2 · متوسط-منخفض",
+  "@mbcBandLowMid": {
+    "description": "Multiband compressor band 2 name"
+  },
+  "mbcBandHighMid": "النطاق 3 · متوسط-مرتفع",
+  "@mbcBandHighMid": {
+    "description": "Multiband compressor band 3 name"
+  },
+  "mbcBandHigh": "النطاق 4 · مرتفع",
+  "@mbcBandHigh": {
+    "description": "Multiband compressor band 4 name"
+  },
   "applyCurve": "تطبيق المنحنى",
   "@applyCurve": {
     "description": "tranche8 l10n"
@@ -3313,6 +3353,12 @@
   "settingsVizLabelMilkdrop": "MILKDROP",
   "settingsVizLabelOff": "إيقاف",
   "settingsVizLabelWave": "موجة",
+  "settingsVizLabelParticles": "جسيمات",
+  "settingsVizParticlesDesc": "حقل جسيمات GPU ينبض مع طاقة الجهير",
+  "settingsVizLabelTerrain": "تضاريس ثلاثية الأبعاد",
+  "settingsVizTerrainDesc": "تضاريس صوتية ثلاثية الأبعاد ينحتها الطيف",
+  "settingsVizLabelAlbumReactive": "تفاعلي مع الألبوم",
+  "settingsVizAlbumReactiveDesc": "غلاف الألبوم يتنفس مع الموسيقى",
   "settingsVizOffDesc": "تعطيل حركة طيف مُصوّر الصوت",
   "settingsVizWaveDesc": "خط موجي بيزيه مستمر وسلس مع تعبئة متدرّجة",
   "settingsAboutTitle": "حول {title}",
@@ -3664,5 +3710,51 @@
   "browseWorkoutEnergy": "طاقة التمرين",
   "browseYouTubeMusic": "YouTube Music",
   "browseYoutubeWeb": "ويب YouTube",
-  "browseYtmSearchScreenDesc": "شغّل ونزّل الأغاني من YouTube Music دون إعلانات."
+  "browseYtmSearchScreenDesc": "شغّل ونزّل الأغاني من YouTube Music دون إعلانات.",
+  "dspPreampClipWarning": "المضخم المسبق {preamp} ديسيبل مع ذروة المعادل +{boost} ديسيبل قد يسبب تشويهًا. اخفض المضخم المسبق.",
+  "dspVolumeClipWarning": "مع المضخم المسبق للمعادل (+{preamp} ديسيبل)، قد يتشوه الكسب الكلي. فكر في تقليل التعزيز.",
+  "errSaveQueue": "تعذّر حفظ قائمة الانتظار",
+  "errClearQueue": "تعذّر مسح قائمة الانتظار",
+  "errReorderQueue": "تعذّر إعادة ترتيب قائمة الانتظار",
+  "errRemoveTrack": "تعذّر إزالة المسار",
+  "errQueueSlotEmpty": "خانة قائمة الانتظار فارغة",
+  "errSwitchQueueSlot": "تعذّر التبديل بين خانات قائمة الانتظار",
+  "errInvalidStreamUrl": "رابط البث غير صالح",
+  "errPitchFailed": "تعذّر تغيير النغمة",
+  "errPlaybackActionFailed": "فشل إجراء التشغيل",
+  "errSpeedFailed": "تعذّر تغيير السرعة",
+  "errVolumeFailed": "تعذّر تغيير مستوى الصوت",
+  "errShuffleFailed": "فشل التشغيل العشوائي",
+  "errRepeatFailed": "فشلت الإعادة",
+  "errSkipFailed": "تعذّر التخطي",
+  "errSeekFailed": "فشل الانتقال، تمت استعادة الموضع",
+  "errIrRejected": "رفض محرك الصوت استجابة النبضة",
+  "errLocalMatchStreaming": "لا توجد نسخة محلية، جارٍ البث عبر الإنترنت",
+  "errPlayFailed": "تعذّر تشغيل \"{title}\"",
+  "errAddFailed": "تعذّر إضافة \"{title}\"",
+  "errQueueFull": "قائمة الانتظار ممتلئة ({max}) — لا يمكن إضافة المزيد",
+  "errAudioSettingFailed": "تعذّر تطبيق إعداد الصوت: {detail}",
+  "errYtmNoConnection": "لا يوجد اتصال. تحقق من الشبكة.",
+  "errYtmPlaybackFailed": "فشل التشغيل. حاول مجددًا.",
+  "errYtmGeneric": "حدث خطأ في YouTube Music.",
+  "errYtmRegionRestricted": "هذا المسار مقيد في منطقتك.",
+  "errYtmUnavailable": "هذا المسار غير متاح.",
+  "errYtmSessionExpired": "انتهت جلسة YouTube. انقر لإعادة الاتصال.",
+  "errYtmNotInBuild": "YouTube Music غير متاح في هذا الإصدار.",
+  "errYtmProxyAuth": "فشلت مصادقة البروكسي.",
+  "errYtmSigFail": "فك تشفير التوقيع غير متاح لهذا التنسيق.",
+  "errYtmBusy": "YouTube مشغول. جارٍ التهدئة.",
+  "errYtmTrouble": "يواجه YouTube مشكلة. جارٍ إعادة المحاولة.",
+  "errYtmExtractFail": "فشل استخراج البث. جارٍ تبديل المسار.",
+  "errYtmVerify": "يحتاج YouTube إلى التحقق. جارٍ تجربة مسار بديل.",
+  "errSignInFailed": "فشل تسجيل الدخول. حاول مجددًا.",
+  "errSignUpFailed": "فشل إنشاء الحساب. حاول مجددًا.",
+  "errLoadDownloads": "تعذّر تحميل التنزيلات",
+  "errRetryDownloads": "تعذّرت إعادة محاولة التنزيلات الفاشلة",
+  "errYtmNotSignedIn": "لم تسجل الدخول إلى YouTube Music",
+  "errYtmSyncLikes": "تعذّرت مزامنة الأغاني المفضلة",
+  "dspMultibandLabel": "متعدد النطاقات",
+  "dspBandLow": "منخفض (<160 هرتز)",
+  "dspBandMid": "متوسط",
+  "dspBandHigh": "عالٍ"
 }

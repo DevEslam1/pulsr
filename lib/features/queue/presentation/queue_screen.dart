@@ -175,7 +175,7 @@ class QueueScreen extends StatelessWidget {
                       alignment: Alignment.centerRight,
                       padding: const EdgeInsets.only(right: 20),
                       margin: const EdgeInsets.symmetric(vertical: 4),
-                      decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.15), borderRadius: AppRadii.cardRadius),
+                      decoration: BoxDecoration(color: p.error.withValues(alpha: 0.15), borderRadius: AppRadii.cardRadius),
                       child: Icon(Icons.delete_rounded, color: p.error),
                     ),
                     onDismissed: (_) => context.read<PlayerCubit>().removeQueueItem(index),
@@ -190,8 +190,11 @@ class QueueScreen extends StatelessWidget {
                             width: 1,
                           ),
                         ),
-                        child: ListTile(
-                          leading: CachedArtwork(
+                        child: Semantics(
+                          button: true,
+                          label: '${song.title} by ${song.artist}',
+                          child: ListTile(
+                            leading: CachedArtwork(
                             id: song.id,
                             remoteUrl: song.remoteArtworkUrl,
                             type: ArtworkType.AUDIO,
@@ -224,13 +227,17 @@ class QueueScreen extends StatelessWidget {
                               color: isCurrent ? p.accent : p.textTertiary,
                             ),
                             const SizedBox(width: 4),
-                            Icon(Icons.drag_handle_rounded, color: p.textTertiary.withValues(alpha: 0.5), size: 18),
+                            Semantics(
+                              label: 'Reorder ${song.title}',
+                              child: Icon(Icons.drag_handle_rounded, color: p.textTertiary.withValues(alpha: 0.5), size: 18),
+                            ),
                           ]),
                           onTap: () {
                             context
                                 .read<PlayerCubit>()
                                 .playSong(song, queue: queue);
                           },
+                          ),
                         ),
                       ),
                     ),

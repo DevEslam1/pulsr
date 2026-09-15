@@ -6377,6 +6377,66 @@ abstract class AppLocalizations {
   /// **'512-tap FIR Filter'**
   String get fir512;
 
+  /// Arbitrary EQ linear-phase toggle title
+  ///
+  /// In en, this message translates to:
+  /// **'Linear-phase FIR'**
+  String get linearPhaseFir;
+
+  /// Arbitrary EQ linear-phase enabled subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Constant delay, exact phase (pre-ringing possible)'**
+  String get linearPhaseOnDesc;
+
+  /// Arbitrary EQ minimum-phase subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum-phase, zero extra delay (default)'**
+  String get linearPhaseOffDesc;
+
+  /// DSD DoP PCM container width label
+  ///
+  /// In en, this message translates to:
+  /// **'DoP container'**
+  String get dopContainer;
+
+  /// Multiband compressor per-band section title
+  ///
+  /// In en, this message translates to:
+  /// **'Per-band dynamics'**
+  String get mbcPerBandTitle;
+
+  /// Multiband compressor per-band section subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Threshold, ratio and make-up gain for each of the 4 LR4 bands.'**
+  String get mbcPerBandSubtitle;
+
+  /// Multiband compressor band 1 name
+  ///
+  /// In en, this message translates to:
+  /// **'Band 1 · Low'**
+  String get mbcBandLow;
+
+  /// Multiband compressor band 2 name
+  ///
+  /// In en, this message translates to:
+  /// **'Band 2 · Low-Mid'**
+  String get mbcBandLowMid;
+
+  /// Multiband compressor band 3 name
+  ///
+  /// In en, this message translates to:
+  /// **'Band 3 · High-Mid'**
+  String get mbcBandHighMid;
+
+  /// Multiband compressor band 4 name
+  ///
+  /// In en, this message translates to:
+  /// **'Band 4 · High'**
+  String get mbcBandHigh;
+
   /// tranche8 l10n
   ///
   /// In en, this message translates to:
@@ -8831,6 +8891,42 @@ abstract class AppLocalizations {
   /// **'WAVE'**
   String get settingsVizLabelWave;
 
+  /// Visualizer particles style label
+  ///
+  /// In en, this message translates to:
+  /// **'PARTICLES'**
+  String get settingsVizLabelParticles;
+
+  /// Visualizer particles style description
+  ///
+  /// In en, this message translates to:
+  /// **'GPU particle field pulsing with bass energy'**
+  String get settingsVizParticlesDesc;
+
+  /// Visualizer 3D terrain style label
+  ///
+  /// In en, this message translates to:
+  /// **'TERRAIN 3D'**
+  String get settingsVizLabelTerrain;
+
+  /// Visualizer 3D terrain style description
+  ///
+  /// In en, this message translates to:
+  /// **'3D audio terrain landscape sculpted by the spectrum'**
+  String get settingsVizTerrainDesc;
+
+  /// Visualizer album-reactive style label
+  ///
+  /// In en, this message translates to:
+  /// **'ALBUM REACTIVE'**
+  String get settingsVizLabelAlbumReactive;
+
+  /// Visualizer album-reactive style description
+  ///
+  /// In en, this message translates to:
+  /// **'Album artwork that breathes with the music'**
+  String get settingsVizAlbumReactiveDesc;
+
   /// No description provided for @settingsVizOffDesc.
   ///
   /// In en, this message translates to:
@@ -10942,6 +11038,282 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Stream and download songs from YouTube Music, ad-free.'**
   String get browseYtmSearchScreenDesc;
+
+  /// No description provided for @dspPreampClipWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Preamp {preamp} dB with peak EQ +{boost} dB may clip. Lower the preamp.'**
+  String dspPreampClipWarning(String preamp, String boost);
+
+  /// No description provided for @dspVolumeClipWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Combined with EQ preamp (+{preamp} dB), total gain may clip. Consider reducing boost.'**
+  String dspVolumeClipWarning(String preamp);
+
+  /// No description provided for @errSaveQueue.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save queue'**
+  String get errSaveQueue;
+
+  /// No description provided for @errClearQueue.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to clear queue'**
+  String get errClearQueue;
+
+  /// No description provided for @errReorderQueue.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to reorder queue'**
+  String get errReorderQueue;
+
+  /// No description provided for @errRemoveTrack.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to remove track'**
+  String get errRemoveTrack;
+
+  /// No description provided for @errQueueSlotEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Queue slot is empty'**
+  String get errQueueSlotEmpty;
+
+  /// No description provided for @errSwitchQueueSlot.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to switch queue slot'**
+  String get errSwitchQueueSlot;
+
+  /// No description provided for @errInvalidStreamUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid stream URL'**
+  String get errInvalidStreamUrl;
+
+  /// No description provided for @errPitchFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Pitch change failed'**
+  String get errPitchFailed;
+
+  /// No description provided for @errPlaybackActionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback action failed'**
+  String get errPlaybackActionFailed;
+
+  /// No description provided for @errSpeedFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Speed change failed'**
+  String get errSpeedFailed;
+
+  /// No description provided for @errVolumeFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Volume change failed'**
+  String get errVolumeFailed;
+
+  /// No description provided for @errShuffleFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Shuffle failed'**
+  String get errShuffleFailed;
+
+  /// No description provided for @errRepeatFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat failed'**
+  String get errRepeatFailed;
+
+  /// No description provided for @errSkipFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip failed'**
+  String get errSkipFailed;
+
+  /// No description provided for @errSeekFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Seek failed, position restored'**
+  String get errSeekFailed;
+
+  /// No description provided for @errIrRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Impulse response rejected by the audio engine'**
+  String get errIrRejected;
+
+  /// No description provided for @errLocalMatchStreaming.
+  ///
+  /// In en, this message translates to:
+  /// **'Local match unavailable, streaming online'**
+  String get errLocalMatchStreaming;
+
+  /// No description provided for @errPlayFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to play \"{title}\"'**
+  String errPlayFailed(String title);
+
+  /// No description provided for @errAddFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to add \"{title}\"'**
+  String errAddFailed(String title);
+
+  /// No description provided for @errQueueFull.
+  ///
+  /// In en, this message translates to:
+  /// **'Queue is full ({max}) — cannot add more'**
+  String errQueueFull(String max);
+
+  /// No description provided for @errAudioSettingFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to apply audio setting: {detail}'**
+  String errAudioSettingFailed(String detail);
+
+  /// No description provided for @errYtmNoConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'No connection. Check your network.'**
+  String get errYtmNoConnection;
+
+  /// No description provided for @errYtmPlaybackFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback failed. Please try again.'**
+  String get errYtmPlaybackFailed;
+
+  /// No description provided for @errYtmGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong with YouTube Music.'**
+  String get errYtmGeneric;
+
+  /// No description provided for @errYtmRegionRestricted.
+  ///
+  /// In en, this message translates to:
+  /// **'This track is restricted in your region.'**
+  String get errYtmRegionRestricted;
+
+  /// No description provided for @errYtmUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This track is unavailable.'**
+  String get errYtmUnavailable;
+
+  /// No description provided for @errYtmSessionExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube session expired. Tap to reconnect.'**
+  String get errYtmSessionExpired;
+
+  /// No description provided for @errYtmNotInBuild.
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube Music is not available in this build.'**
+  String get errYtmNotInBuild;
+
+  /// No description provided for @errYtmProxyAuth.
+  ///
+  /// In en, this message translates to:
+  /// **'Backend proxy authentication failed.'**
+  String get errYtmProxyAuth;
+
+  /// No description provided for @errYtmSigFail.
+  ///
+  /// In en, this message translates to:
+  /// **'Signature deciphering unavailable for this format.'**
+  String get errYtmSigFail;
+
+  /// No description provided for @errYtmBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube is busy. Cooling down.'**
+  String get errYtmBusy;
+
+  /// No description provided for @errYtmTrouble.
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube is having trouble. Retrying.'**
+  String get errYtmTrouble;
+
+  /// No description provided for @errYtmExtractFail.
+  ///
+  /// In en, this message translates to:
+  /// **'Stream extraction failed. Switching route.'**
+  String get errYtmExtractFail;
+
+  /// No description provided for @errYtmVerify.
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube needs verification. Trying alternate route.'**
+  String get errYtmVerify;
+
+  /// No description provided for @errSignInFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in failed. Please try again.'**
+  String get errSignInFailed;
+
+  /// No description provided for @errSignUpFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign up failed. Please try again.'**
+  String get errSignUpFailed;
+
+  /// No description provided for @errLoadDownloads.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load downloads'**
+  String get errLoadDownloads;
+
+  /// No description provided for @errRetryDownloads.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not retry failed downloads'**
+  String get errRetryDownloads;
+
+  /// No description provided for @errYtmNotSignedIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Not signed in to YouTube Music'**
+  String get errYtmNotSignedIn;
+
+  /// No description provided for @errYtmSyncLikes.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to sync YouTube Music likes'**
+  String get errYtmSyncLikes;
+
+  /// No description provided for @dspMultibandLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Multiband'**
+  String get dspMultibandLabel;
+
+  /// No description provided for @dspBandLow.
+  ///
+  /// In en, this message translates to:
+  /// **'Low (<160 Hz)'**
+  String get dspBandLow;
+
+  /// No description provided for @dspBandMid.
+  ///
+  /// In en, this message translates to:
+  /// **'Mid'**
+  String get dspBandMid;
+
+  /// No description provided for @dspBandHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'High'**
+  String get dspBandHigh;
 }
 
 class _AppLocalizationsDelegate

@@ -134,6 +134,8 @@ class PrefsKeys {
   static const String viperDdcContent = 'setting_viper_ddc_content';
   static const String arbitraryEqEnabled = 'setting_arbitrary_eq_enabled';
   static const String arbitraryEqString = 'setting_arbitrary_eq_string';
+  static const String arbitraryEqLinearPhase =
+      'setting_arbitrary_eq_linear_phase';
   static const String liveProgEnabled = 'setting_live_prog_enabled';
   static const String liveProgCode = 'setting_live_prog_code';
 
@@ -271,6 +273,10 @@ class PrefsKeys {
   // or 'dop' (frame as DSD over PCM for a compatible USB DAC). Never
   // auto-enabled — DoP requires an explicit user choice plus a detected DAC.
   static const String dsdOutputMode = 'setting_dsd_output_mode';
+  // DoP PCM container width: 24 (standard DoP packing) or 32 (zero-padded
+  // 32-bit containers for DACs that require 32-bit frames). Only used when
+  // [dsdOutputMode] is 'dop' on a DoP-capable USB DAC.
+  static const String dopContainerBits = 'setting_dop_container_bits';
 
   // Smart Audio: 'auto' adapts AutoEQ + output quality to the connected device
   // and track; 'manual' leaves the user's explicit choices untouched.

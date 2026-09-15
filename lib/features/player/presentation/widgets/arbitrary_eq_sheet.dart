@@ -16,6 +16,7 @@ class ArbitraryEqSheet extends StatefulWidget {
 
 class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
   late final TextEditingController _textController;
+  late bool _linearPhase;
 
   static const Map<String, String> _presets = {
     'Harman Target Curve':
@@ -31,10 +32,12 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
   @override
   void initState() {
     super.initState();
-    final current = context.read<PlayerCubit>().state.arbitraryEqString;
+    final cubit = context.read<PlayerCubit>();
+    final current = cubit.state.arbitraryEqString;
     _textController = TextEditingController(
       text: current.isNotEmpty ? current : _presets.values.first,
     );
+    _linearPhase = cubit.isArbitraryEqLinearPhase;
   }
 
   @override
@@ -46,7 +49,9 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
   void _apply(BuildContext context) {
     final text = _textController.text.trim();
     if (text.isNotEmpty) {
-      context.read<PlayerCubit>().setArbitraryEqEnabled(true, eqString: text);
+      context
+          .read<PlayerCubit>()
+          .setArbitraryEqEnabled(true, eqString: text, linearPhase: _linearPhase);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(context.l10n.appliedGraphicEq)),
       );
@@ -106,7 +111,8 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                       activeThumbColor: p.primary,
                       onChanged: (val) {
                         cubit.setArbitraryEqEnabled(val,
-                            eqString: _textController.text.trim());
+                            eqString: _textController.text.trim(),
+                            linearPhase: _linearPhase);
                       },
                     ),
                   ],
@@ -114,6 +120,54 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                 Text(
                   AudioFeatureRegistry.arbitraryEq.subtitle,
                   style: TextStyle(color: p.textSecondary, fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: p.surfaceContainer,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: p.hairline),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(context.l10n.linearPhaseFir,
+                              style: TextStyle(
+                                color: p.textPrimary,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _linearPhase
+                                  ? context.l10n.linearPhaseOnDesc
+                                  : context.l10n.linearPhaseOffDesc,
+                              style: TextStyle(
+                                  color: p.textSecondary, fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch.adaptive(
+                        value: _linearPhase,
+                        activeThumbColor: p.primary,
+                        onChanged: (val) {
+                          setState(() => _linearPhase = val);
+                          cubit.setArbitraryEqEnabled(
+                            state.isArbitraryEqEnabled,
+                            eqString: _textController.text.trim(),
+                            linearPhase: val,
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 16),
 
@@ -233,7 +287,9 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                         setState(() {
                           _textController.text = entry.value;
                         });
-                        cubit.setArbitraryEqEnabled(true, eqString: entry.value);
+                        cubit.setArbitraryEqEnabled(true,
+                            eqString: entry.value,
+                            linearPhase: _linearPhase);
                       },
                       borderRadius: BorderRadius.circular(14),
                       child: Container(

@@ -1179,7 +1179,7 @@ class YtmAccountService {
             '[YTM_ACCOUNT] Liked songs query $bId: HTTP ${response.statusCode}, body length=${response.body.length}');
 
         if (response.statusCode == 200) {
-          final json = jsonDecode(response.body) as Map<String, dynamic>;
+          var json = jsonDecode(response.body) as Map<String, dynamic>;
           if (_isUnauthenticatedResponse(json)) {
             debugPrint(
                 '[YTM_ACCOUNT] Liked songs returned unauthenticated on $bId, trying next candidate');
@@ -1219,6 +1219,9 @@ class YtmAccountService {
                     '[YTM_ACCOUNT] Browse initial continuation parsed ${contTracks.length} tracks');
                 if (contTracks.isNotEmpty) {
                   tracks.addAll(contTracks);
+                  // Continue pagination from the continuation response,
+                  // not the header shell (its token is already consumed).
+                  json = contJson;
                 } else {
                   debugPrint(
                       '[YTM_ACCOUNT] Continuation body returned 0 tracks '
@@ -1231,6 +1234,11 @@ class YtmAccountService {
           if (tracks.isNotEmpty) {
             _cachedLikedSongsBrowseId = bId;
             final allTracks = List<YtmTrack>.from(tracks);
+            // NOTE: when the initial browse was a header shell, `tracks`
+            // already contains the first continuation page. `currentJson`
+            // must continue from the last continuation response, otherwise
+            // pagination replays the consumed token and stalls on duplicates.
+            // `json` is reassigned below when that path is taken.
             var currentJson = json;
 
             // Fetch continuation pages until maxTracks is satisfied.
@@ -1474,7 +1482,7 @@ class YtmAccountService {
         );
 
         if (response.statusCode == 200) {
-          final json = jsonDecode(response.body) as Map<String, dynamic>;
+          var json = jsonDecode(response.body) as Map<String, dynamic>;
           if (_isUnauthenticatedResponse(json) && isLoggedIn) {
             debugPrint(
                 '[YTM_ACCOUNT] Playlist browse returned unauthenticated on $bId');
@@ -1519,6 +1527,9 @@ class YtmAccountService {
                 final contTracks = _parseInnertubePlaylistTracks(contJson);
                 if (contTracks.isNotEmpty) {
                   tracks.addAll(contTracks);
+                  // Continue pagination from the continuation response,
+                  // not the header shell (its token is already consumed).
+                  json = contJson;
                 }
               }
             }

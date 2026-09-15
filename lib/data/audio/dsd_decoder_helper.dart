@@ -152,11 +152,16 @@ class DsdDecoderHelper {
   /// only when the file's DSD rate has a standard DoP carrier and
   /// [dopCapabilities] (when supplied) advertises it; otherwise playback falls
   /// back to the PCM decode path and [AudioQualityInfo.dsdDopActive] stays false.
+  ///
+  /// [dopContainerBits] selects the PCM container width: 24 (standard DoP
+  /// packing, default) or 32 (zero-padded 32-bit frames for DACs that require
+  /// 32-bit USB frames). Any other value falls back to 24.
   static Future<AudioSource> decodeDsdFile(
     SongsTableData song,
     MediaItem tag, {
     bool forceDop = false,
     DsdDacCapabilities? dopCapabilities,
+    int dopContainerBits = 24,
   }) async {
     final file = File(song.path);
     if (!await file.exists()) {
@@ -203,13 +208,16 @@ class DsdDecoderHelper {
         right = Uint8List.fromList([...right, 0]);
       }
 
-      final dopBytes = DopEncoder.encodeToDopPcm24(dsdLeft: left, dsdRight: right);
+      final use32Bit = dopContainerBits == 32;
+      final dopBytes = use32Bit
+          ? DopEncoder.encodeToDopPcm32(dsdLeft: left, dsdRight: right)
+          : DopEncoder.encodeToDopPcm24(dsdLeft: left, dsdRight: right);
 
       final wavBytes = buildDopWavContainer(
         dopPcmBytes: dopBytes,
         sampleRate: dopSampleRate,
         channels: 2,
-        bitsPerSample: 24,
+        bitsPerSample: use32Bit ? 32 : 24,
       );
 
       return DsdPcmStreamAudioSource(wavBytes, tag: tag);

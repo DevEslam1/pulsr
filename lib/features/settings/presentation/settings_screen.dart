@@ -17,6 +17,9 @@ import '../../auth/presentation/ytm_web_login_sheet.dart';
 import '../cubit/settings_accessibility_ext.dart';
 import '../cubit/settings_cubit.dart';
 import '../cubit/settings_state.dart';
+import '../../../core/utils/platform_capabilities.dart';
+import '../../player/presentation/widgets/equalizer_sheet.dart';
+import '../../sheets/sleep_timer_sheet.dart';
 import 'widgets/audio_sound_section.dart';
 import 'widgets/automation_rules_sheet.dart';
 import 'widgets/backup_section.dart';
@@ -1836,6 +1839,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           value: state.autoThemeByTime,
           onChanged: cubit.setAutoThemeByTime,
         ),
+        onTap: () => cubit.setAutoThemeByTime(!state.autoThemeByTime),
       ),
       _SearchItem(
         category: context.l10n.settingsCategoryAppearance,
@@ -1847,6 +1851,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           value: state.highContrast,
           onChanged: cubit.setHighContrast,
         ),
+        onTap: () => cubit.setHighContrast(!state.highContrast),
       ),
       _SearchItem(
         category: context.l10n.settingsCategoryAppearance,
@@ -1858,6 +1863,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           value: state.reduceMotion,
           onChanged: cubit.setReduceMotion,
         ),
+        onTap: () => cubit.setReduceMotion(!state.reduceMotion),
       ),
       _SearchItem(
         category: context.l10n.settingsCategoryAppearance,
@@ -1918,8 +1924,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'reverb'
         ],
         onTap: () {
-          _searchController.clear();
-          setState(() => _selectedCategoryId = 'audio');
+          if (PlatformCapabilities.hasEqualizer) {
+            showModalBottomSheet<void>(
+              context: context,
+              useRootNavigator: true,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (_) => const EqualizerSheet(),
+            );
+          } else {
+            _searchController.clear();
+            setState(() => _selectedCategoryId = 'audio');
+          }
         },
       ),
       _SearchItem(
@@ -1951,10 +1967,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         subtitle: context.l10n.settingsSearchSleepTimerSubtitle,
         icon: Icons.timer_outlined,
         keywords: ['sleep', 'timer', 'stop', 'night'],
-        onTap: () {
-          _searchController.clear();
-          setState(() => _selectedCategoryId = 'playback');
-        },
+        onTap: () => showModalBottomSheet<void>(
+          context: context,
+          useRootNavigator: true,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (_) => const SleepTimerSheet(),
+        ),
       ),
       _SearchItem(
         category: context.l10n.gestures,
@@ -2294,6 +2313,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         activeThumbColor: Colors.white,
         onChanged: onChanged,
       ),
+      onTap: () => onChanged(!value),
     );
   }
 

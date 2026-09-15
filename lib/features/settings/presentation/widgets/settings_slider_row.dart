@@ -65,6 +65,7 @@ class SettingSliderRow extends StatelessWidget {
             children: [
               if (onInfo != null) ...[
                 IconButton(
+                  tooltip: label,
                   icon: Icon(Icons.info_outline_rounded,
                       size: 16, color: p.textTertiary),
                   visualDensity: VisualDensity.compact,

@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
-import '../../../core/constants/app_radii.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/utils/list_content_diff.dart';
@@ -119,6 +119,9 @@ class _MiniPlayerState extends State<MiniPlayer> {
           if (mounted) _syncPageController(currentIndex, queue.length);
         });
 
+        final isTablet = Adaptive.isTablet(context);
+        final playerRadius = BorderRadius.circular(isTablet ? 28 : 24);
+
         return Semantics(
           label: context.l10n.nowPlayingSemantics(song.title, song.artist),
           button: true,
@@ -144,13 +147,15 @@ class _MiniPlayerState extends State<MiniPlayer> {
               _verticalDragDy = 0.0;
             },
             child: Padding(
-              // Outer bottom padding + the row's bottom padding are reduced in
-              // step with the taller seek hit area below so the mini player's
-              // intrinsic height (and the dock's stacked geometry) is unchanged.
-              padding: const EdgeInsetsDirectional.fromSTEB(12, 4, 12, 2.5),
+              padding: EdgeInsetsDirectional.fromSTEB(
+                isTablet ? 24 : 14,
+                3,
+                isTablet ? 24 : 14,
+                3,
+              ),
               child: Container(
                 decoration: BoxDecoration(
-                  borderRadius: AppRadii.miniPlayerRadius,
+                  borderRadius: playerRadius,
                   boxShadow: [
                     BoxShadow(
                       color: activeAccent.withValues(
@@ -170,7 +175,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                 child: GlassContainer(
                   blur: 20,
                   opacity: p.isDark ? 0.93 : 0.97,
-                  borderRadius: AppRadii.miniPlayerRadius,
+                  borderRadius: playerRadius,
                   color: Color.alphaBlend(
                     activeAccent.withValues(alpha: p.isDark ? 0.12 : 0.08),
                     p.surface,
@@ -180,7 +185,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                     width: 1.2,
                   ),
                   child: ClipRRect(
-                    borderRadius: AppRadii.miniPlayerRadius,
+                    borderRadius: playerRadius,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -261,16 +266,23 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                                   ),
                                                 ),
                                               const SizedBox(width: 12),
-                                              // Track title & artist
+                                              // Track title & artist.
+                                              // Dense fixed-height chrome: clamp
+                                              // Dynamic Type here so the 52px
+                                              // row can never clip, while
+                                              // content areas scale to 2.0x.
                                               Expanded(
-                                                child: Column(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment.center,
-                                                  children: [
+                                                child: MediaQuery.withClampedTextScaling(
+                                                  minScaleFactor: 0.8,
+                                                  maxScaleFactor: 1.3,
+                                                  child: Column(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment.start,
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment.center,
+                                                    children: [
                                                       Text(
                                                         item.title,
                                                         maxLines: 1,
@@ -301,6 +313,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                                     ],
                                                   ),
                                                 ),
+                                              ),
                                               ],
                                             ),
                                           );

@@ -71,7 +71,7 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
   static const Duration _animDuration = Duration(milliseconds: 320);
   static const Curve _animCurve = Curves.easeOutCubic;
   static const double _peekOffset = 14.0;
-  static const double _miniPlayerHeight = 78.0;
+  static const double _miniPlayerHeight = 84.0;
 
   void _setMode(DockStackMode nextMode) {
     if (widget.mode == nextMode) return;
@@ -107,8 +107,7 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
     final animDuration = context.motion(_animDuration);
     final animCurve = context.motionCurve(_animCurve);
     final isTablet = Adaptive.isTablet(context);
-    final double maxPlayerWidth = isTablet ? 640.0 : 560.0;
-    final double maxBarWidth = isTablet ? 620.0 : 540.0;
+    final double maxDockWidth = isTablet ? 640.0 : 540.0;
     final double barHeight = isTablet ? 68.0 : 64.0;
     final double navBarPaddingVertical = isTablet ? 14.0 : 10.0;
     final double navBarTotalHeight = barHeight + navBarPaddingVertical;
@@ -258,7 +257,7 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
               opacity: miniPlayerOpacity,
               child: Center(
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: maxPlayerWidth),
+                  constraints: BoxConstraints(maxWidth: maxDockWidth),
                   child: miniPlayerWidget,
                 ),
               ),
@@ -311,7 +310,7 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
               opacity: navBarOpacity,
               child: Center(
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: maxBarWidth),
+                  constraints: BoxConstraints(maxWidth: maxDockWidth),
                   child: navBarWidget,
                 ),
               ),

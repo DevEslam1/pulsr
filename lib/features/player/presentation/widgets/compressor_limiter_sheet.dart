@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../data/audio/equalizer_manager.dart';
+import '../../../../domain/models/audio_effects_config.dart';
 
 class CompressorLimiterSheet extends StatefulWidget {
   final EqualizerManager equalizerManager;
@@ -26,6 +27,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
   late double _mbcF0;
   late double _mbcF1;
   late double _mbcF2;
+  late List<MultibandCompressorBandConfig> _mbcBands;
 
   /// Ratio / attack / make-up are honored only by the Android HAL
   /// DynamicsProcessing limiter; the native C++ stage is a brickwall limiter.
@@ -44,6 +46,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
     _mbcF0 = widget.equalizerManager.multibandCompressorF0;
     _mbcF1 = widget.equalizerManager.multibandCompressorF1;
     _mbcF2 = widget.equalizerManager.multibandCompressorF2;
+    _mbcBands = List.of(widget.equalizerManager.multibandCompressorBands);
     _advancedSupported =
         widget.equalizerManager.isCompressorAdvancedParamsSupported;
   }
@@ -55,6 +58,12 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
       f1: _mbcF1,
       f2: _mbcF2,
     );
+  }
+
+  Future<void> _applyMbcBand(
+      int index, MultibandCompressorBandConfig band) async {
+    setState(() => _mbcBands[index] = band);
+    await widget.equalizerManager.setMultibandCompressorBand(index, band);
   }
 
   void _applyParams() {
@@ -324,6 +333,94 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                 _applyMbc();
               },
             ),
+            const SizedBox(height: 8),
+            Text(
+              context.l10n.mbcPerBandTitle,
+              style: TextStyle(
+                color: p.textPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              context.l10n.mbcPerBandSubtitle,
+              style: TextStyle(color: p.textSecondary, fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            ...List.generate(_mbcBands.length, (i) {
+              final bandNames = [
+                context.l10n.mbcBandLow,
+                context.l10n.mbcBandLowMid,
+                context.l10n.mbcBandHighMid,
+                context.l10n.mbcBandHigh,
+              ];
+              final band = _mbcBands[i];
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: p.surfaceContainer,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: p.hairline),
+                ),
+                child: ExpansionTile(
+                  dense: true,
+                  tilePadding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                  childrenPadding:
+                      const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                  title: Text(
+                    i < bandNames.length ? bandNames[i] : 'Band ${i + 1}',
+                    style: TextStyle(
+                      color: p.textPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${band.thresholdDb.toStringAsFixed(1)} dB · ${band.ratio.toStringAsFixed(1)}:1 · +${band.makeupGainDb.toStringAsFixed(1)} dB',
+                    style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: 11,
+                        fontFamily: 'monospace'),
+                  ),
+                  children: [
+                    _buildParamRow(
+                      title: context.l10n.dspThreshold,
+                      valueDisplay:
+                          '${band.thresholdDb.toStringAsFixed(1)} dB',
+                      value: band.thresholdDb,
+                      min: -60.0,
+                      max: 0.0,
+                      enabled: _mbcEnabled,
+                      onChanged: (val) => _applyMbcBand(
+                          i, band.copyWith(thresholdDb: val)),
+                    ),
+                    _buildParamRow(
+                      title: context.l10n.dspRatio,
+                      valueDisplay: '${band.ratio.toStringAsFixed(1)}:1',
+                      value: band.ratio,
+                      min: 1.0,
+                      max: 20.0,
+                      enabled: _mbcEnabled,
+                      onChanged: (val) =>
+                          _applyMbcBand(i, band.copyWith(ratio: val)),
+                    ),
+                    _buildParamRow(
+                      title: context.l10n.dspMakeupGain,
+                      valueDisplay:
+                          '+${band.makeupGainDb.toStringAsFixed(1)} dB',
+                      value: band.makeupGainDb,
+                      min: 0.0,
+                      max: 24.0,
+                      enabled: _mbcEnabled,
+                      onChanged: (val) => _applyMbcBand(
+                          i, band.copyWith(makeupGainDb: val)),
+                    ),
+                  ],
+                ),
+              );
+            }),
           ],
         ),
       ),

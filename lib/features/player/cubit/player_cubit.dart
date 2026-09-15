@@ -3317,7 +3317,10 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     }
   }
 
-  Future<void> setArbitraryEqEnabled(bool enabled, {String? eqString}) async {
+  bool get isArbitraryEqLinearPhase => _audioHandler.arbitraryEqLinearPhase;
+
+  Future<void> setArbitraryEqEnabled(bool enabled,
+      {String? eqString, bool? linearPhase}) async {
     if (enabled && !_guardDsp('Arbitrary Response EQ')) return;
     safeEmit(state.copyWith(
       isArbitraryEqEnabled: enabled,
@@ -3325,7 +3328,8 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       errorMessage: null,
     ));
     try {
-      await _audioHandler.setArbitraryEq(enabled, eqString: eqString);
+      await _audioHandler.setArbitraryEq(enabled,
+          eqString: eqString, linearPhase: linearPhase);
     } catch (e) {
       _syncAudioEffects();
       safeEmit(state.copyWith(errorMessage: 'Failed to set Arbitrary EQ: $e'));

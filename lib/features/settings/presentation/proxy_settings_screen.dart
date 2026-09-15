@@ -248,6 +248,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                           ],
                         ),
                         IconButton(
+                          tooltip: context.l10n.close,
                           icon:
                               Icon(Icons.close_rounded, color: p.textSecondary),
                           onPressed: () => Navigator.of(ctx).pop(),
@@ -1510,6 +1511,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                 prefixIcon:
                     Icon(Icons.lock_outline_rounded, color: p.accent, size: 20),
                 suffixIcon: IconButton(
+                  tooltip: context.l10n.settingsPasswordLabel,
                   icon: Icon(
                     _obscurePassword
                         ? Icons.visibility_off_rounded

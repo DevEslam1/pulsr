@@ -192,6 +192,9 @@ class EqualizerManager {
   // Arbitrary Response EQ (EqualizerAPO GraphicEq)
   bool isArbitraryEqEnabled = false;
   String arbitraryEqString = '';
+  // Linear-phase FIR variant (constant group delay = FIR_TAPS/2, exact phase
+  // match at the cost of pre-ringing); false = minimum-phase (default).
+  bool arbitraryEqLinearPhase = false;
 
   // Live Programmable DSP (EEL script)
   bool isLiveProgEnabled = false;
@@ -570,6 +573,8 @@ class EqualizerManager {
           prefs.getBool(PrefsKeys.arbitraryEqEnabled) ?? false;
       arbitraryEqString =
           prefs.getString(PrefsKeys.arbitraryEqString) ?? '';
+      arbitraryEqLinearPhase =
+          prefs.getBool(PrefsKeys.arbitraryEqLinearPhase) ?? false;
       isLiveProgEnabled =
           prefs.getBool(PrefsKeys.liveProgEnabled) ?? false;
       liveProgCode =
@@ -790,7 +795,10 @@ class EqualizerManager {
         pendingFutures.add(_effectsChannel.setViperDdcEnabled(true));
       }
       if (isArbitraryEqEnabled && arbitraryEqString.isNotEmpty) {
-        pendingFutures.add(_effectsChannel.loadArbitraryEq(eqString: arbitraryEqString));
+        pendingFutures.add(_effectsChannel.loadArbitraryEq(
+          eqString: arbitraryEqString,
+          linearPhase: arbitraryEqLinearPhase,
+        ));
         pendingFutures.add(_effectsChannel.setArbitraryEqEnabled(true));
       }
       if (isLiveProgEnabled && liveProgCode.isNotEmpty) {
@@ -938,6 +946,7 @@ class EqualizerManager {
         PrefsKeys.viperDdcContent: viperDdcContent,
         PrefsKeys.arbitraryEqEnabled: isArbitraryEqEnabled,
         PrefsKeys.arbitraryEqString: arbitraryEqString,
+        PrefsKeys.arbitraryEqLinearPhase: arbitraryEqLinearPhase,
         PrefsKeys.liveProgEnabled: isLiveProgEnabled,
         PrefsKeys.liveProgCode: liveProgCode,
         PrefsKeys.dspPreference: dspPreference,
@@ -1936,12 +1945,21 @@ class EqualizerManager {
   Future<void> setArbitraryEq(
     bool enabled, {
     String? eqString,
+    bool? linearPhase,
   }) async {
     isArbitraryEqEnabled = enabled;
     if (eqString != null) arbitraryEqString = eqString;
+    if (linearPhase != null) arbitraryEqLinearPhase = linearPhase;
     if (PlatformCapabilities.isAndroid) {
-      if (eqString != null && eqString.isNotEmpty) {
-        await _effectsChannel.loadArbitraryEq(eqString: eqString);
+      // Reload when the curve changed OR the phase mode changed: the native
+      // stage caches by (string, phase) and no-ops on identical pairs, so a
+      // phase-only toggle still re-synthesizes the FIR correctly.
+      if ((eqString != null && eqString.isNotEmpty) ||
+          (linearPhase != null && arbitraryEqString.isNotEmpty)) {
+        await _effectsChannel.loadArbitraryEq(
+          eqString: arbitraryEqString,
+          linearPhase: arbitraryEqLinearPhase,
+        );
       }
       await _effectsChannel.setArbitraryEqEnabled(enabled);
     }
@@ -2693,7 +2711,10 @@ class EqualizerManager {
       futures.add(_effectsChannel.setViperDdcEnabled(true));
     }
     if (isArbitraryEqEnabled && arbitraryEqString.isNotEmpty) {
-      futures.add(_effectsChannel.loadArbitraryEq(eqString: arbitraryEqString));
+      futures.add(_effectsChannel.loadArbitraryEq(
+        eqString: arbitraryEqString,
+        linearPhase: arbitraryEqLinearPhase,
+      ));
       futures.add(_effectsChannel.setArbitraryEqEnabled(true));
     }
     if (isLiveProgEnabled && liveProgCode.isNotEmpty) {

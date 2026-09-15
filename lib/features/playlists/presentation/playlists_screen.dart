@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -837,8 +838,9 @@ class _OnlinePlaylistsContent extends StatelessWidget {
 
     try {
       final ytmService = getIt<YtmService>();
-      final tracks =
-          await ytmService.getPlaylistTracks(playlist.playlistId, limit: 200);
+      final tracks = await ytmService
+          .getPlaylistTracks(playlist.playlistId, limit: 200)
+          .timeout(const Duration(seconds: 45));
       if (tracks.isNotEmpty) {
         final songs = tracks.map((t) => t.toSongData()).toList();
         final downloadCubit = getIt<YtmDownloadCubit>();

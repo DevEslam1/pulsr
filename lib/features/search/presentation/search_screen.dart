@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/di/injection.dart';
+import '../../../core/errors/error_message_resolver.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
@@ -504,7 +505,7 @@ class _OnlineResults extends StatelessWidget {
           return EmptyStateWidget(
             icon: Icons.cloud_off_rounded,
             title: context.l10n.browseSearchFailed,
-            subtitle: state.errorMessage!,
+            subtitle: resolveUiErrorMessage(context, state.errorMessage!),
             primaryActionLabel: context.l10n.tryAgain,
             primaryActionIcon: Icons.refresh_rounded,
             onPrimaryAction: context.read<YtmSearchCubit>().retry,

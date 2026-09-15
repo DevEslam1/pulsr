@@ -65,9 +65,9 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
     final isTablet = context.isTablet;
     final items = _getItems(context);
 
-    final double maxBarWidth = isTablet ? 620.0 : 540.0;
+    final double maxBarWidth = isTablet ? 640.0 : 540.0;
     final double barHeight = isTablet ? 68.0 : 64.0;
-    final navRadius = BorderRadius.circular(isTablet ? 34 : 28);
+    final navRadius = BorderRadius.circular(isTablet ? 28 : 24);
 
     return SafeArea(
       top: false,
@@ -77,7 +77,7 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
       child: Padding(
         padding: EdgeInsets.fromLTRB(
           isTablet ? 24 : 14,
-          2,
+          3,
           isTablet ? 24 : 14,
           isTablet ? 12 : 8,
         ),

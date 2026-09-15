@@ -3494,6 +3494,37 @@ class AppLocalizationsAr extends AppLocalizations {
   String get fir512 => 'مرشح FIR بـ512';
 
   @override
+  String get linearPhaseFir => 'FIR خطي الطور';
+
+  @override
+  String get linearPhaseOnDesc => 'تأخير ثابت وطور دقيق (احتمال رنين مسبق)';
+
+  @override
+  String get linearPhaseOffDesc => 'طور أدنى، بدون تأخير إضافي (افتراضي)';
+
+  @override
+  String get dopContainer => 'حاوية DoP';
+
+  @override
+  String get mbcPerBandTitle => 'ديناميكية لكل نطاق';
+
+  @override
+  String get mbcPerBandSubtitle =>
+      'العتبة والنسبة وكسب التعويض لكل نطاق من نطاقات LR4 الأربعة.';
+
+  @override
+  String get mbcBandLow => 'النطاق 1 · منخفض';
+
+  @override
+  String get mbcBandLowMid => 'النطاق 2 · متوسط-منخفض';
+
+  @override
+  String get mbcBandHighMid => 'النطاق 3 · متوسط-مرتفع';
+
+  @override
+  String get mbcBandHigh => 'النطاق 4 · مرتفع';
+
+  @override
   String get applyCurve => 'تطبيق المنحنى';
 
   @override
@@ -4914,6 +4945,25 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsVizLabelWave => 'موجة';
 
   @override
+  String get settingsVizLabelParticles => 'جسيمات';
+
+  @override
+  String get settingsVizParticlesDesc => 'حقل جسيمات GPU ينبض مع طاقة الجهير';
+
+  @override
+  String get settingsVizLabelTerrain => 'تضاريس ثلاثية الأبعاد';
+
+  @override
+  String get settingsVizTerrainDesc =>
+      'تضاريس صوتية ثلاثية الأبعاد ينحتها الطيف';
+
+  @override
+  String get settingsVizLabelAlbumReactive => 'تفاعلي مع الألبوم';
+
+  @override
+  String get settingsVizAlbumReactiveDesc => 'غلاف الألبوم يتنفس مع الموسيقى';
+
+  @override
   String get settingsVizOffDesc => 'تعطيل حركة طيف مُصوّر الصوت';
 
   @override
@@ -6020,4 +6070,155 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get browseYtmSearchScreenDesc =>
       'شغّل ونزّل الأغاني من YouTube Music دون إعلانات.';
+
+  @override
+  String dspPreampClipWarning(String preamp, String boost) {
+    return 'المضخم المسبق $preamp ديسيبل مع ذروة المعادل +$boost ديسيبل قد يسبب تشويهًا. اخفض المضخم المسبق.';
+  }
+
+  @override
+  String dspVolumeClipWarning(String preamp) {
+    return 'مع المضخم المسبق للمعادل (+$preamp ديسيبل)، قد يتشوه الكسب الكلي. فكر في تقليل التعزيز.';
+  }
+
+  @override
+  String get errSaveQueue => 'تعذّر حفظ قائمة الانتظار';
+
+  @override
+  String get errClearQueue => 'تعذّر مسح قائمة الانتظار';
+
+  @override
+  String get errReorderQueue => 'تعذّر إعادة ترتيب قائمة الانتظار';
+
+  @override
+  String get errRemoveTrack => 'تعذّر إزالة المسار';
+
+  @override
+  String get errQueueSlotEmpty => 'خانة قائمة الانتظار فارغة';
+
+  @override
+  String get errSwitchQueueSlot => 'تعذّر التبديل بين خانات قائمة الانتظار';
+
+  @override
+  String get errInvalidStreamUrl => 'رابط البث غير صالح';
+
+  @override
+  String get errPitchFailed => 'تعذّر تغيير النغمة';
+
+  @override
+  String get errPlaybackActionFailed => 'فشل إجراء التشغيل';
+
+  @override
+  String get errSpeedFailed => 'تعذّر تغيير السرعة';
+
+  @override
+  String get errVolumeFailed => 'تعذّر تغيير مستوى الصوت';
+
+  @override
+  String get errShuffleFailed => 'فشل التشغيل العشوائي';
+
+  @override
+  String get errRepeatFailed => 'فشلت الإعادة';
+
+  @override
+  String get errSkipFailed => 'تعذّر التخطي';
+
+  @override
+  String get errSeekFailed => 'فشل الانتقال، تمت استعادة الموضع';
+
+  @override
+  String get errIrRejected => 'رفض محرك الصوت استجابة النبضة';
+
+  @override
+  String get errLocalMatchStreaming =>
+      'لا توجد نسخة محلية، جارٍ البث عبر الإنترنت';
+
+  @override
+  String errPlayFailed(String title) {
+    return 'تعذّر تشغيل \"$title\"';
+  }
+
+  @override
+  String errAddFailed(String title) {
+    return 'تعذّر إضافة \"$title\"';
+  }
+
+  @override
+  String errQueueFull(String max) {
+    return 'قائمة الانتظار ممتلئة ($max) — لا يمكن إضافة المزيد';
+  }
+
+  @override
+  String errAudioSettingFailed(String detail) {
+    return 'تعذّر تطبيق إعداد الصوت: $detail';
+  }
+
+  @override
+  String get errYtmNoConnection => 'لا يوجد اتصال. تحقق من الشبكة.';
+
+  @override
+  String get errYtmPlaybackFailed => 'فشل التشغيل. حاول مجددًا.';
+
+  @override
+  String get errYtmGeneric => 'حدث خطأ في YouTube Music.';
+
+  @override
+  String get errYtmRegionRestricted => 'هذا المسار مقيد في منطقتك.';
+
+  @override
+  String get errYtmUnavailable => 'هذا المسار غير متاح.';
+
+  @override
+  String get errYtmSessionExpired => 'انتهت جلسة YouTube. انقر لإعادة الاتصال.';
+
+  @override
+  String get errYtmNotInBuild => 'YouTube Music غير متاح في هذا الإصدار.';
+
+  @override
+  String get errYtmProxyAuth => 'فشلت مصادقة البروكسي.';
+
+  @override
+  String get errYtmSigFail => 'فك تشفير التوقيع غير متاح لهذا التنسيق.';
+
+  @override
+  String get errYtmBusy => 'YouTube مشغول. جارٍ التهدئة.';
+
+  @override
+  String get errYtmTrouble => 'يواجه YouTube مشكلة. جارٍ إعادة المحاولة.';
+
+  @override
+  String get errYtmExtractFail => 'فشل استخراج البث. جارٍ تبديل المسار.';
+
+  @override
+  String get errYtmVerify => 'يحتاج YouTube إلى التحقق. جارٍ تجربة مسار بديل.';
+
+  @override
+  String get errSignInFailed => 'فشل تسجيل الدخول. حاول مجددًا.';
+
+  @override
+  String get errSignUpFailed => 'فشل إنشاء الحساب. حاول مجددًا.';
+
+  @override
+  String get errLoadDownloads => 'تعذّر تحميل التنزيلات';
+
+  @override
+  String get errRetryDownloads => 'تعذّرت إعادة محاولة التنزيلات الفاشلة';
+
+  @override
+  String get errYtmNotSignedIn => 'لم تسجل الدخول إلى YouTube Music';
+
+  @override
+  String get errYtmSyncLikes => 'تعذّرت مزامنة الأغاني المفضلة';
+
+  @override
+  String get dspMultibandLabel => 'متعدد النطاقات';
+
+  @override
+  String get dspBandLow => 'منخفض (<160 هرتز)';
+
+  @override
+  String get dspBandMid => 'متوسط';
+
+  @override
+  String get dspBandHigh => 'عالٍ';
 }

@@ -3509,6 +3509,39 @@ class AppLocalizationsEs extends AppLocalizations {
   String get fir512 => 'Filtro FIR de 512';
 
   @override
+  String get linearPhaseFir => 'FIR de fase lineal';
+
+  @override
+  String get linearPhaseOnDesc =>
+      'Retardo constante, fase exacta (posible pre-eco)';
+
+  @override
+  String get linearPhaseOffDesc =>
+      'Fase mínima, sin retardo extra (predeterminado)';
+
+  @override
+  String get dopContainer => 'Contenedor DoP';
+
+  @override
+  String get mbcPerBandTitle => 'Dinámica por banda';
+
+  @override
+  String get mbcPerBandSubtitle =>
+      'Umbral, relación y ganancia de compensación para cada una de las 4 bandas LR4.';
+
+  @override
+  String get mbcBandLow => 'Banda 1 · Graves';
+
+  @override
+  String get mbcBandLowMid => 'Banda 2 · Medios-graves';
+
+  @override
+  String get mbcBandHighMid => 'Banda 3 · Medios-agudos';
+
+  @override
+  String get mbcBandHigh => 'Banda 4 · Agudos';
+
+  @override
   String get applyCurve => 'Aplicar curva';
 
   @override
@@ -4959,6 +4992,27 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsVizLabelWave => 'ONDA';
 
   @override
+  String get settingsVizLabelParticles => 'PARTÍCULAS';
+
+  @override
+  String get settingsVizParticlesDesc =>
+      'Campo de partículas GPU que pulsa con la energía de los graves';
+
+  @override
+  String get settingsVizLabelTerrain => 'TERRENO 3D';
+
+  @override
+  String get settingsVizTerrainDesc =>
+      'Paisaje de terreno 3D esculpido por el espectro';
+
+  @override
+  String get settingsVizLabelAlbumReactive => 'REACTIVO AL ÁLBUM';
+
+  @override
+  String get settingsVizAlbumReactiveDesc =>
+      'La portada del álbum respira con la música';
+
+  @override
   String get settingsVizOffDesc =>
       'Desactiva la animación del espectro del visualizador';
 
@@ -6089,4 +6143,163 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get browseYtmSearchScreenDesc =>
       'Reproduce y descarga canciones de YouTube Music sin anuncios.';
+
+  @override
+  String dspPreampClipWarning(String preamp, String boost) {
+    return 'Preamp $preamp dB con pico de EQ +$boost dB puede saturar. Baja el preamp.';
+  }
+
+  @override
+  String dspVolumeClipWarning(String preamp) {
+    return 'Combinado con preamp de EQ (+$preamp dB), la ganancia total puede saturar. Considera reducir el refuerzo.';
+  }
+
+  @override
+  String get errSaveQueue => 'No se pudo guardar la cola';
+
+  @override
+  String get errClearQueue => 'No se pudo vaciar la cola';
+
+  @override
+  String get errReorderQueue => 'No se pudo reordenar la cola';
+
+  @override
+  String get errRemoveTrack => 'No se pudo quitar la pista';
+
+  @override
+  String get errQueueSlotEmpty => 'La ranura de cola está vacía';
+
+  @override
+  String get errSwitchQueueSlot => 'No se pudo cambiar de ranura';
+
+  @override
+  String get errInvalidStreamUrl => 'URL de stream no válida';
+
+  @override
+  String get errPitchFailed => 'No se pudo cambiar el tono';
+
+  @override
+  String get errPlaybackActionFailed => 'Falló la acción de reproducción';
+
+  @override
+  String get errSpeedFailed => 'No se pudo cambiar la velocidad';
+
+  @override
+  String get errVolumeFailed => 'No se pudo cambiar el volumen';
+
+  @override
+  String get errShuffleFailed => 'Falló el modo aleatorio';
+
+  @override
+  String get errRepeatFailed => 'Falló la repetición';
+
+  @override
+  String get errSkipFailed => 'No se pudo saltar';
+
+  @override
+  String get errSeekFailed => 'Falló la búsqueda, posición restaurada';
+
+  @override
+  String get errIrRejected =>
+      'Respuesta de impulso rechazada por el motor de audio';
+
+  @override
+  String get errLocalMatchStreaming =>
+      'Sin coincidencia local, transmitiendo en línea';
+
+  @override
+  String errPlayFailed(String title) {
+    return 'No se pudo reproducir \"$title\"';
+  }
+
+  @override
+  String errAddFailed(String title) {
+    return 'No se pudo añadir \"$title\"';
+  }
+
+  @override
+  String errQueueFull(String max) {
+    return 'La cola está llena ($max) — no se puede añadir más';
+  }
+
+  @override
+  String errAudioSettingFailed(String detail) {
+    return 'No se pudo aplicar el ajuste de audio: $detail';
+  }
+
+  @override
+  String get errYtmNoConnection => 'Sin conexión. Revisa tu red.';
+
+  @override
+  String get errYtmPlaybackFailed =>
+      'Falló la reproducción. Inténtalo de nuevo.';
+
+  @override
+  String get errYtmGeneric => 'Algo salió mal con YouTube Music.';
+
+  @override
+  String get errYtmRegionRestricted =>
+      'Esta pista está restringida en tu región.';
+
+  @override
+  String get errYtmUnavailable => 'Esta pista no está disponible.';
+
+  @override
+  String get errYtmSessionExpired =>
+      'Sesión de YouTube caducada. Toca para reconectar.';
+
+  @override
+  String get errYtmNotInBuild =>
+      'YouTube Music no está disponible en esta compilación.';
+
+  @override
+  String get errYtmProxyAuth => 'Falló la autenticación del proxy.';
+
+  @override
+  String get errYtmSigFail =>
+      'Descifrado de firma no disponible para este formato.';
+
+  @override
+  String get errYtmBusy => 'YouTube está ocupado. Enfriando.';
+
+  @override
+  String get errYtmTrouble => 'YouTube tiene problemas. Reintentando.';
+
+  @override
+  String get errYtmExtractFail => 'Falló la extracción. Cambiando de ruta.';
+
+  @override
+  String get errYtmVerify =>
+      'YouTube necesita verificación. Probando ruta alternativa.';
+
+  @override
+  String get errSignInFailed => 'Error al iniciar sesión. Inténtalo de nuevo.';
+
+  @override
+  String get errSignUpFailed => 'Error al registrarse. Inténtalo de nuevo.';
+
+  @override
+  String get errLoadDownloads => 'No se pudieron cargar las descargas';
+
+  @override
+  String get errRetryDownloads =>
+      'No se pudieron reintentar las descargas fallidas';
+
+  @override
+  String get errYtmNotSignedIn => 'No has iniciado sesión en YouTube Music';
+
+  @override
+  String get errYtmSyncLikes => 'No se pudieron sincronizar los favoritos';
+
+  @override
+  String get dspMultibandLabel => 'Multibanda';
+
+  @override
+  String get dspBandLow => 'Bajo (<160 Hz)';
+
+  @override
+  String get dspBandMid => 'Medios';
+
+  @override
+  String get dspBandHigh => 'Altos';
 }

@@ -46,7 +46,7 @@ class _HeadsetControlsSectionState extends State<HeadsetControlsSection> {
         _autoResume = prefs.getBool(PrefsKeys.autoResumeOnReconnect) ?? false;
         _autoResumeTimeout = prefs.getInt(PrefsKeys.autoResumeTimeoutSec) ?? 90;
         _keepNotification =
-            prefs.getBool(PrefsKeys.keepNotificationOnPause) ?? false;
+            prefs.getBool(PrefsKeys.keepNotificationOnPause) ?? true;
         _loaded = true;
       });
     } catch (_) {
@@ -241,27 +241,76 @@ class _ClickActionTile extends StatelessWidget {
     HeadsetClickAction.none: 'Do nothing',
   };
 
+  void _showPicker(BuildContext context) {
+    final p = context.palette;
+    showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      backgroundColor: p.surfaceContainer,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...HeadsetClickAction.values.map((action) {
+                final isSelected = action == value;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  child: Material(
+                    color: isSelected
+                        ? p.accent.withValues(alpha: 0.12)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    child: ListTile(
+                      title: Text(
+                        _labels[action] ?? action.wireValue,
+                        style: TextStyle(
+                          fontWeight:
+                              isSelected ? FontWeight.w800 : FontWeight.w600,
+                          color: isSelected ? p.accent : p.textPrimary,
+                        ),
+                      ),
+                      trailing: isSelected
+                          ? Icon(Icons.check_circle_rounded, color: p.accent)
+                          : null,
+                      onTap: () {
+                        onChanged(action);
+                        Navigator.pop(ctx);
+                      },
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SettingsNavTile(
       icon,
       title,
       _labels[value] ?? value.wireValue,
-      trailing: DropdownButton<HeadsetClickAction>(
-        value: value,
-        underline: const SizedBox.shrink(),
-        onChanged: (v) {
-          if (v != null) onChanged(v);
-        },
-        items: HeadsetClickAction.values
-            .map((a) => DropdownMenuItem(
-                  value: a,
-                  child: Text(_labels[a] ?? a.wireValue,
-                      style: const TextStyle(fontSize: 13)),
-                ))
-            .toList(),
-      ),
-      onTap: null,
+      onTap: () => _showPicker(context),
     );
   }
 }

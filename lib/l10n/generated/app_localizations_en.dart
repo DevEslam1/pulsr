@@ -3521,6 +3521,38 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fir512 => '512-tap FIR Filter';
 
   @override
+  String get linearPhaseFir => 'Linear-phase FIR';
+
+  @override
+  String get linearPhaseOnDesc =>
+      'Constant delay, exact phase (pre-ringing possible)';
+
+  @override
+  String get linearPhaseOffDesc => 'Minimum-phase, zero extra delay (default)';
+
+  @override
+  String get dopContainer => 'DoP container';
+
+  @override
+  String get mbcPerBandTitle => 'Per-band dynamics';
+
+  @override
+  String get mbcPerBandSubtitle =>
+      'Threshold, ratio and make-up gain for each of the 4 LR4 bands.';
+
+  @override
+  String get mbcBandLow => 'Band 1 · Low';
+
+  @override
+  String get mbcBandLowMid => 'Band 2 · Low-Mid';
+
+  @override
+  String get mbcBandHighMid => 'Band 3 · High-Mid';
+
+  @override
+  String get mbcBandHigh => 'Band 4 · High';
+
+  @override
   String get applyCurve => 'Apply Curve';
 
   @override
@@ -4957,6 +4989,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsVizLabelWave => 'WAVE';
 
   @override
+  String get settingsVizLabelParticles => 'PARTICLES';
+
+  @override
+  String get settingsVizParticlesDesc =>
+      'GPU particle field pulsing with bass energy';
+
+  @override
+  String get settingsVizLabelTerrain => 'TERRAIN 3D';
+
+  @override
+  String get settingsVizTerrainDesc =>
+      '3D audio terrain landscape sculpted by the spectrum';
+
+  @override
+  String get settingsVizLabelAlbumReactive => 'ALBUM REACTIVE';
+
+  @override
+  String get settingsVizAlbumReactiveDesc =>
+      'Album artwork that breathes with the music';
+
+  @override
   String get settingsVizOffDesc =>
       'Disable audio visualizer spectrum animation';
 
@@ -6064,4 +6117,160 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get browseYtmSearchScreenDesc =>
       'Stream and download songs from YouTube Music, ad-free.';
+
+  @override
+  String dspPreampClipWarning(String preamp, String boost) {
+    return 'Preamp $preamp dB with peak EQ +$boost dB may clip. Lower the preamp.';
+  }
+
+  @override
+  String dspVolumeClipWarning(String preamp) {
+    return 'Combined with EQ preamp (+$preamp dB), total gain may clip. Consider reducing boost.';
+  }
+
+  @override
+  String get errSaveQueue => 'Failed to save queue';
+
+  @override
+  String get errClearQueue => 'Failed to clear queue';
+
+  @override
+  String get errReorderQueue => 'Failed to reorder queue';
+
+  @override
+  String get errRemoveTrack => 'Failed to remove track';
+
+  @override
+  String get errQueueSlotEmpty => 'Queue slot is empty';
+
+  @override
+  String get errSwitchQueueSlot => 'Failed to switch queue slot';
+
+  @override
+  String get errInvalidStreamUrl => 'Invalid stream URL';
+
+  @override
+  String get errPitchFailed => 'Pitch change failed';
+
+  @override
+  String get errPlaybackActionFailed => 'Playback action failed';
+
+  @override
+  String get errSpeedFailed => 'Speed change failed';
+
+  @override
+  String get errVolumeFailed => 'Volume change failed';
+
+  @override
+  String get errShuffleFailed => 'Shuffle failed';
+
+  @override
+  String get errRepeatFailed => 'Repeat failed';
+
+  @override
+  String get errSkipFailed => 'Skip failed';
+
+  @override
+  String get errSeekFailed => 'Seek failed, position restored';
+
+  @override
+  String get errIrRejected => 'Impulse response rejected by the audio engine';
+
+  @override
+  String get errLocalMatchStreaming =>
+      'Local match unavailable, streaming online';
+
+  @override
+  String errPlayFailed(String title) {
+    return 'Failed to play \"$title\"';
+  }
+
+  @override
+  String errAddFailed(String title) {
+    return 'Failed to add \"$title\"';
+  }
+
+  @override
+  String errQueueFull(String max) {
+    return 'Queue is full ($max) — cannot add more';
+  }
+
+  @override
+  String errAudioSettingFailed(String detail) {
+    return 'Failed to apply audio setting: $detail';
+  }
+
+  @override
+  String get errYtmNoConnection => 'No connection. Check your network.';
+
+  @override
+  String get errYtmPlaybackFailed => 'Playback failed. Please try again.';
+
+  @override
+  String get errYtmGeneric => 'Something went wrong with YouTube Music.';
+
+  @override
+  String get errYtmRegionRestricted =>
+      'This track is restricted in your region.';
+
+  @override
+  String get errYtmUnavailable => 'This track is unavailable.';
+
+  @override
+  String get errYtmSessionExpired =>
+      'YouTube session expired. Tap to reconnect.';
+
+  @override
+  String get errYtmNotInBuild =>
+      'YouTube Music is not available in this build.';
+
+  @override
+  String get errYtmProxyAuth => 'Backend proxy authentication failed.';
+
+  @override
+  String get errYtmSigFail =>
+      'Signature deciphering unavailable for this format.';
+
+  @override
+  String get errYtmBusy => 'YouTube is busy. Cooling down.';
+
+  @override
+  String get errYtmTrouble => 'YouTube is having trouble. Retrying.';
+
+  @override
+  String get errYtmExtractFail => 'Stream extraction failed. Switching route.';
+
+  @override
+  String get errYtmVerify =>
+      'YouTube needs verification. Trying alternate route.';
+
+  @override
+  String get errSignInFailed => 'Sign in failed. Please try again.';
+
+  @override
+  String get errSignUpFailed => 'Sign up failed. Please try again.';
+
+  @override
+  String get errLoadDownloads => 'Failed to load downloads';
+
+  @override
+  String get errRetryDownloads => 'Could not retry failed downloads';
+
+  @override
+  String get errYtmNotSignedIn => 'Not signed in to YouTube Music';
+
+  @override
+  String get errYtmSyncLikes => 'Failed to sync YouTube Music likes';
+
+  @override
+  String get dspMultibandLabel => 'Multiband';
+
+  @override
+  String get dspBandLow => 'Low (<160 Hz)';
+
+  @override
+  String get dspBandMid => 'Mid';
+
+  @override
+  String get dspBandHigh => 'High';
 }

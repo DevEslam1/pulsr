@@ -19,14 +19,24 @@ class PlaybackVolumeController {
   bool _isDucked = false;
   double _duckFactor = 0.2;
   bool _isDopActive = false;
+  bool _nativeRgActive = false;
 
   double get userVolume => _userVolume;
   String get replayGainMode => _replayGainMode;
   bool get isDucked => _isDucked;
   bool get isDopActive => _isDopActive;
+  bool get nativeRgActive => _nativeRgActive;
 
   void setDopActive(bool active) {
     _isDopActive = active;
+  }
+
+  /// Mirrors [PulsrAudioHandler.isNativeRgActive]: when true the native DSP
+  /// pre-gain owns ReplayGain, so this controller must not re-apply it in
+  /// [calculateTargetVolume] (ducking/crossfade path) — otherwise the gain
+  /// would double. DoP unity-gain still takes precedence over both.
+  void setNativeRgActive(bool active) {
+    _nativeRgActive = active;
   }
 
   PlaybackVolumeController({
@@ -60,17 +70,20 @@ class PlaybackVolumeController {
     }
 
     final baseVolume = _isDucked ? (_userVolume * _duckFactor) : _userVolume;
-    final rgVolume = ReplayGainMath.apply(
-      mode: _replayGainMode,
-      volume: baseVolume,
-      trackGainDb: song.replayGainTrack,
-      trackPeak: song.replayGainTrackPeak,
-      albumGainDb: song.replayGainAlbum,
-      albumPeak: song.replayGainAlbumPeak,
-      albumContext: albumContext,
-      preampWithRg: _preampWithRg,
-      preampWithoutRg: _preampWithoutRg,
-    );
+    // Native pre-gain owns RG: keep the mixer at user volume (+ per-song).
+    final rgVolume = _nativeRgActive
+        ? baseVolume
+        : ReplayGainMath.apply(
+            mode: _replayGainMode,
+            volume: baseVolume,
+            trackGainDb: song.replayGainTrack,
+            trackPeak: song.replayGainTrackPeak,
+            albumGainDb: song.replayGainAlbum,
+            albumPeak: song.replayGainAlbumPeak,
+            albumContext: albumContext,
+            preampWithRg: _preampWithRg,
+            preampWithoutRg: _preampWithoutRg,
+          );
 
     if (perSongOffsetDb.abs() >= 0.1) {
       final multiplier = math.pow(10, perSongOffsetDb / 20.0).toDouble();

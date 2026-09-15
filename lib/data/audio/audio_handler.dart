@@ -46,6 +46,7 @@ import 'optimized_dsp_pipeline.dart';
 import 'output_format_negotiation.dart';
 import 'playback_analytics.dart';
 import 'replay_gain_math.dart';
+import '../../domain/models/audio_quality_info.dart';
 import 'smart_preload_scheduler.dart';
 import 'stream_pre_resolver.dart';
 import 'triple_buffer_pipeline.dart';
@@ -90,36 +91,40 @@ class PulsrAudioHandler extends BaseAudioHandler
     // User preference: keep the media notification after pause so playback
     // can be resumed from the shade. AudioServiceConfig is init-time only,
     // so this takes effect on the next cold start after the toggle changes.
-    bool keepOnPause = false;
+    // Default TRUE: a paused player must keep its notification (standard
+    // music-player behavior). With stopForegroundOnPause=true the OS drops
+    // the notification on every pause — including end-of-queue Next — which
+    // users report as "notification disappearing with no action".
+    bool keepOnPause = true;
     try {
       final prefs = await SharedPreferences.getInstance();
-      keepOnPause = prefs.getBool(PrefsKeys.keepNotificationOnPause) ?? false;
+      keepOnPause = prefs.getBool(PrefsKeys.keepNotificationOnPause) ?? true;
     } catch (_) {}
-    final initFuture = AudioService.init(
-      builder: () {
-        built = fallback ?? PulsrAudioHandler(repository, ytmService);
-        return built!;
-      },
-      // The channel name stays English on purpose (C-6): the config is a const
-      // evaluated while dependencies are still being constructed, before any
-      // SettingsCubit / MaterialApp has resolved the *app-selected* locale — the
-      // platform locale alone would mislabel the channel for users who picked a
-      // different language than the system one, and Android only applies a
-      // channel's name when the channel is first created, so a later re-resolve
-      // could not fix it anyway.
-      config: AudioServiceConfig(
-        androidNotificationChannelId: 'com.pulsr.music.audio',
-        androidNotificationChannelName: 'Pulsr Audio Playback',
-        androidNotificationChannelDescription:
-            'Playback controls and now-playing information for Pulsr Music.',
-        androidNotificationOngoing: true,
-        androidNotificationClickStartsActivity: true,
-        androidStopForegroundOnPause: !keepOnPause,
-        androidResumeOnClick: true,
-        androidNotificationIcon: 'drawable/ic_notification',
-      ),
-    );
     try {
+      final initFuture = AudioService.init(
+        builder: () {
+          built = fallback ?? PulsrAudioHandler(repository, ytmService);
+          return built!;
+        },
+        // The channel name stays English on purpose (C-6): the config is a const
+        // evaluated while dependencies are still being constructed, before any
+        // SettingsCubit / MaterialApp has resolved the *app-selected* locale — the
+        // platform locale alone would mislabel the channel for users who picked a
+        // different language than the system one, and Android only applies a
+        // channel's name when the channel is first created, so a later re-resolve
+        // could not fix it anyway.
+        config: AudioServiceConfig(
+          androidNotificationChannelId: 'com.pulsr.music.audio',
+          androidNotificationChannelName: 'Pulsr Audio Playback',
+          androidNotificationChannelDescription:
+              'Playback controls and now-playing information for Pulsr Music.',
+          androidNotificationOngoing: false,
+          androidNotificationClickStartsActivity: true,
+          androidStopForegroundOnPause: !keepOnPause,
+          androidResumeOnClick: true,
+          androidNotificationIcon: 'drawable/ic_notification',
+        ),
+      );
       return await initFuture.timeout(const Duration(seconds: 10));
     } catch (e, st) {
       ErrorLogger.log(
@@ -631,6 +636,14 @@ class PulsrAudioHandler extends BaseAudioHandler
   bool _dvcEnabled = false;
   bool get isDvcEnabled => _dvcEnabled;
 
+  /// True when the native DSP ReplayGain pre-gain stage is carrying the
+  /// current track's gain (bit-transparent, 20ms-smoothed, clipping-safe).
+  /// When true the Dart mixer carries only user volume + per-song offset so
+  /// the same gain is never applied twice. Falls back to false on non-Android,
+  /// bit-perfect bypass, DoP, or native-bridge failure (Dart math then owns RG).
+  bool _nativeRgActive = false;
+  bool get isNativeRgActive => _nativeRgActive;
+
   /// Assumed Android mixer rate until the real output rate is known. The HAL
   /// only reports it after the first AudioTrack opens, so cold-start DSP
   /// coefficient init uses this; per-track [AudioEffectsChannel.resyncForTrack]
@@ -638,6 +651,16 @@ class PulsrAudioHandler extends BaseAudioHandler
   static const double assumedOutputSampleRate = 48000.0;
 
   double _calculateReplayGainVolume(SongsTableData? song) {
+    // DoP carries raw DSD inside PCM markers: any software gain corrupts the
+    // 0x05/0xFA framing into white noise, so the mixer stays at unity and the
+    // user volume is hardware-only. This also covers the crossfade/duck paths.
+    if (AudioQualityInfo.dsdDopActive) {
+      // Guarded by readiness (no catch): the controller is late-initialized
+      // and must never throw past this point.
+      if (_volumeControllerReady) _volumeController.setDopActive(true);
+      return 1.0;
+    }
+    if (_volumeControllerReady) _volumeController.setDopActive(false);
     if (song == null) {
       if (_dvcEnabled) {
         unawaited(_pushDvcGain(_volume));
@@ -653,6 +676,25 @@ class PulsrAudioHandler extends BaseAudioHandler
     final bitPerfect = (prefs.getBool(PrefsKeys.bitPerfectOutput) ?? false) &&
         (prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true);
     if (bitPerfect) return _volume;
+
+    // Native pre-gain owns RG: mixer carries only user volume + per-song
+    // offset (bit-transparent, 20ms-smoothed natively, no double-apply).
+    if (_nativeRgActive && Platform.isAndroid) {
+      var base = _volume;
+      // _perSongVolumeDbFor is total (returns 0.0 on any lookup failure),
+      // so no catch is needed here.
+      final perSongDb = _perSongVolumeDbFor(song);
+      if (perSongDb != 0.0) {
+        base = (base * math.pow(10, perSongDb / 20).toDouble()).clamp(0.0, 1.0);
+      }
+      if (_dvcEnabled) {
+        if (song.id == currentSong?.id) {
+          unawaited(_pushDvcGain(_volume));
+        }
+        return base == _volume ? 1.0 : base;
+      }
+      return base;
+    }
 
     final dvc = _dvcEnabled;
     var scaled = ReplayGainMath.apply(
@@ -714,14 +756,90 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
   }
 
-  /// Pushes ReplayGain tags to the native DSP pre-gain stage.
-  /// Single-stage mode: the mixer in [_calculateReplayGainVolume] is the
-  /// source of truth, so the native stage is kept disabled to avoid applying
-  /// the same gain twice. Non-Android / bit-perfect: same (disabled).
+  /// Pushes ReplayGain tags to the native DSP pre-gain stage (bit-transparent,
+  /// 20ms-smoothed, clipping-safe). On success [_nativeRgActive] is set so
+  /// [_calculateReplayGainVolume] skips the Dart RG math (no double-apply):
+  /// native owns RG, Dart mixer owns user volume + per-song offset.
+  /// Falls back to Dart math on non-Android, bit-perfect bypass, DoP, mode
+  /// off, or bridge failure — the mixer then applies RG as before.
+  void _syncNativeRgFlag() {
+    // Early return keeps the late-initialized controller access throw-free,
+    // so this stays catch-free by construction.
+    if (!_volumeControllerReady) return;
+    _volumeController.setNativeRgActive(_nativeRgActive);
+  }
+
   Future<void> _pushNativeReplayGain(SongsTableData? song) async {
+    Future<void> disableNative() async {
+      _nativeRgActive = false;
+      _syncNativeRgFlag();
+      try {
+        await AudioEffectsChannel().setReplayGainEnabled(false);
+      } catch (e, st) {
+        ErrorLogger.log(
+          'Failed to disable native ReplayGain stage',
+          error: e,
+          stackTrace: st,
+          category: 'PulsrAudioHandler',
+        );
+      }
+    }
+
+    if (!Platform.isAndroid) {
+      _nativeRgActive = false;
+      _syncNativeRgFlag();
+      return;
+    }
+    if (AudioQualityInfo.dsdDopActive) {
+      await disableNative();
+      return;
+    }
+    final prefs = _cachedPrefs;
+    if (prefs == null || song == null) {
+      await disableNative();
+      return;
+    }
+    final bitPerfect = (prefs.getBool(PrefsKeys.bitPerfectOutput) ?? false) &&
+        (prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true);
+    if (bitPerfect) {
+      await disableNative();
+      return;
+    }
+    final mode = prefs.getString(PrefsKeys.replayGainMode) ?? 'track';
+    if (mode == 'off') {
+      await disableNative();
+      return;
+    }
     try {
-      await AudioEffectsChannel().setReplayGainEnabled(false);
-    } catch (_) {}
+      final albumContext = _isConsecutiveAlbumPlayback();
+      final applied = await AudioEffectsChannel().setReplayGainParams(
+        mode: ReplayGainMath.nativeModeFor(mode, albumContext: albumContext),
+        trackGainDb: song.replayGainTrack ?? 0.0,
+        albumGainDb: song.replayGainAlbum ?? 0.0,
+        trackPeak: song.replayGainTrackPeak ?? 1.0,
+        albumPeak: song.replayGainAlbumPeak ?? 1.0,
+        preAmpDb: ReplayGainMath.nativePreAmpFor(
+          mode: mode,
+          trackGainDb: song.replayGainTrack,
+          albumGainDb: song.replayGainAlbum,
+          albumContext: albumContext,
+          preampWithRg:
+              prefs.getDouble(PrefsKeys.replayGainPreampWithRg) ?? 0.0,
+          preampWithoutRg:
+              prefs.getDouble(PrefsKeys.replayGainPreampWithoutRg) ?? 0.0,
+        ),
+        preventClipping: true,
+        enabled: true,
+      );
+      _nativeRgActive = applied;
+      _syncNativeRgFlag();
+      if (!applied) {
+        await AudioEffectsChannel().setReplayGainEnabled(false);
+      }
+    } catch (_) {
+      _nativeRgActive = false;
+      _syncNativeRgFlag();
+    }
   }
 
   Future<void> setVolume(double volume) async {
@@ -1826,6 +1944,10 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
     unawaited(_beginAudioSession(song));
     unawaited(_maybeNegotiateOutputFormat(song));
+    // Native ReplayGain follows the track: push tags so the DSP pre-gain
+    // tracks the new song, then re-apply the mixer volume (unity for RG
+    // component when native owns it, full Dart math otherwise).
+    unawaited(_pushNativeReplayGain(song));
   }
 
   /// Per-track output-format negotiation. Hi-res-first by default: the pure
@@ -2146,11 +2268,13 @@ class PulsrAudioHandler extends BaseAudioHandler
           caps = await DsdDecoderHelper.probeDopCapabilities();
         }
         final forceDop = wantDop && (caps?.canUseDop ?? false);
+        final containerBits = prefs.getInt(PrefsKeys.dopContainerBits) ?? 24;
         return DsdDecoderHelper.decodeDsdFile(
           song,
           tag,
           forceDop: forceDop,
           dopCapabilities: caps,
+          dopContainerBits: containerBits == 32 ? 32 : 24,
         );
       }
       // Route lossless containers through the format-aware decoder so MQA files
@@ -4213,47 +4337,81 @@ class PulsrAudioHandler extends BaseAudioHandler
     // captures its own _playGeneration token (no double-bump here).
     cancelPrefetches();
     _isManualSkip = true;
-    _rapidGaplessChangeCount = 0;
-    _lastGaplessChangeTime = null;
+    // A headset/double-press storm must never queue overlapping skips: each
+    // skip bumps the generation so a slow YouTube resolve from the previous
+    // skip bails instead of clobbering the new track.
     final wasPlaying = _activePlayer.playing;
 
-    if (_crossfadeManager.isCrossfading) {
-      await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
-          restoreVolume: _volume);
-    }
-    if (_gaplessMode && _gaplessLoaded) {
-      // Native advance: invalidate any in-flight manual playSongAt resolve so
-      // a slow YouTube URL fetch cannot clobber the new current item.
-      _playGeneration++;
-      if (_activePlayer.hasNext) {
-        await _activePlayer.seekToNext();
-        if (wasPlaying) {
-          await _activePlayer.play();
+    try {
+      if (_crossfadeManager.isCrossfading) {
+        await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
+            restoreVolume: _volume);
+      }
+      if (_gaplessMode && _gaplessLoaded) {
+        // Native advance: invalidate any in-flight manual playSongAt resolve so
+        // a slow YouTube URL fetch cannot clobber the new current item.
+        _playGeneration++;
+        if (_activePlayer.hasNext) {
+          await _activePlayer.seekToNext();
+          if (wasPlaying) {
+            await _activePlayer.play();
+          }
+        } else if (_activePlayer.loopMode == LoopMode.all &&
+            _songs.isNotEmpty) {
+          await _activePlayer.seek(Duration.zero, index: 0);
+          if (wasPlaying) {
+            await _activePlayer.play();
+          }
+        } else {
+          // Native concat says "no next" — but it can desync from _songs
+          // after queue edits. Fall back to the Dart queue before giving up,
+          // otherwise Next on a valid queue pauses + dismisses the
+          // notification ("no action").
+          final fallbackIdx = _getNextIndex();
+          if (fallbackIdx != null) {
+            if (wasPlaying) {
+              await playSongAt(fallbackIdx);
+            } else {
+              await _loadSongPaused(fallbackIdx);
+            }
+          } else {
+            // True end-of-queue: restart the current track instead of
+            // pausing. Pausing here drops the foreground service (and with
+            // stopForegroundOnPause the notification) while the user
+            // explicitly asked to keep listening.
+            await _activePlayer.seek(Duration.zero);
+            if (wasPlaying) {
+              await _activePlayer.play();
+            }
+            _broadcastState(_activePlayer.playbackEvent);
+          }
         }
-      } else if (_activePlayer.loopMode == LoopMode.all && _songs.isNotEmpty) {
-        await _activePlayer.seek(Duration.zero, index: 0);
+        return;
+      }
+
+      final nextIdx = _getNextIndex();
+      if (nextIdx != null) {
         if (wasPlaying) {
-          await _activePlayer.play();
+          await playSongAt(nextIdx);
+        } else {
+          await _loadSongPaused(nextIdx);
         }
       } else {
-        await _activePlayer.pause();
+        // True end-of-queue: same no-dismiss policy as the gapless path.
         await _activePlayer.seek(Duration.zero);
+        if (wasPlaying) {
+          await _activePlayer.play();
+        }
         _broadcastState(_activePlayer.playbackEvent);
       }
-      return;
-    }
-
-    final nextIdx = _getNextIndex();
-    if (nextIdx != null) {
-      if (wasPlaying) {
-        await playSongAt(nextIdx);
-      } else {
-        await _loadSongPaused(nextIdx);
-      }
-    } else {
-      await _activePlayer.pause();
-      await _activePlayer.seek(Duration.zero);
-      _broadcastState(_activePlayer.playbackEvent);
+    } catch (e, st) {
+      // Never let a skip kill the service silently: log, keep the queue
+      // position, and re-broadcast so the notification stays alive.
+      ErrorLogger.log('skipToNext failed',
+          error: e, stackTrace: st, category: 'AudioHandler');
+      try {
+        _broadcastState(_activePlayer.playbackEvent);
+      } catch (_) {}
     }
   }
 
@@ -5554,8 +5712,11 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   bool get isArbitraryEqEnabled => _equalizerManager.isArbitraryEqEnabled;
   String get arbitraryEqString => _equalizerManager.arbitraryEqString;
-  Future<void> setArbitraryEq(bool enabled, {String? eqString}) =>
-      _equalizerManager.setArbitraryEq(enabled, eqString: eqString);
+  bool get arbitraryEqLinearPhase => _equalizerManager.arbitraryEqLinearPhase;
+  Future<void> setArbitraryEq(bool enabled,
+          {String? eqString, bool? linearPhase}) =>
+      _equalizerManager.setArbitraryEq(enabled,
+          eqString: eqString, linearPhase: linearPhase);
 
   bool get isLiveProgEnabled => _equalizerManager.isLiveProgEnabled;
   String get liveProgCode => _equalizerManager.liveProgCode;

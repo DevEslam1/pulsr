@@ -148,6 +148,15 @@ class SettingsSwitchTile extends StatelessWidget {
             activeTrackColor: p.accent,
             activeThumbColor: Colors.white,
             onChanged: isDisabled ? null : onChanged),
+        onTap: isDisabled
+            ? (disabledReason != null
+                ? () => showAudioFeatureInfoDialog(
+                      context,
+                      featureInfo ?? AudioFeatureRegistry.equalizer,
+                      conflictReason: disabledReason,
+                    )
+                : null)
+            : () => onChanged(!value),
       ),
     );
   }

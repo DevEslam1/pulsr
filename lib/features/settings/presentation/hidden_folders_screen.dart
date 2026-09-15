@@ -467,6 +467,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                             color: p.textTertiary, size: 18),
                         suffixIcon: _searchQuery.isNotEmpty
                             ? IconButton(
+                                tooltip: context.l10n.clear,
                                 icon: Icon(Icons.clear_rounded,
                                     color: p.textTertiary, size: 16),
                                 onPressed: () {

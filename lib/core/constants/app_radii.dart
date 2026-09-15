@@ -7,7 +7,7 @@ abstract class AppRadii {
   static const double artwork = 20.0;
   static const double bottomSheet = 28.0;
   static const double chip = 10.0;
-  static const double miniPlayer = 20.0;
+  static const double miniPlayer = 24.0;
   static const double dialog = 26.0;
 
   static const BorderRadius tileRadius =

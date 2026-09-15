@@ -330,83 +330,92 @@ void showLanguagePickerSheet(
       code: 'ar',
       name: context.l10n.arabic,
       nativeName: context.l10n.settingsArabicNative,
-      flag: Icons.translate_rounded
+      flag: Icons.translate_rounded,
     ),
     (
       code: 'es',
       name: context.l10n.spanish,
       nativeName: context.l10n.settingsSpanishNative,
-      flag: Icons.public_rounded
+      flag: Icons.public_rounded,
     ),
   ];
 
   showModalBottomSheet(
     context: context,
     useRootNavigator: true,
+    isScrollControlled: true,
     backgroundColor: surfaceColor,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
-    builder: (ctx) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Text(
-              context.l10n.appLanguage,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          ...languages.map((lang) {
-            final isSelected = lang.code == currentCode;
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: Material(
-                color: isSelected
-                    ? primaryColor.withValues(alpha: 0.12)
-                    : cardColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(
-                    color: isSelected ? primaryColor : outlineColor,
-                    width: isSelected ? 1.5 : 1.0,
+    builder: (ctx) => SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+        ),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Text(
+                  context.l10n.appLanguage,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
-                child: ListTile(
-                  leading: Icon(
-                    lang.flag,
-                    color: isSelected ? primaryColor : textSecondary,
-                  ),
-                  title: Text(
-                    lang.name,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: isSelected ? primaryColor : textPrimary,
+              ),
+              const SizedBox(height: 12),
+              ...languages.map((lang) {
+                final isSelected = lang.code == currentCode;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: Material(
+                    color: isSelected
+                        ? primaryColor.withValues(alpha: 0.12)
+                        : cardColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(
+                        color: isSelected ? primaryColor : outlineColor,
+                        width: isSelected ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: Icon(
+                        lang.flag,
+                        color: isSelected ? primaryColor : textSecondary,
+                      ),
+                      title: Text(
+                        lang.name,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: isSelected ? primaryColor : textPrimary,
+                        ),
+                      ),
+                      subtitle: Text(
+                        lang.nativeName,
+                        style: TextStyle(fontSize: 12, color: textSecondary),
+                      ),
+                      trailing: isSelected
+                          ? Icon(Icons.check_circle_rounded, color: primaryColor)
+                          : null,
+                      onTap: () {
+                        cubit.setLanguage(lang.code);
+                        Navigator.pop(ctx);
+                      },
                     ),
                   ),
-                  subtitle: Text(
-                    lang.nativeName,
-                    style: TextStyle(fontSize: 12, color: textSecondary),
-                  ),
-                  trailing: isSelected
-                      ? Icon(Icons.check_circle_rounded, color: primaryColor)
-                      : null,
-                  onTap: () {
-                    cubit.setLanguage(lang.code);
-                    Navigator.pop(ctx);
-                  },
-                ),
-              ),
-            );
-          }),
-        ],
+                );
+              }),
+            ],
+          ),
+        ),
       ),
     ),
   );
@@ -451,69 +460,78 @@ void showColorSourcePickerSheet(
   showModalBottomSheet(
     context: context,
     useRootNavigator: true,
+    isScrollControlled: true,
     backgroundColor: surfaceColor,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
-    builder: (ctx) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Text(context.l10n.appColorSource,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          ...sources.map((s) {
-            final isSelected = s.source == currentSource;
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: Material(
-                color: isSelected
-                    ? primaryColor.withValues(alpha: 0.12)
-                    : cardColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(
-                    color: isSelected ? primaryColor : outlineColor,
-                    width: isSelected ? 1.5 : 1.0,
+    builder: (ctx) => SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+        ),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Text(context.l10n.appColorSource,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
-                child: ListTile(
-                  leading: Icon(
-                    s.icon,
-                    color: isSelected ? primaryColor : textSecondary,
-                  ),
-                  title: Text(
-                    s.title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: isSelected ? primaryColor : textPrimary,
+              ),
+              const SizedBox(height: 12),
+              ...sources.map((s) {
+                final isSelected = s.source == currentSource;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: Material(
+                    color: isSelected
+                        ? primaryColor.withValues(alpha: 0.12)
+                        : cardColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(
+                        color: isSelected ? primaryColor : outlineColor,
+                        width: isSelected ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: Icon(
+                        s.icon,
+                        color: isSelected ? primaryColor : textSecondary,
+                      ),
+                      title: Text(
+                        s.title,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: isSelected ? primaryColor : textPrimary,
+                        ),
+                      ),
+                      subtitle: Text(
+                        s.subtitle,
+                        style: TextStyle(fontSize: 12, color: textSecondary),
+                      ),
+                      trailing: isSelected
+                          ? Icon(Icons.check_circle_rounded, color: primaryColor)
+                          : null,
+                      onTap: () {
+                        cubit.setThemeColorSource(s.source);
+                        Navigator.pop(ctx);
+                      },
                     ),
                   ),
-                  subtitle: Text(
-                    s.subtitle,
-                    style: TextStyle(fontSize: 12, color: textSecondary),
-                  ),
-                  trailing: isSelected
-                      ? Icon(Icons.check_circle_rounded, color: primaryColor)
-                      : null,
-                  onTap: () {
-                    cubit.setThemeColorSource(s.source);
-                    Navigator.pop(ctx);
-                  },
-                ),
-              ),
-            );
-          }),
-        ],
+                );
+              }),
+            ],
+          ),
+        ),
       ),
     ),
   );
@@ -554,6 +572,24 @@ void showVisualizerStylePickerSheet(
       icon: Icons.motion_photos_on_rounded,
     ),
     (
+      style: VisualizerStyle.particles,
+      title: context.l10n.settingsVizLabelParticles,
+      subtitle: context.l10n.settingsVizParticlesDesc,
+      icon: Icons.auto_awesome_rounded,
+    ),
+    (
+      style: VisualizerStyle.terrain3D,
+      title: context.l10n.settingsVizLabelTerrain,
+      subtitle: context.l10n.settingsVizTerrainDesc,
+      icon: Icons.landscape_rounded,
+    ),
+    (
+      style: VisualizerStyle.albumArtReactive,
+      title: context.l10n.settingsVizLabelAlbumReactive,
+      subtitle: context.l10n.settingsVizAlbumReactiveDesc,
+      icon: Icons.album_rounded,
+    ),
+    (
       style: VisualizerStyle.off,
       title: context.l10n.settingsVizLabelOff,
       subtitle: context.l10n.settingsVizOffDesc,
@@ -576,139 +612,148 @@ void showVisualizerStylePickerSheet(
   showModalBottomSheet(
     context: context,
     useRootNavigator: true,
+    isScrollControlled: true,
     backgroundColor: surfaceColor,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
-    builder: (ctx) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Text(context.l10n.visualizerStyleLabel,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          ...styles.map((s) {
-            final isSelected = s.style == currentStyle;
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: Material(
-                color: isSelected
-                    ? primaryColor.withValues(alpha: 0.12)
-                    : cardColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(
-                    color: isSelected ? primaryColor : outlineColor,
-                    width: isSelected ? 1.5 : 1.0,
+    builder: (ctx) => SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+        ),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Text(context.l10n.visualizerStyleLabel,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
-                child: ListTile(
-                  leading: Icon(
-                    s.icon,
-                    color: isSelected ? primaryColor : textSecondary,
-                  ),
-                  title: Text(
-                    s.title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: isSelected ? primaryColor : textPrimary,
+              ),
+              const SizedBox(height: 12),
+              ...styles.map((s) {
+                final isSelected = s.style == currentStyle;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: Material(
+                    color: isSelected
+                        ? primaryColor.withValues(alpha: 0.12)
+                        : cardColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(
+                        color: isSelected ? primaryColor : outlineColor,
+                        width: isSelected ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: Icon(
+                        s.icon,
+                        color: isSelected ? primaryColor : textSecondary,
+                      ),
+                      title: Text(
+                        s.title,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: isSelected ? primaryColor : textPrimary,
+                        ),
+                      ),
+                      subtitle: Text(
+                        s.subtitle,
+                        style: TextStyle(fontSize: 12, color: textSecondary),
+                      ),
+                      trailing: isSelected
+                          ? Icon(Icons.check_circle_rounded, color: primaryColor)
+                          : null,
+                      onTap: () {
+                        cubit.setVisualizerStyle(s.style);
+                        Navigator.pop(ctx);
+                      },
                     ),
                   ),
-                  subtitle: Text(
-                    s.subtitle,
-                    style: TextStyle(fontSize: 12, color: textSecondary),
+                );
+              }),
+              Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: Material(
+                  color: cardColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: outlineColor),
                   ),
-                  trailing: isSelected
-                      ? Icon(Icons.check_circle_rounded, color: primaryColor)
-                      : null,
-                  onTap: () {
-                    cubit.setVisualizerStyle(s.style);
-                    Navigator.pop(ctx);
-                  },
+                  child: ListTile(
+                    leading: Icon(Icons.file_open_rounded, color: textSecondary),
+                    title: Text(context.l10n.importMilk,
+                      style:
+                          TextStyle(fontWeight: FontWeight.w700, color: textPrimary),
+                    ),
+                    subtitle: Text(context.l10n.loadMilkDesc,
+                      style: TextStyle(fontSize: 12, color: textSecondary),
+                    ),
+                    onTap: () async {
+                      final preset = await MilkdropPresetStore().importFromFile();
+                      if (!context.mounted) return;
+                      Navigator.pop(ctx);
+                      cubit.setVisualizerStyle(VisualizerStyle.milkdrop);
+                      if (preset != null) {
+                        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                          SnackBar(
+                            content:
+                                Text(context.l10n.importedPresetTpl(
+                                    'Milkdrop', preset.name)),
+                          ),
+                        );
+                      }
+                    },
+                  ),
                 ),
               ),
-            );
-          }),
-          Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            child: Material(
-              color: cardColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: outlineColor),
-              ),
-              child: ListTile(
-                leading: Icon(Icons.file_open_rounded, color: textSecondary),
-                title: Text(context.l10n.importMilk,
-                  style:
-                      TextStyle(fontWeight: FontWeight.w700, color: textPrimary),
+              Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: Material(
+                  color: cardColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: outlineColor),
+                  ),
+                  child: ListTile(
+                    leading: Icon(Icons.data_object_rounded, color: textSecondary),
+                    title: Text(context.l10n.importJsonViz,
+                      style:
+                          TextStyle(fontWeight: FontWeight.w700, color: textPrimary),
+                    ),
+                    subtitle: Text(context.l10n.loadJsonVizDesc,
+                      style: TextStyle(fontSize: 12, color: textSecondary),
+                    ),
+                    onTap: () async {
+                      final preset = await VisualizerPresetStore().importFromFile();
+                      if (!context.mounted) return;
+                      Navigator.pop(ctx);
+                      cubit.setVisualizerStyle(VisualizerStyle.custom);
+                      if (preset != null) {
+                        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                          SnackBar(
+                            content:
+                                Text(context.l10n.importedPresetTpl(
+                                    'JSON', preset.name)),
+                          ),
+                        );
+                      }
+                    },
+                  ),
                 ),
-                subtitle: Text(context.l10n.loadMilkDesc,
-                  style: TextStyle(fontSize: 12, color: textSecondary),
-                ),
-                onTap: () async {
-                  final preset = await MilkdropPresetStore().importFromFile();
-                  if (!context.mounted) return;
-                  Navigator.pop(ctx);
-                  cubit.setVisualizerStyle(VisualizerStyle.milkdrop);
-                  if (preset != null) {
-                    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-                      SnackBar(
-                        content:
-                            Text(context.l10n.importedPresetTpl(
-                                'Milkdrop', preset.name)),
-                      ),
-                    );
-                  }
-                },
               ),
-            ),
+            ],
           ),
-          Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            child: Material(
-              color: cardColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: outlineColor),
-              ),
-              child: ListTile(
-                leading: Icon(Icons.data_object_rounded, color: textSecondary),
-                title: Text(context.l10n.importJsonViz,
-                  style:
-                      TextStyle(fontWeight: FontWeight.w700, color: textPrimary),
-                ),
-                subtitle: Text(context.l10n.loadJsonVizDesc,
-                  style: TextStyle(fontSize: 12, color: textSecondary),
-                ),
-                onTap: () async {
-                  final preset = await VisualizerPresetStore().importFromFile();
-                  if (!context.mounted) return;
-                  Navigator.pop(ctx);
-                  cubit.setVisualizerStyle(VisualizerStyle.custom);
-                  if (preset != null) {
-                    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-                      SnackBar(
-                        content:
-                            Text(context.l10n.importedPresetTpl(
-                                'JSON', preset.name)),
-                      ),
-                    );
-                  }
-                },
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     ),
   );
@@ -760,66 +805,75 @@ void showMiniPlayerSwipePickerSheet(
   showModalBottomSheet(
     context: context,
     useRootNavigator: true,
+    isScrollControlled: true,
     backgroundColor: surfaceColor,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
-    builder: (ctx) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Text(
-              isLeft
-                  ? context.l10n.settingsSwipeLeftAction
-                  : context.l10n.settingsSwipeRightAction,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-            ),
-          ),
-          const SizedBox(height: 12),
-          ...options.map((opt) {
-            final isSelected = opt.action == currentAction;
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: Material(
-                color: isSelected
-                    ? primaryColor.withValues(alpha: 0.12)
-                    : cardColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(
-                    color: isSelected ? primaryColor : outlineColor,
-                    width: isSelected ? 1.5 : 1.0,
-                  ),
-                ),
-                child: ListTile(
-                  leading: Icon(opt.icon,
-                      color: isSelected ? primaryColor : textSecondary),
-                  title: Text(opt.title,
-                      style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: isSelected ? primaryColor : textPrimary)),
-                  subtitle: Text(opt.subtitle,
-                      style: TextStyle(fontSize: 12, color: textSecondary)),
-                  trailing: isSelected
-                      ? Icon(Icons.check_circle_rounded, color: primaryColor)
-                      : null,
-                  onTap: () {
-                    if (isLeft) {
-                      cubit.setMiniPlayerSwipeLeft(opt.action);
-                    } else {
-                      cubit.setMiniPlayerSwipeRight(opt.action);
-                    }
-                    Navigator.pop(ctx);
-                  },
+    builder: (ctx) => SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+        ),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Text(
+                  isLeft
+                      ? context.l10n.settingsSwipeLeftAction
+                      : context.l10n.settingsSwipeRightAction,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
                 ),
               ),
-            );
-          }),
-        ],
+              const SizedBox(height: 12),
+              ...options.map((opt) {
+                final isSelected = opt.action == currentAction;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: Material(
+                    color: isSelected
+                        ? primaryColor.withValues(alpha: 0.12)
+                        : cardColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(
+                        color: isSelected ? primaryColor : outlineColor,
+                        width: isSelected ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: Icon(opt.icon,
+                          color: isSelected ? primaryColor : textSecondary),
+                      title: Text(opt.title,
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: isSelected ? primaryColor : textPrimary)),
+                      subtitle: Text(opt.subtitle,
+                          style: TextStyle(fontSize: 12, color: textSecondary)),
+                      trailing: isSelected
+                          ? Icon(Icons.check_circle_rounded, color: primaryColor)
+                          : null,
+                      onTap: () {
+                        if (isLeft) {
+                          cubit.setMiniPlayerSwipeLeft(opt.action);
+                        } else {
+                          cubit.setMiniPlayerSwipeRight(opt.action);
+                        }
+                        Navigator.pop(ctx);
+                      },
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
       ),
     ),
   );
@@ -864,59 +918,68 @@ void showNowPlayingDoubleTapPickerSheet(
   showModalBottomSheet(
     context: context,
     useRootNavigator: true,
+    isScrollControlled: true,
     backgroundColor: surfaceColor,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
-    builder: (ctx) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Text(context.l10n.npDoubleTap,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-            ),
-          ),
-          const SizedBox(height: 12),
-          ...options.map((opt) {
-            final isSelected = opt.action == currentAction;
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: Material(
-                color: isSelected
-                    ? primaryColor.withValues(alpha: 0.12)
-                    : cardColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(
-                    color: isSelected ? primaryColor : outlineColor,
-                    width: isSelected ? 1.5 : 1.0,
-                  ),
-                ),
-                child: ListTile(
-                  leading: Icon(opt.icon,
-                      color: isSelected ? primaryColor : textSecondary),
-                  title: Text(opt.title,
-                      style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: isSelected ? primaryColor : textPrimary)),
-                  subtitle: Text(opt.subtitle,
-                      style: TextStyle(fontSize: 12, color: textSecondary)),
-                  trailing: isSelected
-                      ? Icon(Icons.check_circle_rounded, color: primaryColor)
-                      : null,
-                  onTap: () {
-                    cubit.setNowPlayingDoubleTap(opt.action);
-                    Navigator.pop(ctx);
-                  },
+    builder: (ctx) => SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+        ),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Text(context.l10n.npDoubleTap,
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
                 ),
               ),
-            );
-          }),
-        ],
+              const SizedBox(height: 12),
+              ...options.map((opt) {
+                final isSelected = opt.action == currentAction;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: Material(
+                    color: isSelected
+                        ? primaryColor.withValues(alpha: 0.12)
+                        : cardColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(
+                        color: isSelected ? primaryColor : outlineColor,
+                        width: isSelected ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: Icon(opt.icon,
+                          color: isSelected ? primaryColor : textSecondary),
+                      title: Text(opt.title,
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: isSelected ? primaryColor : textPrimary)),
+                      subtitle: Text(opt.subtitle,
+                          style: TextStyle(fontSize: 12, color: textSecondary)),
+                      trailing: isSelected
+                          ? Icon(Icons.check_circle_rounded, color: primaryColor)
+                          : null,
+                      onTap: () {
+                        cubit.setNowPlayingDoubleTap(opt.action);
+                        Navigator.pop(ctx);
+                      },
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
       ),
     ),
   );
@@ -955,59 +1018,68 @@ void showNowPlayingArtworkSwipePickerSheet(
   showModalBottomSheet(
     context: context,
     useRootNavigator: true,
+    isScrollControlled: true,
     backgroundColor: surfaceColor,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
-    builder: (ctx) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Text(context.l10n.npArtworkSwipe,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-            ),
-          ),
-          const SizedBox(height: 12),
-          ...options.map((opt) {
-            final isSelected = opt.action == currentAction;
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: Material(
-                color: isSelected
-                    ? primaryColor.withValues(alpha: 0.12)
-                    : cardColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(
-                    color: isSelected ? primaryColor : outlineColor,
-                    width: isSelected ? 1.5 : 1.0,
-                  ),
-                ),
-                child: ListTile(
-                  leading: Icon(opt.icon,
-                      color: isSelected ? primaryColor : textSecondary),
-                  title: Text(opt.title,
-                      style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: isSelected ? primaryColor : textPrimary)),
-                  subtitle: Text(opt.subtitle,
-                      style: TextStyle(fontSize: 12, color: textSecondary)),
-                  trailing: isSelected
-                      ? Icon(Icons.check_circle_rounded, color: primaryColor)
-                      : null,
-                  onTap: () {
-                    cubit.setNowPlayingArtworkSwipe(opt.action);
-                    Navigator.pop(ctx);
-                  },
+    builder: (ctx) => SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+        ),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Text(context.l10n.npArtworkSwipe,
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
                 ),
               ),
-            );
-          }),
-        ],
+              const SizedBox(height: 12),
+              ...options.map((opt) {
+                final isSelected = opt.action == currentAction;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: Material(
+                    color: isSelected
+                        ? primaryColor.withValues(alpha: 0.12)
+                        : cardColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(
+                        color: isSelected ? primaryColor : outlineColor,
+                        width: isSelected ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: Icon(opt.icon,
+                          color: isSelected ? primaryColor : textSecondary),
+                      title: Text(opt.title,
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: isSelected ? primaryColor : textPrimary)),
+                      subtitle: Text(opt.subtitle,
+                          style: TextStyle(fontSize: 12, color: textSecondary)),
+                      trailing: isSelected
+                          ? Icon(Icons.check_circle_rounded, color: primaryColor)
+                          : null,
+                      onTap: () {
+                        cubit.setNowPlayingArtworkSwipe(opt.action);
+                        Navigator.pop(ctx);
+                      },
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
       ),
     ),
   );
@@ -1059,66 +1131,75 @@ void showQualityPickerSheet(
   showModalBottomSheet(
     context: context,
     useRootNavigator: true,
+    isScrollControlled: true,
     backgroundColor: surfaceColor,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
-    builder: (ctx) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Text(
-              isStreaming
-                  ? context.l10n.streamingQuality
-                  : context.l10n.downloadQuality,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-            ),
-          ),
-          const SizedBox(height: 12),
-          ...options.map((opt) {
-            final isSelected = opt.quality == currentQuality;
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: Material(
-                color: isSelected
-                    ? primaryColor.withValues(alpha: 0.12)
-                    : cardColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(
-                    color: isSelected ? primaryColor : outlineColor,
-                    width: isSelected ? 1.5 : 1.0,
-                  ),
-                ),
-                child: ListTile(
-                  leading: Icon(opt.icon,
-                      color: isSelected ? primaryColor : textSecondary),
-                  title: Text(opt.title,
-                      style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: isSelected ? primaryColor : textPrimary)),
-                  subtitle: Text(opt.subtitle,
-                      style: TextStyle(fontSize: 12, color: textSecondary)),
-                  trailing: isSelected
-                      ? Icon(Icons.check_circle_rounded, color: primaryColor)
-                      : null,
-                  onTap: () {
-                    if (isStreaming) {
-                      cubit.setStreamingQuality(opt.quality);
-                    } else {
-                      cubit.setDownloadQuality(opt.quality);
-                    }
-                    Navigator.pop(ctx);
-                  },
+    builder: (ctx) => SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+        ),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Text(
+                  isStreaming
+                      ? context.l10n.streamingQuality
+                      : context.l10n.downloadQuality,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
                 ),
               ),
-            );
-          }),
-        ],
+              const SizedBox(height: 12),
+              ...options.map((opt) {
+                final isSelected = opt.quality == currentQuality;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: Material(
+                    color: isSelected
+                        ? primaryColor.withValues(alpha: 0.12)
+                        : cardColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(
+                        color: isSelected ? primaryColor : outlineColor,
+                        width: isSelected ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: Icon(opt.icon,
+                          color: isSelected ? primaryColor : textSecondary),
+                      title: Text(opt.title,
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: isSelected ? primaryColor : textPrimary)),
+                      subtitle: Text(opt.subtitle,
+                          style: TextStyle(fontSize: 12, color: textSecondary)),
+                      trailing: isSelected
+                          ? Icon(Icons.check_circle_rounded, color: primaryColor)
+                          : null,
+                      onTap: () {
+                        if (isStreaming) {
+                          cubit.setStreamingQuality(opt.quality);
+                        } else {
+                          cubit.setDownloadQuality(opt.quality);
+                        }
+                        Navigator.pop(ctx);
+                      },
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
       ),
     ),
   );

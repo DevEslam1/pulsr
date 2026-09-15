@@ -256,6 +256,7 @@ class MinimalPlayerTheme extends StatelessWidget {
                                       child: Center(
                                         child: Icon(
                                           Icons.playlist_add_rounded,
+                                          semanticLabel: context.l10n.addToPlaylist,
                                           size: isTablet ? 24 : 22,
                                           color: p.textSecondary,
                                         ),

@@ -98,22 +98,22 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
                       width: 100,
                       height: 100,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF40C4FF).withValues(alpha: 0.15),
+                        color: p.info.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                         border: Border.all(color: p.hairline),
                         boxShadow: [
                           BoxShadow(
-                              color: const Color(0xFF40C4FF)
+                              color: p.info
                                   .withValues(alpha: 0.25),
                               blurRadius: 24,
                               spreadRadius: -4,
                               offset: const Offset(0, 8)),
                         ],
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.calendar_today_rounded,
                         size: 44,
-                        color: Color(0xFF40C4FF),
+                        color: p.info,
                       ),
                     ),
                   ),

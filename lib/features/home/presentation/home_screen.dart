@@ -26,6 +26,20 @@ import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 
 import 'package:go_router/go_router.dart';
 
+/// Scales a fixed two-line card title box (34px at the default text size) with
+/// the user's Dynamic Type setting so large text never clips. Pixel-identical
+/// at the 1.0x scale.
+double _scaledTitleBoxHeight(BuildContext context) =>
+    MediaQuery.textScalerOf(context).scale(34.0).clamp(34.0, 78.0);
+
+/// Grows a fixed-height horizontal card carousel just enough to fit scaled
+/// two-line titles. Pixel-identical at the 1.0x scale.
+double _scaledCarouselHeight(BuildContext context, bool isTablet) {
+  final delta =
+      (MediaQuery.textScalerOf(context).scale(34.0) - 34.0).clamp(0.0, 44.0);
+  return (isTablet ? 232.0 : 212.0) + delta;
+}
+
 class HomeScreen extends StatefulWidget {
   final YtmService? ytmService;
   final YtmAccountService? ytmAccountService;
@@ -798,12 +812,12 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(width: 10),
               _QuickCard(
-                title: context.l10n.browseTopHits,
+                title: context.l10n.newReleases,
                 subtitle: context.l10n.browseTrending,
-                icon: Icons.local_fire_department_rounded,
-                color: const Color(0xFFFF5252),
+                icon: Icons.fiber_new_rounded,
+                color: const Color(0xFF00B0FF),
                 onTap: () =>
-                    setState(() => _selectedOnlineCategory = 'Global Top Hits'),
+                    setState(() => _selectedOnlineCategory = 'New Releases'),
               ),
               const SizedBox(width: 10),
               _QuickCard(
@@ -917,7 +931,7 @@ class _OnlineCategorySection extends StatelessWidget {
             children: [
               SectionHeader(title: title),
               SizedBox(
-                height: isTablet ? 232 : 212,
+                height: _scaledCarouselHeight(context, isTablet),
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   physics: const NeverScrollableScrollPhysics(),
@@ -980,7 +994,7 @@ class _OnlineCategorySection extends StatelessWidget {
             children: [
               SectionHeader(title: title),
               SizedBox(
-                height: isTablet ? 232 : 212,
+                height: _scaledCarouselHeight(context, isTablet),
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   padding: EdgeInsets.symmetric(
@@ -1145,7 +1159,7 @@ class _TrendingCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               SizedBox(
-                height: 34,
+                height: _scaledTitleBoxHeight(context),
                 child: Text(
                   song.title,
                   maxLines: 2,
@@ -1368,7 +1382,7 @@ class _RecentlyPlayedSectionState extends State<_RecentlyPlayedSection> {
               onAction: () => context.push('/recents'),
             ),
             SizedBox(
-              height: widget.isTablet ? 232 : 212,
+              height: _scaledCarouselHeight(context, widget.isTablet),
               child: ListView.builder(
                 controller: _scrollController,
                 scrollDirection: Axis.horizontal,
@@ -1447,7 +1461,7 @@ class _RecentlyPlayedSectionState extends State<_RecentlyPlayedSection> {
                             ),
                             const SizedBox(height: 8),
                             SizedBox(
-                              height: 34,
+                              height: _scaledTitleBoxHeight(context),
                               child: Text(
                                 song.title,
                                 maxLines: 2,

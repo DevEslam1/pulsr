@@ -1,4 +1,5 @@
 // lib/features/playlist_detail/presentation/online_playlist_detail_screen.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -94,19 +95,38 @@ class _OnlinePlaylistDetailScreenState
       final accountService = getIt.isRegistered<YtmAccountService>()
           ? getIt<YtmAccountService>()
           : null;
-      final details = await accountService?.fetchPlaylistDetails(
-        widget.args.playlistId,
-        maxTracks: 300,
-      );
+      // Bound the whole fetch: paginated library playlists can otherwise
+      // keep the spinner forever on slow/auth-challenged networks.
+      // On timeout we fall through to the error state with retry.
+      YtmPlaylistDetails? details;
+      try {
+        details = await accountService
+            ?.fetchPlaylistDetails(
+              widget.args.playlistId,
+              maxTracks: 300,
+            )
+            .timeout(const Duration(seconds: 45));
+      } on TimeoutException {
+        debugPrint(
+            '[ONLINE_PLAYLIST] fetchPlaylistDetails timed out for ${widget.args.playlistId}');
+      }
 
       List<YtmTrack> fetchedTracks = details?.tracks ?? const [];
 
       if (fetchedTracks.isEmpty) {
         final ytmService = getIt<YtmService>();
-        fetchedTracks = await ytmService.getPlaylistTracks(
-          widget.args.playlistId,
-          limit: 300,
-        );
+        try {
+          fetchedTracks = await ytmService
+              .getPlaylistTracks(
+                widget.args.playlistId,
+                limit: 300,
+              )
+              .timeout(const Duration(seconds: 45));
+        } on TimeoutException {
+          debugPrint(
+              '[ONLINE_PLAYLIST] getPlaylistTracks timed out for ${widget.args.playlistId}');
+          fetchedTracks = const [];
+        }
       }
 
       if (!mounted) return;

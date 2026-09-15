@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'core/errors/error_message_resolver.dart';
 import 'core/utils/l10n_extensions.dart';
 import 'package:flutter/services.dart';
 import 'package:dynamic_color/dynamic_color.dart';
@@ -296,7 +297,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                 behavior: SnackBarBehavior.floating,
                 duration: const Duration(seconds: 6),
                 action: SnackBarAction(
-                  label: 'Sign In',
+                  label: ctx.l10n.signIn,
                   onPressed: () => YtmWebLoginSheet.show(ctx),
                 ),
               ),
@@ -505,7 +506,8 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                   if (overlayCtx != null && overlayCtx.mounted) {
                     PulsrToast.show(
                       overlayCtx,
-                      message: message,
+                      message:
+                          resolveUiErrorMessage(context, message),
                       icon: Icons.error_outline_rounded,
                       isError: true,
                     );
@@ -632,8 +634,12 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                                 disableAnimations: reduceMotion,
                               ),
                               child: MediaQuery.withClampedTextScaling(
+                                // Accessibility: allow the full OS text-size
+                                // range (up to 200%). Fixed-height text boxes
+                                // on key surfaces scale via
+                                // MediaQuery.textScalerOf so nothing clips.
                                 minScaleFactor: 0.8,
-                                maxScaleFactor: 1.3,
+                                maxScaleFactor: 2.0,
                                 child: child ?? const SizedBox.shrink(),
                               ),
                             );

@@ -2812,6 +2812,46 @@
   "@fir512": {
     "description": "tranche8 l10n"
   },
+  "linearPhaseFir": "Linear-phase FIR",
+  "@linearPhaseFir": {
+    "description": "Arbitrary EQ linear-phase toggle title"
+  },
+  "linearPhaseOnDesc": "Constant delay, exact phase (pre-ringing possible)",
+  "@linearPhaseOnDesc": {
+    "description": "Arbitrary EQ linear-phase enabled subtitle"
+  },
+  "linearPhaseOffDesc": "Minimum-phase, zero extra delay (default)",
+  "@linearPhaseOffDesc": {
+    "description": "Arbitrary EQ minimum-phase subtitle"
+  },
+  "dopContainer": "DoP container",
+  "@dopContainer": {
+    "description": "DSD DoP PCM container width label"
+  },
+  "mbcPerBandTitle": "Per-band dynamics",
+  "@mbcPerBandTitle": {
+    "description": "Multiband compressor per-band section title"
+  },
+  "mbcPerBandSubtitle": "Threshold, ratio and make-up gain for each of the 4 LR4 bands.",
+  "@mbcPerBandSubtitle": {
+    "description": "Multiband compressor per-band section subtitle"
+  },
+  "mbcBandLow": "Band 1 · Low",
+  "@mbcBandLow": {
+    "description": "Multiband compressor band 1 name"
+  },
+  "mbcBandLowMid": "Band 2 · Low-Mid",
+  "@mbcBandLowMid": {
+    "description": "Multiband compressor band 2 name"
+  },
+  "mbcBandHighMid": "Band 3 · High-Mid",
+  "@mbcBandHighMid": {
+    "description": "Multiband compressor band 3 name"
+  },
+  "mbcBandHigh": "Band 4 · High",
+  "@mbcBandHigh": {
+    "description": "Multiband compressor band 4 name"
+  },
   "applyCurve": "Apply Curve",
   "@applyCurve": {
     "description": "tranche8 l10n"
@@ -3765,6 +3805,30 @@
   "settingsVizLabelMilkdrop": "MILKDROP",
   "settingsVizLabelOff": "OFF",
   "settingsVizLabelWave": "WAVE",
+  "settingsVizLabelParticles": "PARTICLES",
+  "@settingsVizLabelParticles": {
+    "description": "Visualizer particles style label"
+  },
+  "settingsVizParticlesDesc": "GPU particle field pulsing with bass energy",
+  "@settingsVizParticlesDesc": {
+    "description": "Visualizer particles style description"
+  },
+  "settingsVizLabelTerrain": "TERRAIN 3D",
+  "@settingsVizLabelTerrain": {
+    "description": "Visualizer 3D terrain style label"
+  },
+  "settingsVizTerrainDesc": "3D audio terrain landscape sculpted by the spectrum",
+  "@settingsVizTerrainDesc": {
+    "description": "Visualizer 3D terrain style description"
+  },
+  "settingsVizLabelAlbumReactive": "ALBUM REACTIVE",
+  "@settingsVizLabelAlbumReactive": {
+    "description": "Visualizer album-reactive style label"
+  },
+  "settingsVizAlbumReactiveDesc": "Album artwork that breathes with the music",
+  "@settingsVizAlbumReactiveDesc": {
+    "description": "Visualizer album-reactive style description"
+  },
   "settingsVizOffDesc": "Disable audio visualizer spectrum animation",
   "settingsVizWaveDesc": "Smooth continuous Bézier waveform line with ambient gradient fill",
   "settingsAboutTitle": "About {title}",
@@ -4130,5 +4194,96 @@
   "browseWorkoutEnergy": "Workout Energy",
   "browseYouTubeMusic": "YouTube Music",
   "browseYoutubeWeb": "YouTube Web",
-  "browseYtmSearchScreenDesc": "Stream and download songs from YouTube Music, ad-free."
+  "browseYtmSearchScreenDesc": "Stream and download songs from YouTube Music, ad-free.",
+  "dspPreampClipWarning": "Preamp {preamp} dB with peak EQ +{boost} dB may clip. Lower the preamp.",
+  "@dspPreampClipWarning": {
+    "placeholders": {
+      "preamp": {
+        "type": "String"
+      },
+      "boost": {
+        "type": "String"
+      }
+    }
+  },
+  "dspVolumeClipWarning": "Combined with EQ preamp (+{preamp} dB), total gain may clip. Consider reducing boost.",
+  "@dspVolumeClipWarning": {
+    "placeholders": {
+      "preamp": {
+        "type": "String"
+      }
+    }
+  },
+  "errSaveQueue": "Failed to save queue",
+  "errClearQueue": "Failed to clear queue",
+  "errReorderQueue": "Failed to reorder queue",
+  "errRemoveTrack": "Failed to remove track",
+  "errQueueSlotEmpty": "Queue slot is empty",
+  "errSwitchQueueSlot": "Failed to switch queue slot",
+  "errInvalidStreamUrl": "Invalid stream URL",
+  "errPitchFailed": "Pitch change failed",
+  "errPlaybackActionFailed": "Playback action failed",
+  "errSpeedFailed": "Speed change failed",
+  "errVolumeFailed": "Volume change failed",
+  "errShuffleFailed": "Shuffle failed",
+  "errRepeatFailed": "Repeat failed",
+  "errSkipFailed": "Skip failed",
+  "errSeekFailed": "Seek failed, position restored",
+  "errIrRejected": "Impulse response rejected by the audio engine",
+  "errLocalMatchStreaming": "Local match unavailable, streaming online",
+  "errPlayFailed": "Failed to play \"{title}\"",
+  "@errPlayFailed": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "errAddFailed": "Failed to add \"{title}\"",
+  "@errAddFailed": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "errQueueFull": "Queue is full ({max}) — cannot add more",
+  "@errQueueFull": {
+    "placeholders": {
+      "max": {
+        "type": "String"
+      }
+    }
+  },
+  "errAudioSettingFailed": "Failed to apply audio setting: {detail}",
+  "@errAudioSettingFailed": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "errYtmNoConnection": "No connection. Check your network.",
+  "errYtmPlaybackFailed": "Playback failed. Please try again.",
+  "errYtmGeneric": "Something went wrong with YouTube Music.",
+  "errYtmRegionRestricted": "This track is restricted in your region.",
+  "errYtmUnavailable": "This track is unavailable.",
+  "errYtmSessionExpired": "YouTube session expired. Tap to reconnect.",
+  "errYtmNotInBuild": "YouTube Music is not available in this build.",
+  "errYtmProxyAuth": "Backend proxy authentication failed.",
+  "errYtmSigFail": "Signature deciphering unavailable for this format.",
+  "errYtmBusy": "YouTube is busy. Cooling down.",
+  "errYtmTrouble": "YouTube is having trouble. Retrying.",
+  "errYtmExtractFail": "Stream extraction failed. Switching route.",
+  "errYtmVerify": "YouTube needs verification. Trying alternate route.",
+  "errSignInFailed": "Sign in failed. Please try again.",
+  "errSignUpFailed": "Sign up failed. Please try again.",
+  "errLoadDownloads": "Failed to load downloads",
+  "errRetryDownloads": "Could not retry failed downloads",
+  "errYtmNotSignedIn": "Not signed in to YouTube Music",
+  "errYtmSyncLikes": "Failed to sync YouTube Music likes",
+  "dspMultibandLabel": "Multiband",
+  "dspBandLow": "Low (<160 Hz)",
+  "dspBandMid": "Mid",
+  "dspBandHigh": "High"
 }
