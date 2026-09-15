@@ -2746,5 +2746,260 @@
   "cloudSyncItemsDesc": "تتم مزامنة المفضلة والقوائم والسجل في الاتجاهين. تبقى الاعدادات على هذا الجهاز.",
   "@cloudSyncItemsDesc": {
     "description": "tranche8 final"
+  },
+  "dspCopyJsonReport": "نسخ تقرير JSON",
+  "@dspCopyJsonReport": {
+    "description": "dsp inspector l10n"
+  },
+  "dspRefreshStatus": "تحديث الحالة",
+  "@dspRefreshStatus": {
+    "description": "dsp inspector l10n"
+  },
+  "dspActiveEffectsCount": "{count} نشط",
+  "@dspActiveEffectsCount": {
+    "description": "dsp inspector l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dspBitPerfectDirectPassThrough": "تمرير مباشر بت-بيرفكت",
+  "@dspBitPerfectDirectPassThrough": {
+    "description": "dsp inspector l10n"
+  },
+  "dspAudioEffectSessionActive": "جلسة AudioEffect نشطة (#{sessionId})",
+  "@dspAudioEffectSessionActive": {
+    "description": "dsp inspector l10n",
+    "placeholders": {
+      "sessionId": {
+        "type": "int"
+      }
+    }
+  },
+  "dspSessionPendingPlayTrack": "الجلسة معلّقة — شغّل مقطعًا للاتصال",
+  "@dspSessionPendingPlayTrack": {
+    "description": "dsp inspector l10n"
+  },
+  "dspHalDetachedDolbyNativeDsp": "HAL منفصل (Dolby) — DSP المدمج نشط",
+  "@dspHalDetachedDolbyNativeDsp": {
+    "description": "dsp inspector l10n"
+  },
+  "dspAudioEffectSessionDetached": "جلسة AudioEffect منفصلة",
+  "@dspAudioEffectSessionDetached": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatusBypassed": "متجاوز",
+  "@dspStatusBypassed": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatusAttached": "متصل",
+  "@dspStatusAttached": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatusPending": "معلّق",
+  "@dspStatusPending": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatusHalOff": "HAL غير نشط",
+  "@dspStatusHalOff": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatusDetached": "منفصل",
+  "@dspStatusDetached": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatusDegraded": "متدهور",
+  "@dspStatusDegraded": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStageStatusActive": "نشط",
+  "@dspStageStatusActive": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStageStatusOff": "متوقف",
+  "@dspStageStatusOff": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatDspEngine": "محرك DSP",
+  "@dspStatDspEngine": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatDspEngineNative": "C++ و HAL",
+  "@dspStatDspEngineNative": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatDspEngineAndroid": "HAL أندرويد",
+  "@dspStatDspEngineAndroid": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatDspPreference": "تفضيل DSP",
+  "@dspStatDspPreference": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatNative": "مدمج",
+  "@dspStatNative": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatMasterEq": "المعادل الرئيسي",
+  "@dspStatMasterEq": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatMasterDsp": "DSP الرئيسي",
+  "@dspStatMasterDsp": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatOn": "مفعّل",
+  "@dspStatOn": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatOff": "معطّل",
+  "@dspStatOff": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatOemAudioAlert": "تنبيه صوت OEM",
+  "@dspStatOemAudioAlert": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatDetected": "تم الاكتشاف",
+  "@dspStatDetected": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatOutputTarget": "مخرج الهدف",
+  "@dspStatOutputTarget": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatOutputFormat": "{rate} هرتز / {bits} بت",
+  "@dspStatOutputFormat": {
+    "description": "dsp inspector l10n",
+    "placeholders": {
+      "rate": {
+        "type": "int"
+      },
+      "bits": {
+        "type": "int"
+      }
+    }
+  },
+  "dspStatChipLabel": "{label}: ",
+  "@dspStatChipLabel": {
+    "description": "dsp inspector l10n",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "exportBackupDialogTitle": "تصدير نسخة JSON",
+  "@exportBackupDialogTitle": {
+    "description": "backup section l10n"
+  },
+  "exportFailedWithError": "فشل التصدير: {error}",
+  "@exportFailedWithError": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "importFailedWithError": "فشل الاستيراد: {error}",
+  "@importFailedWithError": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "confirmFavoritesCount": "• المفضلة: {count}",
+  "@confirmFavoritesCount": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "confirmPlaylistsCount": "• قوائم التشغيل: {count}",
+  "@confirmPlaylistsCount": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "confirmHistoryCount": "• السجل: {count}",
+  "@confirmHistoryCount": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "confirmSettingsValue": "• الإعدادات: {value}",
+  "@confirmSettingsValue": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "restoredFavoritesCount": "• المفضلة المستعادة: {count}",
+  "@restoredFavoritesCount": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "restoredPlaylistsCount": "• قوائم التشغيل المستعادة: {count}",
+  "@restoredPlaylistsCount": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "restoredHistoryCount": "• سجلات الاستماع المستعادة: {count}",
+  "@restoredHistoryCount": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "restoredSettingsKeys": "• الإعدادات المستعادة: {count} مفتاح",
+  "@restoredSettingsKeys": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "restoredExcludedFoldersCount": "• المجلدات المستبعدة المستعادة: {count}",
+  "@restoredExcludedFoldersCount": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "unmatchedPathsWarning": "⚠️ تعذر مطابقة {count} من مسارات الأغاني في مكتبتك الحالية.",
+  "@unmatchedPathsWarning": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   }
 }

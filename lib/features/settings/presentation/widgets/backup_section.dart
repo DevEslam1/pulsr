@@ -44,6 +44,7 @@ class _BackupSectionState extends State<BackupSection> {
   }
 
   Future<void> _exportBackup(BuildContext context) async {
+    final l10n = context.l10n;
     setState(() => _isExporting = true);
     try {
       final exportUseCase = getIt<ExportBackupUseCase>();
@@ -58,7 +59,7 @@ class _BackupSectionState extends State<BackupSection> {
       final bytes = Uint8List.fromList(utf8.encode(jsonContent));
 
       final outputUri = await FilePicker.saveFile(
-        dialogTitle: 'Export Backup JSON',
+        dialogTitle: l10n.exportBackupDialogTitle,
         fileName: fileName,
         type: FileType.custom,
         allowedExtensions: ['json'],
@@ -79,7 +80,7 @@ class _BackupSectionState extends State<BackupSection> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Export failed: ${e.toString()}'),
+            content: Text(l10n.exportFailedWithError(e.toString())),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -90,6 +91,7 @@ class _BackupSectionState extends State<BackupSection> {
   }
 
   Future<void> _importBackup(BuildContext context) async {
+    final l10n = context.l10n;
     final result = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: ['json'],
@@ -181,11 +183,11 @@ class _BackupSectionState extends State<BackupSection> {
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 12),
-          Text('• ${context.l10n.favorites}: $favsCount'),
-          Text('• ${context.l10n.playlists}: $playlistsCount'),
-          Text('• ${context.l10n.historyLine(historyCount)}'),
-          Text(
-              '• ${context.l10n.settings}: ${hasSettings ? context.l10n.includedLabel : context.l10n.noneLabel}'),
+          Text(l10n.confirmFavoritesCount(favsCount)),
+          Text(l10n.confirmPlaylistsCount(playlistsCount)),
+          Text(l10n.confirmHistoryCount(historyCount)),
+          Text(l10n.confirmSettingsValue(
+              hasSettings ? l10n.includedLabel : l10n.noneLabel)),
           const SizedBox(height: 12),
           Text(
             context.l10n.existingLibraryUpdateNotice,
@@ -238,21 +240,21 @@ class _BackupSectionState extends State<BackupSection> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                  '• Restored Favorites: ${importResult.restoredFavoritesCount}'),
-              Text(
-                  '• Restored Playlists: ${importResult.restoredPlaylistsCount}'),
-              Text(
-                  '• Restored History Entries: ${importResult.restoredHistoryCount}'),
-              Text(
-                  '• Restored Settings: ${importResult.restoredSettingsCount} keys'),
+              Text(l10n
+                  .restoredFavoritesCount(importResult.restoredFavoritesCount)),
+              Text(l10n
+                  .restoredPlaylistsCount(importResult.restoredPlaylistsCount)),
+              Text(l10n
+                  .restoredHistoryCount(importResult.restoredHistoryCount)),
+              Text(l10n.restoredSettingsKeys(
+                  importResult.restoredSettingsCount)),
               if (importResult.restoredExcludedFoldersCount > 0)
-                Text(
-                    '• Restored Excluded Folders: ${importResult.restoredExcludedFoldersCount}'),
+                Text(l10n.restoredExcludedFoldersCount(
+                    importResult.restoredExcludedFoldersCount)),
               if (importResult.unmatchedPaths.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Text(
-                  '⚠️ ${importResult.unmatchedPaths.length} song paths could not be matched in your current library.',
+                  l10n.unmatchedPathsWarning(importResult.unmatchedPaths.length),
                   style: const TextStyle(color: Colors.amber, fontSize: 12),
                 ),
               ],
@@ -270,7 +272,7 @@ class _BackupSectionState extends State<BackupSection> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Import failed: ${e.toString()}'),
+            content: Text(l10n.importFailedWithError(e.toString())),
             backgroundColor: Colors.redAccent,
           ),
         );

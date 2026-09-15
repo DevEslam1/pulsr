@@ -3031,5 +3031,260 @@
   "cloudSyncItemsDesc": "Favorites, playlists, play history and library metadata are synced in both directions. DSP presets and app settings stay on this device.",
   "@cloudSyncItemsDesc": {
     "description": "tranche8 final"
+  },
+  "dspCopyJsonReport": "Copy JSON Report",
+  "@dspCopyJsonReport": {
+    "description": "dsp inspector l10n"
+  },
+  "dspRefreshStatus": "Refresh Status",
+  "@dspRefreshStatus": {
+    "description": "dsp inspector l10n"
+  },
+  "dspActiveEffectsCount": "{count} ACTIVE",
+  "@dspActiveEffectsCount": {
+    "description": "dsp inspector l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dspBitPerfectDirectPassThrough": "Bit-Perfect Direct Pass-Through",
+  "@dspBitPerfectDirectPassThrough": {
+    "description": "dsp inspector l10n"
+  },
+  "dspAudioEffectSessionActive": "AudioEffect Session Active (#{sessionId})",
+  "@dspAudioEffectSessionActive": {
+    "description": "dsp inspector l10n",
+    "placeholders": {
+      "sessionId": {
+        "type": "int"
+      }
+    }
+  },
+  "dspSessionPendingPlayTrack": "Session Pending — Play a track to attach",
+  "@dspSessionPendingPlayTrack": {
+    "description": "dsp inspector l10n"
+  },
+  "dspHalDetachedDolbyNativeDsp": "HAL Detached (Dolby) — Native DSP Active",
+  "@dspHalDetachedDolbyNativeDsp": {
+    "description": "dsp inspector l10n"
+  },
+  "dspAudioEffectSessionDetached": "AudioEffect Session Detached",
+  "@dspAudioEffectSessionDetached": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatusBypassed": "BYPASSED",
+  "@dspStatusBypassed": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatusAttached": "ATTACHED",
+  "@dspStatusAttached": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatusPending": "PENDING",
+  "@dspStatusPending": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatusHalOff": "HAL OFF",
+  "@dspStatusHalOff": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatusDetached": "DETACHED",
+  "@dspStatusDetached": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatusDegraded": "DEGRADED",
+  "@dspStatusDegraded": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStageStatusActive": "ACTIVE",
+  "@dspStageStatusActive": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStageStatusOff": "OFF",
+  "@dspStageStatusOff": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatDspEngine": "DSP Engine",
+  "@dspStatDspEngine": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatDspEngineNative": "C++ & HAL",
+  "@dspStatDspEngineNative": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatDspEngineAndroid": "Android HAL",
+  "@dspStatDspEngineAndroid": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatDspPreference": "DSP Preference",
+  "@dspStatDspPreference": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatNative": "NATIVE",
+  "@dspStatNative": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatMasterEq": "Master EQ",
+  "@dspStatMasterEq": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatMasterDsp": "Master DSP",
+  "@dspStatMasterDsp": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatOn": "ON",
+  "@dspStatOn": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatOff": "OFF",
+  "@dspStatOff": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatOemAudioAlert": "OEM Audio Alert",
+  "@dspStatOemAudioAlert": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatDetected": "Detected",
+  "@dspStatDetected": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatOutputTarget": "Output Target",
+  "@dspStatOutputTarget": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatOutputFormat": "{rate} Hz / {bits}-bit",
+  "@dspStatOutputFormat": {
+    "description": "dsp inspector l10n",
+    "placeholders": {
+      "rate": {
+        "type": "int"
+      },
+      "bits": {
+        "type": "int"
+      }
+    }
+  },
+  "dspStatChipLabel": "{label}: ",
+  "@dspStatChipLabel": {
+    "description": "dsp inspector l10n",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "exportBackupDialogTitle": "Export Backup JSON",
+  "@exportBackupDialogTitle": {
+    "description": "backup section l10n"
+  },
+  "exportFailedWithError": "Export failed: {error}",
+  "@exportFailedWithError": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "importFailedWithError": "Import failed: {error}",
+  "@importFailedWithError": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "confirmFavoritesCount": "• Favorites: {count}",
+  "@confirmFavoritesCount": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "confirmPlaylistsCount": "• Playlists: {count}",
+  "@confirmPlaylistsCount": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "confirmHistoryCount": "• History: {count}",
+  "@confirmHistoryCount": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "confirmSettingsValue": "• Settings: {value}",
+  "@confirmSettingsValue": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "restoredFavoritesCount": "• Restored Favorites: {count}",
+  "@restoredFavoritesCount": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "restoredPlaylistsCount": "• Restored Playlists: {count}",
+  "@restoredPlaylistsCount": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "restoredHistoryCount": "• Restored History Entries: {count}",
+  "@restoredHistoryCount": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "restoredSettingsKeys": "• Restored Settings: {count} keys",
+  "@restoredSettingsKeys": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "restoredExcludedFoldersCount": "• Restored Excluded Folders: {count}",
+  "@restoredExcludedFoldersCount": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "unmatchedPathsWarning": "⚠️ {count} song paths could not be matched in your current library.",
+  "@unmatchedPathsWarning": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   }
 }

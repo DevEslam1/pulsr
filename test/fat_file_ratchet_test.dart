@@ -8,9 +8,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('oversized core files do not grow (01-4)', () {
+    // Caps lowered after tranche 9 extractions:
+    //   audio_handler.dart  -507B (AudioHandlerLifecycleObserver)
+    //   player_cubit.dart  -3291B (QuranRestoreSnapshot)
     const caps = {
-      'lib/data/audio/audio_handler.dart': 224000,
-      'lib/features/player/cubit/player_cubit.dart': 173000,
+      'lib/data/audio/audio_handler.dart': 223500,
+      'lib/features/player/cubit/player_cubit.dart': 170000,
       'lib/features/library/presentation/library_screen.dart': 90000,
       'lib/data/audio/equalizer_manager.dart': 108000,
       'lib/features/settings/cubit/settings_cubit.dart': 84000,

@@ -2746,5 +2746,260 @@
   "cloudSyncItemsDesc": "Favoritos, listas e historial se sincronizan en ambos sentidos. Los ajustes permanecen en este dispositivo.",
   "@cloudSyncItemsDesc": {
     "description": "tranche8 final"
+  },
+  "dspCopyJsonReport": "Copiar informe JSON",
+  "@dspCopyJsonReport": {
+    "description": "dsp inspector l10n"
+  },
+  "dspRefreshStatus": "Actualizar estado",
+  "@dspRefreshStatus": {
+    "description": "dsp inspector l10n"
+  },
+  "dspActiveEffectsCount": "{count} ACTIVOS",
+  "@dspActiveEffectsCount": {
+    "description": "dsp inspector l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dspBitPerfectDirectPassThrough": "Paso directo bit-perfect",
+  "@dspBitPerfectDirectPassThrough": {
+    "description": "dsp inspector l10n"
+  },
+  "dspAudioEffectSessionActive": "Sesión AudioEffect activa (#{sessionId})",
+  "@dspAudioEffectSessionActive": {
+    "description": "dsp inspector l10n",
+    "placeholders": {
+      "sessionId": {
+        "type": "int"
+      }
+    }
+  },
+  "dspSessionPendingPlayTrack": "Sesión pendiente — reproduce una pista para conectar",
+  "@dspSessionPendingPlayTrack": {
+    "description": "dsp inspector l10n"
+  },
+  "dspHalDetachedDolbyNativeDsp": "HAL desconectado (Dolby) — DSP nativo activo",
+  "@dspHalDetachedDolbyNativeDsp": {
+    "description": "dsp inspector l10n"
+  },
+  "dspAudioEffectSessionDetached": "Sesión AudioEffect desconectada",
+  "@dspAudioEffectSessionDetached": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatusBypassed": "OMITIDO",
+  "@dspStatusBypassed": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatusAttached": "CONECTADO",
+  "@dspStatusAttached": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatusPending": "PENDIENTE",
+  "@dspStatusPending": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatusHalOff": "HAL INACTIVO",
+  "@dspStatusHalOff": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatusDetached": "DESCONECTADO",
+  "@dspStatusDetached": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatusDegraded": "DEGRADADO",
+  "@dspStatusDegraded": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStageStatusActive": "ACTIVO",
+  "@dspStageStatusActive": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStageStatusOff": "INACTIVO",
+  "@dspStageStatusOff": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatDspEngine": "Motor DSP",
+  "@dspStatDspEngine": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatDspEngineNative": "C++ y HAL",
+  "@dspStatDspEngineNative": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatDspEngineAndroid": "HAL de Android",
+  "@dspStatDspEngineAndroid": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatDspPreference": "Preferencia DSP",
+  "@dspStatDspPreference": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatNative": "NATIVO",
+  "@dspStatNative": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatMasterEq": "EQ maestro",
+  "@dspStatMasterEq": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatMasterDsp": "DSP maestro",
+  "@dspStatMasterDsp": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatOn": "ACTIVADO",
+  "@dspStatOn": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatOff": "DESACTIVADO",
+  "@dspStatOff": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatOemAudioAlert": "Alerta de audio OEM",
+  "@dspStatOemAudioAlert": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatDetected": "Detectado",
+  "@dspStatDetected": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatOutputTarget": "Salida objetivo",
+  "@dspStatOutputTarget": {
+    "description": "dsp inspector l10n"
+  },
+  "dspStatOutputFormat": "{rate} Hz / {bits} bits",
+  "@dspStatOutputFormat": {
+    "description": "dsp inspector l10n",
+    "placeholders": {
+      "rate": {
+        "type": "int"
+      },
+      "bits": {
+        "type": "int"
+      }
+    }
+  },
+  "dspStatChipLabel": "{label}: ",
+  "@dspStatChipLabel": {
+    "description": "dsp inspector l10n",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "exportBackupDialogTitle": "Exportar copia de seguridad JSON",
+  "@exportBackupDialogTitle": {
+    "description": "backup section l10n"
+  },
+  "exportFailedWithError": "Error al exportar: {error}",
+  "@exportFailedWithError": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "importFailedWithError": "Error al importar: {error}",
+  "@importFailedWithError": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "confirmFavoritesCount": "• Favoritos: {count}",
+  "@confirmFavoritesCount": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "confirmPlaylistsCount": "• Listas: {count}",
+  "@confirmPlaylistsCount": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "confirmHistoryCount": "• Historial: {count}",
+  "@confirmHistoryCount": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "confirmSettingsValue": "• Ajustes: {value}",
+  "@confirmSettingsValue": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "restoredFavoritesCount": "• Favoritos restaurados: {count}",
+  "@restoredFavoritesCount": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "restoredPlaylistsCount": "• Listas restauradas: {count}",
+  "@restoredPlaylistsCount": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "restoredHistoryCount": "• Entradas de historial restauradas: {count}",
+  "@restoredHistoryCount": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "restoredSettingsKeys": "• Ajustes restaurados: {count} claves",
+  "@restoredSettingsKeys": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "restoredExcludedFoldersCount": "• Carpetas excluidas restauradas: {count}",
+  "@restoredExcludedFoldersCount": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "unmatchedPathsWarning": "⚠️ No se pudieron emparejar {count} rutas de canciones en tu biblioteca actual.",
+  "@unmatchedPathsWarning": {
+    "description": "backup section l10n",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   }
 }

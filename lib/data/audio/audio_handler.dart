@@ -68,6 +68,7 @@ import 'multi_output_router.dart';
 import 'playback_bookmark_store.dart';
 import 'silence_skip_controller.dart';
 import 'track_delay_manager.dart';
+import 'audio_handler_lifecycle_observer.dart';
 
 @singleton
 class PulsrAudioHandler extends BaseAudioHandler
@@ -186,7 +187,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   int _lastSmartPrefetchMs = 0;
   String? _lastSmartPrefetchKey;
   Timer? _crossfadeSwitchDebounce;
-  _AudioHandlerLifecycleObserver? _lifecycleObserver;
+  AudioHandlerLifecycleObserver? _lifecycleObserver;
   // Set when a restored YouTube session is left idle; play() resolves it lazily.
   Duration? _pendingLazyPosition;
   // Memoized stream URLs, keyed by video id. Never persisted — they expire.
@@ -1662,7 +1663,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
 
     // Register lifecycle observer to persist playback state and manage buffers on app background/resume
-    _lifecycleObserver = _AudioHandlerLifecycleObserver(
+    _lifecycleObserver = AudioHandlerLifecycleObserver(
       onBackground: () {
         saveCurrentPositionImmediate();
         _equalizerManager.onAppPaused();
@@ -5538,22 +5539,5 @@ class PulsrAudioHandler extends BaseAudioHandler
     await _playerB.dispose();
     await _prefetchPlayer.dispose();
     platformBridgeDegraded.dispose();
-  }
-}
-
-class _AudioHandlerLifecycleObserver with WidgetsBindingObserver {
-  final VoidCallback onBackground;
-  final VoidCallback? onResume;
-  _AudioHandlerLifecycleObserver({required this.onBackground, this.onResume});
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.detached ||
-        state == AppLifecycleState.hidden) {
-      onBackground();
-    } else if (state == AppLifecycleState.resumed) {
-      onResume?.call();
-    }
   }
 }

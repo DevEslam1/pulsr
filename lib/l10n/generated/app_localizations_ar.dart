@@ -3660,4 +3660,167 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get cloudSyncItemsDesc =>
       'تتم مزامنة المفضلة والقوائم والسجل في الاتجاهين. تبقى الاعدادات على هذا الجهاز.';
+
+  @override
+  String get dspCopyJsonReport => 'نسخ تقرير JSON';
+
+  @override
+  String get dspRefreshStatus => 'تحديث الحالة';
+
+  @override
+  String dspActiveEffectsCount(int count) {
+    return '$count نشط';
+  }
+
+  @override
+  String get dspBitPerfectDirectPassThrough => 'تمرير مباشر بت-بيرفكت';
+
+  @override
+  String dspAudioEffectSessionActive(int sessionId) {
+    return 'جلسة AudioEffect نشطة (#$sessionId)';
+  }
+
+  @override
+  String get dspSessionPendingPlayTrack =>
+      'الجلسة معلّقة — شغّل مقطعًا للاتصال';
+
+  @override
+  String get dspHalDetachedDolbyNativeDsp =>
+      'HAL منفصل (Dolby) — DSP المدمج نشط';
+
+  @override
+  String get dspAudioEffectSessionDetached => 'جلسة AudioEffect منفصلة';
+
+  @override
+  String get dspStatusBypassed => 'متجاوز';
+
+  @override
+  String get dspStatusAttached => 'متصل';
+
+  @override
+  String get dspStatusPending => 'معلّق';
+
+  @override
+  String get dspStatusHalOff => 'HAL غير نشط';
+
+  @override
+  String get dspStatusDetached => 'منفصل';
+
+  @override
+  String get dspStatusDegraded => 'متدهور';
+
+  @override
+  String get dspStageStatusActive => 'نشط';
+
+  @override
+  String get dspStageStatusOff => 'متوقف';
+
+  @override
+  String get dspStatDspEngine => 'محرك DSP';
+
+  @override
+  String get dspStatDspEngineNative => 'C++ و HAL';
+
+  @override
+  String get dspStatDspEngineAndroid => 'HAL أندرويد';
+
+  @override
+  String get dspStatDspPreference => 'تفضيل DSP';
+
+  @override
+  String get dspStatNative => 'مدمج';
+
+  @override
+  String get dspStatMasterEq => 'المعادل الرئيسي';
+
+  @override
+  String get dspStatMasterDsp => 'DSP الرئيسي';
+
+  @override
+  String get dspStatOn => 'مفعّل';
+
+  @override
+  String get dspStatOff => 'معطّل';
+
+  @override
+  String get dspStatOemAudioAlert => 'تنبيه صوت OEM';
+
+  @override
+  String get dspStatDetected => 'تم الاكتشاف';
+
+  @override
+  String get dspStatOutputTarget => 'مخرج الهدف';
+
+  @override
+  String dspStatOutputFormat(int rate, int bits) {
+    return '$rate هرتز / $bits بت';
+  }
+
+  @override
+  String dspStatChipLabel(String label) {
+    return '$label: ';
+  }
+
+  @override
+  String get exportBackupDialogTitle => 'تصدير نسخة JSON';
+
+  @override
+  String exportFailedWithError(String error) {
+    return 'فشل التصدير: $error';
+  }
+
+  @override
+  String importFailedWithError(String error) {
+    return 'فشل الاستيراد: $error';
+  }
+
+  @override
+  String confirmFavoritesCount(int count) {
+    return '• المفضلة: $count';
+  }
+
+  @override
+  String confirmPlaylistsCount(int count) {
+    return '• قوائم التشغيل: $count';
+  }
+
+  @override
+  String confirmHistoryCount(int count) {
+    return '• السجل: $count';
+  }
+
+  @override
+  String confirmSettingsValue(String value) {
+    return '• الإعدادات: $value';
+  }
+
+  @override
+  String restoredFavoritesCount(int count) {
+    return '• المفضلة المستعادة: $count';
+  }
+
+  @override
+  String restoredPlaylistsCount(int count) {
+    return '• قوائم التشغيل المستعادة: $count';
+  }
+
+  @override
+  String restoredHistoryCount(int count) {
+    return '• سجلات الاستماع المستعادة: $count';
+  }
+
+  @override
+  String restoredSettingsKeys(int count) {
+    return '• الإعدادات المستعادة: $count مفتاح';
+  }
+
+  @override
+  String restoredExcludedFoldersCount(int count) {
+    return '• المجلدات المستبعدة المستعادة: $count';
+  }
+
+  @override
+  String unmatchedPathsWarning(int count) {
+    return '⚠️ تعذر مطابقة $count من مسارات الأغاني في مكتبتك الحالية.';
+  }
 }

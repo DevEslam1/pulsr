@@ -155,12 +155,12 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Copy JSON Report',
+                        tooltip: context.l10n.dspCopyJsonReport,
                         icon: Icon(Icons.copy_rounded, color: p.accent, size: 19),
                         onPressed: () => _copyReportToClipboard(context),
                       ),
                       IconButton(
-                        tooltip: 'Refresh Status',
+                        tooltip: context.l10n.dspRefreshStatus,
                         icon: Icon(Icons.refresh_rounded, color: p.accent, size: 20),
                         onPressed: () => _refreshReport(),
                       ),
@@ -211,7 +211,8 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
-                                      '${_report?.activeEffectNames.length ?? 0} ACTIVE',
+                                      context.l10n.dspActiveEffectsCount(
+                                          _report?.activeEffectNames.length ?? 0),
                                       style: TextStyle(
                                         fontSize: 10,
                                         fontWeight: FontWeight.w800,
@@ -333,12 +334,12 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
               Expanded(
                 child: Text(
                   isBypassed
-                      ? 'Bit-Perfect Direct Pass-Through'
+                      ? context.l10n.dspBitPerfectDirectPassThrough
                       : (isAttached
-                          ? 'AudioEffect Session Active (#$sessionId)'
+                          ? context.l10n.dspAudioEffectSessionActive(sessionId)
                           : (isPendingNoSession
-                              ? 'Session Pending — Play a track to attach'
-                              : (isOemSoftDetached ? 'HAL Detached (Dolby) — Native DSP Active' : 'AudioEffect Session Detached'))),
+                              ? context.l10n.dspSessionPendingPlayTrack
+                              : (isOemSoftDetached ? context.l10n.dspHalDetachedDolbyNativeDsp : context.l10n.dspAudioEffectSessionDetached))),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
@@ -360,10 +361,10 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
                 ),
                 child: Text(
                   isBypassed
-                      ? 'BYPASSED'
+                      ? context.l10n.dspStatusBypassed
                       : (isAttached
-                          ? 'ATTACHED'
-                          : (isPendingNoSession ? 'PENDING' : (isOemSoftDetached ? 'HAL OFF' : 'DETACHED'))),
+                          ? context.l10n.dspStatusAttached
+                          : (isPendingNoSession ? context.l10n.dspStatusPending : (isOemSoftDetached ? context.l10n.dspStatusHalOff : context.l10n.dspStatusDetached))),
                   style: TextStyle(
                     fontSize: 9.5,
                     fontWeight: FontWeight.w800,
@@ -451,31 +452,39 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
             runSpacing: 8,
             children: [
               _buildStatChip(
-                  p, 'DSP Engine', rep?.isNativeDspLoaded == true ? 'C++ & HAL' : 'Android HAL'),
-              _buildStatChip(p, 'DSP Preference', rep?.dspPreference.toUpperCase() ?? 'NATIVE'),
+                  p,
+                  context.l10n.dspStatDspEngine,
+                  rep?.isNativeDspLoaded == true
+                      ? context.l10n.dspStatDspEngineNative
+                      : context.l10n.dspStatDspEngineAndroid),
+              _buildStatChip(p, context.l10n.dspStatDspPreference,
+                  rep?.dspPreference.toUpperCase() ?? context.l10n.dspStatNative),
               _buildStatChip(
                 p,
-                'Master EQ',
-                isEqEnabled ? 'ON' : 'OFF',
+                context.l10n.dspStatMasterEq,
+                isEqEnabled ? context.l10n.dspStatOn : context.l10n.dspStatOff,
                 isHighlight: isEqEnabled,
               ),
               _buildStatChip(
                 p,
-                'Master DSP',
-                isDspActive ? 'ON' : 'OFF',
+                context.l10n.dspStatMasterDsp,
+                isDspActive ? context.l10n.dspStatOn : context.l10n.dspStatOff,
                 isHighlight: isDspActive,
               ),
               if (rep?.hasOemAudio == true)
                 _buildStatChip(
                   p,
-                  'OEM Audio Alert',
-                  rep?.detectedOemEngines.join(', ') ?? 'Detected',
+                  context.l10n.dspStatOemAudioAlert,
+                  rep?.detectedOemEngines.join(', ') ??
+                      context.l10n.dspStatDetected,
                   isWarning: true,
                 ),
               _buildStatChip(
                 p,
-                'Output Target',
-                '${currentOutputDevice?.sampleRate ?? 44100} Hz / ${currentOutputDevice?.bitDepth ?? 16}-bit',
+                context.l10n.dspStatOutputTarget,
+                context.l10n.dspStatOutputFormat(
+                    currentOutputDevice?.sampleRate ?? 44100,
+                    currentOutputDevice?.bitDepth ?? 16),
               ),
             ],
           ),
@@ -507,7 +516,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            '$label: ',
+            context.l10n.dspStatChipLabel(label),
             style: TextStyle(
               fontSize: 10.5,
               color: p.textSecondary,
@@ -602,10 +611,12 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
                 ),
                 child: Text(
                   isBypassed
-                      ? 'BYPASSED'
+                      ? context.l10n.dspStatusBypassed
                       : (isDegraded
-                          ? 'DEGRADED'
-                          : (isActive ? 'ACTIVE' : 'OFF')),
+                          ? context.l10n.dspStatusDegraded
+                          : (isActive
+                              ? context.l10n.dspStageStatusActive
+                              : context.l10n.dspStageStatusOff)),
                   style: TextStyle(
                     fontSize: 9,
                     fontWeight: FontWeight.w800,

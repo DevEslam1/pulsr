@@ -3681,4 +3681,167 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get cloudSyncItemsDesc =>
       'Favoritos, listas e historial se sincronizan en ambos sentidos. Los ajustes permanecen en este dispositivo.';
+
+  @override
+  String get dspCopyJsonReport => 'Copiar informe JSON';
+
+  @override
+  String get dspRefreshStatus => 'Actualizar estado';
+
+  @override
+  String dspActiveEffectsCount(int count) {
+    return '$count ACTIVOS';
+  }
+
+  @override
+  String get dspBitPerfectDirectPassThrough => 'Paso directo bit-perfect';
+
+  @override
+  String dspAudioEffectSessionActive(int sessionId) {
+    return 'Sesión AudioEffect activa (#$sessionId)';
+  }
+
+  @override
+  String get dspSessionPendingPlayTrack =>
+      'Sesión pendiente — reproduce una pista para conectar';
+
+  @override
+  String get dspHalDetachedDolbyNativeDsp =>
+      'HAL desconectado (Dolby) — DSP nativo activo';
+
+  @override
+  String get dspAudioEffectSessionDetached => 'Sesión AudioEffect desconectada';
+
+  @override
+  String get dspStatusBypassed => 'OMITIDO';
+
+  @override
+  String get dspStatusAttached => 'CONECTADO';
+
+  @override
+  String get dspStatusPending => 'PENDIENTE';
+
+  @override
+  String get dspStatusHalOff => 'HAL INACTIVO';
+
+  @override
+  String get dspStatusDetached => 'DESCONECTADO';
+
+  @override
+  String get dspStatusDegraded => 'DEGRADADO';
+
+  @override
+  String get dspStageStatusActive => 'ACTIVO';
+
+  @override
+  String get dspStageStatusOff => 'INACTIVO';
+
+  @override
+  String get dspStatDspEngine => 'Motor DSP';
+
+  @override
+  String get dspStatDspEngineNative => 'C++ y HAL';
+
+  @override
+  String get dspStatDspEngineAndroid => 'HAL de Android';
+
+  @override
+  String get dspStatDspPreference => 'Preferencia DSP';
+
+  @override
+  String get dspStatNative => 'NATIVO';
+
+  @override
+  String get dspStatMasterEq => 'EQ maestro';
+
+  @override
+  String get dspStatMasterDsp => 'DSP maestro';
+
+  @override
+  String get dspStatOn => 'ACTIVADO';
+
+  @override
+  String get dspStatOff => 'DESACTIVADO';
+
+  @override
+  String get dspStatOemAudioAlert => 'Alerta de audio OEM';
+
+  @override
+  String get dspStatDetected => 'Detectado';
+
+  @override
+  String get dspStatOutputTarget => 'Salida objetivo';
+
+  @override
+  String dspStatOutputFormat(int rate, int bits) {
+    return '$rate Hz / $bits bits';
+  }
+
+  @override
+  String dspStatChipLabel(String label) {
+    return '$label: ';
+  }
+
+  @override
+  String get exportBackupDialogTitle => 'Exportar copia de seguridad JSON';
+
+  @override
+  String exportFailedWithError(String error) {
+    return 'Error al exportar: $error';
+  }
+
+  @override
+  String importFailedWithError(String error) {
+    return 'Error al importar: $error';
+  }
+
+  @override
+  String confirmFavoritesCount(int count) {
+    return '• Favoritos: $count';
+  }
+
+  @override
+  String confirmPlaylistsCount(int count) {
+    return '• Listas: $count';
+  }
+
+  @override
+  String confirmHistoryCount(int count) {
+    return '• Historial: $count';
+  }
+
+  @override
+  String confirmSettingsValue(String value) {
+    return '• Ajustes: $value';
+  }
+
+  @override
+  String restoredFavoritesCount(int count) {
+    return '• Favoritos restaurados: $count';
+  }
+
+  @override
+  String restoredPlaylistsCount(int count) {
+    return '• Listas restauradas: $count';
+  }
+
+  @override
+  String restoredHistoryCount(int count) {
+    return '• Entradas de historial restauradas: $count';
+  }
+
+  @override
+  String restoredSettingsKeys(int count) {
+    return '• Ajustes restaurados: $count claves';
+  }
+
+  @override
+  String restoredExcludedFoldersCount(int count) {
+    return '• Carpetas excluidas restauradas: $count';
+  }
+
+  @override
+  String unmatchedPathsWarning(int count) {
+    return '⚠️ No se pudieron emparejar $count rutas de canciones en tu biblioteca actual.';
+  }
 }

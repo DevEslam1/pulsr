@@ -3696,4 +3696,168 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get cloudSyncItemsDesc =>
       'Favorites, playlists, play history and library metadata are synced in both directions. DSP presets and app settings stay on this device.';
+
+  @override
+  String get dspCopyJsonReport => 'Copy JSON Report';
+
+  @override
+  String get dspRefreshStatus => 'Refresh Status';
+
+  @override
+  String dspActiveEffectsCount(int count) {
+    return '$count ACTIVE';
+  }
+
+  @override
+  String get dspBitPerfectDirectPassThrough =>
+      'Bit-Perfect Direct Pass-Through';
+
+  @override
+  String dspAudioEffectSessionActive(int sessionId) {
+    return 'AudioEffect Session Active (#$sessionId)';
+  }
+
+  @override
+  String get dspSessionPendingPlayTrack =>
+      'Session Pending — Play a track to attach';
+
+  @override
+  String get dspHalDetachedDolbyNativeDsp =>
+      'HAL Detached (Dolby) — Native DSP Active';
+
+  @override
+  String get dspAudioEffectSessionDetached => 'AudioEffect Session Detached';
+
+  @override
+  String get dspStatusBypassed => 'BYPASSED';
+
+  @override
+  String get dspStatusAttached => 'ATTACHED';
+
+  @override
+  String get dspStatusPending => 'PENDING';
+
+  @override
+  String get dspStatusHalOff => 'HAL OFF';
+
+  @override
+  String get dspStatusDetached => 'DETACHED';
+
+  @override
+  String get dspStatusDegraded => 'DEGRADED';
+
+  @override
+  String get dspStageStatusActive => 'ACTIVE';
+
+  @override
+  String get dspStageStatusOff => 'OFF';
+
+  @override
+  String get dspStatDspEngine => 'DSP Engine';
+
+  @override
+  String get dspStatDspEngineNative => 'C++ & HAL';
+
+  @override
+  String get dspStatDspEngineAndroid => 'Android HAL';
+
+  @override
+  String get dspStatDspPreference => 'DSP Preference';
+
+  @override
+  String get dspStatNative => 'NATIVE';
+
+  @override
+  String get dspStatMasterEq => 'Master EQ';
+
+  @override
+  String get dspStatMasterDsp => 'Master DSP';
+
+  @override
+  String get dspStatOn => 'ON';
+
+  @override
+  String get dspStatOff => 'OFF';
+
+  @override
+  String get dspStatOemAudioAlert => 'OEM Audio Alert';
+
+  @override
+  String get dspStatDetected => 'Detected';
+
+  @override
+  String get dspStatOutputTarget => 'Output Target';
+
+  @override
+  String dspStatOutputFormat(int rate, int bits) {
+    return '$rate Hz / $bits-bit';
+  }
+
+  @override
+  String dspStatChipLabel(String label) {
+    return '$label: ';
+  }
+
+  @override
+  String get exportBackupDialogTitle => 'Export Backup JSON';
+
+  @override
+  String exportFailedWithError(String error) {
+    return 'Export failed: $error';
+  }
+
+  @override
+  String importFailedWithError(String error) {
+    return 'Import failed: $error';
+  }
+
+  @override
+  String confirmFavoritesCount(int count) {
+    return '• Favorites: $count';
+  }
+
+  @override
+  String confirmPlaylistsCount(int count) {
+    return '• Playlists: $count';
+  }
+
+  @override
+  String confirmHistoryCount(int count) {
+    return '• History: $count';
+  }
+
+  @override
+  String confirmSettingsValue(String value) {
+    return '• Settings: $value';
+  }
+
+  @override
+  String restoredFavoritesCount(int count) {
+    return '• Restored Favorites: $count';
+  }
+
+  @override
+  String restoredPlaylistsCount(int count) {
+    return '• Restored Playlists: $count';
+  }
+
+  @override
+  String restoredHistoryCount(int count) {
+    return '• Restored History Entries: $count';
+  }
+
+  @override
+  String restoredSettingsKeys(int count) {
+    return '• Restored Settings: $count keys';
+  }
+
+  @override
+  String restoredExcludedFoldersCount(int count) {
+    return '• Restored Excluded Folders: $count';
+  }
+
+  @override
+  String unmatchedPathsWarning(int count) {
+    return '⚠️ $count song paths could not be matched in your current library.';
+  }
 }

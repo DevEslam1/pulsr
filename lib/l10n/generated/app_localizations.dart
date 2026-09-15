@@ -6706,6 +6706,264 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Favorites, playlists, play history and library metadata are synced in both directions. DSP presets and app settings stay on this device.'**
   String get cloudSyncItemsDesc;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Copy JSON Report'**
+  String get dspCopyJsonReport;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh Status'**
+  String get dspRefreshStatus;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'{count} ACTIVE'**
+  String dspActiveEffectsCount(int count);
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-Perfect Direct Pass-Through'**
+  String get dspBitPerfectDirectPassThrough;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'AudioEffect Session Active (#{sessionId})'**
+  String dspAudioEffectSessionActive(int sessionId);
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Session Pending — Play a track to attach'**
+  String get dspSessionPendingPlayTrack;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'HAL Detached (Dolby) — Native DSP Active'**
+  String get dspHalDetachedDolbyNativeDsp;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'AudioEffect Session Detached'**
+  String get dspAudioEffectSessionDetached;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'BYPASSED'**
+  String get dspStatusBypassed;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'ATTACHED'**
+  String get dspStatusAttached;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'PENDING'**
+  String get dspStatusPending;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'HAL OFF'**
+  String get dspStatusHalOff;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'DETACHED'**
+  String get dspStatusDetached;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'DEGRADED'**
+  String get dspStatusDegraded;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'ACTIVE'**
+  String get dspStageStatusActive;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'OFF'**
+  String get dspStageStatusOff;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'DSP Engine'**
+  String get dspStatDspEngine;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'C++ & HAL'**
+  String get dspStatDspEngineNative;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Android HAL'**
+  String get dspStatDspEngineAndroid;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'DSP Preference'**
+  String get dspStatDspPreference;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'NATIVE'**
+  String get dspStatNative;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Master EQ'**
+  String get dspStatMasterEq;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Master DSP'**
+  String get dspStatMasterDsp;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'ON'**
+  String get dspStatOn;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'OFF'**
+  String get dspStatOff;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'OEM Audio Alert'**
+  String get dspStatOemAudioAlert;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Detected'**
+  String get dspStatDetected;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Output Target'**
+  String get dspStatOutputTarget;
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'{rate} Hz / {bits}-bit'**
+  String dspStatOutputFormat(int rate, int bits);
+
+  /// dsp inspector l10n
+  ///
+  /// In en, this message translates to:
+  /// **'{label}: '**
+  String dspStatChipLabel(String label);
+
+  /// backup section l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Export Backup JSON'**
+  String get exportBackupDialogTitle;
+
+  /// backup section l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed: {error}'**
+  String exportFailedWithError(String error);
+
+  /// backup section l10n
+  ///
+  /// In en, this message translates to:
+  /// **'Import failed: {error}'**
+  String importFailedWithError(String error);
+
+  /// backup section l10n
+  ///
+  /// In en, this message translates to:
+  /// **'• Favorites: {count}'**
+  String confirmFavoritesCount(int count);
+
+  /// backup section l10n
+  ///
+  /// In en, this message translates to:
+  /// **'• Playlists: {count}'**
+  String confirmPlaylistsCount(int count);
+
+  /// backup section l10n
+  ///
+  /// In en, this message translates to:
+  /// **'• History: {count}'**
+  String confirmHistoryCount(int count);
+
+  /// backup section l10n
+  ///
+  /// In en, this message translates to:
+  /// **'• Settings: {value}'**
+  String confirmSettingsValue(String value);
+
+  /// backup section l10n
+  ///
+  /// In en, this message translates to:
+  /// **'• Restored Favorites: {count}'**
+  String restoredFavoritesCount(int count);
+
+  /// backup section l10n
+  ///
+  /// In en, this message translates to:
+  /// **'• Restored Playlists: {count}'**
+  String restoredPlaylistsCount(int count);
+
+  /// backup section l10n
+  ///
+  /// In en, this message translates to:
+  /// **'• Restored History Entries: {count}'**
+  String restoredHistoryCount(int count);
+
+  /// backup section l10n
+  ///
+  /// In en, this message translates to:
+  /// **'• Restored Settings: {count} keys'**
+  String restoredSettingsKeys(int count);
+
+  /// backup section l10n
+  ///
+  /// In en, this message translates to:
+  /// **'• Restored Excluded Folders: {count}'**
+  String restoredExcludedFoldersCount(int count);
+
+  /// backup section l10n
+  ///
+  /// In en, this message translates to:
+  /// **'⚠️ {count} song paths could not be matched in your current library.'**
+  String unmatchedPathsWarning(int count);
 }
 
 class _AppLocalizationsDelegate
