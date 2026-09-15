@@ -66,7 +66,7 @@ void main() {
       await store.add(station);
       expect(store.list.length, 1);
       expect(store.list.first.name, 'A');
-      expect(store.snapshot().first.url, 'https://a.com/live');
+      expect(store.list.first.url, 'https://a.com/live');
 
       final reloaded = RadioStationStore();
       await reloaded.ready;

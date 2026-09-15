@@ -417,6 +417,39 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                       onChanged: (val) => _applyMbcBand(
                           i, band.copyWith(makeupGainDb: val)),
                     ),
+                    _buildParamRow(
+                      title: context.l10n.dspAttackTime,
+                      valueDisplay:
+                          '${band.attackMs.toStringAsFixed(1)} ms',
+                      value: band.attackMs,
+                      min: 0.1,
+                      max: 200.0,
+                      enabled: _mbcEnabled,
+                      onChanged: (val) => _applyMbcBand(
+                          i, band.copyWith(attackMs: val)),
+                    ),
+                    _buildParamRow(
+                      title: context.l10n.releaseTime,
+                      valueDisplay:
+                          '${band.releaseMs.toStringAsFixed(0)} ms',
+                      value: band.releaseMs,
+                      min: 5.0,
+                      max: 1000.0,
+                      enabled: _mbcEnabled,
+                      onChanged: (val) => _applyMbcBand(
+                          i, band.copyWith(releaseMs: val)),
+                    ),
+                    _buildParamRow(
+                      title: context.l10n.dspKnee,
+                      valueDisplay:
+                          '${band.kneeDb.toStringAsFixed(1)} dB',
+                      value: band.kneeDb,
+                      min: 0.0,
+                      max: 12.0,
+                      enabled: _mbcEnabled,
+                      onChanged: (val) =>
+                          _applyMbcBand(i, band.copyWith(kneeDb: val)),
+                    ),
                   ],
                 ),
               );

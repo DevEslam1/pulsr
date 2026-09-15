@@ -5190,6 +5190,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get dspMakeupGain => 'كسب التعويض';
 
   @override
+  String get dspKnee => 'الركبة';
+
+  @override
   String get dspMaxBoost => 'أقصى تعزيز';
 
   @override

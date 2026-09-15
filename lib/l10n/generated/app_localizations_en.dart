@@ -5239,6 +5239,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dspMakeupGain => 'Makeup Gain';
 
   @override
+  String get dspKnee => 'Knee';
+
+  @override
   String get dspMaxBoost => 'Max Boost';
 
   @override

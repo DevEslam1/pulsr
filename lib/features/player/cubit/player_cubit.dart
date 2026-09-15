@@ -2654,13 +2654,6 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     ));
   }
 
-  Future<void> set32BandMode(bool enabled) async {
-    await _audioHandler.set32BandMode(enabled);
-    safeEmit(state.copyWith(
-      eqPreset: _audioHandler.currentPreset,
-    ));
-  }
-
   Future<void> switchComparisonSlot(ComparisonSlot slot) async {
     await _audioHandler.switchComparisonSlot(slot);
     safeEmit(state.copyWith(
@@ -2899,10 +2892,26 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
             await _audioHandler.setVolumeBoost(snap.volumeBoost);
           }
         } else {
-          // No snapshot to restore: do not fabricate limiter/dynamics as ON.
-          // Re-sync the UI from the handler (the source of truth) and leave
-          // every stage exactly as the current/stored preference has it.
-          _syncAudioEffects();
+          // Default baseline DSP activation when no previous snapshot exists:
+          final enableSpatial = state.isSpatializerSupported;
+          final enableVirt = !enableSpatial && state.isVirtualizerSupported;
+          safeEmit(state.copyWith(
+            isSpatializerEnabled: enableSpatial,
+            isVirtualizerEnabled: enableVirt,
+            virtualizerStrength: enableVirt ? 0.35 : state.virtualizerStrength,
+            isLimiterEnabled: true,
+            limiterThresholdDb: -0.2,
+            limiterReleaseMs: 50.0,
+          ));
+          if (enableSpatial) {
+            await _audioHandler.setSpatializerEnabled(true);
+          }
+          if (enableVirt) {
+            await _audioHandler.setVirtualizerEnabled(true);
+            await _audioHandler.setVirtualizerStrength(0.35);
+          }
+          await _audioHandler.setLookaheadLimiter(true,
+              thresholdDb: -0.2, releaseMs: 50.0);
         }
       }
     } catch (e) {

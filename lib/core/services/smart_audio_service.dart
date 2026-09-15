@@ -108,14 +108,4 @@ class SmartAudioService {
       json.encode(links.map((k, v) => MapEntry(k, v.toJson()))),
     );
   }
-
-  Future<void> forgetAutoEqLink(String deviceKey) async {
-    final links = await getAutoEqLinks();
-    if (links.remove(deviceKey) == null) return;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      PrefsKeys.smartAudioAutoEqLinks,
-      json.encode(links.map((k, v) => MapEntry(k, v.toJson()))),
-    );
-  }
 }

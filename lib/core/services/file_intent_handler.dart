@@ -44,6 +44,11 @@ class FileIntentHandler {
         if (uri != null) {
           await handleAudioUri(uri);
         }
+      } else if (call.method == 'onVoiceSearch') {
+        final query = call.arguments as String?;
+        if (query != null) {
+          await handleVoiceSearch(query);
+        }
       }
     });
   }
@@ -132,8 +137,47 @@ class FileIntentHandler {
     }
   }
 
+  /// Assistant / Android voice-search entry point. Resolves [query] against the
+  /// local library and immediately plays the best match; when nothing matches,
+  /// opens the Search screen with the query prefilled so the user can refine.
+  Future<void> handleVoiceSearch(String query) async {
+    final q = query.trim();
+    if (q.isEmpty) return;
+    try {
+      final res =
+          await _repository.watchAllSongs(searchQuery: q, limit: 1).first;
+      final match =
+          res.fold((_) => null, (songs) => songs.isEmpty ? null : songs.first);
+      if (match != null) {
+        await _playerCubit.playSong(match);
+        final navCtx = rootNavigatorKey.currentContext;
+        if (navCtx != null && navCtx.mounted) {
+          navCtx.push('/now-playing');
+        }
+        return;
+      }
+      final navCtx = rootNavigatorKey.currentContext;
+      if (navCtx != null && navCtx.mounted) {
+        navCtx.go('/search?q=${Uri.encodeComponent(q)}');
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to handle voice search: $query',
+          error: e, stackTrace: st, category: 'FileIntentHandler');
+    }
+  }
+
   Future<void> handleAudioUri(String uriOrPath) async {
     try {
+      // Cold-start Assistant entry queued by MainActivity as
+      // `pulsr://voice-search?query=...`.
+      final voiceUri = Uri.tryParse(uriOrPath);
+      if (voiceUri != null &&
+          voiceUri.scheme == 'pulsr' &&
+          voiceUri.host == 'voice-search') {
+        await handleVoiceSearch(voiceUri.queryParameters['query'] ?? '');
+        return;
+      }
+
       final videoId = extractYouTubeVideoId(uriOrPath);
       if (videoId != null && AppConfig.ytmEnabled) {
         await _handleYouTubeLink(videoId);

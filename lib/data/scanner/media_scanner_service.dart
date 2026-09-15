@@ -9,6 +9,8 @@ import 'package:on_audio_query/on_audio_query.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../core/constants/audio_formats.dart';
 import '../../core/constants/channels.dart';
+import '../../core/di/injection.dart';
+import '../../core/services/playlist_suggestions_service.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../db/app_database.dart';
@@ -273,6 +275,17 @@ class MediaScannerService {
       // cleanup so it only touches live files and is idempotent on rescans.
       await _repository.expandCueSheets();
       _progressController.add(1.0);
+
+      // A completed scan changes the library, so drop any cached
+      // "Suggested for you" mixes generated from the previous snapshot.
+      try {
+        if (getIt.isRegistered<PlaylistSuggestionsService>()) {
+          getIt<PlaylistSuggestionsService>().invalidateCache();
+        }
+      } catch (e, st) {
+        ErrorLogger.log('Failed to invalidate playlist suggestions',
+            error: e, stackTrace: st, category: 'scanner');
+      }
 
       ErrorLogger.addBreadcrumb(
           'Scanner completed: ${parseResult.songs.length} valid songs indexed'

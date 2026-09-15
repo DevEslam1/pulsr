@@ -49,33 +49,6 @@ void main() {
 
       await store.setRating('track_1', 0);
       expect(store.getRating('track_1'), equals(0));
-
-      final snapshot = store.snapshot();
-      expect(snapshot.containsKey('track_1'), isFalse);
-    });
-
-    test('clearAll removes all ratings', () async {
-      final store = SongRatingStore();
-      await store.ready;
-
-      await store.setRating('track_1', 3);
-      await store.setRating('track_2', 5);
-      expect(store.snapshot().length, equals(2));
-
-      store.clearAll();
-      expect(store.snapshot().isEmpty, isTrue);
-      expect(store.getRating('track_1'), equals(0));
-      expect(store.getRating('track_2'), equals(0));
-    });
-
-    test('snapshot provides an unmodifiable view', () async {
-      final store = SongRatingStore();
-      await store.ready;
-
-      await store.setRating('track_1', 2);
-      final snap = store.snapshot();
-      expect(snap['track_1'], equals(2));
-      expect(() => (snap as dynamic)['track_2'] = 5, throwsUnsupportedError);
     });
   });
 }

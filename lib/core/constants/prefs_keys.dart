@@ -213,7 +213,6 @@ class PrefsKeys {
   // disabling it restores the pre-Quran EQ/reverb/dynamics even across a
   // process restart (when the in-memory snapshot no longer exists).
   static const String quranRestoreSnapshot = 'quran_restore_snapshot_v1';
-  static const String spatializerEngine = 'setting_spatializer_engine'; // 'off' | 'systemHardware' | 'binauralAmbisonic'
   // Removed: exclusiveOffloadEnabled was dead — no native exclusive-offload
   // path exists (orphan 20-01, tranche 5). Reintroduce with native support.
 

@@ -9365,6 +9365,12 @@ abstract class AppLocalizations {
   /// **'Makeup Gain'**
   String get dspMakeupGain;
 
+  /// Compressor knee width label
+  ///
+  /// In en, this message translates to:
+  /// **'Knee'**
+  String get dspKnee;
+
   /// No description provided for @dspMaxBoost.
   ///
   /// In en, this message translates to:

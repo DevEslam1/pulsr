@@ -38,9 +38,6 @@ void main() {
       expect(link, isNotNull);
       expect(link!.profileId, 'sony_wh1000xm5');
       expect(link.score, 1.0);
-
-      await service.forgetAutoEqLink('bluetooth:wh 1000xm5');
-      expect(await service.linkForDeviceKey('bluetooth:wh 1000xm5'), isNull);
     });
 
     test('unknown mode name falls back to Auto', () {

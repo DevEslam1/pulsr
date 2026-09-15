@@ -1482,30 +1482,6 @@ class AudioEffectsChannel {
     }
   }
 
-  Future<void> setReverbParams({
-    double predelayMs = 0.0,
-    double damping = 0.5,
-    double crossChannel = 0.0,
-  }) async {
-    if (!_isAndroid) return;
-    try {
-      await _channel
-          .invokeMethod('setReverbParams', {
-            'predelayMs': predelayMs,
-            'damping': damping,
-            'crossChannel': crossChannel,
-          })
-          .timeout(const Duration(seconds: 2));
-    } catch (e, st) {
-      ErrorLogger.log(
-        'setReverbParams failed',
-        error: e,
-        stackTrace: st,
-        category: 'AudioEffectsChannel',
-      );
-    }
-  }
-
   Future<void> setReverbCrossChannel(double crossChannel) async {
     if (!_isAndroid) return;
     try {

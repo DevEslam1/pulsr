@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,6 +9,7 @@ import '../../../../core/constants/app_radii.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/lrc_parser.dart';
+import '../../../../data/lyrics/lyrics_offset_store.dart';
 import '../../../../domain/models/lyrics_line.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
@@ -44,6 +47,11 @@ class LyricsView extends StatefulWidget {
 class _LyricsViewState extends State<LyricsView> {
   late final LyricController _lyricController;
   Duration _audibleOffset = Duration.zero;
+
+  // Per-file manual sync correction, persisted via [LyricsOffsetStore].
+  final LyricsOffsetStore _offsetStore = LyricsOffsetStore();
+  int _manualOffsetMs = 0;
+  String? _offsetSongPath;
 
   // Cached synced check
   List<LyricsLine>? _syncedCheckSource;
@@ -120,9 +128,134 @@ class _LyricsViewState extends State<LyricsView> {
   }
 
   void _updateProgress(Duration position) {
-    final effectivePos = position - _audibleOffset;
+    final effectivePos = position -
+        _audibleOffset -
+        Duration(milliseconds: _manualOffsetMs);
     _lyricController.setProgress(
       effectivePos < Duration.zero ? Duration.zero : effectivePos,
+    );
+  }
+
+  /// Loads the persisted per-file offset when the current song changes.
+  void _syncManualOffset(String? path) {
+    if (path == _offsetSongPath) return;
+    _offsetSongPath = path;
+    if (path == null || path.isEmpty) {
+      _applyManualOffset(0);
+      return;
+    }
+    unawaited(_offsetStore.getOffsetMs(path).then((ms) {
+      if (!mounted || _offsetSongPath != path) return;
+      _applyManualOffset(ms);
+    }));
+  }
+
+  void _applyManualOffset(int ms) {
+    if (ms == _manualOffsetMs) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() => _manualOffsetMs = ms);
+      Duration? pos = widget.currentPosition;
+      if (pos == null) {
+        try {
+          pos = context.read<PlayerCubit>().state.position;
+        } catch (_) {
+          // PlayerCubit unavailable (e.g. during teardown); the offset is
+          // still applied on the next position tick.
+        }
+      }
+      if (pos != null) _updateProgress(pos);
+    });
+  }
+
+  Future<void> _adjustManualOffset(int deltaMs) async {
+    final path = _offsetSongPath;
+    if (path == null || path.isEmpty) return;
+    final next = (_manualOffsetMs + deltaMs).clamp(-5000, 5000);
+    _applyManualOffset(next);
+    await _offsetStore.setOffsetMs(path, next);
+  }
+
+  Future<void> _resetManualOffset() async {
+    final path = _offsetSongPath;
+    _applyManualOffset(0);
+    if (path != null && path.isNotEmpty) {
+      await _offsetStore.clearOffset(path);
+    }
+  }
+
+  Future<void> _showOffsetSheet() async {
+    final l10n = context.l10n;
+    await showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheet) {
+          return Container(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+            decoration: BoxDecoration(
+              color: Theme.of(sheetContext).colorScheme.surface,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  l10n.settingsSyncOffset,
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${_manualOffsetMs >= 0 ? '+' : ''}$_manualOffsetMs ms',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    color: widget.activeColor,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    OutlinedButton(
+                      onPressed: () async {
+                        await _adjustManualOffset(-50);
+                        setSheet(() {});
+                      },
+                      child: const Text('-50 ms'),
+                    ),
+                    const SizedBox(width: 16),
+                    OutlinedButton(
+                      onPressed: () async {
+                        await _adjustManualOffset(50);
+                        setSheet(() {});
+                      },
+                      child: const Text('+50 ms'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  onPressed: () async {
+                    await _resetManualOffset();
+                    setSheet(() {});
+                  },
+                  icon: const Icon(Icons.restart_alt_rounded, size: 18),
+                  label: Text(l10n.reset),
+                ),
+                const SizedBox(height: 4),
+                FilledButton(
+                  onPressed: () => Navigator.of(sheetContext).pop(),
+                  child: Text(l10n.done),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -259,6 +392,10 @@ class _LyricsViewState extends State<LyricsView> {
       children: [
         if (hasSong)
           _headerIconButton(
+              Icons.sync_rounded, context.l10n.settingsSyncOffset,
+              () => unawaited(_showOffsetSheet())),
+        if (hasSong)
+          _headerIconButton(
               Icons.edit_note_rounded, context.l10n.dspEditLyrics, _openEditor),
         _headerIconButton(
             Icons.fullscreen_rounded, context.l10n.dspKaraokeMode, _openKaraoke),
@@ -379,6 +516,11 @@ class _LyricsViewState extends State<LyricsView> {
     } catch (_) {
       _audibleOffset = Duration.zero;
     }
+    try {
+      final songPath =
+          context.select<PlayerCubit, String?>((c) => c.state.currentSong?.path);
+      _syncManualOffset(songPath);
+    } catch (_) {}
 
     if (widget.isLoading) {
       return Center(

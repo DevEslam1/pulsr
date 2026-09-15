@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/errors/error_message_resolver.dart';
@@ -61,6 +62,23 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _onControllerChanged() {
     if (mounted) setState(() {});
+  }
+
+  bool _initialQueryApplied = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initialQueryApplied) return;
+    _initialQueryApplied = true;
+    // Assistant / deep-link entry: prefill and run the search when the route
+    // carries a `?q=` query (e.g. `go('/search?q=...')` from voice search).
+    final q = GoRouterState.of(context).uri.queryParameters['q'];
+    if (q == null || q.trim().isEmpty) return;
+    _searchController.text = q;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _onQueryChanged(context, q);
+    });
   }
 
   @override

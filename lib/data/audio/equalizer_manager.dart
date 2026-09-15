@@ -91,7 +91,6 @@ class EqualizerManager {
       isDynamicsEnabled && !_isDynamicsBypassed;
 
   bool isSpatializerEnabled = false;
-  String spatializerMode = 'systemHardware';
 
   // Tier 1 & Tier 2 & Tier 3 Native DSP features
   bool isCrossfeedEnabled = false;
@@ -415,8 +414,6 @@ class EqualizerManager {
 
       isSpatializerEnabled =
           prefs.getBool(PrefsKeys.eqSpatializerEnabled) ?? false;
-      spatializerMode =
-          prefs.getString(PrefsKeys.spatializerEngine) ?? 'systemHardware';
 
       isCrossfeedEnabled = prefs.getBool(PrefsKeys.crossfeedEnabled) ?? false;
       crossfeedDelayUs = prefs.getDouble(PrefsKeys.crossfeedDelayUs) ?? 350.0;
@@ -1618,17 +1615,6 @@ class EqualizerManager {
         stackTrace: st,
         category: 'EqualizerManager',
       );
-    }
-  }
-
-  Future<void> setSpatializerMode(String mode) async {
-    spatializerMode = mode;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(PrefsKeys.spatializerEngine, mode);
-    if (mode == 'off') {
-      await setSpatializerEnabled(false);
-    } else {
-      await setSpatializerEnabled(true);
     }
   }
 

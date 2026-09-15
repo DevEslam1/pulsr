@@ -7,6 +7,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_radii.dart';
 import '../../../core/di/injection.dart';
+import '../../../core/services/missing_artwork_service.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
@@ -1434,6 +1435,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           context.l10n.removeMissingFilesSubtitle,
           onTap: () => _removeMissingFiles(context, cubit),
         ),
+        _divider(p),
+        _navTile(
+          context,
+          Icons.image_search_rounded,
+          context.l10n.fetchMissingArtworkTooltip,
+          context.l10n.fetchMissingArtworkBody,
+          onTap: () => _fetchMissingArtwork(context),
+        ),
       ],
       key: _catById('library').key,
     );
@@ -2411,6 +2420,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(l10n.removedMissingTracks(removed)),
+      ),
+    );
+  }
+
+  Future<void> _fetchMissingArtwork(BuildContext context) async {
+    final l10n = context.l10n;
+    final confirmed = await PulsrDialogHelper.showPulsrDialog<bool>(
+      context,
+      title: Text(l10n.fetchMissingArtworkTitle),
+      content: Text(l10n.fetchMissingArtworkBody),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l10n.cancel)),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: Text(l10n.fetchArtwork),
+        ),
+      ],
+    );
+    if (confirmed != true) return;
+    if (!context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      SnackBar(content: Text(l10n.fetchArtwork)),
+    );
+    final int count;
+    try {
+      if (!getIt.isRegistered<MissingArtworkService>()) {
+        messenger.showSnackBar(
+            SnackBar(content: Text(l10n.artworkServiceUnavailable)));
+        return;
+      }
+      count = await getIt<MissingArtworkService>()
+          .fetchAndPersistMissingArtwork();
+    } catch (_) {
+      messenger.showSnackBar(
+          SnackBar(content: Text(l10n.artworkServiceUnavailable)));
+      return;
+    }
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(count > 0
+            ? l10n.updatedArtworkForAlbums(count)
+            : l10n.noMissingArtworkFound),
       ),
     );
   }

@@ -410,9 +410,6 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   Future<void> toggleDynamicsBypass() async {}
 
   @override
-  Future<void> set32BandMode(bool enabled) async {}
-
-  @override
   Future<void> switchComparisonSlot(ComparisonSlot slot) async {}
 
   @override
@@ -985,7 +982,6 @@ void main() {
           equals(EqPreset.defaultPresets.first.name),
         );
         await cubit.setBassBoost(0.6);
-        await cubit.set32BandMode(true);
         await cubit.switchComparisonSlot(ComparisonSlot.slotB);
         await cubit.applyHeadphoneProfile(
           const HeadphoneProfile(

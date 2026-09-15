@@ -131,6 +131,40 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                 padding: EdgeInsets.fromLTRB(
                     context.pagePadding, 12, context.pagePadding, 160),
                 children: [
+                  // Quick-start templates (preset rule sets).
+                  if (SmartCriteria.presetTemplates.isNotEmpty) ...[
+                    Text(context.l10n.suggestedForYou,
+                        style: TextStyle(
+                            color: p.textSecondary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.1)),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 40,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: SmartCriteria.presetTemplates.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (context, index) {
+                          final entry =
+                              SmartCriteria.presetTemplates.entries.elementAt(index);
+                          return ActionChip(
+                            avatar: Icon(Icons.auto_awesome_rounded,
+                                size: 16, color: p.accent),
+                            label: Text(entry.key),
+                            onPressed: () {
+                              cubit.applyTemplate(entry.value);
+                              _limitController.text =
+                                  entry.value.limit?.toString() ?? '';
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
                   // Playlist Name Card
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -322,6 +356,9 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                                           child: Text(context.l10n.sortDuration)),
                                       DropdownMenuItem(
                                           value: 'year', child: Text(context.l10n.yearLabel)),
+                                      DropdownMenuItem(
+                                          value: 'rating',
+                                          child: Text(context.l10n.ruleRating)),
                                     ],
                                     onChanged: (val) => cubit.setSortBy(val),
                                   ),

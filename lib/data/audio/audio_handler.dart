@@ -1003,9 +1003,6 @@ class PulsrAudioHandler extends BaseAudioHandler
   bool get isBassBoostSupported => _equalizerManager.isBassBoostSupported;
   bool get isVolumeBoostSupported => _equalizerManager.isVolumeBoostSupported;
   bool get isHeadTrackerAvailable => _equalizerManager.isHeadTrackerAvailable;
-  String get spatializerMode => _equalizerManager.spatializerMode;
-  Future<void> setSpatializerMode(String mode) =>
-      _equalizerManager.setSpatializerMode(mode);
   Future<void> setSpatializerEnabled(bool enabled) =>
       _equalizerManager.setSpatializerEnabled(enabled);
   double get volumeBoost => _equalizerManager.volumeBoost;
@@ -5592,9 +5589,6 @@ class PulsrAudioHandler extends BaseAudioHandler
     } catch (_) {}
     await silenceSkipController.persist();
   }
-
-  double get silenceSkipThresholdDb => silenceSkipController.thresholdDb;
-  Duration get silenceSkipMinDuration => silenceSkipController.minSilenceDuration;
 
   // F11: bookmarks
   PlaybackBookmark? recallBookmarkFor(SongsTableData song) {

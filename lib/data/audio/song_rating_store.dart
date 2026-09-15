@@ -36,13 +36,6 @@ class SongRatingStore {
     await persist();
   }
 
-  void clearAll() {
-    _ratings.clear();
-    persist();
-  }
-
-  Map<String, int> snapshot() => Map.unmodifiable(_ratings);
-
   Future<void> load() async {
     try {
       final prefs = await SharedPreferences.getInstance();

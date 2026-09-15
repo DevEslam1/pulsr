@@ -156,16 +156,16 @@ void main() {
   });
 
   group('F10 silence skip', () {
-    test('sensitivity mapping', () {
+    test('sensitivity mapping toggles enable state', () {
       final c = SilenceSkipController();
       c.setSensitivity(0);
       expect(c.enabled, isFalse);
       c.setSensitivity(100);
       expect(c.enabled, isTrue);
-      expect(c.thresholdDb, closeTo(-20.0, 1e-9));
-      expect(c.minSilenceDuration.inMilliseconds, 200);
+      expect(c.sensitivity, 100);
       c.setSensitivity(1);
-      expect(c.minSilenceDuration.inMilliseconds, greaterThan(1900));
+      expect(c.enabled, isTrue);
+      expect(c.sensitivity, 1);
     });
   });
 

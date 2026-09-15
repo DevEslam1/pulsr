@@ -41,6 +41,12 @@ class SmartPlaylistBuilderCubit extends Cubit<SmartPlaylistBuilderState> {
     emit(state.copyWith(name: name));
   }
 
+  /// Replaces the current rule set with a preset template.
+  void applyTemplate(SmartCriteria template) {
+    emit(state.copyWith(criteria: template));
+    _updatePreview();
+  }
+
   void toggleMatchAll(bool matchAll) {
     final newCriteria = state.criteria.copyWith(matchAll: matchAll);
     emit(state.copyWith(criteria: newCriteria));

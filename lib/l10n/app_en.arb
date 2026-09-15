@@ -3909,6 +3909,10 @@
   "dspLyricsSaved": "Lyrics saved",
   "dspLyricsSessionOnly": "Lyrics updated for this session only",
   "dspMakeupGain": "Makeup Gain",
+  "dspKnee": "Knee",
+  "@dspKnee": {
+    "description": "Compressor knee width label"
+  },
   "dspMaxBoost": "Max Boost",
   "dspMosqueAmbience": "Mosque Ambience",
   "dspMosqueAmbienceDesc": "Convolution reverb for a hall-like space",

@@ -22,8 +22,6 @@ class RadioStationStore {
   /// Stations in display order (most recently added first).
   List<RadioStation> get list => List.unmodifiable(_stations);
 
-  List<RadioStation> snapshot() => List.unmodifiable(_stations);
-
   Future<void> add(RadioStation station) async {
     if (!RadioStation.isHttpUrl(station.url)) return;
     _stations.removeWhere(

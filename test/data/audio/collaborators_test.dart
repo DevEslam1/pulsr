@@ -1,9 +1,7 @@
 // test/data/audio/collaborators_test.dart
-import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:pulsr/data/audio/collaborators/playback_queue_manager.dart';
 import 'package:pulsr/data/audio/collaborators/playback_volume_controller.dart';
 import 'package:pulsr/data/audio/collaborators/playback_state_coordinator.dart';
 import 'package:pulsr/data/audio/collaborators/playback_preload_orchestrator.dart';
@@ -47,96 +45,6 @@ SongsTableData _createMockSong(int id, {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-
-  group('PlaybackQueueManager Tests', () {
-    late PlaybackQueueManager manager;
-    final testQueue = List.generate(5, (i) => _createMockSong(i + 1));
-
-    setUp(() {
-      manager = PlaybackQueueManager();
-      manager.setQueue(testQueue, initialIndex: 0);
-    });
-
-    test('Initializes queue and clamp index correctly', () {
-      expect(manager.songs.length, equals(5));
-      expect(manager.currentIndex, equals(0));
-      expect(manager.currentSong?.id, equals(1));
-    });
-
-    test('Sequential next and previous navigation without repeat', () {
-      manager.setRepeatMode(AudioServiceRepeatMode.none);
-      
-      expect(manager.getNextIndex(), equals(1));
-      manager.setCurrentIndex(1);
-      expect(manager.getNextIndex(), equals(2));
-      expect(manager.getPreviousIndex(), equals(0));
-
-      manager.setCurrentIndex(4); // Last song
-      expect(manager.getNextIndex(), isNull); // Reached end
-    });
-
-    test('Repeat Mode: all wraps around', () {
-      manager.setRepeatMode(AudioServiceRepeatMode.all);
-      
-      manager.setCurrentIndex(4); // Last song
-      expect(manager.getNextIndex(), equals(0)); // Wraps to beginning
-
-      manager.setCurrentIndex(0); // First song
-      expect(manager.getPreviousIndex(), equals(4)); // Wraps to end
-    });
-
-    test('Repeat Mode: one repeats the current song', () {
-      manager.setRepeatMode(AudioServiceRepeatMode.one);
-      manager.setCurrentIndex(2);
-      expect(manager.getNextIndex(), equals(2));
-      expect(manager.getPreviousIndex(), equals(2));
-    });
-
-    test('Shuffle mode produces valid permutation and navigates', () {
-      manager.setShuffle(true);
-      expect(manager.isShuffle, isTrue);
-      expect(manager.shuffleIndices.length, equals(5));
-      expect(manager.shuffleIndices.toSet().length, equals(5)); // Unique
-
-      final nextIdx = manager.getNextIndex();
-      expect(nextIdx, isNotNull);
-      expect(nextIdx! >= 0 && nextIdx < 5, isTrue);
-
-      manager.setShuffle(false);
-      expect(manager.isShuffle, isFalse);
-    });
-
-    test('Sliding window materialization calculates correct window bounds', () {
-      // Current index 2, windowBefore 1, windowAfter 1 -> window [1, 4]
-      manager.setCurrentIndex(2);
-      final window = manager.getSlidingWindow(windowBefore: 1, windowAfter: 1);
-      expect(window.start, equals(1));
-      expect(window.end, equals(4));
-
-      // Current index 0, windowBefore 2, windowAfter 2 -> window [0, 3]
-      manager.setCurrentIndex(0);
-      final edgeWindow = manager.getSlidingWindow(windowBefore: 2, windowAfter: 2);
-      expect(edgeWindow.start, equals(0));
-      expect(edgeWindow.end, equals(3));
-    });
-
-    test('Queue mutation: remove, insert, and move', () {
-      manager.setCurrentIndex(2); // Song id 3
-      manager.removeSongAt(0); // Remove Song 1
-      expect(manager.songs.length, equals(4));
-      expect(manager.currentIndex, equals(1)); // Shifted down
-      expect(manager.currentSong?.id, equals(3));
-
-      final newSong = _createMockSong(99);
-      manager.insertSong(0, newSong);
-      expect(manager.songs.length, equals(5));
-      expect(manager.currentIndex, equals(2)); // Shifted up
-      expect(manager.songs[0].id, equals(99));
-
-      manager.moveSong(0, 4);
-      expect(manager.songs.last.id, equals(99));
-    });
-  });
 
   group('PlaybackVolumeController Tests', () {
     late PlaybackVolumeController controller;

@@ -620,11 +620,4 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     });
     return sorted;
   }
-
-  @override
-  Future<List<SongsTableData>> createPlaybackSnapshot(
-      SmartCriteria criteria) async {
-    final songs = await evaluateCriteria(criteria);
-    return List<SongsTableData>.unmodifiable(songs);
-  }
 }
