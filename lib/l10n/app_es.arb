@@ -471,6 +471,17 @@
   "rcKeepPlayerPaused": "La música permanece en pausa mientras la corrección de sala está activa",
   "rcApplied": "Preset de corrección de sala aplicado",
   "deviceProfilesTitle": "Perfiles de dispositivo",
+  "themeScheduleTitle": "Horas oscuras",
+  "themeScheduleStartLabel": "Oscuro desde",
+  "themeScheduleEndLabel": "Claro desde",
+  "themeScheduleHour": "{hour}:00",
+  "@themeScheduleHour": {
+    "placeholders": {
+      "hour": {
+        "type": "int"
+      }
+    }
+  },
   "deviceProfilesSubtitle": "Ajustes de sonido recordados por dispositivo de salida",
   "autoDeviceSwitch": "Cambio automático al cambiar de dispositivo",
   "noDevicesSeen": "Aún no se han detectado dispositivos de salida",
@@ -478,6 +489,26 @@
   "forgetDevice": "Olvidar",
   "currentDeviceBadge": "Actual",
   "profileDropdownLabel": "Perfil",
+  "customProfilesTitle": "Perfiles",
+  "profileCreateFromCurrent": "Guardar el sonido actual como perfil",
+  "profileNameHint": "Nombre del perfil",
+  "profileCreated": "Perfil \"{name}\" guardado",
+  "@profileCreated": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "profileDeleteConfirm": "¿Eliminar el perfil \"{name}\"?",
+  "@profileDeleteConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "profileBuiltIn": "Integrado",
   "smartAudioTitle": "Audio inteligente",
   "smartAudioSubtitle": "Ajusta el sonido automáticamente a tus auriculares y a cada pista",
   "smartAudioModeLabel": "Modo",
@@ -657,6 +688,17 @@
   "radioImportedCount": "{count} emisoras importadas",
   "radioNoStreamsFound": "No se encontraron URL de transmisión http(s)",
   "radioPlay": "Reproducir",
+  "radioCuratedBrowse": "Explorar emisoras seleccionadas",
+  "radioCuratedAdded": "{count} emisoras seleccionadas añadidas",
+  "@radioCuratedAdded": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "radioCuratedUpToDate": "Todas las emisoras seleccionadas ya están en tu lista",
+  "radioCuratedTitle": "Emisoras seleccionadas",
   "followTrackSampleRateTitle": "Seguir la frecuencia de muestreo de la pista",
   "followTrackSampleRateSubtitle": "Reconfigura la salida a la frecuencia nativa de cada pista; se omite en Bluetooth y no repite cambios",
   "followTrackSampleRateBluetooth": "Se omite en Bluetooth: el enlace del códec/AVRCP controla la frecuencia",
@@ -2383,6 +2425,10 @@
   "@whatGetsSynced": {
     "description": "tranche8 l10n"
   },
+  "cloudSyncFavoritesLabel": "Sincronizar favoritos",
+  "cloudSyncFavoritesDesc": "Sube y restaura las canciones favoritas entre dispositivos",
+  "cloudSyncPlaylistsLabel": "Sincronizar listas",
+  "cloudSyncPlaylistsDesc": "Sube y restaura tus listas entre dispositivos",
   "syncItemsPrefix": "Favoritos, listas, historial y metadatos ",
   "@syncItemsPrefix": {
     "description": "tranche8 l10n"

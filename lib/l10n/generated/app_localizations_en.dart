@@ -1410,6 +1410,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deviceProfilesTitle => 'Device Profiles';
 
   @override
+  String get themeScheduleTitle => 'Dark hours';
+
+  @override
+  String get themeScheduleStartLabel => 'Dark from';
+
+  @override
+  String get themeScheduleEndLabel => 'Light from';
+
+  @override
+  String themeScheduleHour(int hour) {
+    return '$hour:00';
+  }
+
+  @override
   String get deviceProfilesSubtitle =>
       'Sound settings remembered per output device';
 
@@ -1430,6 +1444,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileDropdownLabel => 'Profile';
+
+  @override
+  String get customProfilesTitle => 'Profiles';
+
+  @override
+  String get profileCreateFromCurrent => 'Save current sound as profile';
+
+  @override
+  String get profileNameHint => 'Profile name';
+
+  @override
+  String profileCreated(String name) {
+    return 'Profile \"$name\" saved';
+  }
+
+  @override
+  String profileDeleteConfirm(String name) {
+    return 'Delete profile \"$name\"?';
+  }
+
+  @override
+  String get profileBuiltIn => 'Built-in';
 
   @override
   String get smartAudioTitle => 'Smart Audio';
@@ -1961,6 +1997,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get radioPlay => 'Play';
+
+  @override
+  String get radioCuratedBrowse => 'Browse curated stations';
+
+  @override
+  String radioCuratedAdded(int count) {
+    return '$count curated stations added';
+  }
+
+  @override
+  String get radioCuratedUpToDate =>
+      'All curated stations are already in your list';
+
+  @override
+  String get radioCuratedTitle => 'Curated Stations';
 
   @override
   String get followTrackSampleRateTitle => 'Follow track sample rate';
@@ -3404,6 +3455,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get whatGetsSynced => 'What gets synced';
+
+  @override
+  String get cloudSyncFavoritesLabel => 'Sync favorites';
+
+  @override
+  String get cloudSyncFavoritesDesc =>
+      'Upload and restore liked songs across devices';
+
+  @override
+  String get cloudSyncPlaylistsLabel => 'Sync playlists';
+
+  @override
+  String get cloudSyncPlaylistsDesc =>
+      'Upload and restore your playlists across devices';
 
   @override
   String get syncItemsPrefix =>

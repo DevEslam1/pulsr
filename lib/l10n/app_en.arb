@@ -544,6 +544,17 @@
   "rcKeepPlayerPaused": "Music playback stays paused while Room Correction is active",
   "rcApplied": "Room Correction preset applied",
   "deviceProfilesTitle": "Device Profiles",
+  "themeScheduleTitle": "Dark hours",
+  "themeScheduleStartLabel": "Dark from",
+  "themeScheduleEndLabel": "Light from",
+  "themeScheduleHour": "{hour}:00",
+  "@themeScheduleHour": {
+    "placeholders": {
+      "hour": {
+        "type": "int"
+      }
+    }
+  },
   "deviceProfilesSubtitle": "Sound settings remembered per output device",
   "autoDeviceSwitch": "Auto-switch on device change",
   "noDevicesSeen": "No output devices seen yet",
@@ -551,6 +562,26 @@
   "forgetDevice": "Forget",
   "currentDeviceBadge": "Current",
   "profileDropdownLabel": "Profile",
+  "customProfilesTitle": "Profiles",
+  "profileCreateFromCurrent": "Save current sound as profile",
+  "profileNameHint": "Profile name",
+  "profileCreated": "Profile \"{name}\" saved",
+  "@profileCreated": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "profileDeleteConfirm": "Delete profile \"{name}\"?",
+  "@profileDeleteConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "profileBuiltIn": "Built-in",
   "smartAudioTitle": "Smart Audio",
   "smartAudioSubtitle": "Automatically tune the sound to your headphones and track",
   "smartAudioModeLabel": "Mode",
@@ -897,6 +928,17 @@
   },
   "radioNoStreamsFound": "No http(s) stream URLs found",
   "radioPlay": "Play",
+  "radioCuratedBrowse": "Browse curated stations",
+  "radioCuratedAdded": "{count} curated stations added",
+  "@radioCuratedAdded": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "radioCuratedUpToDate": "All curated stations are already in your list",
+  "radioCuratedTitle": "Curated Stations",
   "followTrackSampleRateTitle": "Follow track sample rate",
   "followTrackSampleRateSubtitle": "Reconfigure the output to each track's native rate; de-duplicated and skipped on Bluetooth",
   "followTrackSampleRateBluetooth": "Skipped on Bluetooth — the codec/AVRCP link owns the sample rate",
@@ -2668,6 +2710,10 @@
   "@whatGetsSynced": {
     "description": "tranche8 l10n"
   },
+  "cloudSyncFavoritesLabel": "Sync favorites",
+  "cloudSyncFavoritesDesc": "Upload and restore liked songs across devices",
+  "cloudSyncPlaylistsLabel": "Sync playlists",
+  "cloudSyncPlaylistsDesc": "Upload and restore your playlists across devices",
   "syncItemsPrefix": "Favorites, playlists, play history and library metadata are ",
   "@syncItemsPrefix": {
     "description": "tranche8 l10n"

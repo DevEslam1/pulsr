@@ -115,12 +115,18 @@ class SettingSliderRow extends StatelessWidget {
                       fontWeight: FontWeight.w600)),
             ),
           ],
-          PulsrSlider(
-            value: value.clamp(min, max),
-            min: min,
-            max: max,
-            divisions: divisions,
-            onChanged: enabled ? onChanged : (_) {},
+          IgnorePointer(
+            ignoring: !enabled,
+            child: Opacity(
+              opacity: enabled ? 1.0 : 0.5,
+              child: PulsrSlider(
+                value: value.clamp(min, max),
+                min: min,
+                max: max,
+                divisions: divisions,
+                onChanged: onChanged,
+              ),
+            ),
           ),
         ],
       ),

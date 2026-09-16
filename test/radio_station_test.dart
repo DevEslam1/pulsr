@@ -110,6 +110,27 @@ void main() {
       await reloaded.ready;
       expect(reloaded.list.first.lastPlayed, 999);
     });
+
+    test('importCurated adds the directory once and is idempotent', () async {
+      final store = RadioStationStore();
+      await store.ready;
+      expect(store.list, isEmpty);
+
+      final curatedCount = RadioStationStore.curatedDirectory().length;
+      final added = await store.importCurated();
+      expect(added, curatedCount);
+      expect(store.list.length, curatedCount);
+
+      // Second import must not duplicate.
+      final addedAgain = await store.importCurated();
+      expect(addedAgain, 0);
+      expect(store.list.length, curatedCount);
+
+      // Persisted for the next session.
+      final reloaded = RadioStationStore();
+      await reloaded.ready;
+      expect(reloaded.list.length, curatedCount);
+    });
   });
 
   group('RadioStationStore.extractStreamUrls', () {

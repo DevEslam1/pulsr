@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/utils/l10n_extensions.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/cloud_sync_service.dart';
 import '../../../core/theme/aura_theme.dart';
@@ -20,11 +21,29 @@ class _CloudBackupDashboardScreenState
     extends State<CloudBackupDashboardScreen> {
   late final CloudSyncService _syncService;
   bool _isSyncing = false;
+  bool _syncFavorites = true;
+  bool _syncPlaylists = true;
 
   @override
   void initState() {
     super.initState();
     _syncService = widget.syncService ?? getIt<CloudSyncService>();
+    _loadSyncScopes();
+  }
+
+  Future<void> _loadSyncScopes() async {
+    try {
+      final fav = await _syncService.isFavoritesSyncEnabled;
+      final pl = await _syncService.isPlaylistsSyncEnabled;
+      if (!mounted) return;
+      setState(() {
+        _syncFavorites = fav;
+        _syncPlaylists = pl;
+      });
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load cloud sync scope toggles',
+          error: e, stackTrace: st, category: 'CloudBackupDashboard');
+    }
   }
 
   Future<void> _performSync() async {
@@ -135,6 +154,30 @@ class _CloudBackupDashboardScreenState
             context.l10n.cloudSyncItemsDesc,
             style: TextStyle(fontSize: 13, color: p.textSecondary),
           ),
+          const SizedBox(height: 16),
+
+          // Per-scope sync toggles (previously the service exposed them but
+          // no UI ever set or read them, so syncAll always synced everything).
+          _SyncScopeTile(
+            icon: Icons.favorite_rounded,
+            title: context.l10n.cloudSyncFavoritesLabel,
+            subtitle: context.l10n.cloudSyncFavoritesDesc,
+            value: _syncFavorites,
+            onChanged: (v) async {
+              setState(() => _syncFavorites = v);
+              await _syncService.setFavoritesSyncEnabled(v);
+            },
+          ),
+          _SyncScopeTile(
+            icon: Icons.queue_music_rounded,
+            title: context.l10n.cloudSyncPlaylistsLabel,
+            subtitle: context.l10n.cloudSyncPlaylistsDesc,
+            value: _syncPlaylists,
+            onChanged: (v) async {
+              setState(() => _syncPlaylists = v);
+              await _syncService.setPlaylistsSyncEnabled(v);
+            },
+          ),
           const SizedBox(height: 24),
 
           SizedBox(
@@ -159,6 +202,65 @@ class _CloudBackupDashboardScreenState
           ),
         ],
       ),
+      ),
+    );
+  }
+}
+
+class _SyncScopeTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _SyncScopeTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: p.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: p.primary, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14.5,
+                    color: p.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  subtitle,
+                  style: TextStyle(fontSize: 12, color: p.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          Switch.adaptive(value: value, onChanged: onChanged),
+        ],
       ),
     );
   }

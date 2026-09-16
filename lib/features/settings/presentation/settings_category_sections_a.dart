@@ -211,6 +211,10 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
           value: state.autoThemeByTime,
           onChanged: cubit.setAutoThemeByTime,
         ),
+        if (state.autoThemeByTime) ...[
+          const ThemeScheduleRow(),
+          _divider(p),
+        ],
         _divider(p),
         _switchTile(
           context,

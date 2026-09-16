@@ -1418,6 +1418,20 @@ class AppLocalizationsEs extends AppLocalizations {
   String get deviceProfilesTitle => 'Perfiles de dispositivo';
 
   @override
+  String get themeScheduleTitle => 'Horas oscuras';
+
+  @override
+  String get themeScheduleStartLabel => 'Oscuro desde';
+
+  @override
+  String get themeScheduleEndLabel => 'Claro desde';
+
+  @override
+  String themeScheduleHour(int hour) {
+    return '$hour:00';
+  }
+
+  @override
   String get deviceProfilesSubtitle =>
       'Ajustes de sonido recordados por dispositivo de salida';
 
@@ -1438,6 +1452,28 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get profileDropdownLabel => 'Perfil';
+
+  @override
+  String get customProfilesTitle => 'Perfiles';
+
+  @override
+  String get profileCreateFromCurrent => 'Guardar el sonido actual como perfil';
+
+  @override
+  String get profileNameHint => 'Nombre del perfil';
+
+  @override
+  String profileCreated(String name) {
+    return 'Perfil \"$name\" guardado';
+  }
+
+  @override
+  String profileDeleteConfirm(String name) {
+    return '¿Eliminar el perfil \"$name\"?';
+  }
+
+  @override
+  String get profileBuiltIn => 'Integrado';
 
   @override
   String get smartAudioTitle => 'Audio inteligente';
@@ -1981,6 +2017,21 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get radioPlay => 'Reproducir';
+
+  @override
+  String get radioCuratedBrowse => 'Explorar emisoras seleccionadas';
+
+  @override
+  String radioCuratedAdded(int count) {
+    return '$count emisoras seleccionadas añadidas';
+  }
+
+  @override
+  String get radioCuratedUpToDate =>
+      'Todas las emisoras seleccionadas ya están en tu lista';
+
+  @override
+  String get radioCuratedTitle => 'Emisoras seleccionadas';
 
   @override
   String get followTrackSampleRateTitle =>
@@ -3394,6 +3445,20 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get whatGetsSynced => 'Que se sincroniza';
+
+  @override
+  String get cloudSyncFavoritesLabel => 'Sincronizar favoritos';
+
+  @override
+  String get cloudSyncFavoritesDesc =>
+      'Sube y restaura las canciones favoritas entre dispositivos';
+
+  @override
+  String get cloudSyncPlaylistsLabel => 'Sincronizar listas';
+
+  @override
+  String get cloudSyncPlaylistsDesc =>
+      'Sube y restaura tus listas entre dispositivos';
 
   @override
   String get syncItemsPrefix => 'Favoritos, listas, historial y metadatos ';

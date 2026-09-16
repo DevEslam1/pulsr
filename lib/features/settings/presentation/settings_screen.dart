@@ -34,6 +34,7 @@ import 'widgets/scrobbler_settings_modal.dart';
 import 'widgets/settings_hero_card.dart';
 import 'widgets/settings_picker_sheets.dart';
 import 'widgets/storage_cache_section.dart';
+import 'widgets/theme_schedule_row.dart';
 import 'widgets/ytm_account_disconnect_dialog.dart';
 part 'settings_category_sections_a.dart';
 part 'settings_category_sections_b.dart';
