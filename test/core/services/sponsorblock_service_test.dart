@@ -104,6 +104,60 @@ void main() {
       expect(offtopicMatch?.uuid, 'offtopic-1');
     });
 
+    test('findSkipTarget chains adjacent segments and respects categories', () {
+      final service = SponsorBlockService();
+      const segments = [
+        SponsorBlockSegment(
+          category: 'sponsor',
+          start: Duration(seconds: 10),
+          end: Duration(seconds: 20),
+          uuid: 's1',
+        ),
+        SponsorBlockSegment(
+          category: 'sponsor',
+          start: Duration(seconds: 20),
+          end: Duration(seconds: 30),
+          uuid: 's2',
+        ),
+        SponsorBlockSegment(
+          category: 'intro',
+          start: Duration(seconds: 100),
+          end: Duration(seconds: 110),
+          uuid: 'i1',
+        ),
+      ];
+
+      // Inside s1 with both categories enabled: chains s1+s2, +50ms.
+      expect(
+        service.findSkipTarget(
+          segments: segments,
+          enabledCategories: {'sponsor', 'intro'},
+          position: const Duration(seconds: 12),
+        ),
+        const Duration(seconds: 30, milliseconds: 50),
+      );
+
+      // Category disabled: no skip even inside the segment.
+      expect(
+        service.findSkipTarget(
+          segments: segments,
+          enabledCategories: {'intro'},
+          position: const Duration(seconds: 12),
+        ),
+        isNull,
+      );
+
+      // Outside every segment: no skip.
+      expect(
+        service.findSkipTarget(
+          segments: segments,
+          enabledCategories: {'sponsor', 'intro'},
+          position: const Duration(seconds: 50),
+        ),
+        isNull,
+      );
+    });
+
     test('merges overlapping and adjacent skip segments into unified intervals', () async {
       final mockClient = MockClient((request) async {
         final responseJson = jsonEncode([

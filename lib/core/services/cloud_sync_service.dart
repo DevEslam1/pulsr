@@ -123,7 +123,23 @@ class CloudSyncService {
     } catch (_) {}
   }
 
+  bool _syncInProgress = false;
+
   Future<bool> syncAll(
+      {bool? syncFavorites, bool? syncPlaylists}) async {
+    // Serialize syncs: concurrent runs would race on the shared synced-hash
+    // map and the playlist stable-id prefs written by the merge step.
+    if (_syncInProgress) return false;
+    _syncInProgress = true;
+    try {
+      return await _syncAllInternal(
+          syncFavorites: syncFavorites, syncPlaylists: syncPlaylists);
+    } finally {
+      _syncInProgress = false;
+    }
+  }
+
+  Future<bool> _syncAllInternal(
       {bool? syncFavorites, bool? syncPlaylists}) async {
     // Pulsr Pure (prod offline): cloud sync is hard-off — no Firebase traffic
     // even if prefs/account state linger from another flavor.
@@ -147,9 +163,16 @@ class CloudSyncService {
       final firestore = FirebaseFirestore.instance;
       final userDoc = firestore.collection('users').doc(user.uid);
 
-      // 1. Upload Local Data to Cloud
-      await _uploadLocalData(userDoc,
+      // 1. Upload Local Data to Cloud. A permanent/partial write failure must
+      // never be reported as a successful sync.
+      final uploadOk = await _uploadLocalData(userDoc,
           syncFavorites: favEnabled, syncPlaylists: plEnabled);
+      if (!uploadOk) {
+        ErrorLogger.log(
+            'Cloud sync incomplete: one or more uploads failed permanently',
+            category: 'CloudSyncService');
+        return false;
+      }
 
       // 2. Download & Merge Cloud Data into Local DB
       await _downloadAndMergeCloudData(userDoc,
@@ -167,13 +190,13 @@ class CloudSyncService {
 
   final Map<String, String> _syncedDocHashes = <String, String>{};
 
-  Future<void> _commitWithRetry(WriteBatch batch) async {
+  Future<bool> _commitWithRetry(WriteBatch batch) async {
     int attempts = 0;
     while (attempts < 3) {
       attempts++;
       try {
         await batch.commit();
-        return;
+        return true;
       } catch (e, st) {
         // Quota / permission errors are permanent — retrying burns quota
         // and delays the user-facing error. Fail fast with a clear log.
@@ -185,34 +208,47 @@ class CloudSyncService {
               code.contains('unauthenticated')) {
             ErrorLogger.log('Batch commit failed permanently (${e.code})',
                 error: e, stackTrace: st, category: 'CloudSync');
-            return;
+            return false;
           }
         }
         if (attempts >= 3) {
           ErrorLogger.log('Batch commit failed after 3 attempts',
               error: e, stackTrace: st, category: 'CloudSync');
-        } else {
-          await Future<void>.delayed(Duration(milliseconds: 200 * attempts));
+          return false;
         }
+        await Future<void>.delayed(Duration(milliseconds: 200 * attempts));
       }
     }
+    return false;
   }
 
-  Future<void> _uploadLocalData(
+  Future<bool> _uploadLocalData(
     DocumentReference userDoc, {
     required bool syncFavorites,
     required bool syncPlaylists,
   }) async {
     final firestore = FirebaseFirestore.instance;
     WriteBatch currentBatch = firestore.batch();
+    // Hashes for the docs currently staged in `currentBatch`. They are merged
+    // into `_syncedDocHashes` only after a commit succeeds, so a permanent
+    // write failure can never mark unsynced content as synced.
+    Map<String, String> pendingHashes = <String, String>{};
     int opCount = 0;
+    bool commitFailed = false;
 
     Future<void> commitBatchIfFull() async {
       if (opCount >= 200) {
         final batchToCommit = currentBatch;
+        final hashesToCommit = pendingHashes;
         currentBatch = firestore.batch();
+        pendingHashes = <String, String>{};
         opCount = 0;
-        await _commitWithRetry(batchToCommit);
+        final ok = await _commitWithRetry(batchToCommit);
+        if (ok) {
+          _syncedDocHashes.addAll(hashesToCommit);
+        } else {
+          commitFailed = true;
+        }
       }
     }
 
@@ -257,7 +293,7 @@ class CloudSyncService {
               'modifiedAt': FieldValue.serverTimestamp(),
             },
             SetOptions(merge: true));
-        _syncedDocHashes[docId] = hash;
+        pendingHashes[docId] = hash;
         opCount++;
         await commitBatchIfFull();
       }
@@ -291,7 +327,7 @@ class CloudSyncService {
                 'modifiedAt': FieldValue.serverTimestamp(),
               },
               SetOptions(merge: true));
-          _syncedDocHashes[plDocId] = plHash;
+          pendingHashes[plDocId] = plHash;
           opCount++;
           await commitBatchIfFull();
         }
@@ -325,7 +361,7 @@ class CloudSyncService {
                   'modifiedAt': FieldValue.serverTimestamp(),
                 },
                 SetOptions(merge: true));
-            _syncedDocHashes[fullKey] = sHash;
+            pendingHashes[fullKey] = sHash;
             opCount++;
             await commitBatchIfFull();
           }
@@ -334,13 +370,14 @@ class CloudSyncService {
     }
 
     if (opCount > 0) {
-      try {
-        await currentBatch.commit();
-      } catch (e, st) {
-        ErrorLogger.log('Final batch commit failed',
-            error: e, stackTrace: st, category: 'CloudSync');
+      final ok = await _commitWithRetry(currentBatch);
+      if (ok) {
+        _syncedDocHashes.addAll(pendingHashes);
+      } else {
+        commitFailed = true;
       }
     }
+    return !commitFailed;
   }
 
   Future<void> _downloadAndMergeCloudData(
@@ -447,8 +484,6 @@ class CloudSyncService {
           final cloudSyncId = (plData['syncId'] as String?) ?? plDoc.id;
           final mappedLocalId = prefs.getInt('sync_cloud_pl_$cloudSyncId');
 
-          final cloudModifiedAt =
-              (plData['modifiedAt'] as Timestamp?)?.toDate();
           PlaylistsTableData? pl;
           if (mappedLocalId != null) {
             pl = existingPlaylists.where((p) => p.id == mappedLocalId).firstOrNull;
@@ -469,16 +504,12 @@ class CloudSyncService {
             }
           }
 
-          if (pl != null && cloudModifiedAt != null) {
-            final localModifiedAt = pl.createdAt;
-            final diffMs =
-                (localModifiedAt.difference(cloudModifiedAt).inMilliseconds)
-                    .abs();
-            // Conflict Resolution: If local is strictly newer (> 60s diff), preserve local
-            if (localModifiedAt.isAfter(cloudModifiedAt) && diffMs > 60000) {
-              continue;
-            }
-          }
+          // Playlist merge is additive (it only creates missing playlists and
+          // adds missing songs; it never renames or deletes). Local playlists
+          // carry no modification timestamp, so the old `createdAt`-vs-cloud
+          // `modifiedAt` comparison could wrongly skip a merge for a recently
+          // created local playlist. There is nothing destructive to guard
+          // against here, so always merge.
 
           if (pl == null) {
             final createRes = await _repository.createPlaylist(name);

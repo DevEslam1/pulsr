@@ -4,10 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/constants/channels.dart';
-import 'package:pulsr/core/constants/prefs_keys.dart';
-import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/errors/ytm_error_classifier.dart';
-import 'package:pulsr/core/services/xdm_backend_service.dart';
 import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/core/utils/ytm_rate_limiter.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
@@ -19,7 +16,6 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late MockHttpClient mockClient;
-  late XdmBackendService xdmService;
   late YtmService ytmService;
 
   setUpAll(() {
@@ -27,43 +23,19 @@ void main() {
   });
 
   setUp(() {
-    SharedPreferences.setMockInitialValues({
-      PrefsKeys.ytdlpBackendEnabled: true,
-      PrefsKeys.ytdlpBackendUrl: 'https://test-backend.app',
-      PrefsKeys.ytdlpBackendToken: 'test-token',
-      PrefsKeys.syncCookiesToBackend: false,
-    });
+    SharedPreferences.setMockInitialValues({});
 
     mockClient = MockHttpClient();
-    xdmService = XdmBackendService.withClient(mockClient);
-
-    if (getIt.isRegistered<XdmBackendService>()) {
-      getIt.unregister<XdmBackendService>();
-    }
-    getIt.registerSingleton<XdmBackendService>(xdmService);
-
     ytmService = YtmService();
     YtmRateLimiter.debugReset();
   });
 
   tearDown(() {
-    if (getIt.isRegistered<XdmBackendService>()) {
-      getIt.unregister<XdmBackendService>();
-    }
     ytmService.dispose();
   });
 
-  group('Engine 3 Resolution Strategy & Resilience Matrix', () {
-    test(
-        'INT-1: App resolves stream via Native when backend is unreachable/down',
-        () async {
-      // Backend is down (503 / exception)
-      when(() => mockClient.get(
-            any(),
-            headers: any(named: 'headers'),
-          )).thenAnswer((_) async => http.Response('Backend unavailable', 503));
-
-      // Native MethodChannel mock responds with valid stream
+  group('Engine 3 Resolution Strategy & Resilience Matrix (on-device only)', () {
+    test('INT-1: App resolves the stream via the native extractor', () async {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(
         const MethodChannel(PulsrChannels.ytm),
@@ -89,15 +61,13 @@ void main() {
       expect(stream.url, 'https://googlevideo.com/native_stream');
       expect(stream.title, 'Native Track');
 
-      // Clear mock
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(
               const MethodChannel(PulsrChannels.ytm), null);
     });
 
-    test('INT-2: No backend fallback — native failure surfaces directly',
+    test('INT-2: native failure surfaces directly with no HTTP fallback',
         () async {
-      // Native MethodChannel throws extraction failure
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(
         const MethodChannel(PulsrChannels.ytm),
@@ -110,8 +80,6 @@ void main() {
         },
       );
 
-      // Remote backend decommissioned: must not be called, native error
-      // surfaces directly instead of falling back.
       await expectLater(
         ytmService.resolveStream('fallback_vid'),
         throwsA(isA<YtmException>()),
@@ -123,9 +91,7 @@ void main() {
               const MethodChannel(PulsrChannels.ytm), null);
     });
 
-    test(
-        'INT-3: Error code classification maps backend error codes to block signals',
-        () {
+    test('INT-3: error code classification maps codes to block signals', () {
       final botInfo = YtmErrorClassifier.classifyCode('BOT_CHECK');
       expect(botInfo.signal, YtmBlockSignal.botChallenge);
       expect(
@@ -147,21 +113,7 @@ void main() {
       expect(timeoutInfo.recoveryAction, YtmRecoveryAction.retryWithBackoff);
     });
 
-    test('INT-4: Backend disabled — resolveStream never sends cookies',
-        () async {
-      SharedPreferences.setMockInitialValues({
-        PrefsKeys.ytdlpBackendEnabled: true,
-        PrefsKeys.ytdlpBackendUrl: 'https://test-backend.app',
-        PrefsKeys.syncCookiesToBackend: false,
-      });
-
-      final result = await xdmService.resolveStream('vid_test',
-          cookies: 'sensitive_cookie=value');
-      expect(result, isNull);
-      verifyNever(() => mockClient.get(any(), headers: any(named: 'headers')));
-    });
-
-    test('INT-5: YtmStream correctly reports isExpiringSoon and isExpired', () {
+    test('INT-4: YtmStream correctly reports isExpiringSoon and isExpired', () {
       final now = DateTime.now().millisecondsSinceEpoch;
 
       final validStream = YtmStream(

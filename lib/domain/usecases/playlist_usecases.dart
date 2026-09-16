@@ -25,10 +25,6 @@ class PlaylistUseCases {
     return _smartPlaylistEngine.watchCriteria(criteria);
   }
 
-  Future<List<SongsTableData>> evaluateSmartCriteria(SmartCriteria criteria) {
-    return _smartPlaylistEngine.evaluateCriteria(criteria);
-  }
-
   Future<Result<int>> createPlaylist(String name,
       {bool isSmart = false, String? smartCriteria}) {
     return _repository.createPlaylist(name,

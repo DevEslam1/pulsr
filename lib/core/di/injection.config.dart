@@ -39,7 +39,6 @@ import 'package:pulsr/core/services/settings_profiles_service.dart' as _i461;
 import 'package:pulsr/core/services/smart_audio_service.dart' as _i197;
 import 'package:pulsr/core/services/sponsorblock_service.dart' as _i912;
 import 'package:pulsr/core/services/theme_scheduler_service.dart' as _i991;
-import 'package:pulsr/core/services/xdm_backend_service.dart' as _i1031;
 import 'package:pulsr/core/services/yt_download_service.dart' as _i742;
 import 'package:pulsr/core/services/ytm_account_service.dart' as _i631;
 import 'package:pulsr/core/services/ytm_browse_service.dart' as _i222;
@@ -215,8 +214,6 @@ extension GetItInjectableX on _i174.GetIt {
         _i431.PlaylistCubit(playlistUseCases: gh<_i792.PlaylistUseCases>()));
     gh.singleton<_i222.YtmBrowseService>(
         () => _i222.YtmBrowseService(gh<_i391.YtmService>()));
-    gh.lazySingleton<_i1031.XdmBackendService>(() => _i1031.XdmBackendService(
-        secureStorage: gh<_i558.FlutterSecureStorage>()));
     gh.singleton<_i225.CloudSyncService>(() => _i225.CloudSyncService(
           gh<_i535.AuthService>(),
           gh<_i320.IMusicRepository>(),

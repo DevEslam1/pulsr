@@ -22,6 +22,7 @@ import '../widgets/audio_quality_sheet.dart';
 import '../widgets/equalizer_sheet.dart';
 import '../widgets/quran_mode_button.dart';
 import '../widgets/speed_picker_sheet.dart';
+import '../../../../domain/services/cast_service.dart';
 import 'player_theme.dart';
 
 /// Visual tokens that differ between the copies of the dock icon button.
@@ -523,19 +524,22 @@ class PlayerBottomActionDock extends StatelessWidget {
     final p = context.palette;
     final l10n = context.l10n;
     final isUsb = settingsState.currentOutputDevice?.isUsbDac == true;
+    final isCast = CastService().sessionStatus.connected;
     final outputDevice = settingsState.currentOutputDevice;
     final isEqActive = props.state.isEqEnabled;
     final speed = props.state.playbackSpeed;
     final hasTimer = props.state.sleepTimerRemaining != null;
 
-    final IconData outputIcon = isUsb
-        ? Icons.usb_rounded
-        : (outputDevice?.deviceName.contains('Bluetooth') == true ||
-                outputDevice?.deviceName.contains('A2DP') == true
-            ? Icons.bluetooth_audio_rounded
-            : (outputDevice?.deviceName.contains('Speaker') == true
-                ? Icons.speaker_rounded
-                : Icons.headphones_rounded));
+    final IconData outputIcon = isCast
+        ? Icons.cast_connected_rounded
+        : (isUsb
+            ? Icons.usb_rounded
+            : (outputDevice?.deviceName.contains('Bluetooth') == true ||
+                    outputDevice?.deviceName.contains('A2DP') == true
+                ? Icons.bluetooth_audio_rounded
+                : (outputDevice?.deviceName.contains('Speaker') == true
+                    ? Icons.speaker_rounded
+                    : Icons.headphones_rounded)));
 
     return Center(
       child: ConstrainedBox(
@@ -589,9 +593,12 @@ class PlayerBottomActionDock extends StatelessWidget {
                   Expanded(
                     child: PlayerDockIconButton(
                       icon: outputIcon,
-                      tooltip: l10n.audioOutputAndDac,
-                      isActive: isUsb,
-                      activeColor: const Color(0xFFFFD700),
+                      tooltip: isCast ? 'Google Cast' : l10n.audioOutputAndDac,
+                      badgeText: isCast ? 'CAST' : (isUsb ? 'DAC' : null),
+                      isActive: isCast || isUsb,
+                      activeColor: isCast
+                          ? const Color(0xFF00E5FF)
+                          : const Color(0xFFFFD700),
                       inactiveColor: p.textSecondary,
                       isTablet: isTablet,
                       style: dockIconStyle,

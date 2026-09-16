@@ -66,6 +66,7 @@ import '../../settings/cubit/settings_cubit.dart';
 import '../../widgets/widget_service.dart';
 import 'player_state.dart';
 import 'quran_restore_snapshot.dart';
+import 'queue_slot_codec.dart';
 part 'player_queue_mixin.dart';
 part 'player_transport_mixin.dart';
 part 'player_dsp_mixin.dart';
@@ -498,33 +499,20 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     if (isClosed) return;
     try {
       final prefs = await SharedPreferences.getInstance();
-      final data = <String, dynamic>{};
-      for (final entry in _queueSlots.entries) {
-        data['${entry.key}'] = {
-          'songIds': entry.value.songs.map((s) => s.id).toList(),
-          'onlineSongs': entry.value.songs
-              .where((s) => s.source == SongSource.youtube || s.id < 0)
-              .map((s) => {
-                    'id': s.id,
-                    'title': s.title,
-                    'artist': s.artist,
-                    'album': s.album,
-                    'durationMs': s.durationMs,
-                    'path': s.path,
-                    'source': s.source,
-                    'remoteId': s.remoteId,
-                    'remoteArtworkUrl': s.remoteArtworkUrl,
-                  })
-              .toList(),
-          'currentIndex': entry.value.currentIndex,
-          'positionMs': entry.value.position.inMilliseconds,
-          'speed': entry.value.speed,
-        };
-      }
-      // Which slot is active is part of the session: without it a restart
-      // labels the restored queue as slot 0, and the next queue edit writes
-      // over slot 0's saved contents.
-      data['activeSlot'] = state.activeQueueSlot;
+      // JSON mapping lives in QueueSlotCodec (god-object split); only the
+      // prefs write and error surfacing remain here.
+      final data = QueueSlotCodec.encodeDocument(
+        {
+          for (final entry in _queueSlots.entries)
+            entry.key: (
+              songs: entry.value.songs,
+              currentIndex: entry.value.currentIndex,
+              position: entry.value.position,
+              speed: entry.value.speed,
+            ),
+        },
+        state.activeQueueSlot,
+      );
       final encoded = await compute(jsonEncode, data);
       await prefs.setString(PrefsKeys.queueSlots, encoded);
     } catch (e, st) {
@@ -543,82 +531,41 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       if (_queueRestorationDone) return;
       final raw = prefs.getString(PrefsKeys.queueSlots);
       if (raw == null) return;
-      final decoded = await compute(jsonDecode, raw);
-      if (decoded is! Map<String, dynamic>) return;
-      final data = decoded;
-      // Validate: reject oversized slots (DoS). Three slots + activeSlot key.
-      if (data.length > 4) return;
+      final data =
+          QueueSlotCodec.decodeDocument(await compute(jsonDecode, raw));
+      if (data == null) return;
       for (final key in data.keys) {
         if (_queueRestorationDone) return;
-        final slotIndex = int.tryParse(key);
-        if (slotIndex == null || slotIndex < 0 || slotIndex > 2) continue;
+        final slotIndex = QueueSlotCodec.slotIndexForKey(key);
+        if (slotIndex == null) continue;
         // One corrupt slot must not abort the others.
         final rawSlot = data[key];
         if (rawSlot is! Map) continue;
-        final slotData = Map<String, dynamic>.from(rawSlot);
-        final rawIds = (slotData['songIds'] as List<dynamic>?) ?? [];
-        if (rawIds.length > _maxQueueSize) continue;
-        final songIds = rawIds.whereType<int>().toList();
-        if (songIds.isEmpty) continue;
-        final songsResult = await _repository.getSongsByIds(songIds);
+        final decoded = QueueSlotCodec.decodeSlot(
+            Map<String, dynamic>.from(rawSlot), _maxQueueSize);
+        if (decoded == null) continue;
+        final songsResult = await _repository.getSongsByIds(decoded.songIds);
         if (_queueRestorationDone) return;
-        // getSongsByIds returns rows in unspecified (rowid) order; re-map to
-        // the persisted songIds order so the restored slot keeps the real
-        // playback order (previous / current / next) instead of id order.
         final songsMap = {
-          for (final s in songsResult.fold((_) => <SongsTableData>[], (r) => r))
+          for (final s
+              in songsResult.fold((_) => <SongsTableData>[], (r) => r))
             s.id: s
         };
-        final onlineSongsList =
-            (slotData['onlineSongs'] as List<dynamic>?) ?? [];
-        final onlineSongsMap = <int, SongsTableData>{};
-        for (final item in onlineSongsList) {
-          if (item is Map) {
-            final m = Map<String, dynamic>.from(item);
-            final id = m['id'] as int?;
-            if (id != null) {
-              onlineSongsMap[id] = SongsTableData(
-                id: id,
-                title: m['title'] as String? ?? 'Unknown',
-                artist: m['artist'] as String? ?? 'Unknown Artist',
-                album: m['album'] as String? ?? '',
-                durationMs: (m['durationMs'] as num?)?.toInt() ?? 0,
-                path: m['path'] as String? ?? '',
-                source: m['source'] as String? ?? SongSource.youtube,
-                remoteId: m['remoteId'] as String?,
-                remoteArtworkUrl: m['remoteArtworkUrl'] as String?,
-                isFavorite: false,
-                isMissing: false,
-                isDownloaded: false,
-                playCount: 0,
-                lastPositionMs: 0,
-              );
-            }
-          }
-        }
-        final songs = [
-          for (final id in songIds)
-            if (songsMap[id] != null)
-              songsMap[id]!
-            else if (onlineSongsMap[id] != null)
-              onlineSongsMap[id]!,
-        ];
+        final songs = QueueSlotCodec.mergeInPersistedOrder(
+            decoded.songIds, songsMap, decoded.onlineSongsById);
         if (songs.isEmpty) continue;
-        final restoredPosMs = (slotData['positionMs'] as num?)?.toInt() ?? 0;
-        final restoredSpeed = (slotData['speed'] as num?)?.toDouble() ?? 1.0;
         _queueSlots[slotIndex] = _QueueSlotData(
           songs: songs,
-          currentIndex: ((slotData['currentIndex'] as int?) ?? 0)
-              .clamp(0, songs.length - 1),
-          position:
-              Duration(milliseconds: restoredPosMs.clamp(0, 24 * 3600 * 1000)),
-          speed: restoredSpeed.isFinite ? restoredSpeed.clamp(0.1, 8.0) : 1.0,
+          currentIndex: QueueSlotCodec.clampCurrentIndex(
+              decoded.currentIndex, songs.length),
+          position: QueueSlotCodec.clampPosition(decoded.positionMs),
+          speed: QueueSlotCodec.clampSpeed(decoded.speed),
         );
       }
       if (!_queueRestorationDone && !isClosed) {
-        final activeRaw = data['activeSlot'];
-        if (activeRaw is int && activeRaw >= 0 && activeRaw <= 2) {
-          safeEmit(state.copyWith(activeQueueSlot: activeRaw));
+        final restoredSlot = QueueSlotCodec.activeSlotFrom(data['activeSlot']);
+        if (restoredSlot != null) {
+          safeEmit(state.copyWith(activeQueueSlot: restoredSlot));
         }
       }
       _queueRestorationDone = true;
@@ -1342,51 +1289,33 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     // F-67: gate auto-skip on the persisted enable flag and enabled categories.
     final service = _sponsorBlock;
     if (!service.isEnabled) return;
-    final enabledCategories = service.enabledCategories;
     final now = DateTime.now();
     if (_lastSponsorSkipTime != null &&
         now.difference(_lastSponsorSkipTime!).inMilliseconds < 1500) {
       return;
     }
-    // Search only category-eligible segments through the shared helper so the
-    // containment scan lives in one place (service) instead of being
-    // re-implemented here; the guards below stay cubit-side.
-    final eligible = <SponsorBlockSegment>[
-      for (final segment in _currentSponsorSegments)
-        if (enabledCategories.contains(segment.category)) segment,
-    ];
-    final segment = service.findSegmentToSkip(eligible, pos);
-    if (segment != null) {
-      if (_lastSkippedSegmentEnd == null ||
-          (_lastSkippedSegmentEnd != segment.end &&
-              (pos - _lastSkippedSegmentEnd!).abs() >=
-                  const Duration(seconds: 2))) {
-        // Chain adjacent/overlapping segments (contains is [start, end)):
-        // skipping to this segment's end must not land inside the next one,
-        // or the next tick would either re-skip or be suppressed by the
-        // adjacent-segment guard above.
-        var target = segment.end;
-        var chained = true;
-        while (chained) {
-          chained = false;
-          for (final other in _currentSponsorSegments) {
-            if (other.end > target && other.contains(target)) {
-              target = other.end;
-              chained = true;
-            }
-          }
-        }
-        _lastSkippedSegmentEnd = target;
-        _lastSponsorSkipTime = now;
-        debugPrint(
-            '[SPONSORBLOCK] Auto-skipping segment (${segment.category}): ${segment.start} -> $target');
-        final seekTarget = target + const Duration(milliseconds: 50);
-        _audioHandler.seek(seekTarget);
-        // Optimistic position update: the throttled position stream would
-        // otherwise keep reporting in-segment positions for up to 200ms.
-        safeEmit(state.copyWith(position: seekTarget));
-      }
+    // Pure decision lives in the service (god-object split); only guards and
+    // side effects remain here.
+    final seekTarget = service.findSkipTarget(
+      segments: _currentSponsorSegments,
+      enabledCategories: service.enabledCategories,
+      position: pos,
+    );
+    if (seekTarget == null) return;
+    final target = seekTarget - const Duration(milliseconds: 50);
+    if (_lastSkippedSegmentEnd != null &&
+        (_lastSkippedSegmentEnd == target ||
+            (pos - _lastSkippedSegmentEnd!).abs() <
+                const Duration(seconds: 2))) {
+      return;
     }
+    _lastSkippedSegmentEnd = target;
+    _lastSponsorSkipTime = now;
+    debugPrint('[SPONSORBLOCK] Auto-skipping segment: $pos -> $seekTarget');
+    _audioHandler.seek(seekTarget);
+    // Optimistic position update: the throttled position stream would
+    // otherwise keep reporting in-segment positions for up to 200ms.
+    safeEmit(state.copyWith(position: seekTarget));
   }
 
   /// Reads real audio-header fields for a local song the first time it plays

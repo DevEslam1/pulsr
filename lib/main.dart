@@ -223,6 +223,40 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     if (AppConfig.isCloudSyncAllowed) _startNetworkChangeMonitor();
     _startAutomationTriggers();
     _watchPlatformBridgeHealth();
+    _verifyPureMode();
+  }
+
+  /// Runtime "Pulsr Pure" guarantee: a Pure build must not carry the INTERNET
+  /// permission. Ask the platform whether the merged manifest really omits it,
+  /// and surface a loud error if a bad merge silently added network access.
+  void _verifyPureMode() {
+    if (!AppConfig.isPure) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final pure = await AppConfig.verifyPureNoInternet();
+        if (pure == false) {
+          ErrorLogger.log(
+            'CRITICAL: Pulsr Pure build has INTERNET permission — purity check failed',
+            category: 'Startup',
+          );
+          if (!mounted) return;
+          final ctx = rootNavigatorKey.currentContext;
+          if (ctx != null && ctx.mounted) {
+            PulsrToast.show(
+              ctx,
+              message:
+                  'Pulsr Pure integrity check failed: this build can access the network.',
+              icon: Icons.warning_amber_rounded,
+              isError: true,
+              duration: const Duration(seconds: 6),
+            );
+          }
+        }
+      } catch (e, st) {
+        ErrorLogger.log('Pulsr Pure verification failed',
+            error: e, stackTrace: st, category: 'Startup');
+      }
+    });
   }
 
   /// B-6: if the platform audio bridge failed to initialise, playback still

@@ -38,8 +38,6 @@ enum NowPlayingArtworkSwipeAction { nextPrev, none }
 
 enum ReplayGainMode { off, track, album, auto }
 
-enum ExtractorEngine { auto, remoteYtdlp, onDevice }
-
 /// How DSD (DSF/DFF) files are handed to the output device.
 /// - [pcm]: decode DSD to PCM (default, always available).
 /// - [dop]: frame DSD as DSD-over-PCM for a compatible USB DAC. Never enabled
@@ -111,18 +109,6 @@ abstract class SettingsState with _$SettingsState {
     @Default('localhost, 127.0.0.1') String proxyBypassHosts,
     @Default([]) List<ProxyEntry> proxyList,
     @Default(false) bool isTestingAllProxies,
-    // Extractor & Backend Settings (remote yt-dlp backend decommissioned)
-    @Default(ExtractorEngine.onDevice) ExtractorEngine extractorEngine,
-    @Default(false) bool ytdlpBackendEnabled,
-    @Default('https://xdm-backend-10763667121.europe-west1.run.app')
-    String ytdlpBackendUrl,
-    @Default('') String ytdlpBackendToken,
-    @Default(false) bool syncCookiesToBackend,
-    @Default(false) bool isTestingYtdlpBackend,
-    String? ytdlpBackendStatusMessage,
-    String? ytdlpBackendVersion,
-    int? ytdlpBackendProxyCount,
-    String? ytdlpBackendCircuitState,
     // Audiophile & Hi-Res Output
     @Default(false) bool bitPerfectOutput,
     @Default(true) bool bypassDspOnBitPerfect,

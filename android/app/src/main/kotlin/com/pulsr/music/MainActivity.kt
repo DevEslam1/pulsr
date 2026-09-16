@@ -307,6 +307,27 @@ class MainActivity : AudioServiceActivity() {
             }
         }
 
+        // Pulsr Pure runtime guarantee: report whether the merged manifest
+        // actually carries the INTERNET permission, so the Dart layer can
+        // detect a bad manifest merge that would silently add network access.
+        val purityChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.pulsr.music/purity")
+        purityChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "hasInternetPermission" -> {
+                    val granted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        checkSelfPermission(android.Manifest.permission.INTERNET) ==
+                            android.content.pm.PackageManager.PERMISSION_GRANTED
+                    } else {
+                        packageManager.checkPermission(
+                            android.Manifest.permission.INTERNET,
+                            packageName) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                    }
+                    result.success(granted)
+                }
+                else -> result.notImplemented()
+            }
+        }
+
         val batteryChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.pulsr.music/battery_optimization")
         batteryChannel.setMethodCallHandler { call, result ->
             when (call.method) {

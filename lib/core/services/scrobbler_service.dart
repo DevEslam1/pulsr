@@ -5,8 +5,10 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/app_config.dart';
 import '../constants/channels.dart';
 import '../utils/error_logger.dart';
+import '../utils/ytm_rate_limiter.dart';
 
 @singleton
 class ScrobblerService {
@@ -129,6 +131,9 @@ class ScrobblerService {
   final Map<String, DateTime> _lastScrobblePerService = {};
   static const int _maxScrobbleEntries = 10;
   bool _isFlushing = false;
+
+  /// Serializes scrobble submissions (see [_submitScrobbleDirect]).
+  final AsyncMutex _submitMutex = AsyncMutex();
 
   SharedPreferences? _cachedPrefs;
   Future<SharedPreferences> _getPrefs() async {
@@ -495,8 +500,10 @@ class ScrobblerService {
     String? artworkUrl,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    // Offline-only mode: queue locally, never hit the network.
-    if (prefs.getBool('setting_offline_only_mode') == true) {
+    // Offline-only mode (and Pure builds, which have no network): queue
+    // locally, never hit the network.
+    if (!AppConfig.isCloudSyncAllowed ||
+        prefs.getBool('setting_offline_only_mode') == true) {
       await _enqueueOfflineScrobble(
           artist: artist,
           track: track,
@@ -746,8 +753,12 @@ class ScrobblerService {
     _isFlushing = true;
     try {
       final prefs = await SharedPreferences.getInstance();
-      // Offline-only mode: keep the queue stored, never hit the network.
-      if (prefs.getBool('setting_offline_only_mode') == true) return;
+      // Offline-only mode (and Pure builds): keep the queue stored, never hit
+      // the network.
+      if (!AppConfig.isCloudSyncAllowed ||
+          prefs.getBool('setting_offline_only_mode') == true) {
+        return;
+      }
       final queueJson = prefs.getString(_keyOfflineQueue);
       if (queueJson == null || queueJson.isEmpty) return;
 
@@ -820,7 +831,27 @@ class ScrobblerService {
   }
 
   /// Submit scrobble without re-enqueueing on failure (used by flushOfflineQueue).
+  ///
+  /// Serialized: a flush batch submits in parallel, and every submission
+  /// read-modifies the shared dedup keys and stats counters, so unsynchronized
+  /// runs could double-count or drop dedup.
   Future<void> _submitScrobbleDirect({
+    required String artist,
+    required String track,
+    required String album,
+    required int durationSec,
+    required DateTime timestamp,
+  }) {
+    return _submitMutex.run(() => _submitScrobbleDirectLocked(
+          artist: artist,
+          track: track,
+          album: album,
+          durationSec: durationSec,
+          timestamp: timestamp,
+        ));
+  }
+
+  Future<void> _submitScrobbleDirectLocked({
     required String artist,
     required String track,
     required String album,

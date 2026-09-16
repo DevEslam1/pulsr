@@ -2,6 +2,7 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 import '../../core/constants/audio_formats.dart';
+import '../../domain/models/audio_quality_info.dart';
 import '../db/app_database.dart';
 import 'dsd_decoder_helper.dart';
 import 'mqa_decoder_helper.dart';
@@ -21,6 +22,13 @@ class FormatAwareDecoder {
   /// Decodes and wraps [song] into an optimal [AudioSource].
   Future<AudioSource> decodeForFormat(
       SongsTableData song, MediaItem tag) async {
+    // Reset the DoP transport flag for every load. It is a process-wide static
+    // that [DsdDecoderHelper] sets true only when a compatible USB DAC is in
+    // use; without this reset it stayed true after the first DoP DSD track,
+    // forcing unity mixer volume and disabling native ReplayGain for every
+    // subsequent track. The DSD branch below re-sets it when appropriate.
+    AudioQualityInfo.dsdDopActive = false;
+
     if (song.source == SongSource.youtube) {
       return resolveYtmStream(song, tag);
     }

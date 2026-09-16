@@ -2355,6 +2355,8 @@
   "@sampleRateLabel": {
     "description": "tranche7 quality"
   },
+  "btSelectSampleRate": "Elegir frecuencia",
+  "btSelectBitDepth": "Elegir profundidad",
   "bitDepthLabel": "PROFUNDIDAD",
   "@bitDepthLabel": {
     "description": "tranche7 quality"

@@ -143,8 +143,15 @@ class MqaDecoderHelper {
     }
 
     final bytes = await file.readAsBytes();
-    final inputRate = 48000;
-    final targetRate = inputRate * 2; // 96 kHz Core Unfold
+    // The MQA core signal is the file's native rate (typically 44.1 or 48 kHz)
+    // and the first unfold doubles it. Deriving it from the track metadata keeps
+    // 44.1 kHz-family files from being unfolded with the wrong ratio (which
+    // produced 88.2→96 kHz mismatch and a mislabeled output rate).
+    final rawRate = song.sampleRate;
+    final inputRate = (rawRate != null && rawRate >= 32000 && rawRate <= 48000)
+        ? rawRate
+        : 48000;
+    final targetRate = inputRate * 2; // Core Unfold (44.1→88.2, 48→96 kHz)
 
     final Uint8List unfolded;
     if (testUnfold != null) {

@@ -1055,6 +1055,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
     _crossfadeManager.bpmSyncEnabled =
         _cachedPrefs?.getBool(PrefsKeys.bpmSyncCrossfadeEnabled) ?? false;
+    // Restore persisted playback speed/pitch and the extended speed range so a
+    // saved out-of-range speed is not silently clamped to 0.25–4.0 on cold start.
+    await restorePersistedSpeed();
 
     _playbackAnalytics = PlaybackAnalytics(
       onIncreaseBufferSizeRequested: () {
@@ -1538,15 +1541,11 @@ class PulsrAudioHandler extends BaseAudioHandler
                                   : null));
                     } catch (_) {}
                   }
-                  _volumeController.updateSettings(
-                      duckFactor: duckingController.duckFactor);
-                  var perSongDb = 0.0;
-                  try {
-                    final cs = currentSong;
-                    if (cs != null) perSongDb = _perSongVolumeDbFor(cs);
-                  } catch (_) {}
-                  unawaited(_volumeController.setDucked(false, currentSong,
-                      perSongOffsetDb: perSongDb));
+                  // The correct ReplayGain-compensated target was applied above.
+                  // Do NOT recompute through _volumeController.setDucked(): that
+                  // path uses the controller's own ReplayGain mode/preamps, which
+                  // this handler never feeds, so it would overwrite the target
+                  // with raw duck-only user volume on every duck end.
                   _preDuckVolume = null;
                   _preDuckInactiveVolume = null;
                 } else if (shouldResumeAfterInterruption(

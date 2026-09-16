@@ -2355,6 +2355,8 @@
   "@sampleRateLabel": {
     "description": "tranche7 quality"
   },
+  "btSelectSampleRate": "اختر معدل العينات",
+  "btSelectBitDepth": "اختر عمق البت",
   "bitDepthLabel": "عمق البت",
   "@bitDepthLabel": {
     "description": "tranche7 quality"

@@ -395,14 +395,18 @@ class DsdDecoderHelper {
     );
   }
 
-  /// Builds a standard 44-byte WAV header containing 16-bit stereo PCM audio.
+  /// Builds a standard 44-byte WAV container for decoded DSD PCM. Defaults to
+  /// 24-bit so the hi-res resolution produced by the native DSD decoder
+  /// (176.4/352.8/705.6 kHz) is preserved instead of being truncated to 16-bit.
   static Uint8List buildWavContainer({
     required List<double> pcmFloatSamples,
     required int sampleRate,
     int channels = 2,
+    int bitsPerSample = 24,
   }) {
+    final int bytesPerSample = bitsPerSample ~/ 8;
     final int numFrames = pcmFloatSamples.length ~/ channels;
-    final int byteCount = numFrames * channels * 2; // 16-bit PCM = 2 bytes per sample
+    final int byteCount = numFrames * channels * bytesPerSample;
     final ByteData byteData = ByteData(44 + byteCount);
 
     // RIFF header
@@ -425,11 +429,11 @@ class DsdDecoderHelper {
     byteData.setUint16(20, 1, Endian.little); // AudioFormat 1 = PCM
     byteData.setUint16(22, channels, Endian.little);
     byteData.setUint32(24, sampleRate, Endian.little);
-    final int byteRate = sampleRate * channels * 2;
+    final int byteRate = sampleRate * channels * bytesPerSample;
     byteData.setUint32(28, byteRate, Endian.little);
-    final int blockAlign = channels * 2;
+    final int blockAlign = channels * bytesPerSample;
     byteData.setUint16(32, blockAlign, Endian.little);
-    byteData.setUint16(34, 16, Endian.little); // BitsPerSample 16
+    byteData.setUint16(34, bitsPerSample, Endian.little);
 
     // data subchunk
     byteData.setUint8(36, 0x64); // 'd'
@@ -441,9 +445,19 @@ class DsdDecoderHelper {
     int offset = 44;
     for (int i = 0; i < pcmFloatSamples.length; i++) {
       final double sample = pcmFloatSamples[i].clamp(-1.0, 1.0);
-      final int pcm16 = (sample * 32767.0).round().clamp(-32768, 32767);
-      byteData.setInt16(offset, pcm16, Endian.little);
-      offset += 2;
+      if (bytesPerSample == 2) {
+        final int pcm16 = (sample * 32767.0).round().clamp(-32768, 32767);
+        byteData.setInt16(offset, pcm16, Endian.little);
+        offset += 2;
+      } else {
+        // 24-bit packed little-endian
+        final int pcm24 =
+            (sample * 8388607.0).round().clamp(-8388608, 8388607);
+        byteData.setUint8(offset, pcm24 & 0xFF);
+        byteData.setUint8(offset + 1, (pcm24 >> 8) & 0xFF);
+        byteData.setUint8(offset + 2, (pcm24 >> 16) & 0xFF);
+        offset += 3;
+      }
     }
 
     return byteData.buffer.asUint8List();

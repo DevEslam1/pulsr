@@ -122,15 +122,6 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
     } catch (_) {}
   }
 
-  // F5: BT latency auto-calibration helper (codec table lives in service;
-  // handler applies the result to prefs).
-  Future<int> applyBtLatencyOffset(int ms) async {
-    final clamped = ms.clamp(0, 500);
-    final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
-    await prefs.setInt(PrefsKeys.bluetoothLatencyOffsetMs, clamped);
-    return clamped;
-  }
-
   // F6: gapless trim lookup for a song.
   GaplessTrim gaplessTrimFor(SongsTableData song) =>
       GaplessTrimHandler.trimFor(path: song.path, codec: song.codec);

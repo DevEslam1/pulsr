@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/app_config.dart';
 import '../constants/prefs_keys.dart';
 
 class SponsorBlockSegment {
@@ -90,10 +91,15 @@ class SponsorBlockService {
 
   /// Retrieves skip segments for a YouTube video. Results are cached in-memory.
   Future<List<SponsorBlockSegment>> getSegments(String videoId) async {
+    // Pulsr Pure / offline-only: never reach the SponsorBlock API.
+    if (!AppConfig.isCloudSyncAllowed) return const [];
     await loadPreferences();
     // Letting an empty set short-circuit avoids a pointless request when the
     // user has disabled every category.
     if (!_enabled || _enabledCategories.isEmpty) return const [];
+
+    // Bound the in-memory cache so a long session cannot grow it unbounded.
+    if (_cache.length > 256) _cache.clear();
 
     final cleanId = videoId.trim();
     if (cleanId.isEmpty) return const [];
@@ -184,6 +190,40 @@ class SponsorBlockService {
       }
     }
     return null;
+  }
+
+  /// Pure skip decision extracted from PlayerCubit (god-object split): given
+  /// the fetched [segments], the user-enabled [enabledCategories] and the
+  /// current [position], returns the seek target (chained segment end + 50ms)
+  /// when auto-skip should fire, else null.
+  ///
+  /// Debounce, last-skip guards and the actual seek stay caller-side (they own
+  /// mutable playback state); this method only decides. Chaining walks
+  /// adjacent/overlapping segments so the target never lands inside the next
+  /// one (which would re-trigger or suppress the following tick).
+  Duration? findSkipTarget({
+    required List<SponsorBlockSegment> segments,
+    required Set<String> enabledCategories,
+    required Duration position,
+  }) {
+    final eligible = <SponsorBlockSegment>[
+      for (final seg in segments)
+        if (enabledCategories.contains(seg.category)) seg,
+    ];
+    final hit = findSegmentToSkip(eligible, position);
+    if (hit == null) return null;
+    var target = hit.end;
+    var chained = true;
+    while (chained) {
+      chained = false;
+      for (final other in segments) {
+        if (other.end > target && other.contains(target)) {
+          target = other.end;
+          chained = true;
+        }
+      }
+    }
+    return target + const Duration(milliseconds: 50);
   }
 
   void clearCache() {

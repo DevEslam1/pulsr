@@ -968,6 +968,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 }
 
                 // Group 3: ViPER, LiveProg, DSD, System/OEM & Diagnostics
+                "setMultiOutputRoute" -> {
+                    // Android exposes no public API for true simultaneous
+                    // A2DP + speaker routing. Report the limitation honestly
+                    // instead of silently pretending the mode was applied.
+                    val mode = call.argument<String>("mode") ?: "systemDefault"
+                    result.success(if (mode == "systemDefault") "ok" else "unsupported")
+                }
                 else -> {
                     handleAdvancedAndDiagnosticCall(call, result)
                 }

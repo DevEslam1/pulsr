@@ -123,7 +123,12 @@ GoRouter createRouter(MediaScannerService scannerService) {
     initialLocation: '/splash',
     redirect: (context, state) {
       if (!AppConfig.ytmEnabled) {
-        const ytmPaths = {'/ytm-search', '/ytm-explore', '/downloads'};
+        const ytmPaths = {
+          '/ytm-search',
+          '/ytm-explore',
+          '/downloads',
+          '/online-playlist',
+        };
         if (ytmPaths.contains(state.uri.path)) return '/';
       }
       return null;
@@ -471,9 +476,11 @@ GoRouter createRouter(MediaScannerService scannerService) {
         name: 'tag-editor',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) {
-          final song = state.extra is SongsTableData
-              ? state.extra as SongsTableData
-              : null;
+          final extra = state.extra;
+          if (extra is List<SongsTableData> && extra.isNotEmpty) {
+            return TagEditorScreen(song: extra.first, batchSongs: extra);
+          }
+          final song = extra is SongsTableData ? extra : null;
           if (song == null) {
             return Scaffold(body: Center(child: Text(context.l10n.songNotFound)));
           }

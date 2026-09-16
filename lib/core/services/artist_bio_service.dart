@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/app_config.dart';
 import '../utils/error_logger.dart';
 
 class ArtistInfo {
@@ -42,6 +43,7 @@ class ArtistBioService {
     }
 
     try {
+      if (!AppConfig.isCloudSyncAllowed) return null;
       final prefs = await SharedPreferences.getInstance();
       if (prefs.getBool('setting_offline_only_mode') == true) return null;
     } catch (_) {}

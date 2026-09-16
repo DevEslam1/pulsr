@@ -98,39 +98,4 @@ void main() {
       });
     });
   });
-
-  group('YtmRateLimiter backend bucket', () {
-    test('a backend 429 does not freeze the native YouTube path', () {
-      fakeAsync((async) {
-        YtmRateLimiter.debugReset();
-        final limiter = YtmRateLimiter.shared;
-
-        limiter.onBackendRateLimited(60);
-
-        expect(limiter.isBackendCoolingDown, isTrue);
-        // The backend is a different IP; its quota says nothing about how
-        // YouTube sees this device. Freezing both made the fallback take the
-        // primary down with it.
-        expect(limiter.isCoolingDown, isFalse);
-        async.flushTimers();
-      });
-    });
-
-    test('onBackendSuccess does not cancel an active backend window', () {
-      fakeAsync((async) {
-        YtmRateLimiter.debugReset();
-        final limiter = YtmRateLimiter.shared;
-
-        limiter.onBackendRateLimited(60);
-        // A request already in flight when the 429 landed completes after it,
-        // and used to wipe the whole Retry-After window.
-        limiter.onBackendSuccess();
-
-        expect(limiter.isBackendCoolingDown, isTrue);
-        expect(limiter.backendCooldownRemaining,
-            greaterThan(const Duration(seconds: 30)));
-        async.flushTimers();
-      });
-    });
-  });
 }

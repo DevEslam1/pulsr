@@ -43,10 +43,6 @@ class EqualizerManager {
   final ValueNotifier<Map<String, String>> effectStatusNotifier =
       ValueNotifier<Map<String, String>>(const {});
 
-  /// True when the last apply attempt for [effectKey] was rejected by native.
-  bool effectUnavailable(String effectKey) =>
-      effectStatusNotifier.value.containsKey(effectKey);
-
   void _recordEffectOutcome(String effectKey, bool applied) {
     final current = effectStatusNotifier.value;
     if (applied) {
@@ -203,6 +199,7 @@ class EqualizerManager {
   final Map<int, double> liveProgSliders = {};
 
   double reverbCrossChannel = 0.0;
+  List<double> customImpulseResponse = const [];
 
   /// DSP engine routing: 'native' | 'oem' | 'auto'. Single source of truth —
   /// SettingsCubit persists to the same PrefsKeys.dspPreference key.
@@ -1606,6 +1603,7 @@ class EqualizerManager {
     // Must be `custom`: any synthesizable ordinal makes the native side
     // build its own IR on the next re-apply and discard the loaded one.
     reverbPreset = ReverbPreset.custom.wireValue;
+    customImpulseResponse = List<double>.unmodifiable(irSamples);
     await _effectsChannel.setReverbEnabled(true);
     _debouncedSavePreferences();
     _syncPipeline();
@@ -2087,16 +2085,6 @@ class EqualizerManager {
     }
   }
 
-  Future<void> setReverbCrossChannel(double crossChannel) async {
-    reverbCrossChannel = crossChannel.clamp(0.0, 1.0);
-    if (PlatformCapabilities.isAndroid) {
-      await _effectsChannel.setReverbCrossChannel(reverbCrossChannel);
-    }
-    _debouncedSavePreferences();
-  }
-
-  // --- NATIVE C++ 4-BAND MULTIBAND COMPRESSOR ---
-
   Future<void> setMultibandCompressor(
     bool enabled, {
     List<MultibandCompressorBandConfig>? bands,
@@ -2576,12 +2564,18 @@ class EqualizerManager {
       futures.add(_effectsChannel.setLimiterEnabled(true));
     }
     if (isReverbEnabled) {
-      futures.add(_effectsChannel.setReverbPreset(reverbPreset));
       futures.add(_effectsChannel.setReverbWetDry(reverbWetDry));
       if (reverbCrossChannel > 0.0) {
         futures.add(
           _effectsChannel.setReverbCrossChannel(reverbCrossChannel),
         );
+      }
+      if (reverbPreset == ReverbPreset.custom.wireValue &&
+          customImpulseResponse.isNotEmpty) {
+        futures.add(
+            _effectsChannel.loadImpulseResponse(customImpulseResponse));
+      } else {
+        futures.add(_effectsChannel.setReverbPreset(reverbPreset));
       }
       futures.add(_effectsChannel.setReverbEnabled(true));
     }
@@ -2669,6 +2663,12 @@ class EqualizerManager {
       );
     }
     if (isViperDdcEnabled) {
+      if (viperDdcContent.isNotEmpty) {
+        futures.add(_effectsChannel.loadViperDdc(
+          ddcContent: viperDdcContent,
+          profileName: viperDdcProfileName,
+        ));
+      }
       futures.add(_effectsChannel.setViperDdcEnabled(true));
     }
     if (isArbitraryEqEnabled && arbitraryEqString.isNotEmpty) {
@@ -2709,13 +2709,11 @@ class EqualizerManager {
       }
     }
 
-    // Dynamics last — triggers recalculateActiveStages which may disable OEM
-    // engine; apply last to prevent intermediate dropout. No delay needed here
-    // because the session is already stable by the time reapplyToSession is
-    // called (unlike cold-start where AudioTrack is still opening).
+    // Dynamics last: recalculateActiveStages may disable the OEM engine.
     if (isDynamicsEnabled && !_isDynamicsBypassed) {
       await _effectsChannel.setDynamicsPreset(dynamicsPreset, true);
     }
+    unawaited(_effectsChannel.getAutoDegradedStages());
   }
 
   void dispose() {

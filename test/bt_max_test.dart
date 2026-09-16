@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/services/bluetooth_latency_calibrator.dart';
+import 'package:pulsr/domain/models/audio_output_info.dart';
 import 'package:pulsr/features/player/presentation/widgets/audio_quality_sheet.dart';
 
 void main() {
@@ -28,5 +29,32 @@ void main() {
     expect(a2dp, ['SBC', 'AAC', 'aptX', 'LDAC']);
     final le = visibleBtCodecsForRoute(repoCodecs: repo, isLeAudio: true);
     expect(le, repo);
+  });
+
+  test('BT selectable rates/depths parse for in-app pickers', () {
+    final info = AudioOutputInfo.fromMap({
+      'deviceName': 'Buds',
+      'btCodecName': 'LDAC',
+      'btSampleRateHz': 96000,
+      'btBitDepth': 24,
+      'btCodecConnected': true,
+      'btSelectableCodecs': ['SBC', 'AAC', 'LDAC'],
+      'btSelectableSampleRates': [44100, 48000, 96000],
+      'btSelectableBitDepths': [16, 24, 32],
+    });
+
+    // The data contract the sample-rate / bit-depth pickers depend on.
+    expect(info.btCodecName, 'LDAC');
+    expect(info.btSampleRateHz, 96000);
+    expect(info.btBitDepth, 24);
+    expect(info.btSelectableSampleRates, [44100, 48000, 96000]);
+    expect(info.btSelectableBitDepths, [16, 24, 32]);
+  });
+
+  test('BT selectable lists default to empty (pickers stay read-only)', () {
+    final info = AudioOutputInfo.fromMap({'deviceName': 'Speaker'});
+    expect(info.btSelectableSampleRates, isEmpty);
+    expect(info.btSelectableBitDepths, isEmpty);
+    expect(info.btSelectableCodecs, isEmpty);
   });
 }
