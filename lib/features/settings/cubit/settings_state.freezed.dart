@@ -52,16 +52,6 @@ mixin _$SettingsState {
   String get proxyBypassHosts;
   List<ProxyEntry> get proxyList;
   bool get isTestingAllProxies;
-  ExtractorEngine get extractorEngine;
-  bool get ytdlpBackendEnabled;
-  String get ytdlpBackendUrl;
-  String get ytdlpBackendToken;
-  bool get syncCookiesToBackend;
-  bool get isTestingYtdlpBackend;
-  String? get ytdlpBackendStatusMessage;
-  String? get ytdlpBackendVersion;
-  int? get ytdlpBackendProxyCount;
-  String? get ytdlpBackendCircuitState;
   bool get bitPerfectOutput;
   bool get bypassDspOnBitPerfect;
   bool get followTrackSampleRate;
@@ -187,16 +177,6 @@ mixin _$SettingsState {
             (identical(other.proxyBypassHosts, _this.proxyBypassHosts) || other.proxyBypassHosts == _this.proxyBypassHosts) &&
             const DeepCollectionEquality().equals(other.proxyList, _this.proxyList) &&
             (identical(other.isTestingAllProxies, _this.isTestingAllProxies) || other.isTestingAllProxies == _this.isTestingAllProxies) &&
-            (identical(other.extractorEngine, _this.extractorEngine) || other.extractorEngine == _this.extractorEngine) &&
-            (identical(other.ytdlpBackendEnabled, _this.ytdlpBackendEnabled) || other.ytdlpBackendEnabled == _this.ytdlpBackendEnabled) &&
-            (identical(other.ytdlpBackendUrl, _this.ytdlpBackendUrl) || other.ytdlpBackendUrl == _this.ytdlpBackendUrl) &&
-            (identical(other.ytdlpBackendToken, _this.ytdlpBackendToken) || other.ytdlpBackendToken == _this.ytdlpBackendToken) &&
-            (identical(other.syncCookiesToBackend, _this.syncCookiesToBackend) || other.syncCookiesToBackend == _this.syncCookiesToBackend) &&
-            (identical(other.isTestingYtdlpBackend, _this.isTestingYtdlpBackend) || other.isTestingYtdlpBackend == _this.isTestingYtdlpBackend) &&
-            (identical(other.ytdlpBackendStatusMessage, _this.ytdlpBackendStatusMessage) || other.ytdlpBackendStatusMessage == _this.ytdlpBackendStatusMessage) &&
-            (identical(other.ytdlpBackendVersion, _this.ytdlpBackendVersion) || other.ytdlpBackendVersion == _this.ytdlpBackendVersion) &&
-            (identical(other.ytdlpBackendProxyCount, _this.ytdlpBackendProxyCount) || other.ytdlpBackendProxyCount == _this.ytdlpBackendProxyCount) &&
-            (identical(other.ytdlpBackendCircuitState, _this.ytdlpBackendCircuitState) || other.ytdlpBackendCircuitState == _this.ytdlpBackendCircuitState) &&
             (identical(other.bitPerfectOutput, _this.bitPerfectOutput) || other.bitPerfectOutput == _this.bitPerfectOutput) &&
             (identical(other.bypassDspOnBitPerfect, _this.bypassDspOnBitPerfect) || other.bypassDspOnBitPerfect == _this.bypassDspOnBitPerfect) &&
             (identical(other.followTrackSampleRate, _this.followTrackSampleRate) || other.followTrackSampleRate == _this.followTrackSampleRate) &&
@@ -286,16 +266,6 @@ mixin _$SettingsState {
       _this.proxyBypassHosts,
       const DeepCollectionEquality().hash(_this.proxyList),
       _this.isTestingAllProxies,
-      _this.extractorEngine,
-      _this.ytdlpBackendEnabled,
-      _this.ytdlpBackendUrl,
-      _this.ytdlpBackendToken,
-      _this.syncCookiesToBackend,
-      _this.isTestingYtdlpBackend,
-      _this.ytdlpBackendStatusMessage,
-      _this.ytdlpBackendVersion,
-      _this.ytdlpBackendProxyCount,
-      _this.ytdlpBackendCircuitState,
       _this.bitPerfectOutput,
       _this.bypassDspOnBitPerfect,
       _this.followTrackSampleRate,
@@ -347,7 +317,7 @@ mixin _$SettingsState {
   @override
   String toString() {
     final _this = this as SettingsState;
-    return 'SettingsState(gaplessPlayback: ${_this.gaplessPlayback}, crossfadeSeconds: ${_this.crossfadeSeconds}, minDurationSec: ${_this.minDurationSec}, autoHideSystemMedia: ${_this.autoHideSystemMedia}, themeColorSource: ${_this.themeColorSource}, resumeAfterInterruption: ${_this.resumeAfterInterruption}, waveformSeekBarEnabled: ${_this.waveformSeekBarEnabled}, themeMode: ${_this.themeMode}, autoThemeByTime: ${_this.autoThemeByTime}, highContrast: ${_this.highContrast}, reduceMotion: ${_this.reduceMotion}, liquidGlassTint: ${_this.liquidGlassTint}, languageCode: ${_this.languageCode}, customAccentColorValue: ${_this.customAccentColorValue}, playerThemeMode: ${_this.playerThemeMode}, visualizerStyle: ${_this.visualizerStyle}, miniPlayerSwipeLeft: ${_this.miniPlayerSwipeLeft}, miniPlayerSwipeRight: ${_this.miniPlayerSwipeRight}, nowPlayingDoubleTap: ${_this.nowPlayingDoubleTap}, nowPlayingArtworkSwipe: ${_this.nowPlayingArtworkSwipe}, replayGainMode: ${_this.replayGainMode}, replayGainPreampWithRg: ${_this.replayGainPreampWithRg}, replayGainPreampWithoutRg: ${_this.replayGainPreampWithoutRg}, streamingQuality: ${_this.streamingQuality}, downloadQuality: ${_this.downloadQuality}, wifiOnlyMode: ${_this.wifiOnlyMode}, offlineOnlyMode: ${_this.offlineOnlyMode}, isScanning: ${_this.isScanning}, proxyEnabled: ${_this.proxyEnabled}, proxyType: ${_this.proxyType}, proxyHost: ${_this.proxyHost}, proxyPort: ${_this.proxyPort}, proxyUsername: ${_this.proxyUsername}, hasProxyPassword: ${_this.hasProxyPassword}, proxyBypassHosts: ${_this.proxyBypassHosts}, proxyList: ${_this.proxyList}, isTestingAllProxies: ${_this.isTestingAllProxies}, extractorEngine: ${_this.extractorEngine}, ytdlpBackendEnabled: ${_this.ytdlpBackendEnabled}, ytdlpBackendUrl: ${_this.ytdlpBackendUrl}, ytdlpBackendToken: ${_this.ytdlpBackendToken}, syncCookiesToBackend: ${_this.syncCookiesToBackend}, isTestingYtdlpBackend: ${_this.isTestingYtdlpBackend}, ytdlpBackendStatusMessage: ${_this.ytdlpBackendStatusMessage}, ytdlpBackendVersion: ${_this.ytdlpBackendVersion}, ytdlpBackendProxyCount: ${_this.ytdlpBackendProxyCount}, ytdlpBackendCircuitState: ${_this.ytdlpBackendCircuitState}, bitPerfectOutput: ${_this.bitPerfectOutput}, bypassDspOnBitPerfect: ${_this.bypassDspOnBitPerfect}, followTrackSampleRate: ${_this.followTrackSampleRate}, strictBitPerfect: ${_this.strictBitPerfect}, dsdOutputMode: ${_this.dsdOutputMode}, experienceMode: ${_this.experienceMode}, dsdDopSupported: ${_this.dsdDopSupported}, currentOutputDevice: ${_this.currentOutputDevice}, scanResultCount: ${_this.scanResultCount}, errorMessage: ${_this.errorMessage}, crossfeedEnabled: ${_this.crossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, limiterEnabled: ${_this.limiterEnabled}, limiterLookaheadMs: ${_this.limiterLookaheadMs}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, reverbEnabled: ${_this.reverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, sincResamplerEnabled: ${_this.sincResamplerEnabled}, dspPreference: ${_this.dspPreference}, systemEffectsPolicy: ${_this.systemEffectsPolicy}, systemEffectsStatus: ${_this.systemEffectsStatus}, systemEffectsBundles: ${_this.systemEffectsBundles}, bluetoothLatencyOffsetMs: ${_this.bluetoothLatencyOffsetMs}, hedgedResolutionEnabled: ${_this.hedgedResolutionEnabled}, adaptiveQualityEnabled: ${_this.adaptiveQualityEnabled}, duckingMode: ${_this.duckingMode}, duckingLevel: ${_this.duckingLevel}, multiOutputMode: ${_this.multiOutputMode}, dspSnapshotEnabled: ${_this.dspSnapshotEnabled}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, sessionLogEnabled: ${_this.sessionLogEnabled}, outputFormatNegotiationEnabled: ${_this.outputFormatNegotiationEnabled}, floatOutputEnabled: ${_this.floatOutputEnabled}, aaudioOutputEnabled: ${_this.aaudioOutputEnabled}, dvcEnabled: ${_this.dvcEnabled}, usbHardwareVolumeEnabled: ${_this.usbHardwareVolumeEnabled}, aaudioPreferExclusive: ${_this.aaudioPreferExclusive}, aaudioTargetBufferMs: ${_this.aaudioTargetBufferMs}, sincResamplerQuality: ${_this.sincResamplerQuality}, bpmSyncCrossfadeEnabled: ${_this.bpmSyncCrossfadeEnabled})';
+    return 'SettingsState(gaplessPlayback: ${_this.gaplessPlayback}, crossfadeSeconds: ${_this.crossfadeSeconds}, minDurationSec: ${_this.minDurationSec}, autoHideSystemMedia: ${_this.autoHideSystemMedia}, themeColorSource: ${_this.themeColorSource}, resumeAfterInterruption: ${_this.resumeAfterInterruption}, waveformSeekBarEnabled: ${_this.waveformSeekBarEnabled}, themeMode: ${_this.themeMode}, autoThemeByTime: ${_this.autoThemeByTime}, highContrast: ${_this.highContrast}, reduceMotion: ${_this.reduceMotion}, liquidGlassTint: ${_this.liquidGlassTint}, languageCode: ${_this.languageCode}, customAccentColorValue: ${_this.customAccentColorValue}, playerThemeMode: ${_this.playerThemeMode}, visualizerStyle: ${_this.visualizerStyle}, miniPlayerSwipeLeft: ${_this.miniPlayerSwipeLeft}, miniPlayerSwipeRight: ${_this.miniPlayerSwipeRight}, nowPlayingDoubleTap: ${_this.nowPlayingDoubleTap}, nowPlayingArtworkSwipe: ${_this.nowPlayingArtworkSwipe}, replayGainMode: ${_this.replayGainMode}, replayGainPreampWithRg: ${_this.replayGainPreampWithRg}, replayGainPreampWithoutRg: ${_this.replayGainPreampWithoutRg}, streamingQuality: ${_this.streamingQuality}, downloadQuality: ${_this.downloadQuality}, wifiOnlyMode: ${_this.wifiOnlyMode}, offlineOnlyMode: ${_this.offlineOnlyMode}, isScanning: ${_this.isScanning}, proxyEnabled: ${_this.proxyEnabled}, proxyType: ${_this.proxyType}, proxyHost: ${_this.proxyHost}, proxyPort: ${_this.proxyPort}, proxyUsername: ${_this.proxyUsername}, hasProxyPassword: ${_this.hasProxyPassword}, proxyBypassHosts: ${_this.proxyBypassHosts}, proxyList: ${_this.proxyList}, isTestingAllProxies: ${_this.isTestingAllProxies}, bitPerfectOutput: ${_this.bitPerfectOutput}, bypassDspOnBitPerfect: ${_this.bypassDspOnBitPerfect}, followTrackSampleRate: ${_this.followTrackSampleRate}, strictBitPerfect: ${_this.strictBitPerfect}, dsdOutputMode: ${_this.dsdOutputMode}, experienceMode: ${_this.experienceMode}, dsdDopSupported: ${_this.dsdDopSupported}, currentOutputDevice: ${_this.currentOutputDevice}, scanResultCount: ${_this.scanResultCount}, errorMessage: ${_this.errorMessage}, crossfeedEnabled: ${_this.crossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, limiterEnabled: ${_this.limiterEnabled}, limiterLookaheadMs: ${_this.limiterLookaheadMs}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, reverbEnabled: ${_this.reverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, sincResamplerEnabled: ${_this.sincResamplerEnabled}, dspPreference: ${_this.dspPreference}, systemEffectsPolicy: ${_this.systemEffectsPolicy}, systemEffectsStatus: ${_this.systemEffectsStatus}, systemEffectsBundles: ${_this.systemEffectsBundles}, bluetoothLatencyOffsetMs: ${_this.bluetoothLatencyOffsetMs}, hedgedResolutionEnabled: ${_this.hedgedResolutionEnabled}, adaptiveQualityEnabled: ${_this.adaptiveQualityEnabled}, duckingMode: ${_this.duckingMode}, duckingLevel: ${_this.duckingLevel}, multiOutputMode: ${_this.multiOutputMode}, dspSnapshotEnabled: ${_this.dspSnapshotEnabled}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, sessionLogEnabled: ${_this.sessionLogEnabled}, outputFormatNegotiationEnabled: ${_this.outputFormatNegotiationEnabled}, floatOutputEnabled: ${_this.floatOutputEnabled}, aaudioOutputEnabled: ${_this.aaudioOutputEnabled}, dvcEnabled: ${_this.dvcEnabled}, usbHardwareVolumeEnabled: ${_this.usbHardwareVolumeEnabled}, aaudioPreferExclusive: ${_this.aaudioPreferExclusive}, aaudioTargetBufferMs: ${_this.aaudioTargetBufferMs}, sincResamplerQuality: ${_this.sincResamplerQuality}, bpmSyncCrossfadeEnabled: ${_this.bpmSyncCrossfadeEnabled})';
   }
 }
 
@@ -395,16 +365,6 @@ abstract mixin class $SettingsStateCopyWith<$Res> {
       String proxyBypassHosts,
       List<ProxyEntry> proxyList,
       bool isTestingAllProxies,
-      ExtractorEngine extractorEngine,
-      bool ytdlpBackendEnabled,
-      String ytdlpBackendUrl,
-      String ytdlpBackendToken,
-      bool syncCookiesToBackend,
-      bool isTestingYtdlpBackend,
-      String? ytdlpBackendStatusMessage,
-      String? ytdlpBackendVersion,
-      int? ytdlpBackendProxyCount,
-      String? ytdlpBackendCircuitState,
       bool bitPerfectOutput,
       bool bypassDspOnBitPerfect,
       bool followTrackSampleRate,
@@ -502,16 +462,6 @@ class _$SettingsStateCopyWithImpl<$Res>
     Object? proxyBypassHosts = null,
     Object? proxyList = null,
     Object? isTestingAllProxies = null,
-    Object? extractorEngine = null,
-    Object? ytdlpBackendEnabled = null,
-    Object? ytdlpBackendUrl = null,
-    Object? ytdlpBackendToken = null,
-    Object? syncCookiesToBackend = null,
-    Object? isTestingYtdlpBackend = null,
-    Object? ytdlpBackendStatusMessage = freezed,
-    Object? ytdlpBackendVersion = freezed,
-    Object? ytdlpBackendProxyCount = freezed,
-    Object? ytdlpBackendCircuitState = freezed,
     Object? bitPerfectOutput = null,
     Object? bypassDspOnBitPerfect = null,
     Object? followTrackSampleRate = null,
@@ -707,46 +657,6 @@ class _$SettingsStateCopyWithImpl<$Res>
           ? _self.isTestingAllProxies
           : isTestingAllProxies // ignore: cast_nullable_to_non_nullable
               as bool,
-      extractorEngine: null == extractorEngine
-          ? _self.extractorEngine
-          : extractorEngine // ignore: cast_nullable_to_non_nullable
-              as ExtractorEngine,
-      ytdlpBackendEnabled: null == ytdlpBackendEnabled
-          ? _self.ytdlpBackendEnabled
-          : ytdlpBackendEnabled // ignore: cast_nullable_to_non_nullable
-              as bool,
-      ytdlpBackendUrl: null == ytdlpBackendUrl
-          ? _self.ytdlpBackendUrl
-          : ytdlpBackendUrl // ignore: cast_nullable_to_non_nullable
-              as String,
-      ytdlpBackendToken: null == ytdlpBackendToken
-          ? _self.ytdlpBackendToken
-          : ytdlpBackendToken // ignore: cast_nullable_to_non_nullable
-              as String,
-      syncCookiesToBackend: null == syncCookiesToBackend
-          ? _self.syncCookiesToBackend
-          : syncCookiesToBackend // ignore: cast_nullable_to_non_nullable
-              as bool,
-      isTestingYtdlpBackend: null == isTestingYtdlpBackend
-          ? _self.isTestingYtdlpBackend
-          : isTestingYtdlpBackend // ignore: cast_nullable_to_non_nullable
-              as bool,
-      ytdlpBackendStatusMessage: freezed == ytdlpBackendStatusMessage
-          ? _self.ytdlpBackendStatusMessage
-          : ytdlpBackendStatusMessage // ignore: cast_nullable_to_non_nullable
-              as String?,
-      ytdlpBackendVersion: freezed == ytdlpBackendVersion
-          ? _self.ytdlpBackendVersion
-          : ytdlpBackendVersion // ignore: cast_nullable_to_non_nullable
-              as String?,
-      ytdlpBackendProxyCount: freezed == ytdlpBackendProxyCount
-          ? _self.ytdlpBackendProxyCount
-          : ytdlpBackendProxyCount // ignore: cast_nullable_to_non_nullable
-              as int?,
-      ytdlpBackendCircuitState: freezed == ytdlpBackendCircuitState
-          ? _self.ytdlpBackendCircuitState
-          : ytdlpBackendCircuitState // ignore: cast_nullable_to_non_nullable
-              as String?,
       bitPerfectOutput: null == bitPerfectOutput
           ? _self.bitPerfectOutput
           : bitPerfectOutput // ignore: cast_nullable_to_non_nullable
@@ -1062,16 +972,6 @@ extension SettingsStatePatterns on SettingsState {
             String proxyBypassHosts,
             List<ProxyEntry> proxyList,
             bool isTestingAllProxies,
-            ExtractorEngine extractorEngine,
-            bool ytdlpBackendEnabled,
-            String ytdlpBackendUrl,
-            String ytdlpBackendToken,
-            bool syncCookiesToBackend,
-            bool isTestingYtdlpBackend,
-            String? ytdlpBackendStatusMessage,
-            String? ytdlpBackendVersion,
-            int? ytdlpBackendProxyCount,
-            String? ytdlpBackendCircuitState,
             bool bitPerfectOutput,
             bool bypassDspOnBitPerfect,
             bool followTrackSampleRate,
@@ -1161,16 +1061,6 @@ extension SettingsStatePatterns on SettingsState {
             _that.proxyBypassHosts,
             _that.proxyList,
             _that.isTestingAllProxies,
-            _that.extractorEngine,
-            _that.ytdlpBackendEnabled,
-            _that.ytdlpBackendUrl,
-            _that.ytdlpBackendToken,
-            _that.syncCookiesToBackend,
-            _that.isTestingYtdlpBackend,
-            _that.ytdlpBackendStatusMessage,
-            _that.ytdlpBackendVersion,
-            _that.ytdlpBackendProxyCount,
-            _that.ytdlpBackendCircuitState,
             _that.bitPerfectOutput,
             _that.bypassDspOnBitPerfect,
             _that.followTrackSampleRate,
@@ -1274,16 +1164,6 @@ extension SettingsStatePatterns on SettingsState {
             String proxyBypassHosts,
             List<ProxyEntry> proxyList,
             bool isTestingAllProxies,
-            ExtractorEngine extractorEngine,
-            bool ytdlpBackendEnabled,
-            String ytdlpBackendUrl,
-            String ytdlpBackendToken,
-            bool syncCookiesToBackend,
-            bool isTestingYtdlpBackend,
-            String? ytdlpBackendStatusMessage,
-            String? ytdlpBackendVersion,
-            int? ytdlpBackendProxyCount,
-            String? ytdlpBackendCircuitState,
             bool bitPerfectOutput,
             bool bypassDspOnBitPerfect,
             bool followTrackSampleRate,
@@ -1372,16 +1252,6 @@ extension SettingsStatePatterns on SettingsState {
             _that.proxyBypassHosts,
             _that.proxyList,
             _that.isTestingAllProxies,
-            _that.extractorEngine,
-            _that.ytdlpBackendEnabled,
-            _that.ytdlpBackendUrl,
-            _that.ytdlpBackendToken,
-            _that.syncCookiesToBackend,
-            _that.isTestingYtdlpBackend,
-            _that.ytdlpBackendStatusMessage,
-            _that.ytdlpBackendVersion,
-            _that.ytdlpBackendProxyCount,
-            _that.ytdlpBackendCircuitState,
             _that.bitPerfectOutput,
             _that.bypassDspOnBitPerfect,
             _that.followTrackSampleRate,
@@ -1484,16 +1354,6 @@ extension SettingsStatePatterns on SettingsState {
             String proxyBypassHosts,
             List<ProxyEntry> proxyList,
             bool isTestingAllProxies,
-            ExtractorEngine extractorEngine,
-            bool ytdlpBackendEnabled,
-            String ytdlpBackendUrl,
-            String ytdlpBackendToken,
-            bool syncCookiesToBackend,
-            bool isTestingYtdlpBackend,
-            String? ytdlpBackendStatusMessage,
-            String? ytdlpBackendVersion,
-            int? ytdlpBackendProxyCount,
-            String? ytdlpBackendCircuitState,
             bool bitPerfectOutput,
             bool bypassDspOnBitPerfect,
             bool followTrackSampleRate,
@@ -1582,16 +1442,6 @@ extension SettingsStatePatterns on SettingsState {
             _that.proxyBypassHosts,
             _that.proxyList,
             _that.isTestingAllProxies,
-            _that.extractorEngine,
-            _that.ytdlpBackendEnabled,
-            _that.ytdlpBackendUrl,
-            _that.ytdlpBackendToken,
-            _that.syncCookiesToBackend,
-            _that.isTestingYtdlpBackend,
-            _that.ytdlpBackendStatusMessage,
-            _that.ytdlpBackendVersion,
-            _that.ytdlpBackendProxyCount,
-            _that.ytdlpBackendCircuitState,
             _that.bitPerfectOutput,
             _that.bypassDspOnBitPerfect,
             _that.followTrackSampleRate,
@@ -1684,17 +1534,6 @@ class _SettingsState extends SettingsState {
       this.proxyBypassHosts = 'localhost, 127.0.0.1',
       List<ProxyEntry> proxyList = const [],
       this.isTestingAllProxies = false,
-      this.extractorEngine = ExtractorEngine.onDevice,
-      this.ytdlpBackendEnabled = false,
-      this.ytdlpBackendUrl =
-          'https://xdm-backend-10763667121.europe-west1.run.app',
-      this.ytdlpBackendToken = '',
-      this.syncCookiesToBackend = false,
-      this.isTestingYtdlpBackend = false,
-      this.ytdlpBackendStatusMessage,
-      this.ytdlpBackendVersion,
-      this.ytdlpBackendProxyCount,
-      this.ytdlpBackendCircuitState,
       this.bitPerfectOutput = false,
       this.bypassDspOnBitPerfect = true,
       this.followTrackSampleRate = true,
@@ -1861,32 +1700,6 @@ class _SettingsState extends SettingsState {
   @override
   @JsonKey()
   final bool isTestingAllProxies;
-  @override
-  @JsonKey()
-  final ExtractorEngine extractorEngine;
-  @override
-  @JsonKey()
-  final bool ytdlpBackendEnabled;
-  @override
-  @JsonKey()
-  final String ytdlpBackendUrl;
-  @override
-  @JsonKey()
-  final String ytdlpBackendToken;
-  @override
-  @JsonKey()
-  final bool syncCookiesToBackend;
-  @override
-  @JsonKey()
-  final bool isTestingYtdlpBackend;
-  @override
-  final String? ytdlpBackendStatusMessage;
-  @override
-  final String? ytdlpBackendVersion;
-  @override
-  final int? ytdlpBackendProxyCount;
-  @override
-  final String? ytdlpBackendCircuitState;
   @override
   @JsonKey()
   final bool bitPerfectOutput;
@@ -2110,16 +1923,6 @@ class _SettingsState extends SettingsState {
             (identical(other.proxyBypassHosts, proxyBypassHosts) || other.proxyBypassHosts == proxyBypassHosts) &&
             const DeepCollectionEquality().equals(other.proxyList, _proxyList) &&
             (identical(other.isTestingAllProxies, isTestingAllProxies) || other.isTestingAllProxies == isTestingAllProxies) &&
-            (identical(other.extractorEngine, extractorEngine) || other.extractorEngine == extractorEngine) &&
-            (identical(other.ytdlpBackendEnabled, ytdlpBackendEnabled) || other.ytdlpBackendEnabled == ytdlpBackendEnabled) &&
-            (identical(other.ytdlpBackendUrl, ytdlpBackendUrl) || other.ytdlpBackendUrl == ytdlpBackendUrl) &&
-            (identical(other.ytdlpBackendToken, ytdlpBackendToken) || other.ytdlpBackendToken == ytdlpBackendToken) &&
-            (identical(other.syncCookiesToBackend, syncCookiesToBackend) || other.syncCookiesToBackend == syncCookiesToBackend) &&
-            (identical(other.isTestingYtdlpBackend, isTestingYtdlpBackend) || other.isTestingYtdlpBackend == isTestingYtdlpBackend) &&
-            (identical(other.ytdlpBackendStatusMessage, ytdlpBackendStatusMessage) || other.ytdlpBackendStatusMessage == ytdlpBackendStatusMessage) &&
-            (identical(other.ytdlpBackendVersion, ytdlpBackendVersion) || other.ytdlpBackendVersion == ytdlpBackendVersion) &&
-            (identical(other.ytdlpBackendProxyCount, ytdlpBackendProxyCount) || other.ytdlpBackendProxyCount == ytdlpBackendProxyCount) &&
-            (identical(other.ytdlpBackendCircuitState, ytdlpBackendCircuitState) || other.ytdlpBackendCircuitState == ytdlpBackendCircuitState) &&
             (identical(other.bitPerfectOutput, bitPerfectOutput) || other.bitPerfectOutput == bitPerfectOutput) &&
             (identical(other.bypassDspOnBitPerfect, bypassDspOnBitPerfect) || other.bypassDspOnBitPerfect == bypassDspOnBitPerfect) &&
             (identical(other.followTrackSampleRate, followTrackSampleRate) || other.followTrackSampleRate == followTrackSampleRate) &&
@@ -2208,16 +2011,6 @@ class _SettingsState extends SettingsState {
       proxyBypassHosts,
       const DeepCollectionEquality().hash(_proxyList),
       isTestingAllProxies,
-      extractorEngine,
-      ytdlpBackendEnabled,
-      ytdlpBackendUrl,
-      ytdlpBackendToken,
-      syncCookiesToBackend,
-      isTestingYtdlpBackend,
-      ytdlpBackendStatusMessage,
-      ytdlpBackendVersion,
-      ytdlpBackendProxyCount,
-      ytdlpBackendCircuitState,
       bitPerfectOutput,
       bypassDspOnBitPerfect,
       followTrackSampleRate,
@@ -2268,7 +2061,7 @@ class _SettingsState extends SettingsState {
 
   @override
   String toString() {
-    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, autoThemeByTime: $autoThemeByTime, highContrast: $highContrast, reduceMotion: $reduceMotion, liquidGlassTint: $liquidGlassTint, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, hasProxyPassword: $hasProxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, syncCookiesToBackend: $syncCookiesToBackend, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, ytdlpBackendVersion: $ytdlpBackendVersion, ytdlpBackendProxyCount: $ytdlpBackendProxyCount, ytdlpBackendCircuitState: $ytdlpBackendCircuitState, bitPerfectOutput: $bitPerfectOutput, bypassDspOnBitPerfect: $bypassDspOnBitPerfect, followTrackSampleRate: $followTrackSampleRate, strictBitPerfect: $strictBitPerfect, dsdOutputMode: $dsdOutputMode, experienceMode: $experienceMode, dsdDopSupported: $dsdDopSupported, currentOutputDevice: $currentOutputDevice, scanResultCount: $scanResultCount, errorMessage: $errorMessage, crossfeedEnabled: $crossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, limiterEnabled: $limiterEnabled, limiterLookaheadMs: $limiterLookaheadMs, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, reverbEnabled: $reverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, sincResamplerEnabled: $sincResamplerEnabled, dspPreference: $dspPreference, systemEffectsPolicy: $systemEffectsPolicy, systemEffectsStatus: $systemEffectsStatus, systemEffectsBundles: $systemEffectsBundles, bluetoothLatencyOffsetMs: $bluetoothLatencyOffsetMs, hedgedResolutionEnabled: $hedgedResolutionEnabled, adaptiveQualityEnabled: $adaptiveQualityEnabled, duckingMode: $duckingMode, duckingLevel: $duckingLevel, multiOutputMode: $multiOutputMode, dspSnapshotEnabled: $dspSnapshotEnabled, silenceSkipSensitivity: $silenceSkipSensitivity, sessionLogEnabled: $sessionLogEnabled, outputFormatNegotiationEnabled: $outputFormatNegotiationEnabled, floatOutputEnabled: $floatOutputEnabled, aaudioOutputEnabled: $aaudioOutputEnabled, dvcEnabled: $dvcEnabled, usbHardwareVolumeEnabled: $usbHardwareVolumeEnabled, aaudioPreferExclusive: $aaudioPreferExclusive, aaudioTargetBufferMs: $aaudioTargetBufferMs, sincResamplerQuality: $sincResamplerQuality, bpmSyncCrossfadeEnabled: $bpmSyncCrossfadeEnabled)';
+    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, autoThemeByTime: $autoThemeByTime, highContrast: $highContrast, reduceMotion: $reduceMotion, liquidGlassTint: $liquidGlassTint, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, hasProxyPassword: $hasProxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, bitPerfectOutput: $bitPerfectOutput, bypassDspOnBitPerfect: $bypassDspOnBitPerfect, followTrackSampleRate: $followTrackSampleRate, strictBitPerfect: $strictBitPerfect, dsdOutputMode: $dsdOutputMode, experienceMode: $experienceMode, dsdDopSupported: $dsdDopSupported, currentOutputDevice: $currentOutputDevice, scanResultCount: $scanResultCount, errorMessage: $errorMessage, crossfeedEnabled: $crossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, limiterEnabled: $limiterEnabled, limiterLookaheadMs: $limiterLookaheadMs, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, reverbEnabled: $reverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, sincResamplerEnabled: $sincResamplerEnabled, dspPreference: $dspPreference, systemEffectsPolicy: $systemEffectsPolicy, systemEffectsStatus: $systemEffectsStatus, systemEffectsBundles: $systemEffectsBundles, bluetoothLatencyOffsetMs: $bluetoothLatencyOffsetMs, hedgedResolutionEnabled: $hedgedResolutionEnabled, adaptiveQualityEnabled: $adaptiveQualityEnabled, duckingMode: $duckingMode, duckingLevel: $duckingLevel, multiOutputMode: $multiOutputMode, dspSnapshotEnabled: $dspSnapshotEnabled, silenceSkipSensitivity: $silenceSkipSensitivity, sessionLogEnabled: $sessionLogEnabled, outputFormatNegotiationEnabled: $outputFormatNegotiationEnabled, floatOutputEnabled: $floatOutputEnabled, aaudioOutputEnabled: $aaudioOutputEnabled, dvcEnabled: $dvcEnabled, usbHardwareVolumeEnabled: $usbHardwareVolumeEnabled, aaudioPreferExclusive: $aaudioPreferExclusive, aaudioTargetBufferMs: $aaudioTargetBufferMs, sincResamplerQuality: $sincResamplerQuality, bpmSyncCrossfadeEnabled: $bpmSyncCrossfadeEnabled)';
   }
 }
 
@@ -2318,16 +2111,6 @@ abstract mixin class _$SettingsStateCopyWith<$Res>
       String proxyBypassHosts,
       List<ProxyEntry> proxyList,
       bool isTestingAllProxies,
-      ExtractorEngine extractorEngine,
-      bool ytdlpBackendEnabled,
-      String ytdlpBackendUrl,
-      String ytdlpBackendToken,
-      bool syncCookiesToBackend,
-      bool isTestingYtdlpBackend,
-      String? ytdlpBackendStatusMessage,
-      String? ytdlpBackendVersion,
-      int? ytdlpBackendProxyCount,
-      String? ytdlpBackendCircuitState,
       bool bitPerfectOutput,
       bool bypassDspOnBitPerfect,
       bool followTrackSampleRate,
@@ -2425,16 +2208,6 @@ class __$SettingsStateCopyWithImpl<$Res>
     Object? proxyBypassHosts = null,
     Object? proxyList = null,
     Object? isTestingAllProxies = null,
-    Object? extractorEngine = null,
-    Object? ytdlpBackendEnabled = null,
-    Object? ytdlpBackendUrl = null,
-    Object? ytdlpBackendToken = null,
-    Object? syncCookiesToBackend = null,
-    Object? isTestingYtdlpBackend = null,
-    Object? ytdlpBackendStatusMessage = freezed,
-    Object? ytdlpBackendVersion = freezed,
-    Object? ytdlpBackendProxyCount = freezed,
-    Object? ytdlpBackendCircuitState = freezed,
     Object? bitPerfectOutput = null,
     Object? bypassDspOnBitPerfect = null,
     Object? followTrackSampleRate = null,
@@ -2630,46 +2403,6 @@ class __$SettingsStateCopyWithImpl<$Res>
           ? _self.isTestingAllProxies
           : isTestingAllProxies // ignore: cast_nullable_to_non_nullable
               as bool,
-      extractorEngine: null == extractorEngine
-          ? _self.extractorEngine
-          : extractorEngine // ignore: cast_nullable_to_non_nullable
-              as ExtractorEngine,
-      ytdlpBackendEnabled: null == ytdlpBackendEnabled
-          ? _self.ytdlpBackendEnabled
-          : ytdlpBackendEnabled // ignore: cast_nullable_to_non_nullable
-              as bool,
-      ytdlpBackendUrl: null == ytdlpBackendUrl
-          ? _self.ytdlpBackendUrl
-          : ytdlpBackendUrl // ignore: cast_nullable_to_non_nullable
-              as String,
-      ytdlpBackendToken: null == ytdlpBackendToken
-          ? _self.ytdlpBackendToken
-          : ytdlpBackendToken // ignore: cast_nullable_to_non_nullable
-              as String,
-      syncCookiesToBackend: null == syncCookiesToBackend
-          ? _self.syncCookiesToBackend
-          : syncCookiesToBackend // ignore: cast_nullable_to_non_nullable
-              as bool,
-      isTestingYtdlpBackend: null == isTestingYtdlpBackend
-          ? _self.isTestingYtdlpBackend
-          : isTestingYtdlpBackend // ignore: cast_nullable_to_non_nullable
-              as bool,
-      ytdlpBackendStatusMessage: freezed == ytdlpBackendStatusMessage
-          ? _self.ytdlpBackendStatusMessage
-          : ytdlpBackendStatusMessage // ignore: cast_nullable_to_non_nullable
-              as String?,
-      ytdlpBackendVersion: freezed == ytdlpBackendVersion
-          ? _self.ytdlpBackendVersion
-          : ytdlpBackendVersion // ignore: cast_nullable_to_non_nullable
-              as String?,
-      ytdlpBackendProxyCount: freezed == ytdlpBackendProxyCount
-          ? _self.ytdlpBackendProxyCount
-          : ytdlpBackendProxyCount // ignore: cast_nullable_to_non_nullable
-              as int?,
-      ytdlpBackendCircuitState: freezed == ytdlpBackendCircuitState
-          ? _self.ytdlpBackendCircuitState
-          : ytdlpBackendCircuitState // ignore: cast_nullable_to_non_nullable
-              as String?,
       bitPerfectOutput: null == bitPerfectOutput
           ? _self.bitPerfectOutput
           : bitPerfectOutput // ignore: cast_nullable_to_non_nullable

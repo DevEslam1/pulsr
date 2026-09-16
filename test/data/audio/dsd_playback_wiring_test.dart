@@ -18,7 +18,7 @@ void main() {
         channels: 2,
       );
 
-      expect(wav.length, equals(44 + 4 * 2)); // 44 header + 4 samples * 2 bytes
+      expect(wav.length, equals(44 + 4 * 3)); // 44 header + 4 samples * 3 bytes
       // Check RIFF
       expect(String.fromCharCodes(wav.sublist(0, 4)), equals('RIFF'));
       // Check WAVE
@@ -32,7 +32,7 @@ void main() {
       expect(byteData.getUint16(20, Endian.little), equals(1)); // AudioFormat = 1 (PCM)
       expect(byteData.getUint16(22, Endian.little), equals(2)); // Channels = 2
       expect(byteData.getUint32(24, Endian.little), equals(176400)); // SampleRate
-      expect(byteData.getUint16(34, Endian.little), equals(16)); // BitsPerSample = 16
+      expect(byteData.getUint16(34, Endian.little), equals(24)); // BitsPerSample = 24
     });
 
     test('FormatAwareDecoder routes .dsf and .dff to decodeDsdToPcm', () async {

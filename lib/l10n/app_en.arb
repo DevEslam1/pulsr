@@ -2640,6 +2640,8 @@
   "@sampleRateLabel": {
     "description": "tranche7 quality"
   },
+  "btSelectSampleRate": "Select sample rate",
+  "btSelectBitDepth": "Select bit depth",
   "bitDepthLabel": "BIT DEPTH",
   "@bitDepthLabel": {
     "description": "tranche7 quality"

@@ -14,8 +14,10 @@ import '../../../../domain/services/hires_audio_service.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
+import '../../../../domain/services/cast_service.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
+import 'pulsr_cast_sheet.dart';
 
 class AudioQualitySheet extends StatelessWidget {  final SongsTableData song;
   final Color activeColor;
@@ -215,6 +217,8 @@ class AudioQualitySheet extends StatelessWidget {  final SongsTableData song;
                     p,
                     activeColor,
                   ),
+                  const SizedBox(height: 10),
+                  _buildCastOutputTile(context, p, activeColor),
 
                   // --- BLUETOOTH AUDIO CODEC CONTROL ---
                   if ((outputDevice?.isBluetooth == true) ||
@@ -663,6 +667,84 @@ class AudioQualitySheet extends StatelessWidget {  final SongsTableData song;
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildCastOutputTile(
+    BuildContext context,
+    PulsrPalette p,
+    Color activeColor,
+  ) {
+    final session = CastService().sessionStatus;
+    final isConnected = session.connected;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => PulsrCastSheet.show(context),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: isConnected
+              ? activeColor.withValues(alpha: 0.14)
+              : p.surfaceContainer,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isConnected ? activeColor : p.hairline,
+            width: isConnected ? 1.5 : 1.0,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isConnected
+                    ? activeColor.withValues(alpha: 0.20)
+                    : p.surface,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isConnected ? Icons.cast_connected_rounded : Icons.cast_rounded,
+                size: 18,
+                color: isConnected ? activeColor : p.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isConnected
+                        ? 'Casting to ${session.deviceName ?? "Cast Device"}'
+                        : 'Cast to Speaker / Display',
+                    style: TextStyle(
+                      color: isConnected ? activeColor : p.textPrimary,
+                      fontSize: 13,
+                      fontWeight:
+                          isConnected ? FontWeight.w800 : FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    isConnected
+                        ? 'Tap to manage Cast volume or disconnect'
+                        : 'Stream lossless/lossy audio over Wi-Fi',
+                    style: TextStyle(
+                      color: p.textSecondary,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: isConnected ? activeColor : p.textTertiary,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1493,6 +1575,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
     final bitDepth = outputDevice?.btBitDepth ?? 16;
     final ldacMode = outputDevice?.btLdacQualityMode;
     final selectableCodecs = outputDevice?.btSelectableCodecs ?? const [];
+    final selectableRates = outputDevice?.btSelectableSampleRates ?? const [];
+    final selectableDepths = outputDevice?.btSelectableBitDepths ?? const [];
     final isLdac = codecName == 'LDAC';
 
     const allCodecs = ['SBC', 'AAC', 'aptX', 'aptX HD', 'LDAC', 'LC3', 'Opus'];
@@ -1751,7 +1835,9 @@ extension _BluetoothCodecSection on AudioQualitySheet {
 
           const SizedBox(height: 14),
 
-          // ── Sample rate + bit depth (read-only current values) ─────────
+          // ── Sample rate + bit depth (tappable when the device reports ──
+          // selectable options; read-only otherwise so users never tap a
+          // control the platform can never grant) ─────────────────────────
           Row(
             children: [
               Expanded(
@@ -1767,25 +1853,52 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 9,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _btAccent.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: _btAccent.withValues(alpha: 0.3),
+                    GestureDetector(
+                      onTap: selectableRates.isEmpty || cubit == null
+                          ? null
+                          : () => _showBtOptionPicker(
+                                context: context,
+                                cubit: cubit,
+                                title: context.l10n.btSelectSampleRate,
+                                options: selectableRates,
+                                current: sampleRateHz,
+                                label: (hz) =>
+                                    '${(hz / 1000).toStringAsFixed(hz % 1000 == 0 ? 0 : 1)} kHz',
+                                onPick: (v) =>
+                                    cubit.setBluetoothSampleRate(v),
+                              ),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 9,
                         ),
-                      ),
-                      child: Text(
-                        '${(sampleRateHz / 1000).toStringAsFixed(sampleRateHz % 1000 == 0 ? 0 : 1)} kHz',
-                        style: const TextStyle(
-                          color: _btAccent,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
+                        decoration: BoxDecoration(
+                          color: _btAccent.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: _btAccent.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${(sampleRateHz / 1000).toStringAsFixed(sampleRateHz % 1000 == 0 ? 0 : 1)} kHz',
+                                style: const TextStyle(
+                                  color: _btAccent,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            if (selectableRates.isNotEmpty && cubit != null)
+                              const Icon(
+                                Icons.arrow_drop_down_rounded,
+                                color: _btAccent,
+                                size: 20,
+                              ),
+                          ],
                         ),
                       ),
                     ),
@@ -1806,25 +1919,51 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 9,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _btAccent.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: _btAccent.withValues(alpha: 0.3),
+                    GestureDetector(
+                      onTap: selectableDepths.isEmpty || cubit == null
+                          ? null
+                          : () => _showBtOptionPicker(
+                                context: context,
+                                cubit: cubit,
+                                title: context.l10n.btSelectBitDepth,
+                                options: selectableDepths,
+                                current: bitDepth,
+                                label: (b) => '$b-bit',
+                                onPick: (v) =>
+                                    cubit.setBluetoothBitDepth(v),
+                              ),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 9,
                         ),
-                      ),
-                      child: Text(
-                        '$bitDepth-bit',
-                        style: const TextStyle(
-                          color: _btAccent,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
+                        decoration: BoxDecoration(
+                          color: _btAccent.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: _btAccent.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '$bitDepth-bit',
+                                style: const TextStyle(
+                                  color: _btAccent,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            if (selectableDepths.isNotEmpty && cubit != null)
+                              const Icon(
+                                Icons.arrow_drop_down_rounded,
+                                color: _btAccent,
+                                size: 20,
+                              ),
+                          ],
                         ),
                       ),
                     ),
@@ -2007,6 +2146,67 @@ extension _BluetoothCodecSection on AudioQualitySheet {
         ),
       ),
     );
+  }
+
+  /// Option picker for BT sample-rate / bit-depth, built from the
+  /// device-reported selectable lists. Read-only callers must not invoke this
+  /// (no options ⇒ nothing the platform can grant).
+  Future<void> _showBtOptionPicker({
+    required BuildContext context,
+    required SettingsCubit? cubit,
+    required String title,
+    required List<int> options,
+    required int current,
+    required String Function(int value) label,
+    required Future<bool> Function(int value) onPick,
+  }) async {
+    final sorted = List<int>.of(options)..sort();
+    final selected = await PulsrSheetHelper.showPulsrSheet<int>(
+      context: context,
+      builder: (sheetCtx) {
+        final sp = sheetCtx.palette;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: sp.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              for (final opt in sorted)
+                ListTile(
+                  title: Text(
+                    label(opt),
+                    style: TextStyle(
+                      color: opt == current ? _btAccent : sp.textPrimary,
+                      fontWeight: opt == current
+                          ? FontWeight.w800
+                          : FontWeight.w500,
+                    ),
+                  ),
+                  trailing: opt == current
+                      ? const Icon(Icons.check_rounded,
+                          color: _btAccent, size: 20)
+                      : null,
+                  onTap: () => Navigator.of(sheetCtx).pop(opt),
+                ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
+    );
+    if (selected == null || selected == current || !context.mounted) return;
+    HapticFeedback.selectionClick();
+    final ok = await onPick(selected);
+    if (!ok && context.mounted) _showBtRefused(context, cubit);
   }
 
   Widget _buildPermissionBanner(

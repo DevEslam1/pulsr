@@ -5,6 +5,7 @@ import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/db/app_database.dart';
 import '../../domain/repositories/music_repository_interface.dart';
+import '../config/app_config.dart';
 import '../di/injection.dart';
 import '../utils/error_logger.dart';
 
@@ -58,6 +59,7 @@ class MissingArtworkService {
   Future<String?> fetchArtworkForAlbum(
       String albumTitle, String artistName, {int maxRetries = 2}) async {
     try {
+      if (!AppConfig.isCloudSyncAllowed) return null;
       final prefs = await SharedPreferences.getInstance();
       if (prefs.getBool('setting_offline_only_mode') == true) return null;
     } catch (_) {}
@@ -138,6 +140,7 @@ class MissingArtworkService {
     void Function(int processed, int total)? onProgress,
   }) async {
     try {
+      if (!AppConfig.isCloudSyncAllowed) return 0;
       final prefs = await SharedPreferences.getInstance();
       if (prefs.getBool('setting_offline_only_mode') == true) return 0;
     } catch (_) {}

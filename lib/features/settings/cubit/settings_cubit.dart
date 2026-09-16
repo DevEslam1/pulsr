@@ -21,12 +21,14 @@ import '../../../data/audio/audio_effects_channel.dart';
 import '../../../data/audio/audio_handler.dart';
 import '../../../data/audio/dsd_decoder_helper.dart';
 import '../../../data/audio/equalizer_manager.dart';
+import '../../../data/audio/multi_output_router.dart';
 import '../../../data/scanner/media_scanner_service.dart';
 import '../../../domain/repositories/music_repository_interface.dart';
 import '../../../core/constants/audio_feature_info.dart';
 import '../../player/presentation/widgets/audio_visualizer.dart';
 import 'proxy_endpoint_validator.dart';
 import 'settings_state.dart';
+import 'theme_schedule_controller.dart';
 part 'settings_proxy_actions.dart';
 part 'settings_audio_actions.dart';
 
@@ -51,8 +53,6 @@ class SettingsCubit extends PulsrCubit<SettingsState>
   static const String _keyWaveformSeekBar = 'setting_waveform_seek_bar';
   static const String _keyThemeMode = 'setting_theme_mode';
   static const String _keyAutoThemeByTime = 'setting_auto_theme_by_time';
-  static const String _keyThemeScheduleStart = 'setting_theme_schedule_start';
-  static const String _keyThemeScheduleEnd = 'setting_theme_schedule_end';
   static const String _keyHighContrast = 'setting_high_contrast';
   static const String _keyLiquidGlassTint = 'setting_liquid_glass_tint';
   static const String _keyLanguageCode = PrefsKeys.languageCode;
@@ -93,7 +93,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
 
   @override
   final FlutterSecureStorage _secureStorage;
-  ThemeSchedulerService? _themeScheduler;
+  ThemeScheduleController? _themeScheduleController;
   @override
   String _proxyPassword = '';
 
@@ -155,16 +155,24 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     _loadPreferences();
   }
 
-  /// Resolves the scheduler and consumes its stream. The callback is gated on
-  /// [SettingsState.autoThemeByTime] so it never overrides a manual theme mode
-  /// unless the user has opted into scheduled switching.
+  /// Theme-schedule ownership lives in [ThemeScheduleController] (god-object
+  /// split): the cubit only gates on [SettingsState.autoThemeByTime] and
+  /// applies the resulting theme mode. The callback never overrides a manual
+  /// theme mode unless the user has opted into scheduled switching.
   void _initThemeScheduler() {
     try {
-      _themeScheduler = getIt.isRegistered<ThemeSchedulerService>()
+      final scheduler = getIt.isRegistered<ThemeSchedulerService>()
           ? getIt<ThemeSchedulerService>()
           : ThemeSchedulerService();
-      autoSub(_themeScheduler!.isNightStream, _onNightChanged);
-      unawaited(_applyScheduleHoursFromPrefs());
+      _themeScheduleController = ThemeScheduleController(
+        scheduler: scheduler,
+        isAutoEnabled: () => !isClosed && state.autoThemeByTime,
+        onNightChanged: (isNight) {
+          if (isClosed || !state.autoThemeByTime) return;
+          setThemeMode(isNight ? AppThemeMode.dark : AppThemeMode.light);
+        },
+      );
+      unawaited(_themeScheduleController!.init());
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to start theme scheduler',
@@ -175,52 +183,16 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     }
   }
 
-  void _onNightChanged(bool isNight) {
-    if (isClosed || !state.autoThemeByTime) return;
-    setThemeMode(isNight ? AppThemeMode.dark : AppThemeMode.light);
-  }
-
-  /// Starts the periodic schedule check. Only ever called when the preference
-  /// is on, so installs that never opt in carry no timer.
-  void _startThemeScheduler() {
-    try {
-      if (isClosed || !state.autoThemeByTime) return;
-      _themeScheduler?.startScheduler((_) {});
-    } catch (_) {}
-  }
-
-  /// Loads the persisted dark-hours window into the scheduler singleton so a
-  /// cold start with scheduled theming enabled uses the user's chosen window
-  /// rather than the 19:00–06:00 default (defect 19-02 follow-up).
-  Future<void> _applyScheduleHoursFromPrefs() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      // Keep whatever the user (or a previous session) already set; default to
-      // the service's own 19:00–06:00 when nothing is stored yet.
-      final start = prefs.getInt(_keyThemeScheduleStart) ?? _themeScheduler?.startHour ?? 19;
-      final end = prefs.getInt(_keyThemeScheduleEnd) ?? _themeScheduler?.endHour ?? 6;
-      _themeScheduler?.updateScheduleHours(start: start, end: end);
-    } catch (e, st) {
-      ErrorLogger.log('Failed to apply persisted theme schedule hours',
-          error: e, stackTrace: st, category: 'SettingsCubit');
-    }
-  }
-
   /// Persists and applies a new dark-hours window. Restarts the scheduler so
   /// the change is reflected immediately when scheduled theming is on.
-  Future<void> setThemeScheduleHours({required int start, required int end}) async {
-    final s = start.clamp(0, 23);
-    final e = end.clamp(0, 23);
-    _themeScheduler?.updateScheduleHours(start: s, end: e);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_keyThemeScheduleStart, s);
-    await prefs.setInt(_keyThemeScheduleEnd, e);
-    if (state.autoThemeByTime) _startThemeScheduler();
-  }
+  Future<void> setThemeScheduleHours({required int start, required int end}) =>
+      _themeScheduleController?.setHours(start: start, end: end) ??
+      Future.value();
 
   @override
   Future<void> close() {
-    _themeScheduler?.stopScheduler();
+    _themeScheduleController?.dispose();
+    _themeScheduleController = null;
     return super.close();
   }
 
@@ -239,12 +211,9 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       final results = await Future.wait([
         SharedPreferences.getInstance(),
         _safeSecureRead(_keyProxyPasswordSecure),
-        _safeSecureRead('xdm_backend_token_secure'),
       ]);
       final prefs = results[0] as SharedPreferences;
       String proxyPassword = (results[1] as String?) ?? '';
-
-      // Remote backend decommissioned: drop any stored backend token.
 
       // Migration verification for proxy password
       if (prefs.containsKey(_keyProxyPassword) && proxyPassword.isEmpty) {
@@ -375,15 +344,19 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       // Legacy proxy password migration already handled above (lines 164-186)
       // No second migration needed.
 
-      // Remote backend decommissioned: purge any stored backend token and
-      // force on-device prefs so legacy installs migrate on next launch.
+      // Remote yt-dlp backend was removed: purge any legacy backend prefs so
+      // upgraded installs don't carry stale configuration forward. Keep the
+      // secure-storage delete independent so its failure (e.g. no keystore)
+      // can never block the SharedPreferences cleanup.
       try {
         await _secureStorage.delete(key: 'xdm_backend_token_secure');
+      } catch (_) {}
+      try {
         await prefs.remove(PrefsKeys.ytdlpBackendToken);
-        await prefs.setBool(PrefsKeys.ytdlpBackendEnabled, false);
-        await prefs.setString(
-            PrefsKeys.extractorEngine, ExtractorEngine.onDevice.name);
-        await prefs.setBool(PrefsKeys.syncCookiesToBackend, false);
+        await prefs.remove(PrefsKeys.ytdlpBackendEnabled);
+        await prefs.remove(PrefsKeys.ytdlpBackendUrl);
+        await prefs.remove(PrefsKeys.extractorEngine);
+        await prefs.remove(PrefsKeys.syncCookiesToBackend);
       } catch (_) {}
 
       final proxyBypassHosts =
@@ -514,12 +487,6 @@ class SettingsCubit extends PulsrCubit<SettingsState>
         hasProxyPassword: proxyPassword.isNotEmpty,
         proxyBypassHosts: proxyBypassHosts,
         proxyList: proxyList,
-        extractorEngine: ExtractorEngine.onDevice,
-        ytdlpBackendEnabled: false,
-        ytdlpBackendUrl:
-            prefs.getString(PrefsKeys.ytdlpBackendUrl) ?? state.ytdlpBackendUrl,
-        ytdlpBackendToken: '',
-        syncCookiesToBackend: false,
         bitPerfectOutput: strictBitPerfectLoaded
             ? true
             : (prefs.getBool(PrefsKeys.bitPerfectOutput) ??
@@ -685,7 +652,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
         debugPrint('[SettingsCubit] Failed to sync proxy settings during load: $e');
       }
       // Resume scheduled theming across restarts only when the user opted in.
-      _startThemeScheduler();
+      _themeScheduleController?.start();
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to load settings preferences from SharedPreferences',
@@ -824,9 +791,9 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyAutoThemeByTime, value);
     if (value) {
-      _startThemeScheduler();
+      _themeScheduleController?.start();
     } else {
-      _themeScheduler?.stopScheduler();
+      _themeScheduleController?.stop();
     }
   }
 
@@ -928,68 +895,6 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     return AppHttpOverrides.instance.testConnection(configToTest: configToTest);
   }
 
-
-  Future<void> setExtractorEngine(ExtractorEngine engine) async {
-    // DISABLED: remote backend decommissioned — always on-device.
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-        PrefsKeys.extractorEngine, ExtractorEngine.onDevice.name);
-    await prefs.setBool(PrefsKeys.ytdlpBackendEnabled, false);
-    safeEmit(
-      state.copyWith(
-        extractorEngine: ExtractorEngine.onDevice,
-        ytdlpBackendEnabled: false,
-      ),
-    );
-  }
-
-  Future<void> setYtdlpBackendEnabled(bool enabled) async {
-    // DISABLED: remote backend decommissioned — always off.
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(PrefsKeys.ytdlpBackendEnabled, false);
-    await prefs.setString(
-        PrefsKeys.extractorEngine, ExtractorEngine.onDevice.name);
-    safeEmit(
-      state.copyWith(
-          ytdlpBackendEnabled: false,
-          extractorEngine: ExtractorEngine.onDevice),
-    );
-  }
-
-  Future<void> setYtdlpBackendUrl(String url) async {
-    // DISABLED: no-op, kept for API compatibility.
-    return;
-  }
-
-  Future<void> setYtdlpBackendToken(String token) async {
-    // DISABLED: purge instead of storing.
-    try {
-      await _secureStorage.delete(key: 'xdm_backend_token_secure');
-    } catch (_) {}
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(PrefsKeys.ytdlpBackendToken);
-    safeEmit(state.copyWith(ytdlpBackendToken: ''));
-  }
-
-  Future<void> setSyncCookiesToBackend(bool value) async {
-    // DISABLED: never sync cookies to a remote backend.
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(PrefsKeys.syncCookiesToBackend, false);
-    safeEmit(state.copyWith(syncCookiesToBackend: false));
-  }
-
-  Future<void> testYtdlpBackend() async {
-    safeEmit(
-      state.copyWith(
-        isTestingYtdlpBackend: false,
-        ytdlpBackendStatusMessage:
-            'Remote yt-dlp backend is disabled (on-device only).',
-        ytdlpBackendVersion: 'disabled',
-        ytdlpBackendProxyCount: 0,
-        ytdlpBackendCircuitState: 'open',
-      ),
-    );
-  }
 
   Future<int> rescanLibrary() async {
     MediaScannerService.clearNomediaCache();

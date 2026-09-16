@@ -3383,6 +3383,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get sampleRateLabel => 'معدل العينات';
 
   @override
+  String get btSelectSampleRate => 'اختر معدل العينات';
+
+  @override
+  String get btSelectBitDepth => 'اختر عمق البت';
+
+  @override
   String get bitDepthLabel => 'عمق البت';
 
   @override

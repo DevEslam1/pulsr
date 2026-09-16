@@ -1,6 +1,4 @@
 // lib/core/services/ytm_circuit_breaker.dart
-import 'package:injectable/injectable.dart';
-
 import '../errors/ytm_error_classifier.dart';
 
 /// Per-signal circuit breaker + metrics for the YTM resolve chain.
@@ -9,7 +7,9 @@ import '../errors/ytm_error_classifier.dart';
 /// adds what it lacks: bounded per-signal failure counts, explicit cooldown
 /// windows per signal, and observable metrics for debugging Google's
 /// cat-and-mouse breaks. No XDM/backend dependency — on-device only.
-@singleton
+///
+/// Constructed directly by [YtmService] (not DI-registered), so it carries no
+/// `@singleton` annotation.
 class YtmCircuitBreaker {
   static const int maxConsecutiveFailures = 3;
 

@@ -77,7 +77,24 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     );
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.bitPerfectOutput, enabled);
-    await _hiResAudioService.setBitPerfectMode(enabled);
+    final applied = await _hiResAudioService.setBitPerfectMode(enabled);
+    if (enabled && !applied) {
+      // Device rejected bit-perfect (unsupported/route change). Revert the
+      // optimistic state and pref so the UI and quality badge never claim
+      // bit-perfect output that is not actually active.
+      try {
+        await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
+      } catch (_) {}
+      if (!isClosed) {
+        safeEmit(state.copyWith(
+          bitPerfectOutput: false,
+          errorMessage:
+              'Bit-Perfect output is not supported by the current output device.',
+        ));
+      }
+      await refreshOutputDevice();
+      return;
+    }
     // Wire bypass: when bit-perfect enabled and user wants bypass, force DSP off via native
     if (enabled && state.bypassDspOnBitPerfect) {
       try {
@@ -205,7 +222,25 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     await prefs.setBool(PrefsKeys.bitPerfectOutput, true);
     await prefs.setBool(PrefsKeys.bypassDspOnBitPerfect, true);
     await prefs.setBool(PrefsKeys.followTrackSampleRate, true);
-    await _hiResAudioService.setBitPerfectMode(true);
+    final applied = await _hiResAudioService.setBitPerfectMode(true);
+    if (!applied) {
+      // Strict bit-perfect is impossible on this device; revert rather than
+      // persist a configuration the hardware cannot honour.
+      try {
+        await prefs.setBool(PrefsKeys.strictBitPerfect, false);
+        await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
+      } catch (_) {}
+      if (!isClosed) {
+        safeEmit(state.copyWith(
+          strictBitPerfect: false,
+          bitPerfectOutput: false,
+          errorMessage:
+              'Strict Bit-Perfect is not supported by the current output device.',
+        ));
+      }
+      await refreshOutputDevice();
+      return;
+    }
     try {
       if (getIt.isRegistered<EqualizerManager>()) {
         await getIt<EqualizerManager>().setBypassDspForBitPerfect(true);
@@ -646,18 +681,42 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     safeEmit(state.copyWith(hedgedResolutionEnabled: v));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.hedgedResolutionEnabled, v);
+    try {
+      if (getIt.isRegistered<PulsrAudioHandler>()) {
+        await getIt<PulsrAudioHandler>().setHedgedResolutionEnabled(v);
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to apply hedged resolution live',
+          error: e, stackTrace: st, category: 'Settings');
+    }
   }
 
   Future<void> setAdaptiveQualityEnabled(bool v) async {
     safeEmit(state.copyWith(adaptiveQualityEnabled: v));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.adaptiveQualityEnabled, v);
+    try {
+      if (getIt.isRegistered<PulsrAudioHandler>()) {
+        await getIt<PulsrAudioHandler>().setAdaptiveQualityEnabled(v);
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to apply adaptive quality live',
+          error: e, stackTrace: st, category: 'Settings');
+    }
   }
 
   Future<void> setDuckingMode(String mode) async {
     safeEmit(state.copyWith(duckingMode: mode));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(PrefsKeys.duckingMode, mode);
+    try {
+      if (getIt.isRegistered<PulsrAudioHandler>()) {
+        await getIt<PulsrAudioHandler>().setDuckingMode(mode);
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to apply ducking mode live',
+          error: e, stackTrace: st, category: 'Settings');
+    }
   }
 
   Future<void> setDuckingLevel(double level) async {
@@ -665,18 +724,62 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     safeEmit(state.copyWith(duckingLevel: clamped));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(PrefsKeys.duckingLevel, clamped);
+    try {
+      if (getIt.isRegistered<PulsrAudioHandler>()) {
+        await getIt<PulsrAudioHandler>().setDuckingLevel(clamped);
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to apply ducking level live',
+          error: e, stackTrace: st, category: 'Settings');
+    }
   }
 
   Future<void> setMultiOutputMode(String mode) async {
-    safeEmit(state.copyWith(multiOutputMode: mode));
+    final parsed = MultiOutputMode.values.firstWhere(
+      (m) => m.name == mode,
+      orElse: () => MultiOutputMode.systemDefault,
+    );
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(PrefsKeys.multiOutputMode, mode);
+    var applied = parsed == MultiOutputMode.systemDefault;
+    try {
+      if (getIt.isRegistered<PulsrAudioHandler>()) {
+        applied = await getIt<PulsrAudioHandler>().setMultiOutputMode(parsed);
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to apply multi-output routing live',
+          error: e, stackTrace: st, category: 'Settings');
+      applied = false;
+    }
+    if (parsed != MultiOutputMode.systemDefault && !applied) {
+      // Android cannot route media to two outputs simultaneously. Revert the
+      // selection instead of persisting an option that never takes effect.
+      await prefs.setString(
+          PrefsKeys.multiOutputMode, MultiOutputMode.systemDefault.name);
+      if (!isClosed) {
+        safeEmit(state.copyWith(
+          multiOutputMode: MultiOutputMode.systemDefault.name,
+          errorMessage:
+              'This device cannot play to two outputs at once. Output stays on System default.',
+        ));
+      }
+      return;
+    }
+    await prefs.setString(PrefsKeys.multiOutputMode, parsed.name);
+    safeEmit(state.copyWith(multiOutputMode: parsed.name, errorMessage: null));
   }
 
   Future<void> setDspSnapshotEnabled(bool v) async {
     safeEmit(state.copyWith(dspSnapshotEnabled: v));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.dspSnapshotEnabled, v);
+    try {
+      if (getIt.isRegistered<PulsrAudioHandler>()) {
+        await getIt<PulsrAudioHandler>().setDspSnapshotEnabled(v);
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to apply DSP snapshot setting live',
+          error: e, stackTrace: st, category: 'Settings');
+    }
   }
 
   Future<void> setSilenceSkipSensitivity(int v) async {

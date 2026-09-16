@@ -386,7 +386,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       padding: EdgeInsets.symmetric(
                           horizontal: Adaptive.pagePadding(context)),
                       children: [
-                        if (AppConfig.ytmEnabled) ...[
+                        if (AppConfig.ytmEnabled && !offlineOnly) ...[
                           _DiscoveryChip(
                             icon: Icons.explore_rounded,
                             label: context.l10n.ytmExplore,
@@ -408,7 +408,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           iconColor: p.info,
                           onTap: () => context.push('/queue'),
                         ),
-                        if (AppConfig.ytmEnabled) ...[
+                        if (AppConfig.ytmEnabled && !offlineOnly) ...[
                           const SizedBox(width: 8),
                           _DiscoveryChip(
                             icon: Icons.downloading_rounded,

@@ -4,6 +4,8 @@ import 'package:pulsr/core/services/ytm_account_service.dart';
 import 'package:pulsr/data/audio/adaptive_buffer_engine.dart';
 import 'package:pulsr/data/audio/battery_aware_playback.dart';
 import 'package:pulsr/data/audio/crossfade_manager.dart';
+import 'package:pulsr/data/db/app_database.dart';
+import 'package:pulsr/domain/services/cast_service.dart';
 
 void main() {
   group('Audit Fixes Verification Tests', () {
@@ -124,6 +126,115 @@ void main() {
           bitrateKbps: 320, isWifi: true, isLocalFile: false);
       expect(netBuf.inSeconds, greaterThanOrEqualTo(2));
       expect(netBuf.inSeconds, lessThanOrEqualTo(30));
+    });
+
+    test(
+        'Tag editor route extra handles both SongsTableData and List<SongsTableData>',
+        () {
+      const song1 = SongsTableData(
+        id: 1,
+        title: 'Song One',
+        artist: 'Artist One',
+        album: 'Album One',
+        durationMs: 180000,
+        path: '/storage/song1.flac',
+        dateAdded: 0,
+        playCount: 0,
+        lastPositionMs: 0,
+        isFavorite: false,
+        isMissing: false,
+        source: 'local',
+        isDownloaded: true,
+      );
+      const song2 = SongsTableData(
+        id: 2,
+        title: 'Song Two',
+        artist: 'Artist Two',
+        album: 'Album Two',
+        durationMs: 210000,
+        path: '/storage/song2.flac',
+        dateAdded: 0,
+        playCount: 0,
+        lastPositionMs: 0,
+        isFavorite: false,
+        isMissing: false,
+        source: 'local',
+        isDownloaded: true,
+      );
+
+      // Single track extra handling
+      final dynamic extraSingle = song1;
+      final SongsTableData? resolvedSingle = extraSingle is SongsTableData
+          ? extraSingle
+          : (extraSingle is List<SongsTableData> && extraSingle.isNotEmpty
+              ? extraSingle.first
+              : null);
+      final List<SongsTableData>? resolvedListFromSingle =
+          extraSingle is List<SongsTableData>
+              ? extraSingle
+              : (extraSingle is SongsTableData ? [extraSingle] : null);
+      expect(resolvedSingle?.id, 1);
+      expect(resolvedListFromSingle?.length, 1);
+      expect(resolvedListFromSingle?.first.title, 'Song One');
+
+      // Batch list extra handling
+      final dynamic extraBatch = <SongsTableData>[song1, song2];
+      final SongsTableData? resolvedFromBatch = extraBatch is SongsTableData
+          ? extraBatch
+          : (extraBatch is List<SongsTableData> && extraBatch.isNotEmpty
+              ? extraBatch.first
+              : null);
+      final List<SongsTableData>? resolvedList =
+          extraBatch is List<SongsTableData>
+              ? extraBatch
+              : (extraBatch is SongsTableData ? [extraBatch] : null);
+      expect(resolvedFromBatch?.id, 1);
+      expect(resolvedList?.length, 2);
+      expect(resolvedList?[1].id, 2);
+    });
+
+    test('CastSessionStatus correctly maps and evaluates state', () {
+      const initial = CastSessionStatus();
+      expect(initial.available, isFalse);
+      expect(initial.connected, isFalse);
+      expect(initial.deviceName, isNull);
+
+      final fromMap = CastSessionStatus.fromMap({
+        'connected': true,
+        'deviceName': 'Living Room Nest Audio',
+        'playing': true,
+        'positionMs': 45000,
+      });
+      expect(fromMap.available, isTrue);
+      expect(fromMap.connected, isTrue);
+      expect(fromMap.deviceName, 'Living Room Nest Audio');
+      expect(fromMap.playing, isTrue);
+      expect(fromMap.positionMs, 45000);
+    });
+
+    test('CastDevice and CastRoute map parsing handles valid and fallback values', () {
+      final dev = CastDevice.fromMap({
+        'id': 'nest_audio_1',
+        'name': 'Studio Speaker',
+        'model': 'Google Nest Audio',
+        'host': '192.168.1.150',
+        'port': 8009,
+      });
+      expect(dev, isNotNull);
+      expect(dev!.id, 'nest_audio_1');
+      expect(dev.name, 'Studio Speaker');
+      expect(dev.port, 8009);
+
+      final route = CastRoute.fromMap({
+        'id': 'route_abc',
+        'name': 'Bedroom Chromecast',
+        'connected': true,
+        'selected': true,
+      });
+      expect(route, isNotNull);
+      expect(route!.name, 'Bedroom Chromecast');
+      expect(route.connected, isTrue);
+      expect(route.selected, isTrue);
     });
   });
 }

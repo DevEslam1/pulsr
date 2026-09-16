@@ -53,17 +53,21 @@ class DuplicateFinderService {
       }
     }
 
-    // Pass 2: Duration + Size matches verified with audio file content checksum
+    // Pass 2: Duration + Size matches verified with audio file content checksum.
+    // Songs already captured by Pass 1 are dropped from the bucket, and every
+    // checksum cluster in the bucket is emitted (an earlier version returned on
+    // the first cluster and skipped whole buckets, silently losing duplicates).
     for (final entry in byDurationSize.entries) {
       if (entry.value.length > 1) {
-        final alreadyGrouped =
-            result.any((g) => g.songs.contains(entry.value.first));
-        if (!alreadyGrouped) {
-          final verified = await _verifyWithChecksum(entry.value);
-          if (verified.length > 1) {
+        final remaining = entry.value
+            .where((s) => !result.any((g) => g.songs.contains(s)))
+            .toList();
+        if (remaining.length > 1) {
+          final clusters = await _verifyWithChecksum(remaining);
+          for (final cluster in clusters) {
             result.add(DuplicateGroup(
               key: entry.key,
-              songs: verified,
+              songs: cluster,
               reason: 'Identical Audio Content (Checksum Verified)',
             ));
           }
@@ -74,7 +78,8 @@ class DuplicateFinderService {
     return result;
   }
 
-  Future<List<SongsTableData>> _verifyWithChecksum(List<SongsTableData> candidates) async {
+  Future<List<List<SongsTableData>>> _verifyWithChecksum(
+      List<SongsTableData> candidates) async {
     final Map<String, List<SongsTableData>> byHash = {};
     for (final song in candidates) {
       final hash = await computeAudioChecksum(song.path);
@@ -82,10 +87,7 @@ class DuplicateFinderService {
         byHash.putIfAbsent(hash, () => []).add(song);
       }
     }
-    for (final cluster in byHash.values) {
-      if (cluster.length > 1) return cluster;
-    }
-    return [];
+    return byHash.values.where((cluster) => cluster.length > 1).toList();
   }
 
   /// Computes a fast, collision-resistant audio fingerprint for local files

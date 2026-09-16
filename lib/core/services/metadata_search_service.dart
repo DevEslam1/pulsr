@@ -6,6 +6,7 @@ import 'package:injectable/injectable.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/app_config.dart';
 import '../utils/error_logger.dart';
 
 class OnlineTrackMetadata {
@@ -44,6 +45,7 @@ class MetadataSearchService {
     String? album,
   }) async {
     try {
+      if (!AppConfig.isCloudSyncAllowed) return const [];
       final prefs = await SharedPreferences.getInstance();
       if (prefs.getBool('setting_offline_only_mode') == true) return const [];
     } catch (_) {}

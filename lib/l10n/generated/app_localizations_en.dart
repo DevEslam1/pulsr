@@ -3405,6 +3405,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sampleRateLabel => 'SAMPLE RATE';
 
   @override
+  String get btSelectSampleRate => 'Select sample rate';
+
+  @override
+  String get btSelectBitDepth => 'Select bit depth';
+
+  @override
   String get bitDepthLabel => 'BIT DEPTH';
 
   @override

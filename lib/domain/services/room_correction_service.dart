@@ -255,9 +255,10 @@ class RoomCorrectionService {
   }) {
     final n = taps.isOdd ? taps : taps + 1;
     if (gains.isEmpty || centers.isEmpty || gains.length != centers.length) {
-      final ir = Float32List(n);
-      ir[n ~/ 2] = 1.0;
-      return ir;
+      // Cannot design a meaningful correction from mismatched gains/centers.
+      // Return an empty response so callers reject it, instead of silently
+      // loading a pass-through (identity) IR that appears to "correct" nothing.
+      return Float32List(0);
     }
     double magAt(double freq) {
       final f = freq.clamp(centers.first, centers.last).toDouble();

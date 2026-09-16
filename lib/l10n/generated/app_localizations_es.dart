@@ -3396,6 +3396,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get sampleRateLabel => 'FRECUENCIA';
 
   @override
+  String get btSelectSampleRate => 'Elegir frecuencia';
+
+  @override
+  String get btSelectBitDepth => 'Elegir profundidad';
+
+  @override
   String get bitDepthLabel => 'PROFUNDIDAD';
 
   @override

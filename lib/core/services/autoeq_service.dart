@@ -24,7 +24,8 @@ class AutoEqResult {
       name: name,
       brand: manufacturer,
       model: model,
-      category: 'Over-Ear',
+      category:
+          target.toLowerCase().contains('in-ear') ? 'In-Ear' : 'Over-Ear',
       gains: gains,
     );
   }
@@ -149,7 +150,12 @@ class AutoEqService {
     ),
   ];
 
-  /// Searches AutoEQ database with fallback to bundled index.
+  /// Searches the bundled AutoEq-derived profile index.
+  ///
+  /// Offline-only by design: these are hand-tuned approximations bundled with
+  /// the app, not live results from the upstream AutoEq database (which is not
+  /// queried at runtime). Each [AutoEqResult.sourceUrl] deep-links to the
+  /// corresponding upstream curve so users can inspect the measured data.
   Future<List<AutoEqResult>> search(String query) async {
     final cleanQuery = query.trim().toLowerCase();
     if (cleanQuery.isEmpty) return _bundledIndex;

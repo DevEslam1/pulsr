@@ -6143,6 +6143,18 @@ abstract class AppLocalizations {
   /// **'SAMPLE RATE'**
   String get sampleRateLabel;
 
+  /// No description provided for @btSelectSampleRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Select sample rate'**
+  String get btSelectSampleRate;
+
+  /// No description provided for @btSelectBitDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'Select bit depth'**
+  String get btSelectBitDepth;
+
   /// tranche7 quality
   ///
   /// In en, this message translates to:
