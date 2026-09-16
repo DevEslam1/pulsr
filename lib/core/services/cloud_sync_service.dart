@@ -124,7 +124,7 @@ class CloudSyncService {
   }
 
   Future<bool> syncAll(
-      {bool syncFavorites = true, bool syncPlaylists = true}) async {
+      {bool? syncFavorites, bool? syncPlaylists}) async {
     // Pulsr Pure (prod offline): cloud sync is hard-off — no Firebase traffic
     // even if prefs/account state linger from another flavor.
     if (!AppConfig.isCloudSyncAllowed) return false;
@@ -136,6 +136,12 @@ class CloudSyncService {
     final user = _authService.currentUser;
     if (user == null) return false;
 
+    // Fall back to the persisted per-scope toggles when the caller does not
+    // pass explicit values, so the dashboard switches actually gate syncing.
+    final favEnabled = syncFavorites ?? await isFavoritesSyncEnabled;
+    final plEnabled = syncPlaylists ?? await isPlaylistsSyncEnabled;
+    if (!favEnabled && !plEnabled) return true;
+
     try {
       await _loadSyncedHashes();
       final firestore = FirebaseFirestore.instance;
@@ -143,11 +149,11 @@ class CloudSyncService {
 
       // 1. Upload Local Data to Cloud
       await _uploadLocalData(userDoc,
-          syncFavorites: syncFavorites, syncPlaylists: syncPlaylists);
+          syncFavorites: favEnabled, syncPlaylists: plEnabled);
 
       // 2. Download & Merge Cloud Data into Local DB
       await _downloadAndMergeCloudData(userDoc,
-          syncFavorites: syncFavorites, syncPlaylists: syncPlaylists);
+          syncFavorites: favEnabled, syncPlaylists: plEnabled);
 
       await _setLastSyncTime(DateTime.now());
       await _persistSyncedHashes();

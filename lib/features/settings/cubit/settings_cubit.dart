@@ -51,6 +51,8 @@ class SettingsCubit extends PulsrCubit<SettingsState>
   static const String _keyWaveformSeekBar = 'setting_waveform_seek_bar';
   static const String _keyThemeMode = 'setting_theme_mode';
   static const String _keyAutoThemeByTime = 'setting_auto_theme_by_time';
+  static const String _keyThemeScheduleStart = 'setting_theme_schedule_start';
+  static const String _keyThemeScheduleEnd = 'setting_theme_schedule_end';
   static const String _keyHighContrast = 'setting_high_contrast';
   static const String _keyLiquidGlassTint = 'setting_liquid_glass_tint';
   static const String _keyLanguageCode = PrefsKeys.languageCode;
@@ -162,6 +164,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
           ? getIt<ThemeSchedulerService>()
           : ThemeSchedulerService();
       autoSub(_themeScheduler!.isNightStream, _onNightChanged);
+      unawaited(_applyScheduleHoursFromPrefs());
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to start theme scheduler',
@@ -184,6 +187,35 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       if (isClosed || !state.autoThemeByTime) return;
       _themeScheduler?.startScheduler((_) {});
     } catch (_) {}
+  }
+
+  /// Loads the persisted dark-hours window into the scheduler singleton so a
+  /// cold start with scheduled theming enabled uses the user's chosen window
+  /// rather than the 19:00–06:00 default (defect 19-02 follow-up).
+  Future<void> _applyScheduleHoursFromPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // Keep whatever the user (or a previous session) already set; default to
+      // the service's own 19:00–06:00 when nothing is stored yet.
+      final start = prefs.getInt(_keyThemeScheduleStart) ?? _themeScheduler?.startHour ?? 19;
+      final end = prefs.getInt(_keyThemeScheduleEnd) ?? _themeScheduler?.endHour ?? 6;
+      _themeScheduler?.updateScheduleHours(start: start, end: end);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to apply persisted theme schedule hours',
+          error: e, stackTrace: st, category: 'SettingsCubit');
+    }
+  }
+
+  /// Persists and applies a new dark-hours window. Restarts the scheduler so
+  /// the change is reflected immediately when scheduled theming is on.
+  Future<void> setThemeScheduleHours({required int start, required int end}) async {
+    final s = start.clamp(0, 23);
+    final e = end.clamp(0, 23);
+    _themeScheduler?.updateScheduleHours(start: s, end: e);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_keyThemeScheduleStart, s);
+    await prefs.setInt(_keyThemeScheduleEnd, e);
+    if (state.autoThemeByTime) _startThemeScheduler();
   }
 
   @override

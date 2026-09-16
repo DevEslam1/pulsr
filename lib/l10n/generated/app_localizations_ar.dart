@@ -1418,6 +1418,20 @@ class AppLocalizationsAr extends AppLocalizations {
   String get deviceProfilesTitle => 'ملفات إعدادات الأجهزة';
 
   @override
+  String get themeScheduleTitle => 'ساعات الوضع الداكن';
+
+  @override
+  String get themeScheduleStartLabel => 'داكن من';
+
+  @override
+  String get themeScheduleEndLabel => 'فاتح من';
+
+  @override
+  String themeScheduleHour(int hour) {
+    return '$hour:00';
+  }
+
+  @override
   String get deviceProfilesSubtitle => 'تذكّر إعدادات الصوت لكل جهاز إخراج';
 
   @override
@@ -1437,6 +1451,28 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get profileDropdownLabel => 'الملف';
+
+  @override
+  String get customProfilesTitle => 'الملفات';
+
+  @override
+  String get profileCreateFromCurrent => 'احفظ الصوت الحالي كملف';
+
+  @override
+  String get profileNameHint => 'اسم الملف';
+
+  @override
+  String profileCreated(String name) {
+    return 'تم حفظ الملف \"$name\"';
+  }
+
+  @override
+  String profileDeleteConfirm(String name) {
+    return 'حذف الملف \"$name\"؟';
+  }
+
+  @override
+  String get profileBuiltIn => 'مدمج';
 
   @override
   String get smartAudioTitle => 'الصوت الذكي';
@@ -1982,6 +2018,21 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get radioPlay => 'تشغيل';
+
+  @override
+  String get radioCuratedBrowse => 'تصفح المحطات المختارة';
+
+  @override
+  String radioCuratedAdded(int count) {
+    return 'تمت إضافة $count محطة مختارة';
+  }
+
+  @override
+  String get radioCuratedUpToDate =>
+      'جميع المحطات المختارة موجودة بالفعل في قائمتك';
+
+  @override
+  String get radioCuratedTitle => 'محطات مختارة';
 
   @override
   String get followTrackSampleRateTitle => 'متابعة معدل عينات المسار';
@@ -3380,6 +3431,18 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get whatGetsSynced => 'ما الذي تتم مزامنته';
+
+  @override
+  String get cloudSyncFavoritesLabel => 'مزامنة المفضلة';
+
+  @override
+  String get cloudSyncFavoritesDesc => 'ارفع واستعد الأغاني المفضلة عبر أجهزتك';
+
+  @override
+  String get cloudSyncPlaylistsLabel => 'مزامنة قوائم التشغيل';
+
+  @override
+  String get cloudSyncPlaylistsDesc => 'ارفع واستعد قوائم التشغيل عبر أجهزتك';
 
   @override
   String get syncItemsPrefix => 'المفضلة والقوائم والسجل والبيانات ';

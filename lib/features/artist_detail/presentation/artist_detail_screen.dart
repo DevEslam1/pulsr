@@ -33,11 +33,20 @@ class ArtistDetailScreen extends StatefulWidget {
 
 class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
   late GetArtistsUseCase _useCase;
+  late final ArtistBioService _bioService;
+  // Resolved once per artist so widget rebuilds (scroll, theme, selection)
+  // never re-fire the Deezer/Wikipedia lookups (the service's cache is
+  // instance-level, so a per-build `ArtistBioService()` defeated it).
+  late final Future<ArtistInfo?> _bioFuture;
 
   @override
   void initState() {
     super.initState();
     _useCase = widget.getArtistsUseCase ?? getIt<GetArtistsUseCase>();
+    _bioService = getIt.isRegistered<ArtistBioService>()
+        ? getIt<ArtistBioService>()
+        : ArtistBioService();
+    _bioFuture = _bioService.getArtistInfo(widget.artist.name);
   }
 
   @override
@@ -102,7 +111,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
 
                 // Artist Biography & HD Info
                 FutureBuilder(
-                  future: ArtistBioService().getArtistInfo(artist.name),
+                  future: _bioFuture,
                   builder: (context, snapshot) {
                     if (snapshot.hasData && snapshot.data?.bio != null) {
                       final bio = snapshot.data!.bio!;

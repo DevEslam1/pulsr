@@ -1,5 +1,6 @@
 // lib/features/player/presentation/widgets/autoeq_search_sheet.dart
 import 'package:flutter/material.dart';
+import '../../../../core/di/injection.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/services/autoeq_service.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -15,7 +16,11 @@ class AutoEqSearchSheet extends StatefulWidget {
 }
 
 class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
-  final AutoEqService _autoEqService = AutoEqService();
+  // Reuse the DI singleton so its profile cache survives across opens instead
+  // of constructing a fresh (cache-less) service on every sheet.
+  final AutoEqService _autoEqService = getIt.isRegistered<AutoEqService>()
+      ? getIt<AutoEqService>()
+      : AutoEqService();
   final TextEditingController _searchController = TextEditingController();
   List<AutoEqResult> _results = [];
   bool _isLoading = false;

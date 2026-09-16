@@ -2698,6 +2698,30 @@ abstract class AppLocalizations {
   /// **'Device Profiles'**
   String get deviceProfilesTitle;
 
+  /// No description provided for @themeScheduleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark hours'**
+  String get themeScheduleTitle;
+
+  /// No description provided for @themeScheduleStartLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark from'**
+  String get themeScheduleStartLabel;
+
+  /// No description provided for @themeScheduleEndLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Light from'**
+  String get themeScheduleEndLabel;
+
+  /// No description provided for @themeScheduleHour.
+  ///
+  /// In en, this message translates to:
+  /// **'{hour}:00'**
+  String themeScheduleHour(int hour);
+
   /// No description provided for @deviceProfilesSubtitle.
   ///
   /// In en, this message translates to:
@@ -2739,6 +2763,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Profile'**
   String get profileDropdownLabel;
+
+  /// No description provided for @customProfilesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Profiles'**
+  String get customProfilesTitle;
+
+  /// No description provided for @profileCreateFromCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Save current sound as profile'**
+  String get profileCreateFromCurrent;
+
+  /// No description provided for @profileNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile name'**
+  String get profileNameHint;
+
+  /// No description provided for @profileCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile \"{name}\" saved'**
+  String profileCreated(String name);
+
+  /// No description provided for @profileDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete profile \"{name}\"?'**
+  String profileDeleteConfirm(String name);
+
+  /// No description provided for @profileBuiltIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Built-in'**
+  String get profileBuiltIn;
 
   /// No description provided for @smartAudioTitle.
   ///
@@ -3592,6 +3652,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Play'**
   String get radioPlay;
+
+  /// No description provided for @radioCuratedBrowse.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse curated stations'**
+  String get radioCuratedBrowse;
+
+  /// No description provided for @radioCuratedAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} curated stations added'**
+  String radioCuratedAdded(int count);
+
+  /// No description provided for @radioCuratedUpToDate.
+  ///
+  /// In en, this message translates to:
+  /// **'All curated stations are already in your list'**
+  String get radioCuratedUpToDate;
+
+  /// No description provided for @radioCuratedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Curated Stations'**
+  String get radioCuratedTitle;
 
   /// No description provided for @followTrackSampleRateTitle.
   ///
@@ -6160,6 +6244,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'What gets synced'**
   String get whatGetsSynced;
+
+  /// No description provided for @cloudSyncFavoritesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync favorites'**
+  String get cloudSyncFavoritesLabel;
+
+  /// No description provided for @cloudSyncFavoritesDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload and restore liked songs across devices'**
+  String get cloudSyncFavoritesDesc;
+
+  /// No description provided for @cloudSyncPlaylistsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync playlists'**
+  String get cloudSyncPlaylistsLabel;
+
+  /// No description provided for @cloudSyncPlaylistsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload and restore your playlists across devices'**
+  String get cloudSyncPlaylistsDesc;
 
   /// tranche8 l10n
   ///

@@ -76,6 +76,19 @@ class _RadioScreenState extends State<RadioScreen> {
     }
   }
 
+  Future<void> _importCurated() async {
+    final added = await _store.importCurated();
+    _refresh();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(added > 0
+            ? context.l10n.radioCuratedAdded(added)
+            : context.l10n.radioCuratedUpToDate),
+      ),
+    );
+  }
+
   Future<void> _confirmDelete(RadioStation station) async {
     final confirmed = await PulsrDialogHelper.showConfirmDialog(
       context,
@@ -104,6 +117,11 @@ class _RadioScreenState extends State<RadioScreen> {
         leading: const PulsrBackButton(),
         title: Text(context.l10n.radioTitle),
         actions: [
+          IconButton(
+            tooltip: context.l10n.radioCuratedBrowse,
+            icon: const Icon(Icons.explore_rounded),
+            onPressed: _importCurated,
+          ),
           IconButton(
             tooltip: context.l10n.radioImportPlaylist,
             icon: const Icon(Icons.playlist_add_rounded),
@@ -170,6 +188,22 @@ class _RadioScreenState extends State<RadioScreen> {
                         foregroundColor: p.onAccent,
                         padding: const EdgeInsets.symmetric(
                             horizontal: 22, vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: _importCurated,
+                      icon: const Icon(Icons.explore_rounded, size: 18),
+                      label: Text(context.l10n.radioCuratedBrowse),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: p.accent,
+                        side: BorderSide(
+                            color: p.accent.withValues(alpha: 0.5)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),

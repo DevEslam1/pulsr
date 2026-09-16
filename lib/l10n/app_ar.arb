@@ -471,6 +471,17 @@
   "rcKeepPlayerPaused": "يبقى تشغيل الموسيقى متوقفاً أثناء تصحيح الغرفة",
   "rcApplied": "تم تطبيق إعداد تصحيح الغرفة",
   "deviceProfilesTitle": "ملفات إعدادات الأجهزة",
+  "themeScheduleTitle": "ساعات الوضع الداكن",
+  "themeScheduleStartLabel": "داكن من",
+  "themeScheduleEndLabel": "فاتح من",
+  "themeScheduleHour": "{hour}:00",
+  "@themeScheduleHour": {
+    "placeholders": {
+      "hour": {
+        "type": "int"
+      }
+    }
+  },
   "deviceProfilesSubtitle": "تذكّر إعدادات الصوت لكل جهاز إخراج",
   "autoDeviceSwitch": "تبديل تلقائي عند تغيير الجهاز",
   "noDevicesSeen": "لم يتم اكتشاف أي أجهزة إخراج بعد",
@@ -478,6 +489,26 @@
   "forgetDevice": "حذف",
   "currentDeviceBadge": "الحالي",
   "profileDropdownLabel": "الملف",
+  "customProfilesTitle": "الملفات",
+  "profileCreateFromCurrent": "احفظ الصوت الحالي كملف",
+  "profileNameHint": "اسم الملف",
+  "profileCreated": "تم حفظ الملف \"{name}\"",
+  "@profileCreated": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "profileDeleteConfirm": "حذف الملف \"{name}\"؟",
+  "@profileDeleteConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "profileBuiltIn": "مدمج",
   "smartAudioTitle": "الصوت الذكي",
   "smartAudioSubtitle": "اضبط الصوت تلقائيًا حسب سماعاتك والمقطع",
   "smartAudioModeLabel": "الوضع",
@@ -657,6 +688,17 @@
   "radioImportedCount": "تم استيراد {count} محطة",
   "radioNoStreamsFound": "لم يتم العثور على روابط بث http(s)",
   "radioPlay": "تشغيل",
+  "radioCuratedBrowse": "تصفح المحطات المختارة",
+  "radioCuratedAdded": "تمت إضافة {count} محطة مختارة",
+  "@radioCuratedAdded": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "radioCuratedUpToDate": "جميع المحطات المختارة موجودة بالفعل في قائمتك",
+  "radioCuratedTitle": "محطات مختارة",
   "followTrackSampleRateTitle": "متابعة معدل عينات المسار",
   "followTrackSampleRateSubtitle": "إعادة ضبط الإخراج إلى المعدل الأصلي لكل مسار؛ يتم تخطيه في البلوتوث وبدون تكرار",
   "followTrackSampleRateBluetooth": "يتم تخطيه في البلوتوث — رابط الترميز/AVRCP يتحكم في معدل العينات",
@@ -2383,6 +2425,10 @@
   "@whatGetsSynced": {
     "description": "tranche8 l10n"
   },
+  "cloudSyncFavoritesLabel": "مزامنة المفضلة",
+  "cloudSyncFavoritesDesc": "ارفع واستعد الأغاني المفضلة عبر أجهزتك",
+  "cloudSyncPlaylistsLabel": "مزامنة قوائم التشغيل",
+  "cloudSyncPlaylistsDesc": "ارفع واستعد قوائم التشغيل عبر أجهزتك",
   "syncItemsPrefix": "المفضلة والقوائم والسجل والبيانات ",
   "@syncItemsPrefix": {
     "description": "tranche8 l10n"

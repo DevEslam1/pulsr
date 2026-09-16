@@ -8,6 +8,7 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../../../core/services/hires_audio_service.dart';
 import '../../../../core/services/settings_profiles_service.dart';
+import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../player/cubit/player_cubit.dart';
 
 /// Phase 3: per-output-device profile links and the auto-switch master
@@ -106,6 +107,50 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
     );
   }
 
+  /// Captures the player's current EQ/volume as a reusable custom profile so
+  /// the device-profile dropdown can offer more than the built-ins
+  /// (SettingsProfilesService.saveProfile was previously unreachable).
+  Future<void> _createProfileFromCurrent() async {
+    final name = await PulsrDialogHelper.showInputDialog(
+      context,
+      title: context.l10n.customProfilesTitle,
+      hintText: context.l10n.profileNameHint,
+      icon: Icons.library_add_rounded,
+      confirmLabel: context.l10n.save,
+      cancelLabel: context.l10n.cancel,
+    );
+    if (name == null || name.trim().isEmpty || !mounted) return;
+    final player = context.read<PlayerCubit>().state;
+    final profile = SettingsProfile(
+      id: 'profile_custom_${DateTime.now().millisecondsSinceEpoch}',
+      name: name.trim(),
+      type: ProfileType.custom,
+      eqPresetName: player.eqPreset.name,
+      volumeBoost: player.volumeBoost,
+    );
+    await getIt<SettingsProfilesService>().saveProfile(profile);
+    await _reload();
+    if (!mounted) return;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(content: Text(context.l10n.profileCreated(profile.name))),
+    );
+  }
+
+  Future<void> _deleteProfile(SettingsProfile profile) async {
+    if (SettingsProfile.defaultProfiles.any((p) => p.id == profile.id)) return;
+    final confirmed = await PulsrDialogHelper.showConfirmDialog(
+      context,
+      title: context.l10n.profileDeleteConfirm(profile.name),
+      message: context.l10n.browseCannotBeUndone,
+      icon: Icons.delete_outline_rounded,
+      confirmLabel: context.l10n.delete,
+      isDestructive: true,
+    );
+    if (confirmed != true || !mounted) return;
+    await getIt<SettingsProfilesService>().deleteProfile(profile.id);
+    await _reload();
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
@@ -142,7 +187,46 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
         else
           for (final device in _devices)
             _deviceRow(context, device, l10n),
+        const SizedBox(height: 8),
+        Text(
+          l10n.customProfilesTitle,
+          style: Theme.of(context)
+              .textTheme
+              .labelSmall
+              ?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 4),
+        for (final profile in _profiles)
+          _profileRow(context, profile, l10n),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: TextButton.icon(
+            onPressed: _createProfileFromCurrent,
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: Text(l10n.profileCreateFromCurrent),
+          ),
+        ),
       ],
+    );
+  }
+
+  Widget _profileRow(
+      BuildContext context, SettingsProfile profile, AppLocalizations l10n) {
+    final isBuiltIn =
+        SettingsProfile.defaultProfiles.any((p) => p.id == profile.id);
+    return ListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.equalizer_rounded, size: 20),
+      title: Text(profile.name),
+      subtitle: Text(isBuiltIn ? l10n.profileBuiltIn : profile.eqPresetName),
+      trailing: isBuiltIn
+          ? null
+          : IconButton(
+              tooltip: l10n.delete,
+              icon: const Icon(Icons.delete_outline_rounded, size: 20),
+              onPressed: () => _deleteProfile(profile),
+            ),
     );
   }
 
