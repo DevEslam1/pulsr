@@ -13,6 +13,9 @@ import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_dismissible.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/di/injection.dart';
+import '../../../core/services/playlist_suggestions_service.dart';
+import '../../../data/db/app_database.dart';
+import '../../../domain/usecases/get_songs_usecase.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/formatters.dart';
@@ -83,6 +86,42 @@ class QueueScreen extends StatelessWidget {
                     final current = state.currentSong;
                     if (current != null) await cubit.playSong(current, queue: shuffled);
                     break;
+                  case 'autodj':
+                    // Auto-DJ: append tracks similar to the current song.
+                    final seed = state.currentSong;
+                    if (seed == null) break;
+                    final songsRes =
+                        await getIt<GetSongsUseCase>().getAllSongs();
+                    if (!context.mounted) break;
+                    final all = songsRes.fold(
+                        (l) => <SongsTableData>[], (r) => r);
+                    if (all.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(context.l10n.autoDjEmpty)),
+                      );
+                      break;
+                    }
+                    final exclude =
+                        state.queue.map((s) => s.id).toSet();
+                    final dj = getIt<PlaylistSuggestionsService>()
+                        .buildAutoDjQueue(seed, all,
+                            limit: 10, excludeIds: exclude);
+                    if (!context.mounted) break;
+                    if (dj.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(context.l10n.autoDjEmpty)),
+                      );
+                    } else {
+                      await cubit.addAllToQueue(dj);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                              content:
+                                  Text(context.l10n.autoDjAdded(dj.length))),
+                        );
+                      }
+                    }
+                    break;
                   case 'save':
                     final defaultName =
                         '${context.l10n.queue} ${DateTime.now().toIso8601String().substring(0, 10)}';
@@ -120,6 +159,7 @@ class QueueScreen extends StatelessWidget {
               },
               itemBuilder: (c) => [
                 PopupMenuItem(value: 'shuffle', child: Row(children: [const Icon(Icons.shuffle), const SizedBox(width: 8), Text(context.l10n.shuffle)])),
+                PopupMenuItem(value: 'autodj', child: Row(children: [const Icon(Icons.auto_awesome_rounded), const SizedBox(width: 8), Text(context.l10n.autoMix)])),
                 PopupMenuItem(value: 'save', child: Row(children: [const Icon(Icons.playlist_add), const SizedBox(width: 8), Text(context.l10n.saveAsPlaylist)])),
                 const PopupMenuDivider(),
                 PopupMenuItem(value: 'clear', child: Row(children: [Icon(Icons.clear_all, color: p.error), const SizedBox(width: 8), Text(context.l10n.clearQueueConfirm.split('?').first, style: TextStyle(color: p.error))])),

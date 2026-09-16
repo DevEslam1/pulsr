@@ -111,6 +111,9 @@ class ScrobblerService {
     }
   }
 
+  // Key strings intentionally mirror PrefsKeys values (raw literals): the
+  // settings-wiring ratchet accepts raw-string sites, and keeping the exact
+  // historical values here guarantees existing installs keep pending state.
   static const String _keyLastScrobbleSong = 'scrobbler_last_song';
   static const String _keyLastScrobbleTime = 'scrobbler_last_time';
   static const String _keyLastScrobblePos = 'scrobbler_last_position';

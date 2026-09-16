@@ -11,6 +11,7 @@ import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/performance/gpu_budget.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/error_logger.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/visualizer/milkdrop_preset_store.dart';
 import '../../../../data/visualizer/visualizer_preset_store.dart';
 import '../../../../domain/models/milkdrop_preset.dart';
@@ -384,11 +385,13 @@ class _AudioVisualizerState extends State<AudioVisualizer>
     final activeColor = widget.color ?? p.accent;
 
     return ExcludeSemantics(
-      child: SizedBox(
-        width: widget.width,
-        height: widget.height,
-        child: ClipRect(
-          child: ValueListenableBuilder<List<double>>(
+      child: Stack(
+        children: [
+          SizedBox(
+            width: widget.width,
+            height: widget.height,
+            child: ClipRect(
+              child: ValueListenableBuilder<List<double>>(
           valueListenable: _dataNotifier,
           builder: (context, data, _) {
             return CustomPaint(
@@ -429,6 +432,34 @@ class _AudioVisualizerState extends State<AudioVisualizer>
           },
         ),
         ),
+      ),
+          // Honest degradation (16-01): when the MilkDrop GPU shader failed to
+          // compile, the Canvas painter above is NOT MilkDrop — say so instead
+          // of letting the user believe they are seeing it.
+          if (widget.style == VisualizerStyle.milkdrop && isFallbackActive)
+            PositionedDirectional(
+              top: 6,
+              end: 6,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  child: Text(
+                    context.l10n.visualizerCpuFallbackBadge,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

@@ -1144,6 +1144,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Visualizer permission denied — showing a simulated animation instead.';
 
   @override
+  String get visualizerCpuFallbackBadge =>
+      'CPU fallback — GPU visualiser unavailable';
+
+  @override
   String get ytmAccount => 'YouTube Music Account';
 
   @override
@@ -2934,6 +2938,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String addedToQueue(Object count) {
     return 'Added $count tracks to queue';
   }
+
+  @override
+  String autoDjAdded(int count) {
+    return 'Auto-DJ added $count similar tracks';
+  }
+
+  @override
+  String get autoDjEmpty => 'No similar tracks found in your library';
 
   @override
   String savedToLocal(Object title, Object count) {

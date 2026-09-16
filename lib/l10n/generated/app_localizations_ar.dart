@@ -1156,6 +1156,9 @@ class AppLocalizationsAr extends AppLocalizations {
       'تم رفض إذن المؤثر البصري — يتم عرض رسم متحرك محاكى بدلاً من ذلك.';
 
   @override
+  String get visualizerCpuFallbackBadge => 'وضع المعالج: مؤثر GPU غير متاح';
+
+  @override
   String get ytmAccount => 'حساب YouTube Music';
 
   @override
@@ -2930,6 +2933,14 @@ class AppLocalizationsAr extends AppLocalizations {
   String addedToQueue(Object count) {
     return 'تمت اضافة $count الى القائمة';
   }
+
+  @override
+  String autoDjAdded(int count) {
+    return 'أضاف Auto-DJ عدد $count من المقاطع المشابهة';
+  }
+
+  @override
+  String get autoDjEmpty => 'لم يتم العثور على مقاطع مشابهة في مكتبتك';
 
   @override
   String savedToLocal(Object title, Object count) {

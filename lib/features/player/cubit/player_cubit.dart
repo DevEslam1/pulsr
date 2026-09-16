@@ -1348,15 +1348,19 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         now.difference(_lastSponsorSkipTime!).inMilliseconds < 1500) {
       return;
     }
-    for (final segment in _currentSponsorSegments) {
-      if (!enabledCategories.contains(segment.category)) continue;
-      if (segment.contains(pos)) {
-        if (_lastSkippedSegmentEnd != null &&
-            (_lastSkippedSegmentEnd == segment.end ||
-                (pos - _lastSkippedSegmentEnd!).abs() <
-                    const Duration(seconds: 2))) {
-          continue;
-        }
+    // Search only category-eligible segments through the shared helper so the
+    // containment scan lives in one place (service) instead of being
+    // re-implemented here; the guards below stay cubit-side.
+    final eligible = <SponsorBlockSegment>[
+      for (final segment in _currentSponsorSegments)
+        if (enabledCategories.contains(segment.category)) segment,
+    ];
+    final segment = service.findSegmentToSkip(eligible, pos);
+    if (segment != null) {
+      if (_lastSkippedSegmentEnd == null ||
+          (_lastSkippedSegmentEnd != segment.end &&
+              (pos - _lastSkippedSegmentEnd!).abs() >=
+                  const Duration(seconds: 2))) {
         // Chain adjacent/overlapping segments (contains is [start, end)):
         // skipping to this segment's end must not land inside the next one,
         // or the next tick would either re-skip or be suppressed by the
@@ -1381,7 +1385,6 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         // Optimistic position update: the throttled position stream would
         // otherwise keep reporting in-segment positions for up to 200ms.
         safeEmit(state.copyWith(position: seekTarget));
-        break;
       }
     }
   }

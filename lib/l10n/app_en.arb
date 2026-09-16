@@ -456,6 +456,7 @@
   "audioVisualizerPermissionDesc": "The visualizer reads audio output, not your microphone. Android requires the Record Audio permission to process frequency data.",
   "useSimulation": "Use Simulation",
   "visualizerSimulationNotice": "Visualizer permission denied — showing a simulated animation instead.",
+  "visualizerCpuFallbackBadge": "CPU fallback — GPU visualiser unavailable",
   "ytmAccount": "YouTube Music Account",
   "disconnect": "Disconnect",
   "openWebPlayer": "Open Web Player",
@@ -2025,6 +2026,15 @@
       "count": {}
     }
   },
+  "autoDjAdded": "Auto-DJ added {count} similar tracks",
+  "@autoDjAdded": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "autoDjEmpty": "No similar tracks found in your library",
   "savedToLocal": "Saved \"{title}\" to Local Playlists ({count} tracks)",
   "@savedToLocal": {
     "description": "tranche7 tpl",

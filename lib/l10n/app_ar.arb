@@ -390,6 +390,7 @@
   "audioVisualizerPermissionDesc": "يقرأ المؤثر البصري إخراج الصوت وليس الميكروفون. يتطلب نظام أندرويد إذن تسجيل الصوت لمعالجة بيانات التردد.",
   "useSimulation": "استخدام المحاكاة",
   "visualizerSimulationNotice": "تم رفض إذن المؤثر البصري — يتم عرض رسم متحرك محاكى بدلاً من ذلك.",
+  "visualizerCpuFallbackBadge": "وضع المعالج: مؤثر GPU غير متاح",
   "ytmAccount": "حساب YouTube Music",
   "disconnect": "قطع الاتصال",
   "openWebPlayer": "فتح مشغل الويب",
@@ -1740,6 +1741,15 @@
       "count": {}
     }
   },
+  "autoDjAdded": "أضاف Auto-DJ عدد {count} من المقاطع المشابهة",
+  "@autoDjAdded": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "autoDjEmpty": "لم يتم العثور على مقاطع مشابهة في مكتبتك",
   "savedToLocal": "تم حفظ \"{title}\" ({count})",
   "@savedToLocal": {
     "description": "tranche7 tpl",

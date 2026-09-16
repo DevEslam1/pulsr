@@ -1148,6 +1148,10 @@ class AppLocalizationsEs extends AppLocalizations {
       'Permiso del visualizador denegado: se muestra una animación simulada.';
 
   @override
+  String get visualizerCpuFallbackBadge =>
+      'Modo CPU: visualizador GPU no disponible';
+
+  @override
   String get ytmAccount => 'Cuenta de YouTube Music';
 
   @override
@@ -2940,6 +2944,15 @@ class AppLocalizationsEs extends AppLocalizations {
   String addedToQueue(Object count) {
     return '$count anadidas a la cola';
   }
+
+  @override
+  String autoDjAdded(int count) {
+    return 'Auto-DJ añadió $count temas similares';
+  }
+
+  @override
+  String get autoDjEmpty =>
+      'No se encontraron temas similares en tu biblioteca';
 
   @override
   String savedToLocal(Object title, Object count) {
