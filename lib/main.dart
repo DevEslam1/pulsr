@@ -24,6 +24,7 @@ import 'core/widgets/pulsr_toast.dart';
 import 'core/router/app_router.dart';
 import 'core/network/network_change_monitor.dart';
 import 'core/services/auth_service.dart';
+import 'core/services/scrobbler_service.dart';
 import 'core/services/file_intent_handler.dart';
 import 'core/services/restore_detection_service.dart';
 import 'core/services/ytm_account_service.dart';
@@ -146,6 +147,28 @@ Future<void> main() async {
                 .catchError((_) {}));
           }
         } catch (_) {}
+        // Scrobbler session recovery + credential migration (previously only
+        // reachable from tests): recover a scrobble interrupted by process
+        // death, and proactively move leftover plaintext credentials into
+        // secure storage. Local-first; safe to run whenever cloud sync is on.
+        try {
+          if (AppConfig.isCloudSyncAllowed &&
+              !offlineOnly &&
+              getIt.isRegistered<ScrobblerService>()) {
+            final scrobbler = getIt<ScrobblerService>();
+            unawaited(scrobbler
+                .migrateAllCredentialsToSecureStorage()
+                .then((_) => scrobbler.checkPendingScrobble())
+                .timeout(const Duration(seconds: 10))
+                .catchError((e, st) {
+              ErrorLogger.log('Scrobbler startup recovery failed',
+                  error: e, stackTrace: st, category: 'Startup');
+            }));
+          }
+        } catch (e, st) {
+          ErrorLogger.log('Scrobbler startup hook failed',
+              error: e, stackTrace: st, category: 'Startup');
+        }
       } catch (e, st) {
         ErrorLogger.log('Parallel startup init failed',
             error: e, stackTrace: st, category: 'Startup');

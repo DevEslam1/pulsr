@@ -2212,6 +2212,12 @@ abstract class AppLocalizations {
   /// **'Visualizer permission denied — showing a simulated animation instead.'**
   String get visualizerSimulationNotice;
 
+  /// No description provided for @visualizerCpuFallbackBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'CPU fallback — GPU visualiser unavailable'**
+  String get visualizerCpuFallbackBadge;
+
   /// No description provided for @ytmAccount.
   ///
   /// In en, this message translates to:
@@ -5386,6 +5392,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Added {count} tracks to queue'**
   String addedToQueue(Object count);
+
+  /// No description provided for @autoDjAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-DJ added {count} similar tracks'**
+  String autoDjAdded(int count);
+
+  /// No description provided for @autoDjEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No similar tracks found in your library'**
+  String get autoDjEmpty;
 
   /// tranche7 tpl
   ///

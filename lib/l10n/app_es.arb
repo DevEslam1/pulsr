@@ -390,6 +390,7 @@
   "audioVisualizerPermissionDesc": "El visualizador lee la salida de audio, no tu micrófono. Android requiere el permiso de Grabar audio para procesar datos de frecuencia.",
   "useSimulation": "Usar simulación",
   "visualizerSimulationNotice": "Permiso del visualizador denegado: se muestra una animación simulada.",
+  "visualizerCpuFallbackBadge": "Modo CPU: visualizador GPU no disponible",
   "ytmAccount": "Cuenta de YouTube Music",
   "disconnect": "Desconectar",
   "openWebPlayer": "Abrir reproductor web",
@@ -1740,6 +1741,15 @@
       "count": {}
     }
   },
+  "autoDjAdded": "Auto-DJ añadió {count} temas similares",
+  "@autoDjAdded": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "autoDjEmpty": "No se encontraron temas similares en tu biblioteca",
   "savedToLocal": "\"{title}\" guardada ({count})",
   "@savedToLocal": {
     "description": "tranche7 tpl",

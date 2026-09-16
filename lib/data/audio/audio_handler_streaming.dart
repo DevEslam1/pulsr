@@ -67,7 +67,12 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
       if (lowerPath.endsWith('.flac') || lowerPath.endsWith('.wav')) {
         unawaited(MqaDecoderHelper.isMqaFile(song.path).then((isMqa) {
           if (isMqa) MqaDecoderHelper.markMqaPath(song.path);
-        }).catchError((_) {}));
+        }).catchError((e, st) {
+          // File vanished or unreadable mid-play: the track simply plays
+          // without the MQA badge rather than failing silently (14-03).
+          ErrorLogger.log('MQA signature scan failed for ${song.path}',
+              error: e, stackTrace: st, category: 'AudioHandler');
+        }));
       }
     }
     unawaited(_beginAudioSession(song));
