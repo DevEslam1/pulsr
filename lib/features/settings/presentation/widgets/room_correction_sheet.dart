@@ -16,6 +16,7 @@ import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
+import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 
 /// In-memory measurement sweep playable through a dedicated [AudioPlayer]
 /// (NOT the app handler) so the measurement never touches the user's queue,
@@ -41,6 +42,7 @@ class _SweepSource extends StreamAudioSource {
 
 enum _RcPhase { idle, measuring, analyzing, result }
 
+
 /// Phase 5: room-correction wizard. Plays a stepped-sine sweep through the
 /// active output device, records it with the mic, fits a Room Correction EQ
 /// preset and (optionally) applies it through [PlayerCubit.applyPreset] -
@@ -49,11 +51,8 @@ class RoomCorrectionSheet extends StatefulWidget {
   const RoomCorrectionSheet({super.key});
 
   static Future<void> show(BuildContext context) {
-    return showModalBottomSheet<void>(
+    return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (_) => const RoomCorrectionSheet(),
     );
   }

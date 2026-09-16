@@ -105,4 +105,46 @@ class PlaylistSuggestionsService {
 
     return suggestions;
   }
+
+  /// Seed-based similarity for Auto-DJ / Up Next.
+  /// Scores same-artist > same-album > same-genre, boosts favorites and
+  /// near-duration tracks, excludes the seed itself.
+  List<SongsTableData> suggestForSeed(
+    SongsTableData seed,
+    List<SongsTableData> allSongs, {
+    int limit = 10,
+  }) {
+    final scored = <({SongsTableData song, int score})>[];
+    for (final s in allSongs) {
+      if (s.id == seed.id) continue;
+      var score = 0;
+      if (s.artist == seed.artist && s.artist.isNotEmpty) score += 30;
+      if (s.album == seed.album && s.album.isNotEmpty) score += 20;
+      if (s.genre == seed.genre && (s.genre?.isNotEmpty ?? false)) score += 15;
+      if (s.isFavorite) score += 8;
+      final durDiff = (s.durationMs - seed.durationMs).abs();
+      if (durDiff < 30000) score += 5;
+      score += s.playCount.clamp(0, 10);
+      if (score > 0) scored.add((song: s, score: score));
+    }
+    scored.sort((a, b) => b.score.compareTo(a.score));
+    return scored.take(limit).map((e) => e.song).toList();
+  }
+
+  /// Auto-DJ queue: seed + similar tracks, de-duplicated against [excludeIds].
+  List<SongsTableData> buildAutoDjQueue(
+    SongsTableData seed,
+    List<SongsTableData> allSongs, {
+    int limit = 10,
+    Set<int> excludeIds = const {},
+  }) {
+    final similar = suggestForSeed(seed, allSongs, limit: limit * 2);
+    final out = <SongsTableData>[];
+    for (final s in similar) {
+      if (excludeIds.contains(s.id)) continue;
+      out.add(s);
+      if (out.length >= limit) break;
+    }
+    return out;
+  }
 }

@@ -44,6 +44,7 @@ import '../../features/library/presentation/favorites_screen.dart';
 import '../../features/playlist_detail/presentation/online_playlist_detail_screen.dart';
 import '../../features/playlists/cubit/playlist_cubit.dart';
 import '../../features/quran_mode/presentation/quran_mode_screen.dart';
+import '../motion/pulsr_motion.dart';
 import '../services/ytm_account_service.dart';
 import '../widgets/pulsr_modal_tracker.dart';
 
@@ -57,28 +58,58 @@ Page<dynamic> _buildPulsrPageRoute({
   return CustomTransitionPage<void>(
     key: key,
     child: child,
-    transitionDuration: const Duration(milliseconds: 300),
-    reverseTransitionDuration: const Duration(milliseconds: 260),
+    transitionDuration: const Duration(milliseconds: 320),
+    reverseTransitionDuration: const Duration(milliseconds: 280),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      if (!context.motionEnabled) {
+        return child;
+      }
+
       final curved = CurvedAnimation(
         parent: animation,
-        curve: Curves.easeOutCubic,
+        curve: Curves.fastEaseInToSlowEaseOut,
         reverseCurve: Curves.easeInCubic,
       );
+      final secondaryCurved = CurvedAnimation(
+        parent: secondaryAnimation,
+        curve: Curves.fastEaseInToSlowEaseOut,
+        reverseCurve: Curves.easeInCubic,
+      );
+
+      // Primary entrance: smooth slide in from right with fade
       final slide = Tween<Offset>(
-        begin: const Offset(0.08, 0.0),
+        begin: const Offset(0.12, 0.0),
         end: Offset.zero,
       ).animate(curved);
       final fade = Tween<double>(
         begin: 0.0,
         end: 1.0,
-      ).animate(curved);
+      ).animate(CurvedAnimation(
+        parent: animation,
+        curve: const Interval(0.0, 0.75, curve: Curves.easeOut),
+      ));
+
+      // Secondary exit: subtle Apple-style parallax recession
+      final secondarySlide = Tween<Offset>(
+        begin: Offset.zero,
+        end: const Offset(-0.04, 0.0),
+      ).animate(secondaryCurved);
+      final secondaryFade = Tween<double>(
+        begin: 1.0,
+        end: 0.92,
+      ).animate(secondaryCurved);
 
       return SlideTransition(
-        position: slide,
+        position: secondarySlide,
         child: FadeTransition(
-          opacity: fade,
-          child: child,
+          opacity: secondaryFade,
+          child: SlideTransition(
+            position: slide,
+            child: FadeTransition(
+              opacity: fade,
+              child: child,
+            ),
+          ),
         ),
       );
     },
@@ -212,14 +243,18 @@ GoRouter createRouter(MediaScannerService scannerService) {
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
           child: const NowPlayingScreen(),
+          transitionDuration: const Duration(milliseconds: 340),
+          reverseTransitionDuration: const Duration(milliseconds: 280),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            const begin = Offset(0.0, 1.0);
-            const end = Offset.zero;
-            const curve = Curves.easeOutCubic;
-            final tween =
-                Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+            if (!context.motionEnabled) return child;
+            final curved = CurvedAnimation(
+              parent: animation,
+              curve: Curves.fastEaseInToSlowEaseOut,
+              reverseCurve: Curves.easeInCubic,
+            );
             return SlideTransition(
-              position: animation.drive(tween),
+              position: Tween(begin: const Offset(0.0, 1.0), end: Offset.zero)
+                  .animate(curved),
               child: child,
             );
           },

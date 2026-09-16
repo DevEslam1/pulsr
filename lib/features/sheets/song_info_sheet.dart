@@ -7,11 +7,9 @@ import 'package:on_audio_query/on_audio_query.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../core/constants/app_radii.dart';
 import '../../core/constants/channels.dart';
 import '../../core/di/injection.dart';
 import '../../core/theme/aura_theme.dart';
-import '../../core/utils/adaptive.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/l10n_extensions.dart';
 import '../../core/utils/platform_capabilities.dart';
@@ -28,11 +26,19 @@ import '../../domain/models/audio_quality_info.dart';
 import '../../domain/models/eq_preset.dart';
 import '../player/cubit/player_cubit.dart';
 import '../player/presentation/widgets/audio_quality_badge.dart';
+import '../../core/widgets/pulsr_bottom_sheet.dart';
 
 class SongInfoSheet extends StatelessWidget {
   final SongsTableData song;
 
   const SongInfoSheet({super.key, required this.song});
+
+  static Future<void> show(BuildContext context, {required SongsTableData song}) {
+    return PulsrSheetHelper.showPulsrSheet<void>(
+      context: context,
+      builder: (_) => SongInfoSheet(song: song),
+    );
+  }
 
   Future<void> _shareSong(BuildContext context) async {
     final text =
@@ -120,68 +126,53 @@ class SongInfoSheet extends StatelessWidget {
 
   void _showRingtoneOptions(BuildContext context) {
     final p = context.palette;
-    showModalBottomSheet(
+    PulsrSheetHelper.showPulsrSheet(
       context: context,
-      useRootNavigator: true,
-      backgroundColor: p.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: AppRadii.bottomSheetRadius,
-      ),
       builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: p.hairline,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                Text(
-                  context.l10n.setAudioAs,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: p.textPrimary,
-                      ),
-                ),
-                const SizedBox(height: 12),
-                ListTile(
-                  leading: Icon(Icons.ring_volume_rounded, color: p.accent),
-                  title: Text(context.l10n.phoneRingtone,
-                      style: TextStyle(color: p.textPrimary)),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    _setRingtone(context, 'ringtone');
-                  },
-                ),
-                ListTile(
-                  leading:
-                      Icon(Icons.notifications_active_rounded, color: p.accent),
-                  title: Text(context.l10n.notificationSound,
-                      style: TextStyle(color: p.textPrimary)),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    _setRingtone(context, 'notification');
-                  },
-                ),
-                ListTile(
-                  leading: Icon(Icons.alarm_rounded, color: p.accent),
-                  title: Text(context.l10n.alarmSound,
-                      style: TextStyle(color: p.textPrimary)),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    _setRingtone(context, 'alarm');
-                  },
-                ),
-              ],
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12.0),
+              child: Text(
+                context.l10n.setAudioAs,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: p.textPrimary,
+                    ),
+              ),
             ),
-          ),
+            const SizedBox(height: 4),
+            ListTile(
+              leading: Icon(Icons.ring_volume_rounded, color: p.accent),
+              title: Text(context.l10n.phoneRingtone,
+                  style: TextStyle(color: p.textPrimary)),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _setRingtone(context, 'ringtone');
+              },
+            ),
+            ListTile(
+              leading:
+                  Icon(Icons.notifications_active_rounded, color: p.accent),
+              title: Text(context.l10n.notificationSound,
+                  style: TextStyle(color: p.textPrimary)),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _setRingtone(context, 'notification');
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.alarm_rounded, color: p.accent),
+              title: Text(context.l10n.alarmSound,
+                  style: TextStyle(color: p.textPrimary)),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _setRingtone(context, 'alarm');
+              },
+            ),
+            const SizedBox(height: 12),
+          ],
         );
       },
     );
@@ -190,38 +181,19 @@ class SongInfoSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return Align(
-      alignment: Alignment.bottomCenter,
+    return PulsrBottomSheetContainer(
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: Adaptive.sheetConstraints(context).maxWidth,
-          maxHeight: MediaQuery.of(context).size.height * 0.88,
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
         ),
-        child: Material(
-          color: p.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          clipBehavior: Clip.antiAlias,
-          child: SafeArea(
-            top: false,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 14, 24, 28),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: p.hairline,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
                       CachedArtwork(
                         id: song.id,
                         remoteUrl: song.remoteArtworkUrl,
@@ -398,10 +370,8 @@ class SongInfoSheet extends StatelessWidget {
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
+        );
+      }
 
   Widget _buildAudioOverridesSection(BuildContext context, PulsrPalette p) {
     final trackKey = song.id.toString();

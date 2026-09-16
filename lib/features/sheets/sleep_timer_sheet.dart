@@ -2,13 +2,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/theme/aura_theme.dart';
-import '../../core/utils/adaptive.dart';
 import '../../core/utils/l10n_extensions.dart';
 import '../player/cubit/player_cubit.dart';
 import '../player/cubit/player_state.dart';
 
+import '../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../core/widgets/pulsr_pressable.dart';
+
 class SleepTimerSheet extends StatelessWidget {
   const SleepTimerSheet({super.key});
+
+  static Future<void> show(BuildContext context) {
+    return PulsrSheetHelper.showPulsrSheet<void>(
+      context: context,
+      builder: (_) => const SleepTimerSheet(),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -16,82 +25,56 @@ class SleepTimerSheet extends StatelessWidget {
     final presets = [15, 30, 45, 60, 90];
     final screenHeight = MediaQuery.sizeOf(context).height;
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => Navigator.of(context).maybePop(),
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: GestureDetector(
-          onTap: () {},
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: Adaptive.maxSheetWidth,
-              maxHeight: screenHeight * 0.75,
-            ),
-            child: Material(
-              color: p.surface,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(28)),
-              clipBehavior: Clip.antiAlias,
-              child: SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.fromSTEB(24, 16, 24, 32),
-                  child: BlocBuilder<PlayerCubit, PlayerState>(
-                    buildWhen: (prev, curr) =>
-                        prev.sleepTimerRemaining != curr.sleepTimerRemaining,
-                    builder: (context, state) {
-                      final cubit = context.read<PlayerCubit>();
-                      final remainingTracks = cubit.sleepTimerRemainingTracks;
-                      final isQueueMode = cubit.isEndOfQueueSleepTimer;
-                      final isActive = state.sleepTimerRemaining != null ||
-                          remainingTracks != null ||
-                          isQueueMode;
+    return BlocBuilder<PlayerCubit, PlayerState>(
+      buildWhen: (prev, curr) =>
+          prev.sleepTimerRemaining != curr.sleepTimerRemaining,
+      builder: (context, state) {
+        final cubit = context.read<PlayerCubit>();
+        final remainingTracks = cubit.sleepTimerRemainingTracks;
+        final isQueueMode = cubit.isEndOfQueueSleepTimer;
+        final isActive = state.sleepTimerRemaining != null ||
+            remainingTracks != null ||
+            isQueueMode;
 
-                      return SingleChildScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Center(
-                              child: Container(
-                                width: 40,
-                                height: 4,
-                                decoration: BoxDecoration(
-                                  color: p.hairline,
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  context.l10n.sleepTimer,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleLarge
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.w800,
-                                        color: p.textPrimary,
-                                      ),
-                                ),
-                                if (isActive)
-                                  TextButton.icon(
-                                    onPressed: () {
-                                      cubit.cancelSleepTimer();
-                                      Navigator.pop(context);
-                                    },
-                                    icon: Icon(Icons.cancel_rounded,
-                                        color: p.error, size: 18),
-                                    label: Text(context.l10n.turnOff,
-                                        style: TextStyle(color: p.error)),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
+        return PulsrBottomSheetContainer(
+          title: Text(context.l10n.sleepTimer),
+          trailing: isActive
+              ? PulsrPressable(
+                  onTap: () {
+                    cubit.cancelSleepTimer();
+                    Navigator.pop(context);
+                  },
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: p.error.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.cancel_rounded, color: p.error, size: 16),
+                        const SizedBox(width: 4),
+                        Text(context.l10n.turnOff,
+                            style: TextStyle(
+                                color: p.error,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                )
+              : null,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: screenHeight * 0.70),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                             if (isActive)
                               Padding(
                                 padding:
@@ -272,15 +255,10 @@ class SleepTimerSheet extends StatelessWidget {
                             ),
                           ],
                         ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
+                      ),
+                    ),
+                  );
+                },
+              );
+            }
+          }

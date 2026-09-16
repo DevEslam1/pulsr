@@ -212,6 +212,14 @@ class CrossfadeManager {
     return (oldGain, newGain);
   }
 
+  /// 3s audition curve for UI preview: returns sum-safe gain pairs sampled
+  /// across [steps] frames so a settings sheet can animate the fade shape
+  /// without touching the real players.
+  List<(double oldGain, double newGain)> previewFadeCurve({int steps = 24}) {
+    final n = steps.clamp(2, 128);
+    return List.generate(n + 1, (i) => evaluateSumSafeGainPair(i / n));
+  }
+
   /// Arbitrates the transition between outgoing track and incoming track.
   /// Returns [TransitionType.gapless] or [TransitionType.crossfade].
   static TransitionDecision arbitrateTransition({

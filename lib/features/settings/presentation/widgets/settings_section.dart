@@ -1,21 +1,26 @@
 // lib/features/settings/presentation/widgets/settings_section.dart
 import 'package:flutter/material.dart';
+import '../../../../core/constants/app_radii.dart';
 import '../../../../core/theme/aura_theme.dart';
 
 /// A titled, card-wrapped settings group.
 ///
-/// Shared container used by every group on the settings screen so all
-/// sections are labeled and styled consistently (small accent header label +
-/// rounded card body, matching the original hand-rolled `_section` helper).
+/// Shared container used across settings screens and sections so all
+/// groups are styled consistently with a polished accent header and
+/// rounded squircle card body.
 class SettingsSection extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
   final String title;
+  final String? subtitle;
+  final Widget? trailing;
   final List<Widget> children;
 
   const SettingsSection({
     super.key,
-    required this.icon,
+    this.icon,
     required this.title,
+    this.subtitle,
+    this.trailing,
     required this.children,
   });
 
@@ -23,38 +28,70 @@ class SettingsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 22),
+      padding: const EdgeInsets.only(bottom: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(6, 0, 0, 10),
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
             child: Row(
               children: [
-                Icon(icon, size: 14, color: p.accent),
-                const SizedBox(width: 6),
+                if (icon != null) ...[
+                  Container(
+                    width: 24,
+                    height: 24,
+                    margin: const EdgeInsets.only(right: 8),
+                    decoration: BoxDecoration(
+                      color: p.accent.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    child: Icon(icon, size: 13, color: p.accent),
+                  ),
+                ],
                 Expanded(
-                  child: Text(
-                    title.toUpperCase(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: p.textSecondary,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: p.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      if (subtitle != null && subtitle!.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle!,
+                          style: TextStyle(
+                            color: p.textTertiary,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
+                if (trailing != null) trailing!,
               ],
             ),
           ),
           Material(
             color: p.surfaceContainer,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(AppRadii.card),
               side: BorderSide(color: p.hairline),
             ),
             clipBehavior: Clip.antiAlias,
-            child: Column(children: children),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: children,
+            ),
           ),
         ],
       ),

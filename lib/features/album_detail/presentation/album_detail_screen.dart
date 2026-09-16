@@ -303,13 +303,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                                       .playSong(song, queue: songs);
                                 }
                               },
-                              onMorePressed: () => showModalBottomSheet(
-                                context: context,
-                                useRootNavigator: true,
-                                isScrollControlled: true,
-                                backgroundColor: Colors.transparent,
-                                builder: (_) => SongInfoSheet(song: song),
-                              ),
+                              onMorePressed: () => SongInfoSheet.show(context, song: song),
                             ),
                           ],
                         );

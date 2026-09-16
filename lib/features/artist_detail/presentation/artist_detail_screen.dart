@@ -252,10 +252,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                             onTap: () => context
                                 .read<PlayerCubit>()
                                 .playSong(songs[i], queue: songs),
-                            onMorePressed: () => showModalBottomSheet(
-                              context: context,
-                              builder: (_) => SongInfoSheet(song: songs[i]),
-                            ),
+                            onMorePressed: () => SongInfoSheet.show(context, song: songs[i]),
                           ),
                       ],
                     );

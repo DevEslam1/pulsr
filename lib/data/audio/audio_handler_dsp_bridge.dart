@@ -1,6 +1,7 @@
+// ignore_for_file: unused_element
 part of 'audio_handler.dart';
 
-extension PulsrAudioDspBridge on PulsrAudioHandler {
+mixin PulsrAudioDspBridge on BaseAudioHandler {
   bool get isEqualizerEnabled => _equalizerManager.isEnabled;
 
   EqPreset get currentPreset => _equalizerManager.currentPreset;
@@ -75,7 +76,7 @@ extension PulsrAudioDspBridge on PulsrAudioHandler {
           if (_currentIndex >= 0 && _currentIndex < _songs.length) {
             final song = _songs[_currentIndex];
             final artUri = await ArtworkUriResolver.resolveArtworkUri(song);
-            final item = _songToMediaItem(song, artUri);
+            final item = PulsrAudioHandler._songToMediaItem(song, artUri);
             mediaItem.add(item);
             if (song.source != SongSource.youtube) {
               await _activePlayer.setAudioSource(
@@ -410,4 +411,148 @@ extension PulsrAudioDspBridge on PulsrAudioHandler {
         sideGainHigh: sideGainHigh,
       );
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // Requires: provided by the composing class (same library).
+  AudioPlayer get _activePlayer;
+
+  // Requires: provided by the composing class (same library).
+  void _broadcastState(PlaybackEvent event);
+
+  // Requires: provided by the composing class (same library).
+  UriAudioSource _createAudioSource(SongsTableData song, MediaItem tag);
+
+  // Requires: provided by the composing class (same library).
+  CrossfadeManager get _crossfadeManager;
+
+  // Requires: provided by the composing class (same library).
+  Timer? get _crossfadeSwitchDebounce;
+  set _crossfadeSwitchDebounce(Timer? value);
+
+  // Requires: provided by the composing class (same library).
+  int get _currentIndex;
+
+  // Requires: provided by the composing class (same library).
+  int get _engineSwitchGeneration;
+  set _engineSwitchGeneration(int value);
+
+  // Requires: provided by the composing class (same library).
+  EqualizerManager get _equalizerManager;
+
+  // Requires: provided by the composing class (same library).
+  bool get _gaplessEnabled;
+  set _gaplessEnabled(bool value);
+
+  // Requires: provided by the composing class (same library).
+  bool get _gaplessMode;
+
+  // Requires: provided by the composing class (same library).
+  Future<void> _loadGaplessQueue( {Duration? initialPosition, bool preload = true});
+
+  // Requires: provided by the composing class (same library).
+  List<SongsTableData> get _songs;
+
+  // Requires: provided by the composing class (same library).
+  bool get _gaplessLoaded;
+  set _gaplessLoaded(bool value);
+
+  // Requires: provided by the composing class (same library).
+  Duration? get _pendingLazyPosition;
+  set _pendingLazyPosition(Duration? value);
+
+  // Requires: provided by the composing class (same library).
+  Future<void> playSongAt(int index, {Duration? initialPosition});
 }

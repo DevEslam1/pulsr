@@ -499,12 +499,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                 : p.textSecondary,
                           ),
                           tooltip: l10n.equalizer,
-                          onPressed: () => showModalBottomSheet(
-                            context: context,
-                            isScrollControlled: true,
-                            backgroundColor: Colors.transparent,
-                            builder: (_) => const EqualizerSheet(),
-                          ),
+                          onPressed: () => EqualizerSheet.show(context),
                         ),
 
                         // Queue inspector toggle

@@ -1,6 +1,6 @@
 part of 'audio_handler.dart';
 
-extension PulsrAudioPlaybackExtras on PulsrAudioHandler {
+mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
   // ── F1–F11 public API ──────────────────────────────────────────────
   // F1: AB loop
   void setAbPointA(Duration pos) =>
@@ -113,7 +113,7 @@ extension PulsrAudioPlaybackExtras on PulsrAudioHandler {
               _crossfadeManager.isCrossfading) {
             return;
           }
-          final tag = _songToMediaItem(song);
+          final tag = PulsrAudioHandler._songToMediaItem(song);
           final src = AudioSource.uri(Uri.parse(resolved.url), tag: tag);
           await _activePlayer.setAudioSource(src, initialPosition: pos);
           if (wasPlaying) unawaited(_activePlayer.play());
@@ -213,4 +213,180 @@ extension PulsrAudioPlaybackExtras on PulsrAudioHandler {
 
   Future<void> persistBookmarks() => bookmarkStore.persist();
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // Requires: provided by the composing class (same library).
+  AudioPlayer get _activePlayer;
+
+  // Requires: provided by the composing class (same library).
+  SharedPreferences? get _cachedPrefs;
+
+  // Requires: provided by the composing class (same library).
+  CrossfadeManager get _crossfadeManager;
+
+  // Requires: provided by the composing class (same library).
+  EqualizerManager get _equalizerManager;
+
+  // Requires: provided by the composing class (same library).
+  int get _playGeneration;
+  set _playGeneration(int value);
+
+  // Requires: provided by the composing class (same library).
+  AudioPlayer get _playerA;
+
+  // Requires: provided by the composing class (same library).
+  AudioPlayer get _playerB;
+
+  // Requires: provided by the composing class (same library).
+  Future<({String url, String? userAgent, String? cookies, String quality})> _resolveStreamUrl(SongsTableData song, {bool forceRefresh = false});
+
+  // Requires: provided by the composing class (same library).
+  dynamic get _streamCache;
+
+  // Requires: provided by the composing class (same library).
+  StreamResolutionPipeline get _streamResolutionPipeline;
+
+  // Requires: provided by the composing class (same library).
+  AbLoopManager get abLoopManager;
+
+  // Requires: provided by the composing class (same library).
+  AdaptiveQualityManager get adaptiveQualityManager;
+
+  // Requires: provided by the composing class (same library).
+  PlaybackBookmarkStore get bookmarkStore;
+
+  // Requires: provided by the composing class (same library).
+  SongsTableData? get currentSong;
+
+  // Requires: provided by the composing class (same library).
+  dynamic get dspSnapshotStore;
+
+  // Requires: provided by the composing class (same library).
+  DuckingController get duckingController;
+
+  // Requires: provided by the composing class (same library).
+  bool get hedgedResolutionEnabled;
+  set hedgedResolutionEnabled(bool value);
+
+  // Requires: provided by the composing class (same library).
+  MultiOutputRouter get multiOutputRouter;
+
+  // Requires: provided by the composing class (same library).
+  SilenceSkipController get silenceSkipController;
+
+  // Requires: provided by the composing class (same library).
+  TrackDelayManager get trackDelayManager;
 }

@@ -1,6 +1,7 @@
+// ignore_for_file: unused_element
 part of 'audio_handler.dart';
 
-extension PulsrAudioQueueEngine on PulsrAudioHandler {
+mixin PulsrAudioQueueEngine on BaseAudioHandler {
   Future<void> restoreLastPlaybackSession() async {
     try {
       if (_userPlaybackInitiated ||
@@ -107,9 +108,9 @@ extension PulsrAudioQueueEngine on PulsrAudioHandler {
         final currentSong = _songs[_currentIndex];
         final artUri = await ArtworkUriResolver.resolveArtworkUri(currentSong);
         if (_userPlaybackInitiated || _playGeneration != restoreGen) return;
-        final item = _songToMediaItem(currentSong, artUri);
+        final item = PulsrAudioHandler._songToMediaItem(currentSong, artUri);
         mediaItem.add(item);
-        queue.add(_songs.map(_songToMediaItem).toList());
+        queue.add(_songs.map(PulsrAudioHandler._songToMediaItem).toList());
 
         final pos = Duration(milliseconds: savedPositionMs);
         if (_gaplessMode) {
@@ -169,7 +170,7 @@ extension PulsrAudioQueueEngine on PulsrAudioHandler {
       try {
         final nextSong = _songs[nextIndex];
         final artUri = await ArtworkUriResolver.resolveArtworkUri(nextSong);
-        final item = _songToMediaItem(nextSong, artUri);
+        final item = PulsrAudioHandler._songToMediaItem(nextSong, artUri);
 
         final source = await _resolveAudioSource(nextSong, item);
         // Resolving a YouTube URL can take seconds. If a skip/stop cancelled this
@@ -367,7 +368,7 @@ extension PulsrAudioQueueEngine on PulsrAudioHandler {
         _audioSessionIdRouter.handleSessionId(
             currentSessionId ?? _activePlayer.androidAudioSessionId);
 
-        mediaItem.add(_songToMediaItem(nextSong, artUri));
+        mediaItem.add(PulsrAudioHandler._songToMediaItem(nextSong, artUri));
         _notifyTrackChanged(nextSong);
         _planNextStreamResolution();
         _repository.recordPlayHistory(nextSong.id);
@@ -386,7 +387,7 @@ extension PulsrAudioQueueEngine on PulsrAudioHandler {
         // FIX-#5: During crossfade the outgoing player is manually stopped, so
         // ProcessingState.completed never fires.  Notify the sleep timer here
         // so track-count-based timers decrement correctly.
-        _notifySleepTrackCompleted();
+        notifySleepTrackCompleted();
       } catch (e, st) {
         ErrorLogger.log('Error during crossfade playback',
             error: e, stackTrace: st, category: 'AudioHandler');
@@ -487,7 +488,7 @@ extension PulsrAudioQueueEngine on PulsrAudioHandler {
     return null;
   }
 
-  int? _getPreviousIndex({bool forcePrevious = false}) {
+  int? getPreviousIndex({bool forcePrevious = false}) {
     if (_songs.isEmpty) return null;
     if (!forcePrevious && _activePlayer.position.inSeconds > 3) {
       return _currentIndex;
@@ -527,7 +528,7 @@ extension PulsrAudioQueueEngine on PulsrAudioHandler {
     final isPlaying = _activePlayer.playing && !isCompleted;
     final activeSong = currentSong;
     final isStream =
-        activeSong != null && _isStreamUrl(activeSong.path);
+        activeSong != null && PulsrAudioHandler._isStreamUrl(activeSong.path);
     // Skip controls follow the queue, not the URL scheme (C-1): a lone live
     // stream has nowhere to skip, and neither has a single-track local queue.
     // What matters is whether a neighbouring queue entry actually exists.
@@ -619,7 +620,7 @@ extension PulsrAudioQueueEngine on PulsrAudioHandler {
 
     final fastArtUri =
         song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
-    final item = _songToMediaItem(song, fastArtUri);
+    final item = PulsrAudioHandler._songToMediaItem(song, fastArtUri);
     mediaItem.add(item);
     _notifyTrackChanged(song);
     unawaited(_evaluateBufferBucket(song));
@@ -730,7 +731,7 @@ extension PulsrAudioQueueEngine on PulsrAudioHandler {
       final song = _songs[targetIndex];
       final fastArtUri =
           song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
-      mediaItem.add(_songToMediaItem(song, fastArtUri));
+      mediaItem.add(PulsrAudioHandler._songToMediaItem(song, fastArtUri));
       _notifyTrackChanged(song);
       unawaited(_evaluateBufferBucket(song));
       _planNextStreamResolution();
@@ -796,7 +797,7 @@ extension PulsrAudioQueueEngine on PulsrAudioHandler {
             artUri != fastArtUri &&
             generation == _playGeneration &&
             currentSong?.id == song.id) {
-          mediaItem.add(_songToMediaItem(song, artUri));
+          mediaItem.add(PulsrAudioHandler._songToMediaItem(song, artUri));
         }
       }).catchError((_) {});
       return;
@@ -813,7 +814,7 @@ extension PulsrAudioQueueEngine on PulsrAudioHandler {
     _rapidGaplessChangeCount = 0;
     _lastGaplessChangeTime = null;
 
-    final mediaItems = _songs.map(_songToMediaItem).toList();
+    final mediaItems = _songs.map(PulsrAudioHandler._songToMediaItem).toList();
     queue.add(mediaItems);
 
     if (_gaplessMode) {
@@ -831,13 +832,13 @@ extension PulsrAudioQueueEngine on PulsrAudioHandler {
     final idx = _songs.indexWhere((s) => s.id == oldId);
     if (idx != -1) {
       _songs[idx] = newSong;
-      final mediaItems = _songs.map(_songToMediaItem).toList();
+      final mediaItems = _songs.map(PulsrAudioHandler._songToMediaItem).toList();
       queue.add(mediaItems);
       if (_currentIndex == idx) {
         final fastArtUri = newSong.artworkUri != null
             ? Uri.tryParse(newSong.artworkUri!)
             : null;
-        mediaItem.add(_songToMediaItem(newSong, fastArtUri));
+        mediaItem.add(PulsrAudioHandler._songToMediaItem(newSong, fastArtUri));
       }
     }
   }
@@ -873,7 +874,7 @@ extension PulsrAudioQueueEngine on PulsrAudioHandler {
     final song = _songs[targetIndex];
     final fastArtUri =
         song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
-    mediaItem.add(_songToMediaItem(song, fastArtUri));
+    mediaItem.add(PulsrAudioHandler._songToMediaItem(song, fastArtUri));
     _notifyTrackChanged(song);
     unawaited(_evaluateBufferBucket(song));
     _planNextStreamResolution();
@@ -975,7 +976,7 @@ extension PulsrAudioQueueEngine on PulsrAudioHandler {
             artUri != fastArtUri &&
             generation == _playGeneration &&
             currentSong?.id == song.id) {
-          mediaItem.add(_songToMediaItem(song, artUri));
+          mediaItem.add(PulsrAudioHandler._songToMediaItem(song, artUri));
         }
       }).catchError((_) {});
     } on YtmException catch (e, st) {
@@ -1128,11 +1129,11 @@ extension PulsrAudioQueueEngine on PulsrAudioHandler {
     // modes (fixes silent never-fire). Fired before the async work below so it
     // lands within the duplicate-collapse window of the native `completed`
     // event that reports the same boundary.
-    _notifySleepTrackCompleted();
+    notifySleepTrackCompleted();
 
     final fastArtUri =
         song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
-    mediaItem.add(_songToMediaItem(song, fastArtUri));
+    mediaItem.add(PulsrAudioHandler._songToMediaItem(song, fastArtUri));
     _notifyTrackChanged(song);
     unawaited(_evaluateBufferBucket(song));
     _planNextStreamResolution();
@@ -1147,7 +1148,7 @@ extension PulsrAudioQueueEngine on PulsrAudioHandler {
           _currentIndex == index &&
           generation == _playGeneration &&
           currentSong?.id == song.id) {
-        mediaItem.add(_songToMediaItem(song, artUri));
+        mediaItem.add(PulsrAudioHandler._songToMediaItem(song, artUri));
       }
     }).catchError((_) {});
   }
@@ -1223,7 +1224,7 @@ extension PulsrAudioQueueEngine on PulsrAudioHandler {
     _currentIndex = index;
     final fastArtUri =
         song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
-    final item = _songToMediaItem(song, fastArtUri);
+    final item = PulsrAudioHandler._songToMediaItem(song, fastArtUri);
     mediaItem.add(item);
     _notifyTrackChanged(song);
     unawaited(_evaluateBufferBucket(song));
@@ -1234,7 +1235,7 @@ extension PulsrAudioQueueEngine on PulsrAudioHandler {
           artUri != fastArtUri &&
           generation == _playGeneration &&
           currentSong?.id == song.id) {
-        mediaItem.add(_songToMediaItem(song, artUri));
+        mediaItem.add(PulsrAudioHandler._songToMediaItem(song, artUri));
       }
     }).catchError((_) {});
 
@@ -1393,4 +1394,479 @@ extension PulsrAudioQueueEngine on PulsrAudioHandler {
     }
   }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // Requires: provided by the composing class (same library).
+  AudioPlayer get _activePlayer;
+
+  // Requires: provided by the composing class (same library).
+  AudioSessionIdRouter get _audioSessionIdRouter;
+
+  // Requires: provided by the composing class (same library).
+  List<AudioSource> _buildAudioSources(List<SongsTableData> songs);
+
+  // Requires: provided by the composing class (same library).
+  double _calculateReplayGainVolume(SongsTableData? song);
+
+  // Requires: provided by the composing class (same library).
+  int get _consecutiveFailures;
+  set _consecutiveFailures(int value);
+
+  // Requires: provided by the composing class (same library).
+  UriAudioSource _createAudioSource(SongsTableData song, MediaItem tag);
+
+  // Requires: provided by the composing class (same library).
+  CrossfadeManager get _crossfadeManager;
+
+  // Requires: provided by the composing class (same library).
+  int get _currentIndex;
+  set _currentIndex(int value);
+
+  // Requires: provided by the composing class (same library).
+  StreamController<String> get _errorSubject;
+
+  // Requires: provided by the composing class (same library).
+  Future<void> _evaluateBufferBucket(SongsTableData song);
+
+  // Requires: provided by the composing class (same library).
+  Future<void> _fadeOutForSwitch(AudioPlayer player);
+
+  // Requires: provided by the composing class (same library).
+  DateTime? get _gaplessLoadTime;
+  set _gaplessLoadTime(DateTime? value);
+
+  // Requires: provided by the composing class (same library).
+  bool get _gaplessLoaded;
+  set _gaplessLoaded(bool value);
+
+  // Requires: provided by the composing class (same library).
+  bool get _gaplessMode;
+
+  // Requires: provided by the composing class (same library).
+  int? get _gaplessTargetIndex;
+  set _gaplessTargetIndex(int? value);
+
+  // Requires: provided by the composing class (same library).
+  bool get _gaplessTargetReached;
+  set _gaplessTargetReached(bool value);
+
+  // Requires: provided by the composing class (same library).
+  int get _generationCounter;
+  set _generationCounter(int value);
+
+  // Requires: provided by the composing class (same library).
+  AudioPlayer get _inactivePlayer;
+
+  // Requires: provided by the composing class (same library).
+  bool get _isManualSkip;
+  set _isManualSkip(bool value);
+
+  // Requires: provided by the composing class (same library).
+  bool get _isPlayerAActive;
+  set _isPlayerAActive(bool value);
+
+  // Requires: provided by the composing class (same library).
+  DateTime? get _lastGaplessChangeTime;
+  set _lastGaplessChangeTime(DateTime? value);
+
+  // Requires: provided by the composing class (same library).
+  PlaybackLatencyTracker? get _latencyTracker;
+
+  // Requires: provided by the composing class (same library).
+  void notifySleepTrackCompleted();
+
+  // Requires: provided by the composing class (same library).
+  void _notifyTrackChanged(SongsTableData song);
+
+  // Requires: provided by the composing class (same library).
+  double get _pitch;
+
+  // Requires: provided by the composing class (same library).
+  int get _playGeneration;
+  set _playGeneration(int value);
+
+  // Requires: provided by the composing class (same library).
+  int? get _playerASessionId;
+
+  // Requires: provided by the composing class (same library).
+  int? get _playerBSessionId;
+
+  // Requires: provided by the composing class (same library).
+  StreamController<Duration> get _positionSubject;
+
+  // Requires: provided by the composing class (same library).
+  void _prefetchNextTracks();
+
+  // Requires: provided by the composing class (same library).
+  void _prefetchStream(SongsTableData song);
+
+  // Requires: provided by the composing class (same library).
+  int get _preloadCountForCurrentBucket;
+
+  // Requires: provided by the composing class (same library).
+  int get _rapidGaplessChangeCount;
+  set _rapidGaplessChangeCount(int value);
+
+  // Requires: provided by the composing class (same library).
+  IMusicRepository get _repository;
+
+  // Requires: provided by the composing class (same library).
+  Future<AudioSource> _resolveAudioSource( SongsTableData song, MediaItem tag);
+
+  // Requires: provided by the composing class (same library).
+  void _saveCurrentPosition();
+
+  // Requires: provided by the composing class (same library).
+  List<int> get _shuffleHistory;
+
+  // Requires: provided by the composing class (same library).
+  List<SongsTableData> get _songs;
+  set _songs(List<SongsTableData> value);
+
+  // Requires: provided by the composing class (same library).
+  dynamic get _streamCache;
+
+  // Requires: provided by the composing class (same library).
+  StreamPreResolver get _streamPreResolver;
+
+  // Requires: provided by the composing class (same library).
+  TripleBufferPipeline get _tripleBufferPipeline;
+
+  // Requires: provided by the composing class (same library).
+  bool get _userPlaybackInitiated;
+  set _userPlaybackInitiated(bool value);
+
+  // Requires: provided by the composing class (same library).
+  double get _volume;
+
+  // Requires: provided by the composing class (same library).
+  Future<void> _warmStreamCache(SongsTableData song);
+
+  // Requires: provided by the composing class (same library).
+  void cancelPrefetches();
+
+  // Requires: provided by the composing class (same library).
+  Duration get compensatedPosition;
+
+  // Requires: provided by the composing class (same library).
+  SongsTableData? get currentSong;
+
+  // Requires: provided by the composing class (same library).
+  Duration? get _pendingLazyPosition;
+  set _pendingLazyPosition(Duration? value);
+
+  // Requires: provided by the composing class (same library).
+  double? get _preCrossfadeVolume;
+  set _preCrossfadeVolume(double? value);
+
+  // Requires: provided by the composing class (same library).
+  bool get _queueDirty;
+  set _queueDirty(bool value);
+
+  // Requires: provided by the composing class (same library).
+  int get _lastGaplessIndex;
+  set _lastGaplessIndex(int value);
 }

@@ -17,6 +17,7 @@ import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 import 'karaoke_mode_screen.dart';
 import 'lyrics_editor_sheet.dart';
+import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 
 class LyricsView extends StatefulWidget {
   /// Playback position used to highlight the active line.
@@ -186,10 +187,8 @@ class _LyricsViewState extends State<LyricsView> {
 
   Future<void> _showOffsetSheet() async {
     final l10n = context.l10n;
-    await showModalBottomSheet<void>(
+    await PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
-      useRootNavigator: true,
-      backgroundColor: Colors.transparent,
       builder: (sheetContext) => StatefulBuilder(
         builder: (sheetContext, setSheet) {
           return Container(
@@ -349,11 +348,8 @@ class _LyricsViewState extends State<LyricsView> {
     if (song == null) return;
     final l10n = context.l10n;
     final messenger = ScaffoldMessenger.maybeOf(context);
-    await showModalBottomSheet<void>(
+    await PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (_) => LyricsEditorSheet(
         song: song,
         currentPosition: cubit.state.position,

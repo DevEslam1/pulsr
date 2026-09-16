@@ -2,12 +2,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/constants/app_radii.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/platform_capabilities.dart';
+import '../../../../core/widgets/pulsr_pressable.dart';
 import '../../../../domain/services/cast_service.dart';
 import '../../../player/cubit/player_cubit.dart';
 import 'settings_section.dart';
+import 'settings_tiles.dart';
 
 /// Google Cast control.
 ///
@@ -33,6 +36,7 @@ class _CastSectionState extends State<CastSection> {
   CastSessionStatus _session = CastSessionStatus.unavailable;
   bool _sdk = false;
   bool _busy = false;
+  bool _scanning = false;
 
   bool get _isAndroid => PlatformCapabilities.isAndroid;
 
@@ -44,12 +48,27 @@ class _CastSectionState extends State<CastSection> {
   }
 
   Future<void> _init() async {
+    setState(() => _scanning = true);
     final sdk = await _service.isSessionAvailable();
     if (!mounted) return;
-    setState(() => _sdk = sdk);
+    setState(() {
+      _sdk = sdk;
+      if (sdk) {
+        _routes = _service.routes;
+        _session = _service.sessionStatus;
+      } else {
+        _devices = _service.devices;
+      }
+    });
+
     if (sdk) {
       _routeSub = _service.routesStream.listen((r) {
-        if (mounted) setState(() => _routes = r);
+        if (mounted) {
+          setState(() {
+            _routes = r;
+            _scanning = false;
+          });
+        }
       });
       _sessionSub = _service.sessionStream.listen((s) {
         if (mounted) setState(() => _session = s);
@@ -57,11 +76,40 @@ class _CastSectionState extends State<CastSection> {
       await _service.startSessionDiscovery();
     } else {
       _deviceSub = _service.devicesStream.listen((d) {
-        if (mounted) setState(() => _devices = d);
+        if (mounted) {
+          setState(() {
+            _devices = d;
+            _scanning = false;
+          });
+        }
       });
       final supported = await _service.isSupported();
       if (supported) await _service.startDiscovery();
     }
+
+    // Safety timeout for the scanning spinner
+    Future.delayed(const Duration(seconds: 8), () {
+      if (mounted && _scanning) {
+        setState(() => _scanning = false);
+      }
+    });
+  }
+
+  Future<void> _rescan() async {
+    if (_busy) return;
+    setState(() => _scanning = true);
+    if (_sdk) {
+      await _service.stopSessionDiscovery();
+      await _service.startSessionDiscovery();
+    } else {
+      await _service.stopDiscovery();
+      await _service.startDiscovery();
+    }
+    Future.delayed(const Duration(seconds: 8), () {
+      if (mounted && _scanning) {
+        setState(() => _scanning = false);
+      }
+    });
   }
 
   @override
@@ -126,7 +174,8 @@ class _CastSectionState extends State<CastSection> {
 
   void _snack(String text) {
     if (!mounted) return;
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(text)));
+    ScaffoldMessenger.maybeOf(context)
+        ?.showSnackBar(SnackBar(content: Text(text)));
   }
 
   Future<void> _fallbackCast(CastDevice d) async {
@@ -142,102 +191,356 @@ class _CastSectionState extends State<CastSection> {
     if (!_isAndroid) return const SizedBox.shrink();
 
     final p = context.palette;
-    final textSecondary =
-        Theme.of(context).textTheme.bodySmall?.color ?? p.textSecondary;
+    final l10n = context.l10n;
 
     return SettingsSection(
       icon: Icons.cast_rounded,
-      title: context.l10n.settingsGoogleCast,
-      children: [
-        if (_sdk) ...[
-          if (_session.connected) ...[
-            ListTile(
-              leading: const Icon(Icons.cast_connected_rounded),
-              title: Text(_session.deviceName ?? context.l10n.castDevice),
-              subtitle: Text(
-                _session.playing
-                    ? context.l10n.playingOnCast
-                    : context.l10n.castConnected,
-                style: TextStyle(fontSize: 12, color: textSecondary),
+      title: l10n.settingsGoogleCast,
+      subtitle: _session.connected
+          ? (_session.deviceName ?? l10n.castConnected)
+          : null,
+      trailing: IconButton(
+        icon: _scanning
+            ? SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: p.accent,
+                ),
+              )
+            : Icon(
+                Icons.refresh_rounded,
+                size: 19,
+                color: p.textSecondary,
               ),
+        tooltip: l10n.scanningCastDevices,
+        visualDensity: VisualDensity.compact,
+        onPressed: _scanning || _busy ? null : _rescan,
+      ),
+      children: [
+        // Connected Session Banner
+        if (_session.connected) ...[
+          Container(
+            margin: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: p.accentContainer.withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(AppRadii.tile),
+              border: Border.all(color: p.accent.withValues(alpha: 0.35)),
             ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(Icons.cast_connected_rounded,
+                          color: p.accent, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _session.deviceName ?? l10n.castDevice,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                              color: p.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _session.playing
+                                ? l10n.playingOnCast
+                                : l10n.castConnected,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: p.accent,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'ACTIVE',
+                        style: TextStyle(
+                          color: p.accent,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: p.accent,
+                          foregroundColor: p.onAccent,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                        onPressed: _busy ? null : _castCurrent,
+                        icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                        label: Text(
+                          l10n.castCurrentTrack,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w700, fontSize: 13),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: p.hairline),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                      ),
+                      onPressed:
+                          _busy ? null : () async => _service.disconnect(),
+                      child: Text(
+                        l10n.stopCast,
+                        style: TextStyle(
+                          color: p.textSecondary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          settingsCardDivider(p),
+        ],
+
+        // Routes or Devices list
+        if (_sdk) ...[
+          if (_routes.isEmpty)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
                 children: [
+                  if (_scanning)
+                    SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: p.accent,
+                      ),
+                    )
+                  else
+                    Icon(Icons.search_rounded, size: 20, color: p.textTertiary),
+                  const SizedBox(width: 12),
                   Expanded(
-                    child: FilledButton.icon(
-                      onPressed: _busy ? null : _castCurrent,
-                      icon: const Icon(Icons.play_arrow_rounded),
-                      label: Text(context.l10n.castCurrentTrack),
+                    child: Text(
+                      l10n.scanningCastDevices,
+                      style: TextStyle(fontSize: 13, color: p.textSecondary),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  OutlinedButton(
-                    onPressed: _busy
-                        ? null
-                        : () async => _service.disconnect(),
-                    child: Text(context.l10n.stopCast),
-                  ),
-                ],
-              ),
-            ),
-          ] else if (_routes.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  Icon(Icons.search_rounded, size: 18, color: textSecondary),
-                  const SizedBox(width: 12),
-                  Text(context.l10n.scanningCastDevices,
-                      style: TextStyle(fontSize: 13, color: textSecondary)),
                 ],
               ),
             )
           else
-            ..._routes.map(
-              (r) => ListTile(
-                leading: const Icon(Icons.cast_rounded),
-                title: Text(r.name),
-                trailing: r.selected
-                    ? const Icon(Icons.check_circle_rounded)
-                    : null,
-                onTap: _busy ? null : () => _connect(r),
-              ),
+            ..._routes.asMap().entries.map(
+              (entry) {
+                final i = entry.key;
+                final r = entry.value;
+                final isSelected = r.selected || (_session.connected && _session.deviceName == r.name);
+
+                return Column(
+                  children: [
+                    if (i > 0) settingsCardDivider(p),
+                    PulsrPressable(
+                      pressedScale: 0.988,
+                      onTap: _busy ? null : () => _connect(r),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 2),
+                        leading: SettingsIconBox(
+                          isSelected
+                              ? Icons.cast_connected_rounded
+                              : Icons.cast_rounded,
+                        ),
+                        title: Text(
+                          r.name,
+                          style: TextStyle(
+                            fontWeight: isSelected
+                                ? FontWeight.w700
+                                : FontWeight.w600,
+                            fontSize: 14.5,
+                            color: isSelected ? p.accent : p.textPrimary,
+                          ),
+                        ),
+                        subtitle: Text(
+                          isSelected ? l10n.castConnected : l10n.castDevice,
+                          style: TextStyle(
+                            color: isSelected ? p.accent : p.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                        trailing: isSelected
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: p.accent.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.check_rounded,
+                                        size: 14, color: p.accent),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      l10n.castConnected.toUpperCase(),
+                                      style: TextStyle(
+                                        color: p.accent,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : Icon(
+                                Icons.chevron_right_rounded,
+                                color: p.textTertiary.withValues(alpha: 0.6),
+                                size: 20,
+                              ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
         ] else ...[
           if (_devices.isEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
                 children: [
-                  Icon(Icons.search_rounded, size: 18, color: textSecondary),
+                  if (_scanning)
+                    SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: p.accent,
+                      ),
+                    )
+                  else
+                    Icon(Icons.search_rounded, size: 20, color: p.textTertiary),
                   const SizedBox(width: 12),
-                  Text(context.l10n.scanningCastDevices,
-                      style: TextStyle(fontSize: 13, color: textSecondary)),
+                  Expanded(
+                    child: Text(
+                      l10n.scanningCastDevices,
+                      style: TextStyle(fontSize: 13, color: p.textSecondary),
+                    ),
+                  ),
                 ],
               ),
             )
           else
-            ..._devices.map(
-              (d) => ListTile(
-                leading: const Icon(Icons.cast_connected_rounded),
-                title: Text(d.name),
-                subtitle: Text(
-                  d.model.isNotEmpty ? d.model : d.host,
-                  style: TextStyle(fontSize: 12, color: textSecondary),
-                ),
-                onTap: () => _fallbackCast(d),
-              ),
+            ..._devices.asMap().entries.map(
+              (entry) {
+                final i = entry.key;
+                final d = entry.value;
+
+                return Column(
+                  children: [
+                    if (i > 0) settingsCardDivider(p),
+                    PulsrPressable(
+                      pressedScale: 0.988,
+                      onTap: () => _fallbackCast(d),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 2),
+                        leading: const SettingsIconBox(Icons.cast_rounded),
+                        title: Text(
+                          d.name,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14.5,
+                          ),
+                        ),
+                        subtitle: Text(
+                          d.model.isNotEmpty ? d.model : d.host,
+                          style: TextStyle(
+                            color: p.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                        trailing: Icon(
+                          Icons.chevron_right_rounded,
+                          color: p.textTertiary.withValues(alpha: 0.6),
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
         ],
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-          child: Text(
-            _sdk
-                ? context.l10n.settingsCastSdkDesc
-                : context.l10n.settingsCastNoSdkDesc,
-            style: TextStyle(fontSize: 12, color: textSecondary),
+
+        // Footnote info card
+        Container(
+          margin: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: p.surfaceContainerHigh.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: p.hairline),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.info_outline_rounded,
+                  size: 15, color: p.textTertiary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _sdk
+                      ? l10n.settingsCastSdkDesc
+                      : l10n.settingsCastNoSdkDesc,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: p.textTertiary,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],

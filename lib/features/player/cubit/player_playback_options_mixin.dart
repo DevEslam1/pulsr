@@ -1,6 +1,6 @@
 part of 'player_cubit.dart';
 
-extension PlayerPlaybackOptions on PlayerCubit {
+mixin PlayerPlaybackOptions on PulsrCubit<PlayerState> {
   // Sleep Timer
   void startSleepTimer(int minutes) {
     final duration = Duration(minutes: minutes);
@@ -250,4 +250,137 @@ extension PlayerPlaybackOptions on PlayerCubit {
     }
   }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // Requires: provided by the composing class (same library).
+  PulsrAudioHandler get _audioHandler;
+
+  // Requires: provided by the composing class (same library).
+  void _debouncedPersistQueueSlots();
+
+  // Requires: provided by the composing class (same library).
+  EqPreset? get _globalEqBackup;
+  set _globalEqBackup(EqPreset? value);
+
+  // Requires: provided by the composing class (same library).
+  HeadphoneProfile? get _globalHeadphoneProfileBackup;
+  set _globalHeadphoneProfileBackup(HeadphoneProfile? value);
+
+  // Requires: provided by the composing class (same library).
+  // ignore: unused_element
+  DateTime? get _lastSpeedPushAt;
+  set _lastSpeedPushAt(DateTime? value);
+
+  // Requires: provided by the composing class (same library).
+  // ignore: unused_element
+  double? get _lastSpeedPushed;
+  set _lastSpeedPushed(double? value);
+
+  // Requires: provided by the composing class (same library).
+  PerSongEqStore get _perSongEqStore;
+
+  // Requires: provided by the composing class (same library).
+  bool get _perSongOverrideActive;
+  set _perSongOverrideActive(bool value);
+
+  // Requires: provided by the composing class (same library).
+  PerSongVolumeStore get _perSongVolumeStore;
+
+  // Requires: provided by the composing class (same library).
+  Map<int, _QueueSlotData> get _queueSlots;
+
+  // Requires: provided by the composing class (same library).
+  SongRatingStore get _songRatingStore;
+
+  // Requires: provided by the composing class (same library).
+  void _syncAudioEffects();
+
+  // Requires: provided by the composing class (same library).
+  Future<void> applyHeadphoneProfile(HeadphoneProfile? profile, {bool isPerSongRestore = false});
+
+  // Requires: provided by the composing class (same library).
+  Future<void> applyPreset(EqPreset preset, {bool isPerSongRestore = false});
 }

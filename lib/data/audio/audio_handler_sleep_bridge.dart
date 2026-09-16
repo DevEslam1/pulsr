@@ -1,6 +1,6 @@
 part of 'audio_handler.dart';
 
-extension PulsrAudioSleepBridge on PulsrAudioHandler {
+mixin PulsrAudioSleepBridge on BaseAudioHandler {
   Stream<Duration?> get sleepTimerRemainingStream =>
       _sleepTimerManager.sleepTimerRemainingStream;
 
@@ -21,9 +21,9 @@ extension PulsrAudioSleepBridge on PulsrAudioHandler {
   /// mode a boundary is reported twice — native `completed` plus the
   /// `currentIndexStream` advance — and feeding both straight into
   /// [SleepTimerManager.onTrackCompleted] halved an "after N songs" timer.
-  void _notifySleepTrackCompleted() {
+  void notifySleepTrackCompleted() {
     final now = DateTime.now();
-    if (!isDistinctSleepCompletion(_lastSleepTrackCompletedAt, now)) return;
+    if (!PulsrAudioHandler.isDistinctSleepCompletion(_lastSleepTrackCompletedAt, now)) return;
     _lastSleepTrackCompletedAt = now;
     unawaited(_sleepTimerManager.onTrackCompleted());
   }
@@ -80,4 +80,32 @@ extension PulsrAudioSleepBridge on PulsrAudioHandler {
     _sleepTimerManager.cancelSleepTimer();
   }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // Requires: provided by the composing class (same library).
+  AudioPlayer get _activePlayer;
+
+  // Requires: provided by the composing class (same library).
+  DateTime? get _lastSleepTrackCompletedAt;
+  set _lastSleepTrackCompletedAt(DateTime? value);
+
+  // Requires: provided by the composing class (same library).
+  SleepTimerManager get _sleepTimerManager;
 }

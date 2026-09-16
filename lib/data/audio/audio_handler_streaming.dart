@@ -1,6 +1,7 @@
+// ignore_for_file: unused_element
 part of 'audio_handler.dart';
 
-extension PulsrAudioStreaming on PulsrAudioHandler {
+mixin PulsrAudioStreaming on BaseAudioHandler {
   int get _preloadCountForCurrentBucket {
     switch (_currentBucket) {
       case BufferBucket.minimal:
@@ -149,7 +150,7 @@ extension PulsrAudioStreaming on PulsrAudioHandler {
   void _onBufferBucketChanged(BufferBucket bucket) {
     if (bucket == _currentBucket) return;
     _currentBucket = bucket;
-    _currentAudioLoadConfiguration = _loadConfigForBucket(bucket);
+    _currentAudioLoadConfiguration = PulsrAudioHandler._loadConfigForBucket(bucket);
     debugPrint(
         '[AudioHandler] Buffer bucket transitioned to $bucket — applying load control');
     unawaited(
@@ -184,7 +185,7 @@ extension PulsrAudioStreaming on PulsrAudioHandler {
   }
 
   UriAudioSource _createAudioSource(SongsTableData song, MediaItem tag) {
-    if (_isStreamUrl(song.path)) {
+    if (PulsrAudioHandler._isStreamUrl(song.path)) {
       return AudioSource.uri(Uri.parse(song.path), tag: tag);
     }
     if (song.uri?.startsWith('content:') == true ||
@@ -279,10 +280,10 @@ extension PulsrAudioStreaming on PulsrAudioHandler {
   }
 
   AudioSource _buildGaplessChild(SongsTableData song) {
-    final tag = _songToMediaItem(song);
+    final tag = PulsrAudioHandler._songToMediaItem(song);
     // HTTP streams are not files: skip the disk/format/trim paths and hand
     // the URL to just_audio directly (HLS auto-detected).
-    if (_isStreamUrl(song.path)) {
+    if (PulsrAudioHandler._isStreamUrl(song.path)) {
       return _createAudioSource(song, tag);
     }
     final isRemoteYtm = song.source == SongSource.youtube &&
@@ -295,7 +296,7 @@ extension PulsrAudioStreaming on PulsrAudioHandler {
             (_pathExistsCache[song.path] ??= File(song.path).existsSync()));
     // FIX-#8: Evict oldest 25% when the cache exceeds the bound to prevent
     // an unbounded memory leak over long listening sessions.
-    if (_pathExistsCache.length > _maxPathCacheSize) {
+    if (_pathExistsCache.length > PulsrAudioHandler._maxPathCacheSize) {
       final keys = _pathExistsCache.keys.toList();
       for (var i = 0; i < keys.length ~/ 4; i++) {
         _pathExistsCache.remove(keys[i]);
@@ -362,7 +363,7 @@ extension PulsrAudioStreaming on PulsrAudioHandler {
       SongsTableData song, MediaItem tag) async {
     // A pseudo-song whose path is a stream URL: no local match, no MQA/DSD
     // decode, no cache — just build a URI source.
-    if (_isStreamUrl(song.path)) {
+    if (PulsrAudioHandler._isStreamUrl(song.path)) {
       return _createAudioSource(song, tag);
     }
     if (song.source != SongSource.youtube) {
@@ -476,7 +477,7 @@ extension PulsrAudioStreaming on PulsrAudioHandler {
         String? userAgent,
         String? cookies
       }) entry) {
-    if (_streamCache.length >= _maxStreamCacheEntries) {
+    if (_streamCache.length >= PulsrAudioHandler._maxStreamCacheEntries) {
       _streamCache.remove(_streamCache.keys.first);
     }
     _streamCache[key] = entry;
@@ -500,7 +501,6 @@ extension PulsrAudioStreaming on PulsrAudioHandler {
   /// Matching fade-in after a switch: starting at 0 and ramping to the
   /// ReplayGain target avoids the cold-start click. Skipped while ducked
   /// (navigation/call) so the ramp never fights the duck level.
-  // ignore: unused_element
   void _fadeInAfterSwitch(AudioPlayer player, double targetVolume) {
     if (_duckActive) return;
     unawaited(_crossfadeManager.fadeVolume(
@@ -608,7 +608,7 @@ extension PulsrAudioStreaming on PulsrAudioHandler {
   void _seedBpmOverride(SongsTableData song) {
     try {
       final trackId = song.id.toString();
-      final bpm = bpmOverrideStore.getBpmForTrack(trackKeyFor(song));
+      final bpm = bpmOverrideStore.getBpmForTrack(PulsrAudioHandler.trackKeyFor(song));
       final mgr = _crossfadeManager;
       if (bpm != null) {
         mgr.bpmOverrides[trackId] = bpm;
@@ -626,7 +626,7 @@ extension PulsrAudioStreaming on PulsrAudioHandler {
   /// Returns false when out of the 40–240 range.
   Future<bool> setTrackBpm(SongsTableData song, double? bpm) async {
     final ok =
-        await bpmOverrideStore.setBpmForTrack(trackKeyFor(song), bpm);
+        await bpmOverrideStore.setBpmForTrack(PulsrAudioHandler.trackKeyFor(song), bpm);
     if (ok) _seedBpmOverride(song);
     return ok;
   }
@@ -785,4 +785,442 @@ extension PulsrAudioStreaming on PulsrAudioHandler {
     _smartPrefetch();
   }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // Requires: provided by the composing class (same library).
+  AudioPlayer get _activePlayer;
+
+  // Requires: provided by the composing class (same library).
+  AdaptiveBufferEngine get _adaptiveBufferEngine;
+
+  // Requires: provided by the composing class (same library).
+  BatteryAwarePlayback get _batteryAwarePlayback;
+
+  // Requires: provided by the composing class (same library).
+  Future<void> _beginAudioSession(SongsTableData song);
+
+  // Requires: provided by the composing class (same library).
+  void _broadcastState(PlaybackEvent event);
+
+  // Requires: provided by the composing class (same library).
+  SharedPreferences? get _cachedPrefs;
+  set _cachedPrefs(SharedPreferences? value);
+
+  // Requires: provided by the composing class (same library).
+  double _calculateReplayGainVolume(SongsTableData? song);
+
+  // Requires: provided by the composing class (same library).
+  int get _consecutiveFailures;
+  set _consecutiveFailures(int value);
+
+  // Requires: provided by the composing class (same library).
+  CrossfadeManager get _crossfadeManager;
+
+  // Requires: provided by the composing class (same library).
+  bool get _cueStartSeeked;
+  set _cueStartSeeked(bool value);
+
+  // Requires: provided by the composing class (same library).
+  AudioLoadConfiguration get _currentAudioLoadConfiguration;
+  set _currentAudioLoadConfiguration(AudioLoadConfiguration value);
+
+  // Requires: provided by the composing class (same library).
+  BufferBucket get _currentBucket;
+  set _currentBucket(BufferBucket value);
+
+  // Requires: provided by the composing class (same library).
+  int get _currentIndex;
+
+  // Requires: provided by the composing class (same library).
+  Future<AudioOutputInfo?> _currentOutputInfo();
+
+  // Requires: provided by the composing class (same library).
+  String _currentStreamingQuality();
+
+  // Requires: provided by the composing class (same library).
+  bool get _duckActive;
+
+  // Requires: provided by the composing class (same library).
+  EqualizerManager get _equalizerManager;
+
+  // Requires: provided by the composing class (same library).
+  StreamController<String> get _errorSubject;
+
+  // Requires: provided by the composing class (same library).
+  Timer? get _fadeInGuardTimer;
+  set _fadeInGuardTimer(Timer? value);
+
+  // Requires: provided by the composing class (same library).
+  FormatAwareDecoder get _formatDecoder;
+
+  // Requires: provided by the composing class (same library).
+  dynamic get _inFlightResolves;
+
+  // Requires: provided by the composing class (same library).
+  AudioPlayer get _inactivePlayer;
+
+  // Requires: provided by the composing class (same library).
+  SongsTableData? get _lastPlayedSong;
+  set _lastPlayedSong(SongsTableData? value);
+
+  // Requires: provided by the composing class (same library).
+  String? get _lastSmartPrefetchKey;
+  set _lastSmartPrefetchKey(String? value);
+
+  // Requires: provided by the composing class (same library).
+  int get _lastSmartPrefetchMs;
+  set _lastSmartPrefetchMs(int value);
+
+  // Requires: provided by the composing class (same library).
+  AudioMemoryManager get _memoryManager;
+
+  // Requires: provided by the composing class (same library).
+  StreamController<SongsTableData> get _onTrackChangedSubject;
+
+  // Requires: provided by the composing class (same library).
+  Map<String, bool> get _pathExistsCache;
+
+  // Requires: provided by the composing class (same library).
+  int get _playGeneration;
+
+  // Requires: provided by the composing class (same library).
+  AudioPlayer get _playerA;
+
+  // Requires: provided by the composing class (same library).
+  AudioPlayer get _playerB;
+
+  // Requires: provided by the composing class (same library).
+  int get _prefetchGeneration;
+  set _prefetchGeneration(int value);
+
+  // Requires: provided by the composing class (same library).
+  AudioPlayer get _prefetchPlayer;
+
+  // Requires: provided by the composing class (same library).
+  Set<String> get _prefetching;
+
+  // Requires: provided by the composing class (same library).
+  SmartPreloadScheduler get _preloadScheduler;
+
+  // Requires: provided by the composing class (same library).
+  Future<void> _pushNativeReplayGain(SongsTableData? song);
+
+  // Requires: provided by the composing class (same library).
+  int get _rapidGaplessChangeCount;
+  set _rapidGaplessChangeCount(int value);
+
+  // Requires: provided by the composing class (same library).
+  IMusicRepository get _repository;
+
+  // Requires: provided by the composing class (same library).
+  Future<({String url, String? userAgent, String? cookies, String quality})> _resolveStreamUrl(SongsTableData song, {bool forceRefresh = false});
+
+  // Requires: provided by the composing class (same library).
+  List<SongsTableData> get _songs;
+
+  // Requires: provided by the composing class (same library).
+  dynamic get _streamCache;
+
+  // Requires: provided by the composing class (same library).
+  StreamPreResolver get _streamPreResolver;
+
+  // Requires: provided by the composing class (same library).
+  YtmService get _ytmService;
+
+  // Requires: provided by the composing class (same library).
+  AbLoopManager get abLoopManager;
+
+  // Requires: provided by the composing class (same library).
+  BpmOverrideStore get bpmOverrideStore;
+
+  // Requires: provided by the composing class (same library).
+  SongsTableData? get currentSong;
+
+  // Requires: provided by the composing class (same library).
+  dynamic get dspSnapshotStore;
+
+  // Requires: provided by the composing class (same library).
+  Future<bool> recallDspSnapshotFor(SongsTableData song);
+
+  // Requires: provided by the composing class (same library).
+  SilenceSkipController get silenceSkipController;
 }

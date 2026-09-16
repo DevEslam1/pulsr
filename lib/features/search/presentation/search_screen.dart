@@ -487,13 +487,7 @@ class _SearchScreenState extends State<SearchScreen> {
           song: song,
           subtitleOverride: '${song.artist} • ${song.album}',
           onTap: () => playerCubit.playSong(song, queue: state.results),
-          onMorePressed: () => showModalBottomSheet(
-            context: context,
-            useRootNavigator: true,
-            isScrollControlled: true,
-            backgroundColor: Colors.transparent,
-            builder: (_) => SongInfoSheet(song: song),
-          ),
+          onMorePressed: () => SongInfoSheet.show(context, song: song),
         );
       },
     );

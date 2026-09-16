@@ -16,6 +16,8 @@ import '../utils/google_login_recovery.dart';
 import 'ytm_oauth_login_sheet.dart';
 
 import '../../../core/utils/error_logger.dart';
+import '../../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../../core/widgets/pulsr_dialog.dart';
 class YtmWebLoginSheet extends StatefulWidget {
   // Use the modern Google accounts sign-in flow (v3 identifier endpoint).
   // The older ServiceLogin URL is more aggressively fingerprinted for
@@ -42,12 +44,9 @@ class YtmWebLoginSheet extends StatefulWidget {
     String? title,
     bool isBrowseMode = false,
   }) {
-    return showModalBottomSheet<bool>(
+    return PulsrSheetHelper.showPulsrSheet<bool>(
       context: context,
-      isScrollControlled: true,
-      useRootNavigator: true,
       enableDrag: false,
-      backgroundColor: Colors.transparent,
       builder: (_) => YtmWebLoginSheet(
         initialUrl: initialUrl,
         title: title,
@@ -2155,11 +2154,10 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     String? errorText;
     var busy = false;
 
-    await showDialog<void>(
-      context: context,
+    await PulsrDialogHelper.showCustomDialog<void>(
+      context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          backgroundColor: p.surface,
+        builder: (ctx, setDialogState) => PulsrDialog(
           title: Row(
             children: [
               Container(

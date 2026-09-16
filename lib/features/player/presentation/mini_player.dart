@@ -148,10 +148,10 @@ class _MiniPlayerState extends State<MiniPlayer> {
             },
             child: Padding(
               padding: EdgeInsetsDirectional.fromSTEB(
-                isTablet ? 24 : 14,
-                3,
-                isTablet ? 24 : 14,
-                3,
+                isTablet ? 24 : 10,
+                0,
+                isTablet ? 24 : 10,
+                0,
               ),
               child: Container(
                 decoration: BoxDecoration(

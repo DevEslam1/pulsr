@@ -5,10 +5,20 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../data/audio/equalizer_manager.dart';
 import '../../../../domain/models/audio_effects_config.dart';
 
+import '../../../../core/widgets/pulsr_bottom_sheet.dart';
+
 class CompressorLimiterSheet extends StatefulWidget {
   final EqualizerManager equalizerManager;
 
   const CompressorLimiterSheet({super.key, required this.equalizerManager});
+
+  static Future<void> show(BuildContext context, {required EqualizerManager equalizerManager}) {
+    return PulsrSheetHelper.showPulsrSheet<void>(
+      context: context,
+      wrapWithContainer: false,
+      builder: (_) => CompressorLimiterSheet(equalizerManager: equalizerManager),
+    );
+  }
 
   @override
   State<CompressorLimiterSheet> createState() => _CompressorLimiterSheetState();

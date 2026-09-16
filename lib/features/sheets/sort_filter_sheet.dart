@@ -1,8 +1,9 @@
 // lib/features/sheets/sort_filter_sheet.dart
 import 'package:flutter/material.dart';
 import '../../core/theme/aura_theme.dart';
-import '../../core/utils/adaptive.dart';
 import '../../core/utils/l10n_extensions.dart';
+import '../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../core/widgets/pulsr_pressable.dart';
 
 class SortFilterSheet extends StatelessWidget {
   final String currentSort;
@@ -15,6 +16,22 @@ class SortFilterSheet extends StatelessWidget {
     required this.ascending,
     required this.onApply,
   });
+
+  static Future<void> show(
+    BuildContext context, {
+    required String currentSort,
+    required bool ascending,
+    required Function(String sortBy, bool ascending) onApply,
+  }) {
+    return PulsrSheetHelper.showPulsrSheet<void>(
+      context: context,
+      builder: (_) => SortFilterSheet(
+        currentSort: currentSort,
+        ascending: ascending,
+        onApply: onApply,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,99 +50,65 @@ class SortFilterSheet extends StatelessWidget {
       {'key': 'year', 'label': context.l10n.browseReleaseYear},
     ];
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => Navigator.of(context).maybePop(),
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: GestureDetector(
-          onTap: () {},
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: Adaptive.maxSheetWidth,
-              maxHeight: screenHeight * 0.80,
-            ),
-            child: Material(
-              color: p.surface,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(28)),
-              clipBehavior: Clip.antiAlias,
-              child: SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: p.hairline,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
+    return PulsrBottomSheetContainer(
+      title: Text(context.l10n.sortAndFilter),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: screenHeight * 0.65),
+        child: ListView.separated(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+          itemCount: sortOptions.length,
+          separatorBuilder: (_, __) => Divider(
+            color: p.hairline.withValues(alpha: 0.5),
+            height: 1,
+          ),
+          itemBuilder: (context, index) {
+            final option = sortOptions[index];
+            final isSelected = currentSort == option['key'];
+            return PulsrPressable(
+              pressedScale: 0.985,
+              onTap: () {
+                final newAsc = isSelected ? !ascending : true;
+                onApply(option['key']!, newAsc);
+                Navigator.pop(context);
+              },
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        option['label']!,
+                        style: TextStyle(
+                          color: isSelected ? p.accent : p.textPrimary,
+                          fontWeight: isSelected
+                              ? FontWeight.w800
+                              : FontWeight.w500,
+                          fontSize: 15,
                         ),
                       ),
-                      const SizedBox(height: 18),
-                      Text(
-                        context.l10n.sortAndFilter,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: p.textPrimary,
-                            ),
-                      ),
-                      const SizedBox(height: 12),
-                      Flexible(
-                        child: ListView.separated(
-                          shrinkWrap: true,
-                          itemCount: sortOptions.length,
-                          separatorBuilder: (_, __) => Divider(
-                            color: p.hairline.withValues(alpha: 0.5),
-                            height: 1,
-                          ),
-                          itemBuilder: (context, index) {
-                            final option = sortOptions[index];
-                            final isSelected = currentSort == option['key'];
-                            return ListTile(
-                              dense: true,
-                              contentPadding: const EdgeInsets.symmetric(
-                                  vertical: 2, horizontal: 4),
-                              title: Text(
-                                option['label']!,
-                                style: TextStyle(
-                                  color: isSelected ? p.accent : p.textPrimary,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w800
-                                      : FontWeight.w500,
-                                  fontSize: 14.5,
-                                ),
-                              ),
-                              trailing: isSelected
-                                  ? Icon(
-                                      ascending
-                                          ? Icons.arrow_upward_rounded
-                                          : Icons.arrow_downward_rounded,
-                                      color: p.accent,
-                                      size: 20,
-                                    )
-                                  : null,
-                              onTap: () {
-                                final newAsc = isSelected ? !ascending : true;
-                                onApply(option['key']!, newAsc);
-                                Navigator.pop(context);
-                              },
-                            );
-                          },
+                    ),
+                    if (isSelected)
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: p.accentContainer,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          ascending
+                              ? Icons.arrow_upward_rounded
+                              : Icons.arrow_downward_rounded,
+                          color: p.accent,
+                          size: 18,
                         ),
                       ),
-                    ],
-                  ),
+                  ],
                 ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ),
     );

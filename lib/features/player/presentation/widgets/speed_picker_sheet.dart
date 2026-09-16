@@ -2,23 +2,19 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../../core/constants/app_radii.dart';
 import '../../../../core/theme/aura_theme.dart';
-import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
+import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
 
 class SpeedPickerSheet extends StatelessWidget {
   const SpeedPickerSheet({super.key});
 
   static Future<void> show(BuildContext context) {
-    return showModalBottomSheet(
+    return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (_) => const SpeedPickerSheet(),
     );
   }
@@ -52,105 +48,84 @@ class SpeedPickerSheet extends StatelessWidget {
       4.0,
       5.0,
       6.0,
+      7.0,
       8.0,
     ];
-    return base
-        .where((s) => s >= min - 1e-9 && s <= max + 1e-9)
-        .toList(growable: false);
+    return base.where((s) => s >= min && s <= max).toList();
   }
 
-  static String formatSpeed(double speed) {
-    if (speed == 0.75 || speed == 1.25 || speed == 2.5) {
-      return '${speed}x';
-    }
-    return '${speed.toStringAsFixed(1)}x';
-  }
+  static const List<double> pitchSemitoneOptions = [
+    -6.0,
+    -4.0,
+    -2.0,
+    -1.0,
+    0.0,
+    1.0,
+    2.0,
+    4.0,
+    6.0,
+  ];
+
+  static double semitonesToPitch(double semitones) =>
+      math.pow(2.0, semitones / 12.0).toDouble();
+
+  static String formatSpeed(double speed) => '${speed.toStringAsFixed(2)}x';
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => Navigator.of(context).maybePop(),
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: GestureDetector(
-          onTap: () {},
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-                maxWidth: Adaptive.sheetConstraints(context).maxWidth),
-            child: Material(
-              color: p.surface,
-              borderRadius: AppRadii.bottomSheetRadius,
-              clipBehavior: Clip.antiAlias,
-              child: SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-                  child: BlocBuilder<PlayerCubit, PlayerState>(
-                    // Only playbackSpeed and playbackPitch drive this sheet; ignore 10Hz position ticks.
-                    buildWhen: (a, b) =>
-                        a.playbackSpeed != b.playbackSpeed ||
-                        a.playbackPitch != b.playbackPitch,
-                    builder: (context, state) {
-                      final cubit = context.read<PlayerCubit>();
-                      final currentSpeed = state.playbackSpeed;
-                      final currentPitch = state.playbackPitch;
-                      final options = speedOptionsFor(
-                          cubit.minPlaybackSpeed, cubit.maxPlaybackSpeed);
+    return BlocBuilder<PlayerCubit, PlayerState>(
+      buildWhen: (a, b) =>
+          a.playbackSpeed != b.playbackSpeed ||
+          a.playbackPitch != b.playbackPitch,
+      builder: (context, state) {
+        final cubit = context.read<PlayerCubit>();
+        final currentSpeed = state.playbackSpeed;
+        final currentPitch = state.playbackPitch;
+        final options = speedOptionsFor(
+            cubit.minPlaybackSpeed, cubit.maxPlaybackSpeed);
+        final semitones = currentPitch == 1.0
+            ? 0
+            : (12.0 *
+                    (currentPitch > 0
+                        ? math.log(currentPitch) / math.ln2
+                        : 0.0))
+                .round();
 
-                      // Convert pitch multiplier to semitones:
-                      // pitch = 2^(semitones / 12)  =>  semitones = 12 * log2(pitch)
-                      final semitones = currentPitch == 1.0
-                          ? 0
-                          : (12.0 *
-                                  (currentPitch > 0
-                                      ? math.log(currentPitch) / math.ln2
-                                      : 0.0))
-                              .round();
-
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Center(
-                            child: Container(
-                              width: 40,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                color: p.hairline,
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
+        return PulsrBottomSheetContainer(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      context.l10n.playbackSpeed,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: p.textPrimary,
                           ),
-                          const SizedBox(height: 20),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                context.l10n.playbackSpeed,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleLarge
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.w800,
-                                      color: p.textPrimary,
-                                    ),
-                              ),
-                              if (currentSpeed != 1.0)
-                                TextButton(
-                                  onPressed: () => cubit.setPlaybackSpeed(1.0),
-                                  style: TextButton.styleFrom(
-                                    padding: EdgeInsets.zero,
-                                    minimumSize: Size.zero,
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  ),
-                                  child: Text(context.l10n.reset,
-                                      style: TextStyle(
-                                          color: p.accent, fontSize: 13)),
-                                ),
-                            ],
-                          ),
+                    ),
+                    if (currentSpeed != 1.0)
+                      TextButton(
+                        onPressed: () => cubit.setPlaybackSpeed(1.0),
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(context.l10n.reset,
+                            style: TextStyle(
+                                color: p.accent, fontSize: 13)),
+                      ),
+                  ],
+                ),
                           const SizedBox(height: 8),
                           Text(
                             context.l10n.currentSpeed(formatSpeed(currentSpeed)),
@@ -290,15 +265,10 @@ class SpeedPickerSheet extends StatelessWidget {
                             ),
                           ),
                         ],
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
+                      ),
+                    ),
+                  );
+                },
+              );
+            }
+          }

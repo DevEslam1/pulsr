@@ -6,6 +6,7 @@ import '../../../../core/services/artwork_cache_manager.dart';
 import '../../../../core/services/ytm_cache_manager.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 
 /// Storage & Cache section widget: displays album artwork cache size,
 /// YouTube stream cache size (if YTM enabled), cache clearing affordances,
@@ -202,12 +203,8 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
     final p = context.palette;
     final options = [50, 100, 250, 500];
 
-    showModalBottomSheet(
+    PulsrSheetHelper.showPulsrSheet(
       context: context,
-      backgroundColor: p.surfaceContainer,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
       builder: (ctx) {
         return SafeArea(
           child: Padding(

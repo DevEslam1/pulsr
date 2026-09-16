@@ -18,6 +18,8 @@ import '../../../domain/usecases/get_songs_usecase.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../sheets/add_to_playlist_sheet.dart';
 import '../../sheets/song_info_sheet.dart';
+import '../../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../../core/widgets/pulsr_pressable.dart';
 
 class RecentsScreen extends StatefulWidget {
   const RecentsScreen({super.key});
@@ -386,45 +388,33 @@ class _RecentsScreenState extends State<RecentsScreen> {
   }
 
   void _showSongOptions(BuildContext context, SongsTableData song) {
-    final p = context.palette;
-    showModalBottomSheet(
+    PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
-      backgroundColor: p.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
+      builder: (ctx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          PulsrPressable(
+            onTap: () {
+              Navigator.pop(ctx);
+              AddToPlaylistSheet.show(context, song: song);
+            },
+            child: ListTile(
               leading: const Icon(Icons.playlist_add_rounded),
               title: Text(context.l10n.addToPlaylist),
-              onTap: () {
-                Navigator.pop(ctx);
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
-                  builder: (_) => AddToPlaylistSheet(song: song),
-                );
-              },
             ),
-            ListTile(
+          ),
+          PulsrPressable(
+            onTap: () {
+              Navigator.pop(ctx);
+              SongInfoSheet.show(context, song: song);
+            },
+            child: ListTile(
               leading: const Icon(Icons.info_outline_rounded),
               title: Text(context.l10n.songInfo),
-              onTap: () {
-                Navigator.pop(ctx);
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
-                  builder: (_) => SongInfoSheet(song: song),
-                );
-              },
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 8),
+        ],
       ),
     );
   }

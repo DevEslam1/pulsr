@@ -1,13 +1,14 @@
 part of 'audio_handler.dart';
 
-extension PulsrAudioMediaBrowser on PulsrAudioHandler {
+mixin PulsrAudioMediaBrowser on BaseAudioHandler {
   MediaItem _fastSongToMediaItem(SongsTableData song) {
     final artUri = song.artworkUri != null
         ? Uri.tryParse(song.artworkUri!)
         : (song.remoteArtworkUrl != null ? Uri.tryParse(song.remoteArtworkUrl!) : null);
-    return _songToMediaItem(song, artUri);
+    return PulsrAudioHandler._songToMediaItem(song, artUri);
   }
 
+  @override
   Future<List<MediaItem>> getChildren(String parentMediaId,
       [Map<String, dynamic>? options]) async {
     switch (parentMediaId) {
@@ -181,7 +182,7 @@ extension PulsrAudioMediaBrowser on PulsrAudioHandler {
             final ytmTracks = await _ytmService.search('trending music');
             return ytmTracks.map((t) {
               final song = t.toSongData();
-              return _songToMediaItem(song,
+              return PulsrAudioHandler._songToMediaItem(song,
                   t.artworkUrl != null ? Uri.tryParse(t.artworkUrl!) : null);
             }).toList();
           } catch (_) {
@@ -209,6 +210,7 @@ extension PulsrAudioMediaBrowser on PulsrAudioHandler {
     }
   }
 
+  @override
   Future<MediaItem?> getMediaItem(String mediaId) async {
     final id = int.tryParse(mediaId);
     if (id == null) return null;
@@ -216,9 +218,10 @@ extension PulsrAudioMediaBrowser on PulsrAudioHandler {
     final match = songRes.fold((l) => null, (r) => r);
     if (match == null) return null;
     final artUri = await ArtworkUriResolver.resolveArtworkUri(match);
-    return _songToMediaItem(match, artUri);
+    return PulsrAudioHandler._songToMediaItem(match, artUri);
   }
 
+  @override
   Future<void> playFromMediaId(String mediaId,
       [Map<String, dynamic>? extras]) async {
     final queueIndex = _songs.indexWhere(
@@ -346,6 +349,7 @@ extension PulsrAudioMediaBrowser on PulsrAudioHandler {
     }
   }
 
+  @override
   Future<List<MediaItem>> search(String query,
       [Map<String, dynamic>? extras]) async {
     if (query.trim().isEmpty) return [];
@@ -366,7 +370,7 @@ extension PulsrAudioMediaBrowser on PulsrAudioHandler {
           final song = t.toSongData();
           final artUri =
               t.artworkUrl != null ? Uri.tryParse(t.artworkUrl!) : null;
-          results.add(_songToMediaItem(song, artUri));
+          results.add(PulsrAudioHandler._songToMediaItem(song, artUri));
         }
       } catch (_) {}
     }
@@ -374,6 +378,7 @@ extension PulsrAudioMediaBrowser on PulsrAudioHandler {
     return results;
   }
 
+  @override
   Future<void> playFromSearch(String query,
       [Map<String, dynamic>? extras]) async {
     if (query.trim().isEmpty) return;
@@ -401,4 +406,56 @@ extension PulsrAudioMediaBrowser on PulsrAudioHandler {
     }
   }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // Requires: provided by the composing class (same library).
+  AudioPlayer get _activePlayer;
+
+  // Requires: provided by the composing class (same library).
+  Future<List<R>> _boundedParallelMap<T, R>( List<T> items, Future<R> Function(T) mapper, { int concurrency = 6, });
+
+  // Requires: provided by the composing class (same library).
+  IMusicRepository get _repository;
+
+  // Requires: provided by the composing class (same library).
+  List<SongsTableData> get _songs;
+
+  // Requires: provided by the composing class (same library).
+  YtmService get _ytmService;
+
+  // Requires: provided by the composing class (same library).
+  Future<void> loadQueue(List<SongsTableData> songs, {int initialIndex = 0, Duration? initialPosition, bool autoPlay = true});
 }

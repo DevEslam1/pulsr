@@ -8,6 +8,7 @@ import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
+import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/widgets/pulsr_toast.dart';
 import '../../../core/widgets/song_tile.dart';
@@ -88,12 +89,8 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
       DuplicateGroup group, SongsTableData song) async {
     final p = context.palette;
     final l10n = context.l10n;
-    final action = await showModalBottomSheet<_ResolveAction>(
+    final action = await PulsrSheetHelper.showPulsrSheet<_ResolveAction>(
       context: context,
-      backgroundColor: p.surfaceCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,

@@ -2,6 +2,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../constants/app_radii.dart';
+import '../performance/gpu_budget.dart';
 import '../theme/aura_theme.dart';
 
 class GlassContainer extends StatelessWidget {
@@ -159,7 +160,7 @@ class GlassContainer extends StatelessWidget {
       );
     }
 
-    if (!enableBlur) {
+    if (!enableBlur || GpuBudget.isEnabled) {
       return clipped;
     }
 

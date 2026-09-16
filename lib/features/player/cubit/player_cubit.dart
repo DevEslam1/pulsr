@@ -86,23 +86,35 @@ class _QueueSlotData {
 }
 
 @singleton
-class PlayerCubit extends PulsrCubit<PlayerState> {
+class PlayerCubit extends PulsrCubit<PlayerState>
+    with PlayerQueueOps, PlayerTransportControls, PlayerDspControls, PlayerPlaybackOptions {
   static const int _maxQueueSize = 500;
   static const Duration _scrobbleInterval = Duration(seconds: 5);
 
+  @override
   final PulsrAudioHandler _audioHandler;
+  @override
   final IMusicRepository _repository;
+  @override
   final ToggleFavoriteUseCase _toggleFavoriteUseCase;
+  @override
   final SettingsCubit? _settingsCubit;
   final WidgetService? _widgetService;
   final ScrobblerService? _scrobblerService;
   final PlaybackLatencyTracker? _latencyTracker;
+  @override
   final SettingsProfilesService? _settingsProfilesService;
+  @override
   final DeviceProfileService? _deviceProfileService;
+  @override
   final HiResAudioService? _hiResAudioService;
+  @override
   final SmartAudioService? _smartAudioService;
+  @override
   final PerSongEqStore _perSongEqStore;
+  @override
   final PerSongVolumeStore _perSongVolumeStore;
+  @override
   final SongRatingStore _songRatingStore;
   final SponsorBlockService _sponsorBlockService;
   final QuranModeService? _quranModeService;
@@ -111,9 +123,11 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   final YtmAccountService? _ytmAccountService;
   final MediaScannerService? _mediaScannerService;
   QuranRestoreSnapshot? _quranRestore;
+  @override
   String? _lastAutoAppliedDeviceKey;
   /// True when Smart Auto itself enabled bit-perfect output, so it only ever
   /// turns off what it turned on (a manual bit-perfect choice is respected).
+  @override
   bool _smartAutoBitPerfectApplied = false;
 
   // FIX(BUG-14): Expose unthrottled position stream for high-fps UI components like MiniPlayer
@@ -128,12 +142,16 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   int _localMatchSwapGen = 0;
   List<SponsorBlockSegment> _currentSponsorSegments = const [];
   String? _sponsorSegmentsVideoId;
+  @override
   Duration? _lastSkippedSegmentEnd;
+  @override
   DateTime? _lastSponsorSkipTime;
 
   Timer? _persistQueueDebounce;
   Timer? _scrobbleDebounce;
+  @override
   Timer? _seekThrottleTimer;
+  @override
   Duration? _pendingSeek;
   int? _lastScrobbleSongId;
   bool? _lastScrobbleIsPlaying;
@@ -157,8 +175,11 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   /// Per-song EQ override backup: the global preset active before a per-song
   /// override is applied. Restored when a track without an override starts,
   /// so a per-song curve never leaks into the rest of the queue.
+  @override
   EqPreset? _globalEqBackup;
+  @override
   HeadphoneProfile? _globalHeadphoneProfileBackup;
+  @override
   bool _perSongOverrideActive = false;
 
   /// Idempotence key for per-track sync (AB loop, bookmark, rating, per-song
@@ -178,7 +199,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   /// - a transient loading/buffering `playing:false` must not regress an
   ///   optimistic `isPlaying:true` from playSong (flash paused);
   /// - a stale speed echo must not clobber a just-set speed.
+  @override
   double? _lastSpeedPushed;
+  @override
   DateTime? _lastSpeedPushAt;
 
   /// True when the user explicitly paused while a track was still loading or
@@ -186,14 +209,17 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   /// suppresses the optimistic "still playing" re-assert during loading so the
   /// pause is not visually reverted, and is cleared as soon as playback really
   /// starts or a new track is requested.
+  @override
   bool _userPausedIntentionally = false;
 
   /// Bumped on every queue mutation. [_getNextTitles]'s cache is keyed by
   /// index/length/current song, none of which changes when songs AFTER the
   /// current one are reordered - the version counter is what actually
   /// invalidates it.
+  @override
   int _queueVersion = 0;
 
+  @override
   final Map<int, _QueueSlotData> _queueSlots = {
     0: const _QueueSlotData(
         songs: [], currentIndex: 0, position: Duration.zero, speed: 1.0),
@@ -337,6 +363,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     _updateWidgetThrottled(force: true);
   }
 
+  @override
   void _syncAudioEffects() {
     safeEmit(state.copyWith(
       isEqEnabled: _audioHandler.isEqualizerEnabled,
@@ -459,6 +486,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     }
   }
 
+  @override
   void _debouncedPersistQueueSlots() {
     _persistQueueDebounce?.cancel();
     _persistQueueDebounce = autoTimer(Timer(const Duration(seconds: 2), () {
@@ -715,6 +743,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
 
   DateTime? _lastWidgetProgressUpdateTime;
 
+  @override
   void _updateWidgetThrottled({bool force = false}) {
     final now = DateTime.now();
     if (!force &&
@@ -829,6 +858,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     }
   }
 
+  @override
   bool _isSameTrack(SongsTableData? a, SongsTableData? b) {
     if (identical(a, b)) return true;
     if (a == null || b == null) return false;
@@ -1387,6 +1417,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   /// current track's lyrics.
   int _lyricsLoadGen = 0;
 
+  @override
   Future<void> _loadLyricsForSong(SongsTableData song) async {
     if (isClosed) return;
 
@@ -1597,6 +1628,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     }
   }
 
+  @override
   Future<void> playSong(SongsTableData song,
       {List<SongsTableData>? queue,
       Duration? initialPosition,
@@ -1835,12 +1867,15 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   }
 
 
+  @override
   bool _isSwitchingSlot = false;
 
 
+  @override
   int _lastSeekMs = 0;
 
 
+  @override
   PlayerState? _dspSnapshot;
 
 

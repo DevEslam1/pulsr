@@ -5,57 +5,34 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/services/earbud_optimization_service.dart';
 import '../../../../core/theme/aura_theme.dart';
-import '../../../../core/utils/adaptive.dart';
 import '../../../../domain/models/quran_mode_profile.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
+
+import '../../../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../../../core/widgets/pulsr_switch.dart';
 
 /// Bottom sheet entry point for Quran Mode.
 class QuranModeSheet extends StatelessWidget {
   const QuranModeSheet({super.key});
 
   static Future<void> show(BuildContext context) {
-    return showModalBottomSheet<void>(
+    return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (_) => const QuranModeSheet(),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final p = context.palette;
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: ConstrainedBox(
-        constraints: Adaptive.sheetConstraints(context),
-        child: Material(
-          color: p.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          clipBehavior: Clip.antiAlias,
-          child: SafeArea(
-            top: false,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(top: 12, bottom: 8),
-                    decoration: BoxDecoration(
-                      color: p.hairline,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  const QuranModePanel(),
-                  const SizedBox(height: 16),
-                ],
-              ),
-            ),
-          ),
+    return const PulsrBottomSheetContainer(
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            QuranModePanel(),
+            SizedBox(height: 16),
+          ],
         ),
       ),
     );
@@ -129,10 +106,8 @@ class _QuranModePanelState extends State<QuranModePanel> {
                       ],
                     ),
                   ),
-                  Switch.adaptive(
+                  PulsrSwitch(
                     value: enabled,
-                    activeTrackColor: p.accent,
-                    activeThumbColor: p.onAccent,
                     onChanged: (v) => cubit.setQuranModeEnabled(v),
                   ),
                 ],

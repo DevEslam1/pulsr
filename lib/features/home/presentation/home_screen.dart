@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../core/widgets/empty_state_widget.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
@@ -17,6 +19,7 @@ import '../../../core/errors/failures.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../sheets/song_info_sheet.dart';
+import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/services/ytm_service.dart';
@@ -525,11 +528,8 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: () => context.push('/theme-studio'),
       ),
     ];
-    showModalBottomSheet<void>(
+    PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         final sp = sheetContext.palette;
         return SafeArea(
@@ -685,13 +685,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     itemBuilder: (context, index) => SongTile(
                       song: songs[index],
                       onTap: () => playerCubit.playSong(songs[index], queue: songs),
-                      onMorePressed: () => showModalBottomSheet(
-                        context: context,
-                        useRootNavigator: true,
-                        isScrollControlled: true,
-                        backgroundColor: Colors.transparent,
-                        builder: (_) => SongInfoSheet(song: songs[index]),
-                      ),
+                      onMorePressed: () => SongInfoSheet.show(context, song: songs[index]),
                     ),
                   )
                 else
@@ -699,13 +693,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     SongTile(
                       song: song,
                       onTap: () => playerCubit.playSong(song, queue: songs),
-                      onMorePressed: () => showModalBottomSheet(
-                        context: context,
-                        useRootNavigator: true,
-                        isScrollControlled: true,
-                        backgroundColor: Colors.transparent,
-                        builder: (_) => SongInfoSheet(song: song),
-                      ),
+                      onMorePressed: () => SongInfoSheet.show(context, song: song),
                     ),
               ],
             );
@@ -1031,13 +1019,7 @@ class _OnlineCategorySection extends StatelessWidget {
                     index: i + 1,
                     onTap: () => playerCubit.playSong(songs[i], queue: songs),
                     trailing: YtmDownloadButton(song: songs[i]),
-                    onMorePressed: () => showModalBottomSheet(
-                      context: context,
-                      useRootNavigator: true,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (_) => SongInfoSheet(song: songs[i]),
-                    ),
+                    onMorePressed: () => SongInfoSheet.show(context, song: songs[i]),
                   ),
                 )
               else
@@ -1047,13 +1029,7 @@ class _OnlineCategorySection extends StatelessWidget {
                     index: i + 1,
                     onTap: () => playerCubit.playSong(songs[i], queue: songs),
                     trailing: YtmDownloadButton(song: songs[i]),
-                    onMorePressed: () => showModalBottomSheet(
-                      context: context,
-                      useRootNavigator: true,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (_) => SongInfoSheet(song: songs[i]),
-                    ),
+                    onMorePressed: () => SongInfoSheet.show(context, song: songs[i]),
                   ),
             ],
           ),
@@ -1543,68 +1519,142 @@ class _EmptyLibrary extends StatefulWidget {
 
 class _EmptyLibraryState extends State<_EmptyLibrary> {
   bool _isScanning = false;
+  bool _hasPermission = true;
+  double _scanProgress = 0.0;
+  StreamSubscription<double>? _progressSub;
 
-  Future<void> _scan() async {
-    setState(() => _isScanning = true);
+  @override
+  void initState() {
+    super.initState();
+    _checkPermission();
+  }
+
+  @override
+  void dispose() {
+    _progressSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _checkPermission() async {
     try {
       final scanner = context.read<MediaScannerService>();
+      final granted = await scanner.checkPermission();
+      if (mounted) setState(() => _hasPermission = granted);
+    } catch (_) {}
+  }
+
+  Future<void> _requestPermission() async {
+    try {
+      final scanner = context.read<MediaScannerService>();
+      final granted = await scanner.requestPermission();
+      if (mounted) {
+        setState(() => _hasPermission = granted);
+        if (granted) {
+          _scan();
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _scan() async {
+    setState(() {
+      _isScanning = true;
+      _scanProgress = 0.0;
+    });
+
+    final scanner = context.read<MediaScannerService>();
+    _progressSub?.cancel();
+    _progressSub = scanner.scanProgress.listen((p) {
+      if (mounted) setState(() => _scanProgress = p);
+    });
+
+    try {
       final count = await scanner.scanDeviceLibrary();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(context.l10n.scanComplete(count))));
+          SnackBar(
+            content: Text(context.l10n.scanComplete(count)),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     } finally {
-      if (mounted) setState(() => _isScanning = false);
+      if (mounted) {
+        setState(() => _isScanning = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
-      child: Center(
+
+    if (!_hasPermission) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        child: EmptyStateWidget(
+          icon: Icons.folder_special_rounded,
+          title: 'Permission Needed',
+          subtitle:
+              'Grant audio or storage permission so Pulsr can index and play your offline music collection with bit-perfect quality.',
+          primaryActionLabel: 'Grant Permission',
+          primaryActionIcon: Icons.lock_open_rounded,
+          onPrimaryAction: _requestPermission,
+          secondaryActionLabel: 'Excluded Folders',
+          secondaryActionIcon: Icons.folder_off_rounded,
+          onSecondaryAction: () => context.push('/hidden-folders'),
+        ),
+      );
+    }
+
+    if (_isScanning) {
+      final percent = (_scanProgress * 100).toInt();
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 84,
-              height: 84,
-              decoration: BoxDecoration(
-                color: p.accentContainer,
-                shape: BoxShape.circle,
-                border: Border.all(color: p.hairline),
+            EmptyStateWidget(
+              icon: Icons.hourglass_top_rounded,
+              title: 'Scanning Storage...',
+              subtitle: _scanProgress > 0
+                  ? '$percent% indexed • Building your local music catalog'
+                  : 'Searching device directories for audio files...',
+              isPrimaryLoading: true,
+              primaryActionLabel: 'Scanning...',
+            ),
+            if (_scanProgress > 0) ...[
+              const SizedBox(height: 16),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 280),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: _scanProgress.clamp(0.0, 1.0),
+                    minHeight: 6,
+                    backgroundColor: p.surfaceContainerHigh,
+                    valueColor: AlwaysStoppedAnimation<Color>(p.accent),
+                  ),
+                ),
               ),
-              child: _isScanning
-                  ? Padding(
-                      padding: const EdgeInsets.all(22),
-                      child: CircularProgressIndicator(
-                          strokeWidth: 3, color: p.accent),
-                    )
-                  : Icon(Icons.music_off_rounded, size: 38, color: p.accent),
-            ),
-            const SizedBox(height: 18),
-            Text(context.l10n.noMusicYet,
-                style: Theme.of(context)
-                    .textTheme
-                    .titleLarge
-                    ?.copyWith(fontWeight: FontWeight.w800)),
-            const SizedBox(height: 6),
-            Text(context.l10n.scanPrompt,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: p.textSecondary, fontSize: 13),
-            ),
-            const SizedBox(height: 22),
-            ElevatedButton.icon(
-              icon: Icon(_isScanning
-                  ? Icons.hourglass_top_rounded
-                  : Icons.refresh_rounded),
-              label: Text(_isScanning
-                  ? context.l10n.scanning
-                  : context.l10n.scanStorage),
-              onPressed: _isScanning ? null : _scan,
-            ),
+            ],
           ],
         ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      child: EmptyStateWidget(
+        icon: Icons.music_off_rounded,
+        title: context.l10n.noMusicYet,
+        subtitle: context.l10n.scanPrompt,
+        primaryActionLabel: context.l10n.scanStorage,
+        primaryActionIcon: Icons.refresh_rounded,
+        onPrimaryAction: _scan,
+        secondaryActionLabel: 'Excluded Folders',
+        secondaryActionIcon: Icons.folder_off_rounded,
+        onSecondaryAction: () => context.push('/hidden-folders'),
       ),
     );
   }

@@ -1,6 +1,7 @@
 // lib/features/player/presentation/widgets/equalizer_sheet.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../../core/constants/app_radii.dart';
@@ -33,6 +34,8 @@ import '../../../../core/di/injection.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/presentation/widgets/room_correction_sheet.dart';
+import '../../../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../../../core/widgets/pulsr_dialog.dart';
 
 // Rebuild gate for the whole DSP sheet. Every user-facing toggle/slider field
 // MUST be listed here or its switch will not flip until the sheet is reopened
@@ -106,6 +109,14 @@ bool dspSheetRebuildGate(PlayerState a, PlayerState b) {
 class EqualizerSheet extends StatefulWidget {
   const EqualizerSheet({super.key});
 
+  static Future<void> show(BuildContext context) {
+    return PulsrSheetHelper.showPulsrSheet<void>(
+      context: context,
+      wrapWithContainer: false,
+      builder: (_) => const EqualizerSheet(),
+    );
+  }
+
   @override
   State<EqualizerSheet> createState() => _EqualizerSheetState();
 }
@@ -124,6 +135,86 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   String _searchQuery = '';
   bool _isLoadingProfiles = true;
   bool _isAbComparing = false;
+  bool? _isStudioModeOverride;
+
+  bool _isStudio(BuildContext context) {
+    if (_isStudioModeOverride != null) return _isStudioModeOverride!;
+    try {
+      final settings = context.read<SettingsCubit>().state;
+      return settings.isProfessional;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  double _getBassGain(PlayerState state) {
+    final gains = state.eqPreset.gains;
+    if (gains.isEmpty) return 0.0;
+    if (gains.length >= 3) {
+      return ((gains[0] + gains[1] + gains[2]) / 3.0).clamp(-12.0, 12.0);
+    }
+    return gains.first.clamp(-12.0, 12.0);
+  }
+
+  double _getMidGain(PlayerState state) {
+    final gains = state.eqPreset.gains;
+    if (gains.length >= 7) {
+      return ((gains[4] + gains[5] + gains[6]) / 3.0).clamp(-12.0, 12.0);
+    } else if (gains.length >= 3) {
+      return gains[gains.length ~/ 2].clamp(-12.0, 12.0);
+    }
+    return 0.0;
+  }
+
+  double _getTrebleGain(PlayerState state) {
+    final gains = state.eqPreset.gains;
+    if (gains.length >= 10) {
+      return ((gains[7] + gains[8] + gains[9]) / 3.0).clamp(-12.0, 12.0);
+    } else if (gains.length >= 3) {
+      return gains.last.clamp(-12.0, 12.0);
+    }
+    return 0.0;
+  }
+
+  void _setBassMacro(PlayerCubit cubit, PlayerState state, double val) {
+    if (!state.isEqEnabled) cubit.setEqualizerEnabled(true);
+    final count = state.eqPreset.gains.length;
+    if (count >= 10) {
+      cubit.setBandGain(0, val);
+      cubit.setBandGain(1, (val * 0.85).clamp(-12.0, 12.0));
+      cubit.setBandGain(2, (val * 0.65).clamp(-12.0, 12.0));
+    } else if (count > 0) {
+      cubit.setBandGain(0, val);
+    }
+    if (val >= 0) {
+      cubit.setBassBoost((val / 12.0).clamp(0.0, 1.0));
+    }
+  }
+
+  void _setMidMacro(PlayerCubit cubit, PlayerState state, double val) {
+    if (!state.isEqEnabled) cubit.setEqualizerEnabled(true);
+    final count = state.eqPreset.gains.length;
+    if (count >= 10) {
+      cubit.setBandGain(3, (val * 0.5).clamp(-12.0, 12.0));
+      cubit.setBandGain(4, (val * 0.8).clamp(-12.0, 12.0));
+      cubit.setBandGain(5, val);
+      cubit.setBandGain(6, (val * 0.85).clamp(-12.0, 12.0));
+    } else if (count >= 3) {
+      cubit.setBandGain(count ~/ 2, val);
+    }
+  }
+
+  void _setTrebleMacro(PlayerCubit cubit, PlayerState state, double val) {
+    if (!state.isEqEnabled) cubit.setEqualizerEnabled(true);
+    final count = state.eqPreset.gains.length;
+    if (count >= 10) {
+      cubit.setBandGain(7, (val * 0.75).clamp(-12.0, 12.0));
+      cubit.setBandGain(8, val);
+      cubit.setBandGain(9, (val * 0.9).clamp(-12.0, 12.0));
+    } else if (count >= 3) {
+      cubit.setBandGain(count - 1, val);
+    }
+  }
 
   /// F-35: per-band solo/mute are push-to-native only (the engine exposes no
   /// getter), so the sheet owns the transient UI state. Cleared on a band-count
@@ -277,95 +368,81 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   void _showFeatureInfo(BuildContext context, AudioFeatureInfo info,
       {String? conflictReason}) {
     final p = context.palette;
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: p.surface,
-        title: Row(
+    PulsrDialogHelper.showPulsrDialog<void>(
+      context,
+      icon: Icon(Icons.info_outline_rounded, color: p.accent, size: 26),
+      title: Text(info.title),
+      content: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                    color: p.accentContainer,
-                    borderRadius: BorderRadius.circular(8)),
-                child: Icon(Icons.info_outline_rounded,
-                    color: p.accent, size: 18)),
-            const SizedBox(width: 10),
-            Expanded(
-                child: Text(info.title,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w800, fontSize: 15))),
+            Text(info.subtitle,
+                style: TextStyle(
+                    color: p.textSecondary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12)),
+            const SizedBox(height: 10),
+            Text(info.description,
+                style: TextStyle(
+                    color: p.textPrimary, fontSize: 13, height: 1.4)),
+            if (info.conflictsWith != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                      color: p.warning.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: p.warning.withValues(alpha: 0.4))),
+                  child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.warning_amber_rounded,
+                            color: p.warning, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                            child: Text(
+                                context.l10n.conflictsWith(
+                                    info.conflictsWith ?? ''),
+                                style: TextStyle(
+                                    color: p.textSecondary,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600)))
+                      ])),
+            ],
+            if (conflictReason != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                      color: p.error.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                      border:
+                          Border.all(color: p.error.withValues(alpha: 0.4))),
+                  child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.block_rounded, color: p.error, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                            child: Text(conflictReason,
+                                style: TextStyle(
+                                    color: p.error,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600)))
+                      ])),
+            ],
           ],
         ),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(info.subtitle,
-                  style: TextStyle(
-                      color: p.textSecondary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12)),
-              const SizedBox(height: 10),
-              Text(info.description,
-                  style: TextStyle(
-                      color: p.textPrimary, fontSize: 13, height: 1.4)),
-              if (info.conflictsWith != null) ...[
-                const SizedBox(height: 12),
-                Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                        color: p.warning.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                            color: p.warning.withValues(alpha: 0.4))),
-                    child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(Icons.warning_amber_rounded,
-                              color: p.warning, size: 18),
-                          const SizedBox(width: 8),
-                          Expanded(
-                              child: Text(
-                                  context.l10n.conflictsWith(
-                                      info.conflictsWith ?? ''),
-                                  style: TextStyle(
-                                      color: p.textSecondary,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600)))
-                        ])),
-              ],
-              if (conflictReason != null) ...[
-                const SizedBox(height: 12),
-                Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                        color: p.error.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
-                        border:
-                            Border.all(color: p.error.withValues(alpha: 0.4))),
-                    child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(Icons.block_rounded, color: p.error, size: 18),
-                          const SizedBox(width: 8),
-                          Expanded(
-                              child: Text(conflictReason,
-                                  style: TextStyle(
-                                      color: p.error,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600)))
-                        ])),
-              ],
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: Text(context.l10n.gotIt))
-        ],
       ),
+      actions: [
+        FilledButton(
+          onPressed: () =>
+              Navigator.of(context, rootNavigator: true).pop(),
+          child: Text(context.l10n.gotIt),
+        ),
+      ],
     );
   }
 
@@ -416,32 +493,16 @@ class _EqualizerSheetState extends State<EqualizerSheet>
 
   Future<void> _showSaveCustomPresetDialog(
       PlayerCubit cubit, PlayerState state) async {
-    final textController = TextEditingController(text: context.l10n.dspMyCustomEq);
-    final name = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(context.l10n.saveCustomEqPreset),
-        content: TextField(
-          controller: textController,
-          autofocus: true,
-          decoration: InputDecoration(
-            labelText: context.l10n.dspPresetName,
-            hintText: context.l10n.dspPresetNameHint,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(context.l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, textController.text.trim()),
-            child: Text(context.l10n.save),
-          ),
-        ],
-      ),
+    final name = await PulsrDialogHelper.showInputDialog(
+      context,
+      title: context.l10n.saveCustomEqPreset,
+      initialText: context.l10n.dspMyCustomEq,
+      hintText: context.l10n.dspPresetNameHint,
+      icon: Icons.equalizer_rounded,
+      confirmLabel: context.l10n.save,
+      cancelLabel: context.l10n.cancel,
     );
-    if (name != null && name.isNotEmpty) {
+    if (name != null && name.trim().isNotEmpty) {
       final id = 'custom_${DateTime.now().millisecondsSinceEpoch}';
       // Read from the cubit at tap time: with the F-10 gating, this build's
       // captured `state` may predate the latest band-drag gains.
@@ -488,16 +549,17 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   Future<void> _importPresetDialog(
       BuildContext context, PlayerCubit cubit) async {
     final textController = TextEditingController();
-    final jsonString = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(context.l10n.importEqPreset),
+    final jsonString = await PulsrDialogHelper.showCustomDialog<String>(
+      context,
+      builder: (ctx) => PulsrDialog(
+        title: context.l10n.importEqPreset,
+        icon: Icons.file_download_rounded,
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(context.l10n.pasteJsonPreset,
-              style: TextStyle(fontSize: 13),
+              style: TextStyle(fontSize: 13, color: context.palette.textSecondary),
             ),
             const SizedBox(height: 10),
             TextField(
@@ -554,11 +616,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 : f.toStringAsFixed(1)),
     ];
     String? error;
-    final applied = await showDialog<bool>(
-      context: context,
+    final applied = await PulsrDialogHelper.showCustomDialog<bool>(
+      context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: Text(context.l10n.customBandFreqs(initial.length)),
+        builder: (ctx, setDialogState) => PulsrDialog(
+          title: context.l10n.customBandFreqs(initial.length),
           content: SizedBox(
             width: 340,
             child: Column(
@@ -677,10 +739,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   /// measurement wizard or exports the current curve to the convolution stage
   /// as a linear-phase FIR (see [PlayerCubit.exportCorrectionImpulseResponse]).
   Future<void> _showRoomCorrectionActions(PlayerCubit cubit) async {
-    final action = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(context.l10n.roomCorrection),
+    final action = await PulsrDialogHelper.showCustomDialog<String>(
+      context,
+      builder: (ctx) => PulsrDialog(
+        title: context.l10n.roomCorrection,
+        icon: Icons.mic_rounded,
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -965,6 +1028,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
         builder: (context, state) {
           final cubit = context.read<PlayerCubit>();
           final dspBlockedGlobal = _dspBlockedReason(context);
+          final isStudio = _isStudio(context);
 
           // One snack per DSP auto-degrade session (re-arms after recovery).
           if (_degradeSnackQueued) {
@@ -1114,8 +1178,23 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       ),
                       const SizedBox(height: 6),
 
-                      // Separated EQ and DSP Master Toggles
-                      Padding(
+                      // Essential vs Studio Mode Switcher
+                      _buildModeSwitcher(context, p, isStudio),
+                      const SizedBox(height: 6),
+
+                      if (!isStudio)
+                        Expanded(
+                          child: _buildEssentialView(
+                            context,
+                            cubit,
+                            state,
+                            p,
+                            dspBlockedGlobal,
+                          ),
+                        )
+                      else ...[
+                        // Separated EQ and DSP Master Toggles
+                        Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Column(
                           children: [
@@ -1492,6 +1571,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           ],
                         ),
                       ),
+                      ],
                     ],
                   ),
                 ),
@@ -1499,6 +1579,666 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             ),
           );
         },
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Essential / Studio Mode Switcher
+  // ---------------------------------------------------------------------------
+  Widget _buildModeSwitcher(BuildContext context, PulsrPalette p, bool isStudio) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        height: 38,
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: p.surfaceContainer,
+          borderRadius: BorderRadius.circular(19),
+          border: Border.all(color: p.hairline),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() => _isStudioModeOverride = false);
+                },
+                child: AnimatedContainer(
+                  duration: context.motionMs(200),
+                  decoration: BoxDecoration(
+                    color: !isStudio ? p.accent : Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: !isStudio
+                        ? [
+                            BoxShadow(
+                              color: p.glow.withValues(alpha: 0.35),
+                              blurRadius: 8,
+                              offset: const Offset(0, 1),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.auto_awesome_rounded,
+                          size: 14,
+                          color: !isStudio ? p.onAccent : p.textSecondary,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Essential',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight:
+                                !isStudio ? FontWeight.w800 : FontWeight.w600,
+                            color: !isStudio ? p.onAccent : p.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() => _isStudioModeOverride = true);
+                },
+                child: AnimatedContainer(
+                  duration: context.motionMs(200),
+                  decoration: BoxDecoration(
+                    color: isStudio ? p.accent : Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: isStudio
+                        ? [
+                            BoxShadow(
+                              color: p.glow.withValues(alpha: 0.35),
+                              blurRadius: 8,
+                              offset: const Offset(0, 1),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.tune_rounded,
+                          size: 14,
+                          color: isStudio ? p.onAccent : p.textSecondary,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Studio (Pro)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight:
+                                isStudio ? FontWeight.w800 : FontWeight.w600,
+                            color: isStudio ? p.onAccent : p.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Essential (Curated / Low Cognitive Load) View
+  // ---------------------------------------------------------------------------
+  Widget _buildEssentialView(
+    BuildContext context,
+    PlayerCubit cubit,
+    PlayerState state,
+    PulsrPalette p,
+    String? dspBlocked,
+  ) {
+    final isEnabled = state.isEqEnabled && dspBlocked == null;
+    final preset = state.eqPreset;
+
+    final bassVal = _getBassGain(state);
+    final midVal = _getMidGain(state);
+    final trebleVal = _getTrebleGain(state);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
+      physics: const BouncingScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (dspBlocked != null) ...[
+            _conflictBanner(dspBlocked, p),
+            const SizedBox(height: 8),
+          ],
+
+          // 1. Master Equalizer Toggle Card
+          Material(
+            color: Colors.transparent,
+            child: Ink(
+              decoration: BoxDecoration(
+                color: state.isEqEnabled
+                    ? p.accent.withValues(alpha: 0.08)
+                    : p.surfaceContainer,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: state.isEqEnabled
+                      ? p.accent.withValues(alpha: 0.35)
+                      : p.hairline,
+                ),
+              ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: dspBlocked != null && !state.isEqEnabled
+                    ? null
+                    : () => cubit.setEqualizerEnabled(!state.isEqEnabled),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: state.isEqEnabled
+                              ? p.accent.withValues(alpha: 0.2)
+                              : p.surfaceContainerHigh,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.graphic_eq_rounded,
+                          color:
+                              state.isEqEnabled ? p.accent : p.textSecondary,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              context.l10n.equalizer,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: state.isEqEnabled
+                                    ? p.textPrimary
+                                    : p.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              state.isEqEnabled
+                                  ? (state.selectedHeadphoneProfile != null
+                                      ? '${context.l10n.dspTunedFor} ${state.selectedHeadphoneProfile!.name}'
+                                      : preset.name)
+                                  : context.l10n.dspAllEffectsBypassed,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: state.isEqEnabled
+                                    ? p.accent
+                                    : p.textTertiary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch.adaptive(
+                        value: dspBlocked == null && state.isEqEnabled,
+                        activeTrackColor: p.accent,
+                        activeThumbColor: p.onAccent,
+                        onChanged: dspBlocked != null && !state.isEqEnabled
+                            ? null
+                            : (val) => cubit.setEqualizerEnabled(val),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // 2. Sound Profiles Presets Carousel
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'SOUND PROFILES',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.0,
+                  color: p.textTertiary,
+                ),
+              ),
+              if (preset.name != 'Flat' ||
+                  state.selectedHeadphoneProfile != null)
+                GestureDetector(
+                  onTap: dspBlocked != null ? null : () => cubit.resetToFlat(),
+                  child: Text(
+                    context.l10n.resetToFlat,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: p.accent,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 36,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: EqPreset.defaultPresets.length,
+              itemBuilder: (context, index) {
+                final item = EqPreset.defaultPresets[index];
+                final isSelected = state.selectedHeadphoneProfile == null &&
+                    preset.name == item.name;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(item.name),
+                    selected: isSelected,
+                    selectedColor: p.accent.withValues(alpha: 0.22),
+                    backgroundColor: p.surfaceContainer,
+                    side: BorderSide(
+                      color: isSelected
+                          ? p.accent.withValues(alpha: 0.5)
+                          : p.hairline,
+                    ),
+                    labelStyle: TextStyle(
+                      color: isSelected ? p.accent : p.textSecondary,
+                      fontWeight:
+                          isSelected ? FontWeight.w800 : FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                    onSelected: dspBlocked != null
+                        ? null
+                        : (_) {
+                            if (!state.isEqEnabled) {
+                              cubit.setEqualizerEnabled(true);
+                            }
+                            cubit.applyPreset(item);
+                          },
+                  ),
+                );
+              },
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // 3. Quick Headphone Target Profile Card
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: p.surfaceContainer,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: state.selectedHeadphoneProfile != null
+                    ? p.accent.withValues(alpha: 0.35)
+                    : p.hairline,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: state.selectedHeadphoneProfile != null
+                        ? p.accent.withValues(alpha: 0.16)
+                        : p.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.headphones_rounded,
+                    color: state.selectedHeadphoneProfile != null
+                        ? p.accent
+                        : p.textSecondary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        state.selectedHeadphoneProfile != null
+                            ? 'AutoEQ: ${state.selectedHeadphoneProfile!.name}'
+                            : 'Headphone Calibration',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: state.selectedHeadphoneProfile != null
+                              ? p.accent
+                              : p.textPrimary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        state.selectedHeadphoneProfile != null
+                            ? '${state.selectedHeadphoneProfile!.brand} • Target Curve Applied'
+                            : 'Auto-calibrate frequency response for your headphones',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: p.textSecondary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (state.selectedHeadphoneProfile != null)
+                  IconButton(
+                    tooltip: 'Clear Headphone Calibration',
+                    icon: Icon(Icons.close_rounded,
+                        size: 18, color: p.textSecondary),
+                    onPressed: () => cubit.resetToFlat(),
+                    visualDensity: VisualDensity.compact,
+                  )
+                else
+                  TextButton(
+                    onPressed: () {
+                      setState(() => _isStudioModeOverride = true);
+                      _tabController.animateTo(1);
+                    },
+                    child: Text(
+                      'Calibrate',
+                      style: TextStyle(
+                          color: p.accent, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // 4. Live Frequency Curve Visualizer Card
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+            decoration: BoxDecoration(
+              color: p.surfaceContainer,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: p.hairline),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'FREQUENCY RESPONSE CURVE',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                        color: p.textTertiary,
+                      ),
+                    ),
+                    Text(
+                      isEnabled ? 'Active' : 'Bypassed',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: isEnabled ? p.accent : p.textTertiary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 86,
+                  child: EqCurveVisualizer(
+                    gains: preset.gains,
+                    activeColor: isEnabled
+                        ? p.accent
+                        : p.textTertiary.withValues(alpha: 0.4),
+                    height: 86,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // 5. Macro Sound Tuning Sliders (Bass, Vocals, Treble)
+          Text(
+            'QUICK TONE DIALS',
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.0,
+              color: p.textTertiary,
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          _buildMacroSliderRow(
+            context: context,
+            icon: Icons.speaker_rounded,
+            title: 'Bass & Punch',
+            subtitle: 'Sub-bass impact & warmth (31 Hz – 125 Hz)',
+            value: bassVal,
+            accentColor: p.accent,
+            p: p,
+            onChanged: (val) => _setBassMacro(cubit, state, val),
+          ),
+          const SizedBox(height: 10),
+
+          _buildMacroSliderRow(
+            context: context,
+            icon: Icons.mic_rounded,
+            title: 'Vocal & Presence',
+            subtitle: 'Lead vocals & acoustic presence (500 Hz – 2 kHz)',
+            value: midVal,
+            accentColor: const Color(0xFF00E5FF),
+            p: p,
+            onChanged: (val) => _setMidMacro(cubit, state, val),
+          ),
+          const SizedBox(height: 10),
+
+          _buildMacroSliderRow(
+            context: context,
+            icon: Icons.auto_awesome_rounded,
+            title: 'Clarity & Air',
+            subtitle: 'Treble shimmer & spatial detail (4 kHz – 16 kHz)',
+            value: trebleVal,
+            accentColor: const Color(0xFFFFB300),
+            p: p,
+            onChanged: (val) => _setTrebleMacro(cubit, state, val),
+          ),
+
+          const SizedBox(height: 16),
+
+          // 6. Pro Banner: "Switch to Studio Console"
+          InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () {
+              HapticFeedback.lightImpact();
+              setState(() => _isStudioModeOverride = true);
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    p.accent.withValues(alpha: 0.14),
+                    p.surfaceContainer,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: p.accent.withValues(alpha: 0.28)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: p.accent.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.tune_rounded, color: p.accent, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Unlock Studio DSP Console',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: p.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Access 10/32/64 parametric bands, room correction, limiter & spatializer',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: p.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right_rounded, color: p.accent, size: 20),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMacroSliderRow({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required double value,
+    required Color accentColor,
+    required PulsrPalette p,
+    required ValueChanged<double> onChanged,
+  }) {
+    final sign = value > 0 ? '+' : '';
+    final gainText = '$sign${value.toStringAsFixed(1)} dB';
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: p.hairline),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: accentColor, size: 16),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: p.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: TextStyle(fontSize: 10.5, color: p.textTertiary),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                  border:
+                      Border.all(color: accentColor.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  gainText,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                    color: accentColor,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: accentColor,
+              thumbColor: Colors.white,
+              overlayColor: accentColor.withValues(alpha: 0.18),
+              trackHeight: 4,
+            ),
+            child: Slider(
+              value: value.clamp(-12.0, 12.0),
+              min: -12.0,
+              max: 12.0,
+              divisions: 48,
+              onChanged: (v) {
+                HapticFeedback.selectionClick();
+                onChanged(v);
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1722,11 +2462,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
                   onPressed: () {
-                    showModalBottomSheet<void>(
+                    PulsrSheetHelper.showPulsrSheet<void>(
                       context: context,
-                      useRootNavigator: true,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
+                      wrapWithContainer: false,
                       builder: (_) => AutoEqSearchSheet(
                         equalizerManager: getIt<EqualizerManager>(),
                       ),
@@ -1747,14 +2485,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
                   onPressed: () {
-                    showModalBottomSheet<void>(
-                      context: context,
-                      useRootNavigator: true,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (_) => CompressorLimiterSheet(
-                        equalizerManager: getIt<EqualizerManager>(),
-                      ),
+                    CompressorLimiterSheet.show(
+                      context,
+                      equalizerManager: getIt<EqualizerManager>(),
                     );
                   },
                 ),
@@ -1803,11 +2536,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
                   onPressed: () {
-                    showModalBottomSheet<void>(
+                    PulsrSheetHelper.showPulsrSheet<void>(
                       context: context,
-                      useRootNavigator: true,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
+                      wrapWithContainer: false,
                       builder: (_) => const ViperDdcSheet(),
                     );
                   },
@@ -1838,11 +2569,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
                   onPressed: () {
-                    showModalBottomSheet<void>(
+                    PulsrSheetHelper.showPulsrSheet<void>(
                       context: context,
-                      useRootNavigator: true,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
+                      wrapWithContainer: false,
                       builder: (_) => const ArbitraryEqSheet(),
                     );
                   },
@@ -1871,11 +2600,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
                   onPressed: () {
-                    showModalBottomSheet<void>(
+                    PulsrSheetHelper.showPulsrSheet<void>(
                       context: context,
-                      useRootNavigator: true,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
+                      wrapWithContainer: false,
                       builder: (_) => const LiveProgSheet(),
                     );
                   },
@@ -1925,15 +2652,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   side: BorderSide(color: p.hairline),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
-                  onPressed: () {
-                    showModalBottomSheet<void>(
-                      context: context,
-                      useRootNavigator: true,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (_) => const DspInspectorSheet(),
-                    );
-                  },
+                  onPressed: () => DspInspectorSheet.show(context),
                 ),
               ],
             ),
@@ -6091,11 +6810,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
               onPressed: () {
-                showModalBottomSheet<void>(
+                PulsrSheetHelper.showPulsrSheet<void>(
                   context: context,
-                  useRootNavigator: true,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
+                  wrapWithContainer: false,
                   builder: (_) => const ViperDdcSheet(),
                 );
               },
@@ -6223,11 +6940,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
               onPressed: () {
-                showModalBottomSheet<void>(
+                PulsrSheetHelper.showPulsrSheet<void>(
                   context: context,
-                  useRootNavigator: true,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
+                  wrapWithContainer: false,
                   builder: (_) => const ArbitraryEqSheet(),
                 );
               },
@@ -6357,11 +7072,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
               onPressed: () {
-                showModalBottomSheet<void>(
+                PulsrSheetHelper.showPulsrSheet<void>(
                   context: context,
-                  useRootNavigator: true,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
+                  wrapWithContainer: false,
                   builder: (_) => const LiveProgSheet(),
                 );
               },

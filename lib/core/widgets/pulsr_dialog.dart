@@ -284,8 +284,8 @@ class _PulsrInputDialogState extends State<_PulsrInputDialog> {
 /// Features rounded corners (24px), subtle hairline border, soft glow shadow,
 /// and frosted translucent backdrop.
 class PulsrDialog extends StatelessWidget {
-  final Widget? icon;
-  final Widget? title;
+  final dynamic icon;
+  final dynamic title;
   final Widget? content;
   final List<Widget>? actions;
 
@@ -300,6 +300,20 @@ class PulsrDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+
+    Widget? iconWidget;
+    if (icon is Widget) {
+      iconWidget = icon as Widget;
+    } else if (icon is IconData) {
+      iconWidget = Icon(icon as IconData, size: 26, color: p.accent);
+    }
+
+    Widget? titleWidget;
+    if (title is Widget) {
+      titleWidget = title as Widget;
+    } else if (title is String) {
+      titleWidget = Text(title as String);
+    }
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -324,7 +338,7 @@ class PulsrDialog extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Optional top icon badge
-              if (icon != null) ...[
+              if (iconWidget != null) ...[
                 Padding(
                   padding: const EdgeInsets.only(top: 24),
                   child: Center(
@@ -340,30 +354,30 @@ class PulsrDialog extends StatelessWidget {
                         ),
                       ),
                       alignment: Alignment.center,
-                      child: icon,
+                      child: iconWidget,
                     ),
                   ),
                 ),
               ],
 
               // Dialog Title
-              if (title != null)
+              if (titleWidget != null)
                 Padding(
                   padding: EdgeInsets.fromLTRB(
                     24,
-                    icon != null ? 14 : 24,
+                    iconWidget != null ? 14 : 24,
                     24,
                     0,
                   ),
                   child: DefaultTextStyle.merge(
-                    textAlign: icon != null ? TextAlign.center : TextAlign.start,
+                    textAlign: iconWidget != null ? TextAlign.center : TextAlign.start,
                     style: TextStyle(
                       color: p.textPrimary,
                       fontSize: 19,
                       fontWeight: FontWeight.w800,
                       letterSpacing: -0.3,
                     ),
-                    child: title!,
+                    child: titleWidget,
                   ),
                 ),
 
@@ -390,14 +404,15 @@ class PulsrDialog extends StatelessWidget {
               if (actions != null && actions!.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: actions!
-                        .map((w) => Padding(
-                              padding: const EdgeInsets.only(left: 8),
-                              child: w,
-                            ))
-                        .toList(),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Wrap(
+                      alignment: WrapAlignment.end,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: actions!,
+                    ),
                   ),
                 ),
             ],

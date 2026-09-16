@@ -8,6 +8,7 @@ import '../../../../data/audio/headset_control_config.dart';
 import 'settings_section.dart';
 import 'settings_slider_row.dart';
 import 'settings_tiles.dart';
+import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 
 /// Headset / earbuds + background-service controls.
 ///
@@ -243,13 +244,8 @@ class _ClickActionTile extends StatelessWidget {
 
   void _showPicker(BuildContext context) {
     final p = context.palette;
-    showModalBottomSheet<void>(
+    PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
-      useRootNavigator: true,
-      backgroundColor: p.surfaceContainer,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),

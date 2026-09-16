@@ -7,6 +7,7 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
+import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 
 /// AB-loop / bookmark labels need a placeholder for an unset point; the
 /// duration itself is formatted with the shared [Formatters.formatDuration] so
@@ -117,7 +118,7 @@ class AdvancedPlaybackBar extends StatelessWidget {
   }
 
   void _showDelaySheet(BuildContext context, PlayerCubit cubit, int current) {
-    showModalBottomSheet<void>(
+    PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
       builder: (_) => _DelaySheet(initial: current, cubit: cubit),
     );

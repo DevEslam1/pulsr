@@ -1,6 +1,6 @@
 part of 'player_cubit.dart';
 
-extension PlayerTransportControls on PlayerCubit {
+mixin PlayerTransportControls on PulsrCubit<PlayerState> {
   Future<void> togglePlayPause() async {
     try {
       // Decide from what the user actually sees (the transport mirrors
@@ -205,4 +205,103 @@ extension PlayerTransportControls on PlayerCubit {
     );
   }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // Requires: provided by the composing class (same library).
+  PulsrAudioHandler get _audioHandler;
+
+  // Requires: provided by the composing class (same library).
+  int get _lastSeekMs;
+  set _lastSeekMs(int value);
+
+  // Requires: provided by the composing class (same library).
+  // ignore: unused_element
+  Duration? get _lastSkippedSegmentEnd;
+  set _lastSkippedSegmentEnd(Duration? value);
+
+  // Requires: provided by the composing class (same library).
+  // ignore: unused_element
+  DateTime? get _lastSponsorSkipTime;
+  set _lastSponsorSkipTime(DateTime? value);
+
+  // Requires: provided by the composing class (same library).
+  Duration? get _pendingSeek;
+  set _pendingSeek(Duration? value);
+
+  // Requires: provided by the composing class (same library).
+  Map<int, _QueueSlotData> get _queueSlots;
+
+  // Requires: provided by the composing class (same library).
+  Timer? get _seekThrottleTimer;
+  set _seekThrottleTimer(Timer? value);
+
+  // Requires: provided by the composing class (same library).
+  ToggleFavoriteUseCase get _toggleFavoriteUseCase;
+
+  // Requires: provided by the composing class (same library).
+  void _updateWidgetThrottled({bool force = false});
+
+  // Requires: provided by the composing class (same library).
+  // ignore: unused_element
+  bool get _userPausedIntentionally;
+  set _userPausedIntentionally(bool value);
 }

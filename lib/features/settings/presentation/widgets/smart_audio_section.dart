@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/services/hires_audio_service.dart';
 import '../../../../core/services/smart_audio_service.dart';
+import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../domain/services/smart_audio_plan.dart';
 import '../../../../data/audio/headphone_profiles_repository.dart';
@@ -27,7 +28,6 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
       : SmartAudioService();
 
   SmartAudioMode _mode = SmartAudioMode.auto;
-  bool _loading = true;
   String? _deviceName;
   String? _matchedProfileName;
 
@@ -43,10 +43,9 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
       String? deviceName;
       String? matchedName;
       try {
-        final info =
-            getIt.isRegistered<HiResAudioService>()
-                ? getIt<HiResAudioService>().currentOutputInfo
-                : null;
+        final info = getIt.isRegistered<HiResAudioService>()
+            ? getIt<HiResAudioService>().currentOutputInfo
+            : null;
         if (info != null) {
           deviceName = info.deviceName;
           final key = DeviceProfileService.deviceKeyFromInfo(info);
@@ -63,11 +62,8 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
         _mode = mode;
         _deviceName = deviceName;
         _matchedProfileName = matchedName;
-        _loading = false;
       });
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
-    }
+    } catch (_) {}
   }
 
   Future<void> _setMode(SmartAudioMode mode) async {
@@ -79,13 +75,9 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    if (_loading) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 12),
-        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-      );
-    }
+    final p = context.palette;
     final isAuto = _mode == SmartAudioMode.auto;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -93,54 +85,131 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
           padding: const EdgeInsets.only(bottom: 8),
           child: Text(
             l10n.smartAudioSubtitle,
-            style: Theme.of(context).textTheme.bodySmall,
+            style: TextStyle(
+              color: p.textSecondary,
+              fontSize: 12.5,
+            ),
           ),
         ),
-        SegmentedButton<SmartAudioMode>(
-          segments: [
-            ButtonSegment<SmartAudioMode>(
-              value: SmartAudioMode.auto,
-              label: Text(l10n.smartAudioAuto),
-              icon: const Icon(Icons.auto_awesome_rounded),
+        SizedBox(
+          width: double.infinity,
+          child: SegmentedButton<SmartAudioMode>(
+            showSelectedIcon: true,
+            style: const ButtonStyle(
+              visualDensity: VisualDensity.compact,
             ),
-            ButtonSegment<SmartAudioMode>(
-              value: SmartAudioMode.manual,
-              label: Text(l10n.smartAudioManual),
-              icon: const Icon(Icons.tune_rounded),
-            ),
-          ],
-          selected: {_mode},
-          onSelectionChanged: (selection) {
-            if (selection.isNotEmpty) _setMode(selection.first);
-          },
-        ),
-        const SizedBox(height: 8),
-        Text(
-          isAuto ? l10n.smartAudioAutoDesc : l10n.smartAudioManualDesc,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        if (isAuto && _deviceName != null) ...[
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              const Icon(Icons.headphones_rounded, size: 16),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  l10n.smartAudioDetectedDevice(_deviceName!),
-                  style: Theme.of(context).textTheme.bodySmall,
-                  overflow: TextOverflow.ellipsis,
-                ),
+            segments: [
+              ButtonSegment<SmartAudioMode>(
+                value: SmartAudioMode.auto,
+                label: Text(l10n.smartAudioAuto),
+                icon: const Icon(Icons.auto_awesome_rounded),
+              ),
+              ButtonSegment<SmartAudioMode>(
+                value: SmartAudioMode.manual,
+                label: Text(l10n.smartAudioManual),
+                icon: const Icon(Icons.tune_rounded),
               ),
             ],
+            selected: {_mode},
+            onSelectionChanged: (selection) {
+              if (selection.isNotEmpty) _setMode(selection.first);
+            },
           ),
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 38,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
             child: Text(
-              _matchedProfileName != null
-                  ? l10n.smartAudioMatchedProfile(_matchedProfileName!)
-                  : l10n.smartAudioNoMatch,
-              style: Theme.of(context).textTheme.bodySmall,
+              isAuto ? l10n.smartAudioAutoDesc : l10n.smartAudioManualDesc,
+              key: ValueKey<bool>(isAuto),
+              style: TextStyle(
+                color: p.textSecondary,
+                fontSize: 12,
+                height: 1.35,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+        if (_deviceName != null) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: p.surfaceContainerHigh.withValues(alpha: 0.45),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: p.hairline),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      _deviceName!.toLowerCase().contains('speaker')
+                          ? Icons.volume_up_rounded
+                          : Icons.headphones_rounded,
+                      size: 15,
+                      color: isAuto ? p.accent : p.textSecondary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        l10n.smartAudioDetectedDevice(_deviceName!),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: p.textPrimary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: (isAuto ? p.accent : p.textTertiary)
+                            .withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        isAuto ? l10n.smartAudioAuto : l10n.smartAudioManual,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: isAuto ? p.accent : p.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: Text(
+                    isAuto
+                        ? (_matchedProfileName != null
+                            ? l10n.smartAudioMatchedProfile(
+                                _matchedProfileName!)
+                            : l10n.smartAudioNoMatch)
+                        : l10n.dspEqCurvesBypassed,
+                    key: ValueKey<String>(
+                      isAuto
+                          ? (_matchedProfileName ?? 'no_match')
+                          : 'manual_bypassed',
+                    ),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: p.textTertiary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
           ),
         ],

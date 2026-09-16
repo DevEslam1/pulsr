@@ -580,12 +580,7 @@ class PlayerBottomActionDock extends StatelessWidget {
                       style: dockIconStyle,
                       onTap: () {
                         HapticFeedback.lightImpact();
-                        showModalBottomSheet<void>(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (_) => const EqualizerSheet(),
-                        );
+                        EqualizerSheet.show(context);
                       },
                     ),
                   ),
@@ -647,13 +642,7 @@ class PlayerBottomActionDock extends StatelessWidget {
                       style: dockIconStyle,
                       onTap: () {
                         HapticFeedback.lightImpact();
-                        showModalBottomSheet<void>(
-                          context: context,
-                          useRootNavigator: true,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (_) => const SleepTimerSheet(),
-                        );
+                        SleepTimerSheet.show(context);
                       },
                     ),
                   ),
@@ -680,13 +669,7 @@ class PlayerBottomActionDock extends StatelessWidget {
                       onTap: () {
                         if (song != null) {
                           HapticFeedback.lightImpact();
-                          showModalBottomSheet<void>(
-                            context: context,
-                            useRootNavigator: true,
-                            isScrollControlled: true,
-                            backgroundColor: Colors.transparent,
-                            builder: (_) => AddToPlaylistSheet(song: song),
-                          );
+                          AddToPlaylistSheet.show(context, song: song);
                         }
                       },
                     ),

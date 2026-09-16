@@ -5,6 +5,7 @@ import '../../../../core/constants/app_radii.dart';
 import '../../../../core/services/battery_optimization_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/platform_capabilities.dart';
+import '../../../../core/widgets/pulsr_dialog.dart';
 
 class BatteryOptimizationCard extends StatefulWidget {
   const BatteryOptimizationCard({super.key});
@@ -116,11 +117,11 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard> {
                     final guideUrl =
                         BatteryOptimizationService.getDontKillMyAppUrl(
                             _manufacturer);
-                    showDialog<void>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: Text(
-                            context.l10n.settingsManufacturerBackgroundGuide(_manufacturer.toUpperCase())),
+                    PulsrDialogHelper.showCustomDialog<void>(
+                      context,
+                      builder: (ctx) => PulsrDialog(
+                        title: context.l10n.settingsManufacturerBackgroundGuide(_manufacturer.toUpperCase()),
+                        icon: Icons.battery_alert_rounded,
                         content: Text(
                           context.l10n.settingsAggressiveBatteryGuide(guideUrl),
                         ),

@@ -12,6 +12,7 @@ import '../../../../data/audio/audio_handler.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
 import '../../../sheets/sleep_timer_sheet.dart';
+import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import 'settings_conflict_card.dart';
 import 'headset_controls_section.dart';
 import 'settings_section.dart';
@@ -52,12 +53,7 @@ class PlaybackSection extends StatelessWidget {
           Icons.timer_outlined,
           context.l10n.sleepTimer,
           context.l10n.sleepTimerSubtitle,
-          onTap: () => showModalBottomSheet<void>(
-              context: context,
-              useRootNavigator: true,
-              isScrollControlled: true,
-              backgroundColor: Colors.transparent,
-              builder: (_) => const SleepTimerSheet()),
+          onTap: () => SleepTimerSheet.show(context),
         ),
         settingsCardDivider(p),
         _switchTile(
@@ -142,12 +138,7 @@ class PlaybackSection extends StatelessWidget {
           Icons.timer_outlined,
           context.l10n.sleepTimer,
           context.l10n.sleepTimerSubtitle,
-          onTap: () => showModalBottomSheet<void>(
-              context: context,
-              useRootNavigator: true,
-              isScrollControlled: true,
-              backgroundColor: Colors.transparent,
-              builder: (_) => const SleepTimerSheet()),
+          onTap: () => SleepTimerSheet.show(context),
         ),
         settingsCardDivider(p),
         _switchTile(
@@ -381,13 +372,8 @@ class _SponsorBlockSettingTileState extends State<_SponsorBlockSettingTile> {
 
   Future<void> _openCategoryPicker() async {
     final p = context.palette;
-    final result = await showModalBottomSheet<Set<String>>(
+    final result = await PulsrSheetHelper.showPulsrSheet<Set<String>>(
       context: context,
-      useRootNavigator: true,
-      backgroundColor: p.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
       builder: (sheetContext) {
         var selected = Set<String>.from(_categories);
         return StatefulBuilder(

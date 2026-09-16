@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/widgets/pulsr_dialog.dart';
+import '../../../../core/widgets/pulsr_pressable.dart';
+import '../../../../core/widgets/pulsr_switch.dart';
 
 /// Icon container used as `leading` on settings tiles (was `_iconBox`).
 class SettingsIconBox extends StatelessWidget {
@@ -14,20 +17,20 @@ class SettingsIconBox extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     return Container(
-      width: 38,
-      height: 38,
+      width: 40,
+      height: 40,
       decoration: BoxDecoration(
         color: p.accentContainer,
-        borderRadius: BorderRadius.circular(11),
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Icon(icon, color: p.accent, size: 19),
+      child: Icon(icon, color: p.accent, size: 20),
     );
   }
 }
 
 /// Hairline divider between rows inside a settings card (was `_divider`).
 Widget settingsCardDivider(PulsrPalette p) =>
-    Divider(height: 1, indent: 68, color: p.hairline);
+    Divider(height: 1, indent: 72, color: p.hairline);
 
 /// Navigation-style settings row (was `_navTile`).
 class SettingsNavTile extends StatelessWidget {
@@ -56,37 +59,73 @@ class SettingsNavTile extends StatelessWidget {
     final isDisabled = disabledReason != null && onTap == null;
     return Opacity(
       opacity: isDisabled ? 0.55 : 1.0,
-      child: ListTile(
-        leading: SettingsIconBox(icon),
-        title: Row(
-          children: [
-            Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14))),
-            if (featureInfo != null)
-              IconButton(
-                icon: Icon(Icons.info_outline_rounded, size: 18, color: p.textTertiary),
-                tooltip: context.l10n.settingsAboutTitle(title),
-                visualDensity: VisualDensity.compact,
-                onPressed: () => showAudioFeatureInfoDialog(context, featureInfo!, conflictReason: disabledReason),
-              ),
-          ],
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(subtitle, style: TextStyle(color: p.textSecondary, fontSize: 12)),
-            if (disabledReason != null) ...[
-              const SizedBox(height: 4),
-              Text(disabledReason!, style: TextStyle(color: p.error, fontSize: 11, fontWeight: FontWeight.w600)),
-            ],
-          ],
-        ),
-        trailing: trailing ??
-            Icon(Icons.chevron_right_rounded, color: p.textTertiary, size: 20),
+      child: PulsrPressable(
+        pressedScale: 0.988,
         onTap: disabledReason != null && onTap == null
             ? () => showAudioFeatureInfoDialog(context,
                 featureInfo ?? AudioFeatureRegistry.equalizer,
                 conflictReason: disabledReason)
             : onTap,
+        child: ListTile(
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+          leading: SettingsIconBox(icon),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14.5,
+                    letterSpacing: -0.1,
+                  ),
+                ),
+              ),
+              if (featureInfo != null)
+                IconButton(
+                  icon: Icon(Icons.info_outline_rounded,
+                      size: 18, color: p.textTertiary),
+                  tooltip: context.l10n.settingsAboutTitle(title),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => showAudioFeatureInfoDialog(
+                      context, featureInfo!,
+                      conflictReason: disabledReason),
+                ),
+            ],
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 1),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  color: p.textSecondary,
+                  fontSize: 12.5,
+                  height: 1.32,
+                ),
+              ),
+              if (disabledReason != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  disabledReason!,
+                  style: TextStyle(
+                    color: p.error,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          trailing: trailing ??
+              Icon(
+                Icons.chevron_right_rounded,
+                color: p.textTertiary.withValues(alpha: 0.7),
+                size: 20,
+              ),
+        ),
       ),
     );
   }
@@ -119,35 +158,8 @@ class SettingsSwitchTile extends StatelessWidget {
     final isDisabled = disabledReason != null;
     return Opacity(
       opacity: isDisabled ? 0.55 : 1.0,
-      child: ListTile(
-        leading: SettingsIconBox(icon),
-        title: Row(
-          children: [
-            Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14))),
-            if (featureInfo != null)
-              IconButton(
-                icon: Icon(Icons.info_outline_rounded, size: 18, color: p.textTertiary),
-                tooltip: context.l10n.settingsAboutTitle(title),
-                visualDensity: VisualDensity.compact,
-                onPressed: () => showAudioFeatureInfoDialog(context, featureInfo!, conflictReason: disabledReason),
-              ),
-          ],
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(subtitle, style: TextStyle(color: p.textSecondary, fontSize: 12)),
-            if (disabledReason != null) ...[
-              const SizedBox(height: 4),
-              Text(disabledReason!, style: TextStyle(color: p.error, fontSize: 11, fontWeight: FontWeight.w600)),
-            ],
-          ],
-        ),
-        trailing: Switch.adaptive(
-            value: value,
-            activeTrackColor: p.accent,
-            activeThumbColor: Colors.white,
-            onChanged: isDisabled ? null : onChanged),
+      child: PulsrPressable(
+        pressedScale: 0.988,
         onTap: isDisabled
             ? (disabledReason != null
                 ? () => showAudioFeatureInfoDialog(
@@ -157,6 +169,64 @@ class SettingsSwitchTile extends StatelessWidget {
                     )
                 : null)
             : () => onChanged(!value),
+        child: ListTile(
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+          leading: SettingsIconBox(icon),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14.5,
+                    letterSpacing: -0.1,
+                  ),
+                ),
+              ),
+              if (featureInfo != null)
+                IconButton(
+                  icon: Icon(Icons.info_outline_rounded,
+                      size: 18, color: p.textTertiary),
+                  tooltip: context.l10n.settingsAboutTitle(title),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => showAudioFeatureInfoDialog(
+                      context, featureInfo!,
+                      conflictReason: disabledReason),
+                ),
+            ],
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 1),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  color: p.textSecondary,
+                  fontSize: 12.5,
+                  height: 1.32,
+                ),
+              ),
+              if (disabledReason != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  disabledReason!,
+                  style: TextStyle(
+                    color: p.error,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          trailing: PulsrSwitch(
+            value: value,
+            onChanged: isDisabled ? null : onChanged,
+          ),
+        ),
       ),
     );
   }
@@ -167,63 +237,81 @@ void showAudioFeatureInfoDialog(
     BuildContext context, AudioFeatureInfo info,
     {String? conflictReason}) {
   final p = context.palette;
-  showDialog<void>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: p.surface,
-      title: Row(
-        children: [
+  PulsrDialogHelper.showPulsrDialog<void>(
+    context,
+    icon: Icon(Icons.info_outline_rounded, color: p.accent, size: 26),
+    title: Text(info.title),
+    content: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(info.subtitle,
+            style: TextStyle(
+                color: p.textSecondary,
+                fontWeight: FontWeight.w600,
+                fontSize: 12)),
+        const SizedBox(height: 10),
+        Text(info.description,
+            style:
+                TextStyle(color: p.textPrimary, fontSize: 13, height: 1.4)),
+        if (info.conflictsWith != null) ...[
+          const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: p.accentContainer, borderRadius: BorderRadius.circular(8)),
-            child: Icon(Icons.info_outline_rounded, color: p.accent, size: 18),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: Colors.amber.withValues(alpha: 0.4))),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.warning_amber_rounded,
+                    color: p.warning, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: Text(
+                        context.l10n.conflictsWith(info.conflictsWith ?? ''),
+                        style: TextStyle(
+                            color: p.textSecondary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600))),
+              ],
+            ),
           ),
-          const SizedBox(width: 10),
-          Expanded(child: Text(info.title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
         ],
-      ),
-      content: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(info.subtitle, style: TextStyle(color: p.textSecondary, fontWeight: FontWeight.w600, fontSize: 12)),
-            const SizedBox(height: 10),
-            Text(info.description, style: TextStyle(color: p.textPrimary, fontSize: 13, height: 1.4)),
-            if (info.conflictsWith != null) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.amber.withValues(alpha: 0.4))),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.warning_amber_rounded, color: p.warning, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(context.l10n.conflictsWith(info.conflictsWith ?? ''), style: TextStyle(color: p.textSecondary, fontSize: 11, fontWeight: FontWeight.w600))),
-                  ],
-                ),
-              ),
-            ],
-            if (conflictReason != null) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: p.error.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10), border: Border.all(color: p.error.withValues(alpha: 0.4))),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.block_rounded, color: p.error, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(conflictReason, style: TextStyle(color: p.error, fontSize: 11, fontWeight: FontWeight.w600))),
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text(context.l10n.gotIt))],
+        if (conflictReason != null) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+                color: p.error.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: p.error.withValues(alpha: 0.4))),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.block_rounded, color: p.error, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: Text(conflictReason,
+                        style: TextStyle(
+                            color: p.error,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600))),
+              ],
+            ),
+          ),
+        ],
+      ],
     ),
+    actions: [
+      FilledButton(
+        onPressed: () =>
+            Navigator.of(context, rootNavigator: true).pop(),
+        child: Text(context.l10n.gotIt),
+      ),
+    ],
   );
 }

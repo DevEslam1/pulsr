@@ -194,13 +194,7 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
                         onTap: () => context
                             .read<PlayerCubit>()
                             .playSong(songs[i], queue: songs),
-                        onMorePressed: () => showModalBottomSheet(
-                          context: context,
-                          useRootNavigator: true,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (_) => SongInfoSheet(song: songs[i]),
-                        ),
+                        onMorePressed: () => SongInfoSheet.show(context, song: songs[i]),
                       ),
                 ],
               ),

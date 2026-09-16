@@ -6,6 +6,7 @@ import '../../core/services/metadata_search_service.dart';
 import '../../core/theme/aura_theme.dart';
 import '../../core/utils/l10n_extensions.dart';
 import '../../core/widgets/pulsr_back_button.dart';
+import '../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../data/db/app_database.dart';
 import '../../data/scanner/media_scanner_service.dart';
@@ -196,17 +197,9 @@ class _TagEditorView extends StatelessWidget {
                                             }
 
                                             final selected =
-                                                await showModalBottomSheet<
+                                                await PulsrSheetHelper.showPulsrSheet<
                                                     OnlineTrackMetadata>(
                                               context: context,
-                                              backgroundColor: p.surfaceCard,
-                                              shape:
-                                                  const RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.vertical(
-                                                        top: Radius.circular(
-                                                            20)),
-                                              ),
                                               builder: (ctx) {
                                                 return SafeArea(
                                                   child: Column(

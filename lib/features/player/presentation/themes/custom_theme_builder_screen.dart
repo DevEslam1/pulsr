@@ -7,6 +7,7 @@ import '../../../../core/constants/app_radii.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_back_button.dart';
+import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../settings/cubit/settings_cubit.dart';
@@ -67,14 +68,11 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
     final l10n = context.l10n;
     final controller = TextEditingController();
 
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: p.surface,
-        shape: RoundedRectangleBorder(borderRadius: AppRadii.cardRadius),
-        title: Text(context.l10n.importThemeJson,
-          style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.bold),
-        ),
+    final result = await PulsrDialogHelper.showCustomDialog<String>(
+      context,
+      builder: (ctx) => PulsrDialog(
+        title: context.l10n.importThemeJson,
+        icon: Icons.palette_rounded,
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

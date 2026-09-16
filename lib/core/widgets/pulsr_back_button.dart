@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/aura_theme.dart';
 
@@ -13,7 +14,7 @@ class PulsrBackButton extends StatelessWidget {
     super.key,
     this.onPressed,
     this.color,
-    this.size = 24.0,
+    this.size = 22.0,
   });
 
   @override
@@ -27,6 +28,7 @@ class PulsrBackButton extends StatelessWidget {
         size: size,
       ),
       onPressed: () {
+        HapticFeedback.lightImpact();
         if (onPressed != null) {
           onPressed!();
         } else if (context.canPop()) {
@@ -38,3 +40,4 @@ class PulsrBackButton extends StatelessWidget {
     );
   }
 }
+

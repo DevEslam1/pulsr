@@ -6,17 +6,12 @@ import '../../../../core/services/automation_rules_service.dart';
 import '../../../../core/services/automation_trigger_service.dart';
 import '../../../../core/services/settings_profiles_service.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../../../core/widgets/pulsr_switch.dart';
 
 void showAutomationRulesSheet(BuildContext context) {
-  final p = context.palette;
-  showModalBottomSheet(
+  PulsrSheetHelper.showPulsrSheet<void>(
     context: context,
-    useRootNavigator: true,
-    isScrollControlled: true,
-    backgroundColor: p.surfaceContainer,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
     builder: (ctx) => const AutomationRulesSheet(),
   );
 }
@@ -149,10 +144,10 @@ class _AutomationRulesSheetState extends State<AutomationRulesSheet> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: p.hairline),
       ),
-      child: SwitchListTile(
+      child: PulsrSwitchListTile(
         value: rule.enabled && supported,
         onChanged: supported ? (v) => _toggle(rule, v) : null,
-        secondary: Icon(
+        leading: Icon(
           icon,
           color: supported ? p.accent : p.textTertiary,
         ),

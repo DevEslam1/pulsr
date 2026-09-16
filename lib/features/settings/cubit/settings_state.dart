@@ -127,7 +127,7 @@ abstract class SettingsState with _$SettingsState {
     @Default(false) bool bitPerfectOutput,
     @Default(true) bool bypassDspOnBitPerfect,
     // T2: reconfigure the output to each track's native sample rate.
-    @Default(false) bool followTrackSampleRate,
+    @Default(true) bool followTrackSampleRate,
     // T3: strict bit-perfect (no resample). Forces Bit-Perfect + DSP bypass and
     // surfaces the EQ/ReplayGain/effects/crossfade conflict card.
     @Default(false) bool strictBitPerfect,

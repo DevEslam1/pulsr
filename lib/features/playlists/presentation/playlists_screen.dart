@@ -17,6 +17,7 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
+import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../domain/models/smart_playlist_criteria.dart';
 import '../../../domain/models/ytm_track.dart';
 import '../../../domain/usecases/get_songs_usecase.dart';
@@ -211,7 +212,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
   /// M3U / PLS / WPL format.
   Future<void> _showExportFormatSheet(
       BuildContext context, PlaylistsTableData pl) async {
-    final format = await showModalBottomSheet<PlaylistFormat>(
+    final format = await PulsrSheetHelper.showPulsrSheet<PlaylistFormat>(
       context: context,
       builder: (ctx) => SafeArea(
         child: Column(

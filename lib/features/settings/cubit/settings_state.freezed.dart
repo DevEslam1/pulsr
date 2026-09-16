@@ -1697,7 +1697,7 @@ class _SettingsState extends SettingsState {
       this.ytdlpBackendCircuitState,
       this.bitPerfectOutput = false,
       this.bypassDspOnBitPerfect = true,
-      this.followTrackSampleRate = false,
+      this.followTrackSampleRate = true,
       this.strictBitPerfect = false,
       this.dsdOutputMode = DsdOutputMode.pcm,
       this.experienceMode = ExperienceMode.normal,

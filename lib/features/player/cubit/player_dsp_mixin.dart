@@ -1,6 +1,6 @@
 part of 'player_cubit.dart';
 
-extension PlayerDspControls on PlayerCubit {
+mixin PlayerDspControls on PulsrCubit<PlayerState> {
   String? _dspBlockedReason() {
     final s = _settingsCubit?.state;
     if (s == null) return null;
@@ -1135,4 +1135,130 @@ extension PlayerDspControls on PlayerCubit {
     }
   }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // Requires: provided by the composing class (same library).
+  PulsrAudioHandler get _audioHandler;
+
+  // Requires: provided by the composing class (same library).
+  DeviceProfileService? get _deviceProfileService;
+
+  // Requires: provided by the composing class (same library).
+  PlayerState? get _dspSnapshot;
+  set _dspSnapshot(PlayerState? value);
+
+
+
+  // Requires: provided by the composing class (same library).
+  // ignore: unused_element
+  EqPreset? get _globalEqBackup;
+  set _globalEqBackup(EqPreset? value);
+
+  // Requires: provided by the composing class (same library).
+  // ignore: unused_element
+  HeadphoneProfile? get _globalHeadphoneProfileBackup;
+  set _globalHeadphoneProfileBackup(HeadphoneProfile? value);
+
+  // Requires: provided by the composing class (same library).
+  HiResAudioService? get _hiResAudioService;
+
+  // Requires: provided by the composing class (same library).
+  String? get _lastAutoAppliedDeviceKey;
+  set _lastAutoAppliedDeviceKey(String? value);
+
+  // Requires: provided by the composing class (same library).
+  bool get _perSongOverrideActive;
+
+  // Requires: provided by the composing class (same library).
+  SettingsCubit? get _settingsCubit;
+
+  // Requires: provided by the composing class (same library).
+  SettingsProfilesService? get _settingsProfilesService;
+
+  // Requires: provided by the composing class (same library).
+  SmartAudioService? get _smartAudioService;
+
+  // Requires: provided by the composing class (same library).
+  bool get _smartAutoBitPerfectApplied;
+  set _smartAutoBitPerfectApplied(bool value);
+
+  // Requires: provided by the composing class (same library).
+  void _syncAudioEffects();
 }

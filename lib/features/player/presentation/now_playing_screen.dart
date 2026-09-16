@@ -1,8 +1,11 @@
 // lib/features/player/presentation/now_playing_screen.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/motion/pulsr_motion.dart';
+import '../../../core/theme/aura_theme.dart';
 import '../../../core/theme/dynamic_theme_cubit.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../settings/cubit/settings_cubit.dart';
@@ -141,7 +144,12 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                         ? (context.isTablet ? 1160.0 : 960.0)
                         : (context.isTablet ? 780.0 : 560.0),
                   ),
-                  child: themeWidget,
+                  child: Stack(
+                    children: [
+                      themeWidget,
+                      const _NowPlayingGestureHintOverlay(),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -272,6 +280,157 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
         child: Transform.translate(
           offset: Offset(0, _dragOffset),
           child: child,
+        ),
+      ),
+    );
+  }
+}
+
+class _NowPlayingGestureHintOverlay extends StatefulWidget {
+  const _NowPlayingGestureHintOverlay();
+
+  @override
+  State<_NowPlayingGestureHintOverlay> createState() =>
+      _NowPlayingGestureHintOverlayState();
+}
+
+class _NowPlayingGestureHintOverlayState
+    extends State<_NowPlayingGestureHintOverlay> {
+  static const String _prefKey = 'pulsr_gesture_hints_dismissed';
+  bool _dismissed = true;
+  bool _visible = false;
+  Timer? _autoHideTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkStatus();
+  }
+
+  @override
+  void dispose() {
+    _autoHideTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _checkStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final seen = prefs.getBool(_prefKey) ?? false;
+      if (!seen && mounted) {
+        setState(() {
+          _dismissed = false;
+        });
+        await Future.delayed(const Duration(milliseconds: 600));
+        if (mounted && !_dismissed) {
+          setState(() => _visible = true);
+          _autoHideTimer = Timer(const Duration(seconds: 7), _dismiss);
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _dismiss() async {
+    if (!mounted || _dismissed) return;
+    setState(() => _visible = false);
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (mounted) setState(() => _dismissed = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_prefKey, true);
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_dismissed) return const SizedBox.shrink();
+
+    final p = context.palette;
+    final isTablet = context.isTablet;
+
+    return Positioned(
+      left: isTablet ? 32 : 16,
+      right: isTablet ? 32 : 16,
+      bottom: isTablet ? 120 : 76,
+      child: IgnorePointer(
+        ignoring: !_visible,
+        child: AnimatedOpacity(
+          opacity: _visible ? 1.0 : 0.0,
+          duration: context.motionMs(300),
+          curve: context.motionCurve(Curves.easeInOut),
+          child: Center(
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 480),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: (p.isDark ? const Color(0xFF161824) : Colors.white)
+                      .withValues(alpha: 0.92),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: p.accent.withValues(alpha: 0.35),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color:
+                          Colors.black.withValues(alpha: p.isDark ? 0.45 : 0.15),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                    BoxShadow(
+                      color: p.accent.withValues(alpha: 0.15),
+                      blurRadius: 10,
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.18),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.touch_app_rounded,
+                        color: p.accent,
+                        size: 16,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        '↓ Pull down to close • ↔ Swipe art to skip',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: p.textPrimary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    GestureDetector(
+                      onTap: _dismiss,
+                      child: Padding(
+                        padding: const EdgeInsets.all(2),
+                        child: Icon(
+                          Icons.close_rounded,
+                          size: 16,
+                          color: p.textTertiary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );

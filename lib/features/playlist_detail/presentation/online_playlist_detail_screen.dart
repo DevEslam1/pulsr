@@ -466,14 +466,7 @@ class _OnlinePlaylistDetailScreenState
                       IconButton(
                         icon: Icon(Icons.more_vert_rounded,
                             size: 18, color: p.textTertiary),
-                        onPressed: () {
-                          showModalBottomSheet(
-                            context: context,
-                            isScrollControlled: true,
-                            backgroundColor: Colors.transparent,
-                            builder: (_) => SongInfoSheet(song: song),
-                          );
-                        },
+                        onPressed: () => SongInfoSheet.show(context, song: song),
                       ),
                     ],
                   ),

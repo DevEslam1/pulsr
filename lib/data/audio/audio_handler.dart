@@ -1,3 +1,4 @@
+// ignore_for_file: unused_field
 // lib/data/audio/audio_handler.dart
 import 'dart:async';
 import 'dart:collection';
@@ -81,7 +82,7 @@ part 'audio_handler_playback_extras.dart';
 
 @singleton
 class PulsrAudioHandler extends BaseAudioHandler
-    with QueueHandler, SeekHandler {
+    with QueueHandler, SeekHandler, PulsrAudioDspBridge, PulsrAudioSleepBridge, PulsrAudioStreaming, PulsrAudioQueueEngine, PulsrAudioTransport, PulsrAudioMediaBrowser, PulsrAudioPlaybackExtras {
   @factoryMethod
   static Future<PulsrAudioHandler> create(
       IMusicRepository repository, YtmService ytmService) async {
@@ -150,77 +151,113 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
   }
 
+  @override
   final AudioPlayer _playerA;
+  @override
   final AudioPlayer _playerB;
+  @override
   final AudioPlayer _prefetchPlayer;
+  @override
   bool _isPlayerAActive = true;
+  @override
   int _generationCounter = 0;
   int get generationCounter => _generationCounter;
+  @override
   AudioPlayer get _activePlayer => _isPlayerAActive ? _playerA : _playerB;
+  @override
   AudioPlayer get _inactivePlayer => _isPlayerAActive ? _playerB : _playerA;
   AudioPlayer get prefetchPlayer => _prefetchPlayer;
 
   /// Returns playback position compensated for native and DSP pipeline latency.
+  @override
   Duration get compensatedPosition =>
       _dspPipeline.getCompensatedPosition(_activePlayer.position);
 
+  @override
   final IMusicRepository _repository;
+  @override
   final YtmService _ytmService;
+  @override
   final CrossfadeManager _crossfadeManager = CrossfadeManager();
+  @override
   final SleepTimerManager _sleepTimerManager = SleepTimerManager();
+  @override
   late final EqualizerManager _equalizerManager;
+  @override
   late final AudioSessionIdRouter _audioSessionIdRouter;
+  @override
   int? _playerASessionId;
+  @override
   int? _playerBSessionId;
 
+  @override
   List<SongsTableData> _songs = [];
+  @override
   int _currentIndex = 0;
+  @override
   bool _queueDirty = false;
   double? _preDuckVolume;
-  // ignore: unused_field
   double? _preDuckInactiveVolume;
+  @override
   bool _duckActive = false;
   int _duckDepthCounter = 0;
   /// Pure, testable interruption bookkeeping (B-1). Replaces the previous pair
   /// of loose booleans whose begin/end bookkeeping was asymmetric.
+  @override
   final InterruptionStateMachine _interruption = InterruptionStateMachine();
-  // ignore: unused_field
   DateTime? _lastNoisyTime;
   // Auto-resume bookkeeping: a becoming-noisy pause arms a one-shot resume
   // window; a reconnect on a headset/BT/USB route within the timeout resumes.
   DateTime? _noisyPauseTime;
   bool _pausedForNoisy = false;
+  @override
   int _consecutiveFailures = 0;
+  @override
   DateTime? _lastGaplessChangeTime;
+  @override
   int _rapidGaplessChangeCount = 0;
   // Last time a track-completion was reported to the sleep timer. Gapless
   // playback reports one boundary through two independent signals (the native
   // `ProcessingState.completed` event and the `currentIndexStream` advance), so
   // this debounce collapses the duplicate. See [_notifySleepTrackCompleted].
+  @override
   DateTime? _lastSleepTrackCompletedAt;
+  @override
   final List<int> _shuffleHistory = [];
+  @override
   DateTime? _lastPreviousTapTime;
+  @override
   bool _isManualSkip = false;
 
   // Bumped on every playSongAt/play entry so a slow async resolve from a
   // superseded call cannot load its source into the player.
+  @override
   int _playGeneration = 0;
   // Seek throttling: optimistic UI + debounced backend seeks.
+  @override
   int _lastSeekMs = 0;
+  @override
   Duration? _pendingSeekPosition;
+  @override
   Timer? _seekDebounceTimer;
+  @override
   int _lastSmartPrefetchMs = 0;
+  @override
   String? _lastSmartPrefetchKey;
+  @override
   Timer? _crossfadeSwitchDebounce;
   AudioHandlerLifecycleObserver? _lifecycleObserver;
   // Set when a restored YouTube session is left idle; play() resolves it lazily.
+  @override
   Duration? _pendingLazyPosition;
   // Memoized stream URLs, keyed by video id. Never persisted — they expire.
+  @override
   final LinkedHashMap<String,
           ({String url, DateTime expires, String? userAgent, String? cookies})>
       _streamCache = LinkedHashMap();
   // Active stream URL resolutions, keyed by videoId-quality. Deduplicates concurrent
   // requests (e.g. background pre-warm and YtmResolvingSource.request()).
+  @override
   final Map<
       String,
       Future<
@@ -231,36 +268,56 @@ class PulsrAudioHandler extends BaseAudioHandler
             String quality
           })>> _inFlightResolves = {};
   // Video ids with an in-flight prefetch, so we resolve each at most once.
+  @override
   final Set<String> _prefetching = {};
 
+  @override
   String _currentStreamingQuality() =>
       _cachedPrefs?.getString('setting_streaming_quality') ?? 'high';
 
+  @override
   final AdaptiveBufferEngine _adaptiveBufferEngine = AdaptiveBufferEngine();
   final OptimizedDspPipeline _dspPipeline = OptimizedDspPipeline();
   late final PlaybackAnalytics _playbackAnalytics;
+  @override
   late final AudioMemoryManager _memoryManager;
+  @override
   late final SmartPreloadScheduler _preloadScheduler;
+  @override
   late final FormatAwareDecoder _formatDecoder;
+  @override
   late final TripleBufferPipeline _tripleBufferPipeline;
+  @override
   late final BatteryAwarePlayback _batteryAwarePlayback;
+  @override
   late final StreamPreResolver _streamPreResolver;
   late final PlaybackVolumeController _volumeController;
   /// Set once [_volumeController] has been assigned in the (async) init. The
   /// settings cubit can emit — and call setVolume() — before that happens on a
   /// cold start, which used to throw a LateInitializationError on every launch.
   bool _volumeControllerReady = false;
+  @override
   late final StreamResolutionPipeline _streamResolutionPipeline;
   // ── F1–F11 feature managers ──────────────────────────────────────────
+  @override
   final AbLoopManager abLoopManager = AbLoopManager();
+  @override
   final TrackDelayManager trackDelayManager = TrackDelayManager();
+  @override
   final AdaptiveQualityManager adaptiveQualityManager =
       AdaptiveQualityManager();
+  @override
   final DuckingController duckingController = DuckingController();
-  final MultiOutputRouter multiOutputRouter = MultiOutputRouter();  final DspSnapshotStore dspSnapshotStore = DspSnapshotStore();
+  @override
+  final MultiOutputRouter multiOutputRouter = MultiOutputRouter();  @override
+  final DspSnapshotStore dspSnapshotStore = DspSnapshotStore();
+  @override
   final SilenceSkipController silenceSkipController = SilenceSkipController();
+  @override
   final BpmOverrideStore bpmOverrideStore = BpmOverrideStore();
+  @override
   final PlaybackBookmarkStore bookmarkStore = PlaybackBookmarkStore();
+  @override
   bool hedgedResolutionEnabled = true;
   DateTime? _lastBookmarkSave;
   DateTime? _lastHealthyReport;
@@ -269,19 +326,26 @@ class PulsrAudioHandler extends BaseAudioHandler
   // active player is the source of truth for track order/advance, and just_audio
   // joins consecutive items seamlessly. False while crossfade (duration > 0) is
   // active, which keeps the manual dual-player path below.
+  @override
   bool _gaplessLoaded = false;
   // Last index reacted to from currentIndexStream, to drop duplicate emits.
+  @override
   int _lastGaplessIndex = -1;
 
   // Guard against session restoration stomping over user-initiated playback on cold start
+  @override
   bool _userPlaybackInitiated = false;
   // Target index for current gapless load; used to filter transient ExoPlayer index 0 emits
+  @override
   int? _gaplessTargetIndex;
+  @override
   DateTime? _gaplessLoadTime;
+  @override
   bool _gaplessTargetReached = false;
 
   /// User-facing gapless toggle (persisted as `setting_gapless`). Gapless is
   /// the default engine but is mutually exclusive with crossfade.
+  @override
   bool _gaplessEnabled = true;
   bool get isGaplessEnabled => _gaplessEnabled;
 
@@ -289,22 +353,28 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// to the overlapping dual-player engine, which cannot also produce a seamless
   /// join, so the two are mutually exclusive by construction. An explicit
   /// gapless OFF also falls back to per-track playback when crossfade is 0.
+  @override
   bool get _gaplessMode =>
       _gaplessEnabled && _crossfadeManager.duration <= Duration.zero;
 
+  @override
   final StreamController<SongsTableData> _onTrackChangedSubject =
       StreamController<SongsTableData>.broadcast();
   Stream<SongsTableData> get onTrackChanged => _onTrackChangedSubject.stream;
+  @override
   SongsTableData? _lastPlayedSong;
 
   // T10: CUE sub-track boundaries. Both flags reset on track change so each
   // virtual track seeks once to its start and advances once at its end.
+  @override
   bool _cueStartSeeked = false;
   bool _cueAdvanceTriggered = false;
 
   bool _positionDirty = false;
   Timer? _positionSaveTimer;
+  @override
   Timer? _fadeInGuardTimer; // FIX-#12: tracked for disposal
+  @override
   final StreamController<Duration> _positionSubject =
       StreamController<Duration>.broadcast();
   Stream<Duration> get positionStream => _positionSubject.stream;
@@ -319,6 +389,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   Stream<Duration> get compensatedPositionStream =>
       _positionSubject.stream.map((pos) => _dspPipeline.getCompensatedPosition(pos));
 
+  @override
   final StreamController<String> _errorSubject =
       StreamController<String>.broadcast();
   Stream<String> get errorStream => _errorSubject.stream;
@@ -331,16 +402,19 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// the visualizer attach to this real session instead of the global mix.
   int? get currentAudioSessionId => _currentAudioSessionId;
   Stream<int?> get audioSessionIdStream => _audioSessionIdSubject.stream;
+  @override
   SongsTableData? get currentSong =>
       (_songs.isNotEmpty && _currentIndex >= 0 && _currentIndex < _songs.length)
           ? _songs[_currentIndex]
           : null;
 
+  @override
   PlaybackLatencyTracker? get _latencyTracker =>
       getIt.isRegistered<PlaybackLatencyTracker>()
           ? getIt<PlaybackLatencyTracker>()
           : null;
   int _lastPositionEmitMs = 0;
+  @override
   double? _preCrossfadeVolume;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
 
@@ -491,6 +565,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   // route change, interruption and underrun/dropout count. Every call is
   // fire-and-forget; the service never throws and is a no-op when disabled.
 
+  @override
   Future<AudioOutputInfo?> _currentOutputInfo() async {
     try {
       if (!getIt.isRegistered<HiResAudioService>()) return null;
@@ -500,6 +575,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
   }
 
+  @override
   Future<void> _beginAudioSession(SongsTableData song) async {
     try {
       final log = AudioSessionLog.instance;
@@ -618,12 +694,14 @@ class PulsrAudioHandler extends BaseAudioHandler
     );
   }
 
+  @override
   SharedPreferences? _cachedPrefs;
 
   Future<void> _initPrefs() async {
     _cachedPrefs = await SharedPreferences.getInstance();
   }
 
+  @override
   double _volume = 1.0;
   double get volume => _volume;
 
@@ -646,6 +724,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// in [_notifyTrackChanged] corrects it once real header rates arrive.
   static const double assumedOutputSampleRate = 48000.0;
 
+  @override
   double _calculateReplayGainVolume(SongsTableData? song) {
     // DoP carries raw DSD inside PCM markers: any software gain corrupts the
     // 0x05/0xFA framing into white noise, so the mixer stays at unity and the
@@ -765,6 +844,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     _volumeController.setNativeRgActive(_nativeRgActive);
   }
 
+  @override
   Future<void> _pushNativeReplayGain(SongsTableData? song) async {
     Future<void> disableNative() async {
       _nativeRgActive = false;
@@ -881,6 +961,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   }
 
 
+  @override
   int _engineSwitchGeneration = 0;
 
 
@@ -927,6 +1008,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
   }
 
+  @override
   void _saveCurrentPosition() {
     _positionDirty = true;
   }
@@ -1168,12 +1250,12 @@ class PulsrAudioHandler extends BaseAudioHandler
                     // the after-N sleep timer decremented twice per song and
                     // end-of-queue fired at the first gap.
                     if (!_activePlayer.hasNext) {
-                      _notifySleepTrackCompleted();
+                      notifySleepTrackCompleted();
                       unawaited(_sleepTimerManager.onQueueCompleted());
                     }
                   }
                 } else {
-                  _notifySleepTrackCompleted();
+                  notifySleepTrackCompleted();
                   if (_getNextIndex(peek: true) == null) {
                     unawaited(_sleepTimerManager.onQueueCompleted());
                   }
@@ -1623,6 +1705,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
   }
 
+  @override
   BufferBucket _currentBucket = BufferBucket.standard;
 
 
@@ -1639,6 +1722,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     );
   }
 
+  @override
   AudioLoadConfiguration _currentAudioLoadConfiguration =
       _loadConfigForBucket(BufferBucket.standard);
 
@@ -1654,6 +1738,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// source; a YouTube row (not yet downloaded) becomes a [YtmResolvingSource]
   /// that resolves its URL and caches its bytes lazily on first playback. A
   /// downloaded YouTube row with a real file on disk plays straight off disk.
+  @override
   final Map<String, bool> _pathExistsCache = {};
   static const _maxPathCacheSize = 2000;
 
@@ -1664,6 +1749,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   ///
   /// [quality] is reported back because it is part of every downstream cache key
   /// ([YtmUrlCache], the disk cache slot); the caller cannot assume `high`.
+  @override
   Future<({String url, String? userAgent, String? cookies, String quality})>
       _resolveStreamUrl(SongsTableData song,
           {bool forceRefresh = false}) async {
@@ -1786,6 +1872,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   static const int _maxStreamCacheEntries = 64;
 
 
+  @override
   int _prefetchGeneration = 0;
 
 
@@ -1827,14 +1914,13 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   // --- ANDROID AUTO & HEADSET BUTTON SUPPORT ---
   Timer? _headsetClickTimer;
+  @override
   int _headsetClickCount = 0;
 
   /// Headset hook button with user-configurable mapping (see
   /// HeadsetControlConfig). 1x/2x/3x clicks resolve after [clickWindowMs];
   /// 3+ clicks collapse to the triple action so fast multi-presses never
   /// get swallowed.
-  @override
-
 
   static const int maxQueueSize = 500;
 
@@ -1842,9 +1928,11 @@ class PulsrAudioHandler extends BaseAudioHandler
   static const double _maxPlaybackSpeed = 4.0;
   static const double _minAdvancedPlaybackSpeed = 0.1;
   static const double _maxAdvancedPlaybackSpeed = 8.0;
+  @override
   bool _advancedSpeedEnabled = false;
 
 
+  @override
   double _pitch = 1.0;
 
 
@@ -1882,16 +1970,6 @@ class PulsrAudioHandler extends BaseAudioHandler
   }
 
   // --- ANDROID AUTO / MEDIA BROWSER TREE ---
-  @override
-
-  @override
-
-  @override
-
-  @override
-
-  @override
-
 
   final Completer<void> _effectsReadyCompleter = Completer<void>();
 
@@ -1901,6 +1979,52 @@ class PulsrAudioHandler extends BaseAudioHandler
   Future<void> get effectsReady => _effectsReadyCompleter.future;
 
       
+  @override
+  Future<dynamic> customAction(String name,
+      [Map<String, dynamic>? extras]) async {
+    switch (name) {
+      case 'toggleFavorite':
+        if (_songs.isNotEmpty && _currentIndex < _songs.length) {
+          final currentSong = _songs[_currentIndex];
+          final result = await _repository.toggleFavorite(currentSong.id);
+          final newFav = result.fold((l) => currentSong.isFavorite, (r) => r);
+          _songs[_currentIndex] = currentSong.copyWith(isFavorite: newFav);
+          final artUri =
+              await ArtworkUriResolver.resolveArtworkUri(_songs[_currentIndex]);
+          mediaItem.add(_songToMediaItem(_songs[_currentIndex], artUri));
+          return newFav;
+        }
+        return false;
+      case 'toggleShuffle':
+        final currentShuffle = _activePlayer.shuffleModeEnabled;
+        await setShuffleMode(currentShuffle
+            ? AudioServiceShuffleMode.none
+            : AudioServiceShuffleMode.all);
+        return !currentShuffle;
+      case 'cycleRepeat':
+      case 'toggleRepeat':
+        final currentLoop = _activePlayer.loopMode;
+        if (currentLoop == LoopMode.off) {
+          await setRepeatMode(AudioServiceRepeatMode.all);
+        } else if (currentLoop == LoopMode.all) {
+          await setRepeatMode(AudioServiceRepeatMode.one);
+        } else {
+          await setRepeatMode(AudioServiceRepeatMode.none);
+        }
+        return true;
+      case 'seekRelative':
+        final secs = (extras?['seconds'] as num?)?.toInt() ?? 10;
+        await seekRelative(Duration(seconds: secs.clamp(-60, 60)));
+        return true;
+      case 'headsetAction':
+        final count = (extras?['count'] as num?)?.toInt() ?? 1;
+        await _performHeadsetAction(count.clamp(1, 3));
+        return true;
+      default:
+        return super.customAction(name, extras);
+    }
+  }
+
   @override
   Future<void> stop() async {
     _sleepTimerManager.cancelSleepTimer();

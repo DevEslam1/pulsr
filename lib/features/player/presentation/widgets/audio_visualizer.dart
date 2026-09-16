@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../../core/constants/channels.dart';
 import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/performance/gpu_budget.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../data/visualizer/milkdrop_preset_store.dart';
@@ -370,6 +371,14 @@ class _AudioVisualizerState extends State<AudioVisualizer>
     if (widget.style == VisualizerStyle.off) {
       return const SizedBox.shrink();
     }
+    // GPU budget mode: heavy GPU styles fall back to cheap bars.
+    final effectiveStyle = GpuBudget.isEnabled &&
+            (widget.style == VisualizerStyle.milkdrop ||
+                widget.style == VisualizerStyle.terrain3D ||
+                widget.style == VisualizerStyle.particles ||
+                widget.style == VisualizerStyle.albumArtReactive)
+        ? VisualizerStyle.bar
+        : widget.style;
 
     final p = context.palette;
     final activeColor = widget.color ?? p.accent;
@@ -384,7 +393,7 @@ class _AudioVisualizerState extends State<AudioVisualizer>
           builder: (context, data, _) {
             return CustomPaint(
               size: Size(widget.width, widget.height),
-              painter: switch (widget.style) {
+              painter: switch (effectiveStyle) {
                 VisualizerStyle.bar =>
                   _BarVisualizerPainter(data: data, color: activeColor),
                 VisualizerStyle.wave =>

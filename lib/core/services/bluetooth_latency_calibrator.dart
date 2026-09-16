@@ -52,8 +52,21 @@ class BluetoothLatencyCalibrator {
 
   int clampOffset(int ms) => ms.clamp(minMs, maxMs);
 
-  Future<BtCalibrationResult> calibrate({
-    String? codecName,
+  /// Interactive tap test: user taps when they HEAR each beep. [tapDeltasMs]
+  /// holds tapTime - beepEmitTime per trial (includes ~180ms human reaction).
+  /// Returns a clamped offset with the reaction baseline removed.
+  int offsetFromTapDeltas(List<int> tapDeltasMs,
+      {int reactionBaselineMs = 180}) {
+    final valid =
+        tapDeltasMs.where((d) => d >= 0 && d <= 1500).toList()..sort();
+    if (valid.isEmpty) return estimateBtLatencyForCodec(null);
+    final trimmed =
+        valid.length >= 4 ? valid.sublist(1, valid.length - 1) : valid;
+    final mean = (trimmed.reduce((a, b) => a + b) / trimmed.length).round();
+    return clampOffset(mean - reactionBaselineMs);
+  }
+
+  Future<BtCalibrationResult> calibrate({    String? codecName,
     BtProbeFn? probe,
     int samples = 5,
   }) async {

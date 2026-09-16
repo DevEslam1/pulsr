@@ -20,16 +20,15 @@ import '../../../core/services/ytm_oauth_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 
+import '../../../core/widgets/pulsr_bottom_sheet.dart';
+
 class YtmOAuthLoginSheet extends StatefulWidget {
   const YtmOAuthLoginSheet({super.key});
 
   static Future<bool?> show(BuildContext context) {
-    return showModalBottomSheet<bool>(
+    return PulsrSheetHelper.showPulsrSheet<bool>(
       context: context,
-      isScrollControlled: true,
-      useRootNavigator: true,
       enableDrag: false,
-      backgroundColor: Colors.transparent,
       builder: (_) => const YtmOAuthLoginSheet(),
     );
   }

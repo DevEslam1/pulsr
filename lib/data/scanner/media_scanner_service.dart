@@ -39,6 +39,25 @@ class MediaScannerService {
   Stream<double> get scanProgress => _progressController.stream;
   Stream<ScanError> get scanErrors => _errorController.stream;
 
+  DateTime? _lastScanAt;
+  int? _lastScanEpochSec;
+  DateTime? get lastScanAt => _lastScanAt;
+  int? get lastScanEpochSec => _lastScanEpochSec;
+
+  /// True when a resume-triggered delta scan is worthwhile (default: 15 min
+  /// since last successful scan). Used by app-resume hooks to avoid a full
+  /// MediaStore query on every foreground.
+  bool shouldRescanOnResume({Duration threshold = const Duration(minutes: 15)}) {
+    final last = _lastScanAt;
+    if (last == null) return true;
+    return DateTime.now().difference(last) >= threshold;
+  }
+
+  void markScanComplete({int? epochSec}) {
+    _lastScanAt = DateTime.now();
+    _lastScanEpochSec = epochSec ?? DateTime.now().millisecondsSinceEpoch ~/ 1000;
+  }
+
   MediaScannerService(this._repository);
 
   void dispose() {
@@ -189,6 +208,7 @@ class MediaScannerService {
     int minDurationSec = 30,
     int minSizeKb = 0,
     bool autoHideSystemMedia = true,
+    int? addedAfterEpochSec,
   }) async {
     _progressController.add(0.0);
     try {
@@ -292,6 +312,9 @@ class MediaScannerService {
           '${parseResult.nativeDecoderRequiredCount > 0 ? ', ${parseResult.nativeDecoderRequiredCount} file(s) need a native decoder (not indexed)' : ''}',
           category: 'scanner');
 
+      // addedAfterEpochSec is advisory: DATE_ADDED filtering is applied by
+      // callers doing delta scans; record completion for resume heuristics.
+      markScanComplete();
       return parseResult.songs.length;
     } catch (e, st) {
       ErrorLogger.log('Media scanner failed',

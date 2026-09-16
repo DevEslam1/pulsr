@@ -473,20 +473,37 @@ class AuraTheme {
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return Colors.white;
+          return p.textSecondary;
+        }),
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return p.accent;
+          return p.isDark
+              ? Colors.white.withValues(alpha: 0.12)
+              : Colors.black.withValues(alpha: 0.08);
+        }),
+        trackOutlineColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return Colors.transparent;
+          return p.hairline;
+        }),
+        trackOutlineWidth: const WidgetStatePropertyAll(1.0),
+      ),
       sliderTheme: SliderThemeData(
         activeTrackColor: p.accent,
         inactiveTrackColor: (p.isDark ? Colors.white : Colors.black)
-            .withValues(alpha: 0.12),
-        thumbColor: p.isDark ? Colors.white : p.accent,
+            .withValues(alpha: 0.14),
+        thumbColor: Colors.white,
         overlayColor: p.accent.withValues(alpha: 0.16),
-        trackHeight: 5.0,
+        trackHeight: 6.0,
         trackShape: const RoundedRectSliderTrackShape(),
         thumbShape: const RoundSliderThumbShape(
-          enabledThumbRadius: 7.0,
-          elevation: 3.0,
-          pressedElevation: 6.0,
+          enabledThumbRadius: 8.0,
+          elevation: 4.0,
+          pressedElevation: 7.0,
         ),
-        overlayShape: const RoundSliderOverlayShape(overlayRadius: 16.0),
+        overlayShape: const RoundSliderOverlayShape(overlayRadius: 18.0),
       ),
       dividerTheme: DividerThemeData(color: p.hairline, thickness: 1, space: 1),
       iconTheme: IconThemeData(color: p.textPrimary, size: 24),
@@ -501,6 +518,17 @@ class AuraTheme {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(color: p.accent, width: 1.5),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: p.accent,
+          foregroundColor: p.onAccent,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          shape:
+              const RoundedRectangleBorder(borderRadius: AppRadii.buttonRadius),
+          textStyle:
+              const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(

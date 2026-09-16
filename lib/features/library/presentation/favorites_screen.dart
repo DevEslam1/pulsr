@@ -374,26 +374,53 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                     else
                       ...List.generate(songs.length, (index) {
                         final song = songs[index];
-                        return SongTile(
-                          song: song,
-                          index: index + 1,
-                          onTap: () => playerCubit.playSong(song, queue: songs),
-                          onMorePressed: () {
-                            showModalBottomSheet<void>(
-                              context: context,
-                              builder: (_) => SongInfoSheet(song: song),
-                            );
+                        return PulsrDismissible(
+                          key: ValueKey('fav_screen_${song.id}'),
+                          startToEndLabel: context.l10n.playNext,
+                          endToStartLabel: context.l10n.delete,
+                          backgroundBuilder: (context, isConfirming) =>
+                              PulsrDismissible.buildActionBackground(
+                            context: context,
+                            icon: Icons.playlist_play_rounded,
+                            label: context.l10n.playNext,
+                            color: p.accent,
+                            backgroundColor: p.accentContainer,
+                            isConfirming: isConfirming,
+                          ),
+                          secondaryBackgroundBuilder: (context, isConfirming) =>
+                              PulsrDismissible.buildActionBackground(
+                            context: context,
+                            icon: Icons.delete_outline_rounded,
+                            label: context.l10n.delete,
+                            color: p.error,
+                            backgroundColor: p.error.withValues(alpha: 0.2),
+                            isConfirming: isConfirming,
+                            isEnd: true,
+                          ),
+                          onConfirm: (direction) async {
+                            if (direction == DismissDirection.startToEnd) {
+                              playerCubit.playNext(song);
+                            } else {
+                              libraryCubit.toggleFavorite(song.id);
+                            }
+                            return false;
                           },
-                          trailing: IconButton(
-                            icon: Icon(
-                              song.isFavorite
-                                  ? Icons.favorite_rounded
-                                  : Icons.favorite_border_rounded,
-                              color: song.isFavorite ? p.favorite : p.textTertiary,
-                              size: 20,
+                          child: SongTile(
+                            song: song,
+                            index: index + 1,
+                            onTap: () => playerCubit.playSong(song, queue: songs),
+                            onMorePressed: () => SongInfoSheet.show(context, song: song),
+                            trailing: IconButton(
+                              icon: Icon(
+                                song.isFavorite
+                                    ? Icons.favorite_rounded
+                                    : Icons.favorite_border_rounded,
+                                color: song.isFavorite ? p.favorite : p.textTertiary,
+                                size: 20,
+                              ),
+                              onPressed: () =>
+                                  libraryCubit.toggleFavorite(song.id),
                             ),
-                            onPressed: () =>
-                                libraryCubit.toggleFavorite(song.id),
                           ),
                         );
                       }),

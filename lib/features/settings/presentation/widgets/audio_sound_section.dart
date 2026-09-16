@@ -5,7 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/constants/prefs_keys.dart';
-import '../../../../core/constants/app_radii.dart';
+import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/services/bluetooth_latency_calibrator.dart';
 import '../../../../core/telemetry/audio_session_log.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -21,6 +21,7 @@ import '../../../player/presentation/widgets/dsp_inspector_sheet.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
 import 'battery_optimization_card.dart';
+import 'bt_latency_tap_sheet.dart';
 import 'cast_section.dart';
 import 'room_correction_sheet.dart';
 import 'settings_conflict_card.dart';
@@ -28,6 +29,7 @@ import 'settings_section.dart';
 import 'settings_slider_row.dart';
 import 'settings_tiles.dart';
 import 'usb_dac_section.dart';
+part 'audio_sound_dop_selector.dart';
 
 /// Sound engine: equalizer, DSP engine, output device / bit-perfect,
 /// ReplayGain and battery optimization for background audio.
@@ -87,12 +89,7 @@ class AudioSoundSection extends StatelessWidget {
               ? context.l10n.equalizerSubtitle
               : context.l10n.settingsNotAvailablePlatform,
           onTap: PlatformCapabilities.hasEqualizer
-              ? () => showModalBottomSheet<void>(
-                  context: context,
-                  useRootNavigator: true,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
-                  builder: (_) => const EqualizerSheet())
+              ? () => EqualizerSheet.show(context)
               : null,
         ),
         settingsCardDivider(p),
@@ -127,10 +124,18 @@ class AudioSoundSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Normal mode: a curated, smart sound section. The full audiophile control
-    // surface (bit-perfect, DSD, AAudio, resampler, DSP engine, diagnostics)
-    // stays available in Professional mode.
-    if (!state.isProfessional) return _buildNormal(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        state.isProfessional
+            ? _buildProfessional(context)
+            : _buildNormal(context),
+        const CastSection(),
+      ],
+    );
+  }
+
+  Widget _buildProfessional(BuildContext context) {
     final p = context.palette;
     final cubit = context.read<SettingsCubit>();
     // Native DSP / HAL / Hi-Res output are Android-only. On other platforms the
@@ -149,12 +154,7 @@ class AudioSoundSection extends StatelessWidget {
               ? context.l10n.equalizerSubtitle
               : context.l10n.settingsNotAvailablePlatform,
           onTap: PlatformCapabilities.hasEqualizer
-              ? () => showModalBottomSheet<void>(
-                  context: context,
-                  useRootNavigator: true,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
-                  builder: (_) => const EqualizerSheet())
+              ? () => EqualizerSheet.show(context)
               : null,
         ),
         settingsCardDivider(p),
@@ -989,14 +989,21 @@ class AudioSoundSection extends StatelessWidget {
                 onChanged: (v) => cubit.setBluetoothLatencyOffsetMs(v.round()),
               ),
               if (isAndroid && state.currentOutputDevice?.isBluetooth == true)
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: () =>
-                        _autoCalibrateBluetoothLatency(context, cubit),
-                    icon: const Icon(Icons.auto_fix_high_rounded, size: 16),
-                    label: Text(context.l10n.autoCalibrate),
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () => BtLatencyTapSheet.show(context),
+                      icon: const Icon(Icons.fingerprint_rounded, size: 16),
+                      label: Text(context.l10n.settingsSyncOffset),
+                    ),
+                    TextButton.icon(
+                      onPressed: () =>
+                          _autoCalibrateBluetoothLatency(context, cubit),
+                      icon: const Icon(Icons.auto_fix_high_rounded, size: 16),
+                      label: Text(context.l10n.autoCalibrate),
+                    ),
+                  ],
                 ),
             ],
           ),
@@ -1076,7 +1083,6 @@ class AudioSoundSection extends StatelessWidget {
         settingsCardDivider(p),
         // USB DAC hardware volume + optional exclusive interface claim.
         UsbDacSection(cubit: cubit, state: state),
-        const CastSection(),
         settingsCardDivider(p),
         // Resampler quality: Fast (linear) .. Ultra (full 64-tap polyphase).
         SettingSliderRow(
@@ -1167,12 +1173,8 @@ class AudioSoundSection extends StatelessWidget {
       ('auto', context.l10n.dspEngineAuto, context.l10n.settingsDspAutoDesc),
     ];
 
-    showModalBottomSheet<void>(
+    PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
-      backgroundColor: p.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: AppRadii.bottomSheetRadius,
-      ),
       builder: (sheetContext) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
@@ -1211,80 +1213,3 @@ class AudioSoundSection extends StatelessWidget {
   }
 }
 
-/// DoP PCM container width selector (24-bit standard packing vs zero-padded
-/// 32-bit frames for DACs that require 32-bit USB frames). Persisted directly
-/// to [PrefsKeys.dopContainerBits] so no settings-state codegen is required;
-/// the playback router reads the same key when framing DoP. Shown only while
-/// DoP output is selected on a capable DAC.
-class _DopContainerSelector extends StatefulWidget {
-  const _DopContainerSelector();
-
-  @override
-  State<_DopContainerSelector> createState() => _DopContainerSelectorState();
-}
-
-class _DopContainerSelectorState extends State<_DopContainerSelector> {
-  int _bits = 24;
-  bool _loaded = false;
-
-  @override
-  void initState() {
-    super.initState();
-    SharedPreferences.getInstance().then((prefs) {
-      if (!mounted) return;
-      setState(() {
-        final stored = prefs.getInt(PrefsKeys.dopContainerBits) ?? 24;
-        _bits = stored == 32 ? 32 : 24;
-        _loaded = true;
-      });
-    });
-  }
-
-  Future<void> _select(int bits) async {
-    setState(() => _bits = bits);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(PrefsKeys.dopContainerBits, bits);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    if (!_loaded) return const SizedBox.shrink();
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            context.l10n.dopContainer,
-            style: TextStyle(color: p.textSecondary, fontSize: 12),
-          ),
-        ),
-        SegmentedButton<int>(
-          showSelectedIcon: false,
-          style: const ButtonStyle(
-            visualDensity: VisualDensity.compact,
-            padding:
-                WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 8)),
-          ),
-          segments: const [
-            ButtonSegment(
-              value: 24,
-              label: Text('24-bit',
-                  style:
-                      TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-            ),
-            ButtonSegment(
-              value: 32,
-              label: Text('32-bit',
-                  style:
-                      TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-            ),
-          ],
-          selected: {_bits},
-          onSelectionChanged: (selected) {
-            if (selected.isNotEmpty) _select(selected.first);
-          },
-        ),
-      ],
-    );
-  }
-}

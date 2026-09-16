@@ -12,11 +12,12 @@ import '../../../../domain/models/audio_output_info.dart';
 import '../../../../domain/models/audio_quality_info.dart';
 import '../../../../domain/services/hires_audio_service.dart';
 import '../../../../core/constants/audio_feature_info.dart';
+import '../../../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 
-class AudioQualitySheet extends StatelessWidget {
-  final SongsTableData song;
+class AudioQualitySheet extends StatelessWidget {  final SongsTableData song;
   final Color activeColor;
 
   const AudioQualitySheet({
@@ -31,22 +32,9 @@ class AudioQualitySheet extends StatelessWidget {
     Color activeColor,
   ) {
     HapticFeedback.mediumImpact();
-    showModalBottomSheet<void>(
+    PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
-      useRootNavigator: true,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      isDismissible: true,
-      enableDrag: true,
-      barrierColor: Colors.black54,
-      builder: (sheetContext) => GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => Navigator.of(sheetContext).pop(),
-        child: GestureDetector(
-          onTap: () {}, // Prevent taps on the sheet card itself from closing
-          child: AudioQualitySheet(song: song, activeColor: activeColor),
-        ),
-      ),
+      builder: (_) => AudioQualitySheet(song: song, activeColor: activeColor),
     );
   }
 
@@ -981,11 +969,11 @@ class AudioQualitySheet extends StatelessWidget {
                           visualDensity: VisualDensity.compact,
                           tooltip: context.l10n.dspAboutBitPerfect,
                           onPressed: () {
-                            showDialog<void>(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                backgroundColor: p.surface,
-                                title: Text(context.l10n.bitPerfectMode),
+                            PulsrDialogHelper.showCustomDialog<void>(
+                              context,
+                              builder: (ctx) => PulsrDialog(
+                                title: context.l10n.bitPerfectMode,
+                                icon: Icons.info_outline_rounded,
                                 content: Text(
                                   AudioFeatureRegistry.bitPerfect.description,
                                   style: TextStyle(
@@ -1478,6 +1466,14 @@ String _sampleRateTag(int rate) {
 
 // ── Bluetooth Codec Section ──────────────────────────────────────────────────
 
+/// LE Audio-only codecs (LC3/Opus) are hidden on classic A2DP routes so users
+/// never tap a chip the platform can never grant.
+List<String> visibleBtCodecsForRoute(
+    {required List<String> repoCodecs, required bool isLeAudio}) {
+  if (isLeAudio) return List.of(repoCodecs);
+  return repoCodecs.where((c) => c != 'LC3' && c != 'Opus').toList();
+}
+
 extension _BluetoothCodecSection on AudioQualitySheet {
   static const _btAccent = Color(0xFF00D4FF);
   static const _ldacAccent = Color(0xFF7C4DFF);
@@ -1500,8 +1496,13 @@ extension _BluetoothCodecSection on AudioQualitySheet {
     final isLdac = codecName == 'LDAC';
 
     const allCodecs = ['SBC', 'AAC', 'aptX', 'aptX HD', 'LDAC', 'LC3', 'Opus'];
-    final visibleCodecs =
+    // LC3/Opus are LE Audio-only: hide them on classic A2DP so users never
+    // tap a chip the platform can never grant.
+    final isLeRoute = outputDevice?.isLeAudio ?? false;
+    final repoCodecs =
         selectableCodecs.isNotEmpty ? selectableCodecs : allCodecs;
+    final visibleCodecs = visibleBtCodecsForRoute(
+        repoCodecs: repoCodecs, isLeAudio: isLeRoute);
 
     const ldacModes = [
       (0, 'Best Effort', 'Auto kbps'),
@@ -1694,9 +1695,13 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                     child: GestureDetector(
                       onTap: isActive
                           ? null
-                          : () {
+                          : () async {
                               HapticFeedback.selectionClick();
-                              unawaited(cubit?.setBluetoothCodec(c));
+                              final ok =
+                                  await cubit?.setBluetoothCodec(c) ?? false;
+                              if (!ok && context.mounted) {
+                                _showBtRefused(context, cubit);
+                              }
                             },
                       child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -1889,9 +1894,13 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                       (i) => Padding(
                         padding: const EdgeInsets.only(left: 3),
                         child: GestureDetector(
-                          onTap: () {
+                          onTap: () async {
                             HapticFeedback.selectionClick();
-                            unawaited(cubit?.setBluetoothLdacQuality(i));
+                            final ok = await cubit?.setBluetoothLdacQuality(i) ??
+                                false;
+                            if (!ok && context.mounted) {
+                              _showBtRefused(context, cubit);
+                            }
                           },
                           child: Container(
                             width: 20,
@@ -1981,6 +1990,22 @@ extension _BluetoothCodecSection on AudioQualitySheet {
           ),
         ],
       ],
+    );
+  }
+
+  /// Stock ROMs refuse in-app codec switches (SystemApi): tell the user the
+  /// platform refused and offer the Developer Options shortcut. Uses only
+  /// existing l10n keys so the literal ratchet stays green.
+  void _showBtRefused(BuildContext context, SettingsCubit? cubit) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text(context.l10n.switchPrefFailed),
+        action: SnackBarAction(
+          label: context.l10n.devOptionsBtCodec,
+          onPressed: () => cubit?.openBluetoothDevOptions(),
+        ),
+      ),
     );
   }
 

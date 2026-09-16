@@ -7,16 +7,12 @@ import '../../../../core/services/scrobbler_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 
-void showScrobblerSettingsModal(BuildContext context) {
-  final p = context.palette;
+import '../../../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../../../core/widgets/pulsr_switch.dart';
 
-  showModalBottomSheet(
+void showScrobblerSettingsModal(BuildContext context) {
+  PulsrSheetHelper.showPulsrSheet<void>(
     context: context,
-    isScrollControlled: true,
-    backgroundColor: p.surfaceContainer,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
     builder: (ctx) => const ScrobblerConfigSheet(),
   );
 }
@@ -201,12 +197,11 @@ class _ScrobblerConfigSheetState extends State<ScrobblerConfigSheet> {
                   fontWeight: FontWeight.w700,
                   fontSize: 14),
             ),
-            SwitchListTile(
+            PulsrSwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: Text(context.l10n.enableListenBrainz,
                   style: TextStyle(color: p.textPrimary, fontSize: 14)),
               value: _listenBrainzEnabled,
-              activeThumbColor: p.accent,
               onChanged: (val) =>
                   setState(() => _listenBrainzEnabled = val),
             ),
@@ -234,12 +229,11 @@ class _ScrobblerConfigSheetState extends State<ScrobblerConfigSheet> {
                   fontWeight: FontWeight.w700,
                   fontSize: 14),
             ),
-            SwitchListTile(
+            PulsrSwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: Text(context.l10n.enableLastFmDirectScrobbling,
                   style: TextStyle(color: p.textPrimary, fontSize: 14)),
               value: _lastFmEnabled,
-              activeThumbColor: p.accent,
               onChanged: (val) => setState(() => _lastFmEnabled = val),
             ),
             if (_lastFmEnabled) ...[

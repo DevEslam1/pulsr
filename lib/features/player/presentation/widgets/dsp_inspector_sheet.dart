@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
@@ -12,14 +13,15 @@ import '../../../../domain/models/dsp_debug_report.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../cubit/player_cubit.dart';
 
+import '../../../../core/widgets/pulsr_bottom_sheet.dart';
+
 class DspInspectorSheet extends StatefulWidget {
   const DspInspectorSheet({super.key});
 
   static Future<void> show(BuildContext context) {
-    return showModalBottomSheet<void>(
+    return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      wrapWithContainer: false,
       builder: (_) => const DspInspectorSheet(),
     );
   }
@@ -60,6 +62,14 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
         _isLoading = false;
       });
     }
+  }
+
+  String exportReportForShare() => _report?.toFormattedJson() ?? '{}';
+
+  Future<void> _shareReport(BuildContext context) async {
+    if (_report == null) return;
+    final jsonText = exportReportForShare();
+    await SharePlus.instance.share(ShareParams(text: jsonText));
   }
 
   Future<void> _copyReportToClipboard(BuildContext context) async {
@@ -158,6 +168,11 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
                         tooltip: context.l10n.dspCopyJsonReport,
                         icon: Icon(Icons.copy_rounded, color: p.accent, size: 19),
                         onPressed: () => _copyReportToClipboard(context),
+                      ),
+                      IconButton(
+                        tooltip: 'Share DSP report',
+                        icon: Icon(Icons.share_rounded, color: p.accent, size: 19),
+                        onPressed: () => _shareReport(context),
                       ),
                       IconButton(
                         tooltip: context.l10n.dspRefreshStatus,

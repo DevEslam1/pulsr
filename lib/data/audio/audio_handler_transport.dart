@@ -1,6 +1,8 @@
+// ignore_for_file: unused_element, unused_element_parameter
 part of 'audio_handler.dart';
 
-extension PulsrAudioTransport on PulsrAudioHandler {
+mixin PulsrAudioTransport on BaseAudioHandler {
+  @override
   Future<void> play() {
     _userPlaybackInitiated = true;
     unawaited(() async {
@@ -30,6 +32,7 @@ extension PulsrAudioTransport on PulsrAudioHandler {
     return playFuture;
   }
 
+  @override
   Future<void> pause() async {
     // A deliberate pause invalidates any pending interruption snapshot so a
     // later call can still pause us (B-1); the previous code only cleared the
@@ -56,6 +59,7 @@ extension PulsrAudioTransport on PulsrAudioHandler {
     await _activePlayer.pause();
   }
 
+  @override
   Future<void> seek(Duration position) async {
     ErrorLogger.addBreadcrumb('Playback seek to ${position.inSeconds}s',
         category: 'player');
@@ -113,11 +117,13 @@ extension PulsrAudioTransport on PulsrAudioHandler {
     _saveCurrentPosition();
   }
 
+  @override
   Future<void> skipToQueueItem(int index) async {
     if (index < 0 || index >= _songs.length) return;
     await loadQueue(_songs, initialIndex: index, autoPlay: _activePlayer.playing);
   }
 
+  @override
   Future<void> skipToNext() async {
     ErrorLogger.addBreadcrumb('Playback skipToNext', category: 'player');
     // Invalidate stale prefetch completions; the manual playSongAt path below
@@ -202,6 +208,7 @@ extension PulsrAudioTransport on PulsrAudioHandler {
     }
   }
 
+  @override
   Future<void> skipToPrevious() async {
     ErrorLogger.addBreadcrumb('Playback skipToPrevious', category: 'player');
     cancelPrefetches();
@@ -256,7 +263,7 @@ extension PulsrAudioTransport on PulsrAudioHandler {
       _saveCurrentPosition();
       return;
     }
-    final prevIdx = _getPreviousIndex(forcePrevious: isDoubleTap);
+    final prevIdx = getPreviousIndex(forcePrevious: isDoubleTap);
     if (prevIdx != null) {
       if (wasPlaying) {
         await playSongAt(prevIdx);
@@ -272,6 +279,7 @@ extension PulsrAudioTransport on PulsrAudioHandler {
     }
   }
 
+  @override
   Future<void> setShuffleMode(AudioServiceShuffleMode shuffleMode) async {
     final enable = shuffleMode != AudioServiceShuffleMode.none;
     await Future.wait([
@@ -291,6 +299,7 @@ extension PulsrAudioTransport on PulsrAudioHandler {
         shuffleMode == AudioServiceShuffleMode.all);
   }
 
+  @override
   Future<void> setRepeatMode(AudioServiceRepeatMode repeatMode) async {
     LoopMode loopMode = switch (repeatMode) {
       AudioServiceRepeatMode.none => LoopMode.off,
@@ -315,6 +324,7 @@ extension PulsrAudioTransport on PulsrAudioHandler {
     await prefs.setString(PrefsKeys.playbackRepeatMode, persistMode);
   }
 
+  @override
   Future<void> click([MediaButton button = MediaButton.media]) async {
     _headsetClickCount++;
     _headsetClickTimer?.cancel();
@@ -404,10 +414,10 @@ extension PulsrAudioTransport on PulsrAudioHandler {
   }
 
   double get minPlaybackSpeed =>
-      _advancedSpeedEnabled ? _minAdvancedPlaybackSpeed : _minPlaybackSpeed;
+      _advancedSpeedEnabled ? PulsrAudioHandler._minAdvancedPlaybackSpeed : PulsrAudioHandler._minPlaybackSpeed;
 
   double get maxPlaybackSpeed =>
-      _advancedSpeedEnabled ? _maxAdvancedPlaybackSpeed : _maxPlaybackSpeed;
+      _advancedSpeedEnabled ? PulsrAudioHandler._maxAdvancedPlaybackSpeed : PulsrAudioHandler._maxPlaybackSpeed;
 
   /// Enables the extended 0.1–8.0 speed range for power users.
   /// When disabled the stable 0.25–4.0 range is enforced.
@@ -452,6 +462,7 @@ extension PulsrAudioTransport on PulsrAudioHandler {
     } catch (_) {}
   }
 
+  @override
   Future<void> setSpeed(double speed) async {
     final clamped = speed.clamp(minPlaybackSpeed, maxPlaybackSpeed);
     await Future.wait([
@@ -487,54 +498,11 @@ extension PulsrAudioTransport on PulsrAudioHandler {
     }
   }
 
-  Future<dynamic> customAction(String name,
-      [Map<String, dynamic>? extras]) async {
-    switch (name) {
-      case 'toggleFavorite':
-        if (_songs.isNotEmpty && _currentIndex < _songs.length) {
-          final currentSong = _songs[_currentIndex];
-          final result = await _repository.toggleFavorite(currentSong.id);
-          final newFav = result.fold((l) => currentSong.isFavorite, (r) => r);
-          _songs[_currentIndex] = currentSong.copyWith(isFavorite: newFav);
-          final artUri =
-              await ArtworkUriResolver.resolveArtworkUri(_songs[_currentIndex]);
-          mediaItem.add(_songToMediaItem(_songs[_currentIndex], artUri));
-          return newFav;
-        }
-        return false;
-      case 'toggleShuffle':
-        final currentShuffle = _activePlayer.shuffleModeEnabled;
-        await setShuffleMode(currentShuffle
-            ? AudioServiceShuffleMode.none
-            : AudioServiceShuffleMode.all);
-        return !currentShuffle;
-      case 'cycleRepeat':
-      case 'toggleRepeat':
-        final currentLoop = _activePlayer.loopMode;
-        if (currentLoop == LoopMode.off) {
-          await setRepeatMode(AudioServiceRepeatMode.all);
-        } else if (currentLoop == LoopMode.all) {
-          await setRepeatMode(AudioServiceRepeatMode.one);
-        } else {
-          await setRepeatMode(AudioServiceRepeatMode.none);
-        }
-        return true;
-      case 'seekRelative':
-        final secs = (extras?['seconds'] as num?)?.toInt() ?? 10;
-        await seekRelative(Duration(seconds: secs.clamp(-60, 60)));
-        return true;
-      case 'headsetAction':
-        final count = (extras?['count'] as num?)?.toInt() ?? 1;
-        await _performHeadsetAction(count.clamp(1, 3));
-        return true;
-      default:
-        return super.customAction(name, extras);
-    }
-  }
 
+  @override
   Future<void> addQueueItem(MediaItem mediaItem) async {
-    if (_songs.length >= maxQueueSize) {
-      ErrorLogger.log('Queue size limit reached ($maxQueueSize)',
+    if (_songs.length >= PulsrAudioHandler.maxQueueSize) {
+      ErrorLogger.log('Queue size limit reached (${PulsrAudioHandler.maxQueueSize})',
           category: 'AudioHandler');
       return;
     }
@@ -548,7 +516,7 @@ extension PulsrAudioTransport on PulsrAudioHandler {
         if (_gaplessMode && _gaplessLoaded) {
           await _activePlayer.addAudioSource(_buildGaplessChild(song));
         }
-        queue.add(_songs.map(_songToMediaItem).toList());
+        queue.add(_songs.map(PulsrAudioHandler._songToMediaItem).toList());
         _saveCurrentPosition();
       }
     }
@@ -569,8 +537,8 @@ extension PulsrAudioTransport on PulsrAudioHandler {
       return;
     }
 
-    if (_songs.length >= maxQueueSize) {
-      ErrorLogger.log('Queue size limit reached ($maxQueueSize)',
+    if (_songs.length >= PulsrAudioHandler.maxQueueSize) {
+      ErrorLogger.log('Queue size limit reached (${PulsrAudioHandler.maxQueueSize})',
           category: 'AudioHandler');
       return;
     }
@@ -584,7 +552,7 @@ extension PulsrAudioTransport on PulsrAudioHandler {
       await _activePlayer.insertAudioSource(
           insertIdx, _buildGaplessChild(song));
     }
-    queue.add(_songs.map(_songToMediaItem).toList());
+    queue.add(_songs.map(PulsrAudioHandler._songToMediaItem).toList());
     _saveCurrentPosition();
   }
 
@@ -601,8 +569,8 @@ extension PulsrAudioTransport on PulsrAudioHandler {
       return;
     }
 
-    if (_songs.length >= maxQueueSize) {
-      ErrorLogger.log('Queue size limit reached ($maxQueueSize)',
+    if (_songs.length >= PulsrAudioHandler.maxQueueSize) {
+      ErrorLogger.log('Queue size limit reached (${PulsrAudioHandler.maxQueueSize})',
           category: 'AudioHandler');
       return;
     }
@@ -612,7 +580,7 @@ extension PulsrAudioTransport on PulsrAudioHandler {
     if (_gaplessMode && _gaplessLoaded) {
       await _activePlayer.addAudioSource(_buildGaplessChild(song));
     }
-    queue.add(_songs.map(_songToMediaItem).toList());
+    queue.add(_songs.map(PulsrAudioHandler._songToMediaItem).toList());
     _saveCurrentPosition();
   }
 
@@ -633,10 +601,11 @@ extension PulsrAudioTransport on PulsrAudioHandler {
       await stop();
     }
     _queueDirty = true;
-    queue.add(_songs.map(_songToMediaItem).toList());
+    queue.add(_songs.map(PulsrAudioHandler._songToMediaItem).toList());
     _saveCurrentPosition();
   }
 
+  @override
   Future<void> removeQueueItemAt(int index) async {
     if (index < 0 || index >= _songs.length) return;
 
@@ -670,7 +639,7 @@ extension PulsrAudioTransport on PulsrAudioHandler {
           final fastArtUri = nextSong.artworkUri != null
               ? Uri.tryParse(nextSong.artworkUri!)
               : null;
-          mediaItem.add(_songToMediaItem(nextSong, fastArtUri));
+          mediaItem.add(PulsrAudioHandler._songToMediaItem(nextSong, fastArtUri));
         }
       } else {
         if (index < _currentIndex) _currentIndex--;
@@ -692,10 +661,11 @@ extension PulsrAudioTransport on PulsrAudioHandler {
         }
       }
     }
-    queue.add(_songs.map(_songToMediaItem).toList());
+    queue.add(_songs.map(PulsrAudioHandler._songToMediaItem).toList());
     _saveCurrentPosition();
   }
 
+  @override
   Future<void> removeQueueItem(MediaItem mediaItem) async {
     final index = _songs.indexWhere((s) => s.id.toString() == mediaItem.id);
     if (index != -1) {
@@ -733,8 +703,426 @@ extension PulsrAudioTransport on PulsrAudioHandler {
       await _activePlayer.moveAudioSource(oldIndex, newIndex);
     }
 
-    queue.add(_songs.map(_songToMediaItem).toList());
+    queue.add(_songs.map(PulsrAudioHandler._songToMediaItem).toList());
     _saveCurrentPosition();
   }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // Requires: provided by the composing class (same library).
+  AudioPlayer get _activePlayer;
+
+  // Requires: provided by the composing class (same library).
+  bool get _advancedSpeedEnabled;
+  set _advancedSpeedEnabled(bool value);
+
+  // Requires: provided by the composing class (same library).
+  void _broadcastState(PlaybackEvent event);
+
+  // Requires: provided by the composing class (same library).
+  AudioSource _buildGaplessChild(SongsTableData song);
+
+  // Requires: provided by the composing class (same library).
+  SharedPreferences? get _cachedPrefs;
+  set _cachedPrefs(SharedPreferences? value);
+
+  // Requires: provided by the composing class (same library).
+  CrossfadeManager get _crossfadeManager;
+
+  // Requires: provided by the composing class (same library).
+  int get _currentIndex;
+  set _currentIndex(int value);
+
+  // Requires: provided by the composing class (same library).
+  bool get _gaplessLoaded;
+  set _gaplessLoaded(bool value);
+
+  // Requires: provided by the composing class (same library).
+  bool get _gaplessMode;
+
+  // Requires: provided by the composing class (same library).
+  int? _getNextIndex({int offset = 1, bool peek = false});
+
+  // Requires: provided by the composing class (same library).
+  int? getPreviousIndex({bool forcePrevious = false});
+
+  // Requires: provided by the composing class (same library).
+  int get _headsetClickCount;
+  set _headsetClickCount(int value);
+
+  // Requires: provided by the composing class (same library).
+  Timer? get _headsetClickTimer;
+  set _headsetClickTimer(Timer? value);
+
+  // Requires: provided by the composing class (same library).
+  AudioPlayer get _inactivePlayer;
+
+  // Requires: provided by the composing class (same library).
+  InterruptionStateMachine get _interruption;
+
+  // Requires: provided by the composing class (same library).
+  set _isManualSkip(bool value);
+
+  // Requires: provided by the composing class (same library).
+  DateTime? get _lastPreviousTapTime;
+  set _lastPreviousTapTime(DateTime? value);
+
+  // Requires: provided by the composing class (same library).
+  int get _lastSeekMs;
+  set _lastSeekMs(int value);
+
+  // Requires: provided by the composing class (same library).
+  Future<void> _loadGaplessQueue({Duration? initialPosition, bool preload = true});
+
+  // Requires: provided by the composing class (same library).
+  Future<void> _loadSongPaused(int index, {Duration? initialPosition});
+
+  // Requires: provided by the composing class (same library).
+  Duration? get _pendingLazyPosition;
+  set _pendingLazyPosition(Duration? value);
+
+  // Requires: provided by the composing class (same library).
+  Duration? get _pendingSeekPosition;
+  set _pendingSeekPosition(Duration? value);
+
+  // Requires: provided by the composing class (same library).
+  double get _pitch;
+  set _pitch(double value);
+
+  // Requires: provided by the composing class (same library).
+  int get _playGeneration;
+  set _playGeneration(int value);
+
+  // Requires: provided by the composing class (same library).
+  AudioPlayer get _playerA;
+
+  // Requires: provided by the composing class (same library).
+  AudioPlayer get _playerB;
+
+  // Requires: provided by the composing class (same library).
+  StreamController<Duration> get _positionSubject;
+
+  // Requires: provided by the composing class (same library).
+  double? get _preCrossfadeVolume;
+
+  // Requires: provided by the composing class (same library).
+  IMusicRepository get _repository;
+
+  // Requires: provided by the composing class (same library).
+  void _saveCurrentPosition();
+
+  // Requires: provided by the composing class (same library).
+  void _scheduleFadeInConvergenceGuard(AudioPlayer player, int generation);
+
+  // Requires: provided by the composing class (same library).
+  Timer? get _seekDebounceTimer;
+  set _seekDebounceTimer(Timer? value);
+
+  // Requires: provided by the composing class (same library).
+  List<SongsTableData> get _songs;
+  set _songs(List<SongsTableData> value);
+
+  // Requires: provided by the composing class (same library).
+  StreamPreResolver get _streamPreResolver;
+
+
+
+  // Requires: provided by the composing class (same library).
+  double get _volume;
+
+  // Requires: provided by the composing class (same library).
+  void cancelPrefetches();
+
+  // Requires: provided by the composing class (same library).
+  SongsTableData? get currentSong;
+
+  // Requires: provided by the composing class (same library).
+  Future<void> loadQueue(List<SongsTableData> songs, {int initialIndex = 0, Duration? initialPosition, bool autoPlay = true});
+
+  // Requires: provided by the composing class (same library).
+  Future<void> playSongAt(int index, {Duration? initialPosition});
+
+  // Requires: provided by the composing class (same library).
+  bool get _userPlaybackInitiated;
+  set _userPlaybackInitiated(bool value);
+
+  // Requires: provided by the composing class (same library).
+  int get _rapidGaplessChangeCount;
+  set _rapidGaplessChangeCount(int value);
+
+  // Requires: provided by the composing class (same library).
+  DateTime? get _lastGaplessChangeTime;
+  set _lastGaplessChangeTime(DateTime? value);
+
+  // Requires: provided by the composing class (same library).
+  bool get _queueDirty;
+  set _queueDirty(bool value);
+
+  // Requires: provided by the composing class (same library).
+  int get _lastGaplessIndex;
+  set _lastGaplessIndex(int value);
 }

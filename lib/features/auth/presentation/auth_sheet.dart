@@ -13,14 +13,14 @@ import '../cubit/auth_cubit.dart';
 import '../cubit/auth_state.dart';
 import 'ytm_web_login_sheet.dart';
 
+import '../../../core/widgets/pulsr_bottom_sheet.dart';
+
 class AuthSheet extends StatefulWidget {
   const AuthSheet({super.key});
 
   static Future<void> show(BuildContext context) {
-    return showModalBottomSheet<void>(
+    return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (ctx) => const AuthSheet(),
     );
   }

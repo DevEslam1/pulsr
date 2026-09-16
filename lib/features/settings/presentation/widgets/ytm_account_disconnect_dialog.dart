@@ -14,11 +14,13 @@ import '../../../auth/presentation/ytm_web_login_sheet.dart';
 /// double tap started a second logout over the first. That second pass races the
 /// first one's WebView cookie deletion and native clear, and can re-import the
 /// jar the first pass was still tearing down.
+import '../../../../core/widgets/pulsr_dialog.dart';
+
 Future<void> showYtmAccountDisconnectDialog(BuildContext context) {
   final account = getIt<YtmAccountService>();
   final p = context.palette;
-  return showDialog<void>(
-    context: context,
+  return PulsrDialogHelper.showCustomDialog<void>(
+    context,
     builder: (ctx) => _YtmAccountDisconnectDialog(
       account: account,
       // The snackbar has to outlive the dialog's own context.
@@ -78,13 +80,11 @@ class _YtmAccountDisconnectDialogState
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: widget.surface,
-      title: Text(context.l10n.ytmAccount,
-          style: TextStyle(color: widget.titleColor)),
+    return PulsrDialog(
+      icon: Icon(Icons.account_circle_rounded, color: widget.accent, size: 28),
+      title: Text(context.l10n.ytmAccount),
       content: Text(
         context.l10n.settingsConnectedAs(widget.account.accountName ?? "User"),
-        style: TextStyle(color: widget.bodyColor),
       ),
       actions: [
         TextButton.icon(
@@ -103,17 +103,19 @@ class _YtmAccountDisconnectDialogState
         ),
         TextButton(
           onPressed: _busy ? null : () => Navigator.pop(context),
-          child: Text(context.l10n.cancel,
-              style: TextStyle(color: widget.bodyColor)),
+          child: Text(context.l10n.cancel),
         ),
         FilledButton(
           onPressed: _busy ? null : _disconnect,
-          style: FilledButton.styleFrom(backgroundColor: widget.error),
+          style: FilledButton.styleFrom(
+            backgroundColor: widget.error,
+            foregroundColor: Colors.white,
+          ),
           child: _busy
               ? const SizedBox(
                   width: 16,
                   height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                 )
               : Text(context.l10n.disconnect),
         ),

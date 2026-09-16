@@ -143,7 +143,7 @@ class UsbExclusiveService {
     try {
       final bool? granted = await _methodChannel
           .invokeMethod<bool>('requestPermission')
-          .timeout(const Duration(seconds: 60));
+          .timeout(const Duration(seconds: 15));
       await getStatus();
       return granted ?? false;
     } catch (e, st) {
@@ -155,6 +155,15 @@ class UsbExclusiveService {
 
   Future<bool> setExclusive(bool enabled) async {
     if (!_isAndroid) return false;
+    if (enabled && (!_last.attached || !_last.permitted)) {
+      await getStatus();
+      if (!_last.attached || !_last.permitted) return false;
+    }
+    if (enabled && !_last.exclusiveSupported && _last.attached) {
+      // Still attempt: some DACs report support only after first claim.
+      ErrorLogger.addBreadcrumb('USB exclusive claim without advertised support',
+          category: 'UsbExclusive');
+    }
     try {
       final dynamic res = await _methodChannel
           .invokeMethod<dynamic>('setExclusive', {'enabled': enabled})
@@ -171,9 +180,15 @@ class UsbExclusiveService {
 
   Future<bool> setHardwareVolume(double db) async {
     if (!_isAndroid) return false;
+    var clamped = db;
+    final min = _last.minVolumeDb;
+    final max = _last.maxVolumeDb;
+    if (min != null && max != null && min <= max) {
+      clamped = db.clamp(min, max);
+    }
     try {
       final dynamic res = await _methodChannel
-          .invokeMethod<dynamic>('setHardwareVolume', {'db': db})
+          .invokeMethod<dynamic>('setHardwareVolume', {'db': clamped})
           .timeout(const Duration(seconds: 5));
       if (res is Map && res['error'] != null) return false;
       await getStatus();
@@ -188,6 +203,13 @@ class UsbExclusiveService {
   /// Raw UAC2 isochronous streaming (experimental; unvalidated on hardware).
   Future<bool> startStreaming({int sampleRate = 48000, int channels = 2}) async {
     if (!_isAndroid) return false;
+    const validRates = [44100, 48000, 88200, 96000, 176400, 192000];
+    if (!validRates.contains(sampleRate)) return false;
+    if (channels < 1 || channels > 8) return false;
+    if (!_last.permitted || !_last.streamingSupported) {
+      await getStatus();
+      if (!_last.permitted || !_last.streamingSupported) return false;
+    }
     try {
       final dynamic res = await _methodChannel.invokeMethod<dynamic>(
           'startStreaming', {

@@ -322,14 +322,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                                       onTap: () {
                                         if (song != null) {
                                           HapticFeedback.lightImpact();
-                                          showModalBottomSheet<void>(
-                                            context: context,
-                                            useRootNavigator: true,
-                                            isScrollControlled: true,
-                                            backgroundColor: Colors.transparent,
-                                            builder: (_) =>
-                                                AddToPlaylistSheet(song: song),
-                                          );
+                                          AddToPlaylistSheet.show(context, song: song);
                                         }
                                       },
                                       child: Center(
@@ -621,10 +614,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                             onTap: () {
                               HapticFeedback.lightImpact();
                               if (song != null) {
-                                showModalBottomSheet<void>(
-                                  context: context,
-                                  builder: (_) => SongInfoSheet(song: song),
-                                );
+                                SongInfoSheet.show(context, song: song);
                               }
                             },
                             child: Center(

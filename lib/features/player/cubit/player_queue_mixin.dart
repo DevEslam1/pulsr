@@ -1,6 +1,6 @@
 part of 'player_cubit.dart';
 
-extension PlayerQueueOps on PlayerCubit {
+mixin PlayerQueueOps on PulsrCubit<PlayerState> {
   /// Plays an internet radio [station] by projecting it onto the normal queue
   /// as a synthetic pseudo-song whose `path` is the stream URL and whose id is
   /// a negative hash. The negative id keeps repository cleanup and
@@ -38,7 +38,7 @@ extension PlayerQueueOps on PlayerCubit {
   Future<void> playNext(SongsTableData song) async {
     if (state.queue.length >= PlayerCubit._maxQueueSize) {
       safeEmit(state.copyWith(
-          errorMessage: 'Queue full ($PlayerCubit._maxQueueSize) — cannot add more'));
+          errorMessage: 'Queue full (${PlayerCubit._maxQueueSize}) — cannot add more'));
       return;
     }
     try {
@@ -86,7 +86,7 @@ extension PlayerQueueOps on PlayerCubit {
     final room = PlayerCubit._maxQueueSize - state.queue.length;
     if (room <= 0) {
       safeEmit(state.copyWith(
-          errorMessage: 'Queue full ($PlayerCubit._maxQueueSize) — cannot add more'));
+          errorMessage: 'Queue full (${PlayerCubit._maxQueueSize}) — cannot add more'));
       return;
     }
     final toAdd = songs
@@ -117,7 +117,7 @@ extension PlayerQueueOps on PlayerCubit {
   Future<void> addToQueue(SongsTableData song) async {
     if (state.queue.length >= PlayerCubit._maxQueueSize) {
       safeEmit(state.copyWith(
-          errorMessage: 'Queue full ($PlayerCubit._maxQueueSize) — cannot add more'));
+          errorMessage: 'Queue full (${PlayerCubit._maxQueueSize}) — cannot add more'));
       return;
     }
     try {
@@ -434,4 +434,96 @@ extension PlayerQueueOps on PlayerCubit {
     } catch (_) {}
   }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // Requires: provided by the composing class (same library).
+  PulsrAudioHandler get _audioHandler;
+
+  // Requires: provided by the composing class (same library).
+  void _debouncedPersistQueueSlots();
+
+  // Requires: provided by the composing class (same library).
+  bool _isSameTrack(SongsTableData? a, SongsTableData? b);
+
+  // Requires: provided by the composing class (same library).
+  bool get _isSwitchingSlot;
+  set _isSwitchingSlot(bool value);
+
+  // Requires: provided by the composing class (same library).
+  Future<void> _loadLyricsForSong(SongsTableData song);
+
+  // Requires: provided by the composing class (same library).
+  Map<int, _QueueSlotData> get _queueSlots;
+
+  // Requires: provided by the composing class (same library).
+  int get _queueVersion;
+  set _queueVersion(int value);
+
+  // Requires: provided by the composing class (same library).
+  IMusicRepository get _repository;
+
+  // Requires: provided by the composing class (same library).
+  void _updateWidgetThrottled({bool force = false});
+
+  // Requires: provided by the composing class (same library).
+  Future<void> playSong(SongsTableData song, {List<SongsTableData>? queue, Duration? initialPosition, bool openPlayerIfPlaying = true});
 }
