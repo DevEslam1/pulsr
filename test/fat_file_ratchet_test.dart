@@ -14,11 +14,14 @@ void main() {
     //   equalizer_manager.dart -464B  (EqFrequencyValidation)
     //   library_screen.dart    -2228B (CategoryCard)
     //   settings_cubit.dart    -472B  (ProxyEndpointValidator)
+    // Caps lowered after EQ/Auto tranche:
+    //   equalizer_manager.dart -5121B (EqualizerPresetOps part: preset slots,
+    //     JSON import/export, A/B comparison, custom frequency layouts)
     const caps = {
       'lib/data/audio/audio_handler.dart': 223500,
       'lib/features/player/cubit/player_cubit.dart': 170000,
       'lib/features/library/presentation/library_screen.dart': 88000,
-      'lib/data/audio/equalizer_manager.dart': 107000,
+      'lib/data/audio/equalizer_manager.dart': 106950,
       'lib/features/settings/cubit/settings_cubit.dart': 82500,
     };
     final offenders = <String>[];

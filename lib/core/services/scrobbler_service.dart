@@ -58,10 +58,16 @@ class ScrobblerService {
         try {
           final prefs = await SharedPreferences.getInstance();
           await prefs.remove(legacyKey);
-        } catch (_) {}
+        } catch (_) {
+          ErrorLogger.addBreadcrumb('Legacy credential wipe skipped',
+              category: 'Scrobbler');
+        }
         return val;
       }
-    } catch (_) {}
+    } catch (_) {
+      ErrorLogger.addBreadcrumb('Secure credential read skipped',
+          category: 'Scrobbler');
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
       final legacyVal = prefs.getString(legacyKey)?.trim();
@@ -72,10 +78,16 @@ class ScrobblerService {
           if (verifyVal == legacyVal) {
             await prefs.remove(legacyKey);
           }
-        } catch (_) {}
+        } catch (_) {
+          ErrorLogger.addBreadcrumb('Credential migration verify skipped',
+              category: 'Scrobbler');
+        }
         return legacyVal;
       }
-    } catch (_) {}
+    } catch (_) {
+      ErrorLogger.addBreadcrumb('Legacy credential read skipped',
+          category: 'Scrobbler');
+    }
     return null;
   }
 
@@ -214,6 +226,7 @@ class ScrobblerService {
     required int positionMs,
     required bool isPlaying,
     String? artworkUrl,
+    bool isQuran = false,
   }) async {
     // 1. Android Broadcast Intent
     try {
@@ -232,6 +245,8 @@ class ScrobblerService {
     }
 
     // 2. Direct REST Scrobbler Logic
+    // Quran recitation is worship, not music listening: never scrobble it.
+    if (isQuran) return;
     try {
       if (artist.isEmpty || track.isEmpty || durationMs < 30000) {
         return; // Skip tracks < 30s
@@ -253,7 +268,10 @@ class ScrobblerService {
           await prefs.setString(_keyLastScrobbleArtist, artist);
           await prefs.setString(_keyLastScrobbleTrack, track);
           await prefs.setString(_keyLastScrobbleAlbum, album);
-        } catch (_) {}
+        } catch (_) {
+          ErrorLogger.addBreadcrumb('Scrobble session persist skipped',
+              category: 'Scrobbler');
+        }
 
         // Send "Now Playing" update
         await _updateNowPlaying(
@@ -269,7 +287,10 @@ class ScrobblerService {
         try {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setInt(_keyLastScrobblePos, positionMs);
-        } catch (_) {}
+        } catch (_) {
+          ErrorLogger.addBreadcrumb('Scrobble position persist skipped',
+              category: 'Scrobbler');
+        }
       }
 
       // Check scrobble threshold (played >50% of duration or >4 minutes (240s))
@@ -304,7 +325,10 @@ class ScrobblerService {
               'last_scrobble_time', DateTime.now().millisecondsSinceEpoch);
           // Clear active session since track scrobbled
           await prefs.remove(_keyLastScrobbleSong);
-        } catch (_) {}
+        } catch (_) {
+          ErrorLogger.addBreadcrumb('Scrobbled-id persist skipped',
+              category: 'Scrobbler');
+        }
       }
     } catch (e, st) {
       ErrorLogger.log('Error during REST scrobbling: $e',
@@ -353,7 +377,10 @@ class ScrobblerService {
                 body: params,
               )
               .timeout(const Duration(seconds: 8));
-        } catch (_) {}
+        } catch (e) {
+          ErrorLogger.log('Last.fm now-playing post skipped: $e',
+              category: 'Scrobbler');
+        }
       }
     }
 
@@ -391,7 +418,10 @@ class ScrobblerService {
                 body: jsonEncode(payload),
               )
               .timeout(const Duration(seconds: 8));
-        } catch (_) {}
+        } catch (e) {
+          ErrorLogger.log('ListenBrainz playing-now post skipped: $e',
+              category: 'Scrobbler');
+        }
       }
     }
   }
@@ -447,7 +477,10 @@ class ScrobblerService {
       final trimmed =
           list.length > 200 ? list.sublist(list.length - 200) : list;
       await prefs.setString(_keyOfflineQueue, jsonEncode(trimmed));
-    } catch (_) {}
+    } catch (_) {
+      ErrorLogger.addBreadcrumb('Offline scrobble queue persist skipped',
+          category: 'Scrobbler');
+    }
   }
 
   Future<void> _submitScrobble({
@@ -683,7 +716,10 @@ class ScrobblerService {
       if (raw != null && raw.isNotEmpty) {
         try {
           dailyLog = Map<String, dynamic>.from(jsonDecode(raw) as Map);
-        } catch (_) {}
+        } catch (_) {
+          ErrorLogger.addBreadcrumb('Corrupt daily scrobble log reset',
+              category: 'Scrobbler');
+        }
       }
       dailyLog[dateKey] = ((dailyLog[dateKey] as int?) ?? 0) + 1;
 
@@ -696,7 +732,10 @@ class ScrobblerService {
         }
       }
       await prefs.setString(keyDailyScrobbleLog, jsonEncode(dailyLog));
-    } catch (_) {}
+    } catch (e) {
+      ErrorLogger.log('Daily scrobble stats persist skipped: $e',
+          category: 'Scrobbler');
+    }
   }
 
   Future<void> flushOfflineQueue() async {

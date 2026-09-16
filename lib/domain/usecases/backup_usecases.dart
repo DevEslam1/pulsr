@@ -142,6 +142,27 @@ class ExportBackupUseCase {
       } catch (_) {}
     }
 
+    // 7b. Backup v2: DSP snapshots, device profiles, settings profiles.
+    // Raw JSON strings carried verbatim so reinstall restores per-device
+    // DSP memory and profile links instead of dropping them.
+    String? dspSnapshotsRaw;
+    String? deviceProfilesRaw;
+    String? deviceRegistryRaw;
+    String? settingsProfilesRaw;
+    try {
+      String? readRaw(String key) {
+        final v = prefs.getString(key);
+        return (v == null || v.isEmpty) ? null : v;
+      }
+
+      dspSnapshotsRaw = readRaw('dsp_snapshot_store_v1');
+      deviceProfilesRaw = readRaw('setting_device_profile_links');
+      deviceRegistryRaw = readRaw('setting_device_registry');
+      settingsProfilesRaw = readRaw('setting_custom_profiles');
+    } catch (e, st) {
+      ErrorLogger.log('Failed reading v2 profile blobs',
+          error: e, stackTrace: st, category: 'Backup');
+    }
     // 8. Downloaded Tracks Metadata
     final downloadedTracks = allSongs
         .where((s) => s.isDownloaded)
@@ -242,7 +263,7 @@ class ExportBackupUseCase {
     }
 
     final backupPayload = {
-      'version': 3,
+      'version': 4,
       'exportedAt': DateTime.now().toIso8601String(),
       'favorites': favoritePaths,
       'playlists': playlistsData,
@@ -251,6 +272,10 @@ class ExportBackupUseCase {
       'excludedFolders': excludedFolders,
       if (customEqProfilesData != null) 'customEqProfiles': customEqProfilesData,
       if (automationRulesData != null) 'automationRules': automationRulesData,
+      if (dspSnapshotsRaw != null) 'dspSnapshots': dspSnapshotsRaw,
+      if (deviceProfilesRaw != null) 'deviceProfiles': deviceProfilesRaw,
+      if (deviceRegistryRaw != null) 'deviceRegistry': deviceRegistryRaw,
+      if (settingsProfilesRaw != null) 'settingsProfiles': settingsProfilesRaw,
       if (downloadedTracks.isNotEmpty) 'downloads': downloadedTracks,
       if (ratingsData != null) 'ratings': ratingsData,
       if (bpmData != null) 'bpmOverrides': bpmData,
@@ -725,6 +750,25 @@ class ImportBackupUseCase {
     await mergePrefsMap('playback_bookmarks_v1', data['bookmarks'],
         bookmark: true);
 
+    // 9b. Backup v2 restore: verbatim raw profile/snapshot blobs.
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (final e in {
+        'dspSnapshots': 'dsp_snapshot_store_v1',
+        'deviceProfiles': 'setting_device_profile_links',
+        'deviceRegistry': 'setting_device_registry',
+        'settingsProfiles': 'setting_custom_profiles',
+      }.entries) {
+        final v = data[e.key];
+        if (v is String && v.isNotEmpty) {
+          await prefs.setString(e.value, v);
+        }
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed restoring v2 profile blobs',
+          error: e, stackTrace: st, category: 'Backup');
+    }
+
     // 10. Restore saved queue (paths resolved against the fresh library).
     if (data['queue'] is Map<String, dynamic>) {
       final q = data['queue'] as Map<String, dynamic>;
@@ -785,7 +829,7 @@ class ImportBackupUseCase {
     if (version == null || version is! int || version < 1) {
       throw const FormatException('Invalid backup version: missing or malformed version field');
     }
-    if (version > 3) {
+    if (version > 4) {
       throw FormatException('Unsupported backup version: $version. Please update Pulsr.');
     }
 

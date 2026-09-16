@@ -11,7 +11,8 @@ void main() {
   group('code hygiene guards', () {
     // Baseline counted at commit 09ce0cb plus remediation tranches 1-2. Lower
     // this constant as empty catch bodies are fixed; never raise it.
-    const int emptyCatchBaseline = 439;
+    // 439 -> 438 after scrobbler/headset logging pass (14 sites fixed).
+    const int emptyCatchBaseline = 438;
 
     List<File> dartFilesUnderLib() {
       final dir = Directory('lib');

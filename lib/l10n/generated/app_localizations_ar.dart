@@ -6224,4 +6224,38 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get dspBandHigh => 'عالٍ';
+
+  @override
+  String get eqModeEssential => 'أساسي';
+
+  @override
+  String get eqModeStudioPro => 'استوديو (احترافي)';
+
+  @override
+  String get eqSoundProfiles => 'ملفات الصوت';
+
+  @override
+  String get eqCalibrate => 'معايرة';
+
+  @override
+  String get eqFreqResponseCurve => 'منحنى الاستجابة الترددية';
+
+  @override
+  String get eqQuickToneDials => 'أدوات النغمة السريعة';
+
+  @override
+  String get eqUnlockStudioConsole => 'فتح وحدة تحكم DSP للاستوديو';
+
+  @override
+  String get eqUnlockStudioDesc =>
+      'الوصول إلى نطاقات بارامترية 10/32/64 وتصحيح الغرفة والمحدد والموسع الصوتي';
+
+  @override
+  String get queueConfirmDelete => 'تأكيد الحذف';
+
+  @override
+  String get headsetRestartNotice => 'يسري بعد إعادة تشغيل التطبيق.';
+
+  @override
+  String get nowPlayingSwipeHint => 'اسحب للأسفل للإغلاق - اسحب الغلاف للتخطي';
 }

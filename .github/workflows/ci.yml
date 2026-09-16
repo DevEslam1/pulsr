@@ -60,6 +60,9 @@ jobs:
       - name: Run Tests with Coverage
         run: flutter test --coverage
 
+      - name: Enforce Coverage Floor
+        run: python3 scripts/check_coverage.py
+
       - name: Upload Coverage Report
         uses: actions/upload-artifact@v4
         with:

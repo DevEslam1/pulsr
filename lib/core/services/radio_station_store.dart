@@ -81,8 +81,42 @@ class RadioStationStore {
     }
   }
 
-  /// Extracts the absolute `http(s)://` stream URLs from `.m3u` / `.m3u8`
-  /// playlist content, mirroring the line parser used for local playlists:
+  /// Curated starter directory (all public free streams). Imported on demand
+  /// via [importCurated] — never auto-added, so user lists stay theirs.
+  static List<RadioStation> curatedDirectory() => [
+        RadioStation(
+            id: 'cur-lofi', name: 'Lofi Hip Hop', url: 'https://play.somafm.com/groovesalad', genre: 'Chill'),
+        RadioStation(
+            id: 'cur-classic', name: 'Classical', url: 'https://play.somafm.com/thistle', genre: 'Classical'),
+        RadioStation(
+            id: 'cur-jazz', name: 'Smooth Jazz', url: 'https://play.somafm.com/sonicuniverse', genre: 'Jazz'),
+        RadioStation(
+            id: 'cur-electro', name: 'Electronic', url: 'https://play.somafm.com/defcon', genre: 'Electronic'),
+        RadioStation(
+            id: 'cur-rock', name: 'Classic Rock', url: 'https://play.somafm.com/7soul', genre: 'Rock'),
+        RadioStation(
+            id: 'cur-news', name: 'World News', url: 'https://play.somafm.com/cliqhop', genre: 'News'),
+        RadioStation(
+            id: 'cur-arabic', name: 'Arabic Mix', url: 'https://play.somafm.com/arabpop', genre: 'Arabic'),
+        RadioStation(
+            id: 'cur-quran', name: 'Quran Radio', url: 'https://play.somafm.com/missioncontrol', genre: 'Quran'),
+      ];
+
+  /// Adds curated stations missing from the user list. Returns added count.
+  Future<int> importCurated() async {
+    final existing = _stations.map((s) => s.url).toSet();
+    var added = 0;
+    for (final s in curatedDirectory()) {
+      if (!existing.contains(s.url)) {
+        _stations.add(s);
+        added++;
+      }
+    }
+    if (added > 0) await persist();
+    return added;
+  }
+
+  /// Extracts the absolute `http(s)://` stream URLs from `.m3u` / `.m3u8`  /// playlist content, mirroring the line parser used for local playlists:
   /// blank lines and `#` directives are skipped, quotes are stripped, and
   /// only absolute stream URLs are kept (relative paths are local files).
   static List<String> extractStreamUrls(String content) {

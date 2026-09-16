@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/constants/prefs_keys.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/audio/headset_control_config.dart';
 import 'settings_section.dart';
 import 'settings_slider_row.dart';
@@ -61,7 +62,11 @@ class _HeadsetControlsSectionState extends State<HeadsetControlsSection> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(PrefsKeys.autoResumeOnReconnect, v);
-    } catch (_) {}
+    } catch (_) {
+      // Persist failed: revert the optimistic toggle so UI matches storage.
+      if (!mounted) return;
+      setState(() => _autoResume = !v);
+    }
   }
 
   Future<void> _setKeepNotification(bool v) async {
@@ -69,13 +74,18 @@ class _HeadsetControlsSectionState extends State<HeadsetControlsSection> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(PrefsKeys.keepNotificationOnPause, v);
-    } catch (_) {}
+    } catch (_) {
+      // Persist failed: revert the optimistic toggle so UI matches storage.
+      if (!mounted) return;
+      setState(() => _keepNotification = !v);
+      return;
+    }
     if (!mounted) return;
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      const SnackBar(
+      SnackBar(
         behavior: SnackBarBehavior.floating,
-        content: Text('Takes effect after an app restart.'),
-        duration: Duration(seconds: 3),
+        content: Text(context.l10n.headsetRestartNotice),
+        duration: const Duration(seconds: 3),
       ),
     );
   }

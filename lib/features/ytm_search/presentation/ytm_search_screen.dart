@@ -148,26 +148,49 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
             );
     }
 
+    final status = cubit.statusMessage;
     final songs = [for (final track in state.results) track.toSongData()];
-    return RefreshIndicator(
-      onRefresh: () async {
-        cubit.retry();
-        await Future.delayed(const Duration(milliseconds: 300));
-      },
-      child: ListView.builder(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 160, top: 4),
-        itemCount: songs.length,
-        itemBuilder: (context, index) {
-          final song = songs[index];
-          return SongTile(
-            song: song,
-            subtitleOverride: state.results[index].artist,
-            onTap: () => playerCubit.playSong(song, queue: songs),
-            trailing: YtmDownloadButton(song: song),
-          );
-        },
-      ),
+    return Column(
+      children: [
+        if (status != null)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: p.accent.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: p.accent.withValues(alpha: 0.35)),
+            ),
+            child: Text(
+              status,
+              style: TextStyle(fontSize: 11.5, color: p.textSecondary),
+            ),
+          ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: () async {
+              cubit.retry();
+              await Future.delayed(const Duration(milliseconds: 300));
+            },
+            child: ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.only(bottom: 160, top: 4),
+              itemCount: songs.length,
+              itemBuilder: (context, index) {
+                final song = songs[index];
+                return SongTile(
+                  song: song,
+                  subtitleOverride: state.results[index].artist,
+                  onTap: () => playerCubit.playSong(song, queue: songs),
+                  trailing: YtmDownloadButton(song: song),
+                );
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

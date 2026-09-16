@@ -128,21 +128,22 @@ void main() {
       expect(MusicRepository.toFtsQuery('*** --- """ ^^^'), isNull);
     });
 
-    // 6. ImportBackupUseCase.validateSchema throws FormatException with unsupported version message for version: 4
-    test('6. ImportBackupUseCase.validateSchema throws FormatException with unsupported version message for version: 4', () {
+    // 6. ImportBackupUseCase.validateSchema throws FormatException with unsupported version message for version: 5
+    test('6. ImportBackupUseCase.validateSchema throws FormatException with unsupported version message for version: 5', () {
       expect(
-        () => ImportBackupUseCase.validateSchema({'version': 4}),
+        () => ImportBackupUseCase.validateSchema({'version': 5}),
         throwsA(isA<FormatException>().having(
           (e) => e.message,
           'message',
-          equals('Unsupported backup version: 4. Please update Pulsr.'),
+          equals('Unsupported backup version: 5. Please update Pulsr.'),
         )),
       );
 
-      // Valid versions (1..3) do not throw version error
+      // Valid versions (1..4) do not throw version error
       expect(() => ImportBackupUseCase.validateSchema({'version': 1}), returnsNormally);
       expect(() => ImportBackupUseCase.validateSchema({'version': 2}), returnsNormally);
       expect(() => ImportBackupUseCase.validateSchema({'version': 3}), returnsNormally);
+      expect(() => ImportBackupUseCase.validateSchema({'version': 4}), returnsNormally);
     });
 
     // 7. LrcParser.parse skips malformed timestamp lines without throwing

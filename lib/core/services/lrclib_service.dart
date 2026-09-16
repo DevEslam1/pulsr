@@ -376,8 +376,44 @@ class LrclibService {
     return null;
   }
 
-  LyricsResult? _extractLyricsFromJson(Map<String, dynamic> json) {
-    final syncedLyrics = json['syncedLyrics'] as String?;
+  /// Batch fetch for library tracks missing lyrics. Sequential with a small
+  /// cap per call to respect LRCLIB rate limits; reports progress.
+  /// Each entry: {title, artist, album?, durationMs?}. Returns index->result.
+  Future<Map<int, LyricsResult>> fetchMissingLyrics(
+    List<Map<String, dynamic>> tracks, {
+    int maxTracks = 50,
+    Future<void> Function(int done, int total)? onProgress,
+  }) async {
+    final out = <int, LyricsResult>{};
+    final total = tracks.length.clamp(0, maxTracks);
+    for (var i = 0; i < total; i++) {
+      final t = tracks[i];
+      final title = (t['title'] as String?)?.trim() ?? '';
+      final artist = (t['artist'] as String?)?.trim() ?? '';
+      if (title.isEmpty) {
+        await onProgress?.call(i + 1, total);
+        continue;
+      }
+      final durMs = (t['durationMs'] as num?)?.toInt();
+      try {
+        final res = await fetchLyrics(
+          trackName: title,
+          artistName: artist,
+          albumName: t['album'] as String?,
+          durationSeconds:
+              durMs != null && durMs > 0 ? (durMs / 1000).round() : null,
+        );
+        if (res != null && res.lines.isNotEmpty) out[i] = res;
+      } catch (e) {
+        ErrorLogger.log('Lyrics batch track skipped: $title',
+            error: e, category: 'LRCLIB');
+      }
+      await onProgress?.call(i + 1, total);
+    }
+    return out;
+  }
+
+  LyricsResult? _extractLyricsFromJson(Map<String, dynamic> json) {    final syncedLyrics = json['syncedLyrics'] as String?;
     final plainLyrics = json['plainLyrics'] as String?;
 
     if (syncedLyrics != null && syncedLyrics.trim().isNotEmpty) {

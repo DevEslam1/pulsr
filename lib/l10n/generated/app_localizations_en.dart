@@ -6276,4 +6276,38 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dspBandHigh => 'High';
+
+  @override
+  String get eqModeEssential => 'Essential';
+
+  @override
+  String get eqModeStudioPro => 'Studio (Pro)';
+
+  @override
+  String get eqSoundProfiles => 'SOUND PROFILES';
+
+  @override
+  String get eqCalibrate => 'Calibrate';
+
+  @override
+  String get eqFreqResponseCurve => 'FREQUENCY RESPONSE CURVE';
+
+  @override
+  String get eqQuickToneDials => 'QUICK TONE DIALS';
+
+  @override
+  String get eqUnlockStudioConsole => 'Unlock Studio DSP Console';
+
+  @override
+  String get eqUnlockStudioDesc =>
+      'Access 10/32/64 parametric bands, room correction, limiter & spatializer';
+
+  @override
+  String get queueConfirmDelete => 'Confirm Delete';
+
+  @override
+  String get headsetRestartNotice => 'Takes effect after an app restart.';
+
+  @override
+  String get nowPlayingSwipeHint => 'Pull down to close - Swipe art to skip';
 }

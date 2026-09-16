@@ -23,6 +23,7 @@ class SongTile extends StatelessWidget {
   final VoidCallback? onLongPress;
   final Widget? trailing;
   final bool? isDownloaded;
+  final Color? backgroundColor;
 
   const SongTile({
     super.key,
@@ -37,6 +38,7 @@ class SongTile extends StatelessWidget {
     this.onLongPress,
     this.trailing,
     this.isDownloaded,
+    this.backgroundColor,
   });
 
   @override
@@ -65,8 +67,12 @@ class SongTile extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             child: Material(
-              color: selected ? p.accentContainer : Colors.transparent,
+              color: backgroundColor ??
+                  (selected
+                      ? p.accentContainer
+                      : (isActive ? p.surfaceContainer : p.surface)),
               borderRadius: BorderRadius.circular(16),
+              clipBehavior: Clip.antiAlias,
               child: InkWell(
                 borderRadius: BorderRadius.circular(16),
                 onTap: onTap,

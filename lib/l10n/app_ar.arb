@@ -3757,5 +3757,16 @@
   "dspMultibandLabel": "متعدد النطاقات",
   "dspBandLow": "منخفض (<160 هرتز)",
   "dspBandMid": "متوسط",
-  "dspBandHigh": "عالٍ"
+  "dspBandHigh": "عالٍ",
+  "eqModeEssential": "أساسي",
+  "eqModeStudioPro": "استوديو (احترافي)",
+  "eqSoundProfiles": "ملفات الصوت",
+  "eqCalibrate": "معايرة",
+  "eqFreqResponseCurve": "منحنى الاستجابة الترددية",
+  "eqQuickToneDials": "أدوات النغمة السريعة",
+  "eqUnlockStudioConsole": "فتح وحدة تحكم DSP للاستوديو",
+  "eqUnlockStudioDesc": "الوصول إلى نطاقات بارامترية 10/32/64 وتصحيح الغرفة والمحدد والموسع الصوتي",
+  "queueConfirmDelete": "تأكيد الحذف",
+  "headsetRestartNotice": "يسري بعد إعادة تشغيل التطبيق.",
+  "nowPlayingSwipeHint": "اسحب للأسفل للإغلاق - اسحب الغلاف للتخطي"
 }

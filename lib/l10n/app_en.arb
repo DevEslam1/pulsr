@@ -4289,5 +4289,16 @@
   "dspMultibandLabel": "Multiband",
   "dspBandLow": "Low (<160 Hz)",
   "dspBandMid": "Mid",
-  "dspBandHigh": "High"
+  "dspBandHigh": "High",
+  "eqModeEssential": "Essential",
+  "eqModeStudioPro": "Studio (Pro)",
+  "eqSoundProfiles": "SOUND PROFILES",
+  "eqCalibrate": "Calibrate",
+  "eqFreqResponseCurve": "FREQUENCY RESPONSE CURVE",
+  "eqQuickToneDials": "QUICK TONE DIALS",
+  "eqUnlockStudioConsole": "Unlock Studio DSP Console",
+  "eqUnlockStudioDesc": "Access 10/32/64 parametric bands, room correction, limiter & spatializer",
+  "queueConfirmDelete": "Confirm Delete",
+  "headsetRestartNotice": "Takes effect after an app restart.",
+  "nowPlayingSwipeHint": "Pull down to close - Swipe art to skip"
 }

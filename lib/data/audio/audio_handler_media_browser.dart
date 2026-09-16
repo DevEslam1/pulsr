@@ -382,13 +382,40 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
   Future<void> playFromSearch(String query,
       [Map<String, dynamic>? extras]) async {
     if (query.trim().isEmpty) return;
-    final cleanQ = query.trim();
+    var cleanQ = query.trim();
+    // Honor Android Auto voice extras: "play [artist]" / genre / shuffle asks.
+    var autoShuffle = false;
+    try {
+      final focus = extras?['android.media.extra.MEDIA_FOCUS'] as String?;
+      if (focus != null && focus.contains('v16')) autoShuffle = true;
+      final artist = extras?['android.media.extra.EXTRA_METADATA_ARTIST']
+          as String?;
+      final album =
+          extras?['android.media.extra.EXTRA_METADATA_ALBUM'] as String?;
+      final genre = extras?['android.media.extra.EXTRA_METADATA_GENRE']
+          as String?;
+      final title =
+          extras?['android.media.extra.EXTRA_METADATA_TITLE'] as String?;
+      final pick = title?.isNotEmpty == true
+          ? title!
+          : artist?.isNotEmpty == true
+              ? artist!
+              : album?.isNotEmpty == true
+                  ? album!
+                  : genre?.isNotEmpty == true
+                      ? genre!
+                      : cleanQ;
+      if (pick.trim().isNotEmpty) cleanQ = pick.trim();
+    } catch (_) {
+      cleanQ = query.trim();
+    }
     // Indexed FTS search (title/artist/album) instead of a full-library scan.
     final songsRes = await _repository
         .watchAllSongs(searchQuery: cleanQ, limit: 50)
         .first;
     final matches = songsRes.fold((l) => <SongsTableData>[], (r) => r);
     if (matches.isNotEmpty) {
+      if (autoShuffle) matches.shuffle();
       await loadQueue(matches);
       return;
     }

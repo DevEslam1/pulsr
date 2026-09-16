@@ -8,6 +8,7 @@ import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/theme/dynamic_theme_cubit.dart';
 import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../settings/cubit/settings_state.dart';
 import '../cubit/player_cubit.dart';
@@ -404,7 +405,7 @@ class _NowPlayingGestureHintOverlayState
                     const SizedBox(width: 8),
                     Flexible(
                       child: Text(
-                        '↓ Pull down to close • ↔ Swipe art to skip',
+                        context.l10n.nowPlayingSwipeHint,
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w700,

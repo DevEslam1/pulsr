@@ -28,6 +28,28 @@ class TagEditorCubit extends Cubit<TagEditorState> {
   // overwrite them.
   final Set<String> _userEditedFields = <String>{};
 
+  /// Undo stack: snapshots before each user edit. Cleared on save.
+  final List<TagEditorState> _history = <TagEditorState>[];
+  static const int _historyMax = 30;
+
+  bool get canUndo => _history.isNotEmpty;
+
+  void _pushHistory() {
+    if (isClosed) return;
+    _history.add(state);
+    if (_history.length > _historyMax) {
+      _history.removeRange(0, _history.length - _historyMax);
+    }
+  }
+
+  /// Restores the state before the last user edit. Returns false when empty.
+  bool undo() {
+    if (isClosed || _history.isEmpty) return false;
+    final prev = _history.removeLast();
+    emit(prev);
+    return true;
+  }
+
   TagEditorCubit({
     required SongsTableData song,
     List<SongsTableData>? batchSongs,
@@ -138,12 +160,14 @@ class TagEditorCubit extends Cubit<TagEditorState> {
 
   void updateTitle(String val) {
     if (isClosed) return;
+    _pushHistory();
     _userEditedFields.add('title');
     emit(state.copyWith(title: val));
   }
 
   void updateArtist(String val) {
     if (isClosed) return;
+    _pushHistory();
     _userEditedFields.add('artist');
     if (state.isBatchMode) _batchArtistEdited = true;
     emit(state.copyWith(artist: val));
@@ -151,6 +175,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
 
   void updateAlbum(String val) {
     if (isClosed) return;
+    _pushHistory();
     _userEditedFields.add('album');
     if (state.isBatchMode) _batchAlbumEdited = true;
     emit(state.copyWith(album: val));
@@ -158,6 +183,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
 
   void updateGenre(String val) {
     if (isClosed) return;
+    _pushHistory();
     _userEditedFields.add('genre');
     if (state.isBatchMode) _batchGenreEdited = true;
     emit(state.copyWith(genre: val));
@@ -165,6 +191,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
 
   void updateYear(String val) {
     if (isClosed) return;
+    _pushHistory();
     _userEditedFields.add('year');
     if (state.isBatchMode) _batchYearEdited = true;
     emit(state.copyWith(year: val));
@@ -173,6 +200,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
   bool _batchCommentEdited = false;
   void updateTrackNumber(String val) {
     if (isClosed) return;
+    _pushHistory();
     _userEditedFields.add('trackNumber');
     if (state.isBatchMode) _batchTrackEdited = true;
     emit(state.copyWith(trackNumber: val));
@@ -180,6 +208,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
 
   void updateDiscNumber(String val) {
     if (isClosed) return;
+    _pushHistory();
     _userEditedFields.add('discNumber');
     if (state.isBatchMode) _batchDiscEdited = true;
     emit(state.copyWith(discNumber: val));
@@ -187,6 +216,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
 
   void updateComment(String val) {
     if (isClosed) return;
+    _pushHistory();
     _userEditedFields.add('comment');
     if (state.isBatchMode) _batchCommentEdited = true;
     emit(state.copyWith(comment: val));
@@ -194,6 +224,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
 
   void updateLyrics(String val) {
     if (isClosed) return;
+    _pushHistory();
     _userEditedFields.add('lyrics');
     emit(state.copyWith(lyrics: val));
   }
@@ -455,6 +486,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
           _batchTrackEdited = false;
           _batchDiscEdited = false;
           _batchCommentEdited = false;
+          _history.clear();
           emit(state.copyWith(
               status: TagEditorStatus.success, clearBatchProgress: true));
         }
@@ -502,12 +534,14 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       if (isClosed) return;
 
       if (lyricsTruncated && !isClosed) {
+        _history.clear();
         emit(state.copyWith(
           status: TagEditorStatus.success,
           errorMessage:
               'Note: lyrics truncated to 8192 chars (device tag limit).',
         ));
       } else {
+        _history.clear();
         emit(state.copyWith(status: TagEditorStatus.success));
       }
     } on _UnverifiedTagWriteException {

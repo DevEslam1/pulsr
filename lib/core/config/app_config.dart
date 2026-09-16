@@ -1,4 +1,5 @@
 // lib/core/config/app_config.dart
+import 'package:flutter/services.dart';
 import '../utils/error_logger.dart';
 
 enum AppEnvironment { dev, prod }
@@ -45,6 +46,25 @@ class AppConfig {
   /// (see android/app/src/prod/AndroidManifest.xml), no YTM, no Firebase,
   /// no Sentry, no cloud sync — competes with Musicolet on manifest privacy.
   static bool get isPure => isProd && !ytmEnabled;
+
+  /// Runtime Pure check: asks the platform whether the INTERNET permission
+  /// is present in the merged manifest, so a bad manifest merge can't
+  /// silently ship network access in a Pure build. Returns null off Android,
+  /// when the native hook is absent, or on error (treat as "unknown").
+  static Future<bool?> verifyPureNoInternet() async {
+    if (!isPure) return false;
+    try {
+      const channel = MethodChannel('com.pulsr.music/purity');
+      final bool? hasInternet =
+          await channel.invokeMethod<bool>('hasInternetPermission');
+      if (hasInternet == null) return null;
+      return !hasInternet;
+    } on MissingPluginException {
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Telemetry (Sentry/Firebase) is only allowed outside Pure builds and
   /// only when a DSN is actually configured (main.dart already gates on this).

@@ -11320,6 +11320,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'High'**
   String get dspBandHigh;
+
+  /// No description provided for @eqModeEssential.
+  ///
+  /// In en, this message translates to:
+  /// **'Essential'**
+  String get eqModeEssential;
+
+  /// No description provided for @eqModeStudioPro.
+  ///
+  /// In en, this message translates to:
+  /// **'Studio (Pro)'**
+  String get eqModeStudioPro;
+
+  /// No description provided for @eqSoundProfiles.
+  ///
+  /// In en, this message translates to:
+  /// **'SOUND PROFILES'**
+  String get eqSoundProfiles;
+
+  /// No description provided for @eqCalibrate.
+  ///
+  /// In en, this message translates to:
+  /// **'Calibrate'**
+  String get eqCalibrate;
+
+  /// No description provided for @eqFreqResponseCurve.
+  ///
+  /// In en, this message translates to:
+  /// **'FREQUENCY RESPONSE CURVE'**
+  String get eqFreqResponseCurve;
+
+  /// No description provided for @eqQuickToneDials.
+  ///
+  /// In en, this message translates to:
+  /// **'QUICK TONE DIALS'**
+  String get eqQuickToneDials;
+
+  /// No description provided for @eqUnlockStudioConsole.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock Studio DSP Console'**
+  String get eqUnlockStudioConsole;
+
+  /// No description provided for @eqUnlockStudioDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Access 10/32/64 parametric bands, room correction, limiter & spatializer'**
+  String get eqUnlockStudioDesc;
+
+  /// No description provided for @queueConfirmDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Delete'**
+  String get queueConfirmDelete;
+
+  /// No description provided for @headsetRestartNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Takes effect after an app restart.'**
+  String get headsetRestartNotice;
+
+  /// No description provided for @nowPlayingSwipeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pull down to close - Swipe art to skip'**
+  String get nowPlayingSwipeHint;
 }
 
 class _AppLocalizationsDelegate

@@ -53,6 +53,26 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
     } catch (_) {}
   }
 
+  /// Persistent YTM health strip for the search screen: bot cooldown, offline
+  /// (last error was connectivity), or null when healthy. No state change —
+  /// the screen polls this alongside state.
+  String? get statusMessage {
+    if (_service.isBotCoolingDown) {
+      return 'YTM cooling down (bot protection) — retry shortly';
+    }
+    final err = state.errorMessage;
+    if (err != null && err.isNotEmpty) {
+      final lower = err.toLowerCase();
+      if (lower.contains('offline') ||
+          lower.contains('network') ||
+          lower.contains('connection') ||
+          lower.contains('timeout')) {
+        return 'YTM offline — showing local results';
+      }
+    }
+    return null;
+  }
+
   void onQueryChanged(String query) {
     emit(state.copyWith(query: query));
     _debounceTimer?.cancel();

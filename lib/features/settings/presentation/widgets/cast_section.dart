@@ -279,7 +279,7 @@ class _CastSectionState extends State<CastSection> {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        'ACTIVE',
+                        context.l10n.settingsActiveBadge,
                         style: TextStyle(
                           color: p.accent,
                           fontSize: 10,

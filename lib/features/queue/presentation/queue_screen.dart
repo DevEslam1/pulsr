@@ -186,7 +186,7 @@ class QueueScreen extends StatelessWidget {
                         children: [
                           if (isConfirming) ...[
                             Text(
-                              'Confirm Delete',
+                              context.l10n.queueConfirmDelete,
                               style: TextStyle(
                                 color: p.error,
                                 fontWeight: FontWeight.w800,

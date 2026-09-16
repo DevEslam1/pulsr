@@ -1631,7 +1631,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          'Essential',
+                          context.l10n.eqModeEssential,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight:
@@ -1677,7 +1677,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          'Studio (Pro)',
+                          context.l10n.eqModeStudioPro,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight:
@@ -1822,7 +1822,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'SOUND PROFILES',
+                context.l10n.eqSoundProfiles,
                 style: TextStyle(
                   fontSize: 10.5,
                   fontWeight: FontWeight.w800,
@@ -1970,7 +1970,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       _tabController.animateTo(1);
                     },
                     child: Text(
-                      'Calibrate',
+                      context.l10n.eqCalibrate,
                       style: TextStyle(
                           color: p.accent, fontWeight: FontWeight.w700),
                     ),
@@ -1996,7 +1996,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'FREQUENCY RESPONSE CURVE',
+                      context.l10n.eqFreqResponseCurve,
                       style: TextStyle(
                         fontSize: 10.5,
                         fontWeight: FontWeight.w800,
@@ -2033,7 +2033,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
 
           // 5. Macro Sound Tuning Sliders (Bass, Vocals, Treble)
           Text(
-            'QUICK TONE DIALS',
+            context.l10n.eqQuickToneDials,
             style: TextStyle(
               fontSize: 10.5,
               fontWeight: FontWeight.w800,
@@ -2117,7 +2117,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Unlock Studio DSP Console',
+                          context.l10n.eqUnlockStudioConsole,
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
@@ -2126,7 +2126,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Access 10/32/64 parametric bands, room correction, limiter & spatializer',
+                          context.l10n.eqUnlockStudioDesc,
                           style: TextStyle(
                             fontSize: 11,
                             color: p.textSecondary,

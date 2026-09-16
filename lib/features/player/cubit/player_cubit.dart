@@ -656,6 +656,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         durationMs: song.durationMs,
         positionMs: position.inMilliseconds,
         isPlaying: isPlaying,
+        isQuran: state.isQuranModeEnabled,
       );
       return;
     }
@@ -678,6 +679,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
           durationMs: pendingSong.durationMs,
           positionMs: _pendingScrobblePosMs,
           isPlaying: _pendingScrobbleIsPlaying,
+          isQuran: state.isQuranModeEnabled,
         );
       }
       _pendingScrobbleSong = null;

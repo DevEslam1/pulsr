@@ -84,11 +84,34 @@ void main() {
     );
   }
 
+  // NOTE: these tests use fixed pumps instead of pumpAndSettle because the
+  // search TextField's InputDecorator/EditableText tickers stay warm in the
+  // test env and never settle (ambient framework animation, not an app bug —
+  // the screen renders and behaves correctly; verified via TickerMode probe).
+  // A phone surface (400x800) forces the phone layout: the default 800x600
+  // test viewport hits the >=720 tablet breakpoint (master-detail without
+  // the 'all' hero card these tests assert).
+  Future<void> pumpScreen(WidgetTester tester) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(buildTestScreen());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+  }
+
+  Future<void> settleAnims(WidgetTester tester) async {
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+  }
+
   group('Redesigned SettingsScreen UI', () {
     testWidgets('renders header, search bar, category pills, and hero card',
         (tester) async {
-      await tester.pumpWidget(buildTestScreen());
-      await tester.pumpAndSettle();
+      await pumpScreen(tester);
 
       // Header title and search box
       expect(find.text('Settings'), findsWidgets);
@@ -98,21 +121,30 @@ void main() {
       // Hero Account / Cloud card
       expect(find.byType(SettingsHeroCard), findsOneWidget);
 
-      // Category filter pills
+      // Category filter pills (row is lazily built: scroll to reveal later pills)
       expect(find.text('All'), findsOneWidget);
       expect(find.text('Audio & Sound'), findsWidgets);
       expect(find.text('Playback'), findsWidgets);
+      final pillsRow = find.byWidgetPredicate(
+        (w) => w is ListView && w.scrollDirection == Axis.horizontal,
+      );
+      expect(pillsRow, findsOneWidget);
+      for (var i = 0;
+          i < 6 && find.text('Appearance').evaluate().isEmpty;
+          i++) {
+        await tester.drag(pillsRow, const Offset(-320, 0));
+        await settleAnims(tester);
+      }
       expect(find.text('Appearance'), findsWidgets);
     });
 
     testWidgets('live search filters settings correctly and displays category badge',
         (tester) async {
-      await tester.pumpWidget(buildTestScreen());
-      await tester.pumpAndSettle();
+      await pumpScreen(tester);
 
       // Enter search query "crossfade"
       await tester.enterText(find.byType(TextField), 'crossfade');
-      await tester.pumpAndSettle();
+      await settleAnims(tester);
 
       // Category filter row is hidden during search mode
       expect(find.text('All'), findsNothing);
@@ -123,33 +155,38 @@ void main() {
 
       // Clear search
       await tester.tap(find.byIcon(Icons.clear_rounded));
-      await tester.pumpAndSettle();
+      await settleAnims(tester);
 
       // Category row restored
       expect(find.text('All'), findsOneWidget);
     });
 
     testWidgets('empty search shows helpful empty state', (tester) async {
-      await tester.pumpWidget(buildTestScreen());
-      await tester.pumpAndSettle();
+      await pumpScreen(tester);
 
       await tester.enterText(find.byType(TextField), 'xyznonexistent123');
-      await tester.pumpAndSettle();
+      await settleAnims(tester);
 
       expect(find.text('No settings found for "xyznonexistent123"'), findsOneWidget);
     });
 
     testWidgets('tapping category filter changes active category', (tester) async {
-      await tester.pumpWidget(buildTestScreen());
-      await tester.pumpAndSettle();
+      await pumpScreen(tester);
 
       // Tap "Playback" category filter pill
       final playbackPill = find.widgetWithText(GestureDetector, 'Playback');
       expect(playbackPill, findsOneWidget);
       await tester.tap(playbackPill);
-      await tester.pumpAndSettle();
+      await settleAnims(tester);
 
-      // Only playback section is visible in filtered mode
+      // Only playback section is visible in filtered mode (scroll: lazy list)
+      for (var i = 0;
+          i < 8 && find.text('PLAYBACK').evaluate().isEmpty;
+          i++) {
+        await tester.dragFrom(
+            const Offset(200, 500), const Offset(0, -500));
+        await settleAnims(tester);
+      }
       expect(find.text('PLAYBACK'), findsWidgets);
     });
   });
