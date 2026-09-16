@@ -736,7 +736,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             try {
                 Log.d(TAG, "Playlist: trying InnertubeClient browse with browseId=$bId")
                 val json = client.requestBrowse(bId)
-                val tracks = parseInnertubeTracksFromJson(json, limit)
+                val tracks = parsePlaylistTracksFromJson(json, limit)
                 if (tracks.isNotEmpty()) {
                     Log.i(TAG, "Playlist: parsed ${tracks.size} tracks via browseId=$bId")
 
@@ -746,10 +746,10 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                     var currentJson = json
                     var pageCount = 0
                     while (allTracks.size < limit && pageCount < 10) {
-                        val token = extractContinuationToken(currentJson) ?: break
+                        val token = extractPlaylistContinuationToken(currentJson) ?: break
                         try {
                             val contJson = client.requestContinuation(token)
-                            val contTracks = parseInnertubeTracksFromJson(contJson, limit - allTracks.size)
+                            val contTracks = parsePlaylistTracksFromJson(contJson, limit - allTracks.size)
                             if (contTracks.isEmpty()) break
                             for (t in contTracks) {
                                 val vid = t["videoId"] as? String
@@ -966,6 +966,218 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             }
         }
         return find(json)
+    }
+
+    /**
+     * Parses tracks strictly belonging to a playlist.
+     * Scopes extraction to musicPlaylistShelfContinuation or musicPlaylistShelfRenderer
+     * to avoid pulling in suggested/recommended tracks.
+     */
+    private fun parsePlaylistTracksFromJson(
+        json: org.json.JSONObject,
+        limit: Int,
+    ): List<Map<String, Any?>> {
+        // 1. Check for musicPlaylistShelfContinuation in continuation responses
+        val contContents = json.optJSONObject("continuationContents")
+        val playlistCont = contContents?.optJSONObject("musicPlaylistShelfContinuation")
+        if (playlistCont != null) {
+            return parseShelfListItems(playlistCont, limit)
+        }
+
+        // 2. Check for musicPlaylistShelfRenderer in browse responses
+        fun findShelf(node: Any?): org.json.JSONObject? {
+            return when (node) {
+                is org.json.JSONObject -> {
+                    if (node.has("musicPlaylistShelfRenderer")) {
+                        node.optJSONObject("musicPlaylistShelfRenderer")
+                    } else {
+                        val keys = node.keys()
+                        while (keys.hasNext()) {
+                            val res = findShelf(node.opt(keys.next()))
+                            if (res != null) return res
+                        }
+                        null
+                    }
+                }
+                is org.json.JSONArray -> {
+                    for (i in 0 until node.length()) {
+                        val res = findShelf(node.opt(i))
+                        if (res != null) return res
+                    }
+                    null
+                }
+                else -> null
+            }
+        }
+
+        val shelf = findShelf(json)
+        if (shelf != null) {
+            return parseShelfListItems(shelf, limit)
+        }
+
+        return parseInnertubeTracksFromJson(json, limit)
+    }
+
+    private fun parseShelfListItems(
+        shelf: org.json.JSONObject,
+        limit: Int,
+    ): List<Map<String, Any?>> {
+        val contents = shelf.optJSONArray("contents") ?: return emptyList()
+        val results = mutableListOf<Map<String, Any?>>()
+        val seenVideoIds = mutableSetOf<String>()
+        for (i in 0 until contents.length()) {
+            if (results.size >= limit) break
+            val item = contents.optJSONObject(i) ?: continue
+            val renderer = item.optJSONObject("musicResponsiveListItemRenderer") ?: continue
+            val track = parseSingleResponsiveRenderer(renderer, seenVideoIds)
+            if (track != null) {
+                results.add(track)
+            }
+        }
+        return results
+    }
+
+    private fun parseSingleResponsiveRenderer(
+        renderer: org.json.JSONObject,
+        seenVideoIds: MutableSet<String>,
+    ): Map<String, Any?>? {
+        val videoId = renderer.optString("videoId").takeIf { it.length == 11 } ?: run {
+            renderer.optJSONObject("navigationEndpoint")
+                ?.optJSONObject("watchEndpoint")
+                ?.optString("videoId")
+                ?.takeIf { it.length == 11 }
+        } ?: return null
+
+        if (!seenVideoIds.add(videoId)) return null
+
+        var title = "Unknown Title"
+        val flexCols = renderer.optJSONArray("flexColumns")
+        if (flexCols != null && flexCols.length() > 0) {
+            val runs = flexCols.optJSONObject(0)
+                ?.optJSONObject("musicResponsiveListItemFlexColumnRenderer")
+                ?.optJSONObject("text")
+                ?.optJSONArray("runs")
+            if (runs != null && runs.length() > 0) {
+                title = runs.optJSONObject(0)?.optString("text") ?: title
+            }
+        }
+
+        var artist = "Unknown Artist"
+        if (flexCols != null && flexCols.length() > 1) {
+            val runs = flexCols.optJSONObject(1)
+                ?.optJSONObject("musicResponsiveListItemFlexColumnRenderer")
+                ?.optJSONObject("text")
+                ?.optJSONArray("runs")
+            if (runs != null) {
+                for (i in 0 until runs.length()) {
+                    val text = runs.optJSONObject(i)?.optString("text")?.trim() ?: continue
+                    if (text.isNotEmpty() && text != "•" && text != "·" &&
+                        text.lowercase() != "song" && text.lowercase() != "video"
+                    ) {
+                        artist = text
+                        break
+                    }
+                }
+            }
+        }
+
+        var durationSec = 0
+        val fixedCols = renderer.optJSONArray("fixedColumns")
+        if (fixedCols != null && fixedCols.length() > 0) {
+            val durText = fixedCols.optJSONObject(0)
+                ?.optJSONObject("musicResponsiveListItemFixedColumnRenderer")
+                ?.optJSONObject("text")
+                ?.optJSONArray("runs")
+                ?.optJSONObject(0)
+                ?.optString("text")
+            if (durText != null) {
+                val parts = durText.split(":").mapNotNull { it.toIntOrNull() }
+                durationSec = when (parts.size) {
+                    2 -> parts[0] * 60 + parts[1]
+                    3 -> parts[0] * 3600 + parts[1] * 60 + parts[2]
+                    else -> 0
+                }
+            }
+        }
+
+        val thumbUrl: String? = renderer
+            .optJSONObject("thumbnail")
+            ?.optJSONObject("musicThumbnailRenderer")
+            ?.optJSONObject("thumbnail")
+            ?.optJSONArray("thumbnails")
+            ?.let { arr ->
+                if (arr.length() > 0) arr.optJSONObject(arr.length() - 1)?.optString("url")
+                else null
+            }
+
+        return mapOf(
+            "videoId" to videoId,
+            "title" to title,
+            "uploader" to artist,
+            "thumbnailUrl" to thumbUrl,
+            "duration" to durationSec.toLong(),
+            "viewCount" to -1L,
+            "isLive" to false,
+            "shortDescription" to null,
+            "url" to "https://music.youtube.com/watch?v=$videoId",
+        )
+    }
+
+    /** Extracts a playlist continuation token strictly from playlist shelf/continuation nodes. */
+    private fun extractPlaylistContinuationToken(json: org.json.JSONObject): String? {
+        val contContents = json.optJSONObject("continuationContents")
+        val playlistCont = contContents?.optJSONObject("musicPlaylistShelfContinuation")
+        if (playlistCont != null) {
+            return extractTokenFromShelfContinuations(playlistCont)
+        }
+
+        fun findShelf(node: Any?): org.json.JSONObject? {
+            return when (node) {
+                is org.json.JSONObject -> {
+                    if (node.has("musicPlaylistShelfRenderer")) {
+                        node.optJSONObject("musicPlaylistShelfRenderer")
+                    } else {
+                        val keys = node.keys()
+                        while (keys.hasNext()) {
+                            val res = findShelf(node.opt(keys.next()))
+                            if (res != null) return res
+                        }
+                        null
+                    }
+                }
+                is org.json.JSONArray -> {
+                    for (i in 0 until node.length()) {
+                        val res = findShelf(node.opt(i))
+                        if (res != null) return res
+                    }
+                    null
+                }
+                else -> null
+            }
+        }
+
+        val shelf = findShelf(json)
+        if (shelf != null) {
+            return extractTokenFromShelfContinuations(shelf)
+        }
+        return null
+    }
+
+    private fun extractTokenFromShelfContinuations(shelf: org.json.JSONObject): String? {
+        val continuations = shelf.optJSONArray("continuations") ?: return null
+        for (i in 0 until continuations.length()) {
+            val c = continuations.optJSONObject(i) ?: continue
+            val nextData = c.optJSONObject("nextContinuationData")
+            val token = nextData?.optString("continuation")?.takeIf { it.isNotEmpty() }
+            if (token != null) return token
+            val endpoint = c.optJSONObject("continuationEndpoint")
+            val cmdToken = endpoint?.optJSONObject("continuationCommand")?.optString("token")?.takeIf { it.isNotEmpty() }
+            if (cmdToken != null) return cmdToken
+            val cmd = c.optJSONObject("continuationCommand")
+            val directToken = cmd?.optString("token")?.takeIf { it.isNotEmpty() }
+            if (directToken != null) return directToken
+        }
+        return null
     }
 
     /**

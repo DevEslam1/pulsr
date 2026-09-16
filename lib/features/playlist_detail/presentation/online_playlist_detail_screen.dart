@@ -148,7 +148,10 @@ class _OnlinePlaylistDetailScreenState
               details.title != 'Playlist') {
             _title = details.title;
           }
-          if (details.author.isNotEmpty) {
+          if (details.author.isNotEmpty &&
+              details.author != 'YouTube Music' &&
+              details.author != 'Auto Playlist' &&
+              !details.author.toLowerCase().startsWith('playlist ')) {
             _subtitle = details.author;
           }
           _artworkUrl = details.artworkUrl ?? fetchedTracks.firstOrNull?.artworkUrl;

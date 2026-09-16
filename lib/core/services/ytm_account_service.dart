@@ -1187,7 +1187,7 @@ class YtmAccountService {
           }
 
           _harvestSessionState(json);
-          final tracks = _parseInnertubePlaylistTracks(json);
+          final tracks = _parsePlaylistTracks(json);
           debugPrint(
               '[YTM_ACCOUNT] Liked songs query $bId parsed ${tracks.length} tracks'
               ' (top-level keys: ${json.keys.take(8).join(', ')})');
@@ -1198,7 +1198,7 @@ class YtmAccountService {
                 '(${response.body.length} B, keys: ${json.keys.take(8).join(', ')})');
             // YouTube Music frequently delivers the liked-songs list only via
             // continuation — the initial browse response is a header shell.
-            final initToken = _extractContinuationToken(json);
+            final initToken = _extractPlaylistContinuationToken(json);
             if (initToken != null && initToken.isNotEmpty) {
               debugPrint(
                   '[YTM_ACCOUNT] Initial browse had 0 tracks but continuation found, fetching...');
@@ -1214,7 +1214,7 @@ class YtmAccountService {
               if (contRes.statusCode == 200) {
                 final contJson =
                     jsonDecode(contRes.body) as Map<String, dynamic>;
-                final contTracks = _parseInnertubePlaylistTracks(contJson);
+                final contTracks = _parsePlaylistTracks(contJson);
                 debugPrint(
                     '[YTM_ACCOUNT] Browse initial continuation parsed ${contTracks.length} tracks');
                 if (contTracks.isNotEmpty) {
@@ -1248,7 +1248,7 @@ class YtmAccountService {
             while (allTracks.length < maxTracks && pageCount < maxPages) {
               pageCount++;
               try {
-                final ctoken = _extractContinuationToken(currentJson);
+                final ctoken = _extractPlaylistContinuationToken(currentJson);
                 if (ctoken == null || ctoken.isEmpty) break;
 
                 final contBody = jsonEncode({
@@ -1265,7 +1265,7 @@ class YtmAccountService {
                 if (contResponse.statusCode == 200) {
                   currentJson =
                       jsonDecode(contResponse.body) as Map<String, dynamic>;
-                  final contTracks = _parseInnertubePlaylistTracks(currentJson);
+                  final contTracks = _parsePlaylistTracks(currentJson);
                   if (contTracks.isEmpty) {
                     consecutiveEmptyPages++;
                     if (consecutiveEmptyPages >= 3) break;
@@ -1503,13 +1503,13 @@ class YtmAccountService {
             playlistArtwork = headerInfo['artwork'];
           }
 
-          final tracks = _parseInnertubePlaylistTracks(json);
+          final tracks = _parsePlaylistTracks(json);
           debugPrint(
               '[YTM_ACCOUNT] Playlist browse $bId parsed ${tracks.length} tracks (title: $playlistTitle)');
 
           // Check if initial response was a header shell with continuation
           if (tracks.isEmpty) {
-            final initToken = _extractContinuationToken(json);
+            final initToken = _extractPlaylistContinuationToken(json);
             if (initToken != null && initToken.isNotEmpty) {
               final contBody = jsonEncode({
                 'context': _buildClientContext('WEB_REMIX'),
@@ -1524,7 +1524,7 @@ class YtmAccountService {
               if (contRes.statusCode == 200) {
                 final contJson =
                     jsonDecode(contRes.body) as Map<String, dynamic>;
-                final contTracks = _parseInnertubePlaylistTracks(contJson);
+                final contTracks = _parsePlaylistTracks(contJson);
                 if (contTracks.isNotEmpty) {
                   tracks.addAll(contTracks);
                   // Continue pagination from the continuation response,
@@ -1545,7 +1545,7 @@ class YtmAccountService {
             var consecutiveEmpty = 0;
             while (allTracks.length < maxTracks && pageCount < maxPages) {
               pageCount++;
-              final ctoken = _extractContinuationToken(currentJson);
+              final ctoken = _extractPlaylistContinuationToken(currentJson);
               if (ctoken == null || ctoken.isEmpty) break;
 
               final contBody = jsonEncode({
@@ -1562,7 +1562,7 @@ class YtmAccountService {
 
               if (contRes.statusCode == 200) {
                 currentJson = jsonDecode(contRes.body) as Map<String, dynamic>;
-                final contTracks = _parseInnertubePlaylistTracks(currentJson);
+                final contTracks = _parsePlaylistTracks(currentJson);
                 if (contTracks.isEmpty) {
                   consecutiveEmpty++;
                   if (consecutiveEmpty >= 2) break;
@@ -1627,7 +1627,7 @@ class YtmAccountService {
           playlistAuthor = headerInfo['author']!;
         }
 
-        final tracks = _parseInnertubePlaylistTracks(json);
+        final tracks = _parsePlaylistTracks(json);
         if (tracks.isNotEmpty) {
           final seen = <String>{};
           final uniqueTracks =
@@ -1671,15 +1671,47 @@ class YtmAccountService {
         title = titleRuns.map((r) => r['text']?.toString() ?? '').join();
       }
 
-      final subRuns = (header['subtitle']?['runs'] ??
-          header['straplineTextOne']?['runs'] ??
-          header['secondSubtitle']?['runs']) as List<dynamic>?;
-      if (subRuns != null && subRuns.isNotEmpty && author == null) {
-        final text = subRuns
+      // Prioritize straplineTextOne / straplineText / owner as they contain the actual author/creator
+      final straplineRuns = (header['straplineTextOne']?['runs'] ??
+          header['straplineText']?['runs'] ??
+          header['strapline']?['runs'] ??
+          header['owner']?['runs']) as List<dynamic>?;
+      if (straplineRuns != null && straplineRuns.isNotEmpty && author == null) {
+        final text = straplineRuns
             .map((r) => r['text']?.toString().trim() ?? '')
             .where((t) => t.isNotEmpty && t != '•' && t != '·')
             .join(' ');
         if (text.isNotEmpty) author = text;
+      }
+
+      final subRuns = (header['subtitle']?['runs'] ??
+          header['secondSubtitle']?['runs']) as List<dynamic>?;
+      if (subRuns != null && subRuns.isNotEmpty && author == null) {
+        // Filter out metadata keywords like "Playlist", "Public", "Private", "Unlisted", or 4-digit years
+        final filteredRuns = subRuns.where((r) {
+          final t = r['text']?.toString().trim() ?? '';
+          final lower = t.toLowerCase();
+          return t.isNotEmpty &&
+              t != '•' &&
+              t != '·' &&
+              lower != 'playlist' &&
+              lower != 'public' &&
+              lower != 'private' &&
+              lower != 'unlisted' &&
+              !RegExp(r'^\d{4}$').hasMatch(t);
+        }).toList();
+
+        if (filteredRuns.isNotEmpty) {
+          author = filteredRuns
+              .map((r) => r['text']?.toString().trim() ?? '')
+              .join(' ');
+        } else {
+          final text = subRuns
+              .map((r) => r['text']?.toString().trim() ?? '')
+              .where((t) => t.isNotEmpty && t != '•' && t != '·')
+              .join(' ');
+          if (text.isNotEmpty) author = text;
+        }
       }
 
       final thumbRenderer =
@@ -2432,6 +2464,125 @@ class YtmAccountService {
     return null;
   }
 
+  /// Searches for a map containing [key] in the InnerTube JSON tree.
+  Map<String, dynamic>? _findShelfNode(dynamic node, String key, [int depth = 0]) {
+    if (depth > 25 || node == null) return null;
+    if (node is Map<String, dynamic>) {
+      if (node.containsKey(key) && node[key] is Map<String, dynamic>) {
+        return node[key] as Map<String, dynamic>;
+      }
+      for (final val in node.values) {
+        final found = _findShelfNode(val, key, depth + 1);
+        if (found != null) return found;
+      }
+    } else if (node is List) {
+      for (final item in node) {
+        final found = _findShelfNode(item, key, depth + 1);
+        if (found != null) return found;
+      }
+    }
+    return null;
+  }
+
+  /// Extracts the continuation token strictly from a playlist shelf or continuation.
+  /// Never extracts from Suggestions or unrelated shelves.
+  String? _extractPlaylistContinuationToken(Map<String, dynamic> root) {
+    // 1. Continuation response: continuationContents.musicPlaylistShelfContinuation
+    final contContents = root['continuationContents'] as Map<String, dynamic>?;
+    final playlistCont = contContents?['musicPlaylistShelfContinuation']
+            as Map<String, dynamic>? ??
+        _findShelfNode(root, 'musicPlaylistShelfContinuation');
+    if (playlistCont != null) {
+      return _extractTokenFromShelfContinuations(playlistCont);
+    }
+
+    // 2. Initial browse response: musicPlaylistShelfRenderer
+    final playlistShelf = _findShelfNode(root, 'musicPlaylistShelfRenderer');
+    if (playlistShelf != null) {
+      return _extractTokenFromShelfContinuations(playlistShelf);
+    }
+
+    return null;
+  }
+
+  String? _extractTokenFromShelfContinuations(Map<String, dynamic> shelf) {
+    final continuations = shelf['continuations'];
+    if (continuations is List && continuations.isNotEmpty) {
+      for (final c in continuations) {
+        if (c is Map<String, dynamic>) {
+          final nextData = c['nextContinuationData'];
+          if (nextData is Map<String, dynamic>) {
+            final token = nextData['continuation'] as String?;
+            if (token != null && token.isNotEmpty) return token;
+          }
+          final contEndpoint = c['continuationEndpoint'];
+          if (contEndpoint is Map<String, dynamic>) {
+            final token = contEndpoint['continuationCommand']?['token'] as String?;
+            if (token != null && token.isNotEmpty) return token;
+          }
+          final contCmd = c['continuationCommand'];
+          if (contCmd is Map<String, dynamic>) {
+            final token = contCmd['token'] as String?;
+            if (token != null && token.isNotEmpty) return token;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Parses tracks strictly belonging to a playlist.
+  /// Ignores "Suggestions", "Related", and carousels so playlists only contain
+  /// their actual tracks.
+  List<YtmTrack> _parsePlaylistTracks(Map<String, dynamic> root) {
+    // 1. Check for continuation response: musicPlaylistShelfContinuation
+    final contContents = root['continuationContents'] as Map<String, dynamic>?;
+    final playlistCont = contContents?['musicPlaylistShelfContinuation']
+            as Map<String, dynamic>? ??
+        _findShelfNode(root, 'musicPlaylistShelfContinuation');
+    if (playlistCont != null) {
+      final contents = playlistCont['contents'];
+      if (contents is List) {
+        final tracks = <YtmTrack>[];
+        for (final item in contents) {
+          if (item is Map<String, dynamic>) {
+            final renderer = item['musicResponsiveListItemRenderer']
+                as Map<String, dynamic>?;
+            if (renderer != null) {
+              final track = _parseListItemRenderer(renderer);
+              if (track != null) tracks.add(track);
+            }
+          }
+        }
+        return tracks;
+      }
+    }
+
+    // 2. Check for initial browse response: musicPlaylistShelfRenderer
+    final playlistShelf = _findShelfNode(root, 'musicPlaylistShelfRenderer');
+    if (playlistShelf != null) {
+      final contents = playlistShelf['contents'];
+      if (contents is List) {
+        final tracks = <YtmTrack>[];
+        for (final item in contents) {
+          if (item is Map<String, dynamic>) {
+            final renderer = item['musicResponsiveListItemRenderer']
+                as Map<String, dynamic>?;
+            if (renderer != null) {
+              final track = _parseListItemRenderer(renderer);
+              if (track != null) tracks.add(track);
+            }
+          }
+        }
+        return tracks;
+      }
+    }
+
+    // 3. Fallback: For Next endpoint (playlistPanelVideoRenderer) or generic browse,
+    // parse while strictly ignoring Suggestions and card carousels.
+    return _parseInnertubePlaylistTracks(root, ignoreSuggestions: true);
+  }
+
   /// Reads the account `datasyncId` from `responseContext.mainAppWebResponseContext.datasyncId`.
   /// This is the raw content-binding for the account poToken (kept verbatim, incl. trailing `||`).
   String? _extractDataSyncId(Map<String, dynamic> json) {
@@ -2494,7 +2645,10 @@ class YtmAccountService {
     }
   }
 
-  List<YtmTrack> _parseInnertubePlaylistTracks(Map<String, dynamic> root) {
+  List<YtmTrack> _parseInnertubePlaylistTracks(
+    Map<String, dynamic> root, {
+    bool ignoreSuggestions = false,
+  }) {
     final tracks = <YtmTrack>[];
 
     void traverse(dynamic node) {
@@ -2524,6 +2678,24 @@ class YtmAccountService {
         }
         if (node.containsKey('musicShelfRenderer')) {
           final shelf = node['musicShelfRenderer'] as Map<String, dynamic>;
+          if (ignoreSuggestions) {
+            final titleRuns = shelf['title']?['runs'] as List<dynamic>?;
+            final titleText = titleRuns
+                    ?.map((r) => r['text']?.toString() ?? '')
+                    .join()
+                    .toLowerCase() ??
+                '';
+            final isSuggestions = titleText.contains('suggestion') ||
+                titleText.contains('suggested') ||
+                titleText.contains('اقتراح') ||
+                titleText.contains('sugerencia') ||
+                titleText.contains('empfehlung');
+            final hasReload = shelf.containsKey('bottomEndpoint') ||
+                shelf.containsKey('reloadContinuationData');
+            if (isSuggestions || hasReload) {
+              return; // Skip suggestions shelf!
+            }
+          }
           final contents = shelf['contents'];
           if (contents is List) {
             for (final item in contents) {
@@ -2603,6 +2775,9 @@ class YtmAccountService {
           }
           return;
         } else if (node.containsKey('musicTwoRowItemRenderer')) {
+          if (ignoreSuggestions) {
+            return; // Skip album/playlist tiles in playlist track context
+          }
           final renderer =
               node['musicTwoRowItemRenderer'] as Map<String, dynamic>;
           String? vid = renderer['navigationEndpoint']?['watchEndpoint']
