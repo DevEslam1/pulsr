@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/di/injection.dart';
@@ -39,9 +41,31 @@ class _YtmSearchView extends StatefulWidget {
 
 class _YtmSearchViewState extends State<_YtmSearchView> {
   final TextEditingController _searchController = TextEditingController();
+  Future<List<String>>? _historyFuture;
+  Timer? _healthTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshHistory();
+    // statusMessage polls YtmService.isBotCoolingDown which lives outside
+    // Bloc state — repaint periodically so the cooldown strip appears /
+    // clears without requiring another search.
+    _healthTimer =
+        Timer.periodic(const Duration(seconds: 5), (_) => mounted ? setState(() {}) : null);
+  }
+
+  void _refreshHistory() {
+    try {
+      _historyFuture = context.read<YtmSearchCubit>().getSearchHistory();
+    } catch (_) {
+      _historyFuture = Future.value(const <String>[]);
+    }
+  }
 
   @override
   void dispose() {
+    _healthTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -64,7 +88,11 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
         child: Center(
           child: ConstrainedBox(
             constraints: Adaptive.contentConstraints(context),
-            child: BlocBuilder<YtmSearchCubit, YtmSearchState>(
+            child: BlocListener<YtmSearchCubit, YtmSearchState>(
+              listenWhen: (prev, curr) =>
+                  prev.results != curr.results && curr.results.isNotEmpty,
+              listener: (_, __) => setState(_refreshHistory),
+              child: BlocBuilder<YtmSearchCubit, YtmSearchState>(
               builder: (context, state) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -103,11 +131,77 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                   ],
                 );
               },
+              ),
             ),
           ),
         ),
       ),
       ),
+    );
+  }
+
+  Widget _buildHistory(BuildContext context, PulsrPalette p) {
+    final cubit = context.read<YtmSearchCubit>();
+    return FutureBuilder<List<String>>(
+      future: _historyFuture,
+      builder: (context, snapshot) {
+        final history = snapshot.data ?? const <String>[];
+        if (history.isEmpty) {
+          return EmptyStateWidget(
+            icon: Icons.travel_explore_rounded,
+            title: context.l10n.searchYtm,
+            subtitle: context.l10n.browseYtmSearchScreenDesc,
+          );
+        }
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 160),
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    context.l10n.history,
+                    style: TextStyle(
+                      color: p.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    await cubit.clearHistory();
+                    if (mounted) setState(_refreshHistory);
+                  },
+                  child: Text(context.l10n.browseClearHistory),
+                ),
+              ],
+            ),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final h in history)
+                  ActionChip(
+                    label: Text(h,
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                    avatar: Icon(Icons.history_rounded,
+                        size: 16, color: p.textTertiary),
+                    onPressed: () {
+                      _searchController.text = h;
+                      cubit.onQueryChanged(h);
+                    },
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              context.l10n.browseYtmSearchScreenDesc,
+              style: TextStyle(color: p.textTertiary, fontSize: 12.5),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -141,11 +235,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
               subtitle:
                   '${context.l10n.browseNoYtmMatchesFor} "${state.query.trim()}".',
             )
-          : EmptyStateWidget(
-              icon: Icons.travel_explore_rounded,
-              title: context.l10n.searchYtm,
-              subtitle: context.l10n.browseYtmSearchScreenDesc,
-            );
+          : _buildHistory(context, p);
     }
 
     final status = cubit.statusMessage;

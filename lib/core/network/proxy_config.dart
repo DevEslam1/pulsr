@@ -67,7 +67,12 @@ class ProxyConfig {
     return false;
   }
 
-  /// Returns proxy string for Dart `HttpClient.findProxy`
+  /// Returns proxy string for Dart `HttpClient.findProxy`.
+  ///
+  /// Dart's `HttpClient` speaks HTTP proxies only — emitting a SOCKS token
+  /// here would fail closed on the Dart fallback path. SOCKS5 is applied on
+  /// the native OkHttp extractor (`YtmHttpClient` → `Proxy.Type.SOCKS`), so
+  /// this method honestly returns DIRECT for SOCKS and the UI must say so.
   String toFindProxyString(Uri uri) {
     if (!enabled || !isValid || isBypassed(uri)) {
       return 'DIRECT';
@@ -82,9 +87,13 @@ class ProxyConfig {
       case AppProxyType.http:
         return 'PROXY $formattedHost:$port; DIRECT';
       case AppProxyType.socks5:
-        return 'SOCKS5 $formattedHost:$port; SOCKS $formattedHost:$port; DIRECT';
+        // Dart fallback cannot speak SOCKS — native extractor owns it.
+        return 'DIRECT';
     }
   }
+
+  /// True when the Dart `HttpClient` path can apply this config.
+  bool get isSupportedOnDart => !enabled || !isValid || type == AppProxyType.http;
 
   Map<String, dynamic> toMap() {
     return {

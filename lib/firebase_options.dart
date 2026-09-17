@@ -66,7 +66,7 @@ class DefaultFirebaseOptions {
     storageBucket: 'pulsr-24243.firebasestorage.app',
     iosClientId:
         '973193718497-bb716okvnhklii03mimq4pv5pdfjaveg.apps.googleusercontent.com',
-    iosBundleId: 'com.example.pulsr',
+    iosBundleId: 'com.pulsr.music',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -77,7 +77,7 @@ class DefaultFirebaseOptions {
     storageBucket: 'pulsr-24243.firebasestorage.app',
     iosClientId:
         '973193718497-bb716okvnhklii03mimq4pv5pdfjaveg.apps.googleusercontent.com',
-    iosBundleId: 'com.example.pulsr',
+    iosBundleId: 'com.pulsr.music',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(

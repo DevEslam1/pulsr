@@ -1236,6 +1236,24 @@ class AppLocalizationsEn extends AppLocalizations {
       'Wi-Fi Only Mode is active. Connect to Wi-Fi to download.';
 
   @override
+  String get downloadOfflineOnly =>
+      'Offline Only Mode is active. Turn it off in Settings to download.';
+
+  @override
+  String get settingsDownloadConcurrent => 'Concurrent downloads';
+
+  @override
+  String get settingsDownloadConcurrentSubtitle =>
+      'Maximum tracks downloading at the same time (1-5).';
+
+  @override
+  String get settingsDownloadLocation => 'Download location';
+
+  @override
+  String get settingsDownloadLocationUnsupported =>
+      'Custom download locations are not supported yet. Files are saved to the Music folder.';
+
+  @override
   String get downloadErrorAlreadyQueued =>
       'This song is already in the download queue.';
 
@@ -6347,6 +6365,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get errYtmSyncLikes => 'Failed to sync YouTube Music likes';
+
+  @override
+  String get errSearchFailed => 'Search failed. Please try again.';
+
+  @override
+  String get errPlaylistNameRequired => 'Please enter a playlist name.';
 
   @override
   String get dspMultibandLabel => 'Multiband';

@@ -1,29 +1,50 @@
-import 'package:bloc_test/bloc_test.dart';
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
-import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:pulsr/core/errors/failures.dart';
 import 'package:pulsr/core/services/yt_download_service.dart';
 import 'package:pulsr/data/db/app_database.dart';
+import 'package:pulsr/domain/models/download_task.dart';
+import 'package:pulsr/features/downloads/cubit/downloads_cubit.dart';
+import 'package:pulsr/features/downloads/cubit/downloads_state.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/ytm_search/cubit/ytm_download_cubit.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class MockYtDownloadService extends Mock implements YtDownloadService {}
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
+class MockDownloadsCubit extends Mock implements DownloadsCubit {}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  setUpAll(() {
+    registerFallbackValue(DownloadTask(
+      id: 'fallbackVid1',
+      videoId: 'fallbackVid1',
+      title: 'Fallback',
+      artist: 'Fallback',
+      createdAt: DateTime(2026, 1, 1),
+    ));
+  });
+
   late MockYtDownloadService mockService;
   late MockPlayerCubit mockPlayerCubit;
+  late MockDownloadsCubit mockDownloads;
+  late StreamController<DownloadsState> controller;
   late SongsTableData testSong;
 
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
-    mockService = MockYtDownloadService();
-    mockPlayerCubit = MockPlayerCubit();
+    mockService = MockYtDownloadService();    mockPlayerCubit = MockPlayerCubit();
+    mockDownloads = MockDownloadsCubit();
+    controller = StreamController<DownloadsState>.broadcast();
+    when(() => mockDownloads.stream).thenAnswer((_) => controller.stream);
+    when(() => mockDownloads.queueDownload(any())).thenAnswer((_) async {});
+    when(() => mockDownloads.cancelDownload(any())).thenAnswer((_) async {});
+    when(() => mockPlayerCubit.swapReconciledSong(any(), any()))
+        .thenAnswer((_) async {});
+
     testSong = const SongsTableData(
       id: -101,
       title: 'Test YTM Song',
@@ -41,99 +62,123 @@ void main() {
     );
   });
 
-  group('YtmDownloadCubit State Transitions', () {
-    test('initial state has empty download items', () {
-      final cubit = YtmDownloadCubit(mockService, mockPlayerCubit);
-      expect(cubit.state.items, isEmpty);
-      expect(cubit.state.itemFor('nonexistent').status,
-          equals(YtDownloadStatus.idle));
-      cubit.close();
-    });
+  tearDown(() async {
+    await controller.close();
+  });
 
-    blocTest<YtmDownloadCubit, YtmDownloadState>(
-      'transitions from idle -> queued -> running -> done on successful download',
-      build: () {
-        when(() => mockService.download(testSong,
-                onProgress: any(named: 'onProgress')))
-            .thenAnswer((invocation) async {
-          final onProgress =
-              invocation.namedArguments[const Symbol('onProgress')] as void
-                  Function(YtDownloadProgress)?;
-          onProgress?.call(const YtDownloadProgress(
-              YtDownloadStage.downloading, 0.5, 512.0, 10));
-          return const Right(501);
-        });
-        when(() => mockPlayerCubit.swapReconciledSong(any(), any()))
-            .thenAnswer((_) async {});
-        return YtmDownloadCubit(mockService, mockPlayerCubit);
-      },
-      act: (cubit) => cubit.download(testSong),
-      expect: () => [
-        isA<YtmDownloadState>().having(
-          (s) => s.itemFor('testVid1').status,
-          'status',
-          YtDownloadStatus.queued,
-        ),
-        isA<YtmDownloadState>().having(
-          (s) => s.itemFor('testVid1').status,
-          'status',
-          YtDownloadStatus.running,
-        ),
-        isA<YtmDownloadState>().having(
-          (s) => s.itemFor('testVid1').status,
-          'status',
-          YtDownloadStatus.done,
-        ),
-      ],
-    );
+  YtmDownloadCubit build() =>
+      YtmDownloadCubit(mockService, mockPlayerCubit, downloadsCubit: mockDownloads);
 
-    blocTest<YtmDownloadCubit, YtmDownloadState>(
-      'transitions from queued -> failed when service returns failure',
-      build: () {
-        when(() => mockService.download(testSong,
-                onProgress: any(named: 'onProgress')))
-            .thenAnswer((_) async =>
-                const Left(DownloadFailure('Download network timeout')));
-        return YtmDownloadCubit(mockService, mockPlayerCubit);
-      },
-      act: (cubit) => cubit.download(testSong),
-      expect: () => [
-        isA<YtmDownloadState>().having(
-          (s) => s.itemFor('testVid1').status,
-          'status',
-          YtDownloadStatus.queued,
-        ),
-        isA<YtmDownloadState>()
-            .having(
-              (s) => s.itemFor('testVid1').status,
-              'status',
-              YtDownloadStatus.failed,
-            )
-            .having(
-              (s) => s.itemFor('testVid1').error,
-              'error',
-              'Download network timeout',
-            ),
-      ],
-    );
+  DownloadTask taskWith(DownloadStatus status, {int? localSongId}) =>
+      DownloadTask(
+        id: 'testVid1',
+        videoId: 'testVid1',
+        title: 'Test YTM Song',
+        artist: 'Test Artist',
+        status: status,
+        progress: status == DownloadStatus.downloading ? 0.5 : 1.0,
+        sourceSongId: -101,
+        localSongId: localSongId,
+        createdAt: DateTime(2026, 1, 1),
+      );
 
-    blocTest<YtmDownloadCubit, YtmDownloadState>(
-      'cancelDownload immediately transitions status to canceled and notifies service',
-      build: () {
-        when(() => mockService.cancel('testVid1')).thenReturn(null);
-        return YtmDownloadCubit(mockService, mockPlayerCubit);
-      },
-      act: (cubit) => cubit.cancelDownload('testVid1'),
-      expect: () => [
-        isA<YtmDownloadState>().having(
-          (s) => s.itemFor('testVid1').status,
-          'status',
-          YtDownloadStatus.canceled,
-        ),
-      ],
-      verify: (_) {
-        verify(() => mockService.cancel('testVid1')).called(1);
-      },
+  test('initial state has empty download items', () async {
+    final cubit = build();
+    expect(cubit.state.items, isEmpty);
+    expect(cubit.state.itemFor('nonexistent').status,
+        equals(YtDownloadStatus.idle));
+    await cubit.close();
+  });
+
+  test('download() submits a task to DownloadsCubit and mirrors its states',
+      () async {
+    final cubit = build();
+    final states = <YtmDownloadState>[];
+    final sub = cubit.stream.listen(states.add);
+
+    await cubit.download(testSong);
+
+    // Optimistically queued before the repository answers.
+    expect(cubit.state.itemFor('testVid1').status, YtDownloadStatus.queued);
+    verify(() => mockDownloads.queueDownload(any())).called(1);
+
+    controller.add(DownloadsState(tasks: {
+      'testVid1': taskWith(DownloadStatus.downloading),
+    }));
+    await Future.delayed(Duration.zero);
+    expect(cubit.state.itemFor('testVid1').status, YtDownloadStatus.running);
+    expect(cubit.state.itemFor('testVid1').progress, 0.5);
+
+    controller.add(DownloadsState(tasks: {
+      'testVid1': taskWith(DownloadStatus.complete, localSongId: 501),
+    }));
+    await Future.delayed(Duration.zero);
+    expect(cubit.state.itemFor('testVid1').status, YtDownloadStatus.done);
+
+    // Completion swaps the stale remote row for the local one exactly once.
+    verify(() => mockPlayerCubit.swapReconciledSong(-101, 501)).called(1);
+
+    expect(states.any((s) => s.itemFor('testVid1').status == YtDownloadStatus.running),
+        isTrue);
+    await sub.cancel();
+    await cubit.close();
+  });
+
+  test('download() does not re-submit while already queued or running',
+      () async {
+    final cubit = build();
+    controller.add(DownloadsState(tasks: {
+      'testVid1': taskWith(DownloadStatus.downloading),
+    }));
+    await Future.delayed(Duration.zero);
+
+    await cubit.download(testSong);
+
+    verifyNever(() => mockDownloads.queueDownload(any()));
+    await cubit.close();
+  });
+
+  test('a failed task surfaces its error through the item', () async {
+    final cubit = build();
+    controller.add(DownloadsState(tasks: {
+      'testVid1': taskWith(DownloadStatus.failed),
+    }));
+    await Future.delayed(Duration.zero);
+
+    expect(cubit.state.itemFor('testVid1').status, YtDownloadStatus.failed);
+    await cubit.close();
+  });
+
+  test('cancelDownload delegates to DownloadsCubit and marks the row canceled',
+      () async {
+    final cubit = build();
+    cubit.cancelDownload('testVid1');
+    expect(cubit.state.itemFor('testVid1').status, YtDownloadStatus.canceled);
+    verify(() => mockDownloads.cancelDownload('testVid1')).called(1);
+    await cubit.close();
+  });
+
+  test('downloadAll queues remote tracks and skips local ones', () async {
+    final cubit = build();
+    final localSong = const SongsTableData(
+      id: 42,
+      title: 'Local Song',
+      artist: 'Local Artist',
+      album: '',
+      path: '/music/local.mp3',
+      source: SongSource.local,
+      remoteId: 'localVid1234',
+      durationMs: 1000,
+      isFavorite: false,
+      playCount: 0,
+      lastPositionMs: 0,
+      isMissing: false,
+      isDownloaded: true,
     );
+    final count = cubit.downloadAll([testSong, localSong], maxBatch: 10);
+    expect(count, 1);
+    await Future.delayed(const Duration(milliseconds: 10));
+    verify(() => mockDownloads.queueDownload(any())).called(1);
+    await cubit.close();
   });
 }

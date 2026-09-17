@@ -3,13 +3,24 @@
 enum DownloadStatus {
   queued,
   downloading,
+
+  /// The bytes are on disk and the service is embedding artwork/tags, saving to
+  /// MediaStore, and indexing the row. Distinct from [downloading] so the UI can
+  /// say "Embedding tags" instead of showing a finished-looking 100% bar.
+  tagging,
   paused,
   failed,
   complete;
 
   bool get isTerminal => this == DownloadStatus.complete || this == DownloadStatus.failed;
-  bool get isActive => this == DownloadStatus.queued || this == DownloadStatus.downloading;
-  bool get canPause => this == DownloadStatus.downloading || this == DownloadStatus.queued;
+  bool get isActive =>
+      this == DownloadStatus.queued ||
+      this == DownloadStatus.downloading ||
+      this == DownloadStatus.tagging;
+  bool get canPause =>
+      this == DownloadStatus.downloading ||
+      this == DownloadStatus.queued ||
+      this == DownloadStatus.tagging;
   bool get canResume => this == DownloadStatus.paused;
   bool get canRetry => this == DownloadStatus.failed;
 }
@@ -30,6 +41,15 @@ class DownloadTask {
   final DateTime createdAt;
   final String? artworkUrl;
 
+  /// Library row id of the remote (`youtube`-sourced) track this download was
+  /// launched for. Carried so the reconcile on completion can swap the stale
+  /// negative-id queue entry for the positive local row.
+  final int? sourceSongId;
+
+  /// Positive library row id once the download has been reconciled into a local
+  /// track. Null until [status] reaches [DownloadStatus.complete].
+  final int? localSongId;
+
   const DownloadTask({
     required this.id,
     required this.videoId,
@@ -45,6 +65,8 @@ class DownloadTask {
     this.error,
     required this.createdAt,
     this.artworkUrl,
+    this.sourceSongId,
+    this.localSongId,
   });
 
   DownloadTask copyWith({
@@ -62,6 +84,8 @@ class DownloadTask {
     String? error,
     DateTime? createdAt,
     String? artworkUrl,
+    int? sourceSongId,
+    int? localSongId,
     bool clearError = false, // FIX-A09: support clearing error via copyWith
   }) {
     return DownloadTask(
@@ -79,6 +103,8 @@ class DownloadTask {
       error: clearError ? null : (error ?? this.error), // FIX-A09: clear error if requested
       createdAt: createdAt ?? this.createdAt,
       artworkUrl: artworkUrl ?? this.artworkUrl,
+      sourceSongId: sourceSongId ?? this.sourceSongId,
+      localSongId: localSongId ?? this.localSongId,
     );
   }
 
@@ -98,6 +124,8 @@ class DownloadTask {
       'error': error,
       'createdAt': createdAt.toIso8601String(),
       'artworkUrl': artworkUrl,
+      'sourceSongId': sourceSongId,
+      'localSongId': localSongId,
     };
   }
 
@@ -122,6 +150,8 @@ class DownloadTask {
           ? DateTime.tryParse(json['createdAt'] as String) ?? DateTime.now()
           : DateTime.now(),
       artworkUrl: json['artworkUrl'] as String?,
+      sourceSongId: (json['sourceSongId'] as num?)?.toInt(),
+      localSongId: (json['localSongId'] as num?)?.toInt(),
     );
   }
 
@@ -135,10 +165,13 @@ class DownloadTask {
           status == other.status &&
           progress == other.progress &&
           filePath == other.filePath &&
-          error == other.error;
+          error == other.error &&
+          sourceSongId == other.sourceSongId &&
+          localSongId == other.localSongId;
 
   @override
-  int get hashCode => Object.hash(id, videoId, status, progress, filePath, error);
+  int get hashCode => Object.hash(
+      id, videoId, status, progress, filePath, error, sourceSongId, localSongId);
 }
 
 class StorageStats {

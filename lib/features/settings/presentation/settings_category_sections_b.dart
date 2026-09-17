@@ -119,6 +119,10 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
               ),
             ),
             _divider(p),
+            const DownloadConcurrencyTile(),
+            _divider(p),
+            const DownloadLocationTile(),
+            _divider(p),
             _navTile(
               context,
               Icons.folder_zip_rounded,

@@ -146,6 +146,16 @@ class AuraTheme {
   static ThemeData get highContrastTheme => customTheme(const Color(0xFF00E5FF),
       brightness: Brightness.dark, isAmoled: true);
 
+  /// Brightness-aware high-contrast theme. Respects the light/dark mode and
+  /// the user's accent seed (custom/system/artwork) instead of forcing
+  /// dark-AMOLED cyan everywhere.
+  static ThemeData highContrastThemeFor(Brightness brightness,
+      {Color seed = const Color(0xFF00E5FF)}) {
+    final isDark = brightness == Brightness.dark;
+    return customTheme(seed,
+        brightness: brightness, isAmoled: isDark ? true : false);
+  }
+
   static PulsrPalette _palette(
       Color accent, Brightness brightness, bool isAmoled) {
     final isDark = brightness == Brightness.dark;

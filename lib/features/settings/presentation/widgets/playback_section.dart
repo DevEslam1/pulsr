@@ -115,7 +115,10 @@ class PlaybackSection extends StatelessWidget {
           onChanged: (v) => cubit.setDuckingMode(v ? 'duck' : 'pause'),
         ),
         settingsCardDivider(p),
+        settingsCardDivider(p),
         const _AudioNormalizationSettingTile(),
+        settingsCardDivider(p),
+        const _PlaybackPresetsTile(),
         settingsCardDivider(p),
         const HeadsetControlsSection(),
       ],
@@ -296,7 +299,10 @@ class PlaybackSection extends StatelessWidget {
         const _AdvancedSpeedSettingTile(),
         settingsCardDivider(p),
         // F-27: manual loudness normalization.
+        settingsCardDivider(p),
         const _AudioNormalizationSettingTile(),
+        settingsCardDivider(p),
+        const _PlaybackPresetsTile(),
         settingsCardDivider(p),
         const HeadsetControlsSection(),
       ],
@@ -588,6 +594,84 @@ class _AudioNormalizationSettingTileState
       context.l10n.settingsAudioNormalizationSubtitle,
       value: _value,
       onChanged: _onChanged,
+    );
+  }
+}
+
+/// One-tap playback presets: Maximum Quality (audiophile), Smooth Playback
+/// (balanced), Poor Network (data saver). Previously defined on the cubit
+/// with zero UI callers.
+class _PlaybackPresetsTile extends StatelessWidget {
+  const _PlaybackPresetsTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final cubit = context.read<SettingsCubit>();
+    Future<void> apply(
+        Future<void> Function() fn, String label) async {
+      try {
+        await fn();
+        if (context.mounted) {
+          ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text('$label applied'),
+            duration: const Duration(seconds: 2),
+          ));
+        }
+      } catch (_) {}
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.tune_rounded, color: p.textTertiary, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Playback presets',
+                      style: TextStyle(
+                          color: p.textPrimary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14.5)),
+                  Text('One-tap tuning for quality, balance or data saving',
+                      style: TextStyle(
+                          color: p.textTertiary, fontSize: 12.5, height: 1.32)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            OutlinedButton.icon(
+              onPressed: () => apply(
+                  cubit.applyMaximumQualityPreset, 'Maximum Quality'),
+              icon: const Icon(Icons.high_quality_rounded, size: 18),
+              label: const Text('Max Quality'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () =>
+                  apply(cubit.applySmoothPlaybackPreset, 'Smooth Playback'),
+              icon: const Icon(Icons.spa_rounded, size: 18),
+              label: const Text('Smooth'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () =>
+                  apply(cubit.applyPoorNetworkPreset, 'Data Saver'),
+              icon: const Icon(Icons.data_saver_on_rounded, size: 18),
+              label: const Text('Data Saver'),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

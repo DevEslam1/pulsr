@@ -87,6 +87,27 @@ class _TagEditorView extends StatelessWidget {
               ),
             ),
             actions: [
+              BlocBuilder<TagEditorCubit, TagEditorState>(
+                buildWhen: (a, b) =>
+                    a.title != b.title ||
+                    a.artist != b.artist ||
+                    a.album != b.album ||
+                    a.genre != b.genre ||
+                    a.year != b.year ||
+                    a.trackNumber != b.trackNumber ||
+                    a.discNumber != b.discNumber,
+                builder: (context, _) {
+                  final canUndo =
+                      context.read<TagEditorCubit>().canUndo;
+                  return IconButton(
+                    tooltip: 'Undo',
+                    icon: const Icon(Icons.undo_rounded),
+                    onPressed: canUndo && !isSaving
+                        ? () => context.read<TagEditorCubit>().undo()
+                        : null,
+                  );
+                },
+              ),
               TextButton(
                 onPressed: (isSaving || isAutoFetching)
                     ? null
@@ -161,14 +182,32 @@ class _TagEditorView extends StatelessWidget {
                                 onRemove: () => cubit.removeArtworkImage(),
                               ),
                               const SizedBox(height: 16),
-                              if (!state.isBatchMode) ...[
-                                Center(
-                                  child: OutlinedButton.icon(
-                                    onPressed: (isAutoFetching || isSaving)
-                                        ? null
-                                        : () async {
-                                            final matches = await cubit
-                                                .searchOnlineMatches();
+                              Center(
+                                child: OutlinedButton.icon(
+                                  onPressed: (isAutoFetching || isSaving)
+                                      ? null
+                                      : () async {
+                                          if (state.isBatchMode) {
+                                            final resolved = await cubit
+                                                .autoFetchBatchTags();
+                                            if (!context.mounted) return;
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                content: Text(resolved > 0
+                                                    ? 'Online metadata filled for $resolved track${resolved == 1 ? '' : 's'} (shared fields only)'
+                                                    : context.l10n
+                                                        .noOnlineMetadata),
+                                                backgroundColor:
+                                                    resolved > 0
+                                                        ? p.accent
+                                                        : null,
+                                              ),
+                                            );
+                                            return;
+                                          }
+                                          final matches = await cubit
+                                              .searchOnlineMatches();
                                             if (!context.mounted) return;
                                             if (matches.isEmpty) {
                                               ScaffoldMessenger.of(context)
@@ -351,15 +390,15 @@ class _TagEditorView extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(height: 20),
+                                if (!state.isBatchMode)
+                                  TagFieldWidget(
+                                    label: context.l10n.songTitle,
+                                    initialValue: state.title,
+                                    icon: Icons.title_rounded,
+                                    onChanged: cubit.updateTitle,
+                                  ),
                                 TagFieldWidget(
-                                  label: context.l10n.songTitle,
-                                  initialValue: state.title,
-                                  icon: Icons.title_rounded,
-                                  onChanged: cubit.updateTitle,
-                                ),
-                              ],
-                              TagFieldWidget(
-                                label: context.l10n.artist,
+                                  label: context.l10n.artist,
                                 initialValue: state.artist,
                                 icon: Icons.person_outline_rounded,
                                 onChanged: cubit.updateArtist,

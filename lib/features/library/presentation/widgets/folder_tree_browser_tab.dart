@@ -35,27 +35,36 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
           );
         }
 
-        // Determine all unique folders
+        // Determine all unique folders (normalize separators first so
+        // MediaStore `/storage/...` paths behave identically on Windows).
         final folders = <String>{};
         for (final song in songs) {
           if (!song.path.startsWith('ytmusic://') &&
               !song.path.startsWith('content://')) {
-            final dir = p_path.dirname(song.path);
+            final normalized = song.path.replaceAll('\\', '/');
+            final dir = p_path.posix.dirname(normalized);
             if (dir.isNotEmpty && dir != '.') folders.add(dir);
           }
         }
 
-        // Initialize root if null
+        // Initialize root to the shortest (top-most) folder, not an
+        // arbitrary set order.
         if (_currentPath == null && folders.isNotEmpty) {
-          _currentPath = folders.first;
+          final sorted = folders.toList()
+            ..sort((a, b) => a.length.compareTo(b.length));
+          _currentPath = sorted.first;
         }
 
-        final currentDir = _currentPath ?? '';
-        final childSongs =
-            songs.where((s) => p_path.dirname(s.path) == currentDir).toList();
+        final currentDir = (_currentPath ?? '').replaceAll('\\', '/');
+        final childSongs = songs.where((s) {
+          final dir =
+              p_path.posix.dirname(s.path.replaceAll('\\', '/'));
+          return dir == currentDir;
+        }).toList();
         final childFolders = folders
             .where((f) => f != currentDir && f.startsWith(currentDir))
-            .toList();
+            .toList()
+          ..sort();
 
         FolderItem? folderItemFor(String path) {
           final normalized = path.replaceAll('\\', '/').toLowerCase();
@@ -67,8 +76,8 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
           return null;
         }
 
-        // Breadcrumb parts
-        final breadcrumbs = p_path.split(currentDir);
+        // Breadcrumb parts (posix: MediaStore paths are always /-separated).
+        final breadcrumbs = p_path.posix.split(currentDir);
 
         return Column(
           children: [
@@ -83,7 +92,8 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                 separatorBuilder: (_, __) => Icon(Icons.chevron_right_rounded,
                     size: 18, color: p.textSecondary),
                 itemBuilder: (context, index) {
-                  final crumbPath = p_path.joinAll(breadcrumbs.take(index + 1));
+                  final crumbPath = p_path.posix
+                      .joinAll(breadcrumbs.take(index + 1));
                   final isLast = index == breadcrumbs.length - 1;
 
                   return Center(
@@ -127,19 +137,19 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                               fontWeight: FontWeight.w600)),
                       onTap: () {
                         setState(() {
-                          _currentPath = p_path.dirname(currentDir);
+                          _currentPath = p_path.posix.dirname(currentDir);
                         });
                       },
                     ),
                     Divider(color: p.hairline),
                   ],
 
-                  // Subfolders
-                  for (final sub in childFolders.take(15)) ...[
+                  // Subfolders (all of them — ListView virtualizes, no cap).
+                  for (final sub in childFolders) ...[
                     ListTile(
                       leading: Icon(Icons.folder_rounded, color: p.primary),
                       title: Text(
-                        p_path.basename(sub),
+                        p_path.posix.basename(sub),
                         style: TextStyle(
                             color: p.textPrimary, fontWeight: FontWeight.w600),
                       ),

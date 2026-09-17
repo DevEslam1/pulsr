@@ -18,8 +18,10 @@ class YtmBrowseItem {
     required this.subtitle,
     this.artworkUrl,
     required this.type,
-    this.duration = const Duration(minutes: 3, seconds: 30),
+    this.duration = Duration.zero,
   });
+
+  bool get hasKnownDuration => duration > Duration.zero;
 
   YtmTrack toYtmTrack() {
     return YtmTrack(

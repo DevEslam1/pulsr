@@ -90,7 +90,11 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
           songs.add(song);
           if (item.isCurrent) {
             targetIndex = songs.length - 1;
-            savedPositionMs = item.positionMs;
+            // Fall back to the per-song position when the queue row carries
+            // none (e.g. saved before the position refresh existed), so a cold
+            // resume does not silently restart the track from 0.
+            savedPositionMs =
+                item.positionMs > 0 ? item.positionMs : song.lastPositionMs;
           }
         }
       }

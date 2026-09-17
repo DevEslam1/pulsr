@@ -439,15 +439,28 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       final experienceModeLoaded = ExperienceMode.fromName(
           prefs.getString(PrefsKeys.experienceMode));
 
+      final loadedCrossfade =
+          prefs.getDouble(_keyCrossfade) ?? state.crossfadeSeconds;
+      final loadedBitPerfect =
+          prefs.getBool(PrefsKeys.bitPerfectOutput) ?? state.bitPerfectOutput;
+      // Bit-perfect cannot run with crossfade (it would alter the bitstream), so
+      // a legacy persisted pair is reconciled to crossfade off on load instead of
+      // letting the engine overlap tracks under a bit-perfect sink.
+      final effectiveCrossfade =
+          (loadedBitPerfect && loadedCrossfade > 0.01) ? 0.0 : loadedCrossfade;
+      if (effectiveCrossfade != loadedCrossfade) {
+        try {
+          await prefs.setDouble(_keyCrossfade, effectiveCrossfade);
+        } catch (_) {}
+      }
+
       final newState = state.copyWith(
         // Crossfade > 0 forces gapless OFF (they are mutually exclusive), even
         // if legacy prefs stored both on.
-        gaplessPlayback:
-            ((prefs.getDouble(_keyCrossfade) ?? state.crossfadeSeconds) > 0.01)
-                ? false
-                : (prefs.getBool(_keyGapless) ?? state.gaplessPlayback),
-        crossfadeSeconds:
-            prefs.getDouble(_keyCrossfade) ?? state.crossfadeSeconds,
+        gaplessPlayback: (effectiveCrossfade > 0.01)
+            ? false
+            : (prefs.getBool(_keyGapless) ?? state.gaplessPlayback),
+        crossfadeSeconds: effectiveCrossfade,
         minDurationSec: prefs.getInt(_keyMinDuration) ?? state.minDurationSec,
         autoHideSystemMedia:
             prefs.getBool(_keyAutoHideSystemMedia) ?? state.autoHideSystemMedia,
@@ -694,6 +707,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       bitPerfectOutput: state.bitPerfectOutput,
       bypassDspOnBitPerfect: state.bypassDspOnBitPerfect,
       device: state.currentOutputDevice,
+      aaudioEnabled: state.aaudioOutputEnabled,
     );
     if (clamped > 0.01 && bitPerfectBlock != null) {
       safeEmit(state.copyWith(errorMessage: bitPerfectBlock));

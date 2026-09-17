@@ -188,6 +188,35 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_isAndroid) {
+      final p = context.palette;
+      return SafeArea(
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.cast_rounded, size: 40, color: p.textTertiary),
+              const SizedBox(height: 12),
+              Text(
+                context.l10n.settingsGoogleCast,
+                style: TextStyle(
+                    color: p.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Casting is available on Android only in this build.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: p.textSecondary, fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final p = context.palette;
     final l10n = context.l10n;
     final isConnected = _session.connected;
@@ -257,7 +286,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                             ? (_session.deviceName ?? l10n.castConnected)
                             : (_scanning
                                 ? l10n.scanningCastDevices
-                                : 'Select a speaker or display'),
+                                : l10n.castDevice),
                         style: TextStyle(
                           color: isConnected ? p.accent : p.textSecondary,
                           fontSize: 13,
@@ -284,6 +313,33 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
             ),
 
             const SizedBox(height: 18),
+
+            // mDNS direct-device fallback: honest capability note.
+            if (!_sdk && !isConnected) ...[
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: p.textTertiary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded,
+                        size: 14, color: p.textTertiary),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Direct device mode: casts the current track. Queue and remote volume need the Cast SDK.',
+                        style: TextStyle(
+                            fontSize: 11.5, color: p.textSecondary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
 
             // Connected Session Controls Card
             if (isConnected) ...[
@@ -313,7 +369,9 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                _session.playing ? 'Playing' : 'Ready to cast',
+                                _session.playing
+                                    ? l10n.castConnected
+                                    : l10n.castDevice,
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: p.accent,
@@ -326,7 +384,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                         TextButton.icon(
                           onPressed: _busy ? null : () => _service.disconnect(),
                           icon: const Icon(Icons.stop_circle_outlined, size: 18),
-                          label: const Text('Disconnect'),
+                          label: Text(l10n.disconnect),
                           style: TextButton.styleFrom(
                             foregroundColor: p.error,
                             padding: const EdgeInsets.symmetric(
@@ -363,17 +421,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
             ],
 
             // Device list
-            if (!_isAndroid) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 24),
-                child: Center(
-                  child: Text(
-                    'Google Cast is supported on Android devices.',
-                    style: TextStyle(color: p.textSecondary, fontSize: 14),
-                  ),
-                ),
-              ),
-            ] else if (!hasDevices && !_scanning) ...[
+            if (!hasDevices && !_scanning) ...[
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Center(
@@ -383,14 +431,14 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                           size: 44, color: p.textTertiary),
                       const SizedBox(height: 10),
                       Text(
-                        'No Cast devices found on this Wi-Fi network',
+                        l10n.scanningCastDevices,
                         style: TextStyle(color: p.textSecondary, fontSize: 14),
                       ),
                       const SizedBox(height: 12),
                       OutlinedButton.icon(
                         onPressed: _rescan,
                         icon: const Icon(Icons.refresh_rounded, size: 16),
-                        label: const Text('Search Again'),
+                        label: Text(l10n.scanningCastDevices),
                       ),
                     ],
                   ),
@@ -398,7 +446,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
               ),
             ] else ...[
               Text(
-                'AVAILABLE RECEIVERS',
+                l10n.castDevice.toUpperCase(),
                 style: TextStyle(
                   fontSize: 11,
                   letterSpacing: 1.2,

@@ -12,6 +12,7 @@ import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/audio/headphone_profiles_repository.dart';
 import '../../../../domain/models/audio_effects_config.dart';
+import '../../../../domain/models/audio_quality_info.dart';
 import '../../../../domain/models/eq_preset.dart';
 import '../../../../domain/models/headphone_profile.dart';
 import '../../../../domain/models/reverb_preset.dart';
@@ -20,6 +21,7 @@ import '../../../../core/utils/list_content_diff.dart';
 import '../../cubit/player_state.dart';
 import 'dart:async';
 
+import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../../data/audio/audio_effects_channel.dart';
 import '../../../../data/audio/equalizer_manager.dart';
 import 'eq_curve_visualizer.dart';
@@ -270,6 +272,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
         bitPerfectOutput: settings.bitPerfectOutput,
         bypassDspOnBitPerfect: settings.bypassDspOnBitPerfect,
         device: settings.currentOutputDevice,
+        aaudioEnabled: settings.aaudioOutputEnabled,
+        dsdDopActive: AudioQualityInfo.dsdDopActive,
       );
     } catch (_) {
       return null;
@@ -2485,6 +2489,19 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
                   onPressed: () {
+                    final blocked = _dspBlockedReason(context);
+                    if (blocked != null) {
+                      // This sheet drives EqualizerManager directly, bypassing
+                      // PlayerCubit's guard; refuse it here so the compressor
+                      // cannot be toggled while bit-perfect/AAudio/DoP is active.
+                      PulsrToast.show(
+                        context,
+                        message: blocked,
+                        icon: Icons.error_outline_rounded,
+                        isError: true,
+                      );
+                      return;
+                    }
                     CompressorLimiterSheet.show(
                       context,
                       equalizerManager: getIt<EqualizerManager>(),

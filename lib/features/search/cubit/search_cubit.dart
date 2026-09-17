@@ -82,8 +82,11 @@ class SearchCubit extends PulsrCubit<SearchState> {
     } catch (_) {}
   }
 
-  void clearHistory() async {
-    try { final p = await SharedPreferences.getInstance(); await p.remove(_historyKey); } catch (_) {}
+  Future<void> clearHistory() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.remove(_historyKey);
+    } catch (_) {}
     if (!isClosed) safeEmit(state.copyWith(history: []));
   }
 

@@ -1,6 +1,7 @@
 // lib/features/downloads/presentation/widgets/download_tile.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/errors/error_message_resolver.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../domain/models/download_task.dart';
 import '../../../../l10n/generated/app_localizations.dart';
@@ -25,6 +26,11 @@ class DownloadTile extends StatelessWidget {
           Icons.downloading_rounded,
           p.accent,
           l10n.statusDownloading,
+        ),
+      DownloadStatus.tagging => (
+          Icons.tune_rounded,
+          p.accent,
+          l10n.statusEmbedding,
         ),
       DownloadStatus.queued => (
           Icons.schedule_rounded,
@@ -116,6 +122,7 @@ class DownloadTile extends StatelessWidget {
                 const SizedBox(width: 4),
                 // FIX-A12: Direct cancel button during active download or queued state
                 if (task.status == DownloadStatus.downloading ||
+                    task.status == DownloadStatus.tagging ||
                     task.status == DownloadStatus.queued)
                   IconButton(
                     icon: Icon(Icons.close_rounded,
@@ -202,41 +209,46 @@ class DownloadTile extends StatelessWidget {
                 ),
               ],
             ),
-            if (task.status == DownloadStatus.downloading) ...[
+            if (task.status == DownloadStatus.downloading ||
+                task.status == DownloadStatus.tagging) ...[
               const SizedBox(height: 12),
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
-                  value: task.progress > 0 ? task.progress : null,
+                  value: task.status == DownloadStatus.tagging
+                      ? null
+                      : (task.progress > 0 ? task.progress : null),
                   backgroundColor: p.surfaceContainerHigh,
                   valueColor: AlwaysStoppedAnimation<Color>(p.accent),
                   minHeight: 6,
                 ),
               ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '${(task.progress * 100).toStringAsFixed(0)}%',
-                    style: TextStyle(
-                      color: p.textSecondary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  if (task.speedKbps != null && task.speedKbps! > 0)
+              if (task.status == DownloadStatus.downloading) ...[
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
                     Text(
-                      '${task.speedKbps!.toStringAsFixed(0)} KB/s',
-                      style: TextStyle(color: p.textTertiary, fontSize: 12),
+                      '${(task.progress * 100).toStringAsFixed(0)}%',
+                      style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  if (task.etaSeconds != null && task.etaSeconds! > 0)
-                    Text(
-                      '${l10n.browseEta} ${task.etaSeconds}s',
-                      style: TextStyle(color: p.textTertiary, fontSize: 12),
-                    ),
-                ],
-              ),
+                    if (task.speedKbps != null && task.speedKbps! > 0)
+                      Text(
+                        '${task.speedKbps!.toStringAsFixed(0)} KB/s',
+                        style: TextStyle(color: p.textTertiary, fontSize: 12),
+                      ),
+                    if (task.etaSeconds != null && task.etaSeconds! > 0)
+                      Text(
+                        '${l10n.browseEta} ${task.etaSeconds}s',
+                        style: TextStyle(color: p.textTertiary, fontSize: 12),
+                      ),
+                  ],
+                ),
+              ],
             ],
             if (task.error != null && task.error!.isNotEmpty) ...[
               const SizedBox(height: 8),
@@ -246,7 +258,7 @@ class DownloadTile extends StatelessWidget {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      task.error!,
+                      resolveUiErrorMessage(context, task.error!),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(color: p.error, fontSize: 12),

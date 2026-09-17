@@ -27,6 +27,7 @@ import 'widgets/audio_sound_section.dart';
 import 'widgets/automation_rules_sheet.dart';
 import 'widgets/backup_section.dart';
 import 'widgets/device_profiles_section.dart';
+import 'widgets/download_settings_tiles.dart';
 import 'widgets/experience_mode_section.dart';
 import 'widgets/smart_audio_section.dart';
 import 'widgets/playback_section.dart';

@@ -235,18 +235,36 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     return next;
   }
 
-  Future<void> _writeOnlineCache() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final data = {
-        'likedTracks':
-            ytmOnline.value.likedTracks.map((t) => t.toJson()).toList(),
-        'accountPlaylists':
-            ytmOnline.value.accountPlaylists.map((p) => p.toJson()).toList(),
-        'customPlaylists':
-            ytmOnline.value.customPlaylists.map((p) => p.toJson()).toList(),
-      };
-      await prefs.setString(_onlineCacheKey, jsonEncode(data));
+    Future<void> _writeOnlineCache() async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        // Bounded cache: prefs is not a database. Liked tracks capped at 200,
+        // custom playlists at the 10 most recent with 50 tracks each — full
+        // track lists are re-fetched on open, so the cache only needs enough
+        // for instant paint. Previously unbounded (200-track × N playlists).
+        final liked = ytmOnline.value.likedTracks;
+        final customs = ytmOnline.value.customPlaylists;
+        final cappedCustoms = customs.length > 10
+            ? customs.sublist(customs.length - 10)
+            : customs;
+        final data = {
+          'likedTracks': liked
+              .take(200)
+              .map((t) => t.toJson())
+              .toList(),
+          'accountPlaylists':
+              ytmOnline.value.accountPlaylists.map((p) => p.toJson()).toList(),
+          'customPlaylists': [
+            for (final p in cappedCustoms)
+              () {
+                final json = Map<String, dynamic>.from(p.toJson());
+                final tracks = (json['tracks'] as List? ?? []);
+                json['tracks'] = tracks.take(50).toList();
+                return json;
+              }(),
+          ],
+        };
+        await prefs.setString(_onlineCacheKey, jsonEncode(data));
     } catch (e, st) {
       ErrorLogger.log('Failed to save online playlist cache',
           error: e, stackTrace: st, category: 'PlaylistCubit');

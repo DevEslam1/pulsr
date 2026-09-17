@@ -88,7 +88,14 @@ class _RangeIgnored implements Exception {
 class YtDownloadService {
   static const _downloadChannel = MethodChannel(PulsrChannels.ytDownload);
   static const _tagChannel = MethodChannel(PulsrChannels.tagEditor);
-  static const int _maxConcurrentDownloads = 3;
+  int _maxConcurrentDownloads = 3;
+
+  /// Kept in step with [DownloadSettings.maxConcurrent] by
+  /// [DownloadRepositoryImpl]; the class used to hard-code 3 independently of
+  /// the user's setting, so raising the preference changed nothing.
+  void setMaxConcurrentDownloads(int value) {
+    _maxConcurrentDownloads = value.clamp(1, 5);
+  }
 
   final HttpClient _http;
   final YtmService _ytmService;
@@ -385,24 +392,38 @@ class YtDownloadService {
     }
   }
 
-  Future<Result<int>> _executeDownload(_QueuedDownload task) async {
-    final song = task.song;
-    final videoId = song.remoteId!;
-    final onProgress = task.onProgress;
-
+  /// Returns a failure when the current network policy forbids downloading, or
+  /// null when the transfer may proceed.
+  ///
+  /// Shared by the pre-queue gate in [DownloadRepositoryImpl] and the
+  /// execution-time check in [_executeDownload], so the decision is made from a
+  /// single place. Previously the repository admitted tasks and this service
+  /// only rejected them once a slot had been consumed.
+  Future<AppFailure?> downloadPolicyBlock() async {
     final prefs = await SharedPreferences.getInstance();
     final offlineOnly = prefs.getBool('setting_offline_only_mode') ?? false;
     if (offlineOnly) {
-      return const Left(
-          DownloadFailure('Offline Only Mode is active in Settings'));
+      return const DownloadFailure('Offline Only Mode is active in Settings');
     }
     final wifiOnly = prefs.getBool('setting_wifi_only_mode') ?? false;
     if (wifiOnly) {
       final isWifi = await _ytmService.isWifiConnected();
       if (!isWifi) {
-        return const Left(DownloadFailure(
-            'Wi-Fi Only Mode is active. Connect to Wi-Fi to download.'));
+        return const DownloadFailure(
+            'Wi-Fi Only Mode is active. Connect to Wi-Fi to download.');
       }
+    }
+    return null;
+  }
+
+  Future<Result<int>> _executeDownload(_QueuedDownload task) async {
+    final song = task.song;
+    final videoId = song.remoteId!;
+    final onProgress = task.onProgress;
+
+    final policyBlock = await downloadPolicyBlock();
+    if (policyBlock != null) {
+      return Left(policyBlock);
     }
 
     File? temp;
@@ -420,9 +441,9 @@ class YtDownloadService {
       // 1. Ensure PoToken attestation is fresh before requesting stream
       await _ytmService.ensurePoTokenReady();
 
+      final prefs = await SharedPreferences.getInstance();
       final quality = prefs.getString('setting_download_quality') ?? 'high';
       final dir = await getTemporaryDirectory();
-
       // Download high-res master artwork in parallel with stream resolution
       final rawArtUrl = song.remoteArtworkUrl;
       if (rawArtUrl != null && rawArtUrl.isNotEmpty) {

@@ -2380,6 +2380,36 @@ abstract class AppLocalizations {
   /// **'Wi-Fi Only Mode is active. Connect to Wi-Fi to download.'**
   String get downloadWifiOnly;
 
+  /// No description provided for @downloadOfflineOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline Only Mode is active. Turn it off in Settings to download.'**
+  String get downloadOfflineOnly;
+
+  /// No description provided for @settingsDownloadConcurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Concurrent downloads'**
+  String get settingsDownloadConcurrent;
+
+  /// No description provided for @settingsDownloadConcurrentSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum tracks downloading at the same time (1-5).'**
+  String get settingsDownloadConcurrentSubtitle;
+
+  /// No description provided for @settingsDownloadLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Download location'**
+  String get settingsDownloadLocation;
+
+  /// No description provided for @settingsDownloadLocationUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom download locations are not supported yet. Files are saved to the Music folder.'**
+  String get settingsDownloadLocationUnsupported;
+
   /// No description provided for @downloadErrorAlreadyQueued.
   ///
   /// In en, this message translates to:
@@ -11434,6 +11464,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to sync YouTube Music likes'**
   String get errYtmSyncLikes;
+
+  /// No description provided for @errSearchFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Search failed. Please try again.'**
+  String get errSearchFailed;
+
+  /// No description provided for @errPlaylistNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a playlist name.'**
+  String get errPlaylistNameRequired;
 
   /// No description provided for @dspMultibandLabel.
   ///

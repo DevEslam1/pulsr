@@ -8,7 +8,9 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/widgets/pulsr_back_button.dart';
 import '../../../../core/widgets/pulsr_page_pop_scope.dart';
+import '../../../data/db/app_database.dart';
 import '../../player/cubit/player_cubit.dart';
+import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 
 class YtmBrowseScreen extends StatefulWidget {
   const YtmBrowseScreen({super.key});
@@ -30,11 +32,13 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
   }
 
   String? _error;
+  bool _loadFailed = false;
   Future<void> _loadFeed() async {
     if (_sections.isEmpty) {
       setState(() {
         _isLoading = true;
         _error = null;
+        _loadFailed = false;
       });
     }
     try {
@@ -43,14 +47,17 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
         setState(() {
           _sections = sections;
           _isLoading = false;
-          _error =
-              sections.isEmpty ? context.l10n.browseNoRecommendations : null;
+          // Empty feed is not an error — offline/error surfaces via
+          // exception path below. Empty just shows the empty state.
+          _loadFailed = false;
+          _error = null;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _loadFailed = true;
           _error = context.l10n.browseFailedLoadFeed;
         });
       }
@@ -84,7 +91,7 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
       ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: p.primary))
-          : _error != null
+          : (_error != null && _loadFailed)
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24),
@@ -105,6 +112,28 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                     ),
                   ),
                 )
+              : _sections.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.explore_off_rounded,
+                                color: p.textSecondary, size: 40),
+                            const SizedBox(height: 12),
+                            Text(context.l10n.browseNoRecommendations,
+                                textAlign: TextAlign.center,
+                                style:
+                                    TextStyle(color: p.textSecondary)),
+                            const SizedBox(height: 12),
+                            FilledButton(
+                                onPressed: _loadFeed,
+                                child: Text(context.l10n.retry)),
+                          ],
+                        ),
+                      ),
+                    )
               : RefreshIndicator(
               onRefresh: _loadFeed,
               color: p.primary,
@@ -159,7 +188,12 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                                   const SizedBox(width: 14),
                               itemBuilder: (context, i) {
                                 final item = section.items[i];
-                                return _buildBrowseCard(context, item, p);
+                                final queueSongs = [
+                                  for (final e in section.items)
+                                    e.toYtmTrack().toSongData()
+                                ];
+                                return _buildBrowseCard(
+                                    context, item, queueSongs, p);
                               },
                             ),
                           ),
@@ -174,8 +208,9 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
     );
   }
 
-  Widget _buildBrowseCard(
-      BuildContext context, YtmBrowseItem item, PulsrPalette p) {
+  Widget _buildBrowseCard(BuildContext context, YtmBrowseItem item,
+      List<SongsTableData> queueSongs, PulsrPalette p) {
+    final song = item.toYtmTrack().toSongData();
     return Container(
       width: 140,
       decoration: BoxDecoration(
@@ -185,8 +220,7 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () {
-          final track = item.toYtmTrack();
-          context.read<PlayerCubit>().playSong(track.toSongData());
+          context.read<PlayerCubit>().playSong(song, queue: queueSongs);
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -227,6 +261,17 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                         color: Colors.white, size: 18),
                   ),
                 ),
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      shape: BoxShape.circle,
+                    ),
+                    child: YtmDownloadButton(song: song, iconSize: 16),
+                  ),
+                ),
               ],
             ),
             Padding(
@@ -246,7 +291,9 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    item.subtitle,
+                    item.hasKnownDuration
+                        ? '${item.subtitle} • ${_formatDuration(item.duration)}'
+                        : item.subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -261,5 +308,11 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
         ),
       ),
     );
+  }
+
+  String _formatDuration(Duration d) {
+    final m = d.inMinutes;
+    final s = d.inSeconds % 60;
+    return '$m:${s.toString().padLeft(2, '0')}';
   }
 }

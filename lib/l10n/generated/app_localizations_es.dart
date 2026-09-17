@@ -1243,6 +1243,24 @@ class AppLocalizationsEs extends AppLocalizations {
       'Modo solo Wi-Fi activo. Conéctate al Wi-Fi para descargar.';
 
   @override
+  String get downloadOfflineOnly =>
+      'El modo solo sin conexión está activo. Desactívalo en Ajustes para descargar.';
+
+  @override
+  String get settingsDownloadConcurrent => 'Descargas simultáneas';
+
+  @override
+  String get settingsDownloadConcurrentSubtitle =>
+      'Máximo de pistas descargando a la vez (1-5).';
+
+  @override
+  String get settingsDownloadLocation => 'Ubicación de descarga';
+
+  @override
+  String get settingsDownloadLocationUnsupported =>
+      'Las ubicaciones personalizadas aún no son compatibles. Los archivos se guardan en la carpeta Música.';
+
+  @override
   String get downloadErrorAlreadyQueued =>
       'Esta canción ya está en la cola de descarga.';
 
@@ -6377,6 +6395,12 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get errYtmSyncLikes => 'No se pudieron sincronizar los favoritos';
+
+  @override
+  String get errSearchFailed => 'La búsqueda falló. Inténtalo de nuevo.';
+
+  @override
+  String get errPlaylistNameRequired => 'Introduce un nombre para la lista.';
 
   @override
   String get dspMultibandLabel => 'Multibanda';

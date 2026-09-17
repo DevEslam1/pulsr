@@ -18,6 +18,7 @@ import 'comparison_slot.dart';
 import 'eq_frequency_validation.dart';
 import 'headphone_profiles_repository.dart';
 import 'ir_file_parser.dart';
+import 'live_prog_slider_persistence.dart';
 import 'optimized_dsp_pipeline.dart';
 
 export 'comparison_slot.dart';
@@ -575,7 +576,10 @@ class EqualizerManager {
           prefs.getBool(PrefsKeys.liveProgEnabled) ?? false;
       liveProgCode =
           prefs.getString(PrefsKeys.liveProgCode) ?? '';
-      dspPreference = prefs.getString(PrefsKeys.dspPreference) ?? 'native';
+      liveProgSliders
+        ..clear()
+        ..addAll(
+            decodeLiveProgSliders(prefs.getString(PrefsKeys.liveProgSliders)));      dspPreference = prefs.getString(PrefsKeys.dspPreference) ?? 'native';
       if (dspPreference != 'native' &&
           dspPreference != 'oem' &&
           dspPreference != 'auto') {
@@ -800,6 +804,10 @@ class EqualizerManager {
       if (isLiveProgEnabled && liveProgCode.isNotEmpty) {
         pendingFutures.add(_effectsChannel.loadLiveProgCode(liveProgCode));
         pendingFutures.add(_effectsChannel.setLiveProgEnabled(true));
+        for (final entry in liveProgSliders.entries) {
+          pendingFutures
+              .add(_effectsChannel.setLiveProgSlider(entry.key, entry.value));
+        }
       }
       // Dynamics last — it triggers recalculateActiveStages which disables OEM engine; doing it last prevents intermediate dropout
       // Log individual failures so failed effect stages are diagnosable while allowing remaining stages to complete
@@ -945,6 +953,7 @@ class EqualizerManager {
         PrefsKeys.arbitraryEqLinearPhase: arbitraryEqLinearPhase,
         PrefsKeys.liveProgEnabled: isLiveProgEnabled,
         PrefsKeys.liveProgCode: liveProgCode,
+        PrefsKeys.liveProgSliders: encodeLiveProgSliders(liveProgSliders),
         PrefsKeys.dspPreference: dspPreference,
         PrefsKeys.ditherEnabled: isDitherEnabled,
         PrefsKeys.ditherTargetBitDepth: ditherTargetBitDepth,
@@ -1846,27 +1855,12 @@ class EqualizerManager {
   }
 
   Future<void> setLiveProgSlider(int sliderIndex, double value) async {
-    // Native LiveProg::setSlider only honors 1..8; anything else is dropped
-    // there while the Dart mirror would keep it — reject up front so the two
-    // never diverge.
-    if (sliderIndex < 1 || sliderIndex > 8) {
-      ErrorLogger.log(
-        'Rejected LiveProg slider index $sliderIndex (valid 1..8)',
-        category: 'EqualizerManager',
-      );
-      return;
-    }
-    if (!value.isFinite) {
-      ErrorLogger.log(
-        'Rejected non-finite LiveProg slider value for index $sliderIndex',
-        category: 'EqualizerManager',
-      );
-      return;
-    }
+    if (!isValidLiveProgSlider(sliderIndex, value)) return;
     liveProgSliders[sliderIndex] = value;
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setLiveProgSlider(sliderIndex, value);
     }
+    _debouncedSavePreferences();
   }
 
   Future<void> setStereoWidth(
@@ -2681,6 +2675,9 @@ class EqualizerManager {
     if (isLiveProgEnabled && liveProgCode.isNotEmpty) {
       futures.add(_effectsChannel.loadLiveProgCode(liveProgCode));
       futures.add(_effectsChannel.setLiveProgEnabled(true));
+      for (final entry in liveProgSliders.entries) {
+        futures.add(_effectsChannel.setLiveProgSlider(entry.key, entry.value));
+      }
     }
 
     // Partial-failure tolerance: one failing effect must not abort the rest.

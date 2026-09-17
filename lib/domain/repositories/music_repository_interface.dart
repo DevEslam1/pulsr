@@ -132,6 +132,12 @@ abstract class IMusicRepository {
       List<int> songIds, int currentIndex, int positionMs);
   Future<Result<List<QueueItemsTableData>>> getSavedQueue();
 
+  /// Refreshes only the saved position of the current queue row, without
+  /// rewriting the whole table. Called on the periodic position flush so a
+  /// cold resume lands where the user left off instead of at the position from
+  /// the last structural queue edit.
+  Future<Result<void>> updateQueuePosition(int positionMs);
+
   // --- SCAN SYNC ---
   Future<Result<void>> syncScannedMusic({
     required List<SongsTableCompanion> songs,

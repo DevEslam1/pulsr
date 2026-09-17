@@ -25,7 +25,25 @@ class AppDatabase extends _$AppDatabase {
   /// Set true when the FTS rebuild during migration failed, so the
   /// search index may be incomplete and tracks can be unfindable.
   /// Surfaced instead of only printed (defect 08-04 / 05-01).
+  /// The search path calls [repairFtsIndex] once per session on FTS error.
   static bool ftsRebuildFailed = false;
+
+  /// Best-effort FTS repair: recreates the index tables/triggers and
+  /// rebuilds. Returns true on success. Safe when healthy. Once per session.
+  static bool _ftsRepairAttempted = false;
+  Future<bool> repairFtsIndex() async {
+    if (_ftsRepairAttempted) return !ftsRebuildFailed;
+    _ftsRepairAttempted = true;
+    try {
+      await _createFtsTable(customStatement);
+      await customStatement(
+          "INSERT INTO songs_fts(songs_fts) VALUES('rebuild');");
+      ftsRebuildFailed = false;
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
   @factoryMethod
   AppDatabase() : super(driftDatabase(name: 'pulsr_music_db'));
 

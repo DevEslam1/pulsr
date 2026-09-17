@@ -8,6 +8,8 @@ mixin PlayerDspControls on PulsrCubit<PlayerState> {
       bitPerfectOutput: s.bitPerfectOutput,
       bypassDspOnBitPerfect: s.bypassDspOnBitPerfect,
       device: s.currentOutputDevice,
+      aaudioEnabled: s.aaudioOutputEnabled,
+      dsdDopActive: AudioQualityInfo.dsdDopActive,
     );
   }
 
