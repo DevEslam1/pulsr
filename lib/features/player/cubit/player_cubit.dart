@@ -496,6 +496,16 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     }));
   }
 
+  /// Flushes the debounced queue-slot write immediately.
+  ///
+  /// Called on app background/detach so a process kill inside the 2s debounce
+  /// window cannot drop the most recent queue state.
+  Future<void> persistQueueSlotsNow() {
+    _persistQueueDebounce?.cancel();
+    _persistQueueDebounce = null;
+    return _persistQueueSlots();
+  }
+
   Future<void> _persistQueueSlots() async {
     if (isClosed) return;
     try {

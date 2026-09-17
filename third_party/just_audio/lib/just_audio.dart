@@ -4248,8 +4248,14 @@ class _IdleAudioPlayer extends AudioPlayerPlatform {
     required this.errorCode,
     required this.errorMessage,
   }) : super(id) {
-    _sequenceSubscription =
-        sequenceStream.listen((sequence) => _sequence = sequence);
+    _sequenceSubscription = sequenceStream.listen(
+      (sequence) => _sequence = sequence,
+      onError: (Object e, StackTrace st) {
+        // A sequence-stream error must not escape as an unhandled zone error
+        // while the engine is idle; keep the idle player alive.
+        debugPrint('IdleAudioPlayer sequence error: $e');
+      },
+    );
   }
 
   void _broadcastPlaybackEvent() {

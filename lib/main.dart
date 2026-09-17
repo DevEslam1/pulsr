@@ -346,6 +346,14 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       // No-op: locale is stable; avoid AssetManager thrash (LOG-16)
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      // Flush the debounced queue-slot write before the process can be killed.
+      try {
+        if (getIt.isRegistered<PlayerCubit>()) {
+          unawaited(getIt<PlayerCubit>().persistQueueSlotsNow());
+        }
+      } catch (_) {}
     }
   }
 
