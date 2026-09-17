@@ -1,6 +1,7 @@
 // android/app/src/main/cpp/eq_jni_bridge.cpp
 #include <jni.h>
 #include <android/log.h>
+#include <cmath>
 #include <cstring>
 #include <vector>
 #include "AudioDspEngine.h"
@@ -656,13 +657,22 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReplayGainParams(
         jdouble preAmpDb, jboolean preventClipping, jboolean enabled) {
     if (mode < 0 || mode > 2) return;
     auto m = static_cast<ReplayGainMode>(mode);
+    // Sanitize at the boundary: a corrupt tag (NaN / ±inf) reaching the engine
+    // poisons its smoothed pre-gain for the whole session, so every following
+    // track plays as noise. Peak already had a `> 0.0` guard, which happens to
+    // reject NaN; gain and preamp had none.
+    const auto finiteOr = [](double v, double fallback) {
+        return std::isfinite(v) ? v : fallback;
+    };
     AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
         snap.replayGain.mode = enabled ? m : ReplayGainMode::Off;
-        snap.replayGain.trackGainDb = trackGainDb;
-        snap.replayGain.albumGainDb = albumGainDb;
-        snap.replayGain.trackPeak = (trackPeak > 0.0) ? trackPeak : 1.0;
-        snap.replayGain.albumPeak = (albumPeak > 0.0) ? albumPeak : 1.0;
-        snap.replayGain.preAmpDb = preAmpDb;
+        snap.replayGain.trackGainDb = finiteOr(trackGainDb, 0.0);
+        snap.replayGain.albumGainDb = finiteOr(albumGainDb, 0.0);
+        snap.replayGain.trackPeak =
+            (std::isfinite(trackPeak) && trackPeak > 0.0) ? trackPeak : 1.0;
+        snap.replayGain.albumPeak =
+            (std::isfinite(albumPeak) && albumPeak > 0.0) ? albumPeak : 1.0;
+        snap.replayGain.preAmpDb = finiteOr(preAmpDb, 0.0);
         snap.replayGain.preventClipping = preventClipping;
         snap.replayGain.enabled = enabled;
     });

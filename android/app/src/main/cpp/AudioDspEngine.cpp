@@ -570,5 +570,25 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         }
     }
 
+    // Output-integrity guard: if any upstream stage emitted a non-finite sample
+    // (corrupt tag, denormal blow-up, bad coefficient), scrub it and reset the
+    // whole chain. Without this a poisoned filter/gain state stays NaN and every
+    // subsequent track plays as persistent noise until the process restarts.
+    {
+        const int total = frames * channels;
+        bool nonFiniteFound = false;
+        for (int i = 0; i < total; ++i) {
+            if (!std::isfinite(buffer[i])) {
+                buffer[i] = 0.0f;
+                nonFiniteFound = true;
+            }
+        }
+        if (nonFiniteFound) {
+            resetInternal();
+            smoothedReplayGain_ = 1.0;
+            smoothedDirectVolume_ = 1.0;
+        }
+    }
+
     return frames;
 }
