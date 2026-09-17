@@ -12,6 +12,7 @@ import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
+import '../../library/cubit/library_cubit.dart';
 import '../../sheets/song_info_sheet.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/cubit/ytm_search_cubit.dart';
@@ -479,19 +480,140 @@ class _SearchScreenState extends State<SearchScreen> {
       );
     }
     return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 160, top: 4),
-      itemCount: state.results.length,
-      itemBuilder: (context, index) {
-        final song = state.results[index];
-        return SongTile(
-          song: song,
-          subtitleOverride: '${song.artist} • ${song.album}',
-          onTap: () => playerCubit.playSong(song, queue: state.results),
-          onMorePressed: () => SongInfoSheet.show(context, song: song),
+        padding: const EdgeInsets.only(bottom: 160, top: 4),
+        itemCount: state.results.length + _derivedHeaderCount(context, state),
+        itemBuilder: (context, index) {
+          final headerOffset =
+              _buildDerivedHeaders(context, state, index, playerCubit, p);
+          if (headerOffset != null) return headerOffset;
+          final song =
+              state.results[index - _derivedHeaderCount(context, state)];
+          return SongTile(
+            song: song,
+            subtitleOverride: '${song.artist} • ${song.album}',
+            onTap: () => playerCubit.playSong(song, queue: state.results),
+            onMorePressed: () => SongInfoSheet.show(context, song: song),
+          );
+        },
+      );
+    }
+
+    int _derivedHeaderCount(BuildContext context, SearchState state) {
+      if (state.query.trim().isEmpty || state.results.isEmpty) return 0;
+      final filter = state.selectedFilter;
+      if (filter == 'Songs') return 0;
+      var count = 0;
+      if (filter == 'All' || filter == 'Artists') {
+        count += _derivedArtists(state).take(3).length;
+      }
+      if (filter == 'All' || filter == 'Albums') {
+        count += _derivedAlbums(state).take(3).length;
+      }
+      return count;
+    }
+
+    List<String> _derivedArtists(SearchState state) {
+      final seen = <String>[];
+      for (final s in state.results) {
+        final a = s.artist.trim();
+        if (a.isNotEmpty &&
+            !seen.any((e) => e.toLowerCase() == a.toLowerCase())) {
+          seen.add(a);
+        }
+      }
+      return seen;
+    }
+
+    List<String> _derivedAlbums(SearchState state) {
+      final seen = <String>[];
+      for (final s in state.results) {
+        final a = s.album.trim();
+        if (a.isNotEmpty &&
+            !seen.any((e) => e.toLowerCase() == a.toLowerCase())) {
+          seen.add(a);
+        }
+      }
+      return seen;
+    }
+
+    Widget? _buildDerivedHeaders(BuildContext context, SearchState state,
+        int index, PlayerCubit playerCubit, PulsrPalette p) {
+      final filter = state.selectedFilter;
+      if (filter == 'Songs') return null;
+      final artists = (filter == 'All' || filter == 'Artists')
+          ? _derivedArtists(state).take(3).toList()
+          : const <String>[];
+      final albums = (filter == 'All' || filter == 'Albums')
+          ? _derivedAlbums(state).take(3).toList()
+          : const <String>[];
+      final total = artists.length + albums.length;
+      if (index >= total) return null;
+      if (index < artists.length) {
+        final name = artists[index];
+        return ListTile(
+          leading: CircleAvatar(
+            backgroundColor: p.accent.withValues(alpha: 0.15),
+            child: Icon(Icons.person_rounded, color: p.accent, size: 20),
+          ),
+          title: Text(name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style:
+                  TextStyle(color: p.textPrimary, fontWeight: FontWeight.w600)),
+          subtitle: Text(context.l10n.artist,
+              style: TextStyle(color: p.textTertiary, fontSize: 12)),
+          trailing:
+              Icon(Icons.chevron_right_rounded, color: p.textTertiary),
+          onTap: () => _openDerivedArtist(context, name),
         );
-      },
-    );
-  }
+      }
+      final album = albums[index - artists.length];
+      return ListTile(
+        leading: CircleAvatar(
+          backgroundColor: p.accent.withValues(alpha: 0.15),
+          child: Icon(Icons.album_rounded, color: p.accent, size: 20),
+        ),
+        title: Text(album,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style:
+                TextStyle(color: p.textPrimary, fontWeight: FontWeight.w600)),
+        subtitle: Text(context.l10n.album,
+            style: TextStyle(color: p.textTertiary, fontSize: 12)),
+        trailing: Icon(Icons.chevron_right_rounded, color: p.textTertiary),
+        onTap: () => _openDerivedAlbum(context, album),
+      );
+    }
+
+    void _openDerivedArtist(BuildContext context, String name) {
+      try {
+        final lib = context.read<LibraryCubit>().state.artists;
+        final match = lib.cast<dynamic>().firstWhere(
+            (a) =>
+                (a?.name as String?)?.toLowerCase() == name.toLowerCase(),
+            orElse: () => null);
+        if (match != null) {
+          context.push('/artist', extra: match);
+          return;
+        }
+      } catch (_) {}
+      context.read<SearchCubit>().setFilter('Artists');
+    }
+
+    void _openDerivedAlbum(BuildContext context, String name) {
+      try {
+        final lib = context.read<LibraryCubit>().state.albums;
+        final match = lib.cast<dynamic>().firstWhere(
+            (a) =>
+                (a?.title as String?)?.toLowerCase() == name.toLowerCase(),
+            orElse: () => null);
+        if (match != null) {
+          context.push('/album', extra: match);
+          return;
+        }
+      } catch (_) {}
+      context.read<SearchCubit>().setFilter('Albums');
+    }
 }
 
 /// The "Online" tab body: live YouTube Music results with per-row download

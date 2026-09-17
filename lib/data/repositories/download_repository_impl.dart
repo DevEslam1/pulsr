@@ -14,6 +14,7 @@ import '../../core/errors/failures.dart';
 import '../../core/errors/ytm_error_classifier.dart';
 import '../../core/services/yt_download_service.dart';
 import '../../core/utils/error_logger.dart';
+import '../../domain/models/download_settings.dart';
 import '../../domain/models/download_task.dart';
 import '../../domain/models/ytm_track.dart';
 import '../../domain/repositories/download_repository_interface.dart';
@@ -22,9 +23,13 @@ import '../../domain/repositories/download_repository_interface.dart';
 class DownloadRepositoryImpl implements IDownloadRepository {
   static const _downloadChannel = MethodChannel(PulsrChannels.ytDownload);
   static const String _prefKey = 'pulsr_download_tasks_v2';
-  static const int _maxConcurrent = 3;
 
   final YtDownloadService _ytDownloadService;
+
+  /// Effective concurrency, refreshed from [DownloadSettings] whenever a task
+  /// is admitted. The user-facing setting used to be dead code (a hard-coded 3
+  /// lived here AND in [YtDownloadService]); both now honour the preference.
+  int _maxConcurrent = 3;
 
   final Map<String, DownloadTask> _tasks = {};
   final Queue<String> _queue = Queue<String>();
@@ -107,6 +112,15 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     // FIX-A15: Validate task.videoId with RegExp(r'^[A-Za-z0-9_-]{11}$') before proceeding
     if (!RegExp(r'^[A-Za-z0-9_-]{11}$').hasMatch(videoId)) {
       return const Left(DownloadFailure('Invalid video ID'));
+    }
+
+    await _reloadSettings();
+
+    // Refuse before admitting the task: a Wi-Fi-only/offline-only download used
+    // to be accepted, shown as queued, and only then fail mid-transfer.
+    final policyBlock = await _ytDownloadService.downloadPolicyBlock();
+    if (policyBlock != null) {
+      return Left(policyBlock);
     }
 
     final existing = _tasks[videoId];
@@ -197,6 +211,12 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     final task = _tasks[videoId];
     if (task == null) {
       return const Left(DownloadFailure('Task not found'));
+    }
+
+    await _reloadSettings();
+    final policyBlock = await _ytDownloadService.downloadPolicyBlock();
+    if (policyBlock != null) {
+      return Left(policyBlock);
     }
 
     _pausedVideoIds.remove(videoId);
@@ -336,8 +356,24 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     }
   }
 
+  /// Loads the persisted download preferences and applies the concurrency
+  /// limit to both this repository's scheduler and the underlying
+  /// [YtDownloadService], which keeps its own queue and would otherwise cap the
+  /// effective parallel transfers at its own hard-coded 3.
+  Future<void> _reloadSettings() async {
+    try {
+      final settings = await DownloadSettings.load();
+      _maxConcurrent = settings.maxConcurrent.clamp(1, 5);
+      _ytDownloadService.setMaxConcurrentDownloads(_maxConcurrent);
+    } catch (e, st) {
+      ErrorLogger.log('DownloadRepository settings reload failed',
+          error: e, stackTrace: st, category: 'Download');
+    }
+  }
+
   @override
   Future<void> reconcileOnBoot() async {
+    await _reloadSettings();
     try {
       final prefs = await SharedPreferences.getInstance();
       final rawJson = prefs.getString(_prefKey);
@@ -346,7 +382,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         for (final item in list) {
           final task = DownloadTask.fromJson(item as Map<String, dynamic>);
           if (task.status == DownloadStatus.downloading ||
-              task.status == DownloadStatus.queued) {
+              task.status == DownloadStatus.queued ||
+              task.status == DownloadStatus.tagging) {
             // Restore interrupted downloads as paused on startup (process death reconciliation)
             _tasks[task.videoId] = task.copyWith(status: DownloadStatus.paused);
           } else if (task.status == DownloadStatus.complete) {
@@ -573,9 +610,22 @@ class DownloadRepositoryImpl implements IDownloadRepository {
           onProgress: (p) {
             if (_pausedVideoIds.contains(videoId)) return;
 
+            final mappedStatus = switch (p.stage) {
+              YtDownloadStage.queued => DownloadStatus.queued,
+              YtDownloadStage.resolving ||
+              YtDownloadStage.downloading =>
+                DownloadStatus.downloading,
+              YtDownloadStage.tagging ||
+              YtDownloadStage.saving ||
+              YtDownloadStage.indexing =>
+                DownloadStatus.tagging,
+              YtDownloadStage.done => DownloadStatus.tagging,
+              YtDownloadStage.canceled => DownloadStatus.downloading,
+            };
+
             final progressTask = _tasks[videoId] ?? task;
             _updateTask(progressTask.copyWith(
-              status: DownloadStatus.downloading,
+              status: mappedStatus,
               progress: p.fraction ?? progressTask.progress,
               speedKbps: p.speedKbps,
               etaSeconds: p.etaSeconds,
@@ -626,6 +676,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
             error: null,
             speedKbps: null,
             etaSeconds: null,
+            localSongId: newId,
           ));
           // FIX-A06: Reconcile completed files after each successful download
           unawaited(_reconcileCompletedFiles());

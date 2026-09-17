@@ -36,8 +36,9 @@ class MetadataSearchService {
   MetadataSearchService([http.Client? httpClient])
       : _httpClient = httpClient ?? http.Client();
 
-  /// Searches the iTunes Search API for track metadata matching [title] & [artist].
-  /// MusicBrainz is not implemented; only iTunes is queried.
+  /// Searches online metadata matching [title] & [artist].
+  /// Sources: iTunes Search API first (fast, high-res artwork), then
+  /// MusicBrainz (open, no key, slower) as fallback/enrichment.
   /// Returns empty when offline-only mode is enabled.
   Future<List<OnlineTrackMetadata>> searchMetadata({
     required String title,
@@ -112,6 +113,82 @@ class MetadataSearchService {
     } catch (e, st) {
       ErrorLogger.log('iTunes metadata search failed',
           error: e, stackTrace: st, category: 'MetadataSearch');
+    }
+
+    // 2. MusicBrainz fallback (open API, no key): fills gaps iTunes misses
+    // (obscure pressings, non-Latin catalog). Rate-limited to 1 req/s per
+    // their etiquette — single query per search, 10s timeout.
+    if (results.isEmpty && title.trim().isNotEmpty) {
+      try {
+        final query = [
+          'recording:"${title.trim()}"',
+          if (artist != null &&
+              artist.isNotEmpty &&
+              artist.toLowerCase() != 'unknown artist')
+            'artist:"${artist.trim()}"',
+        ].join(' AND ');
+        final uri = Uri.https('musicbrainz.org', '/ws/2/recording/', {
+          'query': query,
+          'fmt': 'json',
+          'limit': '8',
+        });
+        final response = await _httpClient.get(uri, headers: {
+          'User-Agent': 'Pulsr/1.0 ( https://pulsr.music )',
+          'Accept': 'application/json',
+        }).timeout(const Duration(seconds: 10));
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
+          final items = (data['recordings'] as List<dynamic>?) ?? [];
+          for (final item in items) {
+            if (item is! Map<String, dynamic>) continue;
+            final recTitle = item['title'] as String? ?? '';
+            if (recTitle.isEmpty) continue;
+            var recArtist = '';
+            String? recAlbum;
+            String? recYear;
+            final artists =
+                (item['artist-credit'] as List<dynamic>?) ?? [];
+            if (artists.isNotEmpty) {
+              final names = <String>[];
+              for (final a in artists) {
+                if (a is Map<String, dynamic>) {
+                  final n = (a['name'] as String?) ??
+                      (a['artist'] is Map
+                          ? (a['artist'] as Map)['name'] as String?
+                          : null);
+                  if (n != null && n.isNotEmpty) names.add(n);
+                } else if (a is String && a.isNotEmpty) {
+                  names.add(a);
+                }
+              }
+              recArtist = names.join(', ');
+            }
+            final releases = (item['releases'] as List<dynamic>?) ?? [];
+            if (releases.isNotEmpty && releases.first is Map) {
+              final rel = releases.first as Map<String, dynamic>;
+              recAlbum = rel['title'] as String?;
+              final date = rel['date'] as String?;
+              if (date != null && date.length >= 4) {
+                recYear = date.substring(0, 4);
+              }
+            }
+            results.add(OnlineTrackMetadata(
+              title: recTitle,
+              artist: recArtist.isNotEmpty
+                  ? recArtist
+                  : (artist ?? 'Unknown Artist'),
+              album: recAlbum ?? album ?? '',
+              releaseYear: recYear,
+              // MusicBrainz core has no genre/artwork inline; Cover Art
+              // Archive fetch would need per-release MBIDs (slow) — artwork
+              // stays iTunes-sourced.
+            ));
+          }
+        }
+      } catch (e, st) {
+        ErrorLogger.log('MusicBrainz metadata search failed',
+            error: e, stackTrace: st, category: 'MetadataSearch');
+      }
     }
 
     return results;

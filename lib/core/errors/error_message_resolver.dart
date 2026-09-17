@@ -123,6 +123,60 @@ String resolveUiErrorMessage(BuildContext context, String message) {
   if (message.startsWith('Failed to sync YouTube Music likes')) {
     return l10n.errYtmSyncLikes;
   }
+  if (message.startsWith('Search failed')) {
+    return l10n.errSearchFailed;
+  }
+  if (message.startsWith('Please enter a playlist name')) {
+    return l10n.errPlaylistNameRequired;
+  }
+
+  // Download failures. The repository stores the raw service message; match by
+  // stem so both the '…' and '.' variants and interpolated details resolve.
+  if (message.startsWith('Wi-Fi Only Mode is active')) {
+    return l10n.downloadWifiOnly;
+  }
+  if (message.startsWith('Offline Only Mode is active')) {
+    return l10n.downloadOfflineOnly;
+  }
+  if (message.startsWith('Insufficient storage') ||
+      message.startsWith('Storage full') ||
+      message.startsWith('MediaStore did not return') ||
+      message.startsWith('Downloaded file was not found')) {
+    return l10n.downloadErrorStorage;
+  }
+  if (message.startsWith('Downloaded audio file is corrupt') ||
+      message.startsWith('Downloaded file was corrupted') ||
+      message.startsWith('Downloaded file was not created') ||
+      message.startsWith('Download incomplete') ||
+      message.startsWith('Parallel download byte mismatch') ||
+      message.startsWith('Merged file size mismatch') ||
+      message.startsWith('Chunk ')) {
+    return l10n.downloadErrorCorrupt;
+  }
+  if (message.startsWith('No connection while downloading') ||
+      message.startsWith('Download network timeout')) {
+    return l10n.downloadErrorNetwork;
+  }
+  if (message.startsWith('YouTube is busy') ||
+      message.startsWith('HTTP 429') ||
+      message.contains('Rate limited')) {
+    return l10n.downloadErrorRateLimited;
+  }
+  if (message.startsWith('Download timed out')) {
+    return l10n.downloadErrorTimeout;
+  }
+  if (message.startsWith('YouTube verification triggered') ||
+      message.startsWith('HTTP 403') ||
+      message.startsWith('HTTP 401')) {
+    return l10n.downloadErrorBotChallenge;
+  }
+  if (message.startsWith('This track is unavailable')) {
+    return l10n.downloadErrorUnavailable;
+  }
+  if (message.startsWith('Download canceled') ||
+      message.startsWith('Download cancelled')) {
+    return l10n.downloadErrorInterrupted;
+  }
 
   // Technical DSP/file failures: translate the template, keep the raw detail
   // (exception text / parameter) verbatim.

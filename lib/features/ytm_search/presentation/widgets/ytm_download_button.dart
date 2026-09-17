@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/config/app_config.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/errors/error_message_resolver.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/db/app_database.dart';
@@ -42,9 +43,15 @@ class YtmDownloadButton extends StatelessWidget {
 
     return BlocBuilder<YtmDownloadCubit, YtmDownloadState>(
       bloc: cubit,
-      buildWhen: (a, b) =>
-          a.itemFor(videoId).status != b.itemFor(videoId).status ||
-          a.itemFor(videoId).progress != b.itemFor(videoId).progress,
+      buildWhen: (a, b) {
+        final prev = a.itemFor(videoId);
+        final next = b.itemFor(videoId);
+        return prev.status != next.status ||
+            prev.progress != next.progress ||
+            prev.speedKbps != next.speedKbps ||
+            prev.etaSeconds != next.etaSeconds ||
+            prev.error != next.error;
+      },
       builder: (context, state) {
         final item = state.itemFor(videoId);
         final isAlreadyLocal = song.source == SongSource.local &&
@@ -87,12 +94,15 @@ class YtmDownloadButton extends StatelessWidget {
             );
           case YtDownloadStatus.failed:
             return IconButton(
-              tooltip: item.error,
+              tooltip: item.error == null
+                  ? null
+                  : resolveUiErrorMessage(context, item.error!),
               icon: Icon(Icons.error_outline_rounded,
                   size: iconSize, color: p.error),
-              onPressed: () => cubit.download(song),
+              onPressed: () => cubit.retryDownload(song),
               visualDensity: VisualDensity.compact,
             );
+          case YtDownloadStatus.paused:
           case YtDownloadStatus.canceled:
           case YtDownloadStatus.idle:
             return IconButton(

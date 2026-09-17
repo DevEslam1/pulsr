@@ -16,6 +16,7 @@ import '../utils/google_login_recovery.dart';
 import 'ytm_oauth_login_sheet.dart';
 
 import '../../../core/utils/error_logger.dart';
+import '../../../core/utils/ytm_locale.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 class YtmWebLoginSheet extends StatefulWidget {
@@ -237,7 +238,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
     // Set Egypt region preference cookie on .youtube.com
     try {
-      document.cookie = "PREF=f1=50000000&gl=EG&hl=en; domain=.youtube.com; path=/";
+      document.cookie = "PREF=${YtmLocale.prefCookieValue()}; domain=.youtube.com; path=/";
     } catch(e) {}
 
     // Hook ytcfg to enforce Egypt region and disable unavailable state
@@ -382,16 +383,11 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
   bool _isGeoBlocked = false;
 
-  /// Ensures that any YouTube Music URL carries explicit gl=EG&hl=en parameters.
+  /// Ensures that any YouTube Music URL carries explicit gl/hl parameters
+  /// derived from the device locale (YtmLocale, EG/en fallback).
   static String _withGeoParams(String url) {
     if (!url.contains('music.youtube.com')) return url;
-    final uri = Uri.tryParse(url);
-    if (uri == null) return url;
-    if (uri.queryParameters.containsKey('gl')) return url;
-    final newParams = Map<String, String>.from(uri.queryParameters);
-    newParams['gl'] = 'EG';
-    newParams['hl'] = 'en';
-    return uri.replace(queryParameters: newParams).toString();
+    return YtmLocale.withLocaleParams(url);
   }
 
   static bool _shouldScanGeoBlockUrl(String url) {
@@ -432,12 +428,12 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       await cookieManager.setCookie(
         url: WebUri('https://music.youtube.com'),
         name: 'PREF',
-        value: 'f1=50000000&gl=EG&hl=en',
+        value: YtmLocale.prefCookieValue(),
         domain: '.youtube.com',
         path: '/',
       );
     } catch (_) {}
-    await _navigateTo('https://music.youtube.com/?gl=EG&hl=en');
+    await _navigateTo(YtmLocale.homeUrl());
   }
 
   @override
@@ -446,7 +442,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     _currentUrl = widget.initialUrl != null
         ? _withGeoParams(widget.initialUrl!)
         : (widget.isBrowseMode
-            ? 'https://music.youtube.com/?gl=EG&hl=en'
+            ? YtmLocale.homeUrl()
             : googleSignInUrl);
 
     // Pre-seed Egypt region preference cookie for YouTube domains
@@ -455,7 +451,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       cookieManager.setCookie(
         url: WebUri('https://music.youtube.com'),
         name: 'PREF',
-        value: 'f1=50000000&gl=EG&hl=en',
+        value: YtmLocale.prefCookieValue(),
         domain: '.youtube.com',
         path: '/',
       );
@@ -1307,21 +1303,23 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                 _navChip(
                                   label: context.l10n.browseHome,
                                   icon: Icons.home_rounded,
-                                  url: 'https://music.youtube.com/?gl=EG&hl=en',
+                                  url: YtmLocale.homeUrl(),
                                   p: p,
                                 ),
                                 const SizedBox(width: 6),
                                 _navChip(
                                   label: context.l10n.browseExplore,
                                   icon: Icons.explore_rounded,
-                                  url: 'https://music.youtube.com/explore?gl=EG&hl=en',
+                                  url: YtmLocale.withLocaleParams(
+                                      'https://music.youtube.com/explore'),
                                   p: p,
                                 ),
                                 const SizedBox(width: 6),
                                 _navChip(
                                   label: context.l10n.navLibrary,
                                   icon: Icons.library_music_rounded,
-                                  url: 'https://music.youtube.com/library?gl=EG&hl=en',
+                                  url: YtmLocale.withLocaleParams(
+                                      'https://music.youtube.com/library'),
                                   p: p,
                                 ),
                                 const SizedBox(width: 6),
@@ -1329,21 +1327,24 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                   label: context.l10n.likedMusic,
                                   icon: Icons.favorite_rounded,
                                   url:
-                                      'https://music.youtube.com/playlist?list=LM&gl=EG&hl=en',
+                                      YtmLocale.withLocaleParams(
+                                          'https://music.youtube.com/playlist?list=LM'),
                                   p: p,
                                 ),
                                 const SizedBox(width: 6),
                                 _navChip(
                                   label: context.l10n.newReleases,
                                   icon: Icons.fiber_new_rounded,
-                                  url: 'https://music.youtube.com/new_releases?gl=EG&hl=en',
+                                  url: YtmLocale.withLocaleParams(
+                                      'https://music.youtube.com/new_releases'),
                                   p: p,
                                 ),
                                 const SizedBox(width: 6),
                                 _navChip(
                                   label: context.l10n.history,
                                   icon: Icons.history_rounded,
-                                  url: 'https://music.youtube.com/history?gl=EG&hl=en',
+                                  url: YtmLocale.withLocaleParams(
+                                      'https://music.youtube.com/history'),
                                   p: p,
                                 ),
                                 const SizedBox(width: 6),
@@ -1357,7 +1358,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                 _navChip(
                                   label: context.l10n.browseEgyptMode,
                                   icon: Icons.public_rounded,
-                                  url: 'https://music.youtube.com/?gl=EG&hl=en',
+                                  url: YtmLocale.homeUrl(),
                                   p: p,
                                 ),
                               ],

@@ -92,7 +92,9 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       trackNumber: isBatch
           ? ''
           : (song.trackNumber != null ? song.trackNumber.toString() : ''),
-      discNumber: isBatch ? '' : '',
+      discNumber: isBatch
+          ? ''
+          : (song.discNumber != null ? song.discNumber.toString() : ''),
     );
   }
 
@@ -333,7 +335,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
     }
   }
 
-  /// Automatically searches online (iTunes & MusicBrainz) and updates tags + cover art in 1 tap.
+    /// Automatically searches online (iTunes & MusicBrainz) and updates tags + cover art in 1 tap.
   Future<bool> autoFetchOnlineTags() async {
     if (isClosed) return false;
     emit(state.copyWith(isAutoFetching: true, clearErrorMessage: true));
@@ -352,11 +354,85 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       if (isClosed) return false;
       ErrorLogger.log('Auto-fetch online tags failed',
           error: e, stackTrace: st, category: 'TagEditorCubit');
+        emit(state.copyWith(
+          isAutoFetching: false,
+          errorMessage: 'Failed to auto-fetch online tags: $e',
+        ));
+        return false;
+      }
+    }
+
+  /// Batch auto-fetch: queries online metadata per track (capped at 20 to
+  /// respect iTunes/MusicBrainz rate limits) and fills the shared form fields
+  /// only where every resolved track agrees (artist/album/genre/year).
+  /// Returns the number of tracks resolved.
+  Future<int> autoFetchBatchTags({int maxTracks = 20}) async {
+    if (isClosed || !state.isBatchMode) return 0;
+    emit(state.copyWith(isAutoFetching: true, clearErrorMessage: true));
+    try {
+      final targets = state.batchSongs.take(maxTracks).toList();
+      final artists = <String>[];
+      final albums = <String>[];
+      final genres = <String>[];
+      final years = <String>[];
+      var resolved = 0;
+      for (final song in targets) {
+        if (isClosed) return resolved;
+        try {
+          final matches = await _metadataSearchService.searchMetadata(
+            title: song.title,
+            artist: song.artist,
+            album: song.album,
+          );
+          if (matches.isEmpty) continue;
+          resolved++;
+          final m = matches.first;
+          if (m.artist.isNotEmpty) artists.add(m.artist);
+          if (m.album.isNotEmpty) albums.add(m.album);
+          if (m.genre != null && m.genre!.isNotEmpty) genres.add(m.genre!);
+          if (m.releaseYear != null && m.releaseYear!.isNotEmpty) {
+            years.add(m.releaseYear!);
+          }
+        } catch (_) {}
+      }
+      if (isClosed) return resolved;
+      String? unanimous(List<String> values) {
+        if (values.isEmpty || values.length < resolved || resolved == 0) {
+          return null;
+        }
+        final first = values.first.toLowerCase();
+        if (values.every((v) => v.toLowerCase() == first)) return values.first;
+        return null;
+      }
+
+      final artist = unanimous(artists);
+      final album = unanimous(albums);
+      final genre = unanimous(genres);
+      final year = unanimous(years);
+      if (artist != null) _batchArtistEdited = true;
+      if (album != null) _batchAlbumEdited = true;
+      if (genre != null) _batchGenreEdited = true;
+      if (year != null) _batchYearEdited = true;
+      emit(state.copyWith(
+        isAutoFetching: false,
+        artist: artist ?? state.artist,
+        album: album ?? state.album,
+        genre: genre ?? state.genre,
+        year: year ?? state.year,
+        errorMessage: resolved == 0
+            ? 'No matching online metadata found for these tracks.'
+            : null,
+      ));
+      return resolved;
+    } catch (e, st) {
+      if (isClosed) return 0;
+      ErrorLogger.log('Batch auto-fetch online tags failed',
+          error: e, stackTrace: st, category: 'TagEditorCubit');
       emit(state.copyWith(
         isAutoFetching: false,
         errorMessage: 'Failed to auto-fetch online tags: $e',
       ));
-      return false;
+      return 0;
     }
   }
 

@@ -123,15 +123,22 @@ class AuthCubit extends Cubit<AuthState> {
     }
   }
 
-  Future<void> sendPasswordReset(String email) async {
+  /// Returns true when the reset email was accepted by the backend.
+  /// Emits [errorMessage] on failure so the sheet can surface it instead of
+  /// an optimistic "sent" snackbar.
+  Future<bool> sendPasswordReset(String email) async {
     try {
       await _authService.sendPasswordResetEmail(email);
+      if (isClosed) return true;
+      emit(state.copyWith(errorMessage: null));
+      return true;
     } catch (e) {
-      if (isClosed) return;
+      if (isClosed) return false;
       final msg = _mapAuthError(e);
       emit(state.copyWith(
         errorMessage: msg,
       ));
+      return false;
     }
   }
 

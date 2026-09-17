@@ -8,11 +8,13 @@ import '../utils/error_logger.dart';
 /// Persists the user's internet radio stations as a JSON list in
 /// [SharedPreferences]. Plain class (no injectable annotation): constructed
 /// directly like [BpmOverrideStore] to avoid regenerating the DI graph.
+/// The station list is static-shared so direct-constructed instances (radio
+/// screen, player queue mixin) never diverge within a session.
 class RadioStationStore {
   static const String prefsKey = 'radio_stations_v1';
   static const int maxEntries = 500;
 
-  final List<RadioStation> _stations = [];
+  static final List<RadioStation> _stations = [];
   late final Future<void> ready;
 
   RadioStationStore() {

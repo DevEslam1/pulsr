@@ -64,12 +64,29 @@ class PlatformCapabilities {
   static bool get isIOS =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
-  static bool get hasEqualizer => isAndroid;
-  static bool get hasAudioEffects => isAndroid;
-  static bool get hasTagEditor => isAndroid;
-  static bool get hasRingtoneManager => isAndroid;
-  static bool get hasAppWidget => isAndroid;
-  static bool get hasHardwareVisualizer => isAndroid;
+  static AudioCapabilities? _nativeCache;
+
+  /// Warms the native capability cache at startup. Safe to call repeatedly;
+  /// failures fall back to the platform defaults below.
+  static Future<void> ensureLoaded() async {
+    if (_nativeCache != null || !isAndroid) return;
+    try {
+      _nativeCache = await queryCapabilities();
+    } catch (_) {}
+  }
+
+  static bool get hasEqualizer =>
+      _nativeCache?.hasEqualizer ?? isAndroid;
+  static bool get hasAudioEffects =>
+      _nativeCache?.hasAudioEffects ?? isAndroid;
+  static bool get hasTagEditor =>
+      _nativeCache?.hasTagEditor ?? isAndroid;
+  static bool get hasRingtoneManager =>
+      _nativeCache?.hasRingtoneManager ?? isAndroid;
+  static bool get hasAppWidget =>
+      _nativeCache?.hasAppWidget ?? isAndroid;
+  static bool get hasHardwareVisualizer =>
+      _nativeCache?.hasHardwareVisualizer ?? isAndroid;
 
   static Future<AudioCapabilities> queryCapabilities() async {
     if (!isAndroid) {

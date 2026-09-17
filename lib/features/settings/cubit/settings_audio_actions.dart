@@ -7,6 +7,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         bitPerfectOutput: state.bitPerfectOutput,
         bypassDspOnBitPerfect: state.bypassDspOnBitPerfect,
         device: state.currentOutputDevice,
+        aaudioEnabled: state.aaudioOutputEnabled,
       );
       if (blocked != null) {
         safeEmit(state.copyWith(errorMessage: blocked));
@@ -59,8 +60,22 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     await prefs.setBool(SettingsCubit._keyOfflineOnlyMode, enabled);
   }
 
-  Future<void> setBitPerfectOutput(bool enabled) async {
-    if (enabled) {
+  /// Crossfade overlaps two tracks and would alter the bitstream, so turning on
+  /// a bit-perfect path must clear any active crossfade rather than leaving both
+  /// persisted and letting the engine overlap tracks anyway.
+  Future<void> _forceCrossfadeOffForBitPerfect() async {
+    if (state.crossfadeSeconds <= 0.01) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(SettingsCubit._keyCrossfade, 0.0);
+    if (isClosed) return;
+    safeEmit(state.copyWith(
+      crossfadeSeconds: 0.0,
+      errorMessage:
+          'Crossfade disabled: it is not compatible with Bit-Perfect output.',
+    ));
+  }
+
+  Future<void> setBitPerfectOutput(bool enabled) async {    if (enabled) {
       final block = AudioConflicts.bitPerfectBlockedReason(
         state.currentOutputDevice,
       );
@@ -94,6 +109,9 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       }
       await refreshOutputDevice();
       return;
+    }
+    if (enabled) {
+      await _forceCrossfadeOffForBitPerfect();
     }
     // Wire bypass: when bit-perfect enabled and user wants bypass, force DSP off via native
     if (enabled && state.bypassDspOnBitPerfect) {
@@ -248,6 +266,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         await AudioEffectsChannel().setBypassDspForBitPerfect(true);
       }
     } catch (_) {}
+    await _forceCrossfadeOffForBitPerfect();
     // Software gain would alter the bitstream; turn it off like the normal
     // Bit-Perfect path does.
     if (state.replayGainMode != ReplayGainMode.off) {

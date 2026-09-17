@@ -196,6 +196,11 @@ class PulsrAudioHandler extends BaseAudioHandler
   int _currentIndex = 0;
   @override
   bool _queueDirty = false;
+
+  /// Index last written to the persisted queue. Compared against [_currentIndex]
+  /// on the periodic flush so a skip refreshes the cold-resume row even though
+  /// the queue structure did not change.
+  int _savedQueueIndex = -1;
   double? _preDuckVolume;
   double? _preDuckInactiveVolume;
   @override
@@ -991,10 +996,16 @@ class PulsrAudioHandler extends BaseAudioHandler
     final posMs = _activePlayer.position.inMilliseconds;
     try {
       await _repository.updateLastPosition(currentSong.id, posMs);
-      if (_queueDirty) {
+      if (_queueDirty || _currentIndex != _savedQueueIndex) {
         await _repository.saveQueue(
             _songs.map((s) => s.id).toList(), _currentIndex, posMs);
         _queueDirty = false;
+        _savedQueueIndex = _currentIndex;
+      } else {
+        // Same track, later position: refresh just the current row so a cold
+        // resume restores where the user actually was, not the position from
+        // the last structural queue edit (skipToNext never dirtied the queue).
+        await _repository.updateQueuePosition(posMs);
       }
       // Only clear AFTER a successful write: clearing first meant a failed
       // write was never retried and resume-after-kill could restore a stale

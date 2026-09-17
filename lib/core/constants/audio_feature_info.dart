@@ -310,11 +310,23 @@ class AudioFeatureRegistry {
 /// Pure-logic conflict checker. Returns null if allowed, otherwise a human reason why the action must be blocked.
 class AudioConflicts {
   /// Bit-perfect bypass disables all native DSP, virtualizer and software gain.
+  ///
+  /// AAudio Direct bypasses the same DSP chain, and a live DSD-over-PCM carrier
+  /// would be corrupted by any sample processing, so both are reported here too
+  /// — the caller does not have to chain three checks.
   static String? dspBlockedByBitPerfect({
     required bool bitPerfectOutput,
     required bool bypassDspOnBitPerfect,
     required AudioOutputInfo? device,
+    bool aaudioEnabled = false,
+    bool dsdDopActive = false,
   }) {
+    if (aaudioEnabled) {
+      return 'Disabled: AAudio Direct is ON — it bypasses the ExoPlayer DSP chain (EQ, speed/pitch, silence skip, crossfade). Turn it off to re-enable DSP.';
+    }
+    if (dsdDopActive) {
+      return 'Disabled: DSD over PCM (DoP) is playing — any DSP or gain would corrupt the DoP carrier. Switch DSD output to PCM to re-enable DSP.';
+    }
     if (!bitPerfectOutput || !bypassDspOnBitPerfect) return null;
     if (device?.isBluetooth == true) return null;
     if (device?.isBitPerfectActive != true) return null;
@@ -357,11 +369,15 @@ class AudioConflicts {
     required bool bitPerfectOutput,
     required bool bypassDspOnBitPerfect,
     required AudioOutputInfo? device,
+    bool aaudioEnabled = false,
+    bool dsdDopActive = false,
   }) =>
       dspBlockedByBitPerfect(
           bitPerfectOutput: bitPerfectOutput,
           bypassDspOnBitPerfect: bypassDspOnBitPerfect,
-          device: device);
+          device: device,
+          aaudioEnabled: aaudioEnabled,
+          dsdDopActive: dsdDopActive);
 
   /// Strict bit-perfect can only be enabled on a path that actually exposes
   /// exclusive bit-perfect output. Reuses [bitPerfectBlockedReason] for the
@@ -396,7 +412,11 @@ class AudioConflicts {
     required bool bitPerfectOutput,
     required bool bypassDspOnBitPerfect,
     required AudioOutputInfo? device,
+    bool aaudioEnabled = false,
   }) {
+    if (aaudioEnabled) {
+      return 'Disabled: AAudio Direct is ON — crossfade is applied in the ExoPlayer DSP chain it bypasses. Turn AAudio Direct off to use crossfade.';
+    }
     if (!bitPerfectOutput || !bypassDspOnBitPerfect) return null;
     if (device?.isBluetooth == true) return null;
     return 'Disabled: Bit-Perfect bypass is ON — crossfade overlaps two tracks and would alter the bitstream. Turn off Bit-Perfect (or its DSP bypass) to use crossfade.';

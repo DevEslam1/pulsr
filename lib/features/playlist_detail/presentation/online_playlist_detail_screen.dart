@@ -181,16 +181,26 @@ class _OnlinePlaylistDetailScreenState
     if (_tracks.isEmpty) return;
     final songs = _tracks.map((t) => t.toSongData()).toList();
     final downloadCubit = getIt<YtmDownloadCubit>();
-    final count = downloadCubit.downloadAll(songs);
+    final report = downloadCubit.downloadAllDetailed(songs);
 
+    final parts = <String>[];
+    if (report.queued > 0) {
+      parts.add(context.l10n.queuedFromTitle(report.queued, _title));
+    } else {
+      parts.add(context.l10n.allDownloaded(_title));
+    }
+    if (report.capped > 0) {
+      parts.add(
+          '${report.capped} beyond the batch limit left out — re-run Download All for the rest.');
+    }
+    if (report.skippedLocal > 0) {
+      parts.add('${report.skippedLocal} already on device — skipped.');
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-          content: Text(
-          count > 0
-              ? context.l10n.queuedFromTitle(count, _title)
-              : context.l10n.allDownloaded(_title),
-        ),
+        content: Text(parts.join(' ')),
         behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4),
       ),
     );
   }
@@ -212,11 +222,11 @@ class _OnlinePlaylistDetailScreenState
       final playlistRes = await playlistUseCases.createPlaylist(_title);
       final createdId = playlistRes.fold((l) => null, (r) => r);
 
-      if (createdId != null) {
-        for (final s in songs) {
-          await playlistUseCases.addSongToPlaylist(createdId, s.id);
-        }
-        messenger.showSnackBar(
+        if (createdId != null) {
+          // Single batch insert: one transaction instead of N round-trips.
+          await playlistUseCases.addSongsToPlaylist(
+              createdId, [for (final s in songs) s.id]);
+          messenger.showSnackBar(
           SnackBar(
             content: Text(loc.savedToLocal(_title, songs.length)),
             behavior: SnackBarBehavior.floating,

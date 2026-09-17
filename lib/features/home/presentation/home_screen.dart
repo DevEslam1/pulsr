@@ -350,30 +350,50 @@ class _HomeScreenState extends State<HomeScreen> {
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: p.hairline),
                       ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _buildTabButton(
-                              title: context.l10n.localMusic,
-                              icon: Icons.library_music_rounded,
-                              isSelected: currentTab == 0,
-                              p: p,
-                              onTap: () => setState(() => _selectedTab = 0),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _buildTabButton(
+                                title: context.l10n.localMusic,
+                                icon: Icons.library_music_rounded,
+                                isSelected: currentTab == 0,
+                                p: p,
+                                onTap: () => setState(() => _selectedTab = 0),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: _buildTabButton(
-                              title: context.l10n.onlineStream,
-                              icon: Icons.public_rounded,
-                              isSelected: currentTab == 1,
-                              p: p,
-                              onTap: () => setState(() => _selectedTab = 1),
-                            ),
-                          ),
-                        ],
+                            if (showOnlineTab) ...[
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: _buildTabButton(
+                                  title: context.l10n.onlineStream,
+                                  icon: Icons.public_rounded,
+                                  isSelected: currentTab == 1,
+                                  p: p,
+                                  onTap: () =>
+                                      setState(() => _selectedTab = 1),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
-                    ),
+                      if (!showOnlineTab) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(Icons.cloud_off_rounded,
+                                size: 14, color: p.textTertiary),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Offline mode — online streaming is disabled in Settings.',
+                                style: TextStyle(
+                                    color: p.textTertiary, fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                   ],
 
                   // ---------- Quick Discovery Tools Row ----------
@@ -625,15 +645,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 subtitle: context.l10n.topPlayedTracks,
                 icon: Icons.headphones_rounded,
                 color: const Color(0xFF1DE9B6),
-                onTap: () async {
-                  final songs = await getSongsUseCase.getAllSongs();
-                  songs.fold((l) => null, (list) {
-                    final top = list.where((s) => s.playCount > 0).toList();
-                    if (top.isNotEmpty) {
-                      playerCubit.playSong(top.first, queue: top);
-                    }
-                  });
-                },
+                  onTap: () async {
+                    final songs = await getSongsUseCase.getAllSongs();
+                    songs.fold((l) => null, (list) {
+                      final top = list.where((s) => s.playCount > 0).toList()
+                        ..sort((a, b) => b.playCount.compareTo(a.playCount));
+                      if (top.isNotEmpty) {
+                        playerCubit.playSong(top.first, queue: top);
+                      }
+                    });
+                  },
               ),
             ],
           ),

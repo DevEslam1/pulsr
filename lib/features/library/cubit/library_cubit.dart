@@ -129,10 +129,13 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     final excludedRes = await _folderUseCases.getExcludedFolders();
     if (isClosed || t != _songsToken) return;
     final excluded = excludedRes.fold((l) => <String>[], (r) => r);
-    // Top-rated sort is prefs-backed: SQL has no rating column, so watch
-    // the full window and sort in Dart (no pagination in this mode).
-    final isRatingSort = state.sortBy == 'rating';
-    final window = isRatingSort ? null : _songsLimit;
+      // Top-rated sort is prefs-backed: SQL has no rating column, so watch a
+      // bounded window and sort in Dart. 5000 covers realistic libraries
+      // without holding the full table; pagination is disabled in this mode
+      // and the cap is documented on the sort control.
+      final isRatingSort = state.sortBy == 'rating';
+      const ratingSortCap = 5000;
+      final window = isRatingSort ? ratingSortCap : _songsLimit;
     _songsSub = autoSub(
       _getSongsUseCase.watchSongs(
         sortBy: isRatingSort ? 'title' : state.sortBy,
@@ -155,8 +158,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
                   errorMessage: null));
               return;
             }
-            // Hitting the cap means the DB may hold more rows.
-            _hasMoreSongs = songs.length >= window!;
+              // Hitting the cap means the DB may hold more rows.
+              _hasMoreSongs = !isRatingSort && songs.length >= window;
             _isLoadingMoreSongs = false;
             safeEmit(state.copyWith(songs: songs, errorMessage: null));
           },

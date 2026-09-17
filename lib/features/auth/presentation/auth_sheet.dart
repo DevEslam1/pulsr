@@ -12,6 +12,7 @@ import '../../settings/presentation/widgets/ytm_account_disconnect_dialog.dart';
 import '../cubit/auth_cubit.dart';
 import '../cubit/auth_state.dart';
 import 'ytm_web_login_sheet.dart';
+import 'ytm_oauth_login_sheet.dart';
 
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
 
@@ -169,13 +170,25 @@ class _AuthSheetState extends State<AuthSheet> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Image.network(
-                              'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/1200px-Google_%22G%22_logo.svg.png',
+                            // Offline-safe "G" badge: no network asset, no
+                            // webfont — renders identically offline.
+                            Container(
                               height: 20,
                               width: 20,
-                              errorBuilder: (_, __, ___) => const Icon(
-                                  Icons.g_mobiledata_rounded,
-                                  color: Colors.black87),
+                              alignment: Alignment.center,
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Text(
+                                'G',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF4285F4),
+                                  height: 1.0,
+                                ),
+                              ),
                             ),
                             const SizedBox(width: 12),
                             Text(context.l10n.continueWithGoogle,
@@ -287,16 +300,22 @@ class _AuthSheetState extends State<AuthSheet> {
                         Align(
                           alignment: Alignment.centerRight,
                           child: TextButton(
-                            onPressed: () {
+                            onPressed: () async {
                               final email = _emailController.text.trim();
                               if (email.isNotEmpty && email.contains('@')) {
-                                context
+                                final ok = await context
                                     .read<AuthCubit>()
                                     .sendPasswordReset(email);
+                                if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                      content: Text(
-                                          '${context.l10n.browsePasswordResetSent} $email')),
+                                      content: Text(ok
+                                          ? '${context.l10n.browsePasswordResetSent} $email'
+                                          : context
+                                                  .read<AuthCubit>()
+                                                  .state
+                                                  .errorMessage ??
+                                              'Failed to send reset link. Please try again.')),
                                 );
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -441,6 +460,32 @@ class _AuthSheetState extends State<AuthSheet> {
                             );
                           },
                         ),
+                        if (!getIt<YtmAccountService>().loginState.value) ...[
+                          const SizedBox(height: 8),
+                          TextButton.icon(
+                            onPressed: () async {
+                              final ok =
+                                  await YtmOAuthLoginSheet.show(context);
+                              if (ok == true && context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(context.l10n.ytmConnected),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            },
+                            icon: Icon(Icons.phonelink_setup_rounded,
+                                size: 18, color: p.textSecondary),
+                            label: Text(
+                              'Having trouble? Use code sign-in instead',
+                              style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: 12.5,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ],
                   ),

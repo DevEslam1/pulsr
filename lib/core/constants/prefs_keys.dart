@@ -138,6 +138,7 @@ class PrefsKeys {
       'setting_arbitrary_eq_linear_phase';
   static const String liveProgEnabled = 'setting_live_prog_enabled';
   static const String liveProgCode = 'setting_live_prog_code';
+  static const String liveProgSliders = 'setting_live_prog_sliders';
 
   // FIX(N1): Artwork cache disk limit key
   static const String settingMaxCacheSizeMb = 'setting_max_cache_size_mb';

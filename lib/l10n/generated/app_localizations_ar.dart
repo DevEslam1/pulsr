@@ -1245,6 +1245,24 @@ class AppLocalizationsAr extends AppLocalizations {
   String get downloadWifiOnly => 'وضع Wi-Fi فقط نشط. اتصل بالشبكة للتنزيل.';
 
   @override
+  String get downloadOfflineOnly =>
+      'وضع عدم الاتصال فقط نشط. أوقفه من الإعدادات للتنزيل.';
+
+  @override
+  String get settingsDownloadConcurrent => 'التنزيلات المتزامنة';
+
+  @override
+  String get settingsDownloadConcurrentSubtitle =>
+      'الحد الأقصى للمقاطع التي يتم تنزيلها في وقت واحد (1-5).';
+
+  @override
+  String get settingsDownloadLocation => 'موقع التنزيل';
+
+  @override
+  String get settingsDownloadLocationUnsupported =>
+      'مواقع التنزيل المخصصة غير مدعومة بعد. يتم حفظ الملفات في مجلد الموسيقى.';
+
+  @override
   String get downloadErrorAlreadyQueued =>
       'هذه الأغنية موجودة بالفعل في قائمة التنزيل.';
 
@@ -6292,6 +6310,12 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get errYtmSyncLikes => 'تعذّرت مزامنة الأغاني المفضلة';
+
+  @override
+  String get errSearchFailed => 'فشل البحث. يرجى المحاولة مجددًا.';
+
+  @override
+  String get errPlaylistNameRequired => 'يرجى إدخال اسم لقائمة التشغيل.';
 
   @override
   String get dspMultibandLabel => 'متعدد النطاقات';

@@ -43,6 +43,7 @@ import '../../../data/audio/song_rating_store.dart';
 import '../../../data/db/app_database.dart';
 import '../../../data/scanner/media_scanner_service.dart';
 import '../../../domain/models/audio_effects_config.dart';
+import '../../../domain/models/audio_quality_info.dart';
 import '../../../domain/models/eq_preset.dart';
 import '../../../domain/models/headphone_profile.dart';
 import '../../../domain/models/reverb_preset.dart';

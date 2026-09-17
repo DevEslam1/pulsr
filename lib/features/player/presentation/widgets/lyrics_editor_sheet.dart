@@ -225,10 +225,13 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                       ),
                       const SizedBox(width: 10),
                       // Text input field
-                      Expanded(
-                        child: TextFormField(
-                          key: ValueKey(
-                              'lyric_${index}_${line.timestamp.inMilliseconds}'),
+                        Expanded(
+                          child: TextFormField(
+                            // Keyed by index only: including the timestamp
+                            // rebuilt the field on every stamp-tap and dropped
+                            // keyboard focus. Timestamp edits still repaint
+                            // via the stamp label beside this field.
+                            key: ValueKey('lyric_$index'),
                           initialValue: line.text,
                           style: TextStyle(color: p.textPrimary, fontSize: 13),
                           decoration: const InputDecoration(

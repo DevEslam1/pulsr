@@ -102,6 +102,13 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
     if (_bypassController.text != state.proxyBypassHosts) {
       _bypassController.text = state.proxyBypassHosts;
     }
+    // Password lives in secure storage (not in SettingsState) — rehydrate it
+    // so switching pool entries never leaves a stale password behind.
+    context.read<SettingsCubit>().getProxyPassword().then((pw) {
+      if (mounted && _passwordController.text != pw) {
+        _passwordController.text = pw;
+      }
+    });
     _enabled = state.proxyEnabled;
     _type = state.proxyType;
   }

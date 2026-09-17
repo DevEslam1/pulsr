@@ -12,6 +12,10 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'core/performance/gpu_budget.dart';
+import 'core/utils/platform_capabilities.dart';
 import 'core/config/app_config.dart';
 import 'core/di/injection.dart';
 import 'core/network/app_http_overrides.dart';
@@ -69,11 +73,40 @@ Future<void> main() async {
   }
 
   ErrorLogger.onCrashReported = (error, stackTrace, category) {
-    // Production crash reporting hook (FirebaseCrashlytics / Sentry / Bugsnag)
-    // FirebaseCrashlytics.instance.recordError(error, stackTrace, reason: category);
+    // Crashlytics is not a dependency — Sentry is the crash backend.
+    // Route every crash report there (when telemetry is allowed) plus logcat.
+    try {
+      if (AppConfig.isTelemetryAllowed) {
+        Sentry.captureException(error, stackTrace: stackTrace);
+      }
+    } catch (_) {}
     debugPrint('[Pulsr.CrashReport][$category] $error\n$stackTrace');
   };
   ErrorLogger.initialize();
+
+  // Rehydrate the GPU budget before first frame (persisted by SettingsCubit).
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    GpuBudget.setEnabled(prefs.getBool('setting_reduce_motion') ?? false);
+  } catch (_) {}
+  // Warm native audio capability cache (best-effort, never blocks).
+  unawaited(PlatformCapabilities.ensureLoaded()
+      .timeout(const Duration(seconds: 5))
+      .catchError((_) {}));
+
+  // Firebase powers Auth + (optionally) cloud sync. Pure builds must perform
+  // zero network work, so skip init there; elsewhere init best-effort so a
+  // missing google-services file never blocks startup.
+  if (!AppConfig.isPure) {
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      ).timeout(const Duration(seconds: 8));
+    } catch (e, st) {
+      ErrorLogger.log('Firebase.initializeApp failed — Auth runs offline-only',
+          error: e, stackTrace: st, category: 'Startup');
+    }
+  }
 
   // System Chrome configuration for true edge-to-edge UI
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -625,7 +658,8 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                       final isBoldText = MediaQuery.boldTextOf(context);
 
                       final lightTheme = isHighContrast
-                          ? AuraTheme.highContrastTheme
+                          ? AuraTheme.highContrastThemeFor(Brightness.light,
+                              seed: resolveAccent(lightDynamic?.primary))
                           : AuraTheme.customTheme(
                               resolveAccent(lightDynamic?.primary),
                               brightness: Brightness.light,
@@ -633,7 +667,8 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                             );
 
                       final darkTheme = isHighContrast
-                          ? AuraTheme.highContrastTheme
+                          ? AuraTheme.highContrastThemeFor(Brightness.dark,
+                              seed: resolveAccent(darkDynamic?.primary))
                           : AuraTheme.customTheme(
                               resolveAccent(darkDynamic?.primary),
                               brightness: Brightness.dark,

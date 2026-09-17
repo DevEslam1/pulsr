@@ -156,6 +156,8 @@ class MediaScannerService {
   static const int _nomediaCacheMax = 2000;
 
   static bool isInNomediaDirectory(String filePath) {
+    // Web has no filesystem — never treat anything as nomedia there.
+    if (kIsWeb) return false;
     try {
       final normalized = filePath.replaceAll('\\', '/');
       final idx = normalized.lastIndexOf('/');
@@ -208,7 +210,6 @@ class MediaScannerService {
     int minDurationSec = 30,
     int minSizeKb = 0,
     bool autoHideSystemMedia = true,
-    int? addedAfterEpochSec,
   }) async {
     _progressController.add(0.0);
     try {
@@ -312,8 +313,8 @@ class MediaScannerService {
           '${parseResult.nativeDecoderRequiredCount > 0 ? ', ${parseResult.nativeDecoderRequiredCount} file(s) need a native decoder (not indexed)' : ''}',
           category: 'scanner');
 
-      // addedAfterEpochSec is advisory: DATE_ADDED filtering is applied by
-      // callers doing delta scans; record completion for resume heuristics.
+      // Full-scan design: the query is DATE_ADDED DESC and the repository
+      // remaps onto existing paths, so re-scans converge without delta args.
       markScanComplete();
       return parseResult.songs.length;
     } catch (e, st) {

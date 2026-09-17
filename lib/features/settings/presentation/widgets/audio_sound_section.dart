@@ -1070,13 +1070,32 @@ class AudioSoundSection extends StatelessWidget {
           Icons.volume_up_rounded,
           context.l10n.settingsDvcTitle,
           context.l10n.settingsDvcDesc,
-          value: isAndroid && state.dvcEnabled && !state.aaudioOutputEnabled,
+          value: isAndroid &&
+              state.dvcEnabled &&
+              !state.aaudioOutputEnabled &&
+              AudioConflicts.dspBlockedByBitPerfect(
+                    bitPerfectOutput: state.bitPerfectOutput,
+                    bypassDspOnBitPerfect: state.bypassDspOnBitPerfect,
+                    device: state.currentOutputDevice,
+                  ) ==
+                  null,
           disabledReason: !isAndroid
               ? unsupported
               : (state.aaudioOutputEnabled
                   ? context.l10n.settingsUnavailableAaudio
-                  : null),
-          onChanged: !isAndroid || state.aaudioOutputEnabled
+                  : AudioConflicts.dspBlockedByBitPerfect(
+                      bitPerfectOutput: state.bitPerfectOutput,
+                      bypassDspOnBitPerfect: state.bypassDspOnBitPerfect,
+                      device: state.currentOutputDevice,
+                    )),
+          onChanged: !isAndroid ||
+                  state.aaudioOutputEnabled ||
+                  AudioConflicts.dspBlockedByBitPerfect(
+                        bitPerfectOutput: state.bitPerfectOutput,
+                        bypassDspOnBitPerfect: state.bypassDspOnBitPerfect,
+                        device: state.currentOutputDevice,
+                      ) !=
+                      null
               ? (v) {}
               : cubit.setDvcEnabled,
         ),

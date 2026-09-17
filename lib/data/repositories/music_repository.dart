@@ -1,4 +1,5 @@
 // lib/data/repositories/music_repository.dart
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'package:drift/drift.dart';
@@ -221,16 +222,24 @@ class MusicRepository implements IMusicRepository {
         buffer.write('OFFSET ?');
         vars.add(Variable.withInt(offset));
       }
-      return _db
-          .customSelect(buffer.toString(),
-              variables: vars, readsFrom: {_db.songsTable}).watch().asyncMap((rows) async {
-        final songs = await Future.wait(
-            rows.map((r) => _db.songsTable.mapFromRow(r)));
-        return Right<AppFailure, List<SongsTableData>>(songs);
-      }).handleError(
-        (e) => Left<AppFailure, List<SongsTableData>>(
-            DatabaseFailure('Failed to watch songs (FTS)', e)),
-      );
+        return _db
+            .customSelect(buffer.toString(),
+                variables: vars, readsFrom: {_db.songsTable}).watch().asyncMap((rows) async {
+          final songs = await Future.wait(
+              rows.map((r) => _db.songsTable.mapFromRow(r)));
+          return Right<AppFailure, List<SongsTableData>>(songs);
+        }).handleError(
+          (e) {
+            // Missing/corrupt FTS (e.g. failed migration rebuild): repair
+            // once per session, then report. Next watch re-subscribes onto
+            // the rebuilt index instead of failing silently forever.
+            if (AppDatabase.ftsRebuildFailed) {
+              unawaited(_db.repairFtsIndex());
+            }
+            return Left<AppFailure, List<SongsTableData>>(
+                DatabaseFailure('Failed to watch songs (FTS)', e));
+          },
+        );
     } catch (e) {
       return Stream.value(Left(DatabaseFailure('Failed to watch songs', e)));
     }
@@ -318,6 +327,8 @@ class MusicRepository implements IMusicRepository {
   @override
   Future<Result<List<String>>> getLocalSongPaths() async {
     try {
+      // CUE virtual tracks share their container's path — excluding them
+      // here dedupes the path list (callers diff by file, not by chapter).
       final query = _db.selectOnly(_db.songsTable)
         ..addColumns([_db.songsTable.path])
         ..where(_db.songsTable.isMissing.equals(false) &
@@ -1226,11 +1237,12 @@ class MusicRepository implements IMusicRepository {
   }
 
   // --- QUEUE PERSISTENCE ---
-  // Ownership (defect 10-01): the authoritative queue lives in
-  // PlayerCubit.queue_slots_v1 (3 UI slots + active index). This Drift table
-  // is a DERIVED cold-resume cache for the audio service only: PlayerCubit
-  // writes it through on slot persist, AudioHandler reads it on cold start.
-  // On conflict, queue_slots_v1 wins. Do not introduce a third writer.
+  // Ownership (defect 10-01): this Drift table is the cold-resume source of
+  // truth for the audio service. [AudioHandler] writes it — a full rewrite on
+  // structural queue edits, and a single-row position refresh on the periodic
+  // flush — and reads it back on cold start. PlayerCubit's `queue_slots_v1`
+  // preference holds the editable 3-slot UI state used for slot switching.
+  // Backup restore is the only other writer, by design.
   @override
   Future<Result<void>> saveQueue(
       List<int> songIds, int currentIndex, int positionMs) async {
@@ -1266,6 +1278,18 @@ class MusicRepository implements IMusicRepository {
       return Right(items);
     } catch (e) {
       return Left(DatabaseFailure('Failed to get saved queue', e));
+    }
+  }
+
+  @override
+  Future<Result<void>> updateQueuePosition(int positionMs) async {
+    try {
+      await (_db.update(_db.queueItemsTable)
+            ..where((t) => t.isCurrent.equals(true)))
+          .write(QueueItemsTableCompanion(positionMs: Value(positionMs)));
+      return const Right(null);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to update queue position', e));
     }
   }
 

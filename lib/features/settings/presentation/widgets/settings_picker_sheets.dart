@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/utils/ytm_locale.dart';
 import '../../../auth/presentation/ytm_web_login_sheet.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 
@@ -64,7 +65,7 @@ void showYtmWebOptionsSheet(BuildContext context) {
                       icon: Icons.home_rounded,
                       title: ctx.l10n.homePage,
                       subtitle: ctx.l10n.homePageSubtitle,
-                      url: 'https://music.youtube.com/?gl=EG&hl=en',
+                      url: YtmLocale.homeUrl(),
                       p: p,
                     ),
                     _ytmWebOptionTile(
@@ -80,7 +81,8 @@ void showYtmWebOptionsSheet(BuildContext context) {
                       icon: Icons.explore_rounded,
                       title: ctx.l10n.exploreAndCharts,
                       subtitle: ctx.l10n.exploreAndChartsSubtitle,
-                      url: 'https://music.youtube.com/explore?gl=EG&hl=en',
+                      url: YtmLocale.withLocaleParams(
+                          'https://music.youtube.com/explore'),
                       p: p,
                     ),
                     _ytmWebOptionTile(
@@ -88,7 +90,8 @@ void showYtmWebOptionsSheet(BuildContext context) {
                       icon: Icons.library_music_rounded,
                       title: ctx.l10n.yourLibrary,
                       subtitle: ctx.l10n.yourLibrarySubtitle,
-                      url: 'https://music.youtube.com/library?gl=EG&hl=en',
+                      url: YtmLocale.withLocaleParams(
+                          'https://music.youtube.com/library'),
                       p: p,
                     ),
                     _ytmWebOptionTile(
@@ -96,7 +99,8 @@ void showYtmWebOptionsSheet(BuildContext context) {
                       icon: Icons.favorite_rounded,
                       title: ctx.l10n.likedMusic,
                       subtitle: ctx.l10n.likedMusicSubtitle,
-                      url: 'https://music.youtube.com/playlist?list=LM&gl=EG&hl=en',
+                      url: YtmLocale.withLocaleParams(
+                          'https://music.youtube.com/playlist?list=LM'),
                       p: p,
                     ),
                     _ytmWebOptionTile(
@@ -104,7 +108,8 @@ void showYtmWebOptionsSheet(BuildContext context) {
                       icon: Icons.fiber_new_rounded,
                       title: ctx.l10n.newReleases,
                       subtitle: ctx.l10n.newReleasesSubtitle,
-                      url: 'https://music.youtube.com/new_releases?gl=EG&hl=en',
+                      url: YtmLocale.withLocaleParams(
+                          'https://music.youtube.com/new_releases'),
                       p: p,
                     ),
                     _ytmWebOptionTile(
@@ -112,7 +117,8 @@ void showYtmWebOptionsSheet(BuildContext context) {
                       icon: Icons.history_rounded,
                       title: ctx.l10n.listeningHistory,
                       subtitle: ctx.l10n.listeningHistorySubtitle,
-                      url: 'https://music.youtube.com/history?gl=EG&hl=en',
+                      url: YtmLocale.withLocaleParams(
+                          'https://music.youtube.com/history'),
                       p: p,
                     ),
                   ],
