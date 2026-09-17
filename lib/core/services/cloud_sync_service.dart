@@ -112,7 +112,10 @@ class CloudSyncService {
           _syncedDocHashes.clear();
           decoded.forEach((k, v) => _syncedDocHashes[k] = v.toString());
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Failed to decode synced hashes',
+            error: e, stackTrace: st, category: 'CloudSync');
+      }
     }
   }
 
@@ -120,7 +123,10 @@ class CloudSyncService {
     final prefs = await _getPrefs();
     try {
       await prefs.setString(_keySyncedHashes, jsonEncode(_syncedDocHashes));
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist synced hashes',
+          error: e, stackTrace: st, category: 'CloudSync');
+    }
   }
 
   bool _syncInProgress = false;

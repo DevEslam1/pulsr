@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
@@ -18,6 +19,7 @@ import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../domain/models/smart_playlist_criteria.dart';
 import '../../../domain/models/ytm_track.dart';
 import '../../../domain/usecases/get_songs_usecase.dart';
@@ -227,13 +229,13 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
             ListTile(
               leading: const Icon(Icons.list_alt_rounded),
               title: const Text('PLS'),
-              subtitle: const Text('Winamp / Poweramp'),
+              subtitle: Text(context.l10n.exportFormatWinampLabel),
               onTap: () => Navigator.pop(ctx, PlaylistFormat.pls),
             ),
             ListTile(
               leading: const Icon(Icons.queue_music_rounded),
               title: const Text('WPL'),
-              subtitle: const Text('Windows Media Player'),
+              subtitle: Text(context.l10n.exportFormatWmpLabel),
               onTap: () => Navigator.pop(ctx, PlaylistFormat.wpl),
             ),
           ],
@@ -725,7 +727,25 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
           // ── TAB CONTENT ─────────────────────────────────────────
           if (_selectedTab == _PlaylistTabMode.local) ...[
             // LOCAL PLAYLISTS VIEW
-            if (userPlaylists.isEmpty)
+            if (state.playlists.isEmpty && state.isLoading)
+              Padding(
+                padding: EdgeInsets.symmetric(
+                    horizontal: Adaptive.pagePadding(context)),
+                child: SkeletonGrid(
+                  columns: isTabletLandscape ? 2 : columns,
+                  itemCount: (isTabletLandscape ? 2 : columns) * 2,
+                  padding: EdgeInsets.zero,
+                ),
+              )
+            else if (state.playlists.isEmpty && state.errorMessage != null)
+              EmptyStateWidget(
+                icon: Icons.error_outline_rounded,
+                title: context.l10n.playlistLoadFailed,
+                subtitle: state.errorMessage!,
+                primaryActionLabel: context.l10n.retry,
+                onPrimaryAction: cubit.reloadPlaylists,
+              )
+            else if (userPlaylists.isEmpty)
               EmptyStateWidget(
                 icon: Icons.playlist_add_rounded,
                 title: context.l10n.emptyPlaylists,
@@ -1823,12 +1843,30 @@ class _PlaylistCard extends StatelessWidget {
     this.onMenuSelected,
   });
 
+  void _openContextMenu(BuildContext context, Offset globalPosition) {
+    final items = menuItems?.call(context);
+    if (items == null || items.isEmpty) return;
+    HapticFeedback.selectionClick();
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) return;
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromLTWH(globalPosition.dx, globalPosition.dy, 0, 0),
+        Offset.zero & overlay.size,
+      ),
+      items: items,
+    ).then((selected) {
+      if (selected != null) onMenuSelected?.call(selected);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
     final card = InkWell(
       onTap: onTap,
-      onLongPress: onLongPress,
       borderRadius: BorderRadius.circular(20),
       child: Container(
         decoration: BoxDecoration(
@@ -1906,7 +1944,20 @@ class _PlaylistCard extends StatelessWidget {
         ),
       ),
     );
-    if (onLongPress == null && menuItems == null) return card;
+    if (menuItems != null) {
+      return GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onLongPressStart: (d) => _openContextMenu(context, d.globalPosition),
+        child: card,
+      );
+    }
+    if (onLongPress != null) {
+      return GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onLongPress: onLongPress,
+        child: card,
+      );
+    }
     return card;
   }
 }

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/theme/aura_theme.dart';
@@ -39,6 +40,44 @@ class _MiniPlayerState extends State<MiniPlayer> {
   bool _isUserDragging = false;
   bool _swipeInFlight = false;
   double _verticalDragDy = 0.0;
+  double _horizontalDragDx = 0.0;
+
+  /// The Hero tag used by the full-screen artwork for the active theme, so the
+  /// mini -> full shared-element transition actually runs (tags must match).
+  String _fullArtworkHeroTag(PlayerThemeMode mode) {
+    switch (mode) {
+      case PlayerThemeMode.minimal:
+        return 'now_playing_art_minimal';
+      default:
+        return 'now_playing_art_full';
+    }
+  }
+
+  /// Honors the user's configured mini-player swipe actions
+  /// (next / prev / volume / none) for the directions the carousel does not
+  /// already handle natively.
+  void _applySwipeAction(
+    MiniPlayerSwipeAction action,
+    PlayerCubit cubit, {
+    required bool swipedLeft,
+  }) {
+    switch (action) {
+      case MiniPlayerSwipeAction.next:
+        HapticFeedback.selectionClick();
+        unawaited(cubit.next());
+        break;
+      case MiniPlayerSwipeAction.prev:
+        HapticFeedback.selectionClick();
+        unawaited(cubit.previous());
+        break;
+      case MiniPlayerSwipeAction.volume:
+        HapticFeedback.selectionClick();
+        unawaited(cubit.adjustVolume(swipedLeft ? 0.05 : -0.05));
+        break;
+      case MiniPlayerSwipeAction.none:
+        break;
+    }
+  }
 
   @override
   void initState() {
@@ -92,6 +131,15 @@ class _MiniPlayerState extends State<MiniPlayer> {
     // unrelated settings change must not rebuild the mini player (A-11).
     final playerThemeMode = context
         .select<SettingsCubit, PlayerThemeMode>((c) => c.state.playerThemeMode);
+    // Mini-player swipe actions are user-configurable; the queue carousel can
+    // only natively express the next/prev mapping.
+    final swipeLeftAction = context.select<SettingsCubit, MiniPlayerSwipeAction>(
+        (c) => c.state.miniPlayerSwipeLeft);
+    final swipeRightAction =
+        context.select<SettingsCubit, MiniPlayerSwipeAction>(
+            (c) => c.state.miniPlayerSwipeRight);
+    final carouselEnabled = swipeLeftAction == MiniPlayerSwipeAction.next &&
+        swipeRightAction == MiniPlayerSwipeAction.prev;
     final p = context.palette;
 
     return BlocBuilder<PlayerCubit, PlayerState>(
@@ -136,8 +184,10 @@ class _MiniPlayerState extends State<MiniPlayer> {
             onVerticalDragEnd: (d) {
               final vy = d.velocity.pixelsPerSecond.dy;
               if (_verticalDragDy > 25 || vy > 120) {
+                HapticFeedback.selectionClick();
                 widget.onSwipeDown?.call();
               } else if (_verticalDragDy < -25 || vy < -120) {
+                HapticFeedback.selectionClick();
                 if (widget.onSwipeUp != null) {
                   widget.onSwipeUp!();
                 } else {
@@ -146,6 +196,29 @@ class _MiniPlayerState extends State<MiniPlayer> {
               }
               _verticalDragDy = 0.0;
             },
+            onHorizontalDragStart: carouselEnabled
+                ? null
+                : (_) {
+                    _horizontalDragDx = 0.0;
+                  },
+            onHorizontalDragUpdate: carouselEnabled
+                ? null
+                : (d) {
+                    _horizontalDragDx += d.delta.dx;
+                  },
+            onHorizontalDragEnd: carouselEnabled
+                ? null
+                : (d) {
+                    final dx = _horizontalDragDx + d.velocity.pixelsPerSecond.dx * 0.05;
+                    _horizontalDragDx = 0.0;
+                    if (dx.abs() < 24) return;
+                    final swipedLeft = dx < 0;
+                    _applySwipeAction(
+                      swipedLeft ? swipeLeftAction : swipeRightAction,
+                      cubit,
+                      swipedLeft: swipedLeft,
+                    );
+                  },
             child: Padding(
               padding: EdgeInsetsDirectional.fromSTEB(
                 isTablet ? 24 : 10,
@@ -221,7 +294,9 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                       },
                                       child: PageView.builder(
                                         controller: _pageController,
-                                        physics: const BouncingScrollPhysics(),
+                                        physics: carouselEnabled
+                                            ? const BouncingScrollPhysics()
+                                            : const NeverScrollableScrollPhysics(),
                                         itemCount: queue.length,
                                         onPageChanged: (page) {
                                           if (_isUserDragging &&
@@ -254,7 +329,8 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                               else
                                                 Hero(
                                                   tag: isCurrent
-                                                      ? 'now_playing_art_mini_${item.id}'
+                                                      ? _fullArtworkHeroTag(
+                                                          playerThemeMode)
                                                       : 'queue_art_${item.id}_$index',
                                                   child: CachedArtwork(
                                                     id: item.id,
@@ -335,7 +411,10 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                     color: activeAccent,
                                     size: 32,
                                   ),
-                                  onPressed: cubit.togglePlayPause,
+                                  onPressed: () {
+                                    HapticFeedback.lightImpact();
+                                    cubit.togglePlayPause();
+                                  },
                                 ),
                                 IconButton(
                                   tooltip: context.l10n.next,
@@ -344,7 +423,10 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                     color: p.textPrimary,
                                     size: 28,
                                   ),
-                                  onPressed: cubit.next,
+                                  onPressed: () {
+                                    HapticFeedback.selectionClick();
+                                    cubit.next();
+                                  },
                                 ),
                               ],
                             ),
@@ -413,10 +495,29 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar> {
               final valueLabel =
                   '${Formatters.formatDuration(currentDuration)} / ${Formatters.formatDuration(widget.duration)}';
 
+              Duration clampDuration(Duration d) {
+                if (d < Duration.zero) return Duration.zero;
+                if (d > widget.duration) return widget.duration;
+                return d;
+              }
+
+              String labelFor(Duration d) =>
+                  '${Formatters.formatDuration(d)} / ${Formatters.formatDuration(widget.duration)}';
+              final increasedLabel = labelFor(
+                  clampDuration(currentDuration + const Duration(seconds: 10)));
+              final decreasedLabel = labelFor(
+                  clampDuration(currentDuration - const Duration(seconds: 10)));
+
               return Semantics(
                 slider: true,
-                label: 'Seek',
+                label: context.l10n.seekLabel,
                 value: valueLabel,
+                increasedValue: increasedLabel,
+                decreasedValue: decreasedLabel,
+                onIncrease: () => widget.onSeek(
+                    clampDuration(currentDuration + const Duration(seconds: 10))),
+                onDecrease: () => widget.onSeek(
+                    clampDuration(currentDuration - const Duration(seconds: 10))),
                 child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTapDown: (details) {

@@ -62,7 +62,10 @@ class MissingArtworkService {
       if (!AppConfig.isCloudSyncAllowed) return null;
       final prefs = await SharedPreferences.getInstance();
       if (prefs.getBool('setting_offline_only_mode') == true) return null;
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to read offline-only preference for artwork',
+          error: e, stackTrace: st, category: 'MissingArtwork');
+    }
     for (int attempt = 0; attempt <= maxRetries; attempt++) {
       await _rateLimiter.acquire();
       try {
@@ -143,7 +146,10 @@ class MissingArtworkService {
       if (!AppConfig.isCloudSyncAllowed) return 0;
       final prefs = await SharedPreferences.getInstance();
       if (prefs.getBool('setting_offline_only_mode') == true) return 0;
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to read offline-only preference for artwork',
+          error: e, stackTrace: st, category: 'MissingArtwork');
+    }
 
     if (!getIt.isRegistered<IMusicRepository>()) return 0;
     final repo = getIt<IMusicRepository>();

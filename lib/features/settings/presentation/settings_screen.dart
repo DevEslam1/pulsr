@@ -336,7 +336,11 @@ class _SettingsScreenState extends State<SettingsScreen>
           final item = items[i];
           final isSelected = _selectedCategoryId == item.id;
 
-          return PulsrPressable(
+          return Semantics(
+            selected: isSelected,
+            button: true,
+            label: item.title,
+            child: PulsrPressable(
             pressedScale: 0.94,
             onTap: () {
               HapticFeedback.selectionClick();
@@ -377,6 +381,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                 ],
               ),
             ),
+          ),
           );
         },
       ),

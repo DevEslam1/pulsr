@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../domain/models/download_settings.dart';
 
 /// Concurrency picker for the download queue.
@@ -35,27 +36,28 @@ class _DownloadConcurrencyTileState extends State<DownloadConcurrencyTile> {
 
   Future<void> _pick() async {
     final p = context.palette;
-    final selected = await showModalBottomSheet<int>(
+    final selected = await PulsrSheetHelper.showPulsrSheet<int>(
       context: context,
-      backgroundColor: p.surfaceContainerHigh,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
       builder: (sheetContext) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: 8),
             for (var i = 1; i <= 5; i++)
-              ListTile(
-                leading: Icon(
-                  _value == i
-                      ? Icons.radio_button_checked_rounded
-                      : Icons.radio_button_unchecked_rounded,
-                  color: p.accent,
+              Semantics(
+                selected: _value == i,
+                button: true,
+                label: '$i',
+                excludeSemantics: true,
+                child: ListTile(
+                  leading: Icon(
+                    _value == i
+                        ? Icons.radio_button_checked_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    color: p.accent,
+                  ),
+                  title: Text('$i', style: TextStyle(color: p.textPrimary)),
+                  onTap: () => Navigator.of(sheetContext).pop(i),
                 ),
-                title: Text('$i', style: TextStyle(color: p.textPrimary)),
-                onTap: () => Navigator.of(sheetContext).pop(i),
               ),
             const SizedBox(height: 8),
           ],

@@ -34,9 +34,13 @@ void main() {
         port: 1080,
       );
       expect(config.isValid, true);
+      // Dart's HttpClient only understands "PROXY host:port" and "DIRECT";
+      // a SOCKS5 token would throw "Invalid proxy configuration". SOCKS5 is
+      // applied on the native OkHttp extractor, so the Dart fallback is DIRECT.
+      expect(config.isSupportedOnDart, false);
       expect(
         config.toFindProxyString(Uri.parse('https://music.youtube.com/search')),
-        'SOCKS5 192.168.1.100:1080; SOCKS 192.168.1.100:1080; DIRECT',
+        'DIRECT',
       );
     });
 

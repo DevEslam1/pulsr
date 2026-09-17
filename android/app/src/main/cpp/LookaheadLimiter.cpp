@@ -48,8 +48,8 @@ void LookaheadLimiter::configure(double lookaheadMs, double thresholdDb, double 
 
     threshold_ = static_cast<float>(std::pow(10.0, thresholdDb_ / 20.0));
     fastReleaseCoeff_ = static_cast<float>(std::exp(-1.0 / (0.015 * sampleRate_))); // 15ms fast transient release
-    slowReleaseCoeff_ = static_cast<float>(std::exp(-1.0 / (std::max(releaseMs_, 50.0) * 0.001 * sampleRate_)));
-    releaseCoeff_ = slowReleaseCoeff_;
+    // Honour the user's release time (clamped to [5, 1000] ms in configure).
+    slowReleaseCoeff_ = static_cast<float>(std::exp(-1.0 / (releaseMs_ * 0.001 * sampleRate_)));
 }
 
 void LookaheadLimiter::setEnabled(bool enabled) {

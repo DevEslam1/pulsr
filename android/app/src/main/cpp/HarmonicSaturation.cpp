@@ -38,6 +38,12 @@ void HarmonicSaturation::configure(double drive, double mix, double tilt, int mo
 
     const double fc = kTiltHpHz / (sampleRate_ * OVERSAMPLE_FACTOR);
     tiltHpCoeff_ = static_cast<float>(1.0 - std::exp(-2.0 * M_PI * fc));
+
+    // DC blocker for the asymmetric modes. Runs at the base rate (after the
+    // 4x decimation average), so its pole is derived from sampleRate_ to keep
+    // a constant ~5 Hz corner instead of the previous fixed 0.9995 pole, whose
+    // corner drifted from ~3.8 Hz @48k up to ~61 Hz @768k (audible bass loss).
+    dcCoeff_ = static_cast<float>(std::exp(-2.0 * M_PI * 5.0 / sampleRate_));
 }
 
 void HarmonicSaturation::applyParams(const SaturationParamSet& params) {
@@ -55,15 +61,18 @@ void HarmonicSaturation::reset() {
 static inline float shapeSample(float x, double k, float invNorm, int mode) {
     const float xin = static_cast<float>(k) * x;
     if (mode == 1) {
-        // Tube (Triode / 6J1): asymmetric quadratic curve generating rich 2nd harmonics
-        const float num = xin + 0.35f * (xin * std::abs(xin));
-        const float den = 1.0f + 0.35f * std::abs(xin);
-        return (num / den) * invNorm;
+        // Tube (Triode / 6J1): biased soft clip. tanh is strictly monotonic
+        // with a bounded (-1, 1) range, and the input bias makes the curve
+        // asymmetric, generating even (2nd) harmonics. The resulting DC offset
+        // is removed by the post de-emphasis DC blocker. (The previous
+        // quadratic ratio was algebraically identical to x for any input, so
+        // Tube mode produced no harmonics at all.)
+        return std::tanh(xin + 0.40f) * invNorm;
     } else if (mode == 2) {
-        // Analog Class-A single-ended transistor curve
-        const float num = xin - 0.15f * (xin * xin * xin) + 0.20f * (xin * std::abs(xin));
-        const float den = 1.0f + 0.25f * std::abs(xin);
-        return (num / den) * invNorm;
+        // Analog Class-A single-ended transistor: stronger asymmetry for a
+        // fatter even-harmonic ratio. Monotonic and bounded, unlike the old
+        // cubic curve which folded back above |xin|~1.77 and changed sign.
+        return std::tanh(xin + 0.80f) * invNorm;
     }
     // Mode 0: Tape (symmetric tanh)
     return std::tanh(xin) * invNorm;
@@ -132,8 +141,8 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
 
             // DC blocker for asymmetric modes
             if (mode != 0) {
-                float yL = wetL - dcX_[0] + 0.9995f * dcY_[0];
-                float yR = wetR - dcX_[1] + 0.9995f * dcY_[1];
+                float yL = wetL - dcX_[0] + dcCoeff_ * dcY_[0];
+                float yR = wetR - dcX_[1] + dcCoeff_ * dcY_[1];
                 dcX_[0] = wetL;
                 dcX_[1] = wetR;
                 dcY_[0] = yL;
@@ -198,7 +207,7 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
                 wet = sum * (1.0f / static_cast<float>(OVERSAMPLE_FACTOR));
 
                 if (mode != 0) {
-                    float y = wet - dcX_[ch] + 0.9995f * dcY_[ch];
+                    float y = wet - dcX_[ch] + dcCoeff_ * dcY_[ch];
                     dcX_[ch] = wet;
                     dcY_[ch] = y;
                     wet = y;

@@ -706,6 +706,7 @@ int main() {
     runDspEffectsTest();
     runDspStressTest();
     runRtAllocGuardTest();
+    runRtPreparedPayloadTest();
     runSampleRateChangeTest();
     runSnapshotRaceTest();
     runSyntheticIrCacheBudgetTest();

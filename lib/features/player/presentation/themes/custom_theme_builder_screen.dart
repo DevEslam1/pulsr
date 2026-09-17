@@ -24,6 +24,20 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
   int _accentColor = 0xFF9B9EF5;
   double _cornerRadius = 24.0;
   bool _glowEnabled = true;
+  bool _initializedFromSettings = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initializedFromSettings) return;
+    _initializedFromSettings = true;
+    try {
+      final s = context.read<SettingsCubit>().state;
+      _accentColor = s.customAccentColorValue;
+      _cornerRadius = s.customThemeRadius;
+      _glowEnabled = s.customThemeGlow;
+    } catch (_) {}
+  }
 
   static const List<int> _paletteOptions = [
     0xFF9B9EF5, // Lavender
@@ -139,6 +153,14 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
             if (glowVal != null) _glowEnabled = glowVal;
           });
           context.read<SettingsCubit>().setCustomAccentColor(Color(colorVal));
+          final cubit = context.read<SettingsCubit>();
+          if (radiusVal != null) {
+            await cubit.setCustomThemeRadius(radiusVal);
+          }
+          if (glowVal != null) {
+            await cubit.setCustomThemeGlow(glowVal);
+          }
+          if (!mounted) return;
           PulsrToast.show(context,
               message: l10n.themeApplied, icon: Icons.palette_rounded);
         } else {
@@ -324,6 +346,8 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
               max: 48.0,
               activeColor: Color(_accentColor),
               onChanged: (val) => setState(() => _cornerRadius = val),
+              onChangeEnd: (val) =>
+                  context.read<SettingsCubit>().setCustomThemeRadius(val),
             ),
             const SizedBox(height: 16),
 
@@ -335,7 +359,10 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                   style: TextStyle(color: p.textSecondary, fontSize: 12)),
               value: _glowEnabled,
               activeThumbColor: Color(_accentColor),
-              onChanged: (val) => setState(() => _glowEnabled = val),
+              onChanged: (val) {
+                setState(() => _glowEnabled = val);
+                context.read<SettingsCubit>().setCustomThemeGlow(val);
+              },
             ),
           ],
         ),

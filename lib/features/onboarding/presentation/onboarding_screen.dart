@@ -42,12 +42,34 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     try {
       final granted = await widget.scannerService.requestPermission();
       if (granted) {
-        if (Platform.isAndroid) {
-          try {
-            await Permission.notification.request();
-          } catch (e, st) {
-            ErrorLogger.log('Notification permission request failed',
-                error: e, stackTrace: st, category: 'Onboarding');
+        if (Platform.isAndroid && mounted) {
+          // Prime before the OS prompt: explain why notifications matter so the
+          // user can make an informed choice instead of denying reflexively.
+          final allow = await PulsrDialogHelper.showCustomDialog<bool>(
+            context,
+            builder: (ctx) => PulsrDialog(
+              title: context.l10n.notificationPermissionTitle,
+              icon: Icons.notifications_active_rounded,
+              content: Text(context.l10n.notificationPermissionRationale),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: Text(context.l10n.notificationPermissionNotNow),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: Text(context.l10n.notificationPermissionAllow),
+                ),
+              ],
+            ),
+          );
+          if (allow == true) {
+            try {
+              await Permission.notification.request();
+            } catch (e, st) {
+              ErrorLogger.log('Notification permission request failed',
+                  error: e, stackTrace: st, category: 'Onboarding');
+            }
           }
         }
         await widget.scannerService.scanDeviceLibrary();

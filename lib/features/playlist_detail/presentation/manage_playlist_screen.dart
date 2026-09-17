@@ -7,6 +7,7 @@ import '../../../core/di/injection.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/widgets/cached_artwork.dart';
+import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/glass_container.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
@@ -33,6 +34,7 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
   Timer? _searchDebounce;
   bool _isLoading = true;
   bool _isSaving = false;
+  String? _loadError;
 
   late final PlaylistUseCases _playlistUseCases;
   late final GetSongsUseCase _getSongsUseCase;
@@ -57,20 +59,25 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
   Future<void> _loadInitialPlaylistSongs() async {
     final stream = _playlistUseCases.watchPlaylistSongs(widget.playlist.id);
     final firstBatch = await stream.first;
+    if (!mounted) return;
     firstBatch.fold(
-      (failure) {},
+      (failure) {
+        setState(() {
+          _isLoading = false;
+          _loadError = failure.message;
+        });
+      },
       (songs) {
-        if (mounted) {
-          setState(() {
-            _initialSongIds.clear();
-            _selectedSongIds.clear();
-            for (final song in songs) {
-              _initialSongIds.add(song.id);
-              _selectedSongIds.add(song.id);
-            }
-            _isLoading = false;
-          });
-        }
+        setState(() {
+          _initialSongIds.clear();
+          _selectedSongIds.clear();
+          for (final song in songs) {
+            _initialSongIds.add(song.id);
+            _selectedSongIds.add(song.id);
+          }
+          _isLoading = false;
+          _loadError = null;
+        });
       },
     );
   }
@@ -166,7 +173,21 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
                       valueColor: AlwaysStoppedAnimation<Color>(p.accent),
                     ),
                   )
-                : Column(
+                : _loadError != null
+                    ? EmptyStateWidget(
+                        icon: Icons.error_outline_rounded,
+                        title: context.l10n.playlistLoadFailed,
+                        subtitle: _loadError!,
+                        primaryActionLabel: context.l10n.retry,
+                        onPrimaryAction: () {
+                          setState(() {
+                            _isLoading = true;
+                            _loadError = null;
+                          });
+                          _loadInitialPlaylistSongs();
+                        },
+                      )
+                    : Column(
                     children: [
                       _buildSearchBar(p),
                       _buildCountBanner(p),

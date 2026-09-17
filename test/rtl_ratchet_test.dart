@@ -9,7 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('non-directional positioning does not increase (28-02 ratchet)', () {
-    const baseline = 70;
+    const baseline = 69;
     final positioned =
         RegExp(r'Positioned\s*\(\s*[^)]*\b(left|right)\s*:');
     final insets =

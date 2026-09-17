@@ -360,7 +360,9 @@ class _NowPlayingGestureHintOverlayState
           duration: context.motionMs(300),
           curve: context.motionCurve(Curves.easeInOut),
           child: Center(
-            child: Material(
+            child: GestureDetector(
+              onTap: _dismiss,
+              child: Material(
               color: Colors.transparent,
               child: Container(
                 constraints: const BoxConstraints(maxWidth: 480),
@@ -416,20 +418,22 @@ class _NowPlayingGestureHintOverlayState
                       ),
                     ),
                     const SizedBox(width: 6),
-                    GestureDetector(
-                      onTap: _dismiss,
-                      child: Padding(
-                        padding: const EdgeInsets.all(2),
-                        child: Icon(
-                          Icons.close_rounded,
-                          size: 16,
-                          color: p.textTertiary,
-                        ),
+                    IconButton(
+                      tooltip: context.l10n.close,
+                      onPressed: _dismiss,
+                      visualDensity: VisualDensity.compact,
+                      constraints: const BoxConstraints(
+                          minWidth: 44, minHeight: 44),
+                      icon: Icon(
+                        Icons.close_rounded,
+                        size: 16,
+                        color: p.textTertiary,
                       ),
                     ),
                   ],
                 ),
               ),
+            ),
             ),
           ),
         ),

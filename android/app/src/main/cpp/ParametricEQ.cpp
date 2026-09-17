@@ -101,20 +101,35 @@ void ParametricEQ::applyParams(const EqParamSet& params) {
     for (int i = 0; i < bandCount_; ++i) {
         const auto& p = params.bands[i];
         const double newFreq = std::clamp(p.frequency, 10.0, sampleRate_ * 0.499);
-        // Also clear state if frequency changes significantly (avoids pop on freq switch)
-        if (std::abs(newFreq - bands_[i].frequency) > 1.0) {
+        const double newQ = std::clamp(p.q, 0.05, 30.0);
+        // Clear filter state when the structure changes (frequency, Q, type,
+        // enable or mute), not just frequency: a type/Q switch with retained
+        // state otherwise leaves stale registers and clicks. Only re-derive
+        // coefficients when something structural moved; a pure gain change is
+        // applied through the per-block smoothed-gain path in process(), which
+        // avoids recomputing every band's transcendentals on every parameter
+        // generation.
+        const bool structureChanged =
+            std::abs(newFreq - bands_[i].frequency) > 1.0 ||
+            std::abs(newQ - bands_[i].q) > 1e-6 ||
+            p.type != bands_[i].type ||
+            p.enabled != bands_[i].enabled ||
+            p.mute != bands_[i].mute;
+        if (structureChanged) {
             for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
                 s1_[ch][i] = s2_[ch][i] = 0.0;
             }
         }
         bands_[i].frequency = newFreq;
         bands_[i].targetGainDb = std::clamp(p.gainDb, -30.0, 30.0);
-        bands_[i].q = std::clamp(p.q, 0.05, 30.0);
+        bands_[i].q = newQ;
         bands_[i].type = p.type;
         bands_[i].enabled = p.enabled;
         bands_[i].solo = p.solo;
         bands_[i].mute = p.mute;
-        computeCoeffs(bands_[i], bands_[i].smoothedGainDb);
+        if (structureChanged) {
+            computeCoeffs(bands_[i], bands_[i].smoothedGainDb);
+        }
     }
 }
 
@@ -254,9 +269,9 @@ void ParametricEQ::process(const float* in, float* out, int frames, int channels
 }
 
 void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
-    if (!enabled_ && std::abs(targetPreampDb_) < 0.001 && std::abs(smoothedPreampDb_) < 0.001) {
-        return;
-    }
+    // A disabled EQ is a true bypass: the preamp is part of the EQ and must not
+    // leak gain while the stage is off.
+    if (!enabled_) return;
 
     channels = std::clamp(channels, 1, MAX_CHANNELS);
 
@@ -281,8 +296,6 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
             buffer[i] *= pLinear;
         }
     }
-
-    if (!enabled_) return;
 
     // Check if any band is soloed
     bool hasSolo = false;

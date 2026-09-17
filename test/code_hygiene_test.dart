@@ -12,7 +12,9 @@ void main() {
     // Baseline counted at commit 09ce0cb plus remediation tranches 1-2. Lower
     // this constant as empty catch bodies are fixed; never raise it.
     // 439 -> 438 after scrobbler/headset logging pass (14 sites fixed).
-    const int emptyCatchBaseline = 438;
+    // 438 -> 435 after service-layer logging pass (waveform/ytm-cache/
+    // artist-bio/lrclib/artwork/metadata/cloud-sync).
+    const int emptyCatchBaseline = 435;
 
     List<File> dartFilesUnderLib() {
       final dir = Directory('lib');

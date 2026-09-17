@@ -5,6 +5,8 @@
 #include <memory>
 #include <atomic>
 #include <vector>
+#include <string>
+#include <utility>
 #include "FftUtil.h"
 
 enum class FilterType {
@@ -86,9 +88,12 @@ struct PreparedIr {
     static uint64_t getCacheMutexLockCount();
     static void resetCacheMutexLockCount();
     size_t getEstimatedBytes() const {
-        // Each partition holds FFT_SIZE complex<float> bins = 8 bytes each
-        // (std::complex<float> is two floats), not 16.
-        return static_cast<size_t>(totalTaps) * 12 + static_cast<size_t>(numPartitions) * FFT_SIZE * 8;
+        // Storage: irL + irR float taps (4 bytes each) plus two partition sets
+        // of FFT_SIZE complex<float> bins (8 bytes per complex bin). The old
+        // accounting used *12 total taps and a single 8-byte partition set,
+        // under-reporting the cache footprint by ~30%.
+        return static_cast<size_t>(totalTaps) * 8 +
+               static_cast<size_t>(numPartitions) * FFT_SIZE * 16;
     }
 };
 
@@ -247,16 +252,54 @@ struct DirectVolumeParamSet {
     double gainLinear = 1.0;
 };
 
+struct ViperDdcSection {
+    double b0 = 1.0;
+    double b1 = 0.0;
+    double b2 = 0.0;
+    double a1 = 0.0;
+    double a2 = 0.0;
+};
+
 struct ViperDdcParamSet {
     bool enabled = false;
     std::string ddcContent; // Raw .vdc format text
     std::string profileName;
+    // Pre-parsed coefficient sets, produced off the audio thread by the JNI
+    // setter. When present, ViperDdc::applyParams swaps them in without parsing
+    // or allocating in the audio callback.
+    std::shared_ptr<const std::vector<ViperDdcSection>> sections441;
+    std::shared_ptr<const std::vector<ViperDdcSection>> sections480;
 };
 
 struct ArbitraryEqParamSet {
     bool enabled = false;
     std::string graphicEqString; // GraphicEq: 20 0; 100 2; ...
     bool linearPhase = false;
+    // Node list pre-parsed off the audio thread by the JNI setter. When set,
+    // ArbitraryResponseEq::applyParams swaps this in without parsing/allocating.
+    std::shared_ptr<const std::vector<std::pair<double, double>>> parsedNodes;
+};
+
+// A single LiveProg bytecode instruction in a neutral (audio-thread-safe) form.
+struct LiveProgInstruction {
+    int op = 0;
+    double immValue = 0.0;
+    int varIndex = -1;
+    int targetPc = -1;
+    int funcId = -1;
+};
+
+// A fully compiled LiveProg script. Compiled on the control thread and handed
+// to the audio thread through the parameter snapshot, so applyParams never
+// compiles, allocates or throws in the audio callback.
+struct LiveProgProgram {
+    std::vector<LiveProgInstruction> initBytecode;
+    std::vector<LiveProgInstruction> sampleBytecode;
+    int memorySlots = 0;
+    int idxSpl0 = -1;
+    int idxSpl1 = -1;
+    int idxSrate = -1;
+    int idxSliders[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
 };
 
 struct LiveProgParamSet {
@@ -266,6 +309,7 @@ struct LiveProgParamSet {
     double slider2 = 0.0;
     double slider3 = 0.0;
     double slider4 = 0.0;
+    std::shared_ptr<const LiveProgProgram> program;
 };
 
 struct DspParamSnapshot {

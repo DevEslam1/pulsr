@@ -121,10 +121,10 @@ class GlassContainer extends StatelessWidget {
         children: [
           // Specular refraction highlight along the top hairline
           if (specularHighlight)
-            Positioned(
+            PositionedDirectional(
               top: 0,
-              left: 8,
-              right: 8,
+              start: 8,
+              end: 8,
               height: 1.2,
               child: Container(
                 decoration: BoxDecoration(

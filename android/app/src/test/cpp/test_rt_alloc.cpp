@@ -186,3 +186,84 @@ void runRtAllocGuardTest() {
               << " | RT Cache Mutex Locks: " << PreparedIr::getCacheMutexLockCount() << std::endl;
     std::cout << "  ✓ Zero allocations and zero mutex locks on real-time audio thread verified 100%." << std::endl;
 }
+
+// Verifies that applying prepared ViperDDC / LiveProg / ArbitraryResponseEq
+// payloads (parsed/compiled off the audio thread) performs no heap allocation
+// in the audio callback. Uses two distinct payload sets so the engine's
+// generation change actually re-applies them while the guard is armed.
+void runRtPreparedPayloadTest() {
+    std::cout << "\n=== [RT 2/2] Prepared ViperDDC/LiveProg/ArbEq apply (zero RT allocations) ===" << std::endl;
+    auto& engine = AudioDspEngine::instance();
+    engine.setSampleRate(48000.0);
+
+    auto makeSnapshot = [](uint64_t gen, bool variant) {
+        std::vector<ViperDdcSection> s441, s480;
+        const char* vdc = variant ? "SR_48000 1.0 0.0 0.0 0.04 -0.03"
+                                  : "SR_48000 1.0 0.0 0.0 0.05 -0.04";
+        const bool vOk = ViperDdc::parseVdcContent(vdc, s441, s480);
+        assert(vOk);
+        auto vp441 = std::make_shared<const std::vector<ViperDdcSection>>(s441);
+        auto vp480 = std::make_shared<const std::vector<ViperDdcSection>>(s480);
+
+        LiveProg validator;
+        const char* script = variant ? "@sample\n spl0 = spl0 * 0.9;"
+                                     : "@sample\n spl0 = spl0;";
+        const bool lOk = validator.loadCode(script);
+        assert(lOk);
+        auto program = validator.buildProgram();
+
+        std::vector<std::pair<double, double>> nodes;
+        const char* eq = variant ? "GraphicEq: 100 2; 1000 0; 5000 -1"
+                                 : "GraphicEq: 200 1; 1000 0; 4000 -2";
+        const bool aOk = ArbitraryResponseEq::parseGraphicEq(eq, nodes);
+        assert(aOk);
+        auto parsedNodes = std::make_shared<const std::vector<std::pair<double, double>>>(nodes);
+
+        auto snap = std::make_shared<DspParamSnapshot>();
+        snap->generation = gen;
+        snap->activeStages = STAGE_VIPER_DDC | STAGE_LIVE_PROG | STAGE_ARBITRARY_EQ;
+        snap->viperDdc.enabled = true;
+        snap->viperDdc.ddcContent = vdc;
+        snap->viperDdc.sections441 = vp441;
+        snap->viperDdc.sections480 = vp480;
+        snap->liveProg.enabled = true;
+        snap->liveProg.code = script;
+        snap->liveProg.program = program;
+        snap->arbitraryEq.enabled = true;
+        snap->arbitraryEq.graphicEqString = eq;
+        snap->arbitraryEq.parsedNodes = parsedNodes;
+        return snap;
+    };
+
+    const int blockSize = 512;
+    const int channels = 2;
+    std::vector<float> audio(blockSize * channels, 0.1f);
+
+    // Warm up with payload set A (capacities get reserved here).
+    engine.publishParams(makeSnapshot(900, false));
+    engine.processInterleaved(audio.data(), blockSize, channels);
+
+    // Publish a distinct payload set B with the guard disabled, then let the
+    // audio thread apply it under the guard.
+    engine.publishParams(makeSnapshot(901, true));
+
+    PreparedIr::resetCacheMutexLockCount();
+    g_rt_alloc_count.store(0);
+    g_rt_guard_enabled.store(true);
+    for (int i = 0; i < 2000; ++i) {
+        audio[0] = 0.01f * (i % 7);
+        audio[1] = -0.01f * (i % 7);
+        int out = engine.processInterleaved(audio.data(), blockSize, channels);
+        assert(out == blockSize);
+    }
+    g_rt_guard_enabled.store(false);
+
+    assert(g_rt_alloc_count.load() == 0);
+    for (int i = 0; i < blockSize * channels; ++i) {
+        assert(std::isfinite(audio[i]));
+    }
+    std::cout << "  ✓ Prepared payload re-application allocated 0 times on the audio thread." << std::endl;
+
+    engine.setActiveStages(0xFFFFFFFF);
+}
+

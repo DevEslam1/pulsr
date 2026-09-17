@@ -57,6 +57,8 @@ class SettingsCubit extends PulsrCubit<SettingsState>
   static const String _keyLiquidGlassTint = 'setting_liquid_glass_tint';
   static const String _keyLanguageCode = PrefsKeys.languageCode;
   static const String _keyCustomAccent = 'setting_custom_accent';
+  static const String _keyCustomThemeRadius = 'setting_custom_theme_radius';
+  static const String _keyCustomThemeGlow = 'setting_custom_theme_glow';
   static const String _keyPlayerThemeMode = 'setting_player_theme_mode';
   static const String _keyVisualizerStyle = 'setting_visualizer_style';
   static const String _keyMiniPlayerSwipeLeft =
@@ -478,6 +480,10 @@ class SettingsCubit extends PulsrCubit<SettingsState>
             prefs.getDouble(_keyLiquidGlassTint) ?? state.liquidGlassTint,
         languageCode: prefs.getString(_keyLanguageCode) ?? state.languageCode,
         customAccentColorValue: customAccentValue,
+        customThemeRadius:
+            prefs.getDouble(_keyCustomThemeRadius) ?? state.customThemeRadius,
+        customThemeGlow:
+            prefs.getBool(_keyCustomThemeGlow) ?? state.customThemeGlow,
         playerThemeMode: playerThemeMode,
         visualizerStyle: visualizerStyle,
         miniPlayerSwipeLeft: miniPlayerSwipeLeft,
@@ -857,6 +863,19 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     safeEmit(state.copyWith(customAccentColorValue: colorVal));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_keyCustomAccent, colorVal);
+  }
+
+  Future<void> setCustomThemeRadius(double radius) async {
+    final clamped = radius.clamp(0.0, 48.0);
+    safeEmit(state.copyWith(customThemeRadius: clamped));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_keyCustomThemeRadius, clamped);
+  }
+
+  Future<void> setCustomThemeGlow(bool enabled) async {
+    safeEmit(state.copyWith(customThemeGlow: enabled));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyCustomThemeGlow, enabled);
   }
 
   Future<void> setPlayerThemeMode(PlayerThemeMode mode) async {

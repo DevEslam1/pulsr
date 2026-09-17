@@ -105,6 +105,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get clearSearchHistory => 'Clear History';
 
   @override
+  String get clearSearchQuery => 'Clear search';
+
+  @override
   String get noResultsFound => 'No music found';
 
   @override
@@ -818,6 +821,95 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get miniPlayerSwipeRight => 'Mini Player Swipe Right';
+
+  @override
+  String get seekLabel => 'Seek';
+
+  @override
+  String get homeOfflineNotice =>
+      'Offline mode — online streaming is disabled in Settings.';
+
+  @override
+  String get homePermissionNeeded => 'Permission Needed';
+
+  @override
+  String get homePermissionSubtitle =>
+      'Grant audio or storage permission so Pulsr can index and play your offline music collection with bit-perfect quality.';
+
+  @override
+  String get homeGrantPermission => 'Grant Permission';
+
+  @override
+  String get homeScanningLabel => 'Scanning...';
+
+  @override
+  String homeScanProgress(int percent) {
+    return '$percent% indexed • Building your local music catalog';
+  }
+
+  @override
+  String get homeScanningStorageSubtitle =>
+      'Searching device directories for audio files...';
+
+  @override
+  String get jumpToCategory => 'Jump to Category';
+
+  @override
+  String get sidebarBrowse => 'Browse';
+
+  @override
+  String get sidebarCollection => 'Collection';
+
+  @override
+  String get sidebarPanel => 'Panel';
+
+  @override
+  String get sidebarSidePanel => 'Side Panel';
+
+  @override
+  String get sidebarExpand => 'Expand sidebar';
+
+  @override
+  String get sidebarCollapse => 'Collapse sidebar';
+
+  @override
+  String get exportFormatWinampLabel => 'Winamp / Poweramp';
+
+  @override
+  String get exportFormatWmpLabel => 'Windows Media Player';
+
+  @override
+  String get libraryGridView => 'Grid view';
+
+  @override
+  String get libraryListView => 'List view';
+
+  @override
+  String get authUseCodeSignIn => 'Having trouble? Use code sign-in instead';
+
+  @override
+  String get castAndroidOnly =>
+      'Casting is available on Android only in this build.';
+
+  @override
+  String get castDirectDeviceMode =>
+      'Direct device mode: casts the current track. Queue and remote volume need the Cast SDK.';
+
+  @override
+  String get playbackPresetsTitle => 'Playback presets';
+
+  @override
+  String get playbackPresetsSubtitle =>
+      'One-tap tuning for quality, balance or data saving';
+
+  @override
+  String get playbackPresetMaxQuality => 'Max Quality';
+
+  @override
+  String get playbackPresetSmooth => 'Smooth';
+
+  @override
+  String get playbackPresetDataSaver => 'Data Saver';
 
   @override
   String get nowPlayingDoubleTap => 'Now Playing Double-Tap';

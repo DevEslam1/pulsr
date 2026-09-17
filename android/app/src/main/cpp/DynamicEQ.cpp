@@ -139,6 +139,12 @@ void DynamicEQ::computeBandCoeffs(BandState& band, double gainDb) {
     if (std::abs(gainDb) < 1e-6) {
         band.b0 = 1.0; band.b1 = 0.0; band.b2 = 0.0;
         band.a1 = 0.0; band.a2 = 0.0;
+        // Clear the application filter's Direct-Form-I registers on the way to
+        // identity so stale state cannot re-enter when the band leaves it.
+        for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
+            band.x1[ch] = 0.0; band.x2[ch] = 0.0;
+            band.y1[ch] = 0.0; band.y2[ch] = 0.0;
+        }
         band.lastCoeffGainDb = 0.0;
         return;
     }
@@ -166,8 +172,10 @@ void DynamicEQ::process(float* L, float* R, int frames) {
             if (std::abs(band.currentGainDb) > 1e-4) {
                 const double rampStep = band.currentGainDb / frames;
                 for (int i = 0; i < frames; ++i) {
-                    const double l = L[i];
-                    const double r = R[i];
+                    double l = L[i];
+                    double r = R[i];
+                    if (!std::isfinite(l)) l = 0.0;
+                    if (!std::isfinite(r)) r = 0.0;
                     band.currentGainDb -= rampStep;
                     if (std::abs(band.currentGainDb - band.lastCoeffGainDb) > 0.05) {
                         computeBandCoeffs(band, band.currentGainDb);
@@ -272,7 +280,8 @@ void DynamicEQ::processInterleaved(float* buffer, int frames, int channels) {
                         computeBandCoeffs(band, band.currentGainDb);
                     }
                     for (int ch = 0; ch < chCount; ++ch) {
-                        const double x = buffer[i * channels + ch];
+                        double x = buffer[i * channels + ch];
+                        if (!std::isfinite(x)) x = 0.0;
                         const double y = band.b0 * x + band.b1 * band.x1[ch] + band.b2 * band.x2[ch]
                             - band.a1 * band.y1[ch] - band.a2 * band.y2[ch];
                         band.x2[ch] = band.x1[ch];

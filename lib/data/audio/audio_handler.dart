@@ -849,19 +849,6 @@ class PulsrAudioHandler extends BaseAudioHandler
     _volumeController.setNativeRgActive(_nativeRgActive);
   }
 
-  /// Clamps a ReplayGain dB value to a finite, sane range. Corrupt tags (NaN /
-  /// ±inf / ±1e38) otherwise reach the native pre-gain stage and poison it.
-  static double _sanitizeGainDb(double? value) {
-    if (value == null || !value.isFinite) return 0.0;
-    return value.clamp(-100.0, 100.0).toDouble();
-  }
-
-  /// Clamps a ReplayGain peak to a finite positive value (1.0 when unusable).
-  static double _sanitizePeak(double? value) {
-    if (value == null || !value.isFinite || value <= 0.0) return 1.0;
-    return value.clamp(1e-6, 100.0).toDouble();
-  }
-
   @override
   Future<void> _pushNativeReplayGain(SongsTableData? song) async {
     Future<void> disableNative() async {
@@ -913,11 +900,11 @@ class PulsrAudioHandler extends BaseAudioHandler
         // sanitizes them, but the native pre-gain stage consumes the raw
         // doubles: one NaN poisons its smoothed gain for the rest of the
         // session, turning every following track into noise. Sanitize here.
-        trackGainDb: _sanitizeGainDb(song.replayGainTrack),
-        albumGainDb: _sanitizeGainDb(song.replayGainAlbum),
-        trackPeak: _sanitizePeak(song.replayGainTrackPeak),
-        albumPeak: _sanitizePeak(song.replayGainAlbumPeak),
-        preAmpDb: _sanitizeGainDb(ReplayGainMath.nativePreAmpFor(
+        trackGainDb: ReplayGainMath.sanitizeGainDb(song.replayGainTrack),
+        albumGainDb: ReplayGainMath.sanitizeGainDb(song.replayGainAlbum),
+        trackPeak: ReplayGainMath.sanitizePeak(song.replayGainTrackPeak),
+        albumPeak: ReplayGainMath.sanitizePeak(song.replayGainAlbumPeak),
+        preAmpDb: ReplayGainMath.sanitizeGainDb(ReplayGainMath.nativePreAmpFor(
           mode: mode,
           trackGainDb: song.replayGainTrack,
           albumGainDb: song.replayGainAlbum,

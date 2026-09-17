@@ -21,6 +21,12 @@ public:
     const std::string& getLastError() const { return lastError_; }
     bool isCompiled() const { return isCompiled_; }
 
+    /// Packages the current compiled bytecode + variable layout into a neutral,
+    /// immutable program that can be published through the snapshot and applied
+    /// on the audio thread without compiling/allocating. Call on the control
+    /// thread after loadCode().
+    std::shared_ptr<const LiveProgProgram> buildProgram() const;
+
     void setSlider(int index, double value); // index: 1..8
     double getSlider(int index) const;
 
@@ -81,4 +87,15 @@ private:
     int getOrRegisterVar(const std::string& name);
     bool compileScript(const std::string& code);
     void executeBytecode(const std::vector<Instruction>& program);
+    void applyPreparedProgram(const std::shared_ptr<const LiveProgProgram>& program);
+
+    static constexpr int MAX_BYTECODE = 8192;
+    static constexpr int MAX_MEMORY = 2048;
+
+    // Identity of the last published prepared program, for change detection.
+    std::shared_ptr<const LiveProgProgram> activeProgram_;
+
+    // Real-time xorshift PRNG state for the rand() builtin (std::rand() is a
+    // global, non-reentrant libc call that is not safe in the audio callback).
+    uint32_t rngState_ = 0x12345678u;
 };

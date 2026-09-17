@@ -105,6 +105,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get clearSearchHistory => 'Borrar historial';
 
   @override
+  String get clearSearchQuery => 'Borrar búsqueda';
+
+  @override
   String get noResultsFound => 'No se encontró música';
 
   @override
@@ -821,6 +824,96 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get miniPlayerSwipeRight => 'Deslizar mini reproductor a la derecha';
+
+  @override
+  String get seekLabel => 'Buscar';
+
+  @override
+  String get homeOfflineNotice =>
+      'Modo sin conexión: la transmisión en línea está desactivada en Ajustes.';
+
+  @override
+  String get homePermissionNeeded => 'Permiso necesario';
+
+  @override
+  String get homePermissionSubtitle =>
+      'Concede permiso de audio o almacenamiento para que Pulsr pueda indexar y reproducir tu colección de música local con calidad bit-perfect.';
+
+  @override
+  String get homeGrantPermission => 'Conceder permiso';
+
+  @override
+  String get homeScanningLabel => 'Escaneando...';
+
+  @override
+  String homeScanProgress(int percent) {
+    return '$percent% indexado • Creando tu catálogo de música local';
+  }
+
+  @override
+  String get homeScanningStorageSubtitle =>
+      'Buscando archivos de audio en los directorios del dispositivo...';
+
+  @override
+  String get jumpToCategory => 'Ir a categoría';
+
+  @override
+  String get sidebarBrowse => 'Explorar';
+
+  @override
+  String get sidebarCollection => 'Colección';
+
+  @override
+  String get sidebarPanel => 'Panel';
+
+  @override
+  String get sidebarSidePanel => 'Panel lateral';
+
+  @override
+  String get sidebarExpand => 'Expandir barra lateral';
+
+  @override
+  String get sidebarCollapse => 'Contraer barra lateral';
+
+  @override
+  String get exportFormatWinampLabel => 'Winamp / Poweramp';
+
+  @override
+  String get exportFormatWmpLabel => 'Windows Media Player';
+
+  @override
+  String get libraryGridView => 'Vista de cuadrícula';
+
+  @override
+  String get libraryListView => 'Vista de lista';
+
+  @override
+  String get authUseCodeSignIn =>
+      '¿Problemas? Usa el inicio de sesión con código';
+
+  @override
+  String get castAndroidOnly =>
+      'La transmisión (Cast) solo está disponible en Android en esta compilación.';
+
+  @override
+  String get castDirectDeviceMode =>
+      'Modo de dispositivo directo: transmite la pista actual. La cola y el volumen remoto requieren el SDK de Cast.';
+
+  @override
+  String get playbackPresetsTitle => 'Ajustes de reproducción';
+
+  @override
+  String get playbackPresetsSubtitle =>
+      'Ajuste con un toque para calidad, equilibrio o ahorro de datos';
+
+  @override
+  String get playbackPresetMaxQuality => 'Calidad máxima';
+
+  @override
+  String get playbackPresetSmooth => 'Fluido';
+
+  @override
+  String get playbackPresetDataSaver => 'Ahorro de datos';
 
   @override
   String get nowPlayingDoubleTap => 'Doble toque en reproducción';

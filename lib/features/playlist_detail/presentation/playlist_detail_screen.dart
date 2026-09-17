@@ -26,7 +26,16 @@ import '../../sheets/song_info_sheet.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 
-class PlaylistDetailScreen extends StatelessWidget {
+/// Reactively-loaded playlist contents or the failure that prevented loading,
+/// so a DB error surfaces as a retryable state instead of an empty list.
+class _PlaylistSongsResult {
+  final List<SongsTableData> songs;
+  final String? error;
+
+  const _PlaylistSongsResult({this.songs = const [], this.error});
+}
+
+class PlaylistDetailScreen extends StatefulWidget {
   final PlaylistsTableData playlist;
   final PlaylistUseCases? playlistUseCases;
   final bool isEmbedded;
@@ -38,8 +47,15 @@ class PlaylistDetailScreen extends StatelessWidget {
     this.isEmbedded = false,
   });
 
+  @override
+  State<PlaylistDetailScreen> createState() => _PlaylistDetailScreenState();
+}
+
+class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
+  PlaylistsTableData get playlist => widget.playlist;
+
   PlaylistUseCases get _useCases =>
-      playlistUseCases ?? getIt<PlaylistUseCases>();
+      widget.playlistUseCases ?? getIt<PlaylistUseCases>();
 
   void _downloadPlaylist(BuildContext context, List<SongsTableData> songs) {
     if (songs.isEmpty) {
@@ -170,23 +186,29 @@ class PlaylistDetailScreen extends StatelessWidget {
     final p = context.palette;
     final playlistUseCases = _useCases;
 
-    final Stream<List<SongsTableData>> songsStream =
+    final Stream<_PlaylistSongsResult> songsStream =
         playlist.isSmart && playlist.smartCriteria != null
-            ? playlistUseCases.watchSmartPlaylistSongs(
-                SmartCriteria.fromJsonString(playlist.smartCriteria!))
-            : playlistUseCases
-                .watchPlaylistSongs(playlist.id)
-                .map((res) => res.fold((l) => <SongsTableData>[], (r) => r));
+            ? playlistUseCases
+                .watchSmartPlaylistSongs(
+                    SmartCriteria.fromJsonString(playlist.smartCriteria!))
+                .map((songs) => _PlaylistSongsResult(songs: songs))
+            : playlistUseCases.watchPlaylistSongs(playlist.id).map(
+                  (res) => res.fold(
+                    (failure) => _PlaylistSongsResult(error: failure.message),
+                    (songs) => _PlaylistSongsResult(songs: songs),
+                  ),
+                );
 
-    return StreamBuilder<List<SongsTableData>>(
+    return StreamBuilder<_PlaylistSongsResult>(
       stream: songsStream,
       builder: (context, snapshot) {
-        final songs = snapshot.data ?? [];
+        final songs = snapshot.data?.songs ?? [];
+        final loadError = snapshot.data?.error;
 
         final scaffold = Scaffold(
           appBar: AppBar(
             automaticallyImplyLeading: false,
-            leading: isEmbedded ? null : const PulsrBackButton(),
+            leading: widget.isEmbedded ? null : const PulsrBackButton(),
             title: Row(
               children: [
                 if (playlist.isSmart) ...[
@@ -302,7 +324,15 @@ class PlaylistDetailScreen extends StatelessWidget {
               child: snapshot.connectionState == ConnectionState.waiting &&
                       !snapshot.hasData
                   ? Center(child: CircularProgressIndicator(color: p.accent))
-                  : songs.isEmpty
+                  : loadError != null
+                      ? EmptyStateWidget(
+                          icon: Icons.error_outline_rounded,
+                          title: context.l10n.playlistLoadFailed,
+                          subtitle: loadError,
+                          primaryActionLabel: context.l10n.retry,
+                          onPrimaryAction: () => setState(() {}),
+                        )
+                      : songs.isEmpty
                       ? EmptyStateWidget(
                           icon: playlist.isSmart
                               ? Icons.auto_awesome_rounded
@@ -410,7 +440,7 @@ class PlaylistDetailScreen extends StatelessWidget {
             ),
           ),
         );
-        return isEmbedded ? scaffold : PulsrPagePopScope(child: scaffold);
+        return widget.isEmbedded ? scaffold : PulsrPagePopScope(child: scaffold);
       },
     );
   }

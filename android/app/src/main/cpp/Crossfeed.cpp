@@ -133,6 +133,11 @@ void Crossfeed::process(float* L, float* R, int frames) {
             bs2b_hi_[1] = bs2b_a0_hi_ * inR + bs2b_a1_hi_ * bs2b_asis_[1] + bs2b_b1_hi_ * bs2b_hi_[1];
             bs2b_asis_[0] = inL;
             bs2b_asis_[1] = inR;
+            // Flush subnormal state during silence (ARM denormal CPU spikes).
+            if (std::abs(bs2b_lo_[0]) < 1e-30) bs2b_lo_[0] = 0.0;
+            if (std::abs(bs2b_lo_[1]) < 1e-30) bs2b_lo_[1] = 0.0;
+            if (std::abs(bs2b_hi_[0]) < 1e-30) bs2b_hi_[0] = 0.0;
+            if (std::abs(bs2b_hi_[1]) < 1e-30) bs2b_hi_[1] = 0.0;
 
             L[i] = static_cast<float>((bs2b_hi_[0] + bs2b_lo_[1]) * bs2b_gain_);
             R[i] = static_cast<float>((bs2b_hi_[1] + bs2b_lo_[0]) * bs2b_gain_);
@@ -203,6 +208,11 @@ void Crossfeed::processInterleaved(float* buffer, int frames) {
             bs2b_hi_[1] = bs2b_a0_hi_ * inR + bs2b_a1_hi_ * bs2b_asis_[1] + bs2b_b1_hi_ * bs2b_hi_[1];
             bs2b_asis_[0] = inL;
             bs2b_asis_[1] = inR;
+            // Flush subnormal state during silence (ARM denormal CPU spikes).
+            if (std::abs(bs2b_lo_[0]) < 1e-30) bs2b_lo_[0] = 0.0;
+            if (std::abs(bs2b_lo_[1]) < 1e-30) bs2b_lo_[1] = 0.0;
+            if (std::abs(bs2b_hi_[0]) < 1e-30) bs2b_hi_[0] = 0.0;
+            if (std::abs(bs2b_hi_[1]) < 1e-30) bs2b_hi_[1] = 0.0;
 
             buffer[i * 2] = static_cast<float>((bs2b_hi_[0] + bs2b_lo_[1]) * bs2b_gain_);
             buffer[i * 2 + 1] = static_cast<float>((bs2b_hi_[1] + bs2b_lo_[0]) * bs2b_gain_);

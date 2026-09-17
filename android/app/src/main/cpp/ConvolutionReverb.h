@@ -8,6 +8,7 @@
 #include <cmath>
 #include <memory>
 #include <string>
+#include <atomic>
 
 enum class ReverbPreset {
     Studio = 0,
@@ -45,10 +46,13 @@ public:
     std::shared_ptr<const PreparedIr> getPreparedIr() const { return preparedIr_; }
     ReverbPreset getPreset() const { return preset_; }
 
-    // Reverb wet-path block latency: 512 samples in partitioned mode, 0 in direct FIR
+    // Reverb wet-path block latency: 512 samples in partitioned mode, 0 in direct FIR.
+    // Reads only atomics: this is queried from the JNI/control thread while the
+    // audio thread may be swapping preparedIr_, so it must never dereference the
+    // shared_ptr here (that would be a data race / torn pointer).
     int getReverbLatencyFrames() const {
-        if (!enabled_ || !preparedIr_) return 0;
-        return (preparedIr_->numPartitions == 0) ? 0 : PARTITION_SIZE;
+        if (!enabled_.load(std::memory_order_relaxed)) return 0;
+        return reverbLatencyFrames_.load(std::memory_order_relaxed);
     }
 
     void prepareForBlockSize(int maxFrames);
@@ -57,6 +61,7 @@ public:
 
 private:
     void updatePreparedIr();
+    void setPreparedIrPtr(std::shared_ptr<const PreparedIr> ir);
     void preparePartitions();
     void ensurePredelayCapacity();
     void ensureScratchCapacity(int frames);
@@ -71,7 +76,7 @@ private:
     float targetPredelaySamples_ = 0.0f;
     float smoothedPredelaySamples_ = 0.0f;
     double damping_ = 0.5;
-    bool enabled_ = false;
+    std::atomic<bool> enabled_{false};
 
     // Fixed-rate wet path resamplers for sample rates > 48kHz
     SincResampler wetInResampler_;
@@ -85,6 +90,10 @@ private:
 
     // Prepared IR snapshot pointer
     std::shared_ptr<const PreparedIr> preparedIr_;
+
+    // Latency of the currently prepared IR, mirrored to an atomic so the
+    // control-thread latency query never races the audio-thread IR swap.
+    std::atomic<int> reverbLatencyFrames_{0};
 
     // Overlap-save previous block history (P samples)
     std::vector<float> prevBlockL_;
@@ -109,6 +118,12 @@ private:
     std::vector<float> predelayRingL_;
     std::vector<float> predelayRingR_;
     int predelayWritePos_ = 0;
+
+    // Dry-path delay line (PARTITION_SIZE) used in the partitioned path to
+    // time-align dry with the wet convolution output (which lags by one block).
+    std::vector<float> dryDelayL_;
+    std::vector<float> dryDelayR_;
+    int dryDelayPos_ = 0;
 
     // Working buffers
     std::vector<FftUtil::Complex> fftWorkL_;

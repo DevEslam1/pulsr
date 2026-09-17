@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/services/waveform_service.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../cubit/player_cubit.dart';
@@ -24,7 +25,7 @@ class PlayerSeekBar extends StatefulWidget {
   final Color activeColor;
   final int? songId;
   final String? filePath;
-  final String semanticLabel;
+  final String? semanticLabel;
 
   const PlayerSeekBar({
     super.key,
@@ -34,7 +35,7 @@ class PlayerSeekBar extends StatefulWidget {
     this.activeColor = Colors.white,
     this.songId,
     this.filePath,
-    this.semanticLabel = 'Seek',
+    this.semanticLabel,
   });
 
   @override
@@ -130,6 +131,8 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
   }
 
   Widget _buildStandardSeekBar(BuildContext context) {
+    final isPlaying =
+        context.select<PlayerCubit, bool>((c) => c.state.isPlaying);
     return _withPosition((position) {
       final double maxDuration = widget.duration.inMilliseconds.toDouble();
       final double currentPos = position.inMilliseconds.toDouble();
@@ -140,6 +143,20 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
           : position;
       final valueLabel =
           '${Formatters.formatDuration(currentDuration)} / ${Formatters.formatDuration(widget.duration)}';
+      final semanticLabel = widget.semanticLabel ?? context.l10n.seekLabel;
+      Duration clampDuration(Duration d) {
+        if (d < Duration.zero) return Duration.zero;
+        if (d > widget.duration) return widget.duration;
+        return d;
+      }
+
+      String labelFor(Duration d) =>
+          '${Formatters.formatDuration(d)} / ${Formatters.formatDuration(widget.duration)}';
+      final increasedLabel = labelFor(
+          clampDuration(currentDuration + const Duration(seconds: 10)));
+      final decreasedLabel = labelFor(
+          clampDuration(currentDuration - const Duration(seconds: 10)));
+
       return Directionality(
         textDirection: TextDirection.ltr,
         child: RepaintBoundary(
@@ -151,18 +168,24 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                 // Modern wavy gesture-driven scrubber
                 Semantics(
                   value: valueLabel,
+                  increasedValue: increasedLabel,
+                  decreasedValue: decreasedLabel,
+                  onIncrease: () => widget.onSeek(
+                      clampDuration(currentDuration + const Duration(seconds: 10))),
+                  onDecrease: () => widget.onSeek(
+                      clampDuration(currentDuration - const Duration(seconds: 10))),
                   child: PulsrSlider(
                     value: effectiveValue,
                     min: 0.0,
                     max: maxDuration > 0 ? maxDuration : 1.0,
                     height: 32,
-                    semanticLabel: widget.semanticLabel,
+                    semanticLabel: semanticLabel,
                     activeColor: widget.activeColor,
                     inactiveColor: Theme.of(context).brightness == Brightness.dark
                         ? Colors.white.withValues(alpha: 0.14)
                         : context.palette.hairline.withValues(alpha: 0.8),
                     isWavy: true,
-                    animateWave: true,
+                    animateWave: isPlaying,
                     onChangeStart: (val) {
                       setState(() => _dragValue = val);
                     },

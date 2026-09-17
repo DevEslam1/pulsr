@@ -1,5 +1,6 @@
 // lib/features/player/presentation/widgets/tablet_player_bar.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -210,7 +211,10 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                 tooltip: state.isShuffle
                                     ? l10n.disableShuffle
                                     : l10n.enableShuffle,
-                                onPressed: cubit.toggleShuffle,
+                                onPressed: () {
+                                  HapticFeedback.selectionClick();
+                                  cubit.toggleShuffle();
+                                },
                               ),
                               const SizedBox(width: 2),
                               IconButton(
@@ -224,14 +228,20 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                   color: p.textPrimary,
                                 ),
                                 tooltip: l10n.previous,
-                                onPressed: cubit.previous,
+                                onPressed: () {
+                                  HapticFeedback.selectionClick();
+                                  cubit.previous();
+                                },
                               ),
                               const SizedBox(width: 4),
                               Semantics(
                                 label: state.isPlaying ? l10n.pause : l10n.play,
                                 button: true,
                                 child: GestureDetector(
-                                  onTap: cubit.togglePlayPause,
+                                  onTap: () {
+                                    HapticFeedback.mediumImpact();
+                                    cubit.togglePlayPause();
+                                  },
                                   child: SizedBox(
                                     width: 48,
                                     height: 48,
@@ -275,7 +285,10 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                   color: p.textPrimary,
                                 ),
                                 tooltip: l10n.next,
-                                onPressed: cubit.next,
+                                onPressed: () {
+                                  HapticFeedback.selectionClick();
+                                  cubit.next();
+                                },
                               ),
                               const SizedBox(width: 2),
                               IconButton(
@@ -300,7 +313,10 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                 PlayerRepeatMode.all
                                             ? l10n.repeatAll
                                             : l10n.repeatOff,
-                                onPressed: cubit.toggleRepeat,
+                                onPressed: () {
+                                  HapticFeedback.selectionClick();
+                                  cubit.toggleRepeat();
+                                },
                               ),
                             ],
                           ),
@@ -358,7 +374,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                 .toDouble()
                                             : 1.0,
                                       ),
-                                      semanticLabel: 'Seek',
+                                      semanticLabel: context.l10n.seekLabel,
                                       activeColor: activeColor,
                                       onChangeStart: (val) {
                                         setState(() => _dragSeekValue = val);

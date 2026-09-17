@@ -46,7 +46,10 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeGetPublishedGeneration(
 JNIEXPORT jint JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeGetPipelineLatencyFrames(
         JNIEnv* /* env */, jobject /* thiz */) {
-    return static_cast<jint>(AudioDspEngine::instance().getPipelineLatencyFrames());
+    // Read from the registry: the singleton control engine never renders audio,
+    // so its stage latency is always 0. The per-player engines are the ones
+    // whose limiter/resampler/reverb latency is real.
+    return static_cast<jint>(DspEngineRegistry::instance().getMaxPipelineLatencyFrames());
 }
 
 JNIEXPORT void JNICALL
@@ -307,6 +310,23 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadImpulseResponse(
     if (!data) return JNI_FALSE;
 
     int frames = (channels > 0) ? (len / channels) : len;
+
+    // Normalize the loaded IR to unit peak. A full-scale impulse response would
+    // otherwise drive the wet path far above the dry signal (createCustom does
+    // not normalize), forcing constant limiting/clipping. Normalizing here keeps
+    // the reverb's dry/wet balance meaningful for arbitrary user IRs.
+    float irPeak = 0.0f;
+    for (int i = 0; i < len; ++i) {
+        const float a = std::abs(data[i]);
+        if (a > irPeak) irPeak = a;
+    }
+    if (irPeak > 1e-6f && std::isfinite(irPeak)) {
+        const float invPeak = 1.0f / irPeak;
+        for (int i = 0; i < len; ++i) {
+            data[i] *= invPeak;
+        }
+    }
+
     auto current = AudioDspEngine::instance().getParams();
     const double targetCoreRate = (current && current->sampleRate > 0.0) ? std::min(current->sampleRate, 48000.0) : 48000.0;
     auto customIr = PreparedIr::createCustom(current ? current->sampleRate : 48000.0, data, frames, channels, targetCoreRate);
@@ -386,9 +406,12 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeDecodeDsd(
     }
 
     try {
-        // bitOrder contract: 0 = MSB first (DSF), 1 = LSB first (DFF),
-        // matching the Dart/Kotlin callers (decodeDsd in AudioEffectsPlugin.kt).
-        auto dsdBitOrder = (bitOrder == 0) ? DsdDecoder::DsdBitOrder::MSB_FIRST : DsdDecoder::DsdBitOrder::LSB_FIRST;
+        // bitOrder contract: 0 = LSB first (DSF), 1 = MSB first (DFF), matching
+        // the DsdBitOrder enum (DsdDecoder.h), the DSF/DFF specifications and
+        // the Dart/Kotlin callers (decodeDsd in AudioEffectsPlugin.kt). The
+        // previous mapping was inverted, so DSF (the common format) was decoded
+        // MSB-first -> bit-reversed noise.
+        auto dsdBitOrder = (bitOrder == 0) ? DsdDecoder::DsdBitOrder::LSB_FIRST : DsdDecoder::DsdBitOrder::MSB_FIRST;
         DsdDecoder decoder;
         decoder.configure(
                 static_cast<DsdDecoder::DsdRate>(dsdRate), targetPcmSampleRate, dsdBitOrder);
@@ -657,10 +680,10 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReplayGainParams(
         jdouble preAmpDb, jboolean preventClipping, jboolean enabled) {
     if (mode < 0 || mode > 2) return;
     auto m = static_cast<ReplayGainMode>(mode);
-    // Sanitize at the boundary: a corrupt tag (NaN / ±inf) reaching the engine
-    // poisons its smoothed pre-gain for the whole session, so every following
-    // track plays as noise. Peak already had a `> 0.0` guard, which happens to
-    // reject NaN; gain and preamp had none.
+    // Sanitize at the boundary: a corrupt tag (NaN / +/-inf) reaching the
+    // engine poisons its smoothed pre-gain for the whole session, so every
+    // following track plays as noise. Peak already had a `> 0.0` guard, which
+    // happens to reject NaN; gain and preamp had none.
     const auto finiteOr = [](double v, double fallback) {
         return std::isfinite(v) ? v : fallback;
     };
@@ -776,16 +799,19 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadViperDdc(
     if (ddcStr) env->ReleaseStringUTFChars(jDdcContent, ddcStr);
     if (jProfileName && nameStr) env->ReleaseStringUTFChars(jProfileName, nameStr);
 
-    // Validate on a throwaway instance and publish through the snapshot. The
-    // live engine object is mutated only on the audio thread (applyParams), so
-    // touching it here would race the audio thread (clearing/rebuilding its
-    // biquad sections while process() iterates them).
-    ViperDdc validator;
-    const bool ok = validator.loadVdcString(content);
+    // Parse off-thread and publish the prepared coefficient sets via the
+    // snapshot so the audio-thread applyParams never parses/allocates.
+    std::vector<ViperDdcSection> s441;
+    std::vector<ViperDdcSection> s480;
+    const bool ok = ViperDdc::parseVdcContent(content, s441, s480);
     if (ok) {
+        auto p441 = std::make_shared<const std::vector<ViperDdcSection>>(s441);
+        auto p480 = std::make_shared<const std::vector<ViperDdcSection>>(s480);
         AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
             snap.viperDdc.ddcContent = content;
             snap.viperDdc.profileName = name;
+            snap.viperDdc.sections441 = p441;
+            snap.viperDdc.sections480 = p480;
         });
     }
     return ok ? JNI_TRUE : JNI_FALSE;
@@ -807,13 +833,16 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadArbitraryEq(
     std::string content(eqStr ? eqStr : "");
     if (eqStr) env->ReleaseStringUTFChars(jEqString, eqStr);
 
-    // See nativeLoadViperDdc: validate off-thread, publish via snapshot only.
-    ArbitraryResponseEq validator;
-    const bool ok = validator.loadGraphicEqString(content, linearPhase);
+    // Parse off-thread and publish the parsed node list via the snapshot so the
+    // audio-thread applyParams never parses/allocates (see DspParams.h).
+    std::vector<std::pair<double, double>> nodes;
+    const bool ok = ArbitraryResponseEq::parseGraphicEq(content, nodes);
     if (ok) {
+        auto parsed = std::make_shared<const std::vector<std::pair<double, double>>>(nodes);
         AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
             snap.arbitraryEq.graphicEqString = content;
             snap.arbitraryEq.linearPhase = linearPhase;
+            snap.arbitraryEq.parsedNodes = parsed;
         });
     }
     return ok ? JNI_TRUE : JNI_FALSE;
@@ -835,13 +864,15 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadLiveProgCode(
     std::string script(codeStr ? codeStr : "");
     if (codeStr) env->ReleaseStringUTFChars(jCode, codeStr);
 
-    // See nativeLoadViperDdc: compile on a throwaway instance so the live
-    // bytecode vectors are only rebuilt on the audio thread.
+    // Compile on a throwaway instance so the live bytecode is only rebuilt on
+    // the audio thread from the prepared program; then package it off-thread.
     LiveProg validator;
     const bool ok = validator.loadCode(script);
     if (ok) {
+        auto program = validator.buildProgram();
         AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
             snap.liveProg.code = script;
+            snap.liveProg.program = program;
         });
         return env->NewStringUTF("OK");
     } else {

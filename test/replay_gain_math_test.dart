@@ -87,4 +87,37 @@ void main() {
       expect(zeroGain, closeTo(0.7079, 0.001));
     });
   });
+
+  group('ReplayGainMath.sanitizeGainDb', () {
+    test('passes through finite in-range values', () {
+      expect(ReplayGainMath.sanitizeGainDb(-6.5), -6.5);
+      expect(ReplayGainMath.sanitizeGainDb(0.0), 0.0);
+    });
+
+    test('null and non-finite values become 0.0', () {
+      expect(ReplayGainMath.sanitizeGainDb(null), 0.0);
+      expect(ReplayGainMath.sanitizeGainDb(double.nan), 0.0);
+      expect(ReplayGainMath.sanitizeGainDb(double.infinity), 0.0);
+      expect(ReplayGainMath.sanitizeGainDb(double.negativeInfinity), 0.0);
+    });
+
+    test('clamps absurd magnitudes to the ±100 dB window', () {
+      expect(ReplayGainMath.sanitizeGainDb(1e38), 100.0);
+      expect(ReplayGainMath.sanitizeGainDb(-1e38), -100.0);
+    });
+  });
+
+  group('ReplayGainMath.sanitizePeak', () {
+    test('passes through finite positive values', () {
+      expect(ReplayGainMath.sanitizePeak(0.98), 0.98);
+    });
+
+    test('null, non-finite, zero and negative values become 1.0', () {
+      expect(ReplayGainMath.sanitizePeak(null), 1.0);
+      expect(ReplayGainMath.sanitizePeak(double.nan), 1.0);
+      expect(ReplayGainMath.sanitizePeak(double.infinity), 1.0);
+      expect(ReplayGainMath.sanitizePeak(0.0), 1.0);
+      expect(ReplayGainMath.sanitizePeak(-0.5), 1.0);
+    });
+  });
 }

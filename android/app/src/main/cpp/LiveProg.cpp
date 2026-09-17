@@ -157,9 +157,28 @@ int getFunctionId(const std::string& name) {
     return -1;
 }
 
+// Expected argument count for each builtin. min/max/pow take exactly two; rand
+// takes none; the rest take one. Validating arity at compile time prevents the
+// interpreter from silently leaving operands on the stack (e.g. min(a,b,c)
+// previously stranded `a` and corrupted every subsequent read).
+int functionArity(int funcId) {
+    switch (funcId) {
+        case 7:  // min
+        case 8:  // max
+        case 9:  // pow
+            return 2;
+        case 12: // rand
+            return 0;
+        default:
+            return 1;
+    }
+}
 } // namespace
 
 LiveProg::LiveProg() {
+    initBytecode_.reserve(MAX_BYTECODE);
+    sampleBytecode_.reserve(MAX_BYTECODE);
+    memory_.reserve(MAX_MEMORY);
     idxSpl0_ = getOrRegisterVar("spl0");
     idxSpl1_ = getOrRegisterVar("spl1");
     idxSrate_ = getOrRegisterVar("srate");
@@ -180,6 +199,7 @@ void LiveProg::setSampleRate(double sampleRate) {
 int LiveProg::getOrRegisterVar(const std::string& name) {
     auto it = varMap_.find(name);
     if (it != varMap_.end()) return it->second;
+    if (static_cast<int>(memory_.size()) >= MAX_MEMORY) return -1;
     int idx = static_cast<int>(memory_.size());
     memory_.push_back(0.0);
     varMap_[name] = idx;
@@ -225,9 +245,68 @@ void LiveProg::applyParams(const LiveProgParamSet& params) {
     setSlider(2, params.slider2);
     setSlider(3, params.slider3);
     setSlider(4, params.slider4);
+    // Preferred path: the script was compiled off the audio thread and packaged
+    // into the snapshot. Applying it only copies bytecode (pre-reserved) and
+    // resizes pre-reserved memory, so the audio callback never compiles/allocates.
+    if (params.program) {
+        if (params.program != activeProgram_) {
+            loadedCode_ = params.code;
+            applyPreparedProgram(params.program);
+        }
+        return;
+    }
     if (!params.code.empty() && params.code != loadedCode_) {
         loadCode(params.code);
     }
+}
+
+std::shared_ptr<const LiveProgProgram> LiveProg::buildProgram() const {
+    auto p = std::make_shared<LiveProgProgram>();
+    p->initBytecode.reserve(initBytecode_.size());
+    for (const auto& i : initBytecode_) {
+        p->initBytecode.push_back(
+            {static_cast<int>(i.op), i.immValue, i.varIndex, i.targetPc, i.funcId});
+    }
+    p->sampleBytecode.reserve(sampleBytecode_.size());
+    for (const auto& i : sampleBytecode_) {
+        p->sampleBytecode.push_back(
+            {static_cast<int>(i.op), i.immValue, i.varIndex, i.targetPc, i.funcId});
+    }
+    p->memorySlots = static_cast<int>(memory_.size());
+    p->idxSpl0 = idxSpl0_;
+    p->idxSpl1 = idxSpl1_;
+    p->idxSrate = idxSrate_;
+    for (int i = 0; i < 8; ++i) p->idxSliders[i] = idxSliders_[i];
+    return p;
+}
+
+void LiveProg::applyPreparedProgram(const std::shared_ptr<const LiveProgProgram>& program) {
+    if (!program) return;
+    activeProgram_ = program;
+
+    initBytecode_.clear();
+    for (const auto& i : program->initBytecode) {
+        initBytecode_.push_back(
+            {static_cast<OpCode>(i.op), i.immValue, i.varIndex, i.targetPc, i.funcId});
+    }
+    sampleBytecode_.clear();
+    for (const auto& i : program->sampleBytecode) {
+        sampleBytecode_.push_back(
+            {static_cast<OpCode>(i.op), i.immValue, i.varIndex, i.targetPc, i.funcId});
+    }
+
+    idxSpl0_ = program->idxSpl0;
+    idxSpl1_ = program->idxSpl1;
+    idxSrate_ = program->idxSrate;
+    for (int i = 0; i < 8; ++i) idxSliders_[i] = program->idxSliders[i];
+
+    const int slots = std::min(program->memorySlots, MAX_MEMORY);
+    if (static_cast<int>(memory_.size()) != slots) {
+        memory_.resize(slots, 0.0); // capacity pre-reserved -> no allocation
+    }
+
+    isCompiled_ = !sampleBytecode_.empty();
+    reset();
 }
 
 bool LiveProg::loadCode(const std::string& scriptCode) {
@@ -242,6 +321,7 @@ bool LiveProg::loadCode(const std::string& scriptCode) {
     bool ok = compileScript(scriptCode);
     if (ok) {
         isCompiled_ = true;
+        activeProgram_ = buildProgram();
         reset();
     }
     return ok;
@@ -305,9 +385,18 @@ bool LiveProg::compileScript(const std::string& code) {
                     }
                     if (cur.type != TokenType::RParen) {
                         if (!parseExpr()) return false;
+                        int argCount = 1;
                         while (match(TokenType::Comma)) {
                             if (!parseExpr()) return false;
+                            argCount++;
                         }
+                        if (argCount != functionArity(funcId)) {
+                            lastError_ = "Wrong argument count for function: " + name;
+                            return false;
+                        }
+                    } else if (functionArity(funcId) != 0) {
+                        lastError_ = "Function requires arguments: " + name;
+                        return false;
                     }
                     if (!match(TokenType::RParen)) {
                         lastError_ = "Expected ')'";
@@ -384,9 +473,13 @@ bool LiveProg::compileScript(const std::string& code) {
             return parseComparison();
         };
 
-        // Parse statement sequence
-        while (cur.type != TokenType::End) {
-            if (match(TokenType::Semi)) continue;
+        // A single statement. Shared by the top-level loop and `if` bodies so
+        // assignments inside braces compile correctly (previously the if-body
+        // loop advanced the lexer past an assignment without ever emitting a
+        // StoreVar, silently dropping `if (c) { x = 1; }`).
+        std::function<bool()> parseStatement;
+        parseStatement = [&]() -> bool {
+            if (match(TokenType::Semi)) return true;
 
             if (cur.type == TokenType::If) {
                 cur = lexer.next();
@@ -397,18 +490,17 @@ bool LiveProg::compileScript(const std::string& code) {
                 int jmpFalseIdx = static_cast<int>(outProgram.size());
                 outProgram.push_back({OpCode::JumpIfFalse, 0.0, -1, -1});
 
-                match(TokenType::LBrace);
-                while (cur.type != TokenType::RBrace && cur.type != TokenType::End) {
-                    if (cur.type == TokenType::Ident && lexer.next().type == TokenType::Assign) {
-                        // Assignment
+                if (match(TokenType::LBrace)) {
+                    while (cur.type != TokenType::RBrace && cur.type != TokenType::End) {
+                        if (!parseStatement()) return false;
                     }
-                    if (!parseExpr()) return false;
-                    outProgram.push_back({OpCode::Pop});
-                    match(TokenType::Semi);
+                    if (!match(TokenType::RBrace)) { lastError_ = "Expected '}'"; return false; }
+                } else {
+                    // Single-statement body without braces: consume exactly one.
+                    if (!parseStatement()) return false;
                 }
-                match(TokenType::RBrace);
                 outProgram[jmpFalseIdx].targetPc = static_cast<int>(outProgram.size());
-                continue;
+                return true;
             }
 
             if (cur.type == TokenType::Ident) {
@@ -420,31 +512,35 @@ bool LiveProg::compileScript(const std::string& code) {
                     if (!parseExpr()) return false;
                     outProgram.push_back({OpCode::StoreVar, 0.0, varIdx});
                     match(TokenType::Semi);
-                    continue;
-                } else {
-                    // Expression
-                    cur = peek;
-                    int varIdx = getOrRegisterVar(targetVar);
-                    outProgram.push_back({OpCode::LoadVar, 0.0, varIdx});
-                    if (cur.type == TokenType::Plus || cur.type == TokenType::Minus ||
-                        cur.type == TokenType::Mul || cur.type == TokenType::Div) {
-                        TokenType op = cur.type;
-                        cur = lexer.next();
-                        if (!parsePrimary()) return false;
-                        if (op == TokenType::Plus) outProgram.push_back({OpCode::Add});
-                        else if (op == TokenType::Minus) outProgram.push_back({OpCode::Sub});
-                        else if (op == TokenType::Mul) outProgram.push_back({OpCode::Mul});
-                        else if (op == TokenType::Div) outProgram.push_back({OpCode::Div});
-                    }
-                    outProgram.push_back({OpCode::Pop});
-                    match(TokenType::Semi);
-                    continue;
+                    return true;
                 }
+                // Expression starting with an identifier
+                cur = peek;
+                int varIdx = getOrRegisterVar(targetVar);
+                outProgram.push_back({OpCode::LoadVar, 0.0, varIdx});
+                if (cur.type == TokenType::Plus || cur.type == TokenType::Minus ||
+                    cur.type == TokenType::Mul || cur.type == TokenType::Div) {
+                    TokenType op = cur.type;
+                    cur = lexer.next();
+                    if (!parsePrimary()) return false;
+                    if (op == TokenType::Plus) outProgram.push_back({OpCode::Add});
+                    else if (op == TokenType::Minus) outProgram.push_back({OpCode::Sub});
+                    else if (op == TokenType::Mul) outProgram.push_back({OpCode::Mul});
+                    else if (op == TokenType::Div) outProgram.push_back({OpCode::Div});
+                }
+                outProgram.push_back({OpCode::Pop});
+                match(TokenType::Semi);
+                return true;
             }
 
             if (!parseExpr()) return false;
             outProgram.push_back({OpCode::Pop});
             match(TokenType::Semi);
+            return true;
+        };
+
+        while (cur.type != TokenType::End) {
+            if (!parseStatement()) return false;
         }
 
         return true;
@@ -455,6 +551,14 @@ bool LiveProg::compileScript(const std::string& code) {
     }
     if (!sampleText.empty()) {
         if (!parseBlock(sampleText, sampleBytecode_)) return false;
+    }
+
+    // Bound the program so a hostile/huge script cannot make the audio-thread
+    // program copy exceed the pre-reserved bytecode capacity.
+    if (static_cast<int>(initBytecode_.size()) > MAX_BYTECODE ||
+        static_cast<int>(sampleBytecode_.size()) > MAX_BYTECODE) {
+        lastError_ = "Script too large";
+        return false;
     }
 
     return true;
@@ -551,7 +655,13 @@ void LiveProg::executeBytecode(const std::vector<Instruction>& program) {
                         case 9: if (sp >= 2) { double b = stack[--sp]; stack[sp - 1] = std::pow(stack[sp - 1], b); } break;
                         case 10: stack[sp - 1] = std::floor(stack[sp - 1]); break;
                         case 11: stack[sp - 1] = std::ceil(stack[sp - 1]); break;
-                        case 12: stack[sp - 1] = static_cast<double>(std::rand()) / RAND_MAX; break;
+                        case 12: {
+                            rngState_ ^= rngState_ << 13;
+                            rngState_ ^= rngState_ >> 17;
+                            rngState_ ^= rngState_ << 5;
+                            stack[sp - 1] = static_cast<double>(rngState_ & 0xFFFFFFu) / 16777216.0;
+                            break;
+                        }
                         default: break;
                     }
                 }
@@ -573,8 +683,15 @@ void LiveProg::process(float* L, float* R, int frames) {
 
         executeBytecode(sampleBytecode_);
 
-        L[i] = static_cast<float>(memory_[idxSpl0_]);
-        R[i] = static_cast<float>(memory_[idxSpl1_]);
+        // Sanitize the script's output: a bad script (or tan/exp/pow overflow)
+        // must never inject NaN/Inf into the DAC stream, and a runaway gain is
+        // bounded to a generous range so it cannot blow up the whole mix.
+        double l = memory_[idxSpl0_];
+        double r = memory_[idxSpl1_];
+        if (!std::isfinite(l)) l = 0.0;
+        if (!std::isfinite(r)) r = 0.0;
+        L[i] = static_cast<float>(std::clamp(l, -4.0, 4.0));
+        R[i] = static_cast<float>(std::clamp(r, -4.0, 4.0));
     }
 }
 
@@ -587,7 +704,11 @@ void LiveProg::processInterleaved(float* buffer, int frames, int channels) {
 
         executeBytecode(sampleBytecode_);
 
-        buffer[i * channels] = static_cast<float>(memory_[idxSpl0_]);
-        buffer[i * channels + 1] = static_cast<float>(memory_[idxSpl1_]);
+        double l = memory_[idxSpl0_];
+        double r = memory_[idxSpl1_];
+        if (!std::isfinite(l)) l = 0.0;
+        if (!std::isfinite(r)) r = 0.0;
+        buffer[i * channels] = static_cast<float>(std::clamp(l, -4.0, 4.0));
+        buffer[i * channels + 1] = static_cast<float>(std::clamp(r, -4.0, 4.0));
     }
 }

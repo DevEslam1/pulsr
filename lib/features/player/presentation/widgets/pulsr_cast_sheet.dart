@@ -207,7 +207,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Casting is available on Android only in this build.',
+                context.l10n.castAndroidOnly,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: p.textSecondary, fontSize: 13),
               ),
@@ -330,7 +330,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        'Direct device mode: casts the current track. Queue and remote volume need the Cast SDK.',
+                        context.l10n.castDirectDeviceMode,
                         style: TextStyle(
                             fontSize: 11.5, color: p.textSecondary),
                       ),

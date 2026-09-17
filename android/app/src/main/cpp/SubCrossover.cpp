@@ -10,19 +10,33 @@ SubCrossover::SubCrossover() {
 void SubCrossover::setSampleRate(double sampleRate) {
     if (sampleRate < 8000.0) sampleRate = 8000.0;
     if (sampleRate > 768000.0) sampleRate = 768000.0;
+    if (std::abs(sampleRate_ - sampleRate) < 0.5) return;
     sampleRate_ = sampleRate;
     computeCoeffs();
+    // Coefficient set changed with the rate: clear stale filter state.
+    reset();
 }
 
 void SubCrossover::configure(double cornerHz, double slopeDbPerOct, double subGain, bool bassMono, bool antiPop) {
-    cornerHz_ = std::clamp(cornerHz, 30.0, 300.0);
-    slopeDbPerOct_ = (slopeDbPerOct < 18.0) ? 12.0 : 24.0;
-    cascade_ = (slopeDbPerOct_ >= 24.0);
+    const double newCorner = std::clamp(cornerHz, 30.0, 300.0);
+    const bool newCascade = !(slopeDbPerOct < 18.0); // 12 dB/oct below 18, else 24
+    // A corner/slope change is a structural change: recompute the coefficients
+    // and clear the old filter state (retained registers belong to the previous
+    // cutoff and would otherwise ring/click). Pure gain/mono/anti-pop changes
+    // skip the recompute entirely.
+    const bool structural =
+        std::abs(newCorner - cornerHz_) > 0.01 || newCascade != cascade_;
+    cornerHz_ = newCorner;
+    slopeDbPerOct_ = newCascade ? 24.0 : 12.0;
+    cascade_ = newCascade;
     targetSubGain_ = std::clamp(subGain, 0.0, 1.5);
     subGain_ = targetSubGain_;   // FIX M-5: keep getter in sync
     bassMono_ = bassMono;
     antiPop_ = antiPop;
-    computeCoeffs();
+    if (structural) {
+        computeCoeffs();
+        reset();
+    }
 }
 
 void SubCrossover::applyParams(const SubCrossoverParamSet& params) {
