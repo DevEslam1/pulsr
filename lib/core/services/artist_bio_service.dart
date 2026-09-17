@@ -46,7 +46,10 @@ class ArtistBioService {
       if (!AppConfig.isCloudSyncAllowed) return null;
       final prefs = await SharedPreferences.getInstance();
       if (prefs.getBool('setting_offline_only_mode') == true) return null;
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to read offline-only preference for artist bio',
+          error: e, stackTrace: st, category: 'ArtistBio');
+    }
 
     try {
       // 1. Search Deezer for HD Artist Picture and Top Tracks
@@ -80,7 +83,10 @@ class ArtistBioService {
           final wikiData = json.decode(wikiRes.body);
           bio = wikiData['extract'] as String?;
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Wikipedia bio lookup failed for $cleanName',
+            error: e, stackTrace: st, category: 'ArtistBio');
+      }
 
       final info = ArtistInfo(
         name: cleanName,

@@ -9,10 +9,12 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../../../sheets/add_to_playlist_sheet.dart';
 import '../../../sheets/sleep_timer_sheet.dart';
@@ -117,6 +119,7 @@ class PlayerSwitcherItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final semanticsLabel =
         (badgeCount != null && badgeCount! > 0) ? '$label ($badgeCount)' : label;
     return Semantics(
@@ -151,7 +154,7 @@ class PlayerSwitcherItem extends StatelessWidget {
                 Icon(
                   icon,
                   size: isTablet ? 16 : 14,
-                  color: isSelected ? activeColor : Colors.white60,
+                  color: isSelected ? activeColor : p.textSecondary,
                 ),
                 const SizedBox(width: 4),
                 Flexible(
@@ -162,7 +165,7 @@ class PlayerSwitcherItem extends StatelessWidget {
                     style: TextStyle(
                       fontSize: isTablet ? 13 : 11.5,
                       fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                      color: isSelected ? Colors.white : Colors.white60,
+                      color: isSelected ? p.textPrimary : p.textSecondary,
                       letterSpacing: 0.2,
                     ),
                   ),
@@ -175,7 +178,7 @@ class PlayerSwitcherItem extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: isSelected
                           ? activeColor
-                          : Colors.white.withValues(alpha: 0.15),
+                          : p.textPrimary.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -183,7 +186,7 @@ class PlayerSwitcherItem extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 9.5,
                         fontWeight: FontWeight.w800,
-                        color: isSelected ? Colors.black : Colors.white70,
+                        color: isSelected ? p.onAccent : p.textSecondary,
                       ),
                     ),
                   ),
@@ -405,10 +408,22 @@ class PlayerViewSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final isLyrics = state.isLyricsVisible;
     final isQueue = state.isQueueVisible;
     final isTrack = !isLyrics && !isQueue;
     final l10n = context.l10n;
+    final surfaceBase = p.isDark ? Colors.white : Colors.black;
+    // Custom Theme Studio shape controls apply when the user picked the custom
+    // colour source, so preset themes keep their hand-tuned geometry.
+    final custom = context.select<SettingsCubit, ({double radius, bool glow, bool active})>(
+        (c) => (
+              radius: c.state.customThemeRadius,
+              glow: c.state.customThemeGlow,
+              active: c.state.themeColorSource == ThemeColorSource.custom,
+            ));
+    final barRadius = custom.active ? custom.radius : 24.0;
+    final showGlow = custom.active && custom.glow;
 
     return Center(
       child: ConstrainedBox(
@@ -419,19 +434,25 @@ class PlayerViewSwitcher extends StatelessWidget {
           minHeight: barHeight,
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(barRadius),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
             child: Container(
               padding: const EdgeInsets.all(3.0),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: surfaceFillAlpha),
-                borderRadius: BorderRadius.circular(24),
+                color: surfaceBase.withValues(alpha: surfaceFillAlpha),
+                borderRadius: BorderRadius.circular(barRadius),
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: borderAlpha),
+                  color: surfaceBase.withValues(alpha: borderAlpha),
                   width: 1.0,
                 ),
                 boxShadow: [
+                  if (showGlow)
+                    BoxShadow(
+                      color: activeColor.withValues(alpha: 0.30),
+                      blurRadius: 20,
+                      spreadRadius: 1,
+                    ),
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.20),
                     blurRadius: 16,
@@ -529,6 +550,14 @@ class PlayerBottomActionDock extends StatelessWidget {
     final isEqActive = props.state.isEqEnabled;
     final speed = props.state.playbackSpeed;
     final hasTimer = props.state.sleepTimerRemaining != null;
+    final custom = context.select<SettingsCubit, ({double radius, bool glow, bool active})>(
+        (c) => (
+              radius: c.state.customThemeRadius,
+              glow: c.state.customThemeGlow,
+              active: c.state.themeColorSource == ThemeColorSource.custom,
+            ));
+    final barRadius = custom.active ? custom.radius : 24.0;
+    final showGlow = custom.active && custom.glow;
 
     final IconData outputIcon = isCast
         ? Icons.cast_connected_rounded
@@ -550,19 +579,27 @@ class PlayerBottomActionDock extends StatelessWidget {
           minHeight: barHeight,
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(barRadius),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
             child: Container(
               padding: const EdgeInsets.all(3.0),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(24),
+                color: (p.isDark ? Colors.white : Colors.black)
+                    .withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(barRadius),
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.12),
+                  color: (p.isDark ? Colors.white : Colors.black)
+                      .withValues(alpha: 0.12),
                   width: 1.0,
                 ),
                 boxShadow: [
+                  if (showGlow)
+                    BoxShadow(
+                      color: props.activeColor.withValues(alpha: 0.28),
+                      blurRadius: 20,
+                      spreadRadius: 1,
+                    ),
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.20),
                     blurRadius: 16,

@@ -633,12 +633,12 @@ class _PlaybackPresetsTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Playback presets',
+                  Text(context.l10n.playbackPresetsTitle,
                       style: TextStyle(
                           color: p.textPrimary,
                           fontWeight: FontWeight.w600,
                           fontSize: 14.5)),
-                  Text('One-tap tuning for quality, balance or data saving',
+                  Text(context.l10n.playbackPresetsSubtitle,
                       style: TextStyle(
                           color: p.textTertiary, fontSize: 12.5, height: 1.32)),
                 ],
@@ -655,19 +655,19 @@ class _PlaybackPresetsTile extends StatelessWidget {
               onPressed: () => apply(
                   cubit.applyMaximumQualityPreset, 'Maximum Quality'),
               icon: const Icon(Icons.high_quality_rounded, size: 18),
-              label: const Text('Max Quality'),
+              label: Text(context.l10n.playbackPresetMaxQuality),
             ),
             OutlinedButton.icon(
               onPressed: () =>
                   apply(cubit.applySmoothPlaybackPreset, 'Smooth Playback'),
               icon: const Icon(Icons.spa_rounded, size: 18),
-              label: const Text('Smooth'),
+              label: Text(context.l10n.playbackPresetSmooth),
             ),
             OutlinedButton.icon(
               onPressed: () =>
                   apply(cubit.applyPoorNetworkPreset, 'Data Saver'),
               icon: const Icon(Icons.data_saver_on_rounded, size: 18),
-              label: const Text('Data Saver'),
+              label: Text(context.l10n.playbackPresetDataSaver),
             ),
           ],
         ),

@@ -225,8 +225,8 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                         children: [
                           // Left Action: Download (stream) or Add to Playlist (local)
                           SizedBox(
-                            width: isTablet ? 46 : 40,
-                            height: isTablet ? 46 : 40,
+                            width: isTablet ? 48 : 44,
+                            height: isTablet ? 48 : 44,
                             child: hasDownload
                                 ? Center(
                                     child: YtmDownloadButton(
@@ -472,8 +472,8 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                     children: [
                       // Dismiss Button
                       SizedBox(
-                        width: isTablet ? 44 : 40,
-                        height: isTablet ? 44 : 40,
+                        width: isTablet ? 48 : 44,
+                        height: isTablet ? 48 : 44,
                         child: Material(
                           color: Colors.white.withValues(alpha: 0.07),
                           shape: const CircleBorder(),
@@ -489,7 +489,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                             },
                             child: Center(
                               child: Icon(
-                                Icons.keyboard_arrow_down_rounded,
+                                Icons.keyboard_arrow_down_rounded, semanticLabel: context.l10n.close,
                                 size: isTablet ? 26 : 24,
                                 color: p.textPrimary,
                               ),
@@ -559,8 +559,8 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
 
                       // More Options Button
                       SizedBox(
-                        width: isTablet ? 44 : 40,
-                        height: isTablet ? 44 : 40,
+                        width: isTablet ? 48 : 44,
+                        height: isTablet ? 48 : 44,
                         child: Material(
                           color: Colors.white.withValues(alpha: 0.07),
                           shape: const CircleBorder(),
@@ -574,7 +574,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                             },
                             child: Center(
                               child: Icon(
-                                Icons.more_horiz_rounded,
+                                Icons.more_horiz_rounded, semanticLabel: context.l10n.songInfo,
                                 size: isTablet ? 24 : 22,
                                 color: p.textPrimary,
                               ),
@@ -600,9 +600,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                   child: Center(
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
-                        maxWidth: (state.isLyricsVisible || state.isQueueVisible)
-                            ? (isTablet ? 560.0 : double.infinity)
-                            : (isTablet ? 560.0 : double.infinity),
+                        maxWidth: isTablet ? 560.0 : double.infinity,
                         maxHeight: double.infinity,
                       ),
                       child: centerDisplay,
@@ -675,7 +673,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
 // Waveform Hero Stage: Concentric Sonic Pulse + Floating Art + Neon Waves
 // ---------------------------------------------------------------------------
 class _WaveformHeroStage extends StatelessWidget {
-  final dynamic song;
+  final SongsTableData? song;
   final Color activeColor;
   final bool isPlaying;
   final bool isLandscape;
@@ -694,6 +692,7 @@ class _WaveformHeroStage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final song = this.song;
     return LayoutBuilder(
       builder: (context, constraints) {
         final availableW = constraints.maxWidth - (isTablet ? 40.0 : 16.0);

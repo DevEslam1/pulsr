@@ -292,6 +292,12 @@ abstract class AppLocalizations {
   /// **'Clear History'**
   String get clearSearchHistory;
 
+  /// No description provided for @clearSearchQuery.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear search'**
+  String get clearSearchQuery;
+
   /// No description provided for @noResultsFound.
   ///
   /// In en, this message translates to:
@@ -1647,6 +1653,168 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Mini Player Swipe Right'**
   String get miniPlayerSwipeRight;
+
+  /// No description provided for @seekLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Seek'**
+  String get seekLabel;
+
+  /// No description provided for @homeOfflineNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline mode — online streaming is disabled in Settings.'**
+  String get homeOfflineNotice;
+
+  /// No description provided for @homePermissionNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Permission Needed'**
+  String get homePermissionNeeded;
+
+  /// No description provided for @homePermissionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Grant audio or storage permission so Pulsr can index and play your offline music collection with bit-perfect quality.'**
+  String get homePermissionSubtitle;
+
+  /// No description provided for @homeGrantPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Grant Permission'**
+  String get homeGrantPermission;
+
+  /// No description provided for @homeScanningLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Scanning...'**
+  String get homeScanningLabel;
+
+  /// No description provided for @homeScanProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}% indexed • Building your local music catalog'**
+  String homeScanProgress(int percent);
+
+  /// No description provided for @homeScanningStorageSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching device directories for audio files...'**
+  String get homeScanningStorageSubtitle;
+
+  /// No description provided for @jumpToCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Jump to Category'**
+  String get jumpToCategory;
+
+  /// No description provided for @sidebarBrowse.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse'**
+  String get sidebarBrowse;
+
+  /// No description provided for @sidebarCollection.
+  ///
+  /// In en, this message translates to:
+  /// **'Collection'**
+  String get sidebarCollection;
+
+  /// No description provided for @sidebarPanel.
+  ///
+  /// In en, this message translates to:
+  /// **'Panel'**
+  String get sidebarPanel;
+
+  /// No description provided for @sidebarSidePanel.
+  ///
+  /// In en, this message translates to:
+  /// **'Side Panel'**
+  String get sidebarSidePanel;
+
+  /// No description provided for @sidebarExpand.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand sidebar'**
+  String get sidebarExpand;
+
+  /// No description provided for @sidebarCollapse.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse sidebar'**
+  String get sidebarCollapse;
+
+  /// No description provided for @exportFormatWinampLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Winamp / Poweramp'**
+  String get exportFormatWinampLabel;
+
+  /// No description provided for @exportFormatWmpLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Windows Media Player'**
+  String get exportFormatWmpLabel;
+
+  /// No description provided for @libraryGridView.
+  ///
+  /// In en, this message translates to:
+  /// **'Grid view'**
+  String get libraryGridView;
+
+  /// No description provided for @libraryListView.
+  ///
+  /// In en, this message translates to:
+  /// **'List view'**
+  String get libraryListView;
+
+  /// No description provided for @authUseCodeSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Having trouble? Use code sign-in instead'**
+  String get authUseCodeSignIn;
+
+  /// No description provided for @castAndroidOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Casting is available on Android only in this build.'**
+  String get castAndroidOnly;
+
+  /// No description provided for @castDirectDeviceMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct device mode: casts the current track. Queue and remote volume need the Cast SDK.'**
+  String get castDirectDeviceMode;
+
+  /// No description provided for @playbackPresetsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback presets'**
+  String get playbackPresetsTitle;
+
+  /// No description provided for @playbackPresetsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'One-tap tuning for quality, balance or data saving'**
+  String get playbackPresetsSubtitle;
+
+  /// No description provided for @playbackPresetMaxQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'Max Quality'**
+  String get playbackPresetMaxQuality;
+
+  /// No description provided for @playbackPresetSmooth.
+  ///
+  /// In en, this message translates to:
+  /// **'Smooth'**
+  String get playbackPresetSmooth;
+
+  /// No description provided for @playbackPresetDataSaver.
+  ///
+  /// In en, this message translates to:
+  /// **'Data Saver'**
+  String get playbackPresetDataSaver;
 
   /// No description provided for @nowPlayingDoubleTap.
   ///

@@ -52,7 +52,13 @@ class RadioStationStore {
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(prefsKey);
-      if (raw == null || raw.isEmpty) return;
+      // The station list is process-static, so an empty/missing store must
+      // clear it — otherwise stations from a previous session (or a cleared
+      // store) leak back into the current one.
+      if (raw == null || raw.isEmpty) {
+        _stations.clear();
+        return;
+      }
       final decoded = jsonDecode(raw);
       if (decoded is! List) return;
       _stations.clear();

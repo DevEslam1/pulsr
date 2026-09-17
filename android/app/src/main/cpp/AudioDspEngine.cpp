@@ -107,6 +107,17 @@ void DspEngineRegistry::broadcastParams(const std::shared_ptr<const DspParamSnap
     }
 }
 
+int DspEngineRegistry::getMaxPipelineLatencyFrames() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    int maxLatency = 0;
+    for (auto* engine : engines_) {
+        if (engine) {
+            maxLatency = std::max(maxLatency, engine->getPipelineLatencyFrames());
+        }
+    }
+    return maxLatency;
+}
+
 void AudioDspEngine::updateParams(SnapshotMutator mutator) {
     if (!mutator) return;
     std::lock_guard<std::mutex> lock(publishMutex_);

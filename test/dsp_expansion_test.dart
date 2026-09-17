@@ -25,16 +25,16 @@ void main() {
         DspStage.viperDdc,
         DspStage.dynamicEq,
         DspStage.multibandCompressor,
+        DspStage.stereoPanner,
         DspStage.crossfeed,
         DspStage.convolutionReverb,
-        DspStage.stereoPanner,
         DspStage.harmonicSaturation,
         DspStage.liveProg,
         DspStage.stereoWidth,
         DspStage.subCrossover,
         DspStage.dynamicBass,
-        DspStage.lookaheadLimiter,
         DspStage.loudnessContour,
+        DspStage.lookaheadLimiter,
         DspStage.volume,
       ];
       expect(OptimizedDspPipeline.pipelineOrder, expectedOrder);

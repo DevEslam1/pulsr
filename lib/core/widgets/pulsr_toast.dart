@@ -135,7 +135,8 @@ class _ToastWidgetState extends State<_ToastWidget>
       child: Align(
         alignment: Alignment.bottomCenter,
         child: Padding(
-          padding: const EdgeInsets.only(bottom: 96, left: 24, right: 24),
+          padding:
+              const EdgeInsetsDirectional.only(bottom: 96, start: 24, end: 24),
           child: FadeTransition(
             opacity: _fadeAnimation,
             child: SlideTransition(

@@ -24,10 +24,14 @@ void MultibandCompressor::applyParams(const MultibandCompressorParamSet& params)
 }
 
 void MultibandCompressor::updateCoefficients() {
-    // Validate and sort crossover frequencies
-    double f0 = std::clamp(params_.crossoverFreqs[0], 20.0, 1000.0);
-    double f1 = std::clamp(params_.crossoverFreqs[1], f0 + 50.0, 8000.0);
-    double f2 = std::clamp(params_.crossoverFreqs[2], f1 + 100.0, sampleRate_ * 0.45);
+    // Validate and sort crossover frequencies. Guard std::clamp's lo <= hi
+    // precondition: f2's upper bound is never allowed below its lower bound.
+    double f0 = std::clamp(params_.crossoverFreqs[0], 20.0, std::min(1000.0, sampleRate_ * 0.40));
+    double f1 = std::clamp(params_.crossoverFreqs[1], f0 + 50.0,
+                           std::max(f0 + 50.0, std::min(8000.0, sampleRate_ * 0.44)));
+    double f2lo = f1 + 100.0;
+    double f2hi = std::max(f2lo, sampleRate_ * 0.45);
+    double f2 = std::clamp(params_.crossoverFreqs[2], f2lo, f2hi);
 
     crossoverMid_.configure(sampleRate_, f1);
     crossoverLow_.configure(sampleRate_, f0);
@@ -55,7 +59,12 @@ void MultibandCompressor::reset() {
 double MultibandCompressor::computeBandGain(int band, double envDb) {
     const auto& bp = params_.bands[band];
     if (!bp.enabled || bp.ratio <= 1.001) {
-        return 0.0; // 0 dB gain reduction (unity)
+        // Release the applied gain to unity instead of snapping to 0 dB, so
+        // toggling a band off (or its ratio to 1) ramps out rather than clicks.
+        smoothedGainDb_[band] += (1.0 - releaseCoeff_[band]) * (0.0 - smoothedGainDb_[band]);
+        if (std::abs(smoothedGainDb_[band]) < 0.01) smoothedGainDb_[band] = 0.0;
+        currentGainReductionDb_[band] = smoothedGainDb_[band];
+        return smoothedGainDb_[band];
     }
 
     const double T = bp.thresholdDb;
@@ -124,15 +133,14 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
                 const float sL = bandBufferL_[b][i];
                 const float sR = bandBufferR_[b][i];
 
-                // Envelope follower on linear amplitude (attack/release ballistics)
+                // Level detector: instantaneous peak. Ballistics (attack/release)
+                // are applied once, to the gain in computeBandGain(). Previously
+                // the envelope follower AND the gain smoother each applied the
+                // same time constants, roughly doubling the effective times.
                 const double peak = std::max(std::abs(sL), std::abs(sR));
-                if (peak > envelopeDb_[b]) {  // Note: envelopeDb_ stores linear envelope here
-                    envelopeDb_[b] = attackCoeff_[b]  * envelopeDb_[b] + (1.0 - attackCoeff_[b])  * peak;
-                } else {
-                    envelopeDb_[b] = releaseCoeff_[b] * envelopeDb_[b] + (1.0 - releaseCoeff_[b]) * peak;
-                }
+                envelopeDb_[b] = peak;
 
-                // Convert smoothed linear envelope to dB once per sample
+                // Convert linear envelope to dB once per sample
                 const double envDb = (envelopeDb_[b] > 1e-6) ? (20.0 * std::log10(envelopeDb_[b])) : -120.0;
                 const double gainDb = computeBandGain(b, envDb);
                 const float linearGain = static_cast<float>(std::pow(10.0, gainDb / 20.0));

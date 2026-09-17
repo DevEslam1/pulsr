@@ -37,10 +37,19 @@ public:
     double getRatio() const { return ratio_; }
     bool isBypassed() const { return std::abs(inRate_ - outRate_) < 0.5; }
 
-    // Latency reporting in frames (exact group delay)
-    int getLatencyFrames() const { return linearQuality_ ? 0 : activeHalfTaps_; }
+    // Latency reporting in frames (exact group delay). The polyphase kernel is
+    // always centred at HALF_TAPS regardless of quality truncation, so the
+    // group delay is HALF_TAPS (not the truncation half-width).
+    int getLatencyFrames() const { return linearQuality_ ? 0 : HALF_TAPS; }
 
-    // HARD CONTRACT: Consumes N input frames and returns exactly N output frames
+    // HARD CONTRACT: Consumes N input frames and returns exactly N output frames.
+    //
+    // NOTE: a causal sample-rate converter cannot honour a fixed N-in/N-out
+    // contract (downsampling needs more input frames than it emits; upsampling
+    // emits more than it consumes), so this in-place engine path is a
+    // transparent passthrough and the platform's AudioTrack performs the rate
+    // conversion. Real ratio conversion is done by processPlanar() (used by the
+    // convolution-reverb wet path), which can vary the output frame count.
     int processInterleaved(float* buffer, int frames, int channels = 2);
 
     // Multi-channel planar processing: consumes inFrames and writes up to maxOutFrames

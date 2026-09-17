@@ -125,4 +125,22 @@ class ReplayGainMath {
     if (hasTag) return preampWithRg.isFinite ? preampWithRg : 0.0;
     return preampWithoutRg.isFinite ? preampWithoutRg : 0.0;
   }
+
+  /// Sanitizes a ReplayGain dB tag before it is handed to the native pre-gain
+  /// stage. Corrupt file metadata can carry NaN, ±inf or absurd magnitudes;
+  /// the Dart math guards against them, but the native engine consumes the raw
+  /// double and a single non-finite value poisons its smoothed gain for the
+  /// rest of the session (every following track then plays as noise). Returns
+  /// 0.0 (no gain) for anything unusable and clamps to a sane ±100 dB window.
+  static double sanitizeGainDb(double? value) {
+    if (value == null || !value.isFinite) return 0.0;
+    return value.clamp(-100.0, 100.0).toDouble();
+  }
+
+  /// Sanitizes a ReplayGain peak tag to a finite positive value. Returns 1.0
+  /// (unity, "no known peak") for anything unusable.
+  static double sanitizePeak(double? value) {
+    if (value == null || !value.isFinite || value <= 0.0) return 1.0;
+    return value.clamp(1e-6, 100.0).toDouble();
+  }
 }

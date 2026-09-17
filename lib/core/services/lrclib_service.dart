@@ -50,7 +50,10 @@ class LrclibService {
       if (!AppConfig.isCloudSyncAllowed) return null;
       final prefs = await SharedPreferences.getInstance();
       if (prefs.getBool('setting_offline_only_mode') == true) return null;
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to read offline-only preference for lyrics',
+          error: e, stackTrace: st, category: 'Lrclib');
+    }
     final candidates = _generateCandidates(
       trackName: trackName,
       artistName: artistName,

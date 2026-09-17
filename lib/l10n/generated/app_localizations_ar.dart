@@ -105,6 +105,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get clearSearchHistory => 'مسح السجل';
 
   @override
+  String get clearSearchQuery => 'مسح البحث';
+
+  @override
   String get noResultsFound => 'لم يتم العثور على موسيقى';
 
   @override
@@ -824,6 +827,95 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get miniPlayerSwipeRight => 'سحب المشغل الصغير لليمين';
+
+  @override
+  String get seekLabel => 'بحث';
+
+  @override
+  String get homeOfflineNotice =>
+      'وضع عدم الاتصال — البث عبر الإنترنت معطّل في الإعدادات.';
+
+  @override
+  String get homePermissionNeeded => 'الإذن مطلوب';
+
+  @override
+  String get homePermissionSubtitle =>
+      'امنح إذن الصوت أو التخزين حتى يتمكن Pulsr من فهرسة مجموعتك الموسيقية المحلية وتشغيلها بجودة مثالية.';
+
+  @override
+  String get homeGrantPermission => 'منح الإذن';
+
+  @override
+  String get homeScanningLabel => 'جارٍ الفحص...';
+
+  @override
+  String homeScanProgress(int percent) {
+    return 'تمت فهرسة $percent% • جارٍ إنشاء كتالوج الموسيقى المحلي';
+  }
+
+  @override
+  String get homeScanningStorageSubtitle =>
+      'جارٍ البحث عن ملفات الصوت في مجلدات الجهاز...';
+
+  @override
+  String get jumpToCategory => 'الانتقال إلى الفئة';
+
+  @override
+  String get sidebarBrowse => 'تصفح';
+
+  @override
+  String get sidebarCollection => 'المجموعة';
+
+  @override
+  String get sidebarPanel => 'اللوحة';
+
+  @override
+  String get sidebarSidePanel => 'اللوحة الجانبية';
+
+  @override
+  String get sidebarExpand => 'توسيع الشريط الجانبي';
+
+  @override
+  String get sidebarCollapse => 'طي الشريط الجانبي';
+
+  @override
+  String get exportFormatWinampLabel => 'Winamp / Poweramp';
+
+  @override
+  String get exportFormatWmpLabel => 'Windows Media Player';
+
+  @override
+  String get libraryGridView => 'عرض شبكي';
+
+  @override
+  String get libraryListView => 'عرض القائمة';
+
+  @override
+  String get authUseCodeSignIn => 'هل تواجه مشكلة؟ استخدم تسجيل الدخول بالرمز';
+
+  @override
+  String get castAndroidOnly =>
+      'البث (Cast) متاح على Android فقط في هذا الإصدار.';
+
+  @override
+  String get castDirectDeviceMode =>
+      'وضع الجهاز المباشر: يبث المقطع الحالي. تتطلب القائمة ومستوى الصوت عن بُعد Cast SDK.';
+
+  @override
+  String get playbackPresetsTitle => 'إعدادات التشغيل';
+
+  @override
+  String get playbackPresetsSubtitle =>
+      'ضبط بلمسة واحدة للجودة أو التوازن أو توفير البيانات';
+
+  @override
+  String get playbackPresetMaxQuality => 'أعلى جودة';
+
+  @override
+  String get playbackPresetSmooth => 'سلس';
+
+  @override
+  String get playbackPresetDataSaver => 'موفّر البيانات';
 
   @override
   String get nowPlayingDoubleTap => 'النقر المزدوج في المشغل';

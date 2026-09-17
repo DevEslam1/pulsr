@@ -386,7 +386,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
-                                'Offline mode — online streaming is disabled in Settings.',
+                                context.l10n.homeOfflineNotice,
                                 style: TextStyle(
                                     color: p.textTertiary, fontSize: 12),
                               ),
@@ -689,7 +689,11 @@ class _HomeScreenState extends State<HomeScreen> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SectionHeader(title: context.l10n.recentlyAdded),
+                SectionHeader(
+                  title: context.l10n.recentlyAdded,
+                  actionLabel: context.l10n.browseSeeAll,
+                  onAction: () => context.push('/library'),
+                ),
                 if (context.trackGridColumns > 1)
                   GridView.builder(
                     shrinkWrap: true,
@@ -1615,13 +1619,12 @@ class _EmptyLibraryState extends State<_EmptyLibrary> {
         padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
         child: EmptyStateWidget(
           icon: Icons.folder_special_rounded,
-          title: 'Permission Needed',
-          subtitle:
-              'Grant audio or storage permission so Pulsr can index and play your offline music collection with bit-perfect quality.',
-          primaryActionLabel: 'Grant Permission',
+          title: context.l10n.homePermissionNeeded,
+          subtitle: context.l10n.homePermissionSubtitle,
+          primaryActionLabel: context.l10n.homeGrantPermission,
           primaryActionIcon: Icons.lock_open_rounded,
           onPrimaryAction: _requestPermission,
-          secondaryActionLabel: 'Excluded Folders',
+          secondaryActionLabel: context.l10n.hiddenFolders,
           secondaryActionIcon: Icons.folder_off_rounded,
           onSecondaryAction: () => context.push('/hidden-folders'),
         ),
@@ -1637,12 +1640,12 @@ class _EmptyLibraryState extends State<_EmptyLibrary> {
           children: [
             EmptyStateWidget(
               icon: Icons.hourglass_top_rounded,
-              title: 'Scanning Storage...',
+              title: context.l10n.scanningStorage,
               subtitle: _scanProgress > 0
-                  ? '$percent% indexed • Building your local music catalog'
-                  : 'Searching device directories for audio files...',
+                  ? context.l10n.homeScanProgress(percent)
+                  : context.l10n.homeScanningStorageSubtitle,
               isPrimaryLoading: true,
-              primaryActionLabel: 'Scanning...',
+              primaryActionLabel: context.l10n.homeScanningLabel,
             ),
             if (_scanProgress > 0) ...[
               const SizedBox(height: 16),
@@ -1673,7 +1676,7 @@ class _EmptyLibraryState extends State<_EmptyLibrary> {
         primaryActionLabel: context.l10n.scanStorage,
         primaryActionIcon: Icons.refresh_rounded,
         onPrimaryAction: _scan,
-        secondaryActionLabel: 'Excluded Folders',
+        secondaryActionLabel: context.l10n.hiddenFolders,
         secondaryActionIcon: Icons.folder_off_rounded,
         onSecondaryAction: () => context.push('/hidden-folders'),
       ),

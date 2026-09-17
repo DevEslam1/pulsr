@@ -48,39 +48,43 @@ class OptimizedDspPipeline {
   int _nativeLatencyFrames = 0;
   double _nativeSampleRate = 48000.0;
 
-  /// Pipeline execution order optimized for minimal latency and acoustic correctness:
+  /// Pipeline execution order, mirroring the actual stage order in
+  /// `AudioDspEngine::processInterleaved` (android/app/src/main/cpp):
   /// 1. Parametric EQ (10-32 bands)
   /// 2. Arbitrary Response EQ (EqualizerAPO GraphicEq)
   /// 3. ViPER-DDC
   /// 4. Dynamic EQ (energy-dependent cuts, adjacent to the static EQ)
   /// 5. Multiband Compressor (4-band LR4 dynamics)
-  /// 6. Crossfeed (headphone acoustic cross-coupling / BS2B)
-  /// 7. Convolution Reverb (spatial room impulse response)
-  /// 8. Stereo Balance / Mono Mix
+  /// 6. Stereo Balance / Mono Mix (panner, before the spatial stages)
+  /// 7. Crossfeed (headphone acoustic cross-coupling / BS2B)
+  /// 8. Convolution Reverb (spatial room impulse response)
   /// 9. Harmonic Saturation (multiband warmth option)
   /// 10. Live Programmable DSP (EEL script)
   /// 11. Stereo Width (M/S, after crossfeed/reverb, before the limiter)
   /// 12. Sub Crossover (bass redirection sum, after width, before the limiter)
   /// 13. Dynamic Bass
-  /// 14. Lookahead Limiter (brickwall peak protection)
-  /// 15. Loudness Contour (computed against the current volume-stage value)
+  /// 14. Loudness Contour (computed against the current volume-stage value)
+  /// 15. Lookahead Limiter (brickwall peak protection; guards the contour)
   /// 16. Volume (ReplayGain + user master volume)
+  ///
+  /// The native resampler and TPDF dither have their own stage bits and are not
+  /// part of this latency/ordering model.
   static const List<DspStage> pipelineOrder = [
     DspStage.parametricEq,
     DspStage.arbitraryEq,
     DspStage.viperDdc,
     DspStage.dynamicEq,
     DspStage.multibandCompressor,
+    DspStage.stereoPanner,
     DspStage.crossfeed,
     DspStage.convolutionReverb,
-    DspStage.stereoPanner,
     DspStage.harmonicSaturation,
     DspStage.liveProg,
     DspStage.stereoWidth,
     DspStage.subCrossover,
     DspStage.dynamicBass,
-    DspStage.lookaheadLimiter,
     DspStage.loudnessContour,
+    DspStage.lookaheadLimiter,
     DspStage.volume,
   ];
 

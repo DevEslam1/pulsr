@@ -474,7 +474,7 @@ class _SearchScreenState extends State<SearchScreen> {
         icon: Icons.search_off_rounded,
         title: context.l10n.noResultsFound,
         subtitle: context.l10n.noResultsSubtitle,
-        primaryActionLabel: context.l10n.clearSearchHistory,
+        primaryActionLabel: context.l10n.clearSearchQuery,
         primaryActionIcon: Icons.backspace_rounded,
         onPrimaryAction: () => _clear(context),
       );

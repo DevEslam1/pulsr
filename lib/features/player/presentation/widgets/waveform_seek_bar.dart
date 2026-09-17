@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 
 /// Interactive gesture-driven waveform seek bar widget with pinch-to-zoom and chapter marker support.
 class WaveformSeekBar extends StatefulWidget {
@@ -16,7 +17,7 @@ class WaveformSeekBar extends StatefulWidget {
   final List<Duration>? chapterMarkers;
   final Duration? loopPointA;
   final Duration? loopPointB;
-  final String semanticLabel;
+  final String? semanticLabel;
 
   const WaveformSeekBar({
     super.key,
@@ -30,7 +31,7 @@ class WaveformSeekBar extends StatefulWidget {
     this.chapterMarkers,
     this.loopPointA,
     this.loopPointB,
-    this.semanticLabel = 'Seek',
+    this.semanticLabel,
   });
 
   @override
@@ -42,6 +43,47 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
   double _zoomScale = 1.0;
 
   @override
+  void didUpdateWidget(covariant WaveformSeekBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // New track => new waveform/duration: reset zoom & transient scrub state so
+    // the visible window always matches the samples being painted.
+    if (!identical(oldWidget.samples, widget.samples) ||
+        oldWidget.duration != widget.duration) {
+      _zoomScale = 1.0;
+      _dragValue = null;
+    }
+  }
+
+  /// The slice of samples currently rendered, centered on the committed
+  /// playback position. Gesture hit-testing and the painter MUST agree on this
+  /// window, otherwise a zoomed seek lands on the wrong timestamp.
+  ({int startIndex, int visibleCount}) _visibleWindow(int totalCount) {
+    if (totalCount < 2) return (startIndex: 0, visibleCount: totalCount);
+    final int visibleCount = (totalCount / _zoomScale.clamp(1.0, 8.0))
+        .round()
+        .clamp(2, totalCount);
+    final double centerRatio = widget.duration.inMilliseconds > 0
+        ? widget.position.inMilliseconds / widget.duration.inMilliseconds
+        : 0.0;
+    final int centerIndex = (centerRatio * totalCount).round();
+    final int halfVisible = visibleCount ~/ 2;
+    final int startIndex =
+        (centerIndex - halfVisible).clamp(0, totalCount - visibleCount);
+    return (startIndex: startIndex, visibleCount: visibleCount);
+  }
+
+  /// Maps a local X coordinate to a global 0..1 ratio through the visible
+  /// window, so zoomed scrubbing is accurate.
+  double _ratioForDx(double dx, double trackWidth, int totalCount) {
+    if (trackWidth <= 0 || totalCount <= 0) return 0.0;
+    final window = _visibleWindow(totalCount);
+    final double ratioInWindow = (dx / trackWidth).clamp(0.0, 1.0);
+    final double globalRatio =
+        (window.startIndex + ratioInWindow * window.visibleCount) / totalCount;
+    return globalRatio.clamp(0.0, 1.0);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final double maxDuration = widget.duration.inMilliseconds.toDouble();
     final double currentPos = widget.position.inMilliseconds.toDouble();
@@ -49,6 +91,8 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
         .clamp(0.0, maxDuration > 0 ? maxDuration : 1.0);
     final double progressPercent =
         maxDuration > 0 ? (effectiveValue / maxDuration).clamp(0.0, 1.0) : 0.0;
+    final int totalCount = widget.samples.length;
+    final window = _visibleWindow(totalCount);
     final p = context.palette;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final Color inactiveColor = widget.inactiveColor ??
@@ -62,10 +106,29 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
     final valueLabel =
         '${Formatters.formatDuration(currentDuration)} / ${Formatters.formatDuration(widget.duration)}';
 
+    Duration clampDuration(Duration d) {
+      if (d < Duration.zero) return Duration.zero;
+      if (d > widget.duration) return widget.duration;
+      return d;
+    }
+
+    String labelFor(Duration d) =>
+        '${Formatters.formatDuration(d)} / ${Formatters.formatDuration(widget.duration)}';
+    final increasedLabel = labelFor(
+        clampDuration(currentDuration + const Duration(seconds: 10)));
+    final decreasedLabel = labelFor(
+        clampDuration(currentDuration - const Duration(seconds: 10)));
+
     return Semantics(
       slider: true,
-      label: widget.semanticLabel,
+      label: widget.semanticLabel ?? context.l10n.seekLabel,
       value: valueLabel,
+      increasedValue: increasedLabel,
+      decreasedValue: decreasedLabel,
+      onIncrease: () => widget.onSeek(
+          clampDuration(currentDuration + const Duration(seconds: 10))),
+      onDecrease: () => widget.onSeek(
+          clampDuration(currentDuration - const Duration(seconds: 10))),
       child: Directionality(
       textDirection: TextDirection.ltr,
       child: RepaintBoundary(
@@ -80,6 +143,12 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                   final trackWidth = constraints.maxWidth;
                   return GestureDetector(
                     behavior: HitTestBehavior.opaque,
+                    onDoubleTap: () {
+                      if (_zoomScale > 1.0) {
+                        HapticFeedback.selectionClick();
+                        setState(() => _zoomScale = 1.0);
+                      }
+                    },
                     onScaleUpdate: (details) {
                       if (details.scale != 1.0) {
                         setState(() {
@@ -91,8 +160,8 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                     onHorizontalDragStart: (details) {
                       if (trackWidth > 0 && maxDuration > 0) {
                         HapticFeedback.selectionClick();
-                        final ratio = (details.localPosition.dx / trackWidth)
-                            .clamp(0.0, 1.0);
+                        final ratio =
+                            _ratioForDx(details.localPosition.dx, trackWidth, totalCount);
                         setState(() {
                           _dragValue = ratio * maxDuration;
                         });
@@ -100,8 +169,8 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                     },
                     onHorizontalDragUpdate: (details) {
                       if (trackWidth > 0 && maxDuration > 0) {
-                        final ratio = (details.localPosition.dx / trackWidth)
-                            .clamp(0.0, 1.0);
+                        final ratio =
+                            _ratioForDx(details.localPosition.dx, trackWidth, totalCount);
                         setState(() {
                           _dragValue = ratio * maxDuration;
                         });
@@ -120,8 +189,8 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                     onTapDown: (details) {
                       if (trackWidth > 0 && maxDuration > 0) {
                         HapticFeedback.selectionClick();
-                        final ratio = (details.localPosition.dx / trackWidth)
-                            .clamp(0.0, 1.0);
+                        final ratio =
+                            _ratioForDx(details.localPosition.dx, trackWidth, totalCount);
                         final seekMs = ratio * maxDuration;
                         widget.onSeek(Duration(milliseconds: seekMs.round()));
                       }
@@ -140,6 +209,8 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                           loopPointA: widget.loopPointA,
                           loopPointB: widget.loopPointB,
                           zoomScale: _zoomScale,
+                          visibleStart: window.startIndex,
+                          visibleCount: window.visibleCount,
                         ),
                       ),
                     ),
@@ -192,6 +263,8 @@ class _WaveformPainter extends CustomPainter {
   final Duration? loopPointA;
   final Duration? loopPointB;
   final double zoomScale;
+  final int visibleStart;
+  final int visibleCount;
 
   _WaveformPainter({
     required this.samples,
@@ -203,6 +276,8 @@ class _WaveformPainter extends CustomPainter {
     this.loopPointA,
     this.loopPointB,
     this.zoomScale = 1.0,
+    this.visibleStart = 0,
+    this.visibleCount = 0,
   });
 
   @override
@@ -219,13 +294,11 @@ class _WaveformPainter extends CustomPainter {
       return;
     }
 
-    final int visibleCount =
-        (totalCount / zoomScale.clamp(1.0, 8.0)).round().clamp(2, totalCount);
-    final int centerIndex = (progress * totalCount).round();
-    final int halfVisible = visibleCount ~/ 2;
-    final int startIndex =
-        (centerIndex - halfVisible).clamp(0, totalCount - visibleCount);
-    final int endIndex = (startIndex + visibleCount).clamp(0, totalCount);
+    // Window is computed by the widget so hit-testing and painting stay in sync.
+    final int endBound = (visibleStart + visibleCount).clamp(2, totalCount);
+    final int startIndex = visibleStart.clamp(0, endBound - 2);
+    final int endIndex = endBound;
+    final int visible = endIndex - startIndex;
     final visibleSamples = samples.sublist(startIndex, endIndex);
 
     final int count = visibleSamples.length;
@@ -259,7 +332,7 @@ class _WaveformPainter extends CustomPainter {
 
     // 2. Render active waveform bars clipped to current progress in visible window
     final double visibleProgress =
-        ((progress * totalCount - startIndex) / visibleCount).clamp(0.0, 1.0);
+        ((progress * totalCount - startIndex) / visible).clamp(0.0, 1.0);
     if (visibleProgress > 0) {
       canvas.save();
       canvas.clipRect(
@@ -283,7 +356,7 @@ class _WaveformPainter extends CustomPainter {
     double? mapToVisibleX(double globalRatio) {
       final sampleIdx = globalRatio * totalCount;
       if (sampleIdx < startIndex || sampleIdx > endIndex) return null;
-      return ((sampleIdx - startIndex) / visibleCount) * size.width;
+      return ((sampleIdx - startIndex) / visible) * size.width;
     }
 
     // 3. Render Chapter Markers

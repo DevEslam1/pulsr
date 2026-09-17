@@ -74,7 +74,10 @@ class YtmCacheManager {
             // Update last modified time for LRU
             try {
               await f.setLastModified(DateTime.now());
-            } catch (_) {}
+            } catch (e, st) {
+              ErrorLogger.log('Failed to refresh cache mtime for $videoId',
+                  error: e, stackTrace: st, category: 'YtmCacheManager');
+            }
             return f;
           }
         }
@@ -114,7 +117,10 @@ class YtmCacheManager {
           if (entity is File) {
             try {
               await entity.delete();
-            } catch (_) {}
+            } catch (e, st) {
+              ErrorLogger.log('Failed to delete cached stream file',
+                  error: e, stackTrace: st, category: 'YtmCacheManager');
+            }
           }
         }
       }
@@ -154,7 +160,10 @@ class YtmCacheManager {
         try {
           await item.file.delete();
           totalSize -= item.size;
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Failed to prune cached stream file',
+              error: e, stackTrace: st, category: 'YtmCacheManager');
+        }
       }
     } catch (e, st) {
       ErrorLogger.log('Error pruning stream cache',

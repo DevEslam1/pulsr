@@ -7,6 +7,12 @@ mixin LibrarySongsTab on State<LibraryScreen> {
     final p = context.palette;
     final songs = state.songs;
     if (songs.isEmpty) {
+      if (state.isLoading) {
+        return SkeletonList(
+          padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16,
+              Adaptive.pagePadding(context), 160),
+        );
+      }
       return _buildEmpty(context,
           title: context.l10n.noSongsFound,
           subtitle: context.l10n.noSongsSubtitle,
@@ -115,7 +121,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
       );
     }
 
-    final showAlphabet = songs.length >= 15;
+    // The A–Z rail only makes sense when the list is ordered by title.
+    final showAlphabet = songs.length >= 15 && state.sortBy == 'title';
     final alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ#'.split('');
 
     final trackCols = context.trackGridColumns;
@@ -228,24 +235,31 @@ mixin LibrarySongsTab on State<LibraryScreen> {
               top: 8,
               bottom: 150,
               child: Container(
-                width: 22,
+                width: 30,
                 decoration: BoxDecoration(
                     color: p.surfaceContainer.withValues(alpha: 0.7),
-                    borderRadius: BorderRadius.circular(11)),
+                    borderRadius: BorderRadius.circular(15)),
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   child: Column(
                     children: alphabet
-                        .map((l) => InkWell(
-                              onTap: () => _scrollToLetter(l, songs),
-                              child: Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 1),
-                                child: Text(l,
-                                    style: TextStyle(
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w800,
-                                        color: p.textTertiary)),
+                        .map((l) => Semantics(
+                              button: true,
+                              label: l,
+                              excludeSemantics: true,
+                              child: InkWell(
+                                onTap: () => _scrollToLetter(l, songs),
+                                child: SizedBox(
+                                  width: 30,
+                                  height: 18,
+                                  child: Center(
+                                    child: Text(l,
+                                        style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                            color: p.textTertiary)),
+                                  ),
+                                ),
                               ),
                             ))
                         .toList(),

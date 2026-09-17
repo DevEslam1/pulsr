@@ -4,6 +4,7 @@
 #include "DspParams.h"
 #include <vector>
 #include <string>
+#include <memory>
 #include <cmath>
 
 class ViperDdc {
@@ -20,6 +21,8 @@ public:
         double v2R = 0.0;
     };
 
+    static constexpr int MAX_SECTIONS = 256;
+
     ViperDdc();
     void setSampleRate(double sampleRate);
     void setEnabled(bool enabled) { enabled_ = enabled; }
@@ -28,6 +31,19 @@ public:
     void reset();
 
     bool loadVdcString(const std::string& vdcContent);
+
+    /// Parses a raw .vdc text into coefficient-only sections (both rate
+    /// families). Pure/static and allocates only its own output, so it can run
+    /// on the control thread; the result is published via the snapshot.
+    static bool parseVdcContent(const std::string& vdcContent,
+                                std::vector<ViperDdcSection>& out441,
+                                std::vector<ViperDdcSection>& out480);
+
+    /// Applies already-parsed coefficient sets without parsing/allocating
+    /// (audio-thread entry point; internal vectors are pre-reserved).
+    void applyPreparedSections(const std::vector<ViperDdcSection>& s441,
+                               const std::vector<ViperDdcSection>& s480);
+
     int getSectionCount() const;
     const std::string& getProfileName() const { return profileName_; }
 
@@ -43,6 +59,10 @@ private:
     std::vector<Section> sections441_;
     std::vector<Section> sections480_;
     std::vector<Section> activeSections_;
+
+    // Identity of the last published prepared sets, for change detection.
+    std::shared_ptr<const std::vector<ViperDdcSection>> prepared441_;
+    std::shared_ptr<const std::vector<ViperDdcSection>> prepared480_;
 
     void updateActiveSections();
 };

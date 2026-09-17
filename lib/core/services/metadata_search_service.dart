@@ -49,7 +49,10 @@ class MetadataSearchService {
       if (!AppConfig.isCloudSyncAllowed) return const [];
       final prefs = await SharedPreferences.getInstance();
       if (prefs.getBool('setting_offline_only_mode') == true) return const [];
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to read offline-only preference for metadata',
+          error: e, stackTrace: st, category: 'MetadataSearch');
+    }
     final results = <OnlineTrackMetadata>[];
 
     // 1. Search iTunes Search API (fast, reliable, high-res artwork)

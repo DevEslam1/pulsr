@@ -56,6 +56,7 @@ void DynamicBass::getPresetValues(int preset, int& xLow, int& xHigh,
 void DynamicBass::setParams(bool enabled, double strength, int xLow, int xHigh,
                             int yLow, int yHigh, double sideGainLow, double sideGainHigh,
                             int devicePreset) {
+    const bool presetChanged = (devicePreset != devicePreset_);
     enabled_ = enabled;
     devicePreset_ = devicePreset;
 
@@ -74,6 +75,9 @@ void DynamicBass::setParams(bool enabled, double strength, int xLow, int xHigh,
     strength_ = std::clamp(strength, 0.0, 8.0);
 
     updateFilters();
+    // Preset changes move the filter cutoffs; clear retained state so the swap
+    // does not click.
+    if (presetChanged) reset();
 }
 
 void DynamicBass::updateFilters() {
@@ -81,13 +85,18 @@ void DynamicBass::updateFilters() {
     yHpMid_.setHighPass(sampleRate_, static_cast<double>(yLow_), q);
     yLpMid_.setLowPass(sampleRate_, static_cast<double>(yHigh_), q);
     yLpSide_.setLowPass(sampleRate_, static_cast<double>(yHigh_), q);
-    // FIX C-5: X-band filters define the acoustic response range for dynamic boost
-    xHpBass_.setHighPass(sampleRate_, static_cast<double>(xLow_), q);
-    xLpBass_.setLowPass(sampleRate_, static_cast<double>(xHigh_), q);
+    // FIX C-5: the X-band defines the acoustic response range around the
+    // boosted Y band. The X cutoffs are clamped to the Y band edges so the X
+    // high-pass can never reject the boosted content (every preset has
+    // xLow > yLow, which would otherwise silence the stage).
+    xHpBass_.setHighPass(sampleRate_, std::min<double>(static_cast<double>(xLow_),
+                                                       static_cast<double>(yLow_)), q);
+    xLpBass_.setLowPass(sampleRate_, std::max<double>(static_cast<double>(xHigh_),
+                                                      static_cast<double>(yHigh_)), q);
 }
 
 void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
-    if (!enabled_ || channels != 2 || strength_ <= 0.001f || buffer == nullptr || frames <= 0) {
+    if (!enabled_ || channels != 2 || strength_ <= 0.001 || buffer == nullptr || frames <= 0) {
         return;
     }
 
@@ -110,7 +119,7 @@ void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
         // reject the whole Y band and silence the stage. Keep X as a low-pass
         // shaper on the boosted tap only (transparent below xHigh).
         const double yBand = yLpMid_.process(yHpMid_.process(M));
-        const double midY = xLpBass_.process(yBand);
+        const double midY = xLpBass_.process(xHpBass_.process(yBand));
 
         // 3. Peak envelope follower on sub-bass punch
         const double absY = std::abs(midY);
@@ -119,6 +128,7 @@ void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
         } else {
             envelope_ = releaseCoeff_ * envelope_ + (1.0 - releaseCoeff_) * absY;
         }
+        if (!std::isfinite(envelope_)) envelope_ = 0.0;
 
         // 4. Dynamic gain computer:
         //    Boosts quiet/medium bass passages with smooth soft saturation (tanh)
@@ -126,9 +136,10 @@ void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
         const double dynamicGain = str / (1.0 + 1.8 * envelope_);
         double bassBoost = midY * dynamicGain;
 
-        // Subtle psychoacoustic 2nd-order harmonic injection for earphone reproduction
-        // Missing-fundamental enhancement: x + 0.15 * x^2
-        const double harmonicExcitation = 0.15 * (bassBoost * bassBoost);
+        // Psychoacoustic harmonic excitation for earphone reproduction. Uses a
+        // sign-preserving (odd) nonlinearity so it enriches harmonics WITHOUT
+        // the DC offset / envelope pumping of the previous x^2 term.
+        const double harmonicExcitation = 0.15 * bassBoost * std::abs(bassBoost);
         bassBoost = std::tanh(bassBoost + harmonicExcitation);
 
         // 5. Sub-band Side Spatial Imaging:
@@ -139,7 +150,10 @@ void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
         const double sideProcessed = sideLow * sLow + sideHigh * sHigh;
 
         // 6. Recombine Mid and Side
-        const double midOut = M + bassBoost;
+        double midOut = M + bassBoost;
+        if (!std::isfinite(midOut) || !std::isfinite(sideProcessed)) {
+            midOut = M;
+        }
         buffer[idx] = static_cast<float>(midOut + sideProcessed);
         buffer[idx + 1] = static_cast<float>(midOut - sideProcessed);
     }

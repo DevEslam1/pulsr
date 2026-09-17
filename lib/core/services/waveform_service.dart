@@ -100,7 +100,10 @@ class WaveformService {
         await _pruneStaleEntries(path, keep: diskFile.path);
         try {
           await diskFile.writeAsString(jsonEncode(result));
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Failed to write waveform cache for $path',
+              error: e, stackTrace: st, category: 'Waveform');
+        }
         return result;
       }
     } catch (e, st) {
@@ -148,10 +151,16 @@ class WaveformService {
             entity.uri.pathSegments.last.startsWith(prefix)) {
           try {
             await entity.delete();
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('Failed to delete stale waveform cache entry',
+                error: e, stackTrace: st, category: 'Waveform');
+          }
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to prune stale waveform cache entries',
+          error: e, stackTrace: st, category: 'Waveform');
+    }
   }
 
   Future<Directory> _initCacheDir() async {

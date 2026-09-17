@@ -98,134 +98,24 @@ void SincResampler::reset() {
     phase_ = 0.0;
     writePos_ = 0;
     availableFrames_ = 0;
-    std::memset(ringBuf_, 0, sizeof(ringBuf_));
+    // No ring memset: availableFrames_ == 0 means nothing is readable until new
+    // input is written, and this runs on the audio thread (256 KB memset was a
+    // measurable callback-time spike on parameter changes).
 }
 
 int SincResampler::processInterleaved(float* buffer, int frames, int channels) {
-    if (!enabled_ || frames <= 0 || std::abs(ratio_ - 1.0) < 1e-5) {
-        return frames;
-    }
+    (void)channels;
+    if (!enabled_ || frames <= 0) return frames;
 
-    channels = std::clamp(channels, 1, MAX_CHANNELS);
-
-    const int neededOutputSamples = frames * channels;
-    if (static_cast<int>(tempOutBuf_.size()) < neededOutputSamples) {
-        tempOutBuf_.resize(neededOutputSamples);
-    }
-
-    // Push input frames into ring buffer
-    for (int f = 0; f < frames; ++f) {
-        for (int ch = 0; ch < channels; ++ch) {
-            ringBuf_[ch][writePos_] = buffer[f * channels + ch];
-        }
-        writePos_ = (writePos_ + 1) % FIFO_CAPACITY;
-    }
-    availableFrames_ += frames;
-
-    // Sinc interpolation for each of the `frames` output points
-    for (int outF = 0; outF < frames; ++outF) {
-        const double samplePos = phase_;
-        const int baseInt = static_cast<int>(std::floor(samplePos));
-        const double frac = samplePos - static_cast<double>(baseInt);
-
-        const int phaseIdx = std::clamp(
-            static_cast<int>(frac * NUM_PHASES),
-            0,
-            NUM_PHASES - 1
-        );
-
-        const float* coeffs = polyphaseTable_[phaseIdx];
-
-
-        for (int ch = 0; ch < channels; ++ch) {
-            if (linearQuality_) {
-                // Fast mode: first-order linear interpolation between the two
-                // frames surrounding the fractional read position.
-                const int off0 = availableFrames_ - baseInt;
-                int i0 = (writePos_ - off0) % FIFO_CAPACITY;
-                if (i0 < 0) i0 += FIFO_CAPACITY;
-                int i1 = (writePos_ - off0 + 1) % FIFO_CAPACITY;
-                if (i1 < 0) i1 += FIFO_CAPACITY;
-                const float fracF = static_cast<float>(frac);
-                tempOutBuf_[outF * channels + ch] =
-                    ringBuf_[ch][i0] * (1.0f - fracF) + ringBuf_[ch][i1] * fracF;
-                continue;
-            }
-#if defined(__ARM_NEON)
-            float32x4_t sumVec = vdupq_n_f32(0.0f);
-            for (int tap = HALF_TAPS - activeHalfTaps_; tap < HALF_TAPS + activeHalfTaps_; tap += 4) {
-                const int readOffset0 = availableFrames_ - baseInt + (HALF_TAPS - tap);
-                int ringIndex0 = (writePos_ - readOffset0) % FIFO_CAPACITY;
-                if (ringIndex0 < 0) ringIndex0 += FIFO_CAPACITY;
-
-                const int readOffset1 = availableFrames_ - baseInt + (HALF_TAPS - (tap + 1));
-                int ringIndex1 = (writePos_ - readOffset1) % FIFO_CAPACITY;
-                if (ringIndex1 < 0) ringIndex1 += FIFO_CAPACITY;
-
-                const int readOffset2 = availableFrames_ - baseInt + (HALF_TAPS - (tap + 2));
-                int ringIndex2 = (writePos_ - readOffset2) % FIFO_CAPACITY;
-                if (ringIndex2 < 0) ringIndex2 += FIFO_CAPACITY;
-
-                const int readOffset3 = availableFrames_ - baseInt + (HALF_TAPS - (tap + 3));
-                int ringIndex3 = (writePos_ - readOffset3) % FIFO_CAPACITY;
-                if (ringIndex3 < 0) ringIndex3 += FIFO_CAPACITY;
-
-                const float s[4] = {
-                    ringBuf_[ch][ringIndex0],
-                    ringBuf_[ch][ringIndex1],
-                    ringBuf_[ch][ringIndex2],
-                    ringBuf_[ch][ringIndex3]
-                };
-
-                float32x4_t sampVec = vld1q_f32(s);
-                float32x4_t coeffVec = vld1q_f32(&coeffs[tap]);
-                sumVec = vmlaq_f32(sumVec, sampVec, coeffVec);
-            }
-#if defined(__aarch64__)
-            const float sum = vaddvq_f32(sumVec);
-#else
-            float32x2_t sumPair = vadd_f32(vget_low_f32(sumVec), vget_high_f32(sumVec));
-            const float sum = vget_lane_f32(vpadd_f32(sumPair, sumPair), 0);
-#endif
-#else
-            float sum = 0.0f;
-            for (int tap = HALF_TAPS - activeHalfTaps_; tap < HALF_TAPS + activeHalfTaps_; ++tap) {
-                // Sinc history lookup relative to current write position & phase
-                const int readOffset = availableFrames_ - baseInt + (HALF_TAPS - tap);
-                int ringIndex = (writePos_ - readOffset) % FIFO_CAPACITY;
-                if (ringIndex < 0) ringIndex += FIFO_CAPACITY;
-
-                sum += ringBuf_[ch][ringIndex] * coeffs[tap];
-            }
-#endif
-            tempOutBuf_[outF * channels + ch] = sum;
-        }
-
-        phase_ += ratio_;
-    }
-
-    // Wrap / prune phase and ring buffer
-    const int consumedInt = static_cast<int>(std::floor(phase_));
-    if (consumedInt > 0) {
-        phase_ -= static_cast<double>(consumedInt);
-        availableFrames_ = std::max(0, availableFrames_ - consumedInt);
-    }
-
-    // Prevent availableFrames_ growth past capacity
-    if (availableFrames_ > FIFO_CAPACITY - 256) {
-#if defined(__ANDROID__)
-        __android_log_print(ANDROID_LOG_WARN, "PulsrDSP",
-            "SincResampler: FIFO buffer overflow (%d > %d), dropping oldest frames",
-            availableFrames_, FIFO_CAPACITY - 256);
-#else
-        fprintf(stderr, "SincResampler: FIFO buffer overflow (%d > %d), dropping oldest frames\n",
-            availableFrames_, FIFO_CAPACITY - 256);
-#endif
-        availableFrames_ = FIFO_CAPACITY - 256;
-    }
-
-    // Copy interpolated frames back to output
-    std::memcpy(buffer, tempOutBuf_.data(), neededOutputSamples * sizeof(float));
+    // The engine passes a fixed block and reuses the same buffer downstream, so
+    // the frame count must not change. A causal sample-rate converter cannot
+    // satisfy that (downsampling needs more input frames than it emits, and
+    // upsampling emits more than it consumes): forcing it either reads
+    // future/stale ring samples (gross distortion) or grows/skips the FIFO
+    // (periodic dropouts). Pass the audio through untouched and let the
+    // platform AudioTrack perform the rate conversion. Ratio-correct conversion
+    // is available via processPlanar() (used by the convolution reverb), which
+    // is allowed to vary the output frame count.
     return frames;
 }
 
@@ -265,6 +155,19 @@ int SincResampler::processPlanar(const float* const* in, float* const* out, int 
         const float* coeffs = polyphaseTable_[phaseIdx];
 
         for (int ch = 0; ch < channels; ++ch) {
+            if (linearQuality_) {
+                // Fast mode: first-order linear interpolation between the two
+                // frames surrounding the fractional read position.
+                const int off0 = availableFrames_ - baseInt;
+                int i0 = (writePos_ - off0) % FIFO_CAPACITY;
+                if (i0 < 0) i0 += FIFO_CAPACITY;
+                int i1 = (writePos_ - off0 + 1) % FIFO_CAPACITY;
+                if (i1 < 0) i1 += FIFO_CAPACITY;
+                const float fracF = static_cast<float>(frac);
+                out[ch][outFrames] =
+                    ringBuf_[ch][i0] * (1.0f - fracF) + ringBuf_[ch][i1] * fracF;
+                continue;
+            }
             float sum = 0.0f;
             for (int tap = HALF_TAPS - activeHalfTaps_; tap < HALF_TAPS + activeHalfTaps_; ++tap) {
                 const int readOffset = availableFrames_ - baseInt + (HALF_TAPS - tap);

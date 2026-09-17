@@ -249,6 +249,12 @@ public:
     void unregisterEngine(AudioDspEngine* engine);
     void broadcastParams(const std::shared_ptr<const DspParamSnapshot>& snapshot);
 
+    /// Maximum pipeline latency across all registered (processing) engines.
+    /// The singleton control engine never runs processInterleaved, so its stage
+    /// objects are unconfigured and always report 0; latency must be read from
+    /// the engines that actually render audio (one per NativeDspAudioProcessor).
+    int getMaxPipelineLatencyFrames();
+
 private:
     std::mutex mutex_;
     std::vector<AudioDspEngine*> engines_;

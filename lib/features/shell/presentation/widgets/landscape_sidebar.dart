@@ -9,6 +9,7 @@ import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/pulsr_logo.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
+import '../nav_destinations.dart';
 
 class LandscapeSidebar extends StatelessWidget {
   final int currentIndex;
@@ -36,41 +37,9 @@ class LandscapeSidebar extends StatelessWidget {
     final width = isExtended ? 240.0 : 76.0;
     final targetContentWidth = isExtended ? 240.0 : 76.0;
 
-    final primaryItems = [
-      (
-        index: 0,
-        icon: Icons.home_outlined,
-        activeIcon: Icons.home_rounded,
-        label: context.l10n.navHome,
-      ),
-      (
-        index: 1,
-        icon: Icons.library_music_outlined,
-        activeIcon: Icons.library_music_rounded,
-        label: context.l10n.navLibrary,
-      ),
-      (
-        index: 2,
-        icon: Icons.search_rounded,
-        activeIcon: Icons.search_rounded,
-        label: context.l10n.navSearch,
-      ),
-    ];
-
-    final secondaryItems = [
-      (
-        index: 3,
-        icon: Icons.queue_music_outlined,
-        activeIcon: Icons.queue_music_rounded,
-        label: context.l10n.navPlaylists,
-      ),
-      (
-        index: 4,
-        icon: Icons.settings_outlined,
-        activeIcon: Icons.settings_rounded,
-        label: context.l10n.navSettings,
-      ),
-    ];
+    final destinations = pulsrDestinations(context);
+    final primaryItems = destinations.where((d) => d.index <= 2);
+    final secondaryItems = destinations.where((d) => d.index >= 3);
 
     return AnimatedContainer(
       duration: context.motionMs(240),
@@ -116,7 +85,8 @@ class LandscapeSidebar extends StatelessWidget {
                         ),
                         children: [
                           if (isExtended)
-                            _SectionHeader(title: 'BROWSE', p: p),
+                            _SectionHeader(
+                                title: context.l10n.sidebarBrowse, p: p),
                           for (final item in primaryItems) ...[
                             _SidebarNavItem(
                               icon: item.icon,
@@ -137,7 +107,8 @@ class LandscapeSidebar extends StatelessWidget {
 
                           const SizedBox(height: 10),
                           if (isExtended)
-                            _SectionHeader(title: 'COLLECTION', p: p)
+                            _SectionHeader(
+                                title: context.l10n.sidebarCollection, p: p)
                           else
                             Padding(
                               padding: const EdgeInsets.symmetric(
@@ -171,7 +142,8 @@ class LandscapeSidebar extends StatelessWidget {
                           if (onToggleSideInspector != null) ...[
                             const SizedBox(height: 10),
                             if (isExtended)
-                              _SectionHeader(title: 'PANEL', p: p)
+                              _SectionHeader(
+                                  title: context.l10n.sidebarPanel, p: p)
                             else
                               Padding(
                                 padding: const EdgeInsets.symmetric(
@@ -185,7 +157,7 @@ class LandscapeSidebar extends StatelessWidget {
                             _SidebarNavItem(
                               icon: Icons.vertical_split_outlined,
                               activeIcon: Icons.vertical_split_rounded,
-                              label: 'Side Panel',
+                              label: context.l10n.sidebarSidePanel,
                               isSelected: isSideInspectorOpen,
                               isExtended: isExtended,
                               p: p,
@@ -239,7 +211,7 @@ class _SidebarBrandHeader extends StatelessWidget {
           child: GestureDetector(
             onTap: onToggle,
             child: Tooltip(
-              message: 'Expand sidebar',
+              message: context.l10n.sidebarExpand,
               child: PulsrLogo(
                 size: 32,
                 color: p.accent,
@@ -290,7 +262,7 @@ class _SidebarBrandHeader extends StatelessWidget {
               ),
             ),
             IconButton(
-              tooltip: 'Collapse sidebar',
+              tooltip: context.l10n.sidebarCollapse,
               iconSize: 18,
               visualDensity: VisualDensity.compact,
               icon: Icon(
@@ -355,7 +327,12 @@ class _SidebarNavItem extends StatelessWidget {
     final activeColor = p.accent;
 
     if (!isExtended) {
-      return Center(
+      return Semantics(
+        selected: isSelected,
+        button: true,
+        label: label,
+        excludeSemantics: true,
+        child: Center(
         child: Tooltip(
           message: label,
           waitDuration: const Duration(milliseconds: 350),
@@ -407,10 +384,16 @@ class _SidebarNavItem extends StatelessWidget {
             ),
           ),
         ),
+        ),
       );
     }
 
-    return Material(
+    return Semantics(
+      selected: isSelected,
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
@@ -509,6 +492,7 @@ class _SidebarNavItem extends StatelessWidget {
           ),
         ),
       ),
+    ),
     );
   }
 }
@@ -656,7 +640,7 @@ class _SidebarBottomSection extends StatelessWidget {
               // Expand / Collapse Bottom Trigger (for collapsed mode)
               if (!isExtended)
                 IconButton(
-                  tooltip: 'Expand sidebar',
+                  tooltip: context.l10n.sidebarExpand,
                   iconSize: 20,
                   icon: Icon(
                     Icons.keyboard_double_arrow_right_rounded,

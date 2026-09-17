@@ -373,6 +373,7 @@ class _LyricsViewState extends State<LyricsView> {
       icon: Icon(icon, color: widget.activeColor, size: 20),
       tooltip: tooltip,
       visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
       onPressed: onPressed,
     );
   }
@@ -473,10 +474,13 @@ class _LyricsViewState extends State<LyricsView> {
   Widget _buildContent() {
     final source = _effectiveSource;
     final isSynced = _isSynced;
+    final p = context.palette;
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.4),
+        // Lyrics are rendered in white over the artwork, so the scrim must be
+        // strong enough in light mode to keep the text legible.
+        color: Colors.black.withValues(alpha: p.isDark ? 0.40 : 0.72),
         borderRadius: AppRadii.cardRadius,
       ),
       child: Stack(

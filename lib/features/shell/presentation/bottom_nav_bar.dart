@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
-import '../../../core/utils/l10n_extensions.dart';
+import 'nav_destinations.dart';
 
 class PulsrBottomNavBar extends StatefulWidget {
   final int currentIndex;
@@ -29,41 +29,11 @@ class PulsrBottomNavBar extends StatefulWidget {
 class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
   double _dragDy = 0;
 
-  List<({IconData activeIcon, IconData icon, String label})> _getItems(
-          BuildContext context) =>
-      [
-        (
-          icon: Icons.home_outlined,
-          activeIcon: Icons.home_rounded,
-          label: context.l10n.navHome
-        ),
-        (
-          icon: Icons.library_music_outlined,
-          activeIcon: Icons.library_music_rounded,
-          label: context.l10n.navLibrary
-        ),
-        (
-          icon: Icons.search_rounded,
-          activeIcon: Icons.search_rounded,
-          label: context.l10n.navSearch
-        ),
-        (
-          icon: Icons.queue_music_outlined,
-          activeIcon: Icons.queue_music_rounded,
-          label: context.l10n.navPlaylists
-        ),
-        (
-          icon: Icons.settings_outlined,
-          activeIcon: Icons.settings_rounded,
-          label: context.l10n.navSettings
-        ),
-      ];
-
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
     final isTablet = context.isTablet;
-    final items = _getItems(context);
+    final items = pulsrDestinations(context);
 
     final double maxBarWidth = isTablet ? 640.0 : 540.0;
     final double barHeight = isTablet ? 68.0 : 64.0;
@@ -180,7 +150,7 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
 }
 
 class _NavTabItem extends StatelessWidget {
-  final ({IconData activeIcon, IconData icon, String label}) item;
+  final PulsrDestination item;
   final bool isSelected;
   final PulsrPalette p;
   final bool isTablet;

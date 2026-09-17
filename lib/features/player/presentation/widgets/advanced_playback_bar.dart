@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
+import '../../../settings/cubit/settings_cubit.dart';
+import '../../../settings/cubit/settings_state.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -33,6 +35,10 @@ class AdvancedPlaybackBar extends StatelessWidget {
           p.currentSong?.id != c.currentSong?.id,
       builder: (context, state) {
         final cubit = context.read<PlayerCubit>();
+        // A/B loop and per-track delay are pro-audio tools; keep the consumer
+        // surface clean in Normal mode while still showing the bookmark prompt.
+        final mode = context.select<SettingsCubit, ExperienceMode>(
+            (c) => c.state.experienceMode);
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -63,7 +69,8 @@ class AdvancedPlaybackBar extends StatelessWidget {
                   ),
                 ),
               ),
-            Padding(
+            if (mode == ExperienceMode.professional)
+              Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,

@@ -180,13 +180,13 @@ class DsdDecoderHelper {
       dsdL = parsed.dsdL;
       dsdR = parsed.dsdR;
       dsdRate = parsed.dsdRate;
-      bitOrder = 0; // MSB first (Sony DSF)
+      bitOrder = 0; // LSB first (Sony DSF)
     } else {
       final parsed = parseDffBytes(bytes);
       dsdL = parsed.dsdL;
       dsdR = parsed.dsdR;
       dsdRate = parsed.dsdRate;
-      bitOrder = 1; // LSB first (DFF)
+      bitOrder = 1; // MSB first (Philips DFF)
     }
 
     final int dopSampleRate = DopEncoder.dopPcmSampleRate(dsdRate);

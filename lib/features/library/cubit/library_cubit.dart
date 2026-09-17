@@ -75,7 +75,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
             (getIt.isRegistered<IMusicRepository>()
                 ? getIt<IMusicRepository>()
                 : null),
-        super(const LibraryState()) {
+        super(const LibraryState(isLoading: true)) {
     init();
   }
 
@@ -147,7 +147,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
         result.fold(
           (failure) {
             _isLoadingMoreSongs = false;
-            safeEmit(state.copyWith(errorMessage: failure.message));
+            safeEmit(state.copyWith(
+                errorMessage: failure.message, isLoading: false));
           },
           (songs) {
             if (isRatingSort) {
@@ -155,13 +156,15 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
               _isLoadingMoreSongs = false;
               safeEmit(state.copyWith(
                   songs: _sortByRating(songs, ascending: state.ascending),
-                  errorMessage: null));
+                  errorMessage: null,
+                  isLoading: false));
               return;
             }
               // Hitting the cap means the DB may hold more rows.
               _hasMoreSongs = !isRatingSort && songs.length >= window;
             _isLoadingMoreSongs = false;
-            safeEmit(state.copyWith(songs: songs, errorMessage: null));
+            safeEmit(state.copyWith(
+                songs: songs, errorMessage: null, isLoading: false));
           },
         );
       },

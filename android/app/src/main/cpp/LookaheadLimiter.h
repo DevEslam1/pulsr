@@ -44,7 +44,6 @@ private:
 
     int lookaheadSamples_ = 240;
     float threshold_ = 0.977237f; // pow(10, -0.2 / 20)
-    float releaseCoeff_ = 0.9995f;
     float fastReleaseCoeff_ = 0.998f;
     float slowReleaseCoeff_ = 0.9995f;
     float avgEnergy_ = 0.0f;

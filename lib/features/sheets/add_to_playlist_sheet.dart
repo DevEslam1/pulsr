@@ -109,6 +109,20 @@ class AddToPlaylistSheet extends StatelessWidget {
           child: StreamBuilder(
             stream: _useCases.watchPlaylists(),
             builder: (context, snapshot) {
+              // Avoid flashing the empty state during the initial subscription.
+              if (snapshot.connectionState == ConnectionState.waiting &&
+                  !snapshot.hasData) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32.0),
+                  child: Center(
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2.4),
+                    ),
+                  ),
+                );
+              }
               final playlists = snapshot.data
                       ?.fold((l) => <PlaylistsTableData>[], (r) => r)
                       .where((p) => !p.isSmart)

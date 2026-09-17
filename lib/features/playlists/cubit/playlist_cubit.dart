@@ -136,16 +136,24 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
 
   PlaylistCubit({required PlaylistUseCases playlistUseCases})
       : _playlistUseCases = playlistUseCases,
-        super(const PlaylistState()) {
+        super(const PlaylistState(isLoading: true)) {
     _init();
   }
 
   void _init() {
+    _subscribePlaylists();
+    unawaited(_initOnline());
+  }
+
+  void _subscribePlaylists() {
+    _playlistsSub?.cancel();
     _playlistsSub = autoSub(_playlistUseCases.watchPlaylists(), (result) {
       result.fold(
-        (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
+        (failure) => safeEmit(state.copyWith(
+            errorMessage: failure.message, isLoading: false)),
         (playlists) {
-          safeEmit(state.copyWith(playlists: playlists, errorMessage: null));
+          safeEmit(state.copyWith(
+              playlists: playlists, errorMessage: null, isLoading: false));
           _updateSmartCounts(playlists);
           if (!_isSeedingChecked) {
             _isSeedingChecked = true;
@@ -154,8 +162,13 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
         },
       );
     });
+  }
 
-    unawaited(_initOnline());
+  /// Re-subscribes to the playlists stream after a failure so the UI can offer
+  /// a retry action instead of leaving a stale error on screen.
+  void reloadPlaylists() {
+    safeEmit(state.copyWith(errorMessage: null));
+    _subscribePlaylists();
   }
 
   /// Restores the cached online library before any live fetch is scheduled.

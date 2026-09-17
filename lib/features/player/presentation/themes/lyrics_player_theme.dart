@@ -225,8 +225,8 @@ class LyricsPlayerTheme extends StatelessWidget {
                         children: [
                           // Left Action: Download (stream) or Add to Playlist (local)
                           SizedBox(
-                            width: isTablet ? 46 : 40,
-                            height: isTablet ? 46 : 40,
+                            width: isTablet ? 48 : 44,
+                            height: isTablet ? 48 : 44,
                             child: hasDownload
                                 ? Center(
                                     child: YtmDownloadButton(
@@ -472,8 +472,8 @@ class LyricsPlayerTheme extends StatelessWidget {
                     children: [
                       // Dismiss Button
                       SizedBox(
-                        width: isTablet ? 44 : 40,
-                        height: isTablet ? 44 : 40,
+                        width: isTablet ? 48 : 44,
+                        height: isTablet ? 48 : 44,
                         child: Material(
                           color: Colors.white.withValues(alpha: 0.07),
                           shape: const CircleBorder(),
@@ -489,7 +489,7 @@ class LyricsPlayerTheme extends StatelessWidget {
                             },
                             child: Center(
                               child: Icon(
-                                Icons.keyboard_arrow_down_rounded,
+                                Icons.keyboard_arrow_down_rounded, semanticLabel: context.l10n.close,
                                 size: isTablet ? 26 : 24,
                                 color: p.textPrimary,
                               ),
@@ -559,8 +559,8 @@ class LyricsPlayerTheme extends StatelessWidget {
 
                       // More Options Button
                       SizedBox(
-                        width: isTablet ? 44 : 40,
-                        height: isTablet ? 44 : 40,
+                        width: isTablet ? 48 : 44,
+                        height: isTablet ? 48 : 44,
                         child: Material(
                           color: Colors.white.withValues(alpha: 0.07),
                           shape: const CircleBorder(),
@@ -574,7 +574,7 @@ class LyricsPlayerTheme extends StatelessWidget {
                             },
                             child: Center(
                               child: Icon(
-                                Icons.more_horiz_rounded,
+                                Icons.more_horiz_rounded, semanticLabel: context.l10n.songInfo,
                                 size: isTablet ? 24 : 22,
                                 color: p.textPrimary,
                               ),

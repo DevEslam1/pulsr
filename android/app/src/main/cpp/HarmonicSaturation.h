@@ -13,7 +13,9 @@
 // - Mode 0 (Tape): Symmetric tanh waveshaping with HF tilt pre-emphasis (odd harmonics).
 // - Mode 1 (Tube / 6J1 Triode): Asymmetric soft-curve generating rich 2nd-order even harmonics for vocal & instrument warmth.
 // - Mode 2 (Analog Class-A): Asymmetric transistor soft-clip curve simulating Class-A single-ended amplification.
-// All modes run with 4x polyphase sinc oversampling to completely eliminate digital aliasing foldover.
+// All modes run with 4x polyphase sinc oversampling with a short decimation
+// filter, which substantially suppresses (but does not fully eliminate)
+// digital aliasing foldover.
 class HarmonicSaturation {
 public:
     static constexpr int MAX_CHANNELS = 8;
@@ -50,6 +52,7 @@ private:
     bool multiband_ = false;    // 6-band crossover mid-band warmth mode
     double k_ = 0.0;            // drive sharpness
     float tiltHpCoeff_ = 0.0f;  // one-pole HP coeff for pre-emphasis
+    float dcCoeff_ = 0.9995f;   // DC-blocker pole (rate-derived in configure)
     bool enabled_ = false;
 
     float hpState_[MAX_CHANNELS] = {};

@@ -1,6 +1,8 @@
 // lib/features/queue/presentation/queue_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/constants/app_radii.dart';
 import '../../../core/theme/aura_theme.dart';
@@ -54,6 +56,7 @@ class QueueScreen extends StatelessWidget {
                       isDestructive: true,
                     );
                     if (confirm == true && context.mounted) {
+                      HapticFeedback.mediumImpact();
                       final removed = List.of(state.queue);
                       final removedIndex = state.currentIndex;
                       await cubit.clearQueue();
@@ -81,6 +84,7 @@ class QueueScreen extends StatelessWidget {
                     }
                     break;
                   case 'shuffle':
+                    HapticFeedback.selectionClick();
                     final shuffled = List.of(state.queue)..shuffle();
                     // Rebuild queue with shuffled order centered on current
                     final current = state.currentSong;
@@ -186,9 +190,7 @@ class QueueScreen extends StatelessWidget {
               primaryActionLabel: context.l10n.navLibrary,
               primaryActionIcon: Icons.library_music_rounded,
               onPrimaryAction: () {
-                if (Navigator.of(context).canPop()) {
-                  Navigator.of(context).pop();
-                }
+                context.go('/library');
               },
             );
           }

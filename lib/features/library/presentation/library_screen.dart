@@ -19,6 +19,7 @@ import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_dismissible.dart';
+import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../data/db/app_database.dart';
 import '../../../core/utils/formatters.dart';
 import '../../player/cubit/player_cubit.dart';
@@ -227,17 +228,21 @@ class _LibraryScreenState extends State<LibraryScreen>
                   actions: [
                     IconButton(
                       icon: const Icon(Icons.dashboard_customize_rounded),
-                      tooltip: 'Jump to Category',
+                      tooltip: context.l10n.jumpToCategory,
                       onPressed: () => _showCategoryJumpSheet(context, state),
                     ),
                     IconButton(
                       icon: Icon(state.viewMode == LibraryViewMode.list
                           ? Icons.grid_view_rounded
                           : Icons.view_list_rounded),
+                      tooltip: state.viewMode == LibraryViewMode.list
+                          ? context.l10n.libraryGridView
+                          : context.l10n.libraryListView,
                       onPressed: cubit.toggleViewMode,
                     ),
                     IconButton(
                       icon: const Icon(Icons.sort_rounded),
+                      tooltip: context.l10n.sortBy,
                       onPressed: () => SortFilterSheet.show(
                         context,
                         currentSort: state.sortBy,

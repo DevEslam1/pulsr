@@ -29,6 +29,8 @@ mixin _$SettingsState {
   double get liquidGlassTint;
   String get languageCode;
   int get customAccentColorValue;
+  double get customThemeRadius;
+  bool get customThemeGlow;
   PlayerThemeMode get playerThemeMode;
   VisualizerStyle get visualizerStyle;
   MiniPlayerSwipeAction get miniPlayerSwipeLeft;
@@ -141,6 +143,10 @@ mixin _$SettingsState {
                 other.languageCode == _this.languageCode) &&
             (identical(other.customAccentColorValue, _this.customAccentColorValue) ||
                 other.customAccentColorValue == _this.customAccentColorValue) &&
+            (identical(other.customThemeRadius, _this.customThemeRadius) ||
+                other.customThemeRadius == _this.customThemeRadius) &&
+            (identical(other.customThemeGlow, _this.customThemeGlow) ||
+                other.customThemeGlow == _this.customThemeGlow) &&
             (identical(other.playerThemeMode, _this.playerThemeMode) ||
                 other.playerThemeMode == _this.playerThemeMode) &&
             (identical(other.visualizerStyle, _this.visualizerStyle) ||
@@ -162,10 +168,8 @@ mixin _$SettingsState {
                     _this.replayGainPreampWithoutRg) &&
             (identical(other.streamingQuality, _this.streamingQuality) ||
                 other.streamingQuality == _this.streamingQuality) &&
-            (identical(other.downloadQuality, _this.downloadQuality) ||
-                other.downloadQuality == _this.downloadQuality) &&
-            (identical(other.wifiOnlyMode, _this.wifiOnlyMode) ||
-                other.wifiOnlyMode == _this.wifiOnlyMode) &&
+            (identical(other.downloadQuality, _this.downloadQuality) || other.downloadQuality == _this.downloadQuality) &&
+            (identical(other.wifiOnlyMode, _this.wifiOnlyMode) || other.wifiOnlyMode == _this.wifiOnlyMode) &&
             (identical(other.offlineOnlyMode, _this.offlineOnlyMode) || other.offlineOnlyMode == _this.offlineOnlyMode) &&
             (identical(other.isScanning, _this.isScanning) || other.isScanning == _this.isScanning) &&
             (identical(other.proxyEnabled, _this.proxyEnabled) || other.proxyEnabled == _this.proxyEnabled) &&
@@ -243,6 +247,8 @@ mixin _$SettingsState {
       _this.liquidGlassTint,
       _this.languageCode,
       _this.customAccentColorValue,
+      _this.customThemeRadius,
+      _this.customThemeGlow,
       _this.playerThemeMode,
       _this.visualizerStyle,
       _this.miniPlayerSwipeLeft,
@@ -317,7 +323,7 @@ mixin _$SettingsState {
   @override
   String toString() {
     final _this = this as SettingsState;
-    return 'SettingsState(gaplessPlayback: ${_this.gaplessPlayback}, crossfadeSeconds: ${_this.crossfadeSeconds}, minDurationSec: ${_this.minDurationSec}, autoHideSystemMedia: ${_this.autoHideSystemMedia}, themeColorSource: ${_this.themeColorSource}, resumeAfterInterruption: ${_this.resumeAfterInterruption}, waveformSeekBarEnabled: ${_this.waveformSeekBarEnabled}, themeMode: ${_this.themeMode}, autoThemeByTime: ${_this.autoThemeByTime}, highContrast: ${_this.highContrast}, reduceMotion: ${_this.reduceMotion}, liquidGlassTint: ${_this.liquidGlassTint}, languageCode: ${_this.languageCode}, customAccentColorValue: ${_this.customAccentColorValue}, playerThemeMode: ${_this.playerThemeMode}, visualizerStyle: ${_this.visualizerStyle}, miniPlayerSwipeLeft: ${_this.miniPlayerSwipeLeft}, miniPlayerSwipeRight: ${_this.miniPlayerSwipeRight}, nowPlayingDoubleTap: ${_this.nowPlayingDoubleTap}, nowPlayingArtworkSwipe: ${_this.nowPlayingArtworkSwipe}, replayGainMode: ${_this.replayGainMode}, replayGainPreampWithRg: ${_this.replayGainPreampWithRg}, replayGainPreampWithoutRg: ${_this.replayGainPreampWithoutRg}, streamingQuality: ${_this.streamingQuality}, downloadQuality: ${_this.downloadQuality}, wifiOnlyMode: ${_this.wifiOnlyMode}, offlineOnlyMode: ${_this.offlineOnlyMode}, isScanning: ${_this.isScanning}, proxyEnabled: ${_this.proxyEnabled}, proxyType: ${_this.proxyType}, proxyHost: ${_this.proxyHost}, proxyPort: ${_this.proxyPort}, proxyUsername: ${_this.proxyUsername}, hasProxyPassword: ${_this.hasProxyPassword}, proxyBypassHosts: ${_this.proxyBypassHosts}, proxyList: ${_this.proxyList}, isTestingAllProxies: ${_this.isTestingAllProxies}, bitPerfectOutput: ${_this.bitPerfectOutput}, bypassDspOnBitPerfect: ${_this.bypassDspOnBitPerfect}, followTrackSampleRate: ${_this.followTrackSampleRate}, strictBitPerfect: ${_this.strictBitPerfect}, dsdOutputMode: ${_this.dsdOutputMode}, experienceMode: ${_this.experienceMode}, dsdDopSupported: ${_this.dsdDopSupported}, currentOutputDevice: ${_this.currentOutputDevice}, scanResultCount: ${_this.scanResultCount}, errorMessage: ${_this.errorMessage}, crossfeedEnabled: ${_this.crossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, limiterEnabled: ${_this.limiterEnabled}, limiterLookaheadMs: ${_this.limiterLookaheadMs}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, reverbEnabled: ${_this.reverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, sincResamplerEnabled: ${_this.sincResamplerEnabled}, dspPreference: ${_this.dspPreference}, systemEffectsPolicy: ${_this.systemEffectsPolicy}, systemEffectsStatus: ${_this.systemEffectsStatus}, systemEffectsBundles: ${_this.systemEffectsBundles}, bluetoothLatencyOffsetMs: ${_this.bluetoothLatencyOffsetMs}, hedgedResolutionEnabled: ${_this.hedgedResolutionEnabled}, adaptiveQualityEnabled: ${_this.adaptiveQualityEnabled}, duckingMode: ${_this.duckingMode}, duckingLevel: ${_this.duckingLevel}, multiOutputMode: ${_this.multiOutputMode}, dspSnapshotEnabled: ${_this.dspSnapshotEnabled}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, sessionLogEnabled: ${_this.sessionLogEnabled}, outputFormatNegotiationEnabled: ${_this.outputFormatNegotiationEnabled}, floatOutputEnabled: ${_this.floatOutputEnabled}, aaudioOutputEnabled: ${_this.aaudioOutputEnabled}, dvcEnabled: ${_this.dvcEnabled}, usbHardwareVolumeEnabled: ${_this.usbHardwareVolumeEnabled}, aaudioPreferExclusive: ${_this.aaudioPreferExclusive}, aaudioTargetBufferMs: ${_this.aaudioTargetBufferMs}, sincResamplerQuality: ${_this.sincResamplerQuality}, bpmSyncCrossfadeEnabled: ${_this.bpmSyncCrossfadeEnabled})';
+    return 'SettingsState(gaplessPlayback: ${_this.gaplessPlayback}, crossfadeSeconds: ${_this.crossfadeSeconds}, minDurationSec: ${_this.minDurationSec}, autoHideSystemMedia: ${_this.autoHideSystemMedia}, themeColorSource: ${_this.themeColorSource}, resumeAfterInterruption: ${_this.resumeAfterInterruption}, waveformSeekBarEnabled: ${_this.waveformSeekBarEnabled}, themeMode: ${_this.themeMode}, autoThemeByTime: ${_this.autoThemeByTime}, highContrast: ${_this.highContrast}, reduceMotion: ${_this.reduceMotion}, liquidGlassTint: ${_this.liquidGlassTint}, languageCode: ${_this.languageCode}, customAccentColorValue: ${_this.customAccentColorValue}, customThemeRadius: ${_this.customThemeRadius}, customThemeGlow: ${_this.customThemeGlow}, playerThemeMode: ${_this.playerThemeMode}, visualizerStyle: ${_this.visualizerStyle}, miniPlayerSwipeLeft: ${_this.miniPlayerSwipeLeft}, miniPlayerSwipeRight: ${_this.miniPlayerSwipeRight}, nowPlayingDoubleTap: ${_this.nowPlayingDoubleTap}, nowPlayingArtworkSwipe: ${_this.nowPlayingArtworkSwipe}, replayGainMode: ${_this.replayGainMode}, replayGainPreampWithRg: ${_this.replayGainPreampWithRg}, replayGainPreampWithoutRg: ${_this.replayGainPreampWithoutRg}, streamingQuality: ${_this.streamingQuality}, downloadQuality: ${_this.downloadQuality}, wifiOnlyMode: ${_this.wifiOnlyMode}, offlineOnlyMode: ${_this.offlineOnlyMode}, isScanning: ${_this.isScanning}, proxyEnabled: ${_this.proxyEnabled}, proxyType: ${_this.proxyType}, proxyHost: ${_this.proxyHost}, proxyPort: ${_this.proxyPort}, proxyUsername: ${_this.proxyUsername}, hasProxyPassword: ${_this.hasProxyPassword}, proxyBypassHosts: ${_this.proxyBypassHosts}, proxyList: ${_this.proxyList}, isTestingAllProxies: ${_this.isTestingAllProxies}, bitPerfectOutput: ${_this.bitPerfectOutput}, bypassDspOnBitPerfect: ${_this.bypassDspOnBitPerfect}, followTrackSampleRate: ${_this.followTrackSampleRate}, strictBitPerfect: ${_this.strictBitPerfect}, dsdOutputMode: ${_this.dsdOutputMode}, experienceMode: ${_this.experienceMode}, dsdDopSupported: ${_this.dsdDopSupported}, currentOutputDevice: ${_this.currentOutputDevice}, scanResultCount: ${_this.scanResultCount}, errorMessage: ${_this.errorMessage}, crossfeedEnabled: ${_this.crossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, limiterEnabled: ${_this.limiterEnabled}, limiterLookaheadMs: ${_this.limiterLookaheadMs}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, reverbEnabled: ${_this.reverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, sincResamplerEnabled: ${_this.sincResamplerEnabled}, dspPreference: ${_this.dspPreference}, systemEffectsPolicy: ${_this.systemEffectsPolicy}, systemEffectsStatus: ${_this.systemEffectsStatus}, systemEffectsBundles: ${_this.systemEffectsBundles}, bluetoothLatencyOffsetMs: ${_this.bluetoothLatencyOffsetMs}, hedgedResolutionEnabled: ${_this.hedgedResolutionEnabled}, adaptiveQualityEnabled: ${_this.adaptiveQualityEnabled}, duckingMode: ${_this.duckingMode}, duckingLevel: ${_this.duckingLevel}, multiOutputMode: ${_this.multiOutputMode}, dspSnapshotEnabled: ${_this.dspSnapshotEnabled}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, sessionLogEnabled: ${_this.sessionLogEnabled}, outputFormatNegotiationEnabled: ${_this.outputFormatNegotiationEnabled}, floatOutputEnabled: ${_this.floatOutputEnabled}, aaudioOutputEnabled: ${_this.aaudioOutputEnabled}, dvcEnabled: ${_this.dvcEnabled}, usbHardwareVolumeEnabled: ${_this.usbHardwareVolumeEnabled}, aaudioPreferExclusive: ${_this.aaudioPreferExclusive}, aaudioTargetBufferMs: ${_this.aaudioTargetBufferMs}, sincResamplerQuality: ${_this.sincResamplerQuality}, bpmSyncCrossfadeEnabled: ${_this.bpmSyncCrossfadeEnabled})';
   }
 }
 
@@ -342,6 +348,8 @@ abstract mixin class $SettingsStateCopyWith<$Res> {
       double liquidGlassTint,
       String languageCode,
       int customAccentColorValue,
+      double customThemeRadius,
+      bool customThemeGlow,
       PlayerThemeMode playerThemeMode,
       VisualizerStyle visualizerStyle,
       MiniPlayerSwipeAction miniPlayerSwipeLeft,
@@ -439,6 +447,8 @@ class _$SettingsStateCopyWithImpl<$Res>
     Object? liquidGlassTint = null,
     Object? languageCode = null,
     Object? customAccentColorValue = null,
+    Object? customThemeRadius = null,
+    Object? customThemeGlow = null,
     Object? playerThemeMode = null,
     Object? visualizerStyle = null,
     Object? miniPlayerSwipeLeft = null,
@@ -565,6 +575,14 @@ class _$SettingsStateCopyWithImpl<$Res>
           ? _self.customAccentColorValue
           : customAccentColorValue // ignore: cast_nullable_to_non_nullable
               as int,
+      customThemeRadius: null == customThemeRadius
+          ? _self.customThemeRadius
+          : customThemeRadius // ignore: cast_nullable_to_non_nullable
+              as double,
+      customThemeGlow: null == customThemeGlow
+          ? _self.customThemeGlow
+          : customThemeGlow // ignore: cast_nullable_to_non_nullable
+              as bool,
       playerThemeMode: null == playerThemeMode
           ? _self.playerThemeMode
           : playerThemeMode // ignore: cast_nullable_to_non_nullable
@@ -949,6 +967,8 @@ extension SettingsStatePatterns on SettingsState {
             double liquidGlassTint,
             String languageCode,
             int customAccentColorValue,
+            double customThemeRadius,
+            bool customThemeGlow,
             PlayerThemeMode playerThemeMode,
             VisualizerStyle visualizerStyle,
             MiniPlayerSwipeAction miniPlayerSwipeLeft,
@@ -1038,6 +1058,8 @@ extension SettingsStatePatterns on SettingsState {
             _that.liquidGlassTint,
             _that.languageCode,
             _that.customAccentColorValue,
+            _that.customThemeRadius,
+            _that.customThemeGlow,
             _that.playerThemeMode,
             _that.visualizerStyle,
             _that.miniPlayerSwipeLeft,
@@ -1141,6 +1163,8 @@ extension SettingsStatePatterns on SettingsState {
             double liquidGlassTint,
             String languageCode,
             int customAccentColorValue,
+            double customThemeRadius,
+            bool customThemeGlow,
             PlayerThemeMode playerThemeMode,
             VisualizerStyle visualizerStyle,
             MiniPlayerSwipeAction miniPlayerSwipeLeft,
@@ -1229,6 +1253,8 @@ extension SettingsStatePatterns on SettingsState {
             _that.liquidGlassTint,
             _that.languageCode,
             _that.customAccentColorValue,
+            _that.customThemeRadius,
+            _that.customThemeGlow,
             _that.playerThemeMode,
             _that.visualizerStyle,
             _that.miniPlayerSwipeLeft,
@@ -1331,6 +1357,8 @@ extension SettingsStatePatterns on SettingsState {
             double liquidGlassTint,
             String languageCode,
             int customAccentColorValue,
+            double customThemeRadius,
+            bool customThemeGlow,
             PlayerThemeMode playerThemeMode,
             VisualizerStyle visualizerStyle,
             MiniPlayerSwipeAction miniPlayerSwipeLeft,
@@ -1419,6 +1447,8 @@ extension SettingsStatePatterns on SettingsState {
             _that.liquidGlassTint,
             _that.languageCode,
             _that.customAccentColorValue,
+            _that.customThemeRadius,
+            _that.customThemeGlow,
             _that.playerThemeMode,
             _that.visualizerStyle,
             _that.miniPlayerSwipeLeft,
@@ -1511,6 +1541,8 @@ class _SettingsState extends SettingsState {
       this.liquidGlassTint = 0.80,
       this.languageCode = 'system',
       this.customAccentColorValue = 0xFF9B9EF5,
+      this.customThemeRadius = 24.0,
+      this.customThemeGlow = true,
       this.playerThemeMode = PlayerThemeMode.classic,
       this.visualizerStyle = VisualizerStyle.bar,
       this.miniPlayerSwipeLeft = MiniPlayerSwipeAction.next,
@@ -1625,6 +1657,12 @@ class _SettingsState extends SettingsState {
   @override
   @JsonKey()
   final int customAccentColorValue;
+  @override
+  @JsonKey()
+  final double customThemeRadius;
+  @override
+  @JsonKey()
+  final bool customThemeGlow;
   @override
   @JsonKey()
   final PlayerThemeMode playerThemeMode;
@@ -1881,6 +1919,10 @@ class _SettingsState extends SettingsState {
                 other.languageCode == languageCode) &&
             (identical(other.customAccentColorValue, customAccentColorValue) ||
                 other.customAccentColorValue == customAccentColorValue) &&
+            (identical(other.customThemeRadius, customThemeRadius) ||
+                other.customThemeRadius == customThemeRadius) &&
+            (identical(other.customThemeGlow, customThemeGlow) ||
+                other.customThemeGlow == customThemeGlow) &&
             (identical(other.playerThemeMode, playerThemeMode) ||
                 other.playerThemeMode == playerThemeMode) &&
             (identical(other.visualizerStyle, visualizerStyle) ||
@@ -1915,10 +1957,8 @@ class _SettingsState extends SettingsState {
                 other.proxyType == proxyType) &&
             (identical(other.proxyHost, proxyHost) ||
                 other.proxyHost == proxyHost) &&
-            (identical(other.proxyPort, proxyPort) ||
-                other.proxyPort == proxyPort) &&
-            (identical(other.proxyUsername, proxyUsername) ||
-                other.proxyUsername == proxyUsername) &&
+            (identical(other.proxyPort, proxyPort) || other.proxyPort == proxyPort) &&
+            (identical(other.proxyUsername, proxyUsername) || other.proxyUsername == proxyUsername) &&
             (identical(other.hasProxyPassword, hasProxyPassword) || other.hasProxyPassword == hasProxyPassword) &&
             (identical(other.proxyBypassHosts, proxyBypassHosts) || other.proxyBypassHosts == proxyBypassHosts) &&
             const DeepCollectionEquality().equals(other.proxyList, _proxyList) &&
@@ -1988,6 +2028,8 @@ class _SettingsState extends SettingsState {
       liquidGlassTint,
       languageCode,
       customAccentColorValue,
+      customThemeRadius,
+      customThemeGlow,
       playerThemeMode,
       visualizerStyle,
       miniPlayerSwipeLeft,
@@ -2061,7 +2103,7 @@ class _SettingsState extends SettingsState {
 
   @override
   String toString() {
-    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, autoThemeByTime: $autoThemeByTime, highContrast: $highContrast, reduceMotion: $reduceMotion, liquidGlassTint: $liquidGlassTint, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, hasProxyPassword: $hasProxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, bitPerfectOutput: $bitPerfectOutput, bypassDspOnBitPerfect: $bypassDspOnBitPerfect, followTrackSampleRate: $followTrackSampleRate, strictBitPerfect: $strictBitPerfect, dsdOutputMode: $dsdOutputMode, experienceMode: $experienceMode, dsdDopSupported: $dsdDopSupported, currentOutputDevice: $currentOutputDevice, scanResultCount: $scanResultCount, errorMessage: $errorMessage, crossfeedEnabled: $crossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, limiterEnabled: $limiterEnabled, limiterLookaheadMs: $limiterLookaheadMs, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, reverbEnabled: $reverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, sincResamplerEnabled: $sincResamplerEnabled, dspPreference: $dspPreference, systemEffectsPolicy: $systemEffectsPolicy, systemEffectsStatus: $systemEffectsStatus, systemEffectsBundles: $systemEffectsBundles, bluetoothLatencyOffsetMs: $bluetoothLatencyOffsetMs, hedgedResolutionEnabled: $hedgedResolutionEnabled, adaptiveQualityEnabled: $adaptiveQualityEnabled, duckingMode: $duckingMode, duckingLevel: $duckingLevel, multiOutputMode: $multiOutputMode, dspSnapshotEnabled: $dspSnapshotEnabled, silenceSkipSensitivity: $silenceSkipSensitivity, sessionLogEnabled: $sessionLogEnabled, outputFormatNegotiationEnabled: $outputFormatNegotiationEnabled, floatOutputEnabled: $floatOutputEnabled, aaudioOutputEnabled: $aaudioOutputEnabled, dvcEnabled: $dvcEnabled, usbHardwareVolumeEnabled: $usbHardwareVolumeEnabled, aaudioPreferExclusive: $aaudioPreferExclusive, aaudioTargetBufferMs: $aaudioTargetBufferMs, sincResamplerQuality: $sincResamplerQuality, bpmSyncCrossfadeEnabled: $bpmSyncCrossfadeEnabled)';
+    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, autoThemeByTime: $autoThemeByTime, highContrast: $highContrast, reduceMotion: $reduceMotion, liquidGlassTint: $liquidGlassTint, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, customThemeRadius: $customThemeRadius, customThemeGlow: $customThemeGlow, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, hasProxyPassword: $hasProxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, bitPerfectOutput: $bitPerfectOutput, bypassDspOnBitPerfect: $bypassDspOnBitPerfect, followTrackSampleRate: $followTrackSampleRate, strictBitPerfect: $strictBitPerfect, dsdOutputMode: $dsdOutputMode, experienceMode: $experienceMode, dsdDopSupported: $dsdDopSupported, currentOutputDevice: $currentOutputDevice, scanResultCount: $scanResultCount, errorMessage: $errorMessage, crossfeedEnabled: $crossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, limiterEnabled: $limiterEnabled, limiterLookaheadMs: $limiterLookaheadMs, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, reverbEnabled: $reverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, sincResamplerEnabled: $sincResamplerEnabled, dspPreference: $dspPreference, systemEffectsPolicy: $systemEffectsPolicy, systemEffectsStatus: $systemEffectsStatus, systemEffectsBundles: $systemEffectsBundles, bluetoothLatencyOffsetMs: $bluetoothLatencyOffsetMs, hedgedResolutionEnabled: $hedgedResolutionEnabled, adaptiveQualityEnabled: $adaptiveQualityEnabled, duckingMode: $duckingMode, duckingLevel: $duckingLevel, multiOutputMode: $multiOutputMode, dspSnapshotEnabled: $dspSnapshotEnabled, silenceSkipSensitivity: $silenceSkipSensitivity, sessionLogEnabled: $sessionLogEnabled, outputFormatNegotiationEnabled: $outputFormatNegotiationEnabled, floatOutputEnabled: $floatOutputEnabled, aaudioOutputEnabled: $aaudioOutputEnabled, dvcEnabled: $dvcEnabled, usbHardwareVolumeEnabled: $usbHardwareVolumeEnabled, aaudioPreferExclusive: $aaudioPreferExclusive, aaudioTargetBufferMs: $aaudioTargetBufferMs, sincResamplerQuality: $sincResamplerQuality, bpmSyncCrossfadeEnabled: $bpmSyncCrossfadeEnabled)';
   }
 }
 
@@ -2088,6 +2130,8 @@ abstract mixin class _$SettingsStateCopyWith<$Res>
       double liquidGlassTint,
       String languageCode,
       int customAccentColorValue,
+      double customThemeRadius,
+      bool customThemeGlow,
       PlayerThemeMode playerThemeMode,
       VisualizerStyle visualizerStyle,
       MiniPlayerSwipeAction miniPlayerSwipeLeft,
@@ -2185,6 +2229,8 @@ class __$SettingsStateCopyWithImpl<$Res>
     Object? liquidGlassTint = null,
     Object? languageCode = null,
     Object? customAccentColorValue = null,
+    Object? customThemeRadius = null,
+    Object? customThemeGlow = null,
     Object? playerThemeMode = null,
     Object? visualizerStyle = null,
     Object? miniPlayerSwipeLeft = null,
@@ -2311,6 +2357,14 @@ class __$SettingsStateCopyWithImpl<$Res>
           ? _self.customAccentColorValue
           : customAccentColorValue // ignore: cast_nullable_to_non_nullable
               as int,
+      customThemeRadius: null == customThemeRadius
+          ? _self.customThemeRadius
+          : customThemeRadius // ignore: cast_nullable_to_non_nullable
+              as double,
+      customThemeGlow: null == customThemeGlow
+          ? _self.customThemeGlow
+          : customThemeGlow // ignore: cast_nullable_to_non_nullable
+              as bool,
       playerThemeMode: null == playerThemeMode
           ? _self.playerThemeMode
           : playerThemeMode // ignore: cast_nullable_to_non_nullable

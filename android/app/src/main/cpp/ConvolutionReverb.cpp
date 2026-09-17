@@ -437,6 +437,8 @@ ConvolutionReverb::ConvolutionReverb() {
     inputHistoryFreqR_.clear();
     directRingL_.assign(1024 * 2 + 16, 0.0f);
     directRingR_.assign(1024 * 2 + 16, 0.0f);
+    dryDelayL_.assign(PARTITION_SIZE, 0.0f);
+    dryDelayR_.assign(PARTITION_SIZE, 0.0f);
 
     ensureScratchCapacity(32768);
     setPreset(ReverbPreset::Room);
@@ -504,7 +506,7 @@ void ConvolutionReverb::setSampleRate(double sampleRate) {
             auto customIr = PreparedIr::createCustom(
                 rawCustomSampleRate_, rawCustomIr_.data(), rawCustomFrames_, rawCustomChannels_, coreRate_);
             if (customIr) {
-                preparedIr_ = customIr;
+                setPreparedIrPtr(customIr);
                 preparePartitions();
             }
         }
@@ -519,8 +521,15 @@ void ConvolutionReverb::setPreset(ReverbPreset preset) {
 void ConvolutionReverb::updatePreparedIr() {
     if (preset_ == ReverbPreset::Custom) return;
     coreRate_ = std::min(sampleRate_, 48000.0);
-    preparedIr_ = PreparedIr::createSynthetic(coreRate_, static_cast<int>(preset_), static_cast<float>(damping_));
+    setPreparedIrPtr(PreparedIr::createSynthetic(coreRate_, static_cast<int>(preset_), static_cast<float>(damping_)));
     preparePartitions();
+}
+
+void ConvolutionReverb::setPreparedIrPtr(std::shared_ptr<const PreparedIr> ir) {
+    preparedIr_ = std::move(ir);
+    reverbLatencyFrames_.store(
+        (preparedIr_ && preparedIr_->numPartitions > 0) ? PARTITION_SIZE : 0,
+        std::memory_order_relaxed);
 }
 
 void ConvolutionReverb::setWetDry(double wet) {
@@ -553,7 +562,7 @@ void ConvolutionReverb::applyParams(const ReverbParamSet& params) {
     // If preparedIr is provided, apply it. If null, DO NOT allocate or lock cache on audio thread.
     if (params.preparedIr) {
         if (params.preparedIr != preparedIr_) {
-            preparedIr_ = params.preparedIr;
+            setPreparedIrPtr(params.preparedIr);
             preset_ = static_cast<ReverbPreset>(params.preset);
             preparePartitions();
         }
@@ -573,7 +582,7 @@ bool ConvolutionReverb::loadCustomIR(const float* irInterleaved, int frames, int
     auto customIr = PreparedIr::createCustom(sourceRate, irInterleaved, frames, channels, coreRate_);
     if (!customIr) return false;
 
-    preparedIr_ = customIr;
+    setPreparedIrPtr(customIr);
     preset_ = ReverbPreset::Custom;
     preparePartitions();
     return true;
@@ -615,10 +624,21 @@ void ConvolutionReverb::preparePartitions() {
     std::fill(prevBlockR_.begin(), prevBlockR_.end(), 0.0f);
     std::fill(inputBlockL_.begin(), inputBlockL_.end(), 0.0f);
     std::fill(inputBlockR_.begin(), inputBlockR_.end(), 0.0f);
-    for (auto& h : inputHistoryFreqL_) std::fill(h.begin(), h.end(), FftUtil::Complex(0.0f, 0.0f));
-    for (auto& h : inputHistoryFreqR_) std::fill(h.begin(), h.end(), FftUtil::Complex(0.0f, 0.0f));
+    // Only the partitions this IR can actually address need clearing; the
+    // history was zero-initialised when allocated, so entries beyond the used
+    // count are never read for this IR. This drops the per-swap clear from
+    // ~8 MB to (numPartitions * FFT_SIZE) and avoids a recurring audio-thread
+    // memory-bandwidth spike on every preset/damping change.
+    const int usedPartitions = std::min(preparedIr_->numPartitions, MAX_PREALLOC_PARTITIONS);
+    for (int p = 0; p < usedPartitions && p < static_cast<int>(inputHistoryFreqL_.size()); ++p) {
+        std::fill(inputHistoryFreqL_[p].begin(), inputHistoryFreqL_[p].end(), FftUtil::Complex(0.0f, 0.0f));
+        std::fill(inputHistoryFreqR_[p].begin(), inputHistoryFreqR_[p].end(), FftUtil::Complex(0.0f, 0.0f));
+    }
     std::fill(accumFreqL_.begin(), accumFreqL_.end(), FftUtil::Complex(0.0f, 0.0f));
     std::fill(accumFreqR_.begin(), accumFreqR_.end(), FftUtil::Complex(0.0f, 0.0f));
+    std::fill(dryDelayL_.begin(), dryDelayL_.end(), 0.0f);
+    std::fill(dryDelayR_.begin(), dryDelayR_.end(), 0.0f);
+    dryDelayPos_ = 0;
     inputBlockPos_ = 0;
     historyHead_ = 0;
 
@@ -655,13 +675,19 @@ void ConvolutionReverb::reset() {
         std::fill(prevBlockR_.begin(), prevBlockR_.end(), 0.0f);
         std::fill(inputBlockL_.begin(), inputBlockL_.end(), 0.0f);
         std::fill(inputBlockR_.begin(), inputBlockR_.end(), 0.0f);
-        for (auto& h : inputHistoryFreqL_) std::fill(h.begin(), h.end(), FftUtil::Complex(0.0f, 0.0f));
-        for (auto& h : inputHistoryFreqR_) std::fill(h.begin(), h.end(), FftUtil::Complex(0.0f, 0.0f));
+        const int usedPartitions = std::min(preparedIr_->numPartitions, MAX_PREALLOC_PARTITIONS);
+        for (int p = 0; p < usedPartitions && p < static_cast<int>(inputHistoryFreqL_.size()); ++p) {
+            std::fill(inputHistoryFreqL_[p].begin(), inputHistoryFreqL_[p].end(), FftUtil::Complex(0.0f, 0.0f));
+            std::fill(inputHistoryFreqR_[p].begin(), inputHistoryFreqR_[p].end(), FftUtil::Complex(0.0f, 0.0f));
+        }
         std::fill(accumFreqL_.begin(), accumFreqL_.end(), FftUtil::Complex(0.0f, 0.0f));
         std::fill(accumFreqR_.begin(), accumFreqR_.end(), FftUtil::Complex(0.0f, 0.0f));
         inputBlockPos_ = 0;
         historyHead_ = 0;
     }
+    std::fill(dryDelayL_.begin(), dryDelayL_.end(), 0.0f);
+    std::fill(dryDelayR_.begin(), dryDelayR_.end(), 0.0f);
+    dryDelayPos_ = 0;
 }
 
 void ConvolutionReverb::process(const float* inL, const float* inR, float* outL, float* outR, int frames) {
@@ -833,8 +859,19 @@ void ConvolutionReverb::processCore(const float* inL, const float* inR, float* o
             wetSampleR = cR;
         }
 
-        outL[i] = inL[i] * dryGain + wetSampleL * wetGain;
-        outR[i] = inR[i] * dryGain + wetSampleR * wetGain;
+        // Delay the dry signal by the partition latency so dry and wet are
+        // time-aligned. Without this the reverb tail begins PARTITION_SIZE
+        // samples after the dry signal (a discrete ~10.7 ms pre-echo at partial
+        // wet mixes). The whole reverb stage then reports PARTITION_SIZE
+        // latency uniformly (see getReverbLatencyFrames).
+        const float dryL = dryDelayL_[dryDelayPos_];
+        const float dryR = dryDelayR_[dryDelayPos_];
+        dryDelayL_[dryDelayPos_] = inL[i];
+        dryDelayR_[dryDelayPos_] = inR[i];
+        dryDelayPos_ = (dryDelayPos_ + 1) % PARTITION_SIZE;
+
+        outL[i] = dryL * dryGain + wetSampleL * wetGain;
+        outR[i] = dryR * dryGain + wetSampleR * wetGain;
 
         inputBlockPos_++;
 

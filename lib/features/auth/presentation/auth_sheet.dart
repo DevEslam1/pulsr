@@ -478,7 +478,7 @@ class _AuthSheetState extends State<AuthSheet> {
                             icon: Icon(Icons.phonelink_setup_rounded,
                                 size: 18, color: p.textSecondary),
                             label: Text(
-                              'Having trouble? Use code sign-in instead',
+                              context.l10n.authUseCodeSignIn,
                               style: TextStyle(
                                 color: p.textSecondary,
                                 fontSize: 12.5,

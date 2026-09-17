@@ -2148,7 +2148,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     }
                     val dsdRate = call.argument<Int>("dsdRate") ?: 64
                     val targetRate = call.argument<Int>("targetSampleRate") ?: 176400
-                    val bitOrder = call.argument<Int>("bitOrder") ?: 0 // 0 = MSB (DSF), 1 = LSB (DFF)
+                    val bitOrder = call.argument<Int>("bitOrder") ?: 0 // 0 = LSB first (DSF), 1 = MSB first (DFF)
                     if (dsdRate <= 0 || targetRate <= 0 || bitOrder !in 0..1) {
                         result.error("INVALID_ARGUMENT", "Invalid DSD parameters: rate=$dsdRate, targetRate=$targetRate, bitOrder=$bitOrder", null)
                         return
@@ -3356,7 +3356,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         val effectiveEqEnabled = isEqEnabled && !isHalEqSuppressed()
         val dynamicsActive = isDynamicsEnabled && currentDynamicsPreset != "off" && !isDynamicsPresetNativeActive
         val needsBalanceMono = monoMix || abs(stereoBalance) > 0.001
-        return effectiveEqEnabled || dynamicsActive || isLimiterEnabled || needsBalanceMono
+        // The native lookahead limiter owns output protection whenever the C++
+        // chain is loaded; running the HAL limiter too applies two limiters in
+        // series (over-compression + stacked release). Single-owner only.
+        val halLimiterActive = isLimiterEnabled && !isNativeDspLoaded
+        return effectiveEqEnabled || dynamicsActive || halLimiterActive || needsBalanceMono
     }
 
     private fun updateDpEnabled() {
@@ -3400,6 +3404,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
         val dynamicsActive = isDynamicsEnabled && currentDynamicsPreset != "off" && !isDynamicsPresetNativeActive
         val needsBalanceMono = monoMix || kotlin.math.abs(stereoBalance) > 0.001
+        // Native lookahead limiter owns output protection when loaded.
+        val halLimiterActive = isLimiterEnabled && !isNativeDspLoaded
         // When dspPreference is "oem" (or "auto" + OEM detected), suppress the HAL
         // graphic EQ to avoid double-processing through Dolby / Dirac / SoundAlive.
         // Limiter and balance/mono still run through DP — they don't colour the
@@ -3411,7 +3417,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
         // Build DynamicsProcessing whenever EQ, dynamics, limiter, or balance/mono are active.
         // Limiter and balance/mono route through the same DynamicsProcessing engine.
-        if (!effectiveEqEnabled && !dynamicsActive && !isLimiterEnabled && !needsBalanceMono) {
+        if (!effectiveEqEnabled && !dynamicsActive && !halLimiterActive && !needsBalanceMono) {
             try { oldDp?.release() } catch (_: Exception) {}
             updateLegacyEqualizer()
             return
@@ -3650,7 +3656,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         val dp = dynamicsProcessing ?: run {
             // If DynamicsProcessing doesn't exist yet, rebuild it — it will
             // call applyHalLimiter internally via buildDynamicsProcessing.
-            if (isLimiterEnabled) buildDynamicsProcessing()
+            // Only when the HAL (not the native chain) owns the limiter.
+            if (isLimiterEnabled && !isNativeDspLoaded) buildDynamicsProcessing()
             return
         }
         try {
@@ -3665,7 +3672,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 // configureDynamicsInPlace); postGain excludes it.
                 dp.getChannelByChannelIndex(ch).inputGain = preampDb
                 val limiter = dp.getLimiterByChannelIndex(ch)
-                if (isLimiterEnabled) {
+                if (isLimiterEnabled && !isNativeDspLoaded) {
                     // Compressor knobs when the user set them; otherwise keep the
                     // brickwall defaults (attack follows lookahead, ratio 20).
                     val attackMs = if (limiterAttackMs > 0.0) {
