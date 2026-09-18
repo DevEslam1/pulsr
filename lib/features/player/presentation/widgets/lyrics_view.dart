@@ -18,6 +18,8 @@ import '../../cubit/player_state.dart';
 import 'karaoke_mode_screen.dart';
 import 'lyrics_editor_sheet.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class LyricsView extends StatefulWidget {
   /// Playback position used to highlight the active line.
@@ -192,11 +194,11 @@ class _LyricsViewState extends State<LyricsView> {
       builder: (sheetContext) => StatefulBuilder(
         builder: (sheetContext, setSheet) {
           return Container(
-            padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+            padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.lg, AppSpacing.s20, AppSpacing.lg, AppSpacing.s28),
             decoration: BoxDecoration(
               color: Theme.of(sheetContext).colorScheme.surface,
               borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(20)),
+                  const BorderRadius.vertical(top: Radius.circular(AppRadii.r20)),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -204,18 +206,18 @@ class _LyricsViewState extends State<LyricsView> {
                 Text(
                   l10n.settingsSyncOffset,
                   style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w800),
+                      fontSize: AppFontSize.bodyLarge, fontWeight: FontWeight.w800),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
                   '${_manualOffsetMs >= 0 ? '+' : ''}$_manualOffsetMs ms',
                   style: TextStyle(
-                    fontSize: 28,
+                    fontSize: AppFontSize.display,
                     fontWeight: FontWeight.w800,
                     color: widget.activeColor,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.sm),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -226,7 +228,7 @@ class _LyricsViewState extends State<LyricsView> {
                       },
                       child: const Text('-50 ms'),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: AppSpacing.md),
                     OutlinedButton(
                       onPressed: () async {
                         await _adjustManualOffset(50);
@@ -236,7 +238,7 @@ class _LyricsViewState extends State<LyricsView> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.xs),
                 TextButton.icon(
                   onPressed: () async {
                     await _resetManualOffset();
@@ -245,7 +247,7 @@ class _LyricsViewState extends State<LyricsView> {
                   icon: const Icon(Icons.restart_alt_rounded, size: 18),
                   label: Text(l10n.reset),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpacing.xxs),
                 FilledButton(
                   onPressed: () => Navigator.of(sheetContext).pop(),
                   child: Text(l10n.done),
@@ -301,10 +303,10 @@ class _LyricsViewState extends State<LyricsView> {
     };
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
       decoration: BoxDecoration(
         color: widget.activeColor.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadii.r12),
         border: Border.all(
           color: widget.activeColor.withValues(alpha: 0.3),
           width: 1,
@@ -314,14 +316,14 @@ class _LyricsViewState extends State<LyricsView> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 12, color: widget.activeColor),
-          const SizedBox(width: 4),
+          const SizedBox(width: AppSpacing.xxs),
           Text(
             label,
             style: TextStyle(
               color: widget.activeColor,
-              fontSize: 11,
+              fontSize: AppFontSize.caption,
               fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
+              letterSpacing: AppTracking.medium,
             ),
           ),
         ],
@@ -332,7 +334,7 @@ class _LyricsViewState extends State<LyricsView> {
   void _openKaraoke() {
     Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute<void>(
-        builder: (_) => KaraokeModeScreen(lyrics: widget.lyrics),
+        builder: (_) => const KaraokeModeScreen(),
       ),
     );
   }
@@ -402,19 +404,19 @@ class _LyricsViewState extends State<LyricsView> {
 
   Widget _buildPlainTextList() {
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg, horizontal: AppSpacing.s20),
       itemCount: widget.lyrics.length,
       // FIX-F02: Use fixed itemExtent for lists > 100 lines to prevent layout thrash and scroll jank
       itemExtent: widget.lyrics.length > 100 ? 36.0 : null,
       itemBuilder: (context, index) {
         final line = widget.lyrics[index];
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s6),
           child: Text(
             line.text,
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 16,
+              fontSize: AppFontSize.bodyLarge,
               fontWeight: FontWeight.w500,
               color: Colors.white.withValues(alpha: 0.85),
               height: 1.4,
@@ -428,13 +430,13 @@ class _LyricsViewState extends State<LyricsView> {
   Widget _buildSyncedLyricView() {
     final style = LyricStyles.default1.copyWith(
       textStyle: TextStyle(
-        fontSize: 16,
+        fontSize: AppFontSize.bodyLarge,
         fontWeight: FontWeight.w500,
         color: Colors.white.withValues(alpha: 0.45),
         height: 1.4,
       ),
       activeStyle: TextStyle(
-        fontSize: 22,
+        fontSize: AppFontSize.titleLarge,
         fontWeight: FontWeight.w800,
         color: widget.activeColor,
         height: 1.3,
@@ -486,18 +488,18 @@ class _LyricsViewState extends State<LyricsView> {
       child: Stack(
         children: [
           Padding(
-            padding: const EdgeInsets.only(top: 48),
+            padding: const EdgeInsets.only(top: AppSpacing.xxl),
             child: isSynced ? _buildSyncedLyricView() : _buildPlainTextList(),
           ),
-          Positioned(
+          PositionedDirectional(
             top: 4,
-            left: 4,
+            start: 4,
             child: _buildHeaderActions(),
           ),
           if (source != LyricsSource.none)
-            Positioned(
+            PositionedDirectional(
               top: 12,
-              right: 12,
+              end: 12,
               child: IgnorePointer(
                 child: _buildSourceBadge(source, isSynced),
               ),
@@ -536,27 +538,27 @@ class _LyricsViewState extends State<LyricsView> {
 
       return Center(
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xl),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.lyrics_outlined, size: 48, color: p.textTertiary),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.sm),
               Text(
                 noLyricsText,
                 style: TextStyle(
                   color: p.textPrimary,
                   fontWeight: FontWeight.w800,
-                  fontSize: 16,
+                  fontSize: AppFontSize.bodyLarge,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
               Text(context.l10n.placeLrcHint,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                    color: p.textSecondary, fontSize: 13, height: 1.4),
+                    color: p.textSecondary, fontSize: AppFontSize.bodySmall, height: 1.4),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.md),
               OutlinedButton.icon(
                 onPressed: () {
                   try {
@@ -565,15 +567,15 @@ class _LyricsViewState extends State<LyricsView> {
                 },
                 icon: const Icon(Icons.refresh_rounded, size: 16),
                 label: Text(context.l10n.searchLyrics,
-                    style: TextStyle(fontSize: 12)),
+                    style: TextStyle(fontSize: AppFontSize.label)),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: widget.activeColor,
                   side: BorderSide(
                       color: widget.activeColor.withValues(alpha: 0.4)),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(AppRadii.r10)),
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
                 ),
               ),
             ],

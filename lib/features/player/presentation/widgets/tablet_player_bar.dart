@@ -16,6 +16,10 @@ import 'audio_quality_badge.dart';
 import 'audio_quality_sheet.dart';
 import 'equalizer_sheet.dart';
 import '../../../../core/widgets/pulsr_modal_tracker.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 class TabletPlayerBar extends StatefulWidget {
   final VoidCallback onOpenNowPlaying;
@@ -94,7 +98,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
             ],
           ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s6),
             child: Row(
               children: [
                 // ── Left: Track Info & Artwork ──────────────────────────
@@ -108,7 +112,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                       GestureDetector(
                         onTap: widget.onOpenNowPlaying,
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(AppRadii.r10),
                           child: CachedArtwork(
                             id: song.id,
                             remoteUrl: song.remoteArtworkUrl,
@@ -118,7 +122,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: AppSpacing.s10),
                       Expanded(
                         child: GestureDetector(
                           onTap: widget.onOpenNowPlaying,
@@ -133,10 +137,10 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                 style: TextStyle(
                                   color: p.textPrimary,
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 13.5,
+                                  fontSize: AppFontSize.bodySmall,
                                 ),
                               ),
-                              const SizedBox(height: 2),
+                              const SizedBox(height: AppSpacing.s2),
                               Text(
                                 song.artist,
                                 maxLines: 1,
@@ -144,13 +148,13 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                 style: TextStyle(
                                   color: p.textSecondary,
                                   fontWeight: FontWeight.w500,
-                                  fontSize: 12,
+                                  fontSize: AppFontSize.label,
                                 ),
                               ),
-                              const SizedBox(height: 3),
+                              const SizedBox(height: AppSpacing.xxs),
                               FittedBox(
                                 fit: BoxFit.scaleDown,
-                                alignment: Alignment.centerLeft,
+                                alignment: AlignmentDirectional.centerStart,
                                 child: AudioQualityBadge(
                                   song: song,
                                   activeColor: activeColor,
@@ -181,12 +185,12 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                   ),
                 ),
 
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.sm),
 
                 // ── Center: Transport Controls & Seekbar ─────────────────
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -216,7 +220,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                   cubit.toggleShuffle();
                                 },
                               ),
-                              const SizedBox(width: 2),
+                              const SizedBox(width: AppSpacing.s2),
                               IconButton(
                                 visualDensity: VisualDensity.compact,
                                 padding: EdgeInsets.zero,
@@ -233,7 +237,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                   cubit.previous();
                                 },
                               ),
-                              const SizedBox(width: 4),
+                              const SizedBox(width: AppSpacing.xxs),
                               Semantics(
                                 label: state.isPlaying ? l10n.pause : l10n.play,
                                 button: true,
@@ -242,8 +246,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                     HapticFeedback.mediumImpact();
                                     cubit.togglePlayPause();
                                   },
-                                  child: SizedBox(
-                                    width: 48,
+                                  child: SizedBox(width: AppSpacing.xxl,
                                     height: 48,
                                     child: Center(
                                       child: Container(
@@ -273,7 +276,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 4),
+                              const SizedBox(width: AppSpacing.xxs),
                               IconButton(
                                 visualDensity: VisualDensity.compact,
                                 padding: EdgeInsets.zero,
@@ -290,7 +293,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                   cubit.next();
                                 },
                               ),
-                              const SizedBox(width: 2),
+                              const SizedBox(width: AppSpacing.s2),
                               IconButton(
                                 visualDensity: VisualDensity.compact,
                                 padding: EdgeInsets.zero,
@@ -344,13 +347,13 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                   ),
                                   style: TextStyle(
                                     color: p.textSecondary,
-                                    fontSize: 11,
+                                    fontSize: AppFontSize.caption,
                                     fontFeatures: const [
                                       FontFeature.tabularFigures()
                                     ],
                                   ),
                                 ),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: AppSpacing.xs),
                                 Expanded(
                                   child: Semantics(
                                     value: valueLabel,
@@ -390,12 +393,12 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: AppSpacing.xs),
                                 Text(
                                   Formatters.formatDuration(state.duration),
                                   style: TextStyle(
                                     color: p.textSecondary,
-                                    fontSize: 11,
+                                    fontSize: AppFontSize.caption,
                                     fontFeatures: const [
                                       FontFeature.tabularFigures()
                                     ],
@@ -410,7 +413,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                   ),
                 ),
 
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.sm),
 
                 // ── Right: Volume & Quick Actions ───────────────────────
                 Flexible(
@@ -479,7 +482,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 2),
+                        const SizedBox(width: AppSpacing.s2),
 
                         // DAC / Output
                         IconButton(
@@ -493,7 +496,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                             color: settingsState
                                         .currentOutputDevice?.isUsbDac ==
                                     true
-                                ? const Color(0xFFFFD700)
+                                ? AppColors.dacGold
                                 : p.textSecondary,
                           ),
                           tooltip: l10n.audioOutputAndDac,

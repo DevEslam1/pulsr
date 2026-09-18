@@ -10,6 +10,9 @@ import '../../../../core/widgets/pulsr_logo.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
 import '../nav_destinations.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class LandscapeSidebar extends StatelessWidget {
   final int currentIndex;
@@ -74,14 +77,15 @@ class LandscapeSidebar extends StatelessWidget {
                       p: p,
                     ),
 
-                    const SizedBox(height: 6),
+                    const SizedBox(height: AppSpacing.s6),
 
                     // ── Main Scrollable Nav List ──────────────────────────────
                     Expanded(
                       child: ListView(
                         padding: EdgeInsets.symmetric(
+
                           horizontal: isExtended ? 12 : 8,
-                          vertical: 4,
+                          vertical: AppSpacing.xxs,
                         ),
                         children: [
                           if (isExtended)
@@ -102,17 +106,18 @@ class LandscapeSidebar extends StatelessWidget {
                                 }
                               },
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: AppSpacing.xxs),
                           ],
 
-                          const SizedBox(height: 10),
+                          const SizedBox(height: AppSpacing.s10),
                           if (isExtended)
                             _SectionHeader(
                                 title: context.l10n.sidebarCollection, p: p)
                           else
                             Padding(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 6),
+
+                                  horizontal: AppSpacing.s14, vertical: AppSpacing.s6),
                               child: Divider(
                                 height: 1,
                                 thickness: 1,
@@ -135,19 +140,20 @@ class LandscapeSidebar extends StatelessWidget {
                                 }
                               },
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: AppSpacing.xxs),
                           ],
 
                           // Optional Side Inspector (Queue/Lyrics) Shortcut
                           if (onToggleSideInspector != null) ...[
-                            const SizedBox(height: 10),
+                            const SizedBox(height: AppSpacing.s10),
                             if (isExtended)
                               _SectionHeader(
                                   title: context.l10n.sidebarPanel, p: p)
                             else
                               Padding(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 6),
+
+                                    horizontal: AppSpacing.s14, vertical: AppSpacing.s6),
                                 child: Divider(
                                   height: 1,
                                   thickness: 1,
@@ -169,6 +175,9 @@ class LandscapeSidebar extends StatelessWidget {
                               },
                             ),
                           ],
+
+                          // Settings is part of [secondaryItems] now, so it
+                          // renders above without a separate entry.
                         ],
                       ),
                     ),
@@ -206,7 +215,7 @@ class _SidebarBrandHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!isExtended) {
       return Padding(
-        padding: const EdgeInsets.fromLTRB(0, 16, 0, 8),
+        padding: const EdgeInsetsDirectional.fromSTEB(0, AppSpacing.md, 0, AppSpacing.xs),
         child: Center(
           child: GestureDetector(
             onTap: onToggle,
@@ -225,7 +234,7 @@ class _SidebarBrandHeader extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 12, 8),
+      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.md, AppSpacing.sm, AppSpacing.xs),
       child: ClipRect(
         child: Row(
           children: [
@@ -235,7 +244,7 @@ class _SidebarBrandHeader extends StatelessWidget {
               glowColor: p.glow,
               animate: false,
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -246,16 +255,16 @@ class _SidebarBrandHeader extends StatelessWidget {
                     style: TextStyle(
                       color: p.textPrimary,
                       fontWeight: FontWeight.w900,
-                      letterSpacing: 2.4,
-                      fontSize: 15.5,
+                      letterSpacing: AppTracking.widest,
+                      fontSize: AppFontSize.bodyLarge,
                     ),
                   ),
                   Text(context.l10n.studioAudio,
                     style: TextStyle(
                       color: p.accent,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: 1.5,
-                      fontSize: 9.0,
+                      letterSpacing: AppTracking.wide,
+                      fontSize: AppFontSize.micro,
                     ),
                   ),
                 ],
@@ -287,13 +296,13 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.sm, AppSpacing.s6, AppSpacing.sm, AppSpacing.s6),
       child: Text(
         title,
         style: TextStyle(
-          fontSize: 10.0,
+          fontSize: AppFontSize.tiny,
           fontWeight: FontWeight.w800,
-          letterSpacing: 1.5,
+          letterSpacing: AppTracking.wide,
           color: p.textTertiary.withValues(alpha: 0.65),
         ),
       ),
@@ -340,7 +349,7 @@ class _SidebarNavItem extends StatelessWidget {
             color: Colors.transparent,
             child: InkWell(
               onTap: onTap,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppRadii.r14),
               splashColor: activeColor.withValues(alpha: 0.15),
               highlightColor: Colors.transparent,
               child: AnimatedContainer(
@@ -352,7 +361,7 @@ class _SidebarNavItem extends StatelessWidget {
                   color: isSelected
                       ? activeColor.withValues(alpha: p.isDark ? 0.18 : 0.12)
                       : Colors.transparent,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(AppRadii.r14),
                   border: isSelected
                       ? Border.all(
                           color: activeColor.withValues(alpha: 0.35),
@@ -397,19 +406,19 @@ class _SidebarNavItem extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadii.r12),
         splashColor: activeColor.withValues(alpha: 0.12),
         highlightColor: Colors.transparent,
         child: AnimatedContainer(
           duration: context.motionMs(200),
           curve: context.motionCurve(Curves.easeOutCubic),
           height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
           decoration: BoxDecoration(
             color: isSelected
                 ? activeColor.withValues(alpha: p.isDark ? 0.14 : 0.08)
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadii.r12),
             border: isSelected
                 ? Border.all(
                     color: activeColor.withValues(alpha: 0.30),
@@ -427,7 +436,7 @@ class _SidebarNavItem extends StatelessWidget {
                   height: isSelected ? 18 : 0,
                   decoration: BoxDecoration(
                     color: isSelected ? activeColor : Colors.transparent,
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(AppRadii.r2),
                     boxShadow: isSelected
                         ? [
                             BoxShadow(
@@ -438,7 +447,7 @@ class _SidebarNavItem extends StatelessWidget {
                         : null,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.xs),
 
                 // Icon
                 AnimatedScale(
@@ -450,7 +459,7 @@ class _SidebarNavItem extends StatelessWidget {
                     color: isSelected ? activeColor : p.textSecondary,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.sm),
 
                 // Label
                 Expanded(
@@ -459,11 +468,11 @@ class _SidebarNavItem extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 13.5,
+                      fontSize: AppFontSize.bodySmall,
                       fontWeight:
                           isSelected ? FontWeight.w700 : FontWeight.w500,
                       color: isSelected ? activeColor : p.textPrimary,
-                      letterSpacing: 0.2,
+                      letterSpacing: AppTracking.label,
                     ),
                   ),
                 ),
@@ -472,18 +481,18 @@ class _SidebarNavItem extends StatelessWidget {
                 if (trailingBadge != null)
                   Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        const EdgeInsets.symmetric(horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                     decoration: BoxDecoration(
                       color: activeColor.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(AppRadii.r6),
                     ),
                     child: Text(
                       trailingBadge!,
                       style: TextStyle(
-                        fontSize: 9.5,
+                        fontSize: AppFontSize.tiny,
                         fontWeight: FontWeight.w800,
                         color: activeColor,
-                        letterSpacing: 0.8,
+                        letterSpacing: AppTracking.overline,
                       ),
                     ),
                   ),
@@ -521,12 +530,7 @@ class _SidebarBottomSection extends StatelessWidget {
         final song = state.currentSong;
 
         return Padding(
-          padding: EdgeInsets.fromLTRB(
-            isExtended ? 12 : 8,
-            8,
-            isExtended ? 12 : 8,
-            12,
-          ),
+          padding: EdgeInsetsDirectional.fromSTEB(isExtended ? 12 : 8, AppSpacing.xs, isExtended ? 12 : 8, AppSpacing.sm, ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -540,9 +544,9 @@ class _SidebarBottomSection extends StatelessWidget {
                       child: Container(
                         width: 44,
                         height: 44,
-                        margin: const EdgeInsets.only(bottom: 10),
+                        margin: const EdgeInsets.only(bottom: AppSpacing.s10),
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadii.r12),
                           border: Border.all(
                             color: state.isPlaying
                                 ? p.accent.withValues(alpha: 0.6)
@@ -559,7 +563,7 @@ class _SidebarBottomSection extends StatelessWidget {
                               : null,
                         ),
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(11),
+                          borderRadius: BorderRadius.circular(AppRadii.r12),
                           child: CachedArtwork(
                             id: song.id,
                             remoteUrl: song.remoteArtworkUrl,
@@ -575,12 +579,13 @@ class _SidebarBottomSection extends StatelessWidget {
                   GestureDetector(
                     onTap: onOpenNowPlaying,
                     child: Container(
-                      margin: const EdgeInsets.only(bottom: 8),
+                      margin: const EdgeInsets.only(bottom: AppSpacing.xs),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 6),
+
+                          horizontal: AppSpacing.xs, vertical: AppSpacing.s6),
                       decoration: BoxDecoration(
                         color: p.surfaceContainer.withValues(alpha: 0.45),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(AppRadii.r10),
                         border: Border.all(
                           color: p.hairline.withValues(alpha: 0.4),
                           width: 1,
@@ -596,7 +601,7 @@ class _SidebarBottomSection extends StatelessWidget {
                               size: 28,
                               borderRadius: 6,
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: AppSpacing.xs),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -607,7 +612,7 @@ class _SidebarBottomSection extends StatelessWidget {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      fontSize: 11.5,
+                                      fontSize: AppFontSize.label,
                                       fontWeight: FontWeight.w700,
                                       color: p.textPrimary,
                                     ),
@@ -617,7 +622,7 @@ class _SidebarBottomSection extends StatelessWidget {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      fontSize: 10,
+                                      fontSize: AppFontSize.tiny,
                                       color: p.textSecondary,
                                     ),
                                   ),

@@ -16,6 +16,8 @@ import '../../../domain/usecases/get_genres_usecase.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../sheets/song_info_sheet.dart';
 import '../../../core/errors/failures.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class GenreDetailScreen extends StatefulWidget {
   final GenreItem genreItem;
@@ -51,28 +53,30 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
       body: StreamBuilder<Result<List<SongsTableData>>>(
         stream: _useCase.watchGenreSongs(genreItem.name),
         builder: (context, snapshot) {
-          if (snapshot.hasError) {
+          final loadFailed = snapshot.hasError ||
+              (snapshot.data?.fold((l) => true, (_) => false) ?? false);
+          if (loadFailed) {
             return Center(
               child: Padding(
-                padding: const EdgeInsets.all(32),
+                padding: const EdgeInsets.all(AppSpacing.xl),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.error_outline_rounded, color: p.error, size: 48),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.md),
                     Text(context.l10n.couldNotLoadGenre,
                       style: TextStyle(
                           color: p.textPrimary,
                           fontWeight: FontWeight.w700,
-                          fontSize: 16),
+                          fontSize: AppFontSize.bodyLarge),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       context.l10n.libraryReadError,
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: p.textSecondary, fontSize: 13),
+                      style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: AppSpacing.s20),
                     ElevatedButton.icon(
                       onPressed: () => setState(() {}),
                       icon: const Icon(Icons.refresh_rounded),
@@ -90,9 +94,9 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
             child: ConstrainedBox(
               constraints: Adaptive.contentConstraints(context),
               child: ListView(
-                padding: const EdgeInsets.only(bottom: 160),
+                padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom),
                 children: [
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.md),
                   Center(
                     child: Container(
                       width: 100,
@@ -116,7 +120,7 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.md),
                   Center(
                     child: Text(
                       genreItem.name,
@@ -124,14 +128,14 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: AppSpacing.xxs),
                   Center(
                     child: Text(
                       Formatters.formatTrackCount(songs.length),
-                      style: TextStyle(color: p.textSecondary, fontSize: 13),
+                      style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: AppSpacing.s20),
 
                   // Action Buttons (Play All, Shuffle)
                   Padding(
@@ -150,7 +154,7 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
                             label: Text(context.l10n.playAll),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: AppSpacing.sm),
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: songs.isNotEmpty
@@ -171,12 +175,12 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: AppSpacing.s20),
 
                   // Songs List
                   if (songs.isEmpty)
                     Padding(
-                      padding: const EdgeInsets.all(32),
+                      padding: const EdgeInsets.all(AppSpacing.xl),
                       child: EmptyStateWidget(
                         icon: Icons.music_off_rounded,
                         title: context.l10n.browseNoTracks,

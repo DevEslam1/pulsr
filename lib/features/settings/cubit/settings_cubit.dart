@@ -20,6 +20,7 @@ import '../../../core/utils/error_logger.dart';
 import '../../../data/audio/audio_effects_channel.dart';
 import '../../../data/audio/audio_handler.dart';
 import '../../../data/audio/dsd_decoder_helper.dart';
+import '../../../data/db/app_database.dart';
 import '../../../data/audio/equalizer_manager.dart';
 import '../../../data/audio/multi_output_router.dart';
 import '../../../data/scanner/media_scanner_service.dart';
@@ -952,6 +953,20 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     } catch (e) {
       safeEmit(state.copyWith(isScanning: false, errorMessage: e.toString()));
       return 0;
+    }
+  }
+
+  /// Rebuilds the FTS search index on demand. Resets the per-session retry
+  /// budget and reports success so the UI can confirm. A no-op if the database
+  /// is not available (e.g. tests).
+  Future<bool> rebuildSearchIndex() async {
+    try {
+      if (!getIt.isRegistered<AppDatabase>()) return false;
+      return await getIt<AppDatabase>().repairFtsIndex(force: true);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to rebuild search index',
+          error: e, stackTrace: st, category: 'SettingsCubit');
+      return false;
     }
   }
 

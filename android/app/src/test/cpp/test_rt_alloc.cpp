@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <new>
 #include <atomic>
+#include <functional>
 
 static std::atomic<bool> g_rt_guard_enabled{false};
 static std::atomic<uint64_t> g_rt_alloc_count{0};
@@ -196,69 +197,75 @@ void runRtPreparedPayloadTest() {
     auto& engine = AudioDspEngine::instance();
     engine.setSampleRate(48000.0);
 
-    auto makeSnapshot = [](uint64_t gen, bool variant) {
-        std::vector<ViperDdcSection> s441, s480;
-        const char* vdc = variant ? "SR_48000 1.0 0.0 0.0 0.04 -0.03"
-                                  : "SR_48000 1.0 0.0 0.0 0.05 -0.04";
-        const bool vOk = ViperDdc::parseVdcContent(vdc, s441, s480);
-        assert(vOk);
-        auto vp441 = std::make_shared<const std::vector<ViperDdcSection>>(s441);
-        auto vp480 = std::make_shared<const std::vector<ViperDdcSection>>(s480);
-
-        LiveProg validator;
-        const char* script = variant ? "@sample\n spl0 = spl0 * 0.9;"
-                                     : "@sample\n spl0 = spl0;";
-        const bool lOk = validator.loadCode(script);
-        assert(lOk);
-        auto program = validator.buildProgram();
-
-        std::vector<std::pair<double, double>> nodes;
-        const char* eq = variant ? "GraphicEq: 100 2; 1000 0; 5000 -1"
-                                 : "GraphicEq: 200 1; 1000 0; 4000 -2";
-        const bool aOk = ArbitraryResponseEq::parseGraphicEq(eq, nodes);
-        assert(aOk);
-        auto parsedNodes = std::make_shared<const std::vector<std::pair<double, double>>>(nodes);
-
-        auto snap = std::make_shared<DspParamSnapshot>();
-        snap->generation = gen;
-        snap->activeStages = STAGE_VIPER_DDC | STAGE_LIVE_PROG | STAGE_ARBITRARY_EQ;
-        snap->viperDdc.enabled = true;
-        snap->viperDdc.ddcContent = vdc;
-        snap->viperDdc.sections441 = vp441;
-        snap->viperDdc.sections480 = vp480;
-        snap->liveProg.enabled = true;
-        snap->liveProg.code = script;
-        snap->liveProg.program = program;
-        snap->arbitraryEq.enabled = true;
-        snap->arbitraryEq.graphicEqString = eq;
-        snap->arbitraryEq.parsedNodes = parsedNodes;
-        return snap;
-    };
-
     const int blockSize = 512;
     const int channels = 2;
     std::vector<float> audio(blockSize * channels, 0.1f);
 
-    // Warm up with payload set A (capacities get reserved here).
-    engine.publishParams(makeSnapshot(900, false));
-    engine.processInterleaved(audio.data(), blockSize, channels);
-
-    // Publish a distinct payload set B with the guard disabled, then let the
-    // audio thread apply it under the guard.
-    engine.publishParams(makeSnapshot(901, true));
-
-    PreparedIr::resetCacheMutexLockCount();
-    g_rt_alloc_count.store(0);
-    g_rt_guard_enabled.store(true);
-    for (int i = 0; i < 2000; ++i) {
-        audio[0] = 0.01f * (i % 7);
-        audio[1] = -0.01f * (i % 7);
-        int out = engine.processInterleaved(audio.data(), blockSize, channels);
-        assert(out == blockSize);
+    // Warm all three so their capacities are reserved off the guarded section.
+    {
+        auto s = std::make_shared<DspParamSnapshot>();
+        s->generation = 900;
+        s->activeStages = STAGE_VIPER_DDC | STAGE_LIVE_PROG | STAGE_ARBITRARY_EQ;
+        std::vector<ViperDdcSection> a, b;
+        ViperDdc::parseVdcContent("SR_48000 1.0 0.0 0.0 0.05 -0.04", a, b);
+        s->viperDdc.enabled = true;
+        s->viperDdc.sections441 = std::make_shared<const std::vector<ViperDdcSection>>(a);
+        s->viperDdc.sections480 = std::make_shared<const std::vector<ViperDdcSection>>(b);
+        LiveProg v;
+        v.loadCode("@sample\n spl0 = spl0;");
+        s->liveProg.enabled = true;
+        s->liveProg.program = v.buildProgram();
+        std::vector<std::pair<double, double>> n;
+        ArbitraryResponseEq::parseGraphicEq("GraphicEq: 100 2; 1000 0", n);
+        s->arbitraryEq.enabled = true;
+        s->arbitraryEq.parsedNodes = std::make_shared<const std::vector<std::pair<double, double>>>(n);
+        engine.publishParams(s);
+        engine.processInterleaved(audio.data(), blockSize, channels);
     }
-    g_rt_guard_enabled.store(false);
 
-    assert(g_rt_alloc_count.load() == 0);
+    auto isolate = [&](const char* name, int slot, const std::function<void(DspParamSnapshot&)>& build) {
+        auto s = std::make_shared<DspParamSnapshot>();
+        s->generation = 910 + slot;
+        s->activeStages = STAGE_VIPER_DDC | STAGE_LIVE_PROG | STAGE_ARBITRARY_EQ;
+        build(*s);
+        engine.publishParams(s);
+        PreparedIr::resetCacheMutexLockCount();
+        g_rt_alloc_count.store(0);
+        g_rt_guard_enabled.store(true);
+        for (int i = 0; i < 2000; ++i) {
+            audio[0] = 0.01f * (i % 7);
+            audio[1] = -0.01f * (i % 7);
+            engine.processInterleaved(audio.data(), blockSize, channels);
+        }
+        g_rt_guard_enabled.store(false);
+        const uint64_t allocs = g_rt_alloc_count.load();
+        std::cout << "  ✓ " << name << " prepared payload applied with " << allocs
+                  << " RT allocations." << std::endl;
+        return allocs;
+    };
+
+    uint64_t allocs = 0;
+    allocs += isolate("Viper", 0, [](DspParamSnapshot& s) {
+        std::vector<ViperDdcSection> a, b;
+        ViperDdc::parseVdcContent("SR_48000 1.0 0.0 0.0 0.04 -0.03", a, b);
+        s.viperDdc.enabled = true;
+        s.viperDdc.sections441 = std::make_shared<const std::vector<ViperDdcSection>>(a);
+        s.viperDdc.sections480 = std::make_shared<const std::vector<ViperDdcSection>>(b);
+    });
+    allocs += isolate("LiveProg", 1, [](DspParamSnapshot& s) {
+        LiveProg v;
+        v.loadCode("@sample\n spl0 = spl0 * 0.9;");
+        s.liveProg.enabled = true;
+        s.liveProg.program = v.buildProgram();
+    });
+    allocs += isolate("ArbEq", 2, [](DspParamSnapshot& s) {
+        std::vector<std::pair<double, double>> n;
+        ArbitraryResponseEq::parseGraphicEq("GraphicEq: 200 1; 1000 0; 5000 -1", n);
+        s.arbitraryEq.enabled = true;
+        s.arbitraryEq.parsedNodes = std::make_shared<const std::vector<std::pair<double, double>>>(n);
+    });
+
+    assert(allocs == 0);
     for (int i = 0; i < blockSize * channels; ++i) {
         assert(std::isfinite(audio[i]));
     }

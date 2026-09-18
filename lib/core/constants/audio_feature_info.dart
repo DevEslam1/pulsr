@@ -116,9 +116,9 @@ class AudioFeatureRegistry {
   static const resampler = AudioFeatureInfo(
     id: 'resampler',
     title: 'Polyphase Sinc Resampler',
-    subtitle: '32 phases × 32 taps, auto 44.1→48 kHz',
+    subtitle: '32 phases × 32 taps (polyphase engine)',
     description:
-        'High-quality sinc interpolation when track rate ≠ device rate. Auto-bypasses when rates match (zero CPU). Disabled during Bit-Perfect (direct 1:1 stream).',
+        'Polyphase sinc interpolation engine. The in-stream playback path keeps the source frame count, so track→device rate conversion is performed by the platform output (AudioTrack); the polyphase engine is applied internally by the convolution reverb wet path above 48 kHz. Disabled during Bit-Perfect (direct 1:1 stream).',
     conflictsWith: 'Bit-Perfect bypass / Direct',
   );
 

@@ -4,6 +4,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../constants/app_radii.dart';
 import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class EmptyStateWidget extends StatelessWidget {
   final IconData icon;
@@ -40,34 +42,47 @@ class EmptyStateWidget extends StatelessWidget {
 
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.lg),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Animated Vector Graphic Container
+            // Animated emblem: two phase-shifted pulse rings around a glass core.
             Stack(
               alignment: Alignment.center,
               children: [
-                // Outer Glow Pulse Circle
                 Container(
                   width: 108,
                   height: 108,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: effectiveIconColor.withValues(alpha: 0.08),
+                    color: effectiveIconColor.withValues(alpha: 0.10),
                   ),
                 )
-                    .animate(
-                        onPlay: (controller) {
-                          if (context.motionEnabled) {
-                            controller.repeat(reverse: true);
-                          }
-                        })
+                    .animate(onPlay: (controller) {
+                      if (context.motionEnabled) controller.repeat(reverse: true);
+                    })
                     .scaleXY(
-                        begin: 0.9,
-                        end: 1.15,
-                        duration: context.motionMs(2500),
+                        begin: 0.88,
+                        end: 1.16,
+                        duration: context.motionMs(2600),
+                        curve: context.motionCurve(Curves.easeInOut)),
+                Container(
+                  width: 108,
+                  height: 108,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: effectiveIconColor.withValues(alpha: 0.05),
+                  ),
+                )
+                    .animate(onPlay: (controller) {
+                      if (context.motionEnabled) controller.repeat(reverse: true);
+                    })
+                    .scaleXY(
+                        begin: 0.80,
+                        end: 1.24,
+                        duration: context.motionMs(2600),
+                        delay: context.motionMs(1300),
                         curve: context.motionCurve(Curves.easeInOut)),
 
                 // Inner Glass Circle Container
@@ -83,8 +98,8 @@ class EmptyStateWidget extends StatelessWidget {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: effectiveIconColor.withValues(alpha: 0.2),
-                        blurRadius: 24,
+                        color: effectiveIconColor.withValues(alpha: 0.22),
+                        blurRadius: 26,
                         spreadRadius: 2,
                       ),
                     ],
@@ -101,7 +116,7 @@ class EmptyStateWidget extends StatelessWidget {
                     curve: context.motionCurve(Curves.easeOutBack)),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.lg),
 
             // Title
             Text(
@@ -109,11 +124,11 @@ class EmptyStateWidget extends StatelessWidget {
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w800,
-                    letterSpacing: -0.3,
-                    fontSize: 20,
+                    letterSpacing: AppTracking.title,
+                    fontSize: AppFontSize.titleLarge,
                   ),
             ).animate().fadeIn(delay: context.motionMs(150)).slideY(begin: 0.15, end: 0),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
 
             // Subtitle
             ConstrainedBox(
@@ -123,14 +138,14 @@ class EmptyStateWidget extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: p.textSecondary,
-                  fontSize: 14,
+                  fontSize: AppFontSize.body,
                   height: 1.45,
                 ),
               ),
             ).animate().fadeIn(delay: context.motionMs(250)).slideY(begin: 0.15, end: 0),
 
             if (primaryActionLabel != null && onPrimaryAction != null) ...[
-              const SizedBox(height: 28),
+              const SizedBox(height: AppSpacing.s28),
               SizedBox(
                 height: 46,
                 child: ElevatedButton(
@@ -138,15 +153,15 @@ class EmptyStateWidget extends StatelessWidget {
                     backgroundColor: p.accent,
                     foregroundColor: p.onAccent,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 12),
+
+                        horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
                     shape: RoundedRectangleBorder(
                         borderRadius: AppRadii.cardRadius),
                     elevation: 2,
                   ),
                   onPressed: isPrimaryLoading ? null : onPrimaryAction,
                   child: isPrimaryLoading
-                      ? SizedBox(
-                          height: 20,
+                      ? SizedBox(height: AppSpacing.s20,
                           width: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
@@ -158,12 +173,12 @@ class EmptyStateWidget extends StatelessWidget {
                           children: [
                             if (primaryActionIcon != null) ...[
                               Icon(primaryActionIcon, size: 20),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: AppSpacing.xs),
                             ],
                             Text(
                               primaryActionLabel!,
                               style: const TextStyle(
-                                  fontWeight: FontWeight.w700, fontSize: 14),
+                                  fontWeight: FontWeight.w700, fontSize: AppFontSize.body),
                             ),
                           ],
                         ),
@@ -172,13 +187,13 @@ class EmptyStateWidget extends StatelessWidget {
             ],
 
             if (secondaryActionLabel != null && onSecondaryAction != null) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.sm),
               OutlinedButton(
                 style: OutlinedButton.styleFrom(
                   foregroundColor: p.textPrimary,
                   side: BorderSide(color: p.hairline),
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.s20, vertical: AppSpacing.s10),
                   shape:
                       RoundedRectangleBorder(borderRadius: AppRadii.cardRadius),
                 ),
@@ -189,12 +204,12 @@ class EmptyStateWidget extends StatelessWidget {
                     if (secondaryActionIcon != null) ...[
                       Icon(secondaryActionIcon,
                           size: 18, color: p.textSecondary),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: AppSpacing.xs),
                     ],
                     Text(
                       secondaryActionLabel!,
                       style: const TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 13),
+                          fontWeight: FontWeight.w600, fontSize: AppFontSize.bodySmall),
                     ),
                   ],
                 ),

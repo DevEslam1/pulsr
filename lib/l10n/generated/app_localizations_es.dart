@@ -888,6 +888,27 @@ class AppLocalizationsEs extends AppLocalizations {
   String get libraryListView => 'Vista de lista';
 
   @override
+  String get pressBackAgainToExit => 'Presiona atrás de nuevo para salir';
+
+  @override
+  String get refresh => 'Actualizar';
+
+  @override
+  String get showPassword => 'Mostrar contraseña';
+
+  @override
+  String get hidePassword => 'Ocultar contraseña';
+
+  @override
+  String get learnMore => 'Más información';
+
+  @override
+  String get zoomIn => 'Acercar';
+
+  @override
+  String get zoomOut => 'Alejar';
+
+  @override
   String get authUseCodeSignIn =>
       '¿Problemas? Usa el inicio de sesión con código';
 
@@ -2149,6 +2170,42 @@ class AppLocalizationsEs extends AppLocalizations {
   String get radioCuratedTitle => 'Emisoras seleccionadas';
 
   @override
+  String get radioEditStation => 'Editar emisora';
+
+  @override
+  String get radioEdit => 'Editar';
+
+  @override
+  String get radioSave => 'Guardar';
+
+  @override
+  String get radioUrlRequired => 'Introduce una URL de emisión';
+
+  @override
+  String get radioUrlMalformed => 'No se pudo interpretar la URL';
+
+  @override
+  String get radioUrlScheme => 'Solo se admiten emisiones http:// y https://';
+
+  @override
+  String get radioUrlNoHost => 'A la URL le falta el nombre del host';
+
+  @override
+  String get settingsRebuildSearchIndexTitle =>
+      'Reconstruir índice de búsqueda';
+
+  @override
+  String get settingsRebuildSearchIndexSubtitle =>
+      'Corrige resultados de búsqueda faltantes reconstruyendo el índice de texto completo';
+
+  @override
+  String get settingsSearchIndexRebuilt => 'Índice de búsqueda reconstruido';
+
+  @override
+  String get settingsSearchIndexRebuildFailed =>
+      'No se pudo reconstruir el índice de búsqueda';
+
+  @override
   String get followTrackSampleRateTitle =>
       'Seguir la frecuencia de muestreo de la pista';
 
@@ -2292,6 +2349,14 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get notificationPermissionNotNow => 'Ahora no';
+
+  @override
+  String get onboardingNotificationDenied =>
+      'Las notificaciones están desactivadas. Puedes activarlas más tarde en Ajustes.';
+
+  @override
+  String get onboardingScanFailed =>
+      'No se pudo escanear tu biblioteca. Puedes reintentarlo desde Ajustes.';
 
   @override
   String get onboardingPermissionRationale =>
@@ -3084,6 +3149,29 @@ class AppLocalizationsEs extends AppLocalizations {
   String previewTrackCount(Object count) {
     return '$count pistas';
   }
+
+  @override
+  String get unlimited => 'Ilimitado';
+
+  @override
+  String get invalidNumber => 'Introduce un número entero mayor que 0';
+
+  @override
+  String previewTruncated(Object count) {
+    return 'Mostrando las primeras $count coincidencias';
+  }
+
+  @override
+  String get expandPlayer => 'Expandir reproductor';
+
+  @override
+  String get dismissPlayer => 'Cerrar reproductor';
+
+  @override
+  String get loadMore => 'Cargar más';
+
+  @override
+  String get loadingMoreSongs => 'Cargando más canciones…';
 
   @override
   String btCalibrated(Object ms) {

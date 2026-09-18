@@ -6,6 +6,10 @@ import '../../../../domain/models/audio_quality_info.dart';
 import '../../../../domain/models/ytm_audio_quality.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import 'audio_quality_sheet.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class AudioQualityBadge extends StatelessWidget {
   final SongsTableData? song;
@@ -58,7 +62,7 @@ class AudioQualityBadge extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: () => AudioQualitySheet.show(context, song!, activeColor),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadii.r20),
         child: Ink(
           padding: EdgeInsets.symmetric(
             horizontal: compact ? 8 : 12,
@@ -67,23 +71,23 @@ class AudioQualityBadge extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                (isUsb ? const Color(0xFFFFD700) : info.badgeColor)
+                (isUsb ? AppColors.dacGold : info.badgeColor)
                     .withValues(alpha: 0.20),
-                (isUsb ? const Color(0xFFFFD700) : info.badgeColor)
+                (isUsb ? AppColors.dacGold : info.badgeColor)
                     .withValues(alpha: 0.06),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(AppRadii.r20),
             border: Border.all(
-              color: (isUsb ? const Color(0xFFFFD700) : info.badgeColor)
+              color: (isUsb ? AppColors.dacGold : info.badgeColor)
                   .withValues(alpha: 0.45),
               width: 1.0,
             ),
             boxShadow: [
               BoxShadow(
-                color: (isUsb ? const Color(0xFFFFD700) : info.badgeColor)
+                color: (isUsb ? AppColors.dacGold : info.badgeColor)
                     .withValues(alpha: 0.14),
                 blurRadius: 8,
                 spreadRadius: -1,
@@ -99,20 +103,20 @@ class AudioQualityBadge extends StatelessWidget {
                 Icon(
                   isUsb ? Icons.usb_rounded : info.icon,
                   size: compact ? 12 : 14,
-                  color: isUsb ? const Color(0xFFFFD700) : info.badgeColor,
+                  color: isUsb ? AppColors.dacGold : info.badgeColor,
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: AppSpacing.s6),
                 Text(
                   info.shortBadgeLabel,
                   style: TextStyle(
-                    color: isUsb ? const Color(0xFFFFD700) : Colors.white,
-                    fontSize: compact ? 10 : 11.5,
+                    color: isUsb ? AppColors.dacGold : Colors.white,
+                    fontSize: compact ? AppFontSize.tiny : AppFontSize.label,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: 0.6,
+                    letterSpacing: AppTracking.overline,
                   ),
                 ),
                 if (showDevice) ...[
-                  const SizedBox(width: 6),
+                  const SizedBox(width: AppSpacing.s6),
                   Container(
                     width: 3,
                     height: 3,
@@ -121,23 +125,23 @@ class AudioQualityBadge extends StatelessWidget {
                       color: Colors.white.withValues(alpha: 0.5),
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: AppSpacing.s6),
                   Text(
                     isBitPerfect
                         ? '$deviceShortName • Direct'
                         : '$deviceShortName • ${outputRate}kHz/${outputBitDepth}b',
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.9),
-                      fontSize: compact ? 9.5 : 11,
+                      fontSize: compact ? AppFontSize.tiny : AppFontSize.caption,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
-                const SizedBox(width: 4),
+                const SizedBox(width: AppSpacing.xxs),
                 Icon(
                   Icons.tune_rounded,
                   size: compact ? 11 : 13,
-                  color: (isUsb ? const Color(0xFFFFD700) : info.badgeColor)
+                  color: (isUsb ? AppColors.dacGold : info.badgeColor)
                       .withValues(alpha: 0.8),
                 ),
               ],

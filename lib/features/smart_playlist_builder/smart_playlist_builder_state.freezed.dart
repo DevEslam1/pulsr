@@ -18,6 +18,7 @@ mixin _$SmartPlaylistBuilderState {
   String get name;
   SmartCriteria get criteria;
   List<SongsTableData> get previewSongs;
+  bool get previewTruncated;
   bool get isSubmitting;
   bool get isEditing;
   int? get editingPlaylistId;
@@ -42,6 +43,8 @@ mixin _$SmartPlaylistBuilderState {
                 other.criteria == _this.criteria) &&
             const DeepCollectionEquality()
                 .equals(other.previewSongs, _this.previewSongs) &&
+            (identical(other.previewTruncated, _this.previewTruncated) ||
+                other.previewTruncated == _this.previewTruncated) &&
             (identical(other.isSubmitting, _this.isSubmitting) ||
                 other.isSubmitting == _this.isSubmitting) &&
             (identical(other.isEditing, _this.isEditing) ||
@@ -60,6 +63,7 @@ mixin _$SmartPlaylistBuilderState {
         _this.name,
         _this.criteria,
         const DeepCollectionEquality().hash(_this.previewSongs),
+        _this.previewTruncated,
         _this.isSubmitting,
         _this.isEditing,
         _this.editingPlaylistId,
@@ -69,7 +73,7 @@ mixin _$SmartPlaylistBuilderState {
   @override
   String toString() {
     final _this = this as SmartPlaylistBuilderState;
-    return 'SmartPlaylistBuilderState(name: ${_this.name}, criteria: ${_this.criteria}, previewSongs: ${_this.previewSongs}, isSubmitting: ${_this.isSubmitting}, isEditing: ${_this.isEditing}, editingPlaylistId: ${_this.editingPlaylistId}, errorMessage: ${_this.errorMessage})';
+    return 'SmartPlaylistBuilderState(name: ${_this.name}, criteria: ${_this.criteria}, previewSongs: ${_this.previewSongs}, previewTruncated: ${_this.previewTruncated}, isSubmitting: ${_this.isSubmitting}, isEditing: ${_this.isEditing}, editingPlaylistId: ${_this.editingPlaylistId}, errorMessage: ${_this.errorMessage})';
   }
 }
 
@@ -83,6 +87,7 @@ abstract mixin class $SmartPlaylistBuilderStateCopyWith<$Res> {
       {String name,
       SmartCriteria criteria,
       List<SongsTableData> previewSongs,
+      bool previewTruncated,
       bool isSubmitting,
       bool isEditing,
       int? editingPlaylistId,
@@ -105,6 +110,7 @@ class _$SmartPlaylistBuilderStateCopyWithImpl<$Res>
     Object? name = null,
     Object? criteria = null,
     Object? previewSongs = null,
+    Object? previewTruncated = null,
     Object? isSubmitting = null,
     Object? isEditing = null,
     Object? editingPlaylistId = freezed,
@@ -123,6 +129,10 @@ class _$SmartPlaylistBuilderStateCopyWithImpl<$Res>
           ? _self.previewSongs
           : previewSongs // ignore: cast_nullable_to_non_nullable
               as List<SongsTableData>,
+      previewTruncated: null == previewTruncated
+          ? _self.previewTruncated
+          : previewTruncated // ignore: cast_nullable_to_non_nullable
+              as bool,
       isSubmitting: null == isSubmitting
           ? _self.isSubmitting
           : isSubmitting // ignore: cast_nullable_to_non_nullable
@@ -240,6 +250,7 @@ extension SmartPlaylistBuilderStatePatterns on SmartPlaylistBuilderState {
             String name,
             SmartCriteria criteria,
             List<SongsTableData> previewSongs,
+            bool previewTruncated,
             bool isSubmitting,
             bool isEditing,
             int? editingPlaylistId,
@@ -254,6 +265,7 @@ extension SmartPlaylistBuilderStatePatterns on SmartPlaylistBuilderState {
             _that.name,
             _that.criteria,
             _that.previewSongs,
+            _that.previewTruncated,
             _that.isSubmitting,
             _that.isEditing,
             _that.editingPlaylistId,
@@ -282,6 +294,7 @@ extension SmartPlaylistBuilderStatePatterns on SmartPlaylistBuilderState {
             String name,
             SmartCriteria criteria,
             List<SongsTableData> previewSongs,
+            bool previewTruncated,
             bool isSubmitting,
             bool isEditing,
             int? editingPlaylistId,
@@ -295,6 +308,7 @@ extension SmartPlaylistBuilderStatePatterns on SmartPlaylistBuilderState {
             _that.name,
             _that.criteria,
             _that.previewSongs,
+            _that.previewTruncated,
             _that.isSubmitting,
             _that.isEditing,
             _that.editingPlaylistId,
@@ -322,6 +336,7 @@ extension SmartPlaylistBuilderStatePatterns on SmartPlaylistBuilderState {
             String name,
             SmartCriteria criteria,
             List<SongsTableData> previewSongs,
+            bool previewTruncated,
             bool isSubmitting,
             bool isEditing,
             int? editingPlaylistId,
@@ -335,6 +350,7 @@ extension SmartPlaylistBuilderStatePatterns on SmartPlaylistBuilderState {
             _that.name,
             _that.criteria,
             _that.previewSongs,
+            _that.previewTruncated,
             _that.isSubmitting,
             _that.isEditing,
             _that.editingPlaylistId,
@@ -352,6 +368,7 @@ class _SmartPlaylistBuilderState implements SmartPlaylistBuilderState {
       {this.name = '',
       this.criteria = const SmartCriteria(),
       List<SongsTableData> previewSongs = const [],
+      this.previewTruncated = false,
       this.isSubmitting = false,
       this.isEditing = false,
       this.editingPlaylistId,
@@ -373,6 +390,9 @@ class _SmartPlaylistBuilderState implements SmartPlaylistBuilderState {
     return EqualUnmodifiableListView(_previewSongs);
   }
 
+  @override
+  @JsonKey()
+  final bool previewTruncated;
   @override
   @JsonKey()
   final bool isSubmitting;
@@ -404,6 +424,8 @@ class _SmartPlaylistBuilderState implements SmartPlaylistBuilderState {
                 other.criteria == criteria) &&
             const DeepCollectionEquality()
                 .equals(other.previewSongs, _previewSongs) &&
+            (identical(other.previewTruncated, previewTruncated) ||
+                other.previewTruncated == previewTruncated) &&
             (identical(other.isSubmitting, isSubmitting) ||
                 other.isSubmitting == isSubmitting) &&
             (identical(other.isEditing, isEditing) ||
@@ -421,6 +443,7 @@ class _SmartPlaylistBuilderState implements SmartPlaylistBuilderState {
         name,
         criteria,
         const DeepCollectionEquality().hash(_previewSongs),
+        previewTruncated,
         isSubmitting,
         isEditing,
         editingPlaylistId,
@@ -429,7 +452,7 @@ class _SmartPlaylistBuilderState implements SmartPlaylistBuilderState {
 
   @override
   String toString() {
-    return 'SmartPlaylistBuilderState(name: $name, criteria: $criteria, previewSongs: $previewSongs, isSubmitting: $isSubmitting, isEditing: $isEditing, editingPlaylistId: $editingPlaylistId, errorMessage: $errorMessage)';
+    return 'SmartPlaylistBuilderState(name: $name, criteria: $criteria, previewSongs: $previewSongs, previewTruncated: $previewTruncated, isSubmitting: $isSubmitting, isEditing: $isEditing, editingPlaylistId: $editingPlaylistId, errorMessage: $errorMessage)';
   }
 }
 
@@ -445,6 +468,7 @@ abstract mixin class _$SmartPlaylistBuilderStateCopyWith<$Res>
       {String name,
       SmartCriteria criteria,
       List<SongsTableData> previewSongs,
+      bool previewTruncated,
       bool isSubmitting,
       bool isEditing,
       int? editingPlaylistId,
@@ -467,6 +491,7 @@ class __$SmartPlaylistBuilderStateCopyWithImpl<$Res>
     Object? name = null,
     Object? criteria = null,
     Object? previewSongs = null,
+    Object? previewTruncated = null,
     Object? isSubmitting = null,
     Object? isEditing = null,
     Object? editingPlaylistId = freezed,
@@ -485,6 +510,10 @@ class __$SmartPlaylistBuilderStateCopyWithImpl<$Res>
           ? _self._previewSongs
           : previewSongs // ignore: cast_nullable_to_non_nullable
               as List<SongsTableData>,
+      previewTruncated: null == previewTruncated
+          ? _self.previewTruncated
+          : previewTruncated // ignore: cast_nullable_to_non_nullable
+              as bool,
       isSubmitting: null == isSubmitting
           ? _self.isSubmitting
           : isSubmitting // ignore: cast_nullable_to_non_nullable

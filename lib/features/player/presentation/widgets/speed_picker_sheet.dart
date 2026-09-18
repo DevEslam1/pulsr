@@ -8,6 +8,8 @@ import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class SpeedPickerSheet extends StatelessWidget {
   const SpeedPickerSheet({super.key});
@@ -94,7 +96,7 @@ class SpeedPickerSheet extends StatelessWidget {
 
         return PulsrBottomSheetContainer(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.xs, AppSpacing.s20, AppSpacing.lg),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -122,17 +124,17 @@ class SpeedPickerSheet extends StatelessWidget {
                         ),
                         child: Text(context.l10n.reset,
                             style: TextStyle(
-                                color: p.accent, fontSize: 13)),
+                                color: p.accent, fontSize: AppFontSize.bodySmall)),
                       ),
                   ],
                 ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: AppSpacing.xs),
                           Text(
                             context.l10n.currentSpeed(formatSpeed(currentSpeed)),
                             style:
-                                TextStyle(color: p.textSecondary, fontSize: 13),
+                                TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                           ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: AppSpacing.s14),
                           SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
                             physics: const BouncingScrollPhysics(),
@@ -140,7 +142,7 @@ class SpeedPickerSheet extends StatelessWidget {
                               children: options.map((speed) {
                                 final isSelected = (currentSpeed == speed);
                                 return Padding(
-                                  padding: const EdgeInsets.only(right: 8.0),
+                                  padding: const EdgeInsetsDirectional.only(end: AppSpacing.xs),
                                   child: ChoiceChip(
                                     label: Text(formatSpeed(speed)),
                                     selected: isSelected,
@@ -168,9 +170,9 @@ class SpeedPickerSheet extends StatelessWidget {
                               }).toList(),
                             ),
                           ),
-                          const SizedBox(height: 24),
+                          const SizedBox(height: AppSpacing.lg),
                           Divider(color: p.hairline),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: AppSpacing.md),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -193,19 +195,19 @@ class SpeedPickerSheet extends StatelessWidget {
                                   ),
                                   child: Text(context.l10n.reset,
                                       style: TextStyle(
-                                          color: p.accent, fontSize: 13)),
+                                          color: p.accent, fontSize: AppFontSize.bodySmall)),
                                 ),
                             ],
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: AppSpacing.s6),
                           Text(
                             (currentPitch - 1.0).abs() < 0.01
                                 ? context.l10n.dspOriginalPitch
                                 : '${semitones > 0 ? '+' : ''}$semitones semitones (${currentPitch.toStringAsFixed(2)}x)',
                             style:
-                                TextStyle(color: p.textSecondary, fontSize: 13),
+                                TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: AppSpacing.sm),
                           PulsrSlider(
                             value: currentPitch.clamp(0.5, 2.0),
                             min: 0.5,
@@ -235,7 +237,7 @@ class SpeedPickerSheet extends StatelessWidget {
                                     ? context.l10n.dspNormal
                                     : '${pitch > 1.0 ? '+' : ''}${((pitch - 1.0) * 100).round()}%';
                                 return Padding(
-                                  padding: const EdgeInsets.only(right: 8.0),
+                                  padding: const EdgeInsetsDirectional.only(end: AppSpacing.xs),
                                   child: ChoiceChip(
                                     label: Text(label),
                                     selected: isSelected,
@@ -249,7 +251,7 @@ class SpeedPickerSheet extends StatelessWidget {
                                       fontWeight: isSelected
                                           ? FontWeight.w800
                                           : FontWeight.w500,
-                                      fontSize: 12,
+                                      fontSize: AppFontSize.label,
                                     ),
                                     side: BorderSide(
                                       color: isSelected ? p.accent : p.hairline,

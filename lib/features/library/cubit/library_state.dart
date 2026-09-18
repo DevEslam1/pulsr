@@ -24,6 +24,7 @@ abstract class LibraryState with _$LibraryState {
     @Default('title') String sortBy,
     @Default(true) bool ascending,
     @Default(false) bool isLoading,
+    @Default(false) bool isLoadingMore,
     String? errorMessage,
     @Default({}) Set<int> selectedSongIds,
     @Default(false) bool isMultiSelectMode,

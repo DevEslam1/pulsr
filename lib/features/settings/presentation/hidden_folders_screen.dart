@@ -13,6 +13,9 @@ import '../../../domain/usecases/folder_usecases.dart';
 import '../../library/cubit/library_cubit.dart';
 import '../cubit/settings_cubit.dart';
 import '../cubit/settings_state.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class HiddenFoldersScreen extends StatefulWidget {
   const HiddenFoldersScreen({super.key});
@@ -120,18 +123,17 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
           ),
           bottomNavigationBar: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.md),
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(
                   backgroundColor: p.accent,
                   foregroundColor: p.onAccent,
                   minimumSize: const Size.fromHeight(50),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
+                      borderRadius: BorderRadius.circular(AppRadii.r16)),
                 ),
                 icon: state.isScanning
-                    ? SizedBox(
-                        width: 18,
+                    ? SizedBox(width: AppSpacing.s18,
                         height: 18,
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: p.onAccent),
@@ -142,7 +144,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                       ? context.l10n.settingsRescanningLibrary
                       : context.l10n.settingsApplyRescanLibrary,
                   style: const TextStyle(
-                      fontWeight: FontWeight.w700, fontSize: 14),
+                      fontWeight: FontWeight.w700, fontSize: AppFontSize.body),
                 ),
                 onPressed: state.isScanning
                     ? null
@@ -163,18 +165,18 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 760),
               child: ListView(
-                padding: EdgeInsets.only(
+                padding: EdgeInsetsDirectional.only(
                   bottom: 40,
                   top: 8,
-                  left: Adaptive.pagePadding(context),
-                  right: Adaptive.pagePadding(context),
+                  start: Adaptive.pagePadding(context),
+                  end: Adaptive.pagePadding(context),
                 ),
                 children: [
                   // 1. Auto-Filter System Media & Messengers Card
                   Material(
                     color: p.surfaceContainer,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(AppRadii.r20),
                       side: BorderSide(color: p.hairline),
                     ),
                     clipBehavior: Clip.antiAlias,
@@ -193,23 +195,23 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                             height: 38,
                             decoration: BoxDecoration(
                               color: p.accentContainer,
-                              borderRadius: BorderRadius.circular(11),
+                              borderRadius: BorderRadius.circular(AppRadii.r12),
                             ),
                             child: Icon(Icons.mic_off_rounded,
                                 color: p.accent, size: 19),
                           ),
                           title: Text(context.l10n.autoFilterVoiceNotes,
                             style: TextStyle(
-                                fontWeight: FontWeight.w700, fontSize: 14),
+                                fontWeight: FontWeight.w700, fontSize: AppFontSize.body),
                           ),
                           subtitle: Text(context.l10n.autoFilterVoiceNotesDesc,
                             style:
-                                TextStyle(color: p.textSecondary, fontSize: 12),
+                                TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
                           ),
                         ),
                         Divider(height: 1, indent: 68, color: p.hairline),
                         Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+                          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.s14),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -225,12 +227,12 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                         decoration: BoxDecoration(
                                           color: p.accentContainer,
                                           borderRadius:
-                                              BorderRadius.circular(11),
+                                              BorderRadius.circular(AppRadii.r12),
                                         ),
                                         child: Icon(Icons.timer_outlined,
                                             color: p.accent, size: 19),
                                       ),
-                                      const SizedBox(width: 14),
+                                      const SizedBox(width: AppSpacing.s14),
                                       Column(
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
@@ -239,13 +241,13 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                             style: TextStyle(
                                               color: p.textPrimary,
                                               fontWeight: FontWeight.w700,
-                                              fontSize: 14,
+                                              fontSize: AppFontSize.body,
                                             ),
                                           ),
                                           Text(context.l10n.shortAudioFilterDesc,
                                             style: TextStyle(
                                                 color: p.textSecondary,
-                                                fontSize: 12),
+                                                fontSize: AppFontSize.label),
                                           ),
                                         ],
                                       ),
@@ -253,10 +255,11 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                   ),
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 3),
+
+                                        horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                                     decoration: BoxDecoration(
                                       color: p.accentContainer,
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.circular(AppRadii.r8),
                                     ),
                                     child: Text(
                                       state.minDurationSec > 0
@@ -265,11 +268,11 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                       style: TextStyle(
                                         color: p.accent,
                                         fontWeight: FontWeight.w800,
-                                        fontSize: 12,
+                                        fontSize: AppFontSize.label,
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 4),
+                                  const SizedBox(width: AppSpacing.xxs),
                                   IconButton(
                                     icon: Icon(Icons.settings_backup_restore,
                                         size: 18,
@@ -287,12 +290,13 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: AppSpacing.xs),
                               PulsrSlider(
                                 value: state.minDurationSec.toDouble(),
                                 min: 0,
                                 max: 90,
                                 divisions: 18,
+                                semanticLabel: context.l10n.shortAudioFilter,
                                 onChanged: (val) =>
                                     cubit.setMinDuration(val.toInt()),
                               ),
@@ -302,14 +306,14 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.sm),
 
                   // Minimum File Size Filter Card
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(AppSpacing.md),
                     decoration: BoxDecoration(
                       color: p.surfaceContainer,
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(AppRadii.r20),
                       border: Border.all(color: p.hairline),
                     ),
                     child: Column(
@@ -325,12 +329,12 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                   height: 38,
                                   decoration: BoxDecoration(
                                     color: p.accentContainer,
-                                    borderRadius: BorderRadius.circular(11),
+                                    borderRadius: BorderRadius.circular(AppRadii.r12),
                                   ),
                                   child: Icon(Icons.sd_storage_outlined,
                                       color: p.accent, size: 19),
                                 ),
-                                const SizedBox(width: 14),
+                                const SizedBox(width: AppSpacing.s14),
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -338,13 +342,13 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                       style: TextStyle(
                                         color: p.textPrimary,
                                         fontWeight: FontWeight.w700,
-                                        fontSize: 14,
+                                        fontSize: AppFontSize.body,
                                       ),
                                     ),
                                     Text(context.l10n.minFileSizeDesc,
                                       style: TextStyle(
                                           color: p.textSecondary,
-                                          fontSize: 12),
+                                          fontSize: AppFontSize.label),
                                     ),
                                   ],
                                 ),
@@ -352,10 +356,11 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                             ),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
+
+                                  horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                               decoration: BoxDecoration(
                                 color: p.accentContainer,
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(AppRadii.r8),
                               ),
                               child: Text(
                                 _minFileSizeKb > 0
@@ -366,13 +371,13 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                 style: TextStyle(
                                   color: p.accent,
                                   fontWeight: FontWeight.w800,
-                                  fontSize: 12,
+                                  fontSize: AppFontSize.label,
                                 ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.sm),
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
@@ -396,7 +401,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                 fontWeight: isSelected
                                     ? FontWeight.w700
                                     : FontWeight.normal,
-                                fontSize: 12,
+                                fontSize: AppFontSize.label,
                               ),
                             );
                           }).toList(),
@@ -404,14 +409,14 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: AppSpacing.s20),
 
                   // 2. Search & Overview Header
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Padding(
-                        padding: const EdgeInsets.only(left: 6),
+                        padding: const EdgeInsetsDirectional.only(start: AppSpacing.s6),
                         child: Text(context.l10n.deviceAudioDirectories,
                           style: Theme.of(context)
                               .textTheme
@@ -422,10 +427,11 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                       if (hiddenCount > 0)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
+
+                              horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
                           decoration: BoxDecoration(
                             color: p.error.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(AppRadii.r8),
                             border: Border.all(
                                 color: p.error.withValues(alpha: 0.3)),
                           ),
@@ -433,20 +439,20 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                             context.l10n.settingsHiddenCount(hiddenCount),
                             style: TextStyle(
                                 color: p.error,
-                                fontSize: 11,
+                                fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w700),
                           ),
                         ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.xs),
 
                   // Search Bar
                   Container(
                     height: 42,
                     decoration: BoxDecoration(
                       color: p.surfaceContainer,
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppRadii.r14),
                       border: Border.all(color: p.hairline),
                     ),
                     child: TextField(
@@ -458,11 +464,11 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                           if (mounted) setState(() => _searchQuery = val);
                         });
                       },
-                      style: TextStyle(fontSize: 13, color: p.textPrimary),
+                      style: TextStyle(fontSize: AppFontSize.bodySmall, color: p.textPrimary),
                       decoration: InputDecoration(
                         hintText: context.l10n.settingsSearchDirectoriesHint,
                         hintStyle:
-                            TextStyle(fontSize: 12, color: p.textTertiary),
+                            TextStyle(fontSize: AppFontSize.label, color: p.textTertiary),
                         prefixIcon: Icon(Icons.search_rounded,
                             color: p.textTertiary, size: 18),
                         suffixIcon: _searchQuery.isNotEmpty
@@ -479,25 +485,25 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                             : null,
                         border: InputBorder.none,
                         contentPadding:
-                            const EdgeInsets.symmetric(vertical: 11),
+                            const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.sm),
 
                   // Folders List
                   if (_isLoading)
                     Padding(
-                      padding: const EdgeInsets.all(40),
+                      padding: const EdgeInsets.all(AppSpacing.s40),
                       child: Center(
                           child: CircularProgressIndicator(color: p.accent)),
                     )
                   else if (filteredFolders.isEmpty)
                     Container(
-                      padding: const EdgeInsets.all(32),
+                      padding: const EdgeInsets.all(AppSpacing.xl),
                       decoration: BoxDecoration(
                         color: p.surfaceContainer,
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(AppRadii.r20),
                         border: Border.all(color: p.hairline),
                       ),
                       child: Center(
@@ -505,7 +511,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                           _searchQuery.isNotEmpty
                               ? context.l10n.settingsNoDirectoriesMatch(_searchQuery)
                               : context.l10n.settingsNoAudioFolders,
-                          style: TextStyle(color: p.textTertiary, fontSize: 13),
+                          style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.bodySmall),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -515,13 +521,13 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                       final isHidden = folder.isExcluded;
 
                       return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
+                        margin: const EdgeInsets.only(bottom: AppSpacing.xs),
                         child: Material(
                           color: isHidden
                               ? p.error.withValues(alpha: 0.08)
                               : p.surfaceContainer,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(AppRadii.r16),
                             side: BorderSide(
                               color: isHidden
                                   ? p.error.withValues(alpha: 0.35)
@@ -531,7 +537,8 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                           ),
                           child: ListTile(
                             contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 4),
+
+                                horizontal: AppSpacing.s14, vertical: AppSpacing.xxs),
                             leading: Container(
                               width: 40,
                               height: 40,
@@ -539,7 +546,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                 color: isHidden
                                     ? p.error.withValues(alpha: 0.15)
                                     : p.accentContainer,
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(AppRadii.r12),
                               ),
                               child: Icon(
                                 isHidden
@@ -555,7 +562,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontWeight: FontWeight.w700,
-                                fontSize: 13.5,
+                                fontSize: AppFontSize.bodySmall,
                                 color:
                                     isHidden ? p.textSecondary : p.textPrimary,
                                 decoration: isHidden
@@ -564,7 +571,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                               ),
                             ),
                             subtitle: Padding(
-                              padding: const EdgeInsets.only(top: 2),
+                              padding: const EdgeInsets.only(top: AppSpacing.s2),
                               child: Text(
                                 '${context.l10n.tracksCountPlural(folder.songCount)} • ${folder.path}',
                                 maxLines: 1,
@@ -573,7 +580,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                   color: isHidden
                                       ? p.textTertiary
                                       : p.textSecondary,
-                                  fontSize: 11,
+                                  fontSize: AppFontSize.caption,
                                 ),
                               ),
                             ),
@@ -585,9 +592,10 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                 foregroundColor:
                                     isHidden ? p.textPrimary : p.error,
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 6),
+
+                                    horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
                                 shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10)),
+                                    borderRadius: BorderRadius.circular(AppRadii.r10)),
                               ),
                               icon: Icon(
                                 isHidden
@@ -599,7 +607,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                 isHidden ? context.l10n.settingsUnhide : context.l10n.settingsHide,
                                 style: const TextStyle(
                                     fontWeight: FontWeight.w700,
-                                    fontSize: 11.5),
+                                    fontSize: AppFontSize.label),
                               ),
                               onPressed: () => _toggleFolder(folder.path),
                             ),

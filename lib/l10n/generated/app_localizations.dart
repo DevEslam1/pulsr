@@ -1768,6 +1768,48 @@ abstract class AppLocalizations {
   /// **'List view'**
   String get libraryListView;
 
+  /// No description provided for @pressBackAgainToExit.
+  ///
+  /// In en, this message translates to:
+  /// **'Press back again to exit'**
+  String get pressBackAgainToExit;
+
+  /// No description provided for @refresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get refresh;
+
+  /// No description provided for @showPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Show password'**
+  String get showPassword;
+
+  /// No description provided for @hidePassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide password'**
+  String get hidePassword;
+
+  /// No description provided for @learnMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Learn more'**
+  String get learnMore;
+
+  /// No description provided for @zoomIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom in'**
+  String get zoomIn;
+
+  /// No description provided for @zoomOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom out'**
+  String get zoomOut;
+
   /// No description provided for @authUseCodeSignIn.
   ///
   /// In en, this message translates to:
@@ -3881,6 +3923,72 @@ abstract class AppLocalizations {
   /// **'Curated Stations'**
   String get radioCuratedTitle;
 
+  /// No description provided for @radioEditStation.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Station'**
+  String get radioEditStation;
+
+  /// No description provided for @radioEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get radioEdit;
+
+  /// No description provided for @radioSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get radioSave;
+
+  /// No description provided for @radioUrlRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a stream URL'**
+  String get radioUrlRequired;
+
+  /// No description provided for @radioUrlMalformed.
+  ///
+  /// In en, this message translates to:
+  /// **'That URL could not be parsed'**
+  String get radioUrlMalformed;
+
+  /// No description provided for @radioUrlScheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Only http:// and https:// streams are supported'**
+  String get radioUrlScheme;
+
+  /// No description provided for @radioUrlNoHost.
+  ///
+  /// In en, this message translates to:
+  /// **'The URL is missing a host name'**
+  String get radioUrlNoHost;
+
+  /// No description provided for @settingsRebuildSearchIndexTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rebuild search index'**
+  String get settingsRebuildSearchIndexTitle;
+
+  /// No description provided for @settingsRebuildSearchIndexSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix missing search results by rebuilding the full-text index'**
+  String get settingsRebuildSearchIndexSubtitle;
+
+  /// No description provided for @settingsSearchIndexRebuilt.
+  ///
+  /// In en, this message translates to:
+  /// **'Search index rebuilt'**
+  String get settingsSearchIndexRebuilt;
+
+  /// No description provided for @settingsSearchIndexRebuildFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not rebuild the search index'**
+  String get settingsSearchIndexRebuildFailed;
+
   /// No description provided for @followTrackSampleRateTitle.
   ///
   /// In en, this message translates to:
@@ -4126,6 +4234,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Not now'**
   String get notificationPermissionNotNow;
+
+  /// No description provided for @onboardingNotificationDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications are off. You can enable them later in Settings.'**
+  String get onboardingNotificationDenied;
+
+  /// No description provided for @onboardingScanFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not scan your library. You can retry from Settings.'**
+  String get onboardingScanFailed;
 
   /// Explains denied permission with limited-access option
   ///
@@ -5626,6 +5746,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} tracks'**
   String previewTrackCount(Object count);
+
+  /// No description provided for @unlimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited'**
+  String get unlimited;
+
+  /// No description provided for @invalidNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a whole number greater than 0'**
+  String get invalidNumber;
+
+  /// Smart playlist preview is capped
+  ///
+  /// In en, this message translates to:
+  /// **'Showing first {count} matches'**
+  String previewTruncated(Object count);
+
+  /// No description provided for @expandPlayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand player'**
+  String get expandPlayer;
+
+  /// No description provided for @dismissPlayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss player'**
+  String get dismissPlayer;
+
+  /// No description provided for @loadMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get loadMore;
+
+  /// No description provided for @loadingMoreSongs.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading more songs…'**
+  String get loadingMoreSongs;
 
   /// tranche7 tpl
   ///

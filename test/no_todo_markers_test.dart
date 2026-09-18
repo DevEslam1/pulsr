@@ -1,8 +1,10 @@
-// Zero-tolerance hygiene gate: production sources must not carry TODO/FIXME/
-// HACK markers. Earlier tooling reported ~196 such markers, but that was a
-// false positive from case-insensitive substring matches inside identifiers
-// such as `toDouble()`. A strict word-boundary scan confirms the real count is
-// 0. This test keeps it at 0: resolve a marker or delete it, never add one.
+// Zero-tolerance hygiene gate: production sources must not carry unfinished-work
+// markers. The forbidden tokens appear only inside the regex below, never in this
+// file's own prose, so the analyzer does not flag the gate itself. Earlier
+// tooling reported ~196 such markers, but that was a false positive from
+// case-insensitive substring matches inside identifiers such as `toDouble()`. A
+// strict word-boundary scan confirms the real count is 0. This test keeps it at
+// 0: resolve a marker or delete it, never add one.
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 

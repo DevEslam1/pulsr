@@ -144,6 +144,31 @@ class YtmService {
   DateTime _botChallengeUntil = DateTime.fromMillisecondsSinceEpoch(0);
   YtmException? _lastBotChallenge;
 
+  /// Pushes bot-cooldown transitions to the UI without a polling timer: the
+  /// value flips to true when a cooldown starts and back to false exactly when
+  /// the window elapses (or a resolve proves the IP is unblocked). The search
+  /// screen listens to this instead of a 5-second [Timer.periodic] + setState.
+  final ValueNotifier<bool> botCooldownNotifier = ValueNotifier<bool>(false);
+  Timer? _botCooldownTimer;
+
+  void _syncBotCooldownNotifier() {
+    _botCooldownTimer?.cancel();
+    _botCooldownTimer = null;
+    final remaining = _botChallengeUntil.difference(DateTime.now());
+    if (remaining <= Duration.zero) {
+      if (botCooldownNotifier.value) botCooldownNotifier.value = false;
+      return;
+    }
+    if (!botCooldownNotifier.value) botCooldownNotifier.value = true;
+    _botCooldownTimer = Timer(remaining, () {
+      if (DateTime.now().isBefore(_botChallengeUntil)) {
+        _syncBotCooldownNotifier();
+      } else if (botCooldownNotifier.value) {
+        botCooldownNotifier.value = false;
+      }
+    });
+  }
+
   // FIX-C01: Per-video failure tracking (trip only if 3 failures for that videoId within 60s)
   final Map<String, List<DateTime>> _videoFailures = {};
   final Map<String, DateTime> _videoCooldownUntil = {};
@@ -193,6 +218,7 @@ class YtmService {
       final cooldown = e.isIpBlocked ? _ipBlockCooldown : _botCooldown;
       _botChallengeUntil = now.add(cooldown);
     }
+    _syncBotCooldownNotifier();
   }
 
   /// Any successful resolve proves the IP is not blocked, so an active cooldown
@@ -211,6 +237,7 @@ class YtmService {
     }
     _botChallengeUntil = DateTime.fromMillisecondsSinceEpoch(0);
     _lastBotChallenge = null;
+    _syncBotCooldownNotifier();
   }
 
   /// Test-only: clears bot-cooldown state.
@@ -224,6 +251,7 @@ class YtmService {
     }
     _botChallengeUntil = DateTime.fromMillisecondsSinceEpoch(0);
     _lastBotChallenge = null;
+    _syncBotCooldownNotifier();
   }
 
   Stream<void> get onAuthExpired => _authExpiredController.stream;
@@ -304,6 +332,22 @@ class YtmService {
           .timeout(const Duration(seconds: 2));
       if (state == null) return null;
       return state.map((k, v) => MapEntry(k.toString(), v));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Mints a content-bound (videoId) poToken for a `/player` request.
+  ///
+  /// Distinct from the visitor-bound `streamingPoToken`, which belongs on media
+  /// URLs and — for a guest web player request — makes YouTube answer UNPLAYABLE
+  /// "Video unavailable". Used by the Dart account chain's guest pass.
+  Future<String?> getPlayerPoToken(String videoId) async {
+    try {
+      final token = await _channel
+          .invokeMethod<String>('getPlayerPoToken', {'videoId': videoId})
+          .timeout(const Duration(seconds: 4));
+      return (token == null || token.isEmpty) ? null : token;
     } catch (_) {
       return null;
     }
@@ -484,11 +528,8 @@ class YtmService {
   Future<List<YtmTrack>> _searchInnertube(String query,
       {int limit = 30}) async {
     try {
-      String apiKey = const String.fromEnvironment(
-        'YTM_API_KEY',
-        defaultValue: 'AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30',
-      );
-      String clientVersion = '1.20250820.01.00';
+      String apiKey = YtmClientVersionResolver.fallbackApiKey;
+      String clientVersion = YtmClientVersionResolver.fallbackClientVersion;
       if (getIt.isRegistered<YtmClientVersionResolver>()) {
         final resolver = getIt<YtmClientVersionResolver>();
         apiKey = resolver.apiKey;
@@ -793,32 +834,39 @@ class YtmService {
       if (!inBotCooldown && getIt.isRegistered<YtmAccountService>()) {
         final account = getIt<YtmAccountService>();
         if (account.isLoggedIn) {
-          // Guard: skip Tier-1 if dataSyncId is not yet available. Without a
-          // valid dataSyncId we cannot mint an account-bound poToken, so the
-          // chain would use a guest token paired with auth cookies — a mismatch
-          // YouTube rejects with LOGIN_REQUIRED / UNPLAYABLE on every client.
-          // Tier-2 (native extractor) handles unauthenticated resolution cleanly.
+          // Do NOT gate Tier-1 on dataSyncId. YtmAccountService.resolvePlayerStream
+          // already detects a missing/empty dataSyncId and runs its chain as a
+          // clean guest pass (no session cookies), which is strictly better than
+          // skipping Tier-1 entirely: that handed every signed-in resolution to
+          // Tier-2, whose WEB_REMIX request pairs session cookies with a guest
+          // poToken — the mismatch YouTube answers with UNPLAYABLE "Video
+          // unavailable" / LOGIN_REQUIRED. It was also the reason dataSyncId was
+          // never harvested, so the account-bound token could never be minted.
+          //
+          // Kick a (throttled) dataSyncId bootstrap in parallel so later tracks
+          // resolve with the account-bound token; the current resolve proceeds
+          // on the guest/native chain meanwhile.
           if (account.dataSyncId == null || account.dataSyncId!.isEmpty) {
-            debugPrint('[YTM_SERVICE] Skipping Tier-1 for $videoId: dataSyncId '
-                'not yet ready (session warming in progress). Tier-2 will handle.');
-          } else {
+            debugPrint('[YTM_SERVICE] Tier-1 running as guest pass for $videoId: '
+                'dataSyncId not yet ready; bootstrapping in background.');
+            unawaited(account.ensureDataSyncId());
+          }
+          try {
+            _tracker?.markStage(PlaybackStage.clientRequestSent);
+            _tracker?.markStage(PlaybackStage.poTokenNeeded);
+          } catch (_) {}
+          final directStream =
+              await account.resolvePlayerStream(videoId, quality: quality);
+          if (directStream != null) {
             try {
-              _tracker?.markStage(PlaybackStage.clientRequestSent);
-              _tracker?.markStage(PlaybackStage.poTokenNeeded);
+              _tracker?.markStage(PlaybackStage.urlObtained);
             } catch (_) {}
-            final directStream =
-                await account.resolvePlayerStream(videoId, quality: quality);
-            if (directStream != null) {
-              try {
-                _tracker?.markStage(PlaybackStage.urlObtained);
-              } catch (_) {}
-              // putStream, not put: the entry keeps the real container, MIME and
-              // bitrate. put() alone let a later cache hit rebuild the stream by
-              // guessing them from the URL, which wrote Opus bytes into a .m4a.
-              urlCache?.putStream(directStream, quality: quality);
-              _noteResolveSuccess(videoId: videoId);
-              return directStream;
-            }
+            // putStream, not put: the entry keeps the real container, MIME and
+            // bitrate. put() alone let a later cache hit rebuild the stream by
+            // guessing them from the URL, which wrote Opus bytes into a .m4a.
+            urlCache?.putStream(directStream, quality: quality);
+            _noteResolveSuccess(videoId: videoId);
+            return directStream;
           }
         }
       }
@@ -975,10 +1023,7 @@ class YtmService {
   /// stream URLs without requiring native deciphers or MethodChannels.
   Future<YtmStream?> _resolveStreamDart(String videoId,
       {String quality = 'high'}) async {
-    String apiKey = const String.fromEnvironment(
-      'YTM_API_KEY',
-      defaultValue: 'AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30',
-    );
+    String apiKey = YtmClientVersionResolver.fallbackApiKey;
     if (getIt.isRegistered<YtmClientVersionResolver>()) {
       apiKey = getIt<YtmClientVersionResolver>().apiKey;
     }

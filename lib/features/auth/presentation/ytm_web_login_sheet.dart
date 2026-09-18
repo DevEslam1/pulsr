@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../../../core/utils/l10n_extensions.dart';
+import '../../../core/motion/pulsr_motion.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../../../core/constants/embedded_browser_ua.dart';
@@ -19,6 +20,9 @@ import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/ytm_locale.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 class YtmWebLoginSheet extends StatefulWidget {
   // Use the modern Google accounts sign-in flow (v3 identifier endpoint).
   // The older ServiceLogin URL is more aggressively fingerprinted for
@@ -1181,13 +1185,13 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         ),
         child: AnimatedPadding(
           padding: EdgeInsets.only(bottom: bottomInset),
-          duration: const Duration(milliseconds: 150),
+            duration: context.motionMs(150),
           child: Container(
             height: targetHeight,
             decoration: BoxDecoration(
               color: p.surface,
               borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(24)),
+                  const BorderRadius.vertical(top: Radius.circular(AppRadii.r24)),
               border: Border.all(color: p.hairline),
               boxShadow: [
                 BoxShadow(
@@ -1204,7 +1208,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                 children: [
                   // Top Drag Handle & Bar
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+                    padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.s10, AppSpacing.md, AppSpacing.s6),
                     child: Column(
                       children: [
                         Center(
@@ -1213,11 +1217,11 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                             height: 4,
                             decoration: BoxDecoration(
                               color: p.textTertiary.withValues(alpha: 0.3),
-                              borderRadius: BorderRadius.circular(2),
+                              borderRadius: BorderRadius.circular(AppRadii.r2),
                             ),
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: AppSpacing.xs),
                         if (isBrowse) ...[
                           // BROWSER TOOLBAR
                           Row(
@@ -1246,29 +1250,30 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                       }
                                     : null,
                               ),
-                              const SizedBox(width: 4),
+                              const SizedBox(width: AppSpacing.xxs),
                               Expanded(
                                 child: Container(
                                   height: 36,
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 10),
+
+                                      horizontal: AppSpacing.s10),
                                   decoration: BoxDecoration(
                                     color: p.surfaceContainerHigh,
-                                    borderRadius: BorderRadius.circular(10),
+                                    borderRadius: BorderRadius.circular(AppRadii.r10),
                                     border: Border.all(color: p.hairline),
                                   ),
                                   child: Row(
                                     children: [
                                       Icon(Icons.lock_rounded,
                                           size: 13, color: p.accent),
-                                      const SizedBox(width: 6),
+                                      const SizedBox(width: AppSpacing.s6),
                                       Expanded(
                                         child: Text(
                                           _currentUrl.replaceFirst(
                                               'https://', ''),
                                           style: TextStyle(
                                             color: p.textSecondary,
-                                            fontSize: 12,
+                                            fontSize: AppFontSize.label,
                                             fontFamily: 'monospace',
                                           ),
                                           overflow: TextOverflow.ellipsis,
@@ -1278,7 +1283,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 4),
+                              const SizedBox(width: AppSpacing.xxs),
                               IconButton(
                                 icon:
                                     const Icon(Icons.refresh_rounded, size: 20),
@@ -1298,7 +1303,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                             child: ListView(
                               scrollDirection: Axis.horizontal,
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 4, vertical: 2),
+
+                                  horizontal: AppSpacing.xxs, vertical: AppSpacing.s2),
                               children: [
                                 _navChip(
                                   label: context.l10n.browseHome,
@@ -1306,7 +1312,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                   url: YtmLocale.homeUrl(),
                                   p: p,
                                 ),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: AppSpacing.s6),
                                 _navChip(
                                   label: context.l10n.browseExplore,
                                   icon: Icons.explore_rounded,
@@ -1314,7 +1320,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                       'https://music.youtube.com/explore'),
                                   p: p,
                                 ),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: AppSpacing.s6),
                                 _navChip(
                                   label: context.l10n.navLibrary,
                                   icon: Icons.library_music_rounded,
@@ -1322,7 +1328,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                       'https://music.youtube.com/library'),
                                   p: p,
                                 ),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: AppSpacing.s6),
                                 _navChip(
                                   label: context.l10n.likedMusic,
                                   icon: Icons.favorite_rounded,
@@ -1331,7 +1337,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                           'https://music.youtube.com/playlist?list=LM'),
                                   p: p,
                                 ),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: AppSpacing.s6),
                                 _navChip(
                                   label: context.l10n.newReleases,
                                   icon: Icons.fiber_new_rounded,
@@ -1339,7 +1345,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                       'https://music.youtube.com/new_releases'),
                                   p: p,
                                 ),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: AppSpacing.s6),
                                 _navChip(
                                   label: context.l10n.history,
                                   icon: Icons.history_rounded,
@@ -1347,14 +1353,14 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                       'https://music.youtube.com/history'),
                                   p: p,
                                 ),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: AppSpacing.s6),
                                 _navChip(
                                   label: context.l10n.browseYoutubeWeb,
                                   icon: Icons.video_library_rounded,
                                   url: 'https://www.youtube.com',
                                   p: p,
                                 ),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: AppSpacing.s6),
                                 _navChip(
                                   label: context.l10n.browseEgyptMode,
                                   icon: Icons.public_rounded,
@@ -1376,7 +1382,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                 color: _isLoggedIn ? p.success : p.error,
                                 size: 22,
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: AppSpacing.xs),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1390,11 +1396,11 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         color: p.textPrimary,
-                                        fontSize: 14.5,
+                                        fontSize: AppFontSize.body,
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
-                                    const SizedBox(height: 1),
+                                    const SizedBox(height: AppSpacing.s2),
                                     Text(
                                       _isLoggedIn
                                           ? context.l10n.browseAccountConnectedDone
@@ -1405,7 +1411,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                         color: _isLoggedIn
                                             ? p.success
                                             : p.textSecondary,
-                                        fontSize: 11,
+                                        fontSize: AppFontSize.caption,
                                         fontWeight: _isLoggedIn
                                             ? FontWeight.w600
                                             : FontWeight.normal,
@@ -1414,7 +1420,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                   ],
                                 ),
                               ),
-                              const SizedBox(width: 6),
+                              const SizedBox(width: AppSpacing.s6),
                               // Action Controls
                               if (_isLoggedIn) ...[
                                 FilledButton.icon(
@@ -1426,7 +1432,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                   ),
                                   label: Text(context.l10n.doneAction,
                                     style: TextStyle(
-                                      fontSize: 12.5,
+                                      fontSize: AppFontSize.label,
                                       fontWeight: FontWeight.w700,
                                       color: Colors.white,
                                     ),
@@ -1436,13 +1442,14 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                     elevation: 2,
                                     visualDensity: VisualDensity.compact,
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 6,
+
+                                      horizontal: AppSpacing.s10,
+                                      vertical: AppSpacing.s6,
                                     ),
                                     minimumSize: Size.zero,
                                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.circular(AppRadii.r8),
                                     ),
                                   ),
                                 ),
@@ -1455,37 +1462,38 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                     elevation: 0,
                                     visualDensity: VisualDensity.compact,
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 6,
+
+                                      horizontal: AppSpacing.s10,
+                                      vertical: AppSpacing.s6,
                                     ),
                                     minimumSize: Size.zero,
                                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.circular(AppRadii.r8),
                                       side: BorderSide(color: p.hairline),
                                     ),
                                   ),
                                   child: Text(context.l10n.doneAction,
                                     style: TextStyle(
-                                      fontSize: 12,
+                                      fontSize: AppFontSize.label,
                                       fontWeight: FontWeight.w600,
                                       color: p.textPrimary,
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 2),
+                                const SizedBox(width: AppSpacing.s2),
                                 IconButton(
                                   icon: const Icon(Icons.refresh_rounded, size: 18),
                                   tooltip: context.l10n.browseRefreshPage,
-                                  padding: const EdgeInsets.all(6),
+                                  padding: const EdgeInsets.all(AppSpacing.s6),
                                   constraints: const BoxConstraints(),
                                   onPressed: () => _webViewController?.reload(),
                                 ),
-                                const SizedBox(width: 2),
+                                const SizedBox(width: AppSpacing.s2),
                                 PopupMenuButton<String>(
                                   icon: const Icon(Icons.more_vert_rounded, size: 18),
                                   tooltip: context.l10n.browseMoreOptions,
-                                  padding: const EdgeInsets.all(6),
+                                  padding: const EdgeInsets.all(AppSpacing.s6),
                                   constraints: const BoxConstraints(),
                                   onSelected: (action) {
                                     switch (action) {
@@ -1507,7 +1515,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                         children: [
                                           Icon(Icons.music_note_rounded,
                                               size: 18, color: p.textSecondary),
-                                          const SizedBox(width: 8),
+                                          const SizedBox(width: AppSpacing.xs),
                                           Text(context.l10n.openYtmWeb),
                                         ],
                                       ),
@@ -1518,7 +1526,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                         children: [
                                           Icon(Icons.vpn_key_rounded,
                                               size: 18, color: p.textSecondary),
-                                          const SizedBox(width: 8),
+                                          const SizedBox(width: AppSpacing.xs),
                                           Text(context.l10n.importCookiesManual),
                                         ],
                                       ),
@@ -1529,7 +1537,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                         children: [
                                           Icon(Icons.cleaning_services_rounded,
                                               size: 18, color: p.textSecondary),
-                                          const SizedBox(width: 8),
+                                          const SizedBox(width: AppSpacing.xs),
                                           Text(context.l10n.clearCacheReset),
                                         ],
                                       ),
@@ -1537,11 +1545,11 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                   ],
                                 ),
                               ],
-                              const SizedBox(width: 2),
+                              const SizedBox(width: AppSpacing.s2),
                               IconButton(
                                 icon: const Icon(Icons.close_rounded, size: 18),
                                 tooltip: context.l10n.browseClose,
-                                padding: const EdgeInsets.all(6),
+                                padding: const EdgeInsets.all(AppSpacing.s6),
                                 constraints: const BoxConstraints(),
                                 onPressed: () =>
                                     Navigator.of(context).pop(false),
@@ -1556,12 +1564,14 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                   if (!isBrowse && _isLoggedIn)
                     Container(
                       margin: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 4),
+
+                          horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
+
+                          horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.success.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(AppRadii.r10),
                         border:
                             Border.all(color: p.success.withValues(alpha: 0.4)),
                       ),
@@ -1569,11 +1579,11 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                         children: [
                           Icon(Icons.check_circle_outline_rounded,
                               size: 18, color: p.success),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: AppSpacing.xs),
                           Expanded(
                             child: Text(context.l10n.loginDetected,
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: AppFontSize.label,
                                 fontWeight: FontWeight.w600,
                                 color: p.textPrimary,
                               ),
@@ -1585,12 +1595,14 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                   else if (!isBrowse && _showHint)
                     Container(
                       margin: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 4),
+
+                          horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
+
+                          horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: Colors.amber.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadii.r8),
                         border: Border.all(
                             color: Colors.amber.withValues(alpha: 0.4)),
                       ),
@@ -1598,11 +1610,11 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                         children: [
                           Icon(Icons.info_outline_rounded,
                               size: 18, color: p.warning),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: AppSpacing.xs),
                           Expanded(
                             child: Text(context.l10n.confirmAccount,
                               style:
-                                  TextStyle(fontSize: 12, color: p.textPrimary),
+                                  TextStyle(fontSize: AppFontSize.label, color: p.textPrimary),
                             ),
                           ),
                         ],
@@ -1613,29 +1625,30 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                   if (!isBrowse && _blockStatus != null)
                     Container(
                       margin: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 4),
+
+                          horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
+
+                          horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadii.r8),
                         border:
                             Border.all(color: p.accent.withValues(alpha: 0.4)),
                       ),
                       child: Row(
                         children: [
-                          SizedBox(
-                            width: 14,
+                          SizedBox(width: AppSpacing.s14,
                             height: 14,
                             child: CircularProgressIndicator(
                                 strokeWidth: 2, color: p.accent),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: AppSpacing.xs),
                           Expanded(
                             child: Text(
                               _blockStatus!,
                               style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: AppFontSize.label,
                                   fontWeight: FontWeight.w600,
                                   color: p.textPrimary),
                             ),
@@ -1648,11 +1661,12 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                   if (_isGeoBlocked)
                     Container(
                       margin: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 4),
-                      padding: const EdgeInsets.all(10),
+
+                          horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
+                      padding: const EdgeInsets.all(AppSpacing.s10),
                       decoration: BoxDecoration(
                         color: Colors.amber.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(AppRadii.r10),
                         border: Border.all(
                             color: Colors.amber.withValues(alpha: 0.4)),
                       ),
@@ -1663,11 +1677,11 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                             children: [
                               Icon(Icons.public_off_rounded,
                                   color: p.warning, size: 17),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: AppSpacing.xs),
                               Expanded(
                                 child: Text(context.l10n.ytmRestricted,
                                   style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: AppFontSize.label,
                                     fontWeight: FontWeight.w700,
                                     color: p.textPrimary,
                                   ),
@@ -1675,43 +1689,45 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: AppSpacing.xxs),
                           Text(context.l10n.ipOutsideYtm,
                             style: TextStyle(
-                                fontSize: 11, color: p.textSecondary),
+                                fontSize: AppFontSize.caption, color: p.textSecondary),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: AppSpacing.xs),
                           Row(
                             children: [
                               FilledButton.icon(
                                 onPressed: _forceEgRegionReload,
                                 icon: const Text('🇪🇬',
-                                    style: TextStyle(fontSize: 12)),
+                                    style: TextStyle(fontSize: AppFontSize.label)),
                                 label: Text(context.l10n.forceEgypt,
-                                    style: TextStyle(fontSize: 11)),
+                                    style: TextStyle(fontSize: AppFontSize.caption)),
                                 style: FilledButton.styleFrom(
                                   backgroundColor: p.accent,
                                   foregroundColor: p.onAccent,
                                   visualDensity: VisualDensity.compact,
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 4),
+
+                                      horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
                                   minimumSize: Size.zero,
                                   tapTargetSize:
                                       MaterialTapTargetSize.shrinkWrap,
                                 ),
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: AppSpacing.xs),
                               OutlinedButton.icon(
                                 onPressed: () =>
                                     _navigateTo('https://www.youtube.com'),
                                 icon: const Icon(Icons.video_library_rounded,
                                     size: 13),
                                 label: Text(context.l10n.openYtWeb,
-                                    style: TextStyle(fontSize: 11)),
+                                    style: TextStyle(fontSize: AppFontSize.caption)),
                                 style: OutlinedButton.styleFrom(
                                   visualDensity: VisualDensity.compact,
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 4),
+
+                                      horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
                                   minimumSize: Size.zero,
                                   tapTargetSize:
                                       MaterialTapTargetSize.shrinkWrap,
@@ -1746,7 +1762,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                     child: _settings == null
                         ? const Center(
                             child: Padding(
-                              padding: EdgeInsets.all(24),
+                              padding: EdgeInsets.all(AppSpacing.lg),
                               child: CircularProgressIndicator(),
                             ),
                           )
@@ -1976,15 +1992,15 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20, vertical: AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
               color: p.error.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppRadii.r14),
               border: Border.all(color: p.error.withValues(alpha: 0.35)),
             ),
             child: Column(
@@ -1993,36 +2009,36 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                 Row(
                   children: [
                     Icon(Icons.gpp_bad_rounded, color: p.error, size: 22),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: AppSpacing.s10),
                     Expanded(
                       child: Text(
                         context.l10n.browseGoogleBlocking,
                         style: TextStyle(
                             color: p.textPrimary,
-                            fontSize: 15,
+                            fontSize: AppFontSize.callout,
                             fontWeight: FontWeight.w800),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.s10),
                 Text(
                   context.l10n.browseGoogleBlockingBody,
                   style: TextStyle(
-                      color: p.textSecondary, fontSize: 12.5, height: 1.4),
+                      color: p.textSecondary, fontSize: AppFontSize.label, height: 1.4),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
                   '${context.l10n.browseCurrentIdentity}: ${identityLabel(currentIdentity)}',
                   style: TextStyle(
                       color: p.textTertiary,
-                      fontSize: 11,
+                      fontSize: AppFontSize.caption,
                       fontWeight: FontWeight.w600),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.s14),
           FilledButton.icon(
             onPressed: () async {
               final ok = await YtmOAuthLoginSheet.show(context);
@@ -2034,12 +2050,12 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
             style: FilledButton.styleFrom(
               backgroundColor: p.accent,
               foregroundColor: p.onAccent,
-              padding: const EdgeInsets.symmetric(vertical: 12),
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(AppRadii.r12)),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           FilledButton.icon(
             onPressed: _manualRetryFromBlock,
             icon: const Icon(Icons.refresh_rounded, size: 18),
@@ -2048,12 +2064,12 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
             style: FilledButton.styleFrom(
               backgroundColor: p.surfaceContainerHigh,
               foregroundColor: p.textPrimary,
-              padding: const EdgeInsets.symmetric(vertical: 12),
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(AppRadii.r12)),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           OutlinedButton.icon(
             onPressed: () => _switchIdentityManually(otherIdentity),
             icon: Icon(identityIcon(otherIdentity), size: 18),
@@ -2063,12 +2079,12 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
             style: OutlinedButton.styleFrom(
               foregroundColor: p.textPrimary,
               side: BorderSide(color: p.hairline),
-              padding: const EdgeInsets.symmetric(vertical: 12),
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(AppRadii.r12)),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           OutlinedButton.icon(
             onPressed: () {
               setState(() => _blockExhausted = false);
@@ -2080,12 +2096,12 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
             style: OutlinedButton.styleFrom(
               foregroundColor: p.textPrimary,
               side: BorderSide(color: p.hairline),
-              padding: const EdgeInsets.symmetric(vertical: 12),
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(AppRadii.r12)),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           OutlinedButton.icon(
             onPressed: () => _showManualCookieDialog(context),
             icon: const Icon(Icons.vpn_key_rounded, size: 18),
@@ -2094,15 +2110,15 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
             style: OutlinedButton.styleFrom(
               foregroundColor: p.textPrimary,
               side: BorderSide(color: p.hairline),
-              padding: const EdgeInsets.symmetric(vertical: 12),
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(AppRadii.r12)),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.s10),
           Text(context.l10n.googleBlockTip,
             textAlign: TextAlign.center,
-            style: TextStyle(color: p.textTertiary, fontSize: 11),
+            style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.caption),
           ),
         ],
       ),
@@ -2119,12 +2135,12 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
     return InkWell(
       onTap: () => _navigateTo(url),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(AppRadii.r8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
         decoration: BoxDecoration(
           color: isCurrent ? p.accentContainer : p.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(AppRadii.r8),
           border: Border.all(
             color: isCurrent ? p.accent : p.hairline,
           ),
@@ -2133,12 +2149,12 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, size: 13, color: isCurrent ? p.accent : p.textSecondary),
-            const SizedBox(width: 5),
+            const SizedBox(width: AppSpacing.s6),
             Text(
               label,
               style: TextStyle(
                 color: isCurrent ? p.accent : p.textPrimary,
-                fontSize: 11,
+                fontSize: AppFontSize.caption,
                 fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
               ),
             ),
@@ -2162,17 +2178,17 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           title: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(AppSpacing.xs),
                 decoration: BoxDecoration(
                   color: p.accent.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppRadii.r10),
                 ),
                 child: Icon(Icons.vpn_key_rounded, color: p.accent, size: 20),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: AppSpacing.s10),
               Expanded(
                 child: Text(context.l10n.importCookiesManual,
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                  style: TextStyle(fontSize: AppFontSize.bodyLarge, fontWeight: FontWeight.w800),
                 ),
               ),
             ],
@@ -2183,22 +2199,22 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(context.l10n.googleBlockHelp,
-                  style: TextStyle(color: p.textSecondary, fontSize: 12.5, height: 1.4),
+                  style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label, height: 1.4),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.sm),
                 TextField(
                   controller: textController,
                   maxLines: 4,
                   enabled: !busy,
-                  style: TextStyle(color: p.textPrimary, fontSize: 12, fontFamily: 'monospace'),
+                  style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.label, fontFamily: 'monospace'),
                   decoration: InputDecoration(
                     hintText: 'SAPISID=...; __Secure-3PSID=...; SID=...',
-                    hintStyle: TextStyle(color: p.textTertiary, fontSize: 11),
+                    hintStyle: TextStyle(color: p.textTertiary, fontSize: AppFontSize.caption),
                     filled: true,
                     fillColor: p.surfaceContainer,
                     errorText: errorText,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(AppRadii.r10),
                       borderSide: BorderSide(color: p.hairline),
                     ),
                   ),

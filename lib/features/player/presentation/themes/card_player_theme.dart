@@ -30,6 +30,10 @@ import '../widgets/player_controls.dart';
 import '../widgets/player_seek_bar.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'player_shape.dart';
 
 class CardPlayerTheme extends StatelessWidget {
   final PlayerThemeProps props;
@@ -194,7 +198,8 @@ class CardPlayerTheme extends StatelessWidget {
                                     tag: 'now_playing_art_full',
                                     child: Container(
                                       decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(28),
+                                        borderRadius: BorderRadius.circular(
+                          resolveCustomRadius(context, AppRadii.r28)),
                                         boxShadow: [
                                           BoxShadow(
                                             color: Colors.black.withValues(
@@ -225,7 +230,7 @@ class CardPlayerTheme extends StatelessWidget {
                                               decoration: BoxDecoration(
                                                 color: p.surfaceContainer,
                                                 borderRadius:
-                                                    BorderRadius.circular(28),
+                                                    BorderRadius.circular(AppRadii.r28),
                                               ),
                                               child: Icon(
                                                 Icons.music_note_rounded,
@@ -248,7 +253,8 @@ class CardPlayerTheme extends StatelessWidget {
                           !state.isQueueVisible)
                       ? Padding(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 24, vertical: 2),
+
+                              horizontal: AppSpacing.lg, vertical: AppSpacing.s2),
                           child: AudioVisualizer(
                             style: settingsState.visualizerStyle,
                             color: activeColor,
@@ -264,14 +270,15 @@ class CardPlayerTheme extends StatelessWidget {
                       : const SizedBox.shrink();
 
               final bottomGlassCard = GlassContainer(
-                borderRadius: BorderRadius.circular(28),
+                borderRadius: BorderRadius.circular(
+                          resolveCustomRadius(context, AppRadii.r28)),
                 blur: 24,
                 color: cardBgColor,
                 border: Border.all(
                   color: cardBorderColor,
                   width: 1,
                 ),
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+                padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.s10),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -318,7 +325,7 @@ class CardPlayerTheme extends StatelessWidget {
                         // Center: Title & Artist
                         Expanded(
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -326,19 +333,19 @@ class CardPlayerTheme extends StatelessWidget {
                                   text: song?.title ?? context.l10n.noTrackSelected,
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
-                                    fontSize: isTablet ? 23 : 19,
+                                    fontSize: isTablet ? AppFontSize.headline : AppFontSize.title,
                                     fontWeight: FontWeight.w900,
                                     color: textTitleColor,
                                     height: 1.22,
-                                    letterSpacing: -0.3,
+                                    letterSpacing: AppTracking.title,
                                   ),
                                 ),
-                                const SizedBox(height: 2),
+                                const SizedBox(height: AppSpacing.s2),
                                 MarqueeText(
                                   text: song?.artist ?? context.l10n.unknownArtist,
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
-                                    fontSize: isTablet ? 15 : 13.5,
+                                    fontSize: isTablet ? AppFontSize.callout : AppFontSize.bodySmall,
                                     fontWeight: FontWeight.w600,
                                     color: textSubtitleColor,
                                   ),
@@ -349,8 +356,7 @@ class CardPlayerTheme extends StatelessWidget {
                         ),
 
                         // Right Symmetrical Action: Animated Favorite Button
-                        SizedBox(
-                          width: 48,
+                        SizedBox(width: AppSpacing.xxl,
                           height: 48,
                           child: Material(
                             color: Colors.white.withValues(alpha: 0.06),
@@ -376,7 +382,7 @@ class CardPlayerTheme extends StatelessWidget {
                     ),
 
                     if (song != null) ...[
-                      const SizedBox(height: 6),
+                      const SizedBox(height: AppSpacing.s6),
                       Center(
                         child: AudioQualityBadge(
                           song: song,
@@ -395,6 +401,8 @@ class CardPlayerTheme extends StatelessWidget {
                       activeColor: activeColor,
                       songId: state.currentSong?.id,
                       filePath: state.currentSong?.path,
+                      loopPointA: state.abPointA,
+                      loopPointB: state.abPointB,
                       onSeek: (pos) => cubit.seek(pos),
                     ),
 
@@ -429,7 +437,7 @@ class CardPlayerTheme extends StatelessWidget {
 
               if (isLandscape) {
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
@@ -450,7 +458,7 @@ class CardPlayerTheme extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: AppSpacing.md),
                       Expanded(
                         flex: 6,
                         child: SingleChildScrollView(
@@ -466,14 +474,14 @@ class CardPlayerTheme extends StatelessWidget {
                 children: [
                   // Top Pull-down Handle Indicator
                   Padding(
-                    padding: const EdgeInsets.only(top: 4, bottom: 2),
+                    padding: const EdgeInsets.only(top: AppSpacing.xxs, bottom: AppSpacing.s2),
                     child: Center(
                       child: Container(
                         width: 38,
                         height: 4,
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.22),
-                          borderRadius: BorderRadius.circular(2),
+                          borderRadius: BorderRadius.circular(AppRadii.r2),
                         ),
                       ),
                     ),
@@ -482,8 +490,9 @@ class CardPlayerTheme extends StatelessWidget {
                   // Top App Bar - Symmetrical Left/Right Targets & Centered Header
                   Padding(
                     padding: EdgeInsets.symmetric(
+
                       horizontal: isTablet ? 28 : 20,
-                      vertical: 2,
+                      vertical: AppSpacing.s2,
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -519,7 +528,7 @@ class CardPlayerTheme extends StatelessWidget {
                         // Center: "PLAYING FROM" / Album Header
                         Expanded(
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -533,15 +542,15 @@ class CardPlayerTheme extends StatelessWidget {
                                           : textSubtitleColor,
                                       animate: state.isPlaying,
                                     ),
-                                    const SizedBox(width: 6),
+                                    const SizedBox(width: AppSpacing.s6),
                                     Text(
                                       context.l10n.playingFrom.toUpperCase(),
                                       style: Theme.of(context)
                                           .textTheme
                                           .bodySmall
                                           ?.copyWith(
-                                            fontSize: 10,
-                                            letterSpacing: 1.2,
+                                            fontSize: AppFontSize.tiny,
+                                            letterSpacing: AppTracking.wide,
                                             fontWeight: FontWeight.w800,
                                             color: textSubtitleColor
                                                 .withValues(alpha: 0.8),
@@ -549,7 +558,7 @@ class CardPlayerTheme extends StatelessWidget {
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 2),
+                                const SizedBox(height: AppSpacing.s2),
                                 Text(
                                   (song?.album != null &&
                                           song!.album.trim().isNotEmpty)
@@ -566,7 +575,7 @@ class CardPlayerTheme extends StatelessWidget {
                                       .titleSmall
                                       ?.copyWith(
                                         fontWeight: FontWeight.w800,
-                                        fontSize: isTablet ? 14 : 13,
+                                        fontSize: isTablet ? AppFontSize.body : AppFontSize.bodySmall,
                                         color: textTitleColor,
                                       ),
                                 ),
@@ -647,12 +656,13 @@ class CardPlayerTheme extends StatelessWidget {
 
                   if (visualizer != const SizedBox.shrink()) visualizer,
 
-                  const SizedBox(height: 6),
+                  const SizedBox(height: AppSpacing.s6),
 
                   // Bottom Card with Controls and EQ Action Dock
                   Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 4),
+
+                        horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
                     child: bottomGlassCard,
                   ),
                 ],

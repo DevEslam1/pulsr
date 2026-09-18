@@ -14,6 +14,10 @@ class SmartPlaylistBuilderCubit extends Cubit<SmartPlaylistBuilderState> {
   final PlaylistUseCases _playlistUseCases;
   StreamSubscription? _previewSub;
 
+  /// The live preview is capped so a rule set that matches the entire library
+  /// cannot materialize every row into memory (OOM risk on large libraries).
+  static const int previewCap = 100;
+
   SmartPlaylistBuilderCubit(this._engine, this._playlistUseCases)
       : super(const SmartPlaylistBuilderState()) {
     // Initialize with default initial rule
@@ -91,14 +95,27 @@ class SmartPlaylistBuilderCubit extends Cubit<SmartPlaylistBuilderState> {
 
   void _updatePreview() {
     _previewSub?.cancel();
-    _previewSub = _engine.watchCriteria(state.criteria).listen(
+
+    final queryLimit = (state.criteria.limit == null || state.criteria.limit! > previewCap)
+        ? previewCap + 1
+        : state.criteria.limit;
+    
+    final previewCriteria = state.criteria.copyWith(limit: queryLimit);
+
+    _previewSub = _engine.watchCriteria(previewCriteria).listen(
       (songs) {
         if (isClosed) return;
-        emit(state.copyWith(previewSongs: songs));
+        final truncated = songs.length > previewCap;
+        final visible =
+            truncated ? songs.take(previewCap).toList() : songs;
+        emit(state.copyWith(
+          previewSongs: visible,
+          previewTruncated: truncated,
+        ));
       },
       onError: (_) {
         if (isClosed) return;
-        emit(state.copyWith(previewSongs: []));
+        emit(state.copyWith(previewSongs: [], previewTruncated: false));
       },
     );
   }

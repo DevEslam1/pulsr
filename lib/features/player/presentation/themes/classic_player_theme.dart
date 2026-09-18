@@ -29,6 +29,10 @@ import '../widgets/player_controls.dart';
 import '../widgets/player_seek_bar.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'player_shape.dart';
 
 class ClassicPlayerTheme extends StatelessWidget {
   final PlayerThemeProps props;
@@ -46,6 +50,10 @@ class ClassicPlayerTheme extends StatelessWidget {
 
     final settingsState = context.watch<SettingsCubit>().state;
     final visualizerStyle = settingsState.visualizerStyle;
+
+    // Custom Theme Studio: the user's corner radius drives the artwork squircle
+    // when the custom colour source is active; preset themes keep their own.
+    final artRadius = resolveCustomRadius(context, AppRadii.r28);
 
     final isTablet = context.isTablet;
 
@@ -79,10 +87,10 @@ class ClassicPlayerTheme extends StatelessWidget {
         ),
 
         // Ambient Top Glow Sphere (Behind Artwork)
-        Positioned(
+        PositionedDirectional(
           top: -40,
-          left: -30,
-          right: -30,
+          start: -30,
+          end: -30,
           height: isTablet ? 540 : 420,
           child: IgnorePointer(
             child: AnimatedContainer(
@@ -104,10 +112,10 @@ class ClassicPlayerTheme extends StatelessWidget {
         ),
 
         // Ambient Bottom Glow (Near Controls) - Centered for visual symmetry
-        Positioned(
+        PositionedDirectional(
           bottom: -70,
-          left: 0,
-          right: 0,
+          start: 0,
+          end: 0,
           height: isTablet ? 420 : 320,
           child: IgnorePointer(
             child: AnimatedContainer(
@@ -134,14 +142,14 @@ class ClassicPlayerTheme extends StatelessWidget {
             children: [
               // Top Pull-down Handle Indicator
               Padding(
-                padding: const EdgeInsets.only(top: 6, bottom: 4),
+                padding: const EdgeInsets.only(top: AppSpacing.s6, bottom: AppSpacing.xxs),
                 child: Center(
                   child: Container(
                     width: 38,
                     height: 4,
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.22),
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(AppRadii.r2),
                     ),
                   ),
                 ),
@@ -150,8 +158,9 @@ class ClassicPlayerTheme extends StatelessWidget {
               // Top App Bar - Symmetrical Left/Right Touch Targets & Centered Header
               Padding(
                 padding: EdgeInsets.symmetric(
+
                   horizontal: isTablet ? 28 : 20,
-                  vertical: 4,
+                  vertical: AppSpacing.xxs,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -187,7 +196,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                     // Center: "PLAYING FROM" / Album Header (Symmetric & Centered)
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -201,15 +210,15 @@ class ClassicPlayerTheme extends StatelessWidget {
                                       : p.textSecondary,
                                   animate: state.isPlaying,
                                 ),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: AppSpacing.s6),
                                 Text(
                                   context.l10n.playingFrom.toUpperCase(),
                                   style: Theme.of(context)
                                       .textTheme
                                       .bodySmall
                                       ?.copyWith(
-                                        fontSize: 10,
-                                        letterSpacing: 1.2,
+                                        fontSize: AppFontSize.tiny,
+                                        letterSpacing: AppTracking.wide,
                                         fontWeight: FontWeight.w800,
                                         color: p.textSecondary
                                             .withValues(alpha: 0.8),
@@ -217,7 +226,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: AppSpacing.s2),
                             Text(
                               (song?.album != null &&
                                       song!.album.trim().isNotEmpty)
@@ -234,7 +243,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                                   .titleSmall
                                   ?.copyWith(
                                     fontWeight: FontWeight.w800,
-                                    fontSize: isTablet ? 14 : 13,
+                                    fontSize: isTablet ? AppFontSize.body : AppFontSize.bodySmall,
                                     color: p.textPrimary,
                                   ),
                             ),
@@ -272,7 +281,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 2),
+              const SizedBox(height: AppSpacing.s2),
 
               // Responsive Two-Pane (Landscape / Tablet) vs Single Column (Portrait)
               Expanded(
@@ -374,7 +383,8 @@ class ClassicPlayerTheme extends StatelessWidget {
                                                 .motionCurve(Curves.easeOutCubic),
                                             decoration: BoxDecoration(
                                               borderRadius:
-                                                  BorderRadius.circular(28),
+                                                  BorderRadius.circular(
+                                                      artRadius),
                                               border: Border.all(
                                                 color: Colors.white
                                                     .withValues(alpha: 0.14),
@@ -405,7 +415,8 @@ class ClassicPlayerTheme extends StatelessWidget {
                                             ),
                                             child: ClipRRect(
                                               borderRadius:
-                                                  BorderRadius.circular(26.8),
+                                                  BorderRadius.circular(
+                                                      artRadius),
                                               child: song != null
                                                   ? CachedArtwork(
                                                       id: song.id,
@@ -432,7 +443,8 @@ class ClassicPlayerTheme extends StatelessWidget {
                               constraints: const BoxConstraints(maxWidth: 360),
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 24, vertical: 4),
+
+                                    horizontal: AppSpacing.lg, vertical: AppSpacing.xxs),
                                 child: AudioVisualizer(
                                   style: visualizerStyle,
                                   color: activeColor,
@@ -460,8 +472,9 @@ class ClassicPlayerTheme extends StatelessWidget {
                         // Symmetrical Track Header: [Action] Title/Artist [Favorite]
                         Padding(
                           padding: EdgeInsets.symmetric(
+
                             horizontal: isTablet ? 28 : 20,
-                            vertical: 2,
+                            vertical: AppSpacing.s2,
                           ),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -510,7 +523,8 @@ class ClassicPlayerTheme extends StatelessWidget {
                                   Expanded(
                                     child: Padding(
                                       padding: const EdgeInsets.symmetric(
-                                          horizontal: 10),
+
+                                          horizontal: AppSpacing.s10),
                                       child: Column(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
@@ -519,20 +533,20 @@ class ClassicPlayerTheme extends StatelessWidget {
                                                 context.l10n.noTrackSelected,
                                             textAlign: TextAlign.center,
                                             style: TextStyle(
-                                              fontSize: isTablet ? 23 : 19,
+                                              fontSize: isTablet ? AppFontSize.headline : AppFontSize.title,
                                               fontWeight: FontWeight.w900,
                                               color: p.textPrimary,
                                               height: 1.22,
-                                              letterSpacing: -0.3,
+                                              letterSpacing: AppTracking.title,
                                             ),
                                           ),
-                                          const SizedBox(height: 3),
+                                          const SizedBox(height: AppSpacing.xxs),
                                           MarqueeText(
                                             text: song?.artist ??
                                                 context.l10n.unknownArtist,
                                             textAlign: TextAlign.center,
                                             style: TextStyle(
-                                              fontSize: isTablet ? 15 : 13.5,
+                                              fontSize: isTablet ? AppFontSize.callout : AppFontSize.bodySmall,
                                               fontWeight: FontWeight.w600,
                                               color: p.textSecondary,
                                             ),
@@ -543,8 +557,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                                   ),
 
                                   // Right Symmetrical Action: Animated Favorite Button
-                                  SizedBox(
-                                    width: 48,
+                                  SizedBox(width: AppSpacing.xxl,
                                     height: 48,
                                     child: Material(
                                       color: Colors.white
@@ -572,7 +585,7 @@ class ClassicPlayerTheme extends StatelessWidget {
 
                               // Symmetrical Audio Quality Badge (Clean & Centered)
                               if (song != null) ...[
-                                const SizedBox(height: 7),
+                                const SizedBox(height: AppSpacing.xs),
                                 Center(
                                   child: AudioQualityBadge(
                                     song: song,
@@ -594,6 +607,8 @@ class ClassicPlayerTheme extends StatelessWidget {
                           activeColor: activeColor,
                           songId: state.currentSong?.id,
                           filePath: state.currentSong?.path,
+                          loopPointA: state.abPointA,
+                          loopPointB: state.abPointB,
                           onSeek: (pos) => cubit.seek(pos),
                         ),
 
@@ -641,13 +656,14 @@ class ClassicPlayerTheme extends StatelessWidget {
                         children: [
                           // Centralized Switcher across the top
                           Padding(
-                            padding: const EdgeInsets.only(top: 2, bottom: 10),
+                            padding: const EdgeInsets.only(top: AppSpacing.s2, bottom: AppSpacing.s10),
                             child: viewSwitcher,
                           ),
                           Expanded(
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 24, vertical: 4),
+
+                                  horizontal: AppSpacing.lg, vertical: AppSpacing.xxs),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
@@ -664,7 +680,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 28),
+                                  const SizedBox(width: AppSpacing.s28),
                                   // Right Pane: Controls
                                   Expanded(
                                     flex: 6,

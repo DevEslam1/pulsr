@@ -4,8 +4,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 /// Lets the user switch between the curated Normal experience and the full
 /// Professional control surface. This is the single switch that reveals or
@@ -26,12 +30,12 @@ class ExperienceModeSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.only(bottom: AppSpacing.xs),
           child: Text(
             l10n.experienceModeSubtitle,
             style: TextStyle(
               color: p.textSecondary,
-              fontSize: 12.5,
+              fontSize: AppFontSize.label,
             ),
           ),
         ),
@@ -60,11 +64,11 @@ class ExperienceModeSection extends StatelessWidget {
             },
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: AppSpacing.s10),
         SizedBox(
           height: 38,
           child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
+            duration: context.motionMs(200),
             child: Text(
               isPro
                   ? l10n.experienceModeProfessionalDesc
@@ -72,7 +76,7 @@ class ExperienceModeSection extends StatelessWidget {
               key: ValueKey<bool>(isPro),
               style: TextStyle(
                 color: p.textSecondary,
-                fontSize: 12,
+                fontSize: AppFontSize.label,
                 height: 1.35,
               ),
               maxLines: 2,
@@ -80,12 +84,12 @@ class ExperienceModeSection extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.xs),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
           decoration: BoxDecoration(
             color: p.surfaceContainerHigh.withValues(alpha: 0.45),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppRadii.r10),
             border: Border.all(color: p.hairline),
           ),
           child: Column(
@@ -98,14 +102,14 @@ class ExperienceModeSection extends StatelessWidget {
                     size: 15,
                     color: isPro ? p.accent : p.textSecondary,
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.xs),
                   Expanded(
                     child: Text(
                       isPro
                           ? l10n.experienceModeProfessional
                           : l10n.experienceModeNormal,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: AppFontSize.label,
                         fontWeight: FontWeight.w600,
                         color: p.textPrimary,
                       ),
@@ -114,16 +118,17 @@ class ExperienceModeSection extends StatelessWidget {
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
+
+                        horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                     decoration: BoxDecoration(
                       color: (isPro ? p.accent : p.textTertiary)
                           .withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(AppRadii.r6),
                     ),
                     child: Text(
                       isPro ? 'PRO' : l10n.experienceModeNormal.toUpperCase(),
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: AppFontSize.tiny,
                         fontWeight: FontWeight.w700,
                         color: isPro ? p.accent : p.textSecondary,
                       ),
@@ -131,16 +136,16 @@ class ExperienceModeSection extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 3),
+              const SizedBox(height: AppSpacing.xxs),
               AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
+                duration: context.motionMs(200),
                 child: Text(
                   isPro
                       ? l10n.settingsDspInspectorDesc
                       : l10n.smartAudioSubtitle,
                   key: ValueKey<bool>(isPro),
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: AppFontSize.caption,
                     color: p.textTertiary,
                   ),
                   maxLines: 1,

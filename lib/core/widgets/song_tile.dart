@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../motion/pulsr_motion.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../data/db/app_database.dart';
@@ -8,6 +9,9 @@ import '../theme/aura_theme.dart';
 import 'cached_artwork.dart';
 import '../../features/player/cubit/player_cubit.dart';
 import '../../features/player/cubit/player_state.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 /// The universal premium song row. Auto-highlights the active track with an
 /// animated EQ indicator. Reused by Home/Library/Search/Albums/Playlists/etc.
@@ -65,22 +69,22 @@ class SongTile extends StatelessWidget {
           label: '${song.title} by ${song.artist}',
           button: true,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
             child: Material(
               color: backgroundColor ??
                   (selected
                       ? p.accentContainer
                       : (isActive ? p.surfaceContainer : p.surface)),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(AppRadii.r16),
               clipBehavior: Clip.antiAlias,
               child: InkWell(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(AppRadii.r16),
                 onTap: onTap,
                 onLongPress: onLongPress,
                 child: Container(
                   constraints: const BoxConstraints(minHeight: 56),
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
                   child: Row(
                     children: [
                       if (index != null)
@@ -92,7 +96,7 @@ class SongTile extends StatelessWidget {
                               style: TextStyle(
                                 color: isActive ? p.accent : p.textTertiary,
                                 fontWeight: FontWeight.w700,
-                                fontSize: isCompact ? 12 : 13,
+                                fontSize: isCompact ? AppFontSize.label : AppFontSize.bodySmall,
                                 fontFeatures: const [
                                   FontFeature.tabularFigures()
                                 ],
@@ -108,7 +112,7 @@ class SongTile extends StatelessWidget {
                               ? Container(
                                   decoration: BoxDecoration(
                                     color: p.accent,
-                                    borderRadius: BorderRadius.circular(13),
+                                    borderRadius: BorderRadius.circular(AppRadii.r12),
                                   ),
                                   child: Icon(Icons.check_rounded,
                                       color: p.onAccent, size: 24),
@@ -129,7 +133,7 @@ class SongTile extends StatelessWidget {
                                           color: Colors.black
                                               .withValues(alpha: 0.45),
                                           borderRadius:
-                                              BorderRadius.circular(13),
+                                              BorderRadius.circular(AppRadii.r12),
                                         ),
                                         child: Center(
                                           child: NowPlayingIndicator(
@@ -156,10 +160,10 @@ class SongTile extends StatelessWidget {
                                 fontWeight: isActive
                                     ? FontWeight.w800
                                     : FontWeight.w600,
-                                fontSize: isCompact ? 13.5 : 14.5,
+                                fontSize: isCompact ? AppFontSize.bodySmall : AppFontSize.body,
                               ),
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: AppSpacing.s2),
                             Row(
                               children: [
                                 if (isDownloadedTrack) ...[
@@ -168,7 +172,7 @@ class SongTile extends StatelessWidget {
                                     size: isCompact ? 12 : 13,
                                     color: p.accent,
                                   ),
-                                  const SizedBox(width: 4),
+                                  const SizedBox(width: AppSpacing.xxs),
                                 ],
                                 Expanded(
                                   child: Text(
@@ -177,7 +181,7 @@ class SongTile extends StatelessWidget {
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       color: p.textSecondary,
-                                      fontSize: isCompact ? 11.5 : 12.5,
+                                      fontSize: isCompact ? AppFontSize.label : AppFontSize.label,
                                     ),
                                   ),
                                 ),
@@ -187,12 +191,12 @@ class SongTile extends StatelessWidget {
                         ),
                       ),
                       if (song.durationMs > 0) ...[
-                        const SizedBox(width: 8),
+                        const SizedBox(width: AppSpacing.xs),
                         Text(
                           Formatters.formatDurationMs(song.durationMs),
                           style: TextStyle(
                             color: p.textTertiary,
-                            fontSize: isCompact ? 11 : 12,
+                            fontSize: isCompact ? AppFontSize.caption : AppFontSize.label,
                             fontWeight: FontWeight.w600,
                             fontFeatures: const [FontFeature.tabularFigures()],
                           ),
@@ -201,10 +205,12 @@ class SongTile extends StatelessWidget {
                       if (trailing != null)
                         trailing!
                       else if (onMorePressed != null)
-                        IconButton(
-                          icon: Icon(Icons.more_vert_rounded,
-                              size: 20, color: p.textTertiary),
-                          onPressed: onMorePressed,
+                          IconButton(
+                            icon: Icon(Icons.more_vert_rounded,
+                                size: 20, color: p.textTertiary),
+                            tooltip:
+                                MaterialLocalizations.of(context).moreButtonTooltip,
+                            onPressed: onMorePressed,
                           visualDensity: VisualDensity.compact,
                         ),
                     ],
@@ -243,6 +249,17 @@ class _NowPlayingIndicatorState extends State<NowPlayingIndicator>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _c.duration = context.motionMs(900);
+    if (!context.motionEnabled) {
+      _c.stop();
+    } else if (widget.isPlaying && !_c.isAnimating) {
+      _c.repeat(reverse: true);
+    }
+  }
+
+  @override
   void didUpdateWidget(NowPlayingIndicator old) {
     super.didUpdateWidget(old);
     if (widget.isPlaying != old.isPlaying) {
@@ -266,8 +283,7 @@ class _NowPlayingIndicatorState extends State<NowPlayingIndicator>
     return AnimatedBuilder(
       animation: _c,
       builder: (_, __) {
-        return SizedBox(
-          width: 18,
+        return SizedBox(width: AppSpacing.s18,
           height: 16,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -281,7 +297,7 @@ class _NowPlayingIndicatorState extends State<NowPlayingIndicator>
                 height: h,
                 decoration: BoxDecoration(
                   color: widget.color,
-                  borderRadius: BorderRadius.circular(2),
+                  borderRadius: BorderRadius.circular(AppRadii.r2),
                 ),
               );
             }),

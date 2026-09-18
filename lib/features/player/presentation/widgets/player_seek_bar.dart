@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/error_logger.dart';
@@ -11,6 +12,8 @@ import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
 import 'waveform_seek_bar.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class PlayerSeekBar extends StatefulWidget {
   /// Position shown by the bar.
@@ -26,6 +29,12 @@ class PlayerSeekBar extends StatefulWidget {
   final int? songId;
   final String? filePath;
   final String? semanticLabel;
+  final Duration? loopPointA;
+  final Duration? loopPointB;
+
+  /// When true (default) a subtle "Up Next" strip renders below the bar so the
+  /// next track is visible without opening the queue.
+  final bool showUpNext;
 
   const PlayerSeekBar({
     super.key,
@@ -36,6 +45,9 @@ class PlayerSeekBar extends StatefulWidget {
     this.songId,
     this.filePath,
     this.semanticLabel,
+    this.loopPointA,
+    this.loopPointB,
+    this.showUpNext = true,
   });
 
   @override
@@ -78,45 +90,112 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
         );
       }
 
-      return FutureBuilder<List<double>>(
-        future: _cachedWaveformFuture,
-        builder: (context, snapshot) {
-          if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-            return _withPosition((position) => WaveformSeekBar(
-                  position: position,
-                  duration: widget.duration,
-                  onSeek: widget.onSeek,
-                  samples: snapshot.data!,
-                  activeColor: widget.activeColor,
-                  semanticLabel: widget.semanticLabel,
-                ));
-          }
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            // Keep themed WaveformSeekBar mounted with loading state
-            return _withPosition((position) => WaveformSeekBar(
-                  position: position,
-                  duration: widget.duration,
-                  onSeek: widget.onSeek,
-                  samples: _loadingWaveformSamples,
-                  activeColor: widget.activeColor.withValues(alpha: 0.45),
-                  semanticLabel: widget.semanticLabel,
-                ));
-          }
-          if (snapshot.hasError) {
-            ErrorLogger.log(
-              'Waveform calculation failed for song $effectiveSongId',
-              error: snapshot.error,
-              stackTrace: snapshot.stackTrace,
-              category: 'WaveformSeekBar',
-            );
-          }
-          // Hard failure fallback to standard seek bar
-          return _buildStandardSeekBar(context);
-        },
+      return _withUpNext(
+        FutureBuilder<List<double>>(
+          future: _cachedWaveformFuture,
+          builder: (context, snapshot) {
+            if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+              return _withPosition((position) => WaveformSeekBar(
+                    position: position,
+                    duration: widget.duration,
+                    onSeek: widget.onSeek,
+                    samples: snapshot.data!,
+                    activeColor: widget.activeColor,
+                    semanticLabel: widget.semanticLabel,
+                    loopPointA: widget.loopPointA,
+                    loopPointB: widget.loopPointB,
+                  ));
+            }
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              // Keep themed WaveformSeekBar mounted with loading state
+              return _withPosition((position) => WaveformSeekBar(
+                    position: position,
+                    duration: widget.duration,
+                    onSeek: widget.onSeek,
+                    samples: _loadingWaveformSamples,
+                    activeColor: widget.activeColor.withValues(alpha: 0.45),
+                    semanticLabel: widget.semanticLabel,
+                    loopPointA: widget.loopPointA,
+                    loopPointB: widget.loopPointB,
+                  ));
+            }
+            if (snapshot.hasError) {
+              ErrorLogger.log(
+                'Waveform calculation failed for song $effectiveSongId',
+                error: snapshot.error,
+                stackTrace: snapshot.stackTrace,
+                category: 'WaveformSeekBar',
+              );
+            }
+            // Hard failure fallback to standard seek bar
+            return _buildStandardSeekBar(context);
+          },
+        ),
       );
     }
 
-    return _buildStandardSeekBar(context);
+    return _withUpNext(_buildStandardSeekBar(context));
+  }
+
+  /// Adds the "Up Next" strip below the seek bar (shared by every theme).
+  Widget _withUpNext(Widget seek) {
+    if (!widget.showUpNext) return seek;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [seek, _upNextRow(context)],
+    );
+  }
+
+  Widget _upNextRow(BuildContext context) {
+    final nextTitle = context.select<PlayerCubit, String?>((c) {
+      final q = c.state.queue;
+      final i = c.state.currentIndex;
+      if (i < 0 || i + 1 >= q.length) return null;
+      return q[i + 1].title;
+    });
+    if (nextTitle == null || nextTitle.isEmpty) return const SizedBox.shrink();
+
+    final p = context.palette;
+    final cubit = context.read<PlayerCubit>();
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(
+          start: AppSpacing.lg, end: AppSpacing.lg, top: AppSpacing.xxs),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          cubit.toggleQueueVisibility();
+        },
+        child: Row(
+          children: [
+            Icon(Icons.skip_next_rounded, size: 14, color: p.textTertiary),
+            const SizedBox(width: AppSpacing.s6),
+            Text(
+              context.l10n.queue.toUpperCase(),
+              style: TextStyle(
+                color: p.textTertiary,
+                fontSize: AppFontSize.tiny,
+                fontWeight: FontWeight.w800,
+                letterSpacing: AppTracking.overline,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: Text(
+                nextTitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: p.textSecondary,
+                  fontSize: AppFontSize.label,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// When no position was passed in (preferred path), narrow the position
@@ -161,7 +240,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
         textDirection: TextDirection.ltr,
         child: RepaintBoundary(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -198,7 +277,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                     },
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: AppSpacing.s2),
                 // Timestamps
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -211,20 +290,20 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                       ),
                       style: TextStyle(
                         color: context.palette.textSecondary,
-                        fontSize: 12,
+                        fontSize: AppFontSize.label,
                         fontWeight: FontWeight.w600,
                         fontFeatures: const [FontFeature.tabularFigures()],
-                        letterSpacing: 0.3,
+                        letterSpacing: AppTracking.label,
                       ),
                     ),
                     Text(
                       Formatters.formatDuration(widget.duration),
                       style: TextStyle(
                         color: context.palette.textSecondary,
-                        fontSize: 12,
+                        fontSize: AppFontSize.label,
                         fontWeight: FontWeight.w600,
                         fontFeatures: const [FontFeature.tabularFigures()],
-                        letterSpacing: 0.3,
+                        letterSpacing: AppTracking.label,
                       ),
                     ),
                   ],

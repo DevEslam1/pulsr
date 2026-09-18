@@ -21,6 +21,9 @@ import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class YtmOAuthLoginSheet extends StatefulWidget {
   const YtmOAuthLoginSheet({super.key});
@@ -129,10 +132,10 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
         constraints:
             BoxConstraints(maxWidth: Adaptive.sheetConstraints(context).maxWidth),
         child: Container(
-          padding: EdgeInsets.fromLTRB(24, 16, 24, bottomInset + 24),
+          padding: EdgeInsetsDirectional.fromSTEB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, bottomInset + 24),
           decoration: BoxDecoration(
             color: p.surfaceContainer,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
             border: Border.all(color: p.hairline),
           ),
           child: SingleChildScrollView(
@@ -146,11 +149,11 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
                     height: 4,
                     decoration: BoxDecoration(
                       color: p.textTertiary.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(AppRadii.r2),
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.s20),
                 Row(
                   children: [
                     Container(
@@ -162,7 +165,7 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
                       ),
                       child: Icon(Icons.tv_rounded, color: p.accent, size: 24),
                     ),
-                    const SizedBox(width: 14),
+                    const SizedBox(width: AppSpacing.s14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -170,20 +173,20 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
                           Text(context.l10n.signInGoogleTv,
                             style: TextStyle(
                               color: p.textPrimary,
-                              fontSize: 18,
+                              fontSize: AppFontSize.title,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                           Text(context.l10n.noCaptchaDesc,
                             style: TextStyle(
-                                color: p.textSecondary, fontSize: 12),
+                                color: p.textSecondary, fontSize: AppFontSize.label),
                           ),
                         ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.s20),
                 if (_success)
                   _statusTile(p, Icons.check_circle_rounded, p.accent,
                       context.l10n.browseSignedInLoading)
@@ -201,19 +204,19 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
 
   Widget _statusTile(PulsrPalette p, IconData icon, Color color, String text) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadii.r14),
         border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
       child: Row(
         children: [
           Icon(icon, color: color, size: 22),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(text,
-                style: TextStyle(color: p.textPrimary, fontSize: 14)),
+                style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body)),
           ),
         ],
       ),
@@ -225,7 +228,7 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _statusTile(p, Icons.error_outline_rounded, p.error, _error!),
-        const SizedBox(height: 14),
+        const SizedBox(height: AppSpacing.s14),
         FilledButton.icon(
           onPressed: _busy ? null : _start,
           icon: const Icon(Icons.refresh_rounded, size: 18),
@@ -234,9 +237,9 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
           style: FilledButton.styleFrom(
             backgroundColor: p.accent,
             foregroundColor: p.onAccent,
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
             shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.r12)),
           ),
         ),
       ],
@@ -246,7 +249,7 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
   Widget _codeBody(PulsrPalette p) {
     if (_busy || _code == null) {
       return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 28),
+        padding: EdgeInsets.symmetric(vertical: AppSpacing.s28),
         child: Center(child: CircularProgressIndicator()),
       );
     }
@@ -255,20 +258,20 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(context.l10n.oauthStep1,
-          style: TextStyle(color: p.textSecondary, fontSize: 13),
+          style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.xs),
         _copyRow(p, code.verificationUrl, context.l10n.browseAddress),
-        const SizedBox(height: 18),
+        const SizedBox(height: AppSpacing.s18),
         Text(context.l10n.oauthStep2,
-          style: TextStyle(color: p.textSecondary, fontSize: 13),
+          style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.xs),
         Container(
-          padding: const EdgeInsets.symmetric(vertical: 18),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s18),
           decoration: BoxDecoration(
             color: p.surface,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(AppRadii.r14),
             border: Border.all(color: p.hairline),
           ),
           child: Center(
@@ -276,14 +279,14 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
               code.userCode,
               style: TextStyle(
                 color: p.textPrimary,
-                fontSize: 30,
+                fontSize: AppFontSize.display,
                 fontWeight: FontWeight.w800,
-                letterSpacing: 4,
+                letterSpacing: AppTracking.widest,
               ),
             ),
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: AppSpacing.s10),
         OutlinedButton.icon(
           onPressed: () => _copy(code.userCode, context.l10n.browseCode),
           icon: const Icon(Icons.copy_rounded, size: 18),
@@ -292,23 +295,22 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
           style: OutlinedButton.styleFrom(
             foregroundColor: p.textPrimary,
             side: BorderSide(color: p.hairline),
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
             shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.r12)),
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: AppSpacing.s14),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const SizedBox(
-              width: 14,
+            const SizedBox(width: AppSpacing.s14,
               height: 14,
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: AppSpacing.s10),
             Text(context.l10n.waitingApproval,
-              style: TextStyle(color: p.textTertiary, fontSize: 12),
+              style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label),
             ),
           ],
         ),
@@ -318,10 +320,10 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
 
   Widget _copyRow(PulsrPalette p, String value, String label) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 4, 4, 4),
+      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s14, AppSpacing.xxs, AppSpacing.xxs, AppSpacing.xxs),
       decoration: BoxDecoration(
         color: p.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadii.r14),
         border: Border.all(color: p.hairline),
       ),
       child: Row(
@@ -330,7 +332,7 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
             child: SelectableText(
               value,
               style: TextStyle(
-                  color: p.textPrimary, fontSize: 13, height: 1.3),
+                  color: p.textPrimary, fontSize: AppFontSize.bodySmall, height: 1.3),
             ),
           ),
           IconButton(

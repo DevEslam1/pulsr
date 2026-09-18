@@ -3,7 +3,7 @@
     "ANDROID_VR": {
       "clientNameId": "28",
       "clientVersion": "1.63.27",
-      "requiresPoToken": false,
+      "requiresPoToken": true,
       "requiresLogin": false,
       "supportsStreamResolve": true,
       "supportsSearch": true,
@@ -14,7 +14,7 @@
     "IOS_MUSIC": {
       "clientNameId": "26",
       "clientVersion": "8.32.1",
-      "requiresPoToken": false,
+      "requiresPoToken": true,
       "requiresLogin": false,
       "supportsStreamResolve": true,
       "supportsSearch": true,
@@ -36,7 +36,7 @@
     "ANDROID_CREATOR": {
       "clientNameId": "62",
       "clientVersion": "24.45.100",
-      "requiresPoToken": false,
+      "requiresPoToken": true,
       "requiresLogin": false,
       "supportsStreamResolve": true,
       "supportsSearch": false,

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -54,10 +55,16 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
   }
 
   /// Persistent YTM health strip for the search screen: bot cooldown, offline
-  /// (last error was connectivity), or null when healthy. No state change —
-  /// the screen polls this alongside state.
-  String? get statusMessage {
-    if (_service.isBotCoolingDown) {
+  /// (last error was connectivity), or null when healthy. The cooldown half is
+  /// pushed to the UI via [botCooldown] so the screen never polls.
+  String? get statusMessage => statusMessageFor(_service.isBotCoolingDown);
+
+  /// Cooldown transitions from [YtmService], so the health strip can react
+  /// without a periodic setState.
+  ValueListenable<bool> get botCooldown => _service.botCooldownNotifier;
+
+  String? statusMessageFor(bool coolingDown) {
+    if (coolingDown) {
       return 'YTM cooling down (bot protection) — retry shortly';
     }
     final err = state.errorMessage;

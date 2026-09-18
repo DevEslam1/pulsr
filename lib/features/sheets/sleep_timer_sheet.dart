@@ -8,6 +8,9 @@ import '../player/cubit/player_state.dart';
 
 import '../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../core/widgets/pulsr_pressable.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class SleepTimerSheet extends StatelessWidget {
   const SleepTimerSheet({super.key});
@@ -46,21 +49,21 @@ class SleepTimerSheet extends StatelessWidget {
                   },
                   child: Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
                     decoration: BoxDecoration(
                       color: p.error.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppRadii.r8),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.cancel_rounded, color: p.error, size: 16),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: AppSpacing.xxs),
                         Text(context.l10n.turnOff,
                             style: TextStyle(
                                 color: p.error,
                                 fontWeight: FontWeight.w700,
-                                fontSize: 12)),
+                                fontSize: AppFontSize.label)),
                       ],
                     ),
                   ),
@@ -70,7 +73,7 @@ class SleepTimerSheet extends StatelessWidget {
             constraints: BoxConstraints(maxHeight: screenHeight * 0.70),
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+              padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.s10, AppSpacing.s20, AppSpacing.lg),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -78,7 +81,7 @@ class SleepTimerSheet extends StatelessWidget {
                             if (isActive)
                               Padding(
                                 padding:
-                                    const EdgeInsets.symmetric(vertical: 8.0),
+                                    const EdgeInsets.symmetric(vertical: AppSpacing.xs),
                                 child: Text(
                                   isQueueMode
                                       ? context.l10n.musicWillStopEndOfQueue
@@ -101,16 +104,16 @@ class SleepTimerSheet extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: AppSpacing.md),
                             Text(
                               context.l10n.bySongs,
                               style: TextStyle(
                                 color: p.textSecondary,
                                 fontWeight: FontWeight.w600,
-                                fontSize: 13,
+                                fontSize: AppFontSize.bodySmall,
                               ),
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: AppSpacing.sm),
                             Wrap(
                               spacing: 8,
                               runSpacing: 8,
@@ -120,7 +123,7 @@ class SleepTimerSheet extends StatelessWidget {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       const Icon(Icons.skip_next_rounded, size: 14),
-                                      const SizedBox(width: 4),
+                                      const SizedBox(width: AppSpacing.xxs),
                                       Text(context.l10n.endOfTrack),
                                     ],
                                   ),
@@ -135,7 +138,7 @@ class SleepTimerSheet extends StatelessWidget {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       const Icon(Icons.queue_music_rounded, size: 14),
-                                      const SizedBox(width: 4),
+                                      const SizedBox(width: AppSpacing.xxs),
                                       Text(context.l10n.endOfQueue),
                                     ],
                                   ),
@@ -179,16 +182,16 @@ class SleepTimerSheet extends StatelessWidget {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: AppSpacing.s20),
                             Text(
                               context.l10n.presets,
                               style: TextStyle(
                                 color: p.textSecondary,
                                 fontWeight: FontWeight.w600,
-                                fontSize: 13,
+                                fontSize: AppFontSize.bodySmall,
                               ),
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: AppSpacing.sm),
                             Wrap(
                               spacing: 8,
                               runSpacing: 8,
@@ -205,23 +208,23 @@ class SleepTimerSheet extends StatelessWidget {
                                 }),
                               ],
                             ),
-                            const SizedBox(height: 24),
+                            const SizedBox(height: AppSpacing.lg),
                             Text(
                               context.l10n.customTime,
                               style: TextStyle(
                                 color: p.textSecondary,
                                 fontWeight: FontWeight.w600,
-                                fontSize: 13,
+                                fontSize: AppFontSize.bodySmall,
                               ),
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: AppSpacing.sm),
                             ListTile(
                               contentPadding: EdgeInsets.zero,
                               leading: Container(
-                                padding: const EdgeInsets.all(8),
+                                padding: const EdgeInsets.all(AppSpacing.xs),
                                 decoration: BoxDecoration(
                                   color: p.surfaceContainer,
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(AppRadii.r8),
                                 ),
                                 child: Icon(Icons.access_time_rounded,
                                     color: p.accent),

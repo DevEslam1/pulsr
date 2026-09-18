@@ -20,6 +20,8 @@ import '../../sheets/add_to_playlist_sheet.dart';
 import '../../sheets/song_info_sheet.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_pressable.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class RecentsScreen extends StatefulWidget {
   const RecentsScreen({super.key});
@@ -94,7 +96,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
           elevation: 0,
           leading: const PulsrBackButton(),
           title: Text(context.l10n.recentlyPlayed,
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: AppFontSize.bodyLarge),
         ),
         actions: [
           IconButton(
@@ -117,17 +119,17 @@ class _RecentsScreenState extends State<RecentsScreen> {
                 children: [
                   Icon(Icons.history_toggle_off_rounded,
                       size: 64, color: p.textTertiary),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.md),
                   Text(context.l10n.noRecentSongs,
                     style: TextStyle(
                       color: p.textPrimary,
                       fontWeight: FontWeight.w700,
-                      fontSize: 16,
+                      fontSize: AppFontSize.bodyLarge,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.xs),
                   Text(context.l10n.recentEmptyHint,
-                    style: TextStyle(color: p.textSecondary, fontSize: 13),
+                    style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                   ),
                 ],
               ),
@@ -142,7 +144,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
               // Search & Header Stats
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
                   child: Column(
                     children: [
                       // Search bar
@@ -152,12 +154,12 @@ class _RecentsScreenState extends State<RecentsScreen> {
                         borderRadius: AppRadii.full,
                         color: p.surfaceContainer,
                         border: Border.all(color: p.hairline, width: 1),
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                         child: Row(
                           children: [
                             Icon(Icons.search_rounded,
                                 color: p.textSecondary, size: 20),
-                            const SizedBox(width: 10),
+                            const SizedBox(width: AppSpacing.s10),
                             Expanded(
                               child: TextField(
                                 controller: _searchController,
@@ -168,24 +170,25 @@ class _RecentsScreenState extends State<RecentsScreen> {
                                   });
                                 },
                                 style: TextStyle(
-                                    color: p.textPrimary, fontSize: 14),
+                                    color: p.textPrimary, fontSize: AppFontSize.body),
                                 decoration: InputDecoration(
                                   hintText:
                                       '${context.l10n.search} ${allRecents.length} ${context.l10n.browseRecentSongs}...',
                                   hintStyle: TextStyle(
-                                      color: p.textTertiary, fontSize: 13.5),
+                                      color: p.textTertiary, fontSize: AppFontSize.bodySmall),
                                   border: InputBorder.none,
                                   isDense: true,
                                   contentPadding:
-                                      const EdgeInsets.symmetric(vertical: 12),
+                                      const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                                 ),
                               ),
                             ),
                             if (_searchQuery.isNotEmpty)
-                              IconButton(
-                                icon: Icon(Icons.close_rounded,
-                                    color: p.textSecondary, size: 18),
-                                onPressed: () {
+                                IconButton(
+                                  icon: Icon(Icons.close_rounded,
+                                      color: p.textSecondary, size: 18),
+                                  tooltip: context.l10n.clear,
+                                  onPressed: () {
                                   _searchDebounce?.cancel();
                                   _searchController.clear();
                                   setState(() => _searchQuery = '');
@@ -194,7 +197,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: AppSpacing.s14),
                       // Action buttons: Play All & Shuffle
                       Row(
                         children: [
@@ -213,14 +216,14 @@ class _RecentsScreenState extends State<RecentsScreen> {
                                 backgroundColor: p.accent,
                                 foregroundColor: p.onAccent,
                                 padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
+                                    const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: AppRadii.buttonRadius,
                                 ),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: AppSpacing.sm),
                           ElevatedButton.icon(
                             onPressed: () {
                               if (filtered.isNotEmpty) {
@@ -236,7 +239,8 @@ class _RecentsScreenState extends State<RecentsScreen> {
                               backgroundColor: p.surfaceContainerHigh,
                               foregroundColor: p.textPrimary,
                               padding: const EdgeInsets.symmetric(
-                                  vertical: 12, horizontal: 16),
+
+                                  vertical: AppSpacing.sm, horizontal: AppSpacing.md),
                               shape: RoundedRectangleBorder(
                                 borderRadius: AppRadii.buttonRadius,
                               ),
@@ -256,14 +260,14 @@ class _RecentsScreenState extends State<RecentsScreen> {
                   child: Center(
                     child: Text(
                       context.l10n.noResultsFor(_searchQuery),
-                      style: TextStyle(color: p.textSecondary, fontSize: 14),
+                      style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.body),
                     ),
                   ),
                 )
               else
                 SliverPadding(
                   padding:
-                      const EdgeInsets.only(top: 8, bottom: 100, left: 16, right: 16),
+                      const EdgeInsetsDirectional.only(top: AppSpacing.xs, bottom: 100, start: AppSpacing.md, end: AppSpacing.md),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
@@ -271,7 +275,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                         return StaggeredListItem(
                           index: index,
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
                             child: Material(
                               color: Colors.transparent,
                               child: InkWell(
@@ -280,7 +284,8 @@ class _RecentsScreenState extends State<RecentsScreen> {
                                     queue: filtered),
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 8),
+
+                                      horizontal: AppSpacing.s10, vertical: AppSpacing.xs),
                                   decoration: BoxDecoration(
                                     borderRadius: AppRadii.cardRadius,
                                     color: p.surfaceContainer.withValues(
@@ -289,19 +294,18 @@ class _RecentsScreenState extends State<RecentsScreen> {
                                   child: Row(
                                     children: [
                                       // Index number
-                                      SizedBox(
-                                        width: 24,
+                                      SizedBox(width: AppSpacing.lg,
                                         child: Text(
                                           '${index + 1}',
                                           textAlign: TextAlign.center,
                                           style: TextStyle(
                                             color: p.textTertiary,
                                             fontWeight: FontWeight.w600,
-                                            fontSize: 12,
+                                            fontSize: AppFontSize.label,
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(width: 8),
+                                      const SizedBox(width: AppSpacing.xs),
                                       // Artwork
                                       CachedArtwork(
                                         id: song.id,
@@ -310,7 +314,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                                         size: 46,
                                         borderRadius: 12,
                                       ),
-                                      const SizedBox(width: 12),
+                                      const SizedBox(width: AppSpacing.sm),
                                       // Title & Artist
                                       Expanded(
                                         child: Column(
@@ -324,29 +328,32 @@ class _RecentsScreenState extends State<RecentsScreen> {
                                               style: TextStyle(
                                                 color: p.textPrimary,
                                                 fontWeight: FontWeight.w700,
-                                                fontSize: 14,
+                                                fontSize: AppFontSize.body,
                                               ),
                                             ),
-                                            const SizedBox(height: 2),
+                                            const SizedBox(height: AppSpacing.s2),
                                             Text(
                                               song.artist,
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                               style: TextStyle(
                                                 color: p.textSecondary,
-                                                fontSize: 12,
+                                                fontSize: AppFontSize.label,
                                               ),
                                             ),
                                           ],
                                         ),
                                       ),
                                       // More menu
-                                      IconButton(
-                                        icon: const Icon(
-                                            Icons.more_vert_rounded,
-                                            size: 20),
-                                        color: p.textSecondary,
-                                        onPressed: () {
+                                        IconButton(
+                                          icon: const Icon(
+                                              Icons.more_vert_rounded,
+                                              size: 20),
+                                          color: p.textSecondary,
+                                          tooltip: MaterialLocalizations.of(
+                                                  context)
+                                              .moreButtonTooltip,
+                                          onPressed: () {
                                           _showSongOptions(context, song);
                                         },
                                       ),
@@ -365,7 +372,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
               if (allRecents.length >= _historyLimit && _searchQuery.isEmpty)
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
                     child: Center(
                       child: TextButton.icon(
                         icon: const Icon(Icons.expand_more_rounded),
@@ -413,7 +420,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
               title: Text(context.l10n.songInfo),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
         ],
       ),
     );

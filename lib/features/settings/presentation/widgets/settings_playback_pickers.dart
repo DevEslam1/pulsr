@@ -5,6 +5,9 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 
 void showMiniPlayerSwipePickerSheet(
@@ -58,31 +61,31 @@ void showMiniPlayerSwipePickerSheet(
         ),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s20, horizontal: AppSpacing.md),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                 child: Text(
                   isLeft
                       ? context.l10n.settingsSwipeLeftAction
                       : context.l10n.settingsSwipeRightAction,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                  style: const TextStyle(fontSize: AppFontSize.title, fontWeight: FontWeight.w900),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.sm),
               ...options.map((opt) {
                 final isSelected = opt.action == currentAction;
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
+                  margin: const EdgeInsets.only(bottom: AppSpacing.xs),
                   child: Material(
                     color: isSelected
                         ? primaryColor.withValues(alpha: 0.12)
                         : cardColor,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(AppRadii.r16),
                       side: BorderSide(
                         color: isSelected ? primaryColor : outlineColor,
                         width: isSelected ? 1.5 : 1.0,
@@ -96,7 +99,7 @@ void showMiniPlayerSwipePickerSheet(
                               fontWeight: FontWeight.w700,
                               color: isSelected ? primaryColor : textPrimary)),
                       subtitle: Text(opt.subtitle,
-                          style: TextStyle(fontSize: 12, color: textSecondary)),
+                          style: TextStyle(fontSize: AppFontSize.label, color: textSecondary)),
                       trailing: isSelected
                           ? Icon(Icons.check_circle_rounded, color: primaryColor)
                           : null,
@@ -164,28 +167,28 @@ void showNowPlayingDoubleTapPickerSheet(
         ),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s20, horizontal: AppSpacing.md),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                 child: Text(context.l10n.npDoubleTap,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                  style: TextStyle(fontSize: AppFontSize.title, fontWeight: FontWeight.w900),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.sm),
               ...options.map((opt) {
                 final isSelected = opt.action == currentAction;
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
+                  margin: const EdgeInsets.only(bottom: AppSpacing.xs),
                   child: Material(
                     color: isSelected
                         ? primaryColor.withValues(alpha: 0.12)
                         : cardColor,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(AppRadii.r16),
                       side: BorderSide(
                         color: isSelected ? primaryColor : outlineColor,
                         width: isSelected ? 1.5 : 1.0,
@@ -199,7 +202,7 @@ void showNowPlayingDoubleTapPickerSheet(
                               fontWeight: FontWeight.w700,
                               color: isSelected ? primaryColor : textPrimary)),
                       subtitle: Text(opt.subtitle,
-                          style: TextStyle(fontSize: 12, color: textSecondary)),
+                          style: TextStyle(fontSize: AppFontSize.label, color: textSecondary)),
                       trailing: isSelected
                           ? Icon(Icons.check_circle_rounded, color: primaryColor)
                           : null,
@@ -257,28 +260,28 @@ void showNowPlayingArtworkSwipePickerSheet(
         ),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s20, horizontal: AppSpacing.md),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                 child: Text(context.l10n.npArtworkSwipe,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                  style: TextStyle(fontSize: AppFontSize.title, fontWeight: FontWeight.w900),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.sm),
               ...options.map((opt) {
                 final isSelected = opt.action == currentAction;
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
+                  margin: const EdgeInsets.only(bottom: AppSpacing.xs),
                   child: Material(
                     color: isSelected
                         ? primaryColor.withValues(alpha: 0.12)
                         : cardColor,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(AppRadii.r16),
                       side: BorderSide(
                         color: isSelected ? primaryColor : outlineColor,
                         width: isSelected ? 1.5 : 1.0,
@@ -292,7 +295,7 @@ void showNowPlayingArtworkSwipePickerSheet(
                               fontWeight: FontWeight.w700,
                               color: isSelected ? primaryColor : textPrimary)),
                       subtitle: Text(opt.subtitle,
-                          style: TextStyle(fontSize: 12, color: textSecondary)),
+                          style: TextStyle(fontSize: AppFontSize.label, color: textSecondary)),
                       trailing: isSelected
                           ? Icon(Icons.check_circle_rounded, color: primaryColor)
                           : null,
@@ -363,31 +366,31 @@ void showQualityPickerSheet(
         ),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s20, horizontal: AppSpacing.md),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                 child: Text(
                   isStreaming
                       ? context.l10n.streamingQuality
                       : context.l10n.downloadQuality,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                  style: const TextStyle(fontSize: AppFontSize.title, fontWeight: FontWeight.w900),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.sm),
               ...options.map((opt) {
                 final isSelected = opt.quality == currentQuality;
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
+                  margin: const EdgeInsets.only(bottom: AppSpacing.xs),
                   child: Material(
                     color: isSelected
                         ? primaryColor.withValues(alpha: 0.12)
                         : cardColor,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(AppRadii.r16),
                       side: BorderSide(
                         color: isSelected ? primaryColor : outlineColor,
                         width: isSelected ? 1.5 : 1.0,
@@ -401,7 +404,7 @@ void showQualityPickerSheet(
                               fontWeight: FontWeight.w700,
                               color: isSelected ? primaryColor : textPrimary)),
                       subtitle: Text(opt.subtitle,
-                          style: TextStyle(fontSize: 12, color: textSecondary)),
+                          style: TextStyle(fontSize: AppFontSize.label, color: textSecondary)),
                       trailing: isSelected
                           ? Icon(Icons.check_circle_rounded, color: primaryColor)
                           : null,

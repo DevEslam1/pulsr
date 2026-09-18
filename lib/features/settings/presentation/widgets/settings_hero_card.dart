@@ -12,6 +12,9 @@ import '../../../auth/cubit/auth_state.dart';
 import '../../../auth/presentation/auth_sheet.dart';
 import '../../../auth/presentation/ytm_web_login_sheet.dart';
 import 'ytm_account_disconnect_dialog.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 /// A hero card displayed at the top of the Settings screen showing the user's
 /// account identity, real-time Cloud Sync status, and quick sync/sign-out actions.
@@ -47,7 +50,7 @@ class SettingsHeroCard extends StatelessWidget {
         }
 
         return Container(
-          margin: const EdgeInsets.only(bottom: 18, top: 4),
+          margin: const EdgeInsets.only(bottom: AppSpacing.lg),
           decoration: BoxDecoration(
             color: p.surfaceContainer,
             borderRadius: BorderRadius.circular(AppRadii.card),
@@ -66,9 +69,9 @@ class SettingsHeroCard extends StatelessWidget {
             child: Stack(
               children: [
                 // Subtle accent gradient glow on top-right corner
-                Positioned(
+                PositionedDirectional(
                   top: -24,
-                  right: -24,
+                  end: -24,
                   child: Container(
                     width: 100,
                     height: 100,
@@ -84,7 +87,7 @@ class SettingsHeroCard extends StatelessWidget {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(AppSpacing.md),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -131,9 +134,9 @@ class SettingsHeroCard extends StatelessWidget {
                                         ),
                                 ),
                                 if (user != null)
-                                  Positioned(
+                                  PositionedDirectional(
                                     bottom: 0,
-                                    right: 0,
+                                    end: 0,
                                     child: Container(
                                       width: 14,
                                       height: 14,
@@ -149,7 +152,7 @@ class SettingsHeroCard extends StatelessWidget {
                                   ),
                               ],
                             ),
-                            const SizedBox(width: 14),
+                            const SizedBox(width: AppSpacing.s14),
                             // User details
                             Expanded(
                               child: Column(
@@ -164,50 +167,51 @@ class SettingsHeroCard extends StatelessWidget {
                                               context.l10n.cloudSync,
                                           style: TextStyle(
                                             color: p.textPrimary,
-                                            fontSize: 16,
+                                            fontSize: AppFontSize.bodyLarge,
                                             fontWeight: FontWeight.w700,
-                                            letterSpacing: -0.2,
+                                            letterSpacing: AppTracking.title,
                                           ),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                       if (user != null) ...[
-                                        const SizedBox(width: 6),
+                                        const SizedBox(width: AppSpacing.s6),
                                         Container(
                                           padding: const EdgeInsets.symmetric(
-                                              horizontal: 6, vertical: 2),
+
+                                              horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                                           decoration: BoxDecoration(
                                             color: p.accent
                                                 .withValues(alpha: 0.15),
                                             borderRadius:
-                                                BorderRadius.circular(6),
+                                                BorderRadius.circular(AppRadii.r6),
                                           ),
                                           child: Text(
                                             context.l10n.syncedLabel,
                                             style: TextStyle(
                                               color: p.accent,
-                                              fontSize: 9.5,
+                                              fontSize: AppFontSize.tiny,
                                               fontWeight: FontWeight.w800,
-                                              letterSpacing: 0.5,
+                                              letterSpacing: AppTracking.medium,
                                             ),
                                           ),
                                         ),
                                       ],
                                     ],
                                   ),
-                                  const SizedBox(height: 3),
+                                  const SizedBox(height: AppSpacing.xxs),
                                   Text(
                                     syncSubtitle,
                                     style: TextStyle(
                                       color: p.textSecondary,
-                                      fontSize: 12.5,
+                                      fontSize: AppFontSize.label,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: AppSpacing.xs),
                             // Action buttons
                             if (user == null)
                               FilledButton.icon(
@@ -218,10 +222,11 @@ class SettingsHeroCard extends StatelessWidget {
                                   backgroundColor: p.accent,
                                   foregroundColor: p.onAccent,
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 14, vertical: 8),
+
+                                      horizontal: AppSpacing.s14, vertical: AppSpacing.xs),
                                   textStyle: const TextStyle(
                                     fontWeight: FontWeight.w700,
-                                    fontSize: 13,
+                                    fontSize: AppFontSize.bodySmall,
                                   ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius:
@@ -239,11 +244,10 @@ class SettingsHeroCard extends StatelessWidget {
                                       backgroundColor:
                                           p.accent.withValues(alpha: 0.15),
                                       foregroundColor: p.accent,
-                                      padding: const EdgeInsets.all(8),
+                                      padding: const EdgeInsets.all(AppSpacing.xs),
                                     ),
                                     icon: isSyncing
-                                        ? SizedBox(
-                                            width: 18,
+                                        ? SizedBox(width: AppSpacing.s18,
                                             height: 18,
                                             child: CircularProgressIndicator(
                                               strokeWidth: 2,
@@ -256,7 +260,7 @@ class SettingsHeroCard extends StatelessWidget {
                                         ? null
                                         : () => authCubit.syncNow(),
                                   ),
-                                  const SizedBox(width: 4),
+                                  const SizedBox(width: AppSpacing.xxs),
                                   IconButton(
                                     tooltip: context.l10n.signOut,
                                     icon: Icon(
@@ -271,13 +275,14 @@ class SettingsHeroCard extends StatelessWidget {
                           ],
                         ),
                         if (state.syncError != null) ...[
-                          const SizedBox(height: 10),
+                          const SizedBox(height: AppSpacing.s10),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 6),
+
+                                horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
                             decoration: BoxDecoration(
                               color: p.error.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(AppRadii.r8),
                               border: Border.all(
                                   color: p.error.withValues(alpha: 0.3)),
                             ),
@@ -285,13 +290,13 @@ class SettingsHeroCard extends StatelessWidget {
                               children: [
                                 Icon(Icons.error_outline_rounded,
                                     color: p.error, size: 16),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: AppSpacing.xs),
                                 Expanded(
                                   child: Text(
                                     state.syncError!,
                                     style: TextStyle(
                                       color: p.error,
-                                      fontSize: 11.5,
+                                      fontSize: AppFontSize.label,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -304,7 +309,7 @@ class SettingsHeroCard extends StatelessWidget {
                       if (AppConfig.isCloudSyncAllowed &&
                           AppConfig.ytmEnabled) ...[
                         Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                           child: Divider(
                             height: 1,
                             thickness: 1,
@@ -333,7 +338,7 @@ class SettingsHeroCard extends StatelessWidget {
         return Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadii.r12),
             onTap: () async {
               if (isLoggedIn) {
                 await showYtmAccountDisconnectDialog(context);
@@ -350,7 +355,7 @@ class SettingsHeroCard extends StatelessWidget {
               }
             },
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
               child: Row(
                 children: [
                   Stack(
@@ -361,12 +366,12 @@ class SettingsHeroCard extends StatelessWidget {
                         height: 50,
                         decoration: BoxDecoration(
                           color: isLoggedIn
-                              ? const Color(0xFFFF0000).withValues(alpha: 0.15)
+                              ? AppColors.ytRed.withValues(alpha: 0.15)
                               : p.surface,
                           shape: BoxShape.circle,
                           border: Border.all(
                             color: isLoggedIn
-                                ? const Color(0xFFFF0000).withValues(alpha: 0.4)
+                                ? AppColors.ytRed.withValues(alpha: 0.4)
                                 : p.hairline,
                             width: 1.5,
                           ),
@@ -374,15 +379,15 @@ class SettingsHeroCard extends StatelessWidget {
                         child: Icon(
                           Icons.play_circle_fill_rounded,
                           color: isLoggedIn
-                              ? const Color(0xFFFF0000)
+                              ? AppColors.ytRed
                               : p.textSecondary,
                           size: 26,
                         ),
                       ),
                       if (isLoggedIn)
-                        Positioned(
+                        PositionedDirectional(
                           bottom: 0,
-                          right: 0,
+                          end: 0,
                           child: Container(
                             width: 14,
                             height: 14,
@@ -398,7 +403,7 @@ class SettingsHeroCard extends StatelessWidget {
                         ),
                     ],
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: AppSpacing.s14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -412,22 +417,23 @@ class SettingsHeroCard extends StatelessWidget {
                                     : 'YouTube Music',
                                 style: TextStyle(
                                   color: p.textPrimary,
-                                  fontSize: 16,
+                                  fontSize: AppFontSize.bodyLarge,
                                   fontWeight: FontWeight.w700,
-                                  letterSpacing: -0.2,
+                                  letterSpacing: AppTracking.title,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             if (isLoggedIn) ...[
-                              const SizedBox(width: 6),
+                              const SizedBox(width: AppSpacing.s6),
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
+
+                                    horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                                 decoration: BoxDecoration(
                                   color: p.success.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(6),
+                                  borderRadius: BorderRadius.circular(AppRadii.r6),
                                 ),
                                 child: Builder(
                                   builder: (_) {
@@ -436,9 +442,9 @@ class SettingsHeroCard extends StatelessWidget {
                                       status,
                                       style: TextStyle(
                                         color: p.success,
-                                        fontSize: 9.5,
+                                        fontSize: AppFontSize.tiny,
                                         fontWeight: FontWeight.w800,
-                                        letterSpacing: 0.5,
+                                        letterSpacing: AppTracking.medium,
                                       ),
                                     );
                                   },
@@ -447,14 +453,14 @@ class SettingsHeroCard extends StatelessWidget {
                             ],
                           ],
                         ),
-                        const SizedBox(height: 3),
+                        const SizedBox(height: AppSpacing.xxs),
                         Text(
                           isLoggedIn
                               ? 'YouTube Music • ${context.l10n.settingsTapToManage}'
                               : context.l10n.connectYtmSubtitle,
                           style: TextStyle(
                             color: p.textSecondary,
-                            fontSize: 12.5,
+                            fontSize: AppFontSize.label,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -462,7 +468,7 @@ class SettingsHeroCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.xs),
                   if (!isLoggedIn)
                     FilledButton.icon(
                       onPressed: () async {
@@ -479,13 +485,14 @@ class SettingsHeroCard extends StatelessWidget {
                       icon: const Icon(Icons.login_rounded, size: 16),
                       label: Text(context.l10n.signIn),
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFFFF0000),
+                        backgroundColor: AppColors.ytRed,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 8),
+
+                            horizontal: AppSpacing.s14, vertical: AppSpacing.xs),
                         textStyle: const TextStyle(
                           fontWeight: FontWeight.w700,
-                          fontSize: 13,
+                          fontSize: AppFontSize.bodySmall,
                         ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(AppRadii.button),

@@ -4,6 +4,8 @@ import '../../core/theme/aura_theme.dart';
 import '../../core/utils/l10n_extensions.dart';
 import '../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../core/widgets/pulsr_pressable.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class SortFilterSheet extends StatelessWidget {
   final String currentSort;
@@ -56,7 +58,7 @@ class SortFilterSheet extends StatelessWidget {
         constraints: BoxConstraints(maxHeight: screenHeight * 0.65),
         child: ListView.separated(
           shrinkWrap: true,
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.s20),
           itemCount: sortOptions.length,
           separatorBuilder: (_, __) => Divider(
             color: p.hairline.withValues(alpha: 0.5),
@@ -74,7 +76,7 @@ class SortFilterSheet extends StatelessWidget {
               },
               child: Padding(
                 padding:
-                    const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                    const EdgeInsets.symmetric(vertical: AppSpacing.sm, horizontal: AppSpacing.xs),
                 child: Row(
                   children: [
                     Expanded(
@@ -85,13 +87,13 @@ class SortFilterSheet extends StatelessWidget {
                           fontWeight: isSelected
                               ? FontWeight.w800
                               : FontWeight.w500,
-                          fontSize: 15,
+                          fontSize: AppFontSize.callout,
                         ),
                       ),
                     ),
                     if (isSelected)
                       Container(
-                        padding: const EdgeInsets.all(4),
+                        padding: const EdgeInsets.all(AppSpacing.xxs),
                         decoration: BoxDecoration(
                           color: p.accentContainer,
                           shape: BoxShape.circle,

@@ -6,6 +6,9 @@ import '../../../core/services/cloud_sync_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class CloudBackupDashboardScreen extends StatefulWidget {
   final CloudSyncService? syncService;
@@ -77,18 +80,18 @@ class _CloudBackupDashboardScreenState
           elevation: 0,
           leading: const PulsrBackButton(),
           title: Text(context.l10n.cloudBackupSync,
-          style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.bold),
+          style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700),
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+        padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, 120),
         children: [
           // Cloud Status Card
           Container(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(AppSpacing.s18),
             decoration: BoxDecoration(
               color: p.surfaceCard,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(AppRadii.r20),
               border: Border.all(color: p.hairline),
             ),
             child: Column(
@@ -101,60 +104,59 @@ class _CloudBackupDashboardScreenState
                       children: [
                         Icon(Icons.cloud_done_rounded,
                             color: p.primary, size: 24),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: AppSpacing.s10),
                         Text(context.l10n.cloudStorageStatus,
                           style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                              fontSize: AppFontSize.bodyLarge,
+                              fontWeight: FontWeight.w700,
                               color: p.textPrimary),
                         ),
                       ],
                     ),
                     if (_isSyncing)
-                      SizedBox(
-                        width: 20,
+                      SizedBox(width: AppSpacing.s20,
                         height: 20,
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: p.primary),
                       ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.xs),
                 Text(context.l10n.cloudBackupDesc,
-                  style: TextStyle(fontSize: 13, color: p.textSecondary),
+                  style: TextStyle(fontSize: AppFontSize.bodySmall, color: p.textSecondary),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.s14),
                 Divider(color: p.hairline),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.s10),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(context.l10n.lastSynced,
-                        style: TextStyle(color: p.textSecondary, fontSize: 13)),
+                        style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall)),
                     Text(lastSyncStr,
                         style: TextStyle(
                             color: p.primary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13)),
+                            fontWeight: FontWeight.w700,
+                            fontSize: AppFontSize.bodySmall)),
                   ],
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpacing.lg),
 
           Text(context.l10n.whatGetsSynced,
             style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
+                fontSize: AppFontSize.callout,
+                fontWeight: FontWeight.w700,
                 color: p.textPrimary),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           Text(
             context.l10n.cloudSyncItemsDesc,
-            style: TextStyle(fontSize: 13, color: p.textSecondary),
+            style: TextStyle(fontSize: AppFontSize.bodySmall, color: p.textSecondary),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
 
           // Per-scope sync toggles (previously the service exposed them but
           // no UI ever set or read them, so syncAll always synced everything).
@@ -178,24 +180,24 @@ class _CloudBackupDashboardScreenState
               await _syncService.setPlaylistsSyncEnabled(v);
             },
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpacing.lg),
 
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
               style: FilledButton.styleFrom(
                 backgroundColor: p.primary,
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.s14),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16)),
+                    borderRadius: BorderRadius.circular(AppRadii.r16)),
               ),
               icon: Icon(Icons.sync_rounded, color: Colors.black),
               label: Text(
                 _isSyncing ? context.l10n.settingsSyncing : context.l10n.syncNow,
                 style: TextStyle(
                     color: Colors.black,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15),
+                    fontWeight: FontWeight.w700,
+                    fontSize: AppFontSize.callout),
               ),
               onPressed: _isSyncing ? null : _performSync,
             ),
@@ -226,7 +228,7 @@ class _SyncScopeTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
       child: Row(
         children: [
           Container(
@@ -234,11 +236,11 @@ class _SyncScopeTile extends StatelessWidget {
             height: 40,
             decoration: BoxDecoration(
               color: p.primary.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadii.r12),
             ),
             child: Icon(icon, color: p.primary, size: 20),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -247,14 +249,14 @@ class _SyncScopeTile extends StatelessWidget {
                   title,
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
-                    fontSize: 14.5,
+                    fontSize: AppFontSize.body,
                     color: p.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 1),
+                const SizedBox(height: AppSpacing.s2),
                 Text(
                   subtitle,
-                  style: TextStyle(fontSize: 12, color: p.textSecondary),
+                  style: TextStyle(fontSize: AppFontSize.label, color: p.textSecondary),
                 ),
               ],
             ),

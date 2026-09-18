@@ -212,7 +212,7 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
         final bg = darkVibrant != null
             ? Color.alphaBlend(
                 Colors.black.withValues(alpha: 0.75), darkVibrant)
-            : const Color(0xFF14172B);
+            : AppColors.darkSurface;
 
         final newPalette = _CachedPalette(
           primaryColor: primary,

@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/di/injection.dart';
 import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/l10n_extensions.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -21,7 +25,13 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkNextScreen() async {
-    await Future.delayed(const Duration(milliseconds: 1600));
+    // Hold the intro for its full choreography, but never route before the DI
+    // graph is actually ready. The timeout is a safety net so a stuck
+    // initializer can never trap the user on the splash (I25).
+    await Future.wait<void>([
+      Future<void>.delayed(const Duration(milliseconds: 800)),
+      initializationReady.timeout(const Duration(seconds: 5), onTimeout: () {}),
+    ]);
     if (!mounted) return;
     final prefs = await SharedPreferences.getInstance();
     final onboardingDone = prefs.getBool('onboarding_completed') ?? false;
@@ -47,7 +57,7 @@ class _SplashScreenState extends State<SplashScreen> {
               width: 96,
               height: 96,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(AppRadii.r24),
                 boxShadow: [
                   BoxShadow(
                     color: const Color(0xFFFF2940).withValues(alpha: 0.45),
@@ -58,7 +68,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(AppRadii.r24),
                 child: Image.asset(
                   'assets/app_icon/app_icon_plus.png',
                   width: 96,
@@ -72,12 +82,12 @@ class _SplashScreenState extends State<SplashScreen> {
                     duration: context.motionMs(800),
                     curve: context.motionCurve(Curves.easeOutBack))
                 .fadeIn(duration: context.motionMs(600)),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.lg),
             Text(
               context.l10n.appTitle,
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
+                    letterSpacing: AppTracking.heading,
                     color: p.textPrimary,
                   ),
             )
@@ -86,12 +96,12 @@ class _SplashScreenState extends State<SplashScreen> {
                     delay: context.motionMs(300),
                     duration: context.motionMs(600))
                 .slideY(begin: 0.2, end: 0),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             Text(
               context.l10n.appTagline,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: p.textSecondary,
-                    letterSpacing: 0.5,
+                    letterSpacing: AppTracking.medium,
                   ),
             ).animate().fadeIn(
                 delay: context.motionMs(500),

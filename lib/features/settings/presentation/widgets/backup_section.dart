@@ -13,6 +13,9 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../../domain/usecases/backup_usecases.dart';
 import '../../cubit/settings_cubit.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class BackupSection extends StatefulWidget {
   const BackupSection({super.key});
@@ -36,7 +39,7 @@ class _BackupSectionState extends State<BackupSection> {
       height: 40,
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(AppRadii.r10),
         border: Border.all(color: outlineColor, width: 1),
       ),
       child: Icon(icon, color: primaryColor, size: 20),
@@ -170,7 +173,7 @@ class _BackupSectionState extends State<BackupSection> {
       title: Row(
         children: [
           Icon(Icons.restore_rounded, color: context.palette.accent),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.xs),
           Expanded(child: Text(context.l10n.confirmRestore)),
         ],
       ),
@@ -182,17 +185,17 @@ class _BackupSectionState extends State<BackupSection> {
             context.l10n.confirmRestoreDesc,
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
           Text(l10n.confirmFavoritesCount(favsCount)),
           Text(l10n.confirmPlaylistsCount(playlistsCount)),
           Text(l10n.confirmHistoryCount(historyCount)),
           Text(l10n.confirmSettingsValue(
               hasSettings ? l10n.includedLabel : l10n.noneLabel)),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
           Text(
             context.l10n.existingLibraryUpdateNotice,
             style:
-                TextStyle(fontSize: 12, color: context.palette.textSecondary),
+                TextStyle(fontSize: AppFontSize.label, color: context.palette.textSecondary),
           ),
         ],
       ),
@@ -232,7 +235,7 @@ class _BackupSectionState extends State<BackupSection> {
           title: Row(
             children: [
               Icon(Icons.check_circle_rounded, color: context.palette.accent),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppSpacing.xs),
               Expanded(child: Text(context.l10n.backupRestored)),
             ],
           ),
@@ -252,10 +255,10 @@ class _BackupSectionState extends State<BackupSection> {
                 Text(l10n.restoredExcludedFoldersCount(
                     importResult.restoredExcludedFoldersCount)),
               if (importResult.unmatchedPaths.isNotEmpty) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.sm),
                 Text(
                   l10n.unmatchedPathsWarning(importResult.unmatchedPaths.length),
-                  style: TextStyle(color: context.palette.warning, fontSize: 12),
+                  style: TextStyle(color: context.palette.warning, fontSize: AppFontSize.label),
                 ),
               ],
             ],
@@ -292,14 +295,13 @@ class _BackupSectionState extends State<BackupSection> {
         ListTile(
           leading: _buildIconContainer(context, Icons.upload_file_rounded),
           title: Text(context.l10n.exportBackup,
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: AppFontSize.body),
           ),
           subtitle: Text(context.l10n.backupExportDesc,
-            style: TextStyle(color: textSecondary, fontSize: 12),
+            style: TextStyle(color: textSecondary, fontSize: AppFontSize.label),
           ),
           trailing: _isExporting
-              ? const SizedBox(
-                  width: 20,
+              ? const SizedBox(width: AppSpacing.s20,
                   height: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
@@ -310,14 +312,13 @@ class _BackupSectionState extends State<BackupSection> {
           leading:
               _buildIconContainer(context, Icons.download_for_offline_rounded),
           title: Text(context.l10n.importBackup,
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: AppFontSize.body),
           ),
           subtitle: Text(context.l10n.backupImportDesc,
-            style: TextStyle(color: textSecondary, fontSize: 12),
+            style: TextStyle(color: textSecondary, fontSize: AppFontSize.label),
           ),
           trailing: _isImporting
-              ? const SizedBox(
-                  width: 20,
+              ? const SizedBox(width: AppSpacing.s20,
                   height: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )

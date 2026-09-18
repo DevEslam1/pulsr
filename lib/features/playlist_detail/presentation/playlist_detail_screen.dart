@@ -14,6 +14,7 @@ import '../../../core/services/playlist_share_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/widgets/song_tile.dart';
@@ -25,6 +26,7 @@ import '../../player/cubit/player_cubit.dart';
 import '../../sheets/song_info_sheet.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
 
 /// Reactively-loaded playlist contents or the failure that prevented loading,
 /// so a DB error surfaces as a retryable state instead of an empty list.
@@ -213,7 +215,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
               children: [
                 if (playlist.isSmart) ...[
                   Icon(Icons.auto_awesome_rounded, color: p.accent, size: 20),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.xs),
                 ],
                 Expanded(
                     child:
@@ -264,7 +266,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                         children: [
                           Icon(Icons.playlist_add_check_rounded,
                               color: p.accent, size: 20),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: AppSpacing.sm),
                           Text(context.l10n.manageSongs),
                         ],
                       ),
@@ -276,7 +278,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                         children: [
                           Icon(Icons.download_rounded,
                               color: p.accent, size: 20),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: AppSpacing.sm),
                           Text(context.l10n.downloadAllTracks),
                         ],
                       ),
@@ -287,7 +289,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                       children: [
                         Icon(Icons.file_upload_outlined,
                             color: p.accent, size: 20),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: AppSpacing.sm),
                         Text(context.l10n.exportM3u),
                       ],
                     ),
@@ -297,7 +299,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                     child: Row(
                       children: [
                         Icon(Icons.share_rounded, color: p.accent, size: 20),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: AppSpacing.sm),
                         Text(context.l10n.sharePlaylist),
                       ],
                     ),
@@ -308,7 +310,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                       children: [
                         Icon(Icons.delete_outline_rounded,
                             color: p.error, size: 20),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: AppSpacing.sm),
                         Text(context.l10n.deletePlaylist,
                             style: TextStyle(color: p.error)),
                       ],
@@ -323,7 +325,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
               constraints: Adaptive.contentConstraints(context),
               child: snapshot.connectionState == ConnectionState.waiting &&
                       !snapshot.hasData
-                  ? Center(child: CircularProgressIndicator(color: p.accent))
+                  ? const SkeletonList(padding: EdgeInsets.only(top: AppSpacing.xs))
                   : loadError != null
                       ? EmptyStateWidget(
                           icon: Icons.error_outline_rounded,
@@ -343,7 +345,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                               : context.l10n.emptyPlaylist,
                         )
                       : ListView.builder(
-                          padding: const EdgeInsets.only(bottom: 160),
+                          padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom),
                           itemCount: songs.length + 1,
                           itemBuilder: (context, index) {
                             if (index == 0) {
@@ -365,7 +367,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                                         label: Text(context.l10n.playAll),
                                       ),
                                     ),
-                                    const SizedBox(width: 12),
+                                    const SizedBox(width: AppSpacing.sm),
                                     Expanded(
                                       child: OutlinedButton.icon(
                                         onPressed: () {
@@ -382,7 +384,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                                       ),
                                     ),
                                     if (AppConfig.ytmEnabled) ...[
-                                      const SizedBox(width: 8),
+                                      const SizedBox(width: AppSpacing.xs),
                                       IconButton.filledTonal(
                                         onPressed: () =>
                                             _downloadPlaylist(context, songs),
@@ -421,11 +423,12 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                                       song.remoteId!.isNotEmpty)
                                     YtmDownloadButton(song: song),
                                   if (!playlist.isSmart)
-                                    IconButton(
-                                      icon: Icon(
-                                          Icons.remove_circle_outline_rounded,
-                                          size: 20,
-                                          color: p.textTertiary),
+                                      IconButton(
+                                        icon: Icon(
+                                            Icons.remove_circle_outline_rounded,
+                                            size: 20,
+                                            color: p.textTertiary),
+                                        tooltip: context.l10n.remove,
                                       onPressed: () {
                                         playlistUseCases
                                             .removeSongFromPlaylist(

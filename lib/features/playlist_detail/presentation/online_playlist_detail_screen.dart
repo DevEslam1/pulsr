@@ -20,6 +20,10 @@ import '../../player/cubit/player_cubit.dart';
 import '../../sheets/song_info_sheet.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 class OnlinePlaylistDetailArgs {
   final String playlistId;
@@ -261,7 +265,7 @@ class _OnlinePlaylistDetailScreenState
       onRefresh: _fetchTracks,
       color: p.accent,
       child: ListView(
-        padding: const EdgeInsets.only(bottom: 160),
+        padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom),
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
           // ── HERO BANNER ─────────────────────────────────────────────
@@ -291,13 +295,13 @@ class _OnlinePlaylistDetailScreenState
                       style: FilledButton.styleFrom(
                         backgroundColor: p.accent,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14)),
+                            borderRadius: BorderRadius.circular(AppRadii.r14)),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: AppSpacing.s10),
                   Expanded(
                     child: FilledButton.tonalIcon(
                       onPressed: () => _playAll(shuffle: true),
@@ -307,9 +311,9 @@ class _OnlinePlaylistDetailScreenState
                       style: FilledButton.styleFrom(
                         backgroundColor: p.surfaceContainerHigh,
                         foregroundColor: p.textPrimary,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14)),
+                            borderRadius: BorderRadius.circular(AppRadii.r14)),
                       ),
                     ),
                   ),
@@ -331,29 +335,29 @@ class _OnlinePlaylistDetailScreenState
                       onPressed: _downloadAll,
                       icon: const Icon(Icons.download_rounded, size: 16),
                       label: Text(context.l10n.downloadAll,
-                          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                          style: TextStyle(fontSize: AppFontSize.label, fontWeight: FontWeight.w600)),
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: p.hairline),
                         foregroundColor: p.textPrimary,
-                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s10),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                            borderRadius: BorderRadius.circular(AppRadii.r12)),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: AppSpacing.s10),
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: _saveToLocalPlaylists,
                       icon: const Icon(Icons.playlist_add_rounded, size: 18),
                       label: Text(context.l10n.saveToPulsr,
-                          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                          style: TextStyle(fontSize: AppFontSize.label, fontWeight: FontWeight.w600)),
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: p.hairline),
                         foregroundColor: p.textPrimary,
-                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s10),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                            borderRadius: BorderRadius.circular(AppRadii.r12)),
                       ),
                     ),
                   ),
@@ -364,7 +368,7 @@ class _OnlinePlaylistDetailScreenState
           // ── SEARCH BAR ──────────────────────────────────────────────
           if (_tracks.isNotEmpty)
             Padding(
-              padding: EdgeInsets.fromLTRB(
+              padding: EdgeInsetsDirectional.fromSTEB(
                 Adaptive.pagePadding(context),
                 12,
                 Adaptive.pagePadding(context),
@@ -377,24 +381,25 @@ class _OnlinePlaylistDetailScreenState
                   hintText: context.l10n.browseSearchWithinPlaylist,
                   prefixIcon: const Icon(Icons.search_rounded, size: 20),
                   suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear_rounded, size: 18),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _searchQuery = '');
-                          },
-                        )
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded, size: 18),
+                            tooltip: context.l10n.clear,
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                          )
                       : null,
                   filled: true,
                   fillColor: p.surfaceContainer,
                   contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s10),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppRadii.r14),
                     borderSide: BorderSide(color: p.hairline),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppRadii.r14),
                     borderSide: BorderSide(color: p.hairline),
                   ),
                 ),
@@ -404,19 +409,18 @@ class _OnlinePlaylistDetailScreenState
           // ── CONTENT / TRACKS LIST ───────────────────────────────────
           if (_isLoading && _tracks.isEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 64),
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.s64),
               child: Center(
                 child: Column(
                   children: [
-                    SizedBox(
-                      width: 28,
+                    SizedBox(width: AppSpacing.s28,
                       height: 28,
                       child: CircularProgressIndicator(
                           strokeWidth: 2.5, color: p.accent),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.md),
                     Text(context.l10n.fetchingYtmTracks,
-                        style: TextStyle(color: p.textSecondary, fontSize: 13)),
+                        style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall)),
                   ],
                 ),
               ),
@@ -432,13 +436,13 @@ class _OnlinePlaylistDetailScreenState
                   children: [
                     Icon(Icons.cloud_off_rounded,
                         size: 48, color: p.textTertiary),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.md),
                     Text(
                       _errorMessage!,
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: p.textSecondary, fontSize: 13),
+                      style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.md),
                     FilledButton.icon(
                       onPressed: _fetchTracks,
                       icon: const Icon(Icons.refresh_rounded, size: 18),
@@ -450,13 +454,13 @@ class _OnlinePlaylistDetailScreenState
             )
           else if (filtered.isEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 40),
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.s40),
               child: Center(
                 child: Text(
                   _searchQuery.isNotEmpty
                       ? '${context.l10n.browseNoSongsMatch} "$_searchQuery"'
                       : context.l10n.browsePlaylistHasNoSongs,
-                  style: TextStyle(color: p.textTertiary, fontSize: 14),
+                  style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.body),
                 ),
               ),
             )
@@ -476,11 +480,13 @@ class _OnlinePlaylistDetailScreenState
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       YtmDownloadButton(song: song, iconSize: 18),
-                      IconButton(
-                        icon: Icon(Icons.more_vert_rounded,
-                            size: 18, color: p.textTertiary),
-                        onPressed: () => SongInfoSheet.show(context, song: song),
-                      ),
+                        IconButton(
+                          icon: Icon(Icons.more_vert_rounded,
+                              size: 18, color: p.textTertiary),
+                          tooltip: MaterialLocalizations.of(context)
+                              .moreButtonTooltip,
+                          onPressed: () => SongInfoSheet.show(context, song: song),
+                        ),
                     ],
                   ),
                   onTap: () {
@@ -532,12 +538,12 @@ class _OnlinePlaylistDetailScreenState
 
   Widget _buildHeroCard(
       BuildContext context, PulsrPalette p, int totalDurationMs) {
-    const ytGradient = [Color(0xFFE50914), Color(0xFF7A0000)];
+    const ytGradient = [AppColors.netflixRed, Color(0xFF7A0000)];
 
     return Container(
       decoration: BoxDecoration(
         color: p.surfaceContainer,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadii.r24),
         border: Border.all(color: p.hairline),
       ),
       clipBehavior: Clip.antiAlias,
@@ -571,31 +577,32 @@ class _OnlinePlaylistDetailScreenState
                     ),
                   ),
                 ),
-                Positioned(
+                PositionedDirectional(
                   bottom: 16,
-                  left: 16,
-                  right: 16,
+                  start: 16,
+                  end: 16,
                   child: Row(
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
+
+                            horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFF0000),
-                          borderRadius: BorderRadius.circular(6),
+                          color: AppColors.ytRed,
+                          borderRadius: BorderRadius.circular(AppRadii.r6),
                         ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Icon(Icons.play_circle_fill_rounded,
                             color: Colors.white, size: 14),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: AppSpacing.xxs),
                             Text(context.l10n.ytmHeader,
                               style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 10,
+                                fontSize: AppFontSize.tiny,
                                 fontWeight: FontWeight.w900,
-                                letterSpacing: 0.5,
+                                letterSpacing: AppTracking.medium,
                               ),
                             ),
                           ],
@@ -608,58 +615,58 @@ class _OnlinePlaylistDetailScreenState
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(AppSpacing.s18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   _title,
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: AppFontSize.titleLarge,
                     fontWeight: FontWeight.w900,
                     color: p.textPrimary,
-                    letterSpacing: -0.4,
+                    letterSpacing: AppTracking.heading,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpacing.xxs),
                 Text(
                   _subtitle,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: AppFontSize.bodySmall,
                     color: p.textSecondary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.s10),
                 Row(
                   children: [
                     Icon(Icons.music_note_rounded,
                         size: 14, color: p.textTertiary),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: AppSpacing.xxs),
                     Text(
                       context.l10n.previewTrackCount(_tracks.length),
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: AppFontSize.label,
                         color: p.textTertiary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     if (totalDurationMs > 0) ...[
-                      const SizedBox(width: 10),
+                      const SizedBox(width: AppSpacing.s10),
                       Builder(
                         builder: (_) {
                           const bullet = '•';
                           return Text(bullet, style: TextStyle(color: p.textTertiary));
                         },
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: AppSpacing.s10),
                       Icon(Icons.schedule_rounded,
                           size: 14, color: p.textTertiary),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: AppSpacing.xxs),
                       Text(
                         Formatters.formatDurationMs(totalDurationMs),
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: AppFontSize.label,
                           color: p.textTertiary,
                           fontWeight: FontWeight.w600,
                         ),

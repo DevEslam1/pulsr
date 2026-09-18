@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:math' as math;
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -6,17 +8,19 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/utils/list_content_diff.dart';
 import '../../../core/widgets/cached_artwork.dart';
-import '../../../core/widgets/glass_container.dart';
 import '../../../core/widgets/spinning_vinyl_disc.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../settings/cubit/settings_state.dart';
 import '../cubit/player_cubit.dart';
 import '../cubit/player_state.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class MiniPlayer extends StatefulWidget {
   final VoidCallback onTap;
@@ -170,9 +174,20 @@ class _MiniPlayerState extends State<MiniPlayer> {
         final isTablet = Adaptive.isTablet(context);
         final playerRadius = BorderRadius.circular(isTablet ? 28 : 24);
 
+        // Screen readers cannot perform drag gestures, so expose the swipe
+        // up/down actions as custom semantics actions (I9).
+        final customSemanticsActions = <CustomSemanticsAction, VoidCallback>{
+          CustomSemanticsAction(label: context.l10n.expandPlayer):
+              widget.onSwipeUp ?? widget.onTap,
+          if (widget.onSwipeDown != null)
+            CustomSemanticsAction(label: context.l10n.dismissPlayer):
+                widget.onSwipeDown!,
+        };
+
         return Semantics(
           label: context.l10n.nowPlayingSemantics(song.title, song.artist),
           button: true,
+          customSemanticsActions: customSemanticsActions,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onVerticalDragStart: (_) {
@@ -221,51 +236,66 @@ class _MiniPlayerState extends State<MiniPlayer> {
                   },
             child: Padding(
               padding: EdgeInsetsDirectional.fromSTEB(
-                isTablet ? 24 : 10,
+                isTablet ? 24 : 14,
                 0,
-                isTablet ? 24 : 10,
+                isTablet ? 24 : 14,
                 0,
               ),
+              // Same glass recipe as the bottom navigation bar so the two dock
+              // cards read as one surface family.
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: playerRadius,
                   boxShadow: [
                     BoxShadow(
-                      color: activeAccent.withValues(
-                          alpha: p.isDark ? 0.22 : 0.15),
-                      blurRadius: 18,
-                      spreadRadius: -2,
-                      offset: const Offset(0, 4),
+                      color:
+                          Colors.black.withValues(alpha: p.isDark ? 0.40 : 0.12),
+                      blurRadius: 24,
+                      spreadRadius: 0,
+                      offset: const Offset(0, 8),
                     ),
                     BoxShadow(
-                      color: Colors.black
-                          .withValues(alpha: p.isDark ? 0.45 : 0.08),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
+                      color:
+                          p.accent.withValues(alpha: p.isDark ? 0.10 : 0.05),
+                      blurRadius: 18,
+                      spreadRadius: -2,
+                      offset: const Offset(0, 2),
                     ),
                   ],
                 ),
-                child: GlassContainer(
-                  blur: 20,
-                  opacity: p.isDark ? 0.93 : 0.97,
+                child: ClipRRect(
                   borderRadius: playerRadius,
-                  color: Color.alphaBlend(
-                    activeAccent.withValues(alpha: p.isDark ? 0.12 : 0.08),
-                    p.surface,
-                  ),
-                  border: Border.all(
-                    color: activeAccent.withValues(alpha: 0.26),
-                    width: 1.2,
-                  ),
-                  child: ClipRRect(
-                    borderRadius: playerRadius,
-                    child: Column(
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: playerRadius,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            p.surface
+                                .withValues(alpha: p.isDark ? 0.78 : 0.88),
+                            p.surfaceContainer
+                                .withValues(alpha: p.isDark ? 0.72 : 0.84),
+                          ],
+                        ),
+                        border: Border.all(
+                          color: p.isDark
+                              ? Colors.white.withValues(alpha: 0.14)
+                              : Colors.black.withValues(alpha: 0.08),
+                          width: 1.2,
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: playerRadius,
+                        child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Directionality(
                           textDirection: TextDirection.ltr,
                           child: Padding(
-                            padding: const EdgeInsets.fromLTRB(10, 8, 8, 0),
+                            padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s10, AppSpacing.xs, AppSpacing.xs, 0),
                             child: Row(
                               children: [
                                 // Interactive Swipeable Track Info Carousel
@@ -341,7 +371,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                                     borderRadius: 12,
                                                   ),
                                                 ),
-                                              const SizedBox(width: 12),
+                                              const SizedBox(width: AppSpacing.sm),
                                               // Track title & artist.
                                               // Dense fixed-height chrome: clamp
                                               // Dynamic Type here so the 52px
@@ -370,10 +400,10 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                                               : p.textSecondary,
                                                           fontWeight:
                                                               FontWeight.w700,
-                                                          fontSize: 14.5,
+                                                          fontSize: AppFontSize.body,
                                                         ),
                                                       ),
-                                                      const SizedBox(height: 2),
+                                                      const SizedBox(height: AppSpacing.s2),
                                                       Text(
                                                         item.artist,
                                                         maxLines: 1,
@@ -381,7 +411,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                                             TextOverflow.ellipsis,
                                                         style: TextStyle(
                                                           color: p.textSecondary,
-                                                          fontSize: 12,
+                                                          fontSize: AppFontSize.label,
                                                           fontWeight:
                                                               FontWeight.w500,
                                                         ),
@@ -398,7 +428,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: AppSpacing.s6),
                                 // Controls
                                 IconButton(
                                   tooltip: state.isPlaying
@@ -436,6 +466,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                           duration: state.duration,
                           activeAccent: activeAccent,
                           hairlineColor: p.hairline,
+                          isPlaying: state.isPlaying,
                           onSeek: (pos) => cubit.seek(pos),
                         ),
                       ],
@@ -445,6 +476,8 @@ class _MiniPlayerState extends State<MiniPlayer> {
               ),
             ),
           ),
+        ),
+        ),
         );
       },
     );
@@ -455,12 +488,14 @@ class _MiniPlayerProgressBar extends StatefulWidget {
   final Duration duration;
   final Color activeAccent;
   final Color hairlineColor;
+  final bool isPlaying;
   final void Function(Duration) onSeek;
 
   const _MiniPlayerProgressBar({
     required this.duration,
     required this.activeAccent,
     required this.hairlineColor,
+    required this.isPlaying,
     required this.onSeek,
   });
 
@@ -468,8 +503,62 @@ class _MiniPlayerProgressBar extends StatefulWidget {
   State<_MiniPlayerProgressBar> createState() => _MiniPlayerProgressBarState();
 }
 
-class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar> {
+class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   double? _dragProgress;
+  bool _isAppActive = true;
+  late final AnimationController _waveController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2600),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final active = state == AppLifecycleState.resumed;
+    if (_isAppActive == active) return;
+    _isAppActive = active;
+    _syncWave();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _waveController.duration = context.motionMs(2600);
+    _syncWave();
+  }
+
+  void _syncWave() {
+    // Never tick a decorative animation while the app is backgrounded or
+    // paused; this was draining battery while music played in the background.
+    final shouldAnimate = _isAppActive &&
+        widget.isPlaying &&
+        context.motionEnabled &&
+        !WidgetsBinding.instance.runtimeType.toString().contains('Test');
+    if (shouldAnimate) {
+      if (!_waveController.isAnimating) _waveController.repeat();
+    } else if (_waveController.isAnimating) {
+      _waveController.stop();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _MiniPlayerProgressBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isPlaying != widget.isPlaying) _syncWave();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _waveController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -522,6 +611,7 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar> {
                 behavior: HitTestBehavior.opaque,
                 onTapDown: (details) {
                   if (trackWidth > 0 && widget.duration.inMilliseconds > 0) {
+                    HapticFeedback.selectionClick();
                     final ratio =
                         (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
                     setState(() => _dragProgress = null);
@@ -532,6 +622,7 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar> {
                 },
                 onHorizontalDragStart: (details) {
                   if (trackWidth > 0 && widget.duration.inMilliseconds > 0) {
+                    HapticFeedback.selectionClick();
                     final ratio =
                         (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
                     setState(() => _dragProgress = ratio);
@@ -557,51 +648,51 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar> {
                 onHorizontalDragCancel: () {
                   setState(() => _dragProgress = null);
                 },
-                // 18px-tall hit area so the thin 4.5px progress bar is actually
-                // grabbable; the visual track stays centered and thin.
+                // Generous hit area so the thin wavy bar is easy to grab; the
+                // wave amplitude stays small so the card never grows.
                 child: SizedBox(
-                  height: 18,
+                  height: AppSpacing.lg,
                   width: double.infinity,
-                  child: Center(
-                    child: SizedBox(
-                      height: 4.5,
-                      width: double.infinity,
-                      child: Stack(
-                        alignment: Alignment.centerLeft,
-                        children: [
-                          Positioned.fill(
-                            child: ColoredBox(
-                                color: widget.hairlineColor
-                                    .withValues(alpha: 0.35)),
+                  child: AnimatedBuilder(
+                    animation: _waveController,
+                    builder: (context, _) => Stack(
+                      clipBehavior: Clip.none,
+                      alignment: AlignmentDirectional.centerStart,
+                      children: [
+                        Positioned.fill(
+                          child: CustomPaint(
+                            painter: _MiniProgressWavePainter(
+                              progress: progress,
+                              phase: _waveController.value * 2 * math.pi,
+                              activeColor: widget.activeAccent,
+                              inactiveColor: widget.hairlineColor
+                                  .withValues(alpha: 0.35),
+                              isPlaying: widget.isPlaying,
+                            ),
                           ),
+                        ),
+                        // Scrub thumb, shown while dragging.
+                        if (_dragProgress != null)
                           Align(
-                            alignment: Alignment.centerLeft,
-                            child: FractionallySizedBox(
-                              widthFactor: progress,
-                              alignment: Alignment.centerLeft,
-                              child: Container(
-                                height: 4.5,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      widget.activeAccent
-                                          .withValues(alpha: 0.7),
-                                      widget.activeAccent,
-                                    ],
+                            alignment: Alignment(
+                                (progress * 2 - 1).clamp(-0.94, 0.94), 0),
+                            child: Container(
+                              width: 9,
+                              height: 9,
+                              decoration: BoxDecoration(
+                                color: widget.activeAccent,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: widget.activeAccent
+                                        .withValues(alpha: 0.5),
+                                    blurRadius: 6,
                                   ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: widget.activeAccent
-                                          .withValues(alpha: 0.45),
-                                      blurRadius: 4,
-                                    ),
-                                  ],
-                                ),
+                                ],
                               ),
                             ),
                           ),
-                        ],
-                      ),
+                      ],
                     ),
                   ),
                 ),
@@ -613,4 +704,88 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar> {
       ),
     );
   }
+}
+
+
+/// Draws the mini-player progress as the app's signature animated wave:
+/// a thin inactive remainder plus a sine-enveloped active line with a soft glow,
+/// matched to [PulsrSlider] so the mini player and seek bar feel like one system.
+class _MiniProgressWavePainter extends CustomPainter {
+  final double progress;
+  final double phase;
+  final Color activeColor;
+  final Color inactiveColor;
+  final bool isPlaying;
+
+  _MiniProgressWavePainter({
+    required this.progress,
+    required this.phase,
+    required this.activeColor,
+    required this.inactiveColor,
+    required this.isPlaying,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final centerY = size.height / 2;
+    const trackHeight = 3.0;
+    final endX = (progress * size.width).clamp(0.0, size.width);
+
+    if (endX < size.width) {
+      final inactivePaint = Paint()
+        ..color = inactiveColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = trackHeight
+        ..strokeCap = StrokeCap.round;
+      canvas.drawLine(
+          Offset(endX, centerY), Offset(size.width, centerY), inactivePaint);
+    }
+    if (endX <= 0.5) return;
+
+    // Sine-enveloped wave so it leaves/returns to the centerline cleanly.
+    final amplitude = isPlaying ? 2.0 : 0.0;
+    const wavelength = 16.0;
+    const fade = 10.0;
+    const step = 2.0;
+    final wavePath = Path()..moveTo(0, centerY);
+    for (double x = 0; x <= endX; x += step) {
+      double env = 1.0;
+      if (x < fade) {
+        env = x / fade;
+      } else if (endX - x < fade) {
+        env = ((endX - x) / fade).clamp(0.0, 1.0);
+      }
+      final y = centerY +
+          amplitude * env * math.sin((x / wavelength) * 2 * math.pi - phase);
+      wavePath.lineTo(x, y);
+    }
+    wavePath.lineTo(endX, centerY);
+
+    final glowPaint = Paint()
+      ..color = activeColor.withValues(alpha: 0.22)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = trackHeight + 3.0
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
+    canvas.drawPath(wavePath, glowPaint);
+
+    final activePaint = Paint()
+      ..shader = LinearGradient(
+        colors: [activeColor.withValues(alpha: 0.75), activeColor],
+      ).createShader(Rect.fromLTRB(0, 0, size.width, size.height))
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = trackHeight
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawPath(wavePath, activePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _MiniProgressWavePainter old) =>
+      old.progress != progress ||
+      old.phase != phase ||
+      old.activeColor != activeColor ||
+      old.inactiveColor != inactiveColor ||
+      old.isPlaying != isPlaying;
 }

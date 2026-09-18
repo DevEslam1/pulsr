@@ -22,6 +22,10 @@ import 'themes/minimal_player_theme.dart';
 import 'themes/player_theme.dart';
 import 'themes/vinyl_player_theme.dart';
 import 'themes/waveform_player_theme.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 class NowPlayingScreen extends StatefulWidget {
   const NowPlayingScreen({super.key});
@@ -85,7 +89,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
         final bgColor = settingsConfig.dynamicThemingEnabled
             ? dynamicThemeConfig.backgroundColor
             : (isDark
-                ? const Color(0xFF14172B)
+                ? AppColors.darkSurface
                 : Theme.of(context).colorScheme.surface);
 
         final props = PlayerThemeProps(
@@ -349,9 +353,9 @@ class _NowPlayingGestureHintOverlayState
     final p = context.palette;
     final isTablet = context.isTablet;
 
-    return Positioned(
-      left: isTablet ? 32 : 16,
-      right: isTablet ? 32 : 16,
+    return PositionedDirectional(
+      start: isTablet ? 32 : 16,
+      end: isTablet ? 32 : 16,
       bottom: isTablet ? 120 : 76,
       child: IgnorePointer(
         ignoring: !_visible,
@@ -367,11 +371,11 @@ class _NowPlayingGestureHintOverlayState
               child: Container(
                 constraints: const BoxConstraints(maxWidth: 480),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    const EdgeInsets.symmetric(horizontal: AppSpacing.s14, vertical: AppSpacing.xs),
                 decoration: BoxDecoration(
                   color: (p.isDark ? const Color(0xFF161824) : Colors.white)
                       .withValues(alpha: 0.92),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadii.r20),
                   border: Border.all(
                     color: p.accent.withValues(alpha: 0.35),
                     width: 1.2,
@@ -393,7 +397,7 @@ class _NowPlayingGestureHintOverlayState
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(4),
+                      padding: const EdgeInsets.all(AppSpacing.xxs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.18),
                         shape: BoxShape.circle,
@@ -404,12 +408,12 @@ class _NowPlayingGestureHintOverlayState
                         size: 16,
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: AppSpacing.xs),
                     Flexible(
                       child: Text(
                         context.l10n.nowPlayingSwipeHint,
                         style: TextStyle(
-                          fontSize: 11.5,
+                          fontSize: AppFontSize.label,
                           fontWeight: FontWeight.w700,
                           color: p.textPrimary,
                         ),
@@ -417,7 +421,7 @@ class _NowPlayingGestureHintOverlayState
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: AppSpacing.s6),
                     IconButton(
                       tooltip: context.l10n.close,
                       onPressed: _dismiss,

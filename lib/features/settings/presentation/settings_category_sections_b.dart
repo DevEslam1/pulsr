@@ -146,17 +146,17 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
               if (state.proxyEnabled)
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                  margin: const EdgeInsets.only(right: 8),
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
+                  margin: const EdgeInsetsDirectional.only(end: AppSpacing.xs),
                   decoration: BoxDecoration(
                     color: p.success.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(AppRadii.r6),
                   ),
                   child: Text(
                     context.l10n.activeLabel,
                     style: TextStyle(
                       color: p.success,
-                      fontSize: 10,
+                      fontSize: AppFontSize.tiny,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -243,7 +243,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
     if (results.isEmpty) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -258,21 +258,21 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
                 child: Icon(Icons.search_off_rounded,
                     color: p.textTertiary, size: 28),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.md),
               Text(
                 context.l10n.settingsNoSettingsFound(_searchQuery),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: p.textPrimary,
-                  fontSize: 16,
+                  fontSize: AppFontSize.bodyLarge,
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: AppSpacing.s6),
               Text(
                 context.l10n.settingsSearchHint,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: p.textSecondary, fontSize: 12.5),
+                style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
               ),
             ],
           ),
@@ -281,17 +281,17 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
     }
 
     return ListView.builder(
-      padding: EdgeInsets.only(
-        bottom: 160,
+      padding: EdgeInsetsDirectional.only(
+        bottom: AppSpacing.scrollBottom,
         top: 8,
-        left: Adaptive.pagePadding(context),
-        right: Adaptive.pagePadding(context),
+        start: Adaptive.pagePadding(context),
+        end: Adaptive.pagePadding(context),
       ),
       itemCount: results.length,
       itemBuilder: (context, i) {
         final r = results[i];
         return Padding(
-          padding: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.only(bottom: AppSpacing.xs),
           child: Material(
             color: p.surfaceContainer,
             shape: RoundedRectangleBorder(
@@ -309,24 +309,24 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
                       style: TextStyle(
                         color: p.textPrimary,
                         fontWeight: FontWeight.w700,
-                        fontSize: 14,
+                        fontSize: AppFontSize.body,
                       ),
                     ),
                   ),
                   Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
                     decoration: BoxDecoration(
                       color: p.accent.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(AppRadii.r6),
                     ),
                     child: Text(
                       r.category.toUpperCase(),
                       style: TextStyle(
                         color: p.accent,
-                        fontSize: 9.5,
+                        fontSize: AppFontSize.tiny,
                         fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
+                        letterSpacing: AppTracking.medium,
                       ),
                     ),
                   ),
@@ -334,7 +334,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
               ),
               subtitle: Text(
                 r.subtitle,
-                style: TextStyle(color: p.textSecondary, fontSize: 12),
+                style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
               ),
               trailing: r.trailing ??
                   Icon(Icons.chevron_right_rounded,
@@ -535,6 +535,14 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
         icon: Icons.refresh_rounded,
         keywords: ['scan', 'refresh', 'library', 'songs', 'tracks', 'storage'],
         onTap: () => cubit.rescanLibrary(),
+      ),
+      _SearchItem(
+        category: context.l10n.navLibrary,
+        title: context.l10n.settingsRebuildSearchIndexTitle,
+        subtitle: context.l10n.settingsRebuildSearchIndexSubtitle,
+        icon: Icons.manage_search_rounded,
+        keywords: ['fts', 'search', 'index', 'rebuild', 'results', 'missing'],
+        onTap: () => cubit.rebuildSearchIndex(),
       ),
       _SearchItem(
         category: context.l10n.navLibrary,

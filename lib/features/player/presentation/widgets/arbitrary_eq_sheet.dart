@@ -6,6 +6,9 @@ import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class ArbitraryEqSheet extends StatefulWidget {
   const ArbitraryEqSheet({super.key});
@@ -70,10 +73,10 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
         final cubit = context.read<PlayerCubit>();
 
         return Container(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, AppSpacing.xl),
           decoration: BoxDecoration(
             color: p.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
           ),
           child: SingleChildScrollView(
             child: Column(
@@ -85,23 +88,23 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                     height: 4,
                     decoration: BoxDecoration(
                       color: p.textSecondary.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(AppRadii.r2),
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Row(
                       children: [
                         Icon(Icons.graphic_eq_rounded, color: p.primary),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: AppSpacing.s10),
                         Text(context.l10n.arbitraryResponseEq,
                           style: TextStyle(
                             color: p.textPrimary,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                            fontSize: AppFontSize.title,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ],
@@ -119,15 +122,16 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                 ),
                 Text(
                   AudioFeatureRegistry.arbitraryEq.subtitle,
-                  style: TextStyle(color: p.textSecondary, fontSize: 13),
+                  style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.sm),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 10),
+
+                      horizontal: AppSpacing.s14, vertical: AppSpacing.s10),
                   decoration: BoxDecoration(
                     color: p.surfaceContainer,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppRadii.r14),
                     border: Border.all(color: p.hairline),
                   ),
                   child: Row(
@@ -139,17 +143,17 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                             Text(context.l10n.linearPhaseFir,
                               style: TextStyle(
                                 color: p.textPrimary,
-                                fontSize: 13,
+                                fontSize: AppFontSize.bodySmall,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: AppSpacing.s2),
                             Text(
                               _linearPhase
                                   ? context.l10n.linearPhaseOnDesc
                                   : context.l10n.linearPhaseOffDesc,
                               style: TextStyle(
-                                  color: p.textSecondary, fontSize: 11),
+                                  color: p.textSecondary, fontSize: AppFontSize.caption),
                             ),
                           ],
                         ),
@@ -169,14 +173,14 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
 
                 // EqualizerAPO format input
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(AppSpacing.sm),
                   decoration: BoxDecoration(
                     color: p.surfaceContainer,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(AppRadii.r16),
                     border: Border.all(color: p.hairline),
                   ),
                   child: Column(
@@ -188,26 +192,26 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                           Text(context.l10n.graphicEqSpec,
                             style: TextStyle(
                               color: p.textSecondary,
-                              fontSize: 12,
+                              fontSize: AppFontSize.label,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                           Text(context.l10n.fir512,
                             style: TextStyle(
                               color: p.primary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
+                              fontSize: AppFontSize.caption,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: AppSpacing.xs),
                       TextField(
                         controller: _textController,
                         maxLines: 4,
                         style: TextStyle(
                           fontFamily: 'monospace',
-                          fontSize: 12,
+                          fontSize: AppFontSize.label,
                           color: p.textPrimary,
                         ),
                         decoration: InputDecoration(
@@ -215,22 +219,22 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                           hintStyle: TextStyle(
                             color: p.textTertiary,
                             fontFamily: 'monospace',
-                            fontSize: 12,
+                            fontSize: AppFontSize.label,
                           ),
                           filled: true,
                           fillColor: p.surface,
-                          contentPadding: const EdgeInsets.all(12),
+                          contentPadding: const EdgeInsets.all(AppSpacing.sm),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(AppRadii.r10),
                             borderSide: BorderSide(color: p.hairline),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(AppRadii.r10),
                             borderSide: BorderSide(color: p.primary),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: AppSpacing.s10),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
@@ -245,12 +249,12 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                               foregroundColor: p.textSecondary,
                               side: BorderSide(color: p.hairline),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(AppRadii.r10),
                               ),
                               visualDensity: VisualDensity.compact,
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: AppSpacing.xs),
                           ElevatedButton.icon(
                             onPressed: () => _apply(context),
                             icon: const Icon(Icons.check_rounded, size: 16),
@@ -259,7 +263,7 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                               backgroundColor: p.primary,
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(AppRadii.r10),
                               ),
                               visualDensity: VisualDensity.compact,
                             ),
@@ -269,19 +273,19 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.s20),
 
                 Text(context.l10n.presetAcousticTargets,
                   style: TextStyle(
                     color: p.textPrimary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
+                    fontSize: AppFontSize.body,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.s10),
                 ..._presets.entries.map((entry) {
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
                     child: InkWell(
                       onTap: () {
                         setState(() {
@@ -291,13 +295,14 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                             eqString: entry.value,
                             linearPhase: _linearPhase);
                       },
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppRadii.r14),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
+
+                            horizontal: AppSpacing.s14, vertical: AppSpacing.sm),
                         decoration: BoxDecoration(
                           color: p.surfaceContainer,
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(AppRadii.r14),
                           border: Border.all(color: p.hairline),
                         ),
                         child: Row(
@@ -307,13 +312,13 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                               color: p.primary,
                               size: 18,
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: AppSpacing.sm),
                             Expanded(
                               child: Text(
                                 entry.key,
                                 style: TextStyle(
                                   color: p.textPrimary,
-                                  fontSize: 13,
+                                  fontSize: AppFontSize.bodySmall,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),

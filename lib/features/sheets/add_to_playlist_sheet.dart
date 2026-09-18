@@ -9,6 +9,9 @@ import '../../domain/usecases/playlist_usecases.dart';
 
 import '../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../core/widgets/pulsr_pressable.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class AddToPlaylistSheet extends StatelessWidget {
   final SongsTableData song;
@@ -93,10 +96,10 @@ class AddToPlaylistSheet extends StatelessWidget {
       trailing: PulsrPressable(
         onTap: () => _showNewPlaylistDialog(context),
         child: Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(AppSpacing.xs),
           decoration: BoxDecoration(
             color: p.accentContainer,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppRadii.r10),
           ),
           child: Icon(Icons.add_rounded, color: p.accent, size: 20),
         ),
@@ -105,7 +108,7 @@ class AddToPlaylistSheet extends StatelessWidget {
         constraints: BoxConstraints(maxHeight: screenHeight * 0.65),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, AppSpacing.lg),
           child: StreamBuilder(
             stream: _useCases.watchPlaylists(),
             builder: (context, snapshot) {
@@ -113,10 +116,9 @@ class AddToPlaylistSheet extends StatelessWidget {
               if (snapshot.connectionState == ConnectionState.waiting &&
                   !snapshot.hasData) {
                 return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 32.0),
+                  padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
                   child: Center(
-                    child: SizedBox(
-                      width: 24,
+                    child: SizedBox(width: AppSpacing.lg,
                       height: 24,
                       child: CircularProgressIndicator(strokeWidth: 2.4),
                     ),
@@ -130,20 +132,20 @@ class AddToPlaylistSheet extends StatelessWidget {
                   [];
               if (playlists.isEmpty) {
                 return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 32.0),
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
                   child: Center(
                     child: Column(
                       children: [
                         Icon(Icons.queue_music_rounded,
                             size: 48, color: p.textTertiary),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.sm),
                         Text(
                           context.l10n.emptyPlaylists,
                           style: TextStyle(
                               color: p.textSecondary,
                               fontWeight: FontWeight.w600),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: AppSpacing.md),
                         FilledButton.icon(
                           onPressed: () => _showNewPlaylistDialog(context),
                           icon: const Icon(Icons.add_rounded, size: 18),
@@ -159,7 +161,7 @@ class AddToPlaylistSheet extends StatelessWidget {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: playlists.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 6),
+                separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.s6),
                 itemBuilder: (context, index) {
                   final playlist = playlists[index];
                   return PulsrPressable(
@@ -184,30 +186,31 @@ class AddToPlaylistSheet extends StatelessWidget {
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
+
+                          horizontal: AppSpacing.s14, vertical: AppSpacing.s10),
                       decoration: BoxDecoration(
                         color: p.surfaceContainer.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(AppRadii.r14),
                         border: Border.all(color: p.hairline),
                       ),
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(AppSpacing.xs),
                             decoration: BoxDecoration(
                               color: p.accentContainer,
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(AppRadii.r10),
                             ),
                             child: Icon(Icons.queue_music_rounded,
                                 color: p.accent, size: 20),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: AppSpacing.sm),
                           Expanded(
                             child: Text(
                               playlist.name,
                               style: TextStyle(
                                 fontWeight: FontWeight.w700,
-                                fontSize: 14.5,
+                                fontSize: AppFontSize.body,
                                 color: p.textPrimary,
                               ),
                             ),

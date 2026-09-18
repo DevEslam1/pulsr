@@ -1,6 +1,9 @@
 // lib/features/settings/presentation/widgets/settings_conflict_card.dart
 import 'package:flutter/material.dart';
 import '../../../../core/theme/aura_theme.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 /// Explains why a setting is currently blocked by a conflict and, when the
 /// conflicting state can be changed programmatically, offers a one-tap
@@ -23,11 +26,11 @@ class SettingsConflictCard extends StatelessWidget {
     final p = context.palette;
     final canResolve = resolveLabel != null && onResolve != null;
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      margin: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.xs),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.s10),
       decoration: BoxDecoration(
         color: p.error.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadii.r12),
         border: Border.all(color: p.error.withValues(alpha: 0.35)),
       ),
       child: Column(
@@ -37,18 +40,18 @@ class SettingsConflictCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(Icons.block_rounded, color: p.error, size: 16),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppSpacing.xs),
               Expanded(
                 child: Text(reason,
                     style: TextStyle(
                         color: p.error,
-                        fontSize: 11,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w600)),
               ),
             ],
           ),
           if (canResolve) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             SizedBox(
               height: 30,
               child: FilledButton.tonalIcon(
@@ -56,10 +59,10 @@ class SettingsConflictCard extends StatelessWidget {
                 icon: Icon(Icons.auto_fix_high_rounded, size: 14),
                 label: Text(resolveLabel!,
                     style: const TextStyle(
-                        fontSize: 11, fontWeight: FontWeight.w700)),
+                        fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
                 style: FilledButton.styleFrom(
                   visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
                   backgroundColor: p.error.withValues(alpha: 0.18),
                   foregroundColor: p.error,
                   elevation: 0,

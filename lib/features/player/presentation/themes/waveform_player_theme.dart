@@ -28,6 +28,10 @@ import '../widgets/player_controls.dart';
 import '../widgets/player_seek_bar.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'player_shape.dart';
 
 class WaveformPlayerTheme extends StatefulWidget {
   final PlayerThemeProps props;
@@ -214,8 +218,9 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                 // Symmetrical Track Header: [Download/Playlist] Title/Artist [Favorite]
                 Padding(
                   padding: EdgeInsets.symmetric(
+
                     horizontal: isTablet ? 28 : 16,
-                    vertical: 2,
+                    vertical: AppSpacing.s2,
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -263,7 +268,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                           Expanded(
                             child: Padding(
                               padding:
-                                  const EdgeInsets.symmetric(horizontal: 10),
+                                  const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -272,20 +277,20 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                                         context.l10n.noTrackSelected,
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
-                                      fontSize: isTablet ? 23 : 19,
+                                      fontSize: isTablet ? AppFontSize.headline : AppFontSize.title,
                                       fontWeight: FontWeight.w900,
                                       color: p.textPrimary,
                                       height: 1.22,
-                                      letterSpacing: -0.3,
+                                      letterSpacing: AppTracking.title,
                                     ),
                                   ),
-                                  const SizedBox(height: 3),
+                                  const SizedBox(height: AppSpacing.xxs),
                                   MarqueeText(
                                     text: song?.artist ??
                                         context.l10n.unknownArtist,
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
-                                      fontSize: isTablet ? 15 : 13.5,
+                                      fontSize: isTablet ? AppFontSize.callout : AppFontSize.bodySmall,
                                       fontWeight: FontWeight.w600,
                                       color: p.textSecondary,
                                     ),
@@ -296,8 +301,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                           ),
 
                           // Right Symmetrical Action: Animated Favorite Button
-                          SizedBox(
-                            width: 48,
+                          SizedBox(width: AppSpacing.xxl,
                             height: 48,
                             child: Material(
                               color: Colors.white.withValues(alpha: 0.06),
@@ -324,7 +328,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
 
                       // Symmetrical Audio Quality Badge & Waveform Indicator
                       if (song != null) ...[
-                        const SizedBox(height: 6),
+                        const SizedBox(height: AppSpacing.s6),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -334,26 +338,27 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                               compact: true,
                               showDevice: false,
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: AppSpacing.xs),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
+
+                                  horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                               decoration: BoxDecoration(
                                 color: activeColor.withValues(alpha: 0.16),
-                                borderRadius: BorderRadius.circular(6),
+                                borderRadius: BorderRadius.circular(AppRadii.r6),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(Icons.graphic_eq_rounded,
                                       size: 11, color: activeColor),
-                                  const SizedBox(width: 3),
+                                  const SizedBox(width: AppSpacing.xxs),
                                   Text(
                                     context.l10n.waveformLabel,
                                     style: TextStyle(
-                                      fontSize: 9,
+                                      fontSize: AppFontSize.micro,
                                       fontWeight: FontWeight.w900,
-                                      letterSpacing: 0.8,
+                                      letterSpacing: AppTracking.overline,
                                       color: activeColor,
                                     ),
                                   ),
@@ -375,6 +380,8 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                   activeColor: activeColor,
                   songId: song?.id,
                   filePath: song?.path,
+                  loopPointA: state.abPointA,
+                  loopPointB: state.abPointB,
                   onSeek: (pos) => cubit.seek(pos),
                 ),
 
@@ -411,7 +418,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
             if (isLandscape) {
               return Padding(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
@@ -432,7 +439,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                         ],
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: AppSpacing.md),
                     Expanded(
                       flex: 6,
                       child: SingleChildScrollView(
@@ -448,14 +455,14 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
               children: [
                 // Top Pull-down Handle Indicator
                 Padding(
-                  padding: const EdgeInsets.only(top: 4, bottom: 2),
+                  padding: const EdgeInsets.only(top: AppSpacing.xxs, bottom: AppSpacing.s2),
                   child: Center(
                     child: Container(
                       width: 38,
                       height: 4,
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.22),
-                        borderRadius: BorderRadius.circular(2),
+                        borderRadius: BorderRadius.circular(AppRadii.r2),
                       ),
                     ),
                   ),
@@ -464,8 +471,9 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                 // Top App Bar - Symmetrical Left/Right Targets & Centered Header
                 Padding(
                   padding: EdgeInsets.symmetric(
+
                     horizontal: isTablet ? 28 : 20,
-                    vertical: 2,
+                    vertical: AppSpacing.s2,
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -501,7 +509,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                       // Center: "PLAYING FROM" / Album Header
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -515,15 +523,15 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                                         : p.textSecondary,
                                     animate: state.isPlaying,
                                   ),
-                                  const SizedBox(width: 6),
+                                  const SizedBox(width: AppSpacing.s6),
                                   Text(
                                     context.l10n.playingFrom.toUpperCase(),
                                     style: Theme.of(context)
                                         .textTheme
                                         .bodySmall
                                         ?.copyWith(
-                                          fontSize: 10,
-                                          letterSpacing: 1.2,
+                                          fontSize: AppFontSize.tiny,
+                                          letterSpacing: AppTracking.wide,
                                           fontWeight: FontWeight.w800,
                                           color: p.textSecondary
                                               .withValues(alpha: 0.8),
@@ -531,7 +539,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 2),
+                              const SizedBox(height: AppSpacing.s2),
                               Text(
                                 (song?.album != null &&
                                         song!.album.trim().isNotEmpty)
@@ -548,7 +556,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                                     .titleSmall
                                     ?.copyWith(
                                       fontWeight: FontWeight.w800,
-                                      fontSize: isTablet ? 14 : 13,
+                                      fontSize: isTablet ? AppFontSize.body : AppFontSize.bodySmall,
                                       color: p.textPrimary,
                                     ),
                               ),
@@ -608,11 +616,11 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                   ),
                 ),
 
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpacing.xxs),
 
                 // Bottom Controls Section
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
+                  padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
                   child: controlsColumn,
                 ),
               ],
@@ -752,7 +760,8 @@ class _WaveformHeroStage extends StatelessWidget {
                 width: artSize,
                 height: artSize,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(28),
+                  borderRadius: BorderRadius.circular(
+                          resolveCustomRadius(context, AppRadii.r28)),
                   boxShadow: [
                     BoxShadow(
                       color:

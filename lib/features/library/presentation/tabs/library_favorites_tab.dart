@@ -24,38 +24,23 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
         children: [
           // ---------- Sub Tabs Switcher (Local / Online) ----------
           Padding(
-            padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 12,
+            padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context), 12,
                 Adaptive.pagePadding(context), 8),
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: p.surfaceContainer,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: p.hairline),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _FavTabButton(
-                      label: context.l10n.local,
-                      count: localFavorites.length,
-                      icon: Icons.folder_rounded,
-                      isSelected: _favTabFilter == 0,
-                      onTap: () => setState(() => _favTabFilter = 0),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: _FavTabButton(
-                      label: context.l10n.online,
-                      count: onlineFavorites.length,
-                      icon: Icons.cloud_rounded,
-                      isSelected: _favTabFilter == 1,
-                      onTap: () => setState(() => _favTabFilter = 1),
-                    ),
-                  ),
-                ],
-              ),
+            child: PulsrSegmentedControl(
+              selectedIndex: _favTabFilter,
+              onChanged: (i) => setState(() => _favTabFilter = i),
+              segments: [
+                PulsrSegment(
+                  label: context.l10n.local,
+                  icon: Icons.folder_rounded,
+                  count: localFavorites.length,
+                ),
+                PulsrSegment(
+                  label: context.l10n.online,
+                  icon: Icons.cloud_rounded,
+                  count: onlineFavorites.length,
+                ),
+              ],
             ),
           ),
 
@@ -72,7 +57,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                     context.l10n.tracksCount(currentFavorites.length),
                     style: TextStyle(
                       color: p.textSecondary,
-                      fontSize: 13,
+                      fontSize: AppFontSize.bodySmall,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -89,7 +74,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                       foregroundColor: p.accent,
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.xs),
                   IconButton.filledTonal(
                     onPressed: () {
                       final shuffled =
@@ -106,7 +91,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                     tooltip: context.l10n.shuffle,
                   ),
                   if (AppConfig.ytmEnabled) ...[
-                    const SizedBox(width: 8),
+                    const SizedBox(width: AppSpacing.xs),
                     IconButton.filledTonal(
                       onPressed: () =>
                           _downloadFavorites(context, currentFavorites),
@@ -120,7 +105,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                     ),
                   ],
                   if (_favTabFilter == 1 && AppConfig.ytmEnabled) ...[
-                    const SizedBox(width: 8),
+                    const SizedBox(width: AppSpacing.xs),
                     IconButton.filledTonal(
                       onPressed: () => _syncYtmLikes(context),
                       icon: const Icon(Icons.sync_rounded, size: 19),
@@ -131,7 +116,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                       ),
                       tooltip: context.l10n.syncYouTubeMusic,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: AppSpacing.xs),
                     IconButton.filledTonal(
                       onPressed: () => _showImportYtmFavoritesDialog(context),
                       icon: const Icon(Icons.link_rounded, size: 20),
@@ -163,7 +148,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                 : (isGrid
                     ? GridView.builder(
                         physics: const AlwaysScrollableScrollPhysics(),
-                        padding: EdgeInsets.fromLTRB(
+                        padding: EdgeInsetsDirectional.fromSTEB(
                           Adaptive.pagePadding(context),
                           8,
                           Adaptive.pagePadding(context),
@@ -179,18 +164,30 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                         itemCount: currentFavorites.length,
                         itemBuilder: (context, index) {
                           final song = currentFavorites[index];
-                          return _buildFavoriteGridCard(
-                              context, song, currentFavorites, p, playerCubit);
+                          return StaggeredReveal(
+                            index: index,
+                            groupKey: currentFavorites.isEmpty
+                                ? ''
+                                : '${currentFavorites.first.id}-${currentFavorites.length}',
+                            child: _buildFavoriteGridCard(
+                                context, song, currentFavorites, p, playerCubit),
+                          );
                         },
                       )
                     : ListView.builder(
                         physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.only(
-                            bottom: 160, top: 4, left: 4, right: 4),
+                        padding: const EdgeInsetsDirectional.only(
+
+                            bottom: AppSpacing.scrollBottom, top: AppSpacing.xxs, start: AppSpacing.xxs, end: AppSpacing.xxs),
                         itemCount: currentFavorites.length,
                         itemBuilder: (context, index) {
                           final song = currentFavorites[index];
-                          return PulsrDismissible(
+                          return StaggeredReveal(
+                            index: index,
+                            groupKey: currentFavorites.isEmpty
+                                ? ''
+                                : '${currentFavorites.first.id}-${currentFavorites.length}',
+                            child: PulsrDismissible(
                             key: ValueKey('fav_${song.id}'),
                             startToEndLabel: context.l10n.playNext,
                             endToStartLabel: context.l10n.delete,
@@ -253,7 +250,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                                   cubit.toggleSongSelection(song.id),
                               onMorePressed: () => SongInfoSheet.show(context, song: song),
                             ),
-                          );
+                          ));
                         },
                       )),
           ),
@@ -310,7 +307,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
           ),
           if (AppConfig.ytmEnabled) ...[
             Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.only(bottom: AppSpacing.xs),
               child: TextButton.icon(
                 onPressed: () => _showImportYtmFavoritesDialog(context),
                 icon: const Icon(Icons.link_rounded, size: 18),
@@ -318,7 +315,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.only(bottom: 24),
+              padding: const EdgeInsets.only(bottom: AppSpacing.lg),
               child: TextButton.icon(
                 onPressed: () => context.push('/ytm-search'),
                 icon: const Icon(Icons.travel_explore_rounded, size: 18),
@@ -383,13 +380,12 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
       SnackBar(
         content: Row(
           children: [
-            SizedBox(
-              width: 16,
+            SizedBox(width: AppSpacing.md,
               height: 16,
               child: CircularProgressIndicator(
                   strokeWidth: 2, color: Colors.white),
             ),
-            SizedBox(width: 12),
+            SizedBox(width: AppSpacing.sm),
             Text(context.l10n.syncingYtm),
           ],
         ),
@@ -456,11 +452,11 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
         builder: (ctx, setSheetState) {
           final bottomInset = MediaQuery.of(ctx).viewInsets.bottom;
           return Container(
-            padding: EdgeInsets.fromLTRB(24, 16, 24, bottomInset + 24),
+            padding: EdgeInsetsDirectional.fromSTEB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, bottomInset + 24),
             decoration: BoxDecoration(
               color: p.surfaceContainer,
               borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(28)),
+                  const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
               border: Border.all(color: p.hairline),
             ),
             child: Column(
@@ -473,11 +469,11 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                     height: 4,
                     decoration: BoxDecoration(
                       color: p.textTertiary.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(AppRadii.r2),
                     ),
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: AppSpacing.s18),
                 Row(
                   children: [
                     Container(
@@ -490,7 +486,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                       child: Icon(Icons.cloud_download_rounded,
                           color: p.accent, size: 22),
                     ),
-                    const SizedBox(width: 14),
+                    const SizedBox(width: AppSpacing.s14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -498,14 +494,14 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                           Text(context.l10n.importYtmFav,
                             style: TextStyle(
                               color: p.textPrimary,
-                              fontSize: 16,
+                              fontSize: AppFontSize.bodyLarge,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                           Text(context.l10n.pastePlaylistLink,
                             style: TextStyle(
                               color: p.textSecondary,
-                              fontSize: 12,
+                              fontSize: AppFontSize.label,
                             ),
                           ),
                         ],
@@ -513,13 +509,13 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.s20),
                 TextField(
                   controller: controller,
                   style: TextStyle(color: p.textPrimary),
                   decoration: InputDecoration(
                     hintText: 'https://music.youtube.com/playlist?list=...',
-                    hintStyle: TextStyle(color: p.textTertiary, fontSize: 13),
+                    hintStyle: TextStyle(color: p.textTertiary, fontSize: AppFontSize.bodySmall),
                     prefixIcon: Icon(Icons.link_rounded,
                         color: p.textTertiary, size: 20),
                     suffixIcon: IconButton(
@@ -537,23 +533,23 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                     filled: true,
                     fillColor: p.surface,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppRadii.r14),
                       borderSide: BorderSide(color: p.hairline),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppRadii.r14),
                       borderSide: BorderSide(color: p.hairline),
                     ),
                   ),
                 ),
                 if (errorText != null) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.xs),
                   Text(
                     errorText!,
-                    style: TextStyle(color: p.error, fontSize: 12),
+                    style: TextStyle(color: p.error, fontSize: AppFontSize.label),
                   ),
                 ],
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.s20),
                 FilledButton(
                   onPressed: isLoading
                       ? null
@@ -628,20 +624,19 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                   style: FilledButton.styleFrom(
                     backgroundColor: p.accent,
                     foregroundColor: p.onAccent,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.s14),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
+                        borderRadius: BorderRadius.circular(AppRadii.r14)),
                   ),
                   child: isLoading
-                      ? const SizedBox(
-                          width: 20,
+                      ? const SizedBox(width: AppSpacing.s20,
                           height: 20,
                           child: CircularProgressIndicator(
                               strokeWidth: 2, color: Colors.white),
                         )
                       : Text(context.l10n.importTracks,
                           style: TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.w600),
+                              fontSize: AppFontSize.callout, fontWeight: FontWeight.w600),
                         ),
                 ),
               ],
@@ -660,7 +655,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
     PlayerCubit playerCubit,
   ) {
     return InkWell(
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(AppRadii.r18),
       onTap: () => playerCubit.playSong(song, queue: currentFavorites),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -680,8 +675,8 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                 if (AppConfig.ytmEnabled &&
                     song.remoteId != null &&
                     song.remoteId!.isNotEmpty)
-                  Positioned(
-                    left: 6,
+                  PositionedDirectional(
+                    start: 6,
                     top: 6,
                     child: Container(
                       decoration: BoxDecoration(
@@ -696,8 +691,8 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                       ),
                     ),
                   ),
-                Positioned(
-                  right: 6,
+                PositionedDirectional(
+                  end: 6,
                   top: 6,
                   child: Material(
                     color: Colors.black.withValues(alpha: 0.5),
@@ -707,7 +702,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                       onTap: () =>
                           context.read<LibraryCubit>().toggleFavorite(song.id),
                       child: Padding(
-                        padding: const EdgeInsets.all(6.0),
+                        padding: const EdgeInsets.all(AppSpacing.s6),
                         child: Icon(Icons.favorite_rounded,
                             color: p.favorite, size: 18),
                       ),
@@ -717,7 +712,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           Text(
             song.title,
             maxLines: 1,
@@ -725,15 +720,15 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
             style: TextStyle(
               color: p.textPrimary,
               fontWeight: FontWeight.w700,
-              fontSize: 13.5,
+              fontSize: AppFontSize.bodySmall,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: AppSpacing.s2),
           Text(
             song.artist,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: p.textSecondary, fontSize: 11.5),
+            style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
           ),
         ],
       ),

@@ -17,46 +17,56 @@ import 'injection.config.dart';
 
 final GetIt getIt = GetIt.instance;
 
+final Completer<void> _initializationReady = Completer<void>();
+
+/// Completes when [configureDependencies] has finished (or failed). The splash
+/// gates its routing on this real signal instead of an arbitrary delay (I25).
+Future<void> get initializationReady => _initializationReady.future;
+
 @InjectableInit()
 Future<void> configureDependencies() async {
-  getIt.init();
-  // Pre-warm async singletons so sync getIt<T>() in main.dart never throws
-  // StateError (audio handler -> player cubit -> download cubit -> intents).
   try {
-    await getIt
-        .getAsync<PulsrAudioHandler>()
-        .timeout(const Duration(seconds: 12));
-  } catch (_) {}
-  try {
-    await getIt.getAsync<PlayerCubit>().timeout(const Duration(seconds: 5));
-  } catch (e, st) {
-    ErrorLogger.log('PlayerCubit DI warm-up timed out or failed',
-        error: e, stackTrace: st, category: 'DI');
+    getIt.init();
+    // Pre-warm async singletons so sync getIt<T>() in main.dart never throws
+    // StateError (audio handler -> player cubit -> download cubit -> intents).
+    try {
+      await getIt
+          .getAsync<PulsrAudioHandler>()
+          .timeout(const Duration(seconds: 12));
+    } catch (_) {}
+    try {
+      await getIt.getAsync<PlayerCubit>().timeout(const Duration(seconds: 5));
+    } catch (e, st) {
+      ErrorLogger.log('PlayerCubit DI warm-up timed out or failed',
+          error: e, stackTrace: st, category: 'DI');
+    }
+    try {
+      await getIt
+          .getAsync<YtmDownloadCubit>()
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {}
+    try {
+      await getIt
+          .getAsync<FileIntentHandler>()
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {}
+    // Per-song override stores load their SharedPreferences map asynchronously
+    // in their constructors; sync getters (player cubit per-track sync, smart
+    // playlist filters, song-info sheet) must never observe the empty pre-load
+    // map. Await their `ready` futures so the first UI read is authoritative.
+    try {
+      await Future.wait<void>([
+        getIt<SongRatingStore>().ready,
+        getIt<PerSongEqStore>().ready,
+        getIt<PerSongVolumeStore>().ready,
+      ]).timeout(const Duration(seconds: 5));
+    } catch (_) {}
+    try {
+      await getIt.allReady().timeout(const Duration(seconds: 5));
+    } catch (_) {}
+  } finally {
+    if (!_initializationReady.isCompleted) _initializationReady.complete();
   }
-  try {
-    await getIt
-        .getAsync<YtmDownloadCubit>()
-        .timeout(const Duration(seconds: 5));
-  } catch (_) {}
-  try {
-    await getIt
-        .getAsync<FileIntentHandler>()
-        .timeout(const Duration(seconds: 5));
-  } catch (_) {}
-  // Per-song override stores load their SharedPreferences map asynchronously
-  // in their constructors; sync getters (player cubit per-track sync, smart
-  // playlist filters, song-info sheet) must never observe the empty pre-load
-  // map. Await their `ready` futures so the first UI read is authoritative.
-  try {
-    await Future.wait<void>([
-      getIt<SongRatingStore>().ready,
-      getIt<PerSongEqStore>().ready,
-      getIt<PerSongVolumeStore>().ready,
-    ]).timeout(const Duration(seconds: 5));
-  } catch (_) {}
-  try {
-    await getIt.allReady().timeout(const Duration(seconds: 5));
-  } catch (_) {}
 }
 
 FutureOr<void> disposeHttpClient(HttpClient client) {

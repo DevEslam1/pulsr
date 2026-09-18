@@ -9,6 +9,9 @@ import '../../../../core/widgets/empty_state_widget.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../cubit/library_cubit.dart';
 import '../../cubit/library_state.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class FolderBrowserTab extends StatelessWidget {
   const FolderBrowserTab({super.key});
@@ -63,11 +66,11 @@ class FolderBrowserTab extends StatelessWidget {
               onRefresh: onRefresh,
               child: ListView.builder(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.only(
-                  bottom: 160,
+                padding: EdgeInsetsDirectional.only(
+                  bottom: AppSpacing.scrollBottom,
                   top: 8,
-                  left: Adaptive.pagePadding(context),
-                  right: Adaptive.pagePadding(context),
+                  start: Adaptive.pagePadding(context),
+                  end: Adaptive.pagePadding(context),
                 ),
                 itemCount: folders.length,
                 itemBuilder: (context, index) {
@@ -79,11 +82,11 @@ class FolderBrowserTab extends StatelessWidget {
                           folder.name.toLowerCase() == 'downloads';
 
                   return Container(
-                    margin: const EdgeInsets.symmetric(vertical: 4),
+                    margin: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
                     child: Material(
                       color: p.surfaceContainer,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(AppRadii.r16),
                         side: BorderSide(
                           color: folder.isExcluded
                               ? p.error.withValues(alpha: 0.4)
@@ -95,7 +98,7 @@ class FolderBrowserTab extends StatelessWidget {
                       child: ListTile(
                         onTap: () => context.push('/folder', extra: folder),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(AppRadii.r16),
                         ),
                         leading: Container(
                           width: 42,
@@ -106,7 +109,7 @@ class FolderBrowserTab extends StatelessWidget {
                                 : isDownloads
                                     ? p.accent.withValues(alpha: 0.22)
                                     : p.accentContainer,
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(AppRadii.r12),
                           ),
                           child: Icon(
                             folder.isExcluded
@@ -127,7 +130,7 @@ class FolderBrowserTab extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 14,
+                                  fontSize: AppFontSize.body,
                                   color: folder.isExcluded
                                       ? p.textTertiary
                                       : p.textPrimary,
@@ -138,21 +141,22 @@ class FolderBrowserTab extends StatelessWidget {
                               ),
                             ),
                             if (isDownloads) ...[
-                              const SizedBox(width: 6),
+                              const SizedBox(width: AppSpacing.s6),
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 1.5),
+
+                                    horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                                 decoration: BoxDecoration(
                                   color: p.accent.withValues(alpha: 0.18),
-                                  borderRadius: BorderRadius.circular(6),
+                                  borderRadius: BorderRadius.circular(AppRadii.r6),
                                 ),
                                 child: Text(
                                   context.l10n.downloadsLabel,
                                   style: TextStyle(
-                                    fontSize: 9,
+                                    fontSize: AppFontSize.micro,
                                     fontWeight: FontWeight.w800,
                                     color: p.accent,
-                                    letterSpacing: 0.4,
+                                    letterSpacing: AppTracking.medium,
                                   ),
                                 ),
                               ),
@@ -164,7 +168,7 @@ class FolderBrowserTab extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style:
-                              TextStyle(color: p.textSecondary, fontSize: 11.5),
+                              TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
                         ),
                         trailing: IconButton(
                           icon: Icon(

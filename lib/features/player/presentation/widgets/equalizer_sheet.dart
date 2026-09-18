@@ -38,6 +38,9 @@ import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/presentation/widgets/room_correction_sheet.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 // Rebuild gate for the whole DSP sheet. Every user-facing toggle/slider field
 // MUST be listed here or its switch will not flip until the sheet is reopened
@@ -347,17 +350,17 @@ class _EqualizerSheetState extends State<EqualizerSheet>
       builder: (context, status, _) {
         if (!status.containsKey(effectKey)) return const SizedBox.shrink();
         return Padding(
-          padding: const EdgeInsets.only(top: 6),
+          padding: const EdgeInsets.only(top: AppSpacing.s6),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(Icons.error_outline_rounded, size: 13, color: p.error),
-              const SizedBox(width: 5),
+              const SizedBox(width: AppSpacing.s6),
               Expanded(
                 child: Text(context.l10n.notAppliedWarn,
                   style: TextStyle(
                     color: p.error,
-                    fontSize: 10,
+                    fontSize: AppFontSize.tiny,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -385,18 +388,18 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 style: TextStyle(
                     color: p.textSecondary,
                     fontWeight: FontWeight.w600,
-                    fontSize: 12)),
-            const SizedBox(height: 10),
+                    fontSize: AppFontSize.label)),
+            const SizedBox(height: AppSpacing.s10),
             Text(info.description,
                 style: TextStyle(
-                    color: p.textPrimary, fontSize: 13, height: 1.4)),
+                    color: p.textPrimary, fontSize: AppFontSize.bodySmall, height: 1.4)),
             if (info.conflictsWith != null) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.sm),
               Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(AppSpacing.s10),
                   decoration: BoxDecoration(
                       color: p.warning.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(AppRadii.r10),
                       border: Border.all(
                           color: p.warning.withValues(alpha: 0.4))),
                   child: Row(
@@ -404,36 +407,36 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       children: [
                         Icon(Icons.warning_amber_rounded,
                             color: p.warning, size: 18),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: AppSpacing.xs),
                         Expanded(
                             child: Text(
                                 context.l10n.conflictsWith(
                                     info.conflictsWith ?? ''),
                                 style: TextStyle(
                                     color: p.textSecondary,
-                                    fontSize: 11,
+                                    fontSize: AppFontSize.caption,
                                     fontWeight: FontWeight.w600)))
                       ])),
             ],
             if (conflictReason != null) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.sm),
               Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(AppSpacing.s10),
                   decoration: BoxDecoration(
                       color: p.error.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(AppRadii.r10),
                       border:
                           Border.all(color: p.error.withValues(alpha: 0.4))),
                   child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Icon(Icons.block_rounded, color: p.error, size: 18),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: AppSpacing.xs),
                         Expanded(
                             child: Text(conflictReason,
                                 style: TextStyle(
                                     color: p.error,
-                                    fontSize: 11,
+                                    fontSize: AppFontSize.caption,
                                     fontWeight: FontWeight.w600)))
                       ])),
             ],
@@ -452,19 +455,19 @@ class _EqualizerSheetState extends State<EqualizerSheet>
 
   Widget _conflictBanner(String reason, PulsrPalette p) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
       decoration: BoxDecoration(
           color: p.error.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppRadii.r10),
           border: Border.all(color: p.error.withValues(alpha: 0.3))),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Icon(Icons.block_rounded, color: p.error, size: 16),
-        const SizedBox(width: 8),
+        const SizedBox(width: AppSpacing.xs),
         Expanded(
             child: Text(reason,
                 style: TextStyle(
-                    color: p.error, fontSize: 11, fontWeight: FontWeight.w600)))
+                    color: p.error, fontSize: AppFontSize.caption, fontWeight: FontWeight.w600)))
       ]),
     );
   }
@@ -563,9 +566,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(context.l10n.pasteJsonPreset,
-              style: TextStyle(fontSize: 13, color: context.palette.textSecondary),
+              style: TextStyle(fontSize: AppFontSize.bodySmall, color: context.palette.textSecondary),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.s10),
             TextField(
               controller: textController,
               autofocus: true,
@@ -633,14 +636,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               children: [
                 Text(
                   context.l10n.centerFreqHelp,
-                  style: const TextStyle(fontSize: 12),
+                  style: const TextStyle(fontSize: AppFontSize.label),
                 ),
                 if (error != null) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.xs),
                   Text(error!,
-                      style: TextStyle(color: context.palette.error, fontSize: 12)),
+                      style: TextStyle(color: context.palette.error, fontSize: AppFontSize.label)),
                 ],
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.xs),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxHeight: 360),
                   child: SingleChildScrollView(
@@ -648,7 +651,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       children: [
                         for (var i = 0; i < controllers.length; i++)
                           Padding(
-                            padding: const EdgeInsets.only(bottom: 4),
+                            padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
                             child: TextField(
                               controller: controllers[i],
                               keyboardType:
@@ -754,9 +757,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           children: [
             Text(
               context.l10n.roomMeasureHelp,
-              style: const TextStyle(fontSize: 12),
+              style: const TextStyle(fontSize: AppFontSize.label),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.mic_rounded),
@@ -856,7 +859,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 cubit.setBandGain(index, val);
               },
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: AppSpacing.xxs),
             // F-35: fast solo/mute toggles. State is transient (native has no
             // getter), so it is mirrored locally for the current session only.
             Row(
@@ -887,7 +890,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         }
                       : null,
                 ),
-                const SizedBox(width: 2),
+                const SizedBox(width: AppSpacing.s2),
                 _bandToggle(
                   label: 'S',
                   tooltip: isSoloed
@@ -933,7 +936,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
       message: tooltip,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(AppRadii.r4),
         child: Container(
           width: 16,
           height: 16,
@@ -942,7 +945,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             color: active
                 ? activeColor.withValues(alpha: 0.18)
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(AppRadii.r4),
             border: Border.all(
               color: active ? activeColor : Colors.grey.withValues(alpha: 0.35),
             ),
@@ -950,7 +953,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           child: Text(
             label,
             style: TextStyle(
-              fontSize: 9,
+              fontSize: AppFontSize.micro,
               height: 1.0,
               fontWeight: FontWeight.w800,
               color: active ? activeColor : Colors.grey,
@@ -968,10 +971,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     if (!Platform.isAndroid) {
       return Material(
         color: p.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.r24)),
         clipBehavior: Clip.antiAlias,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.md, AppSpacing.s20, AppSpacing.xl),
           child: SafeArea(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -982,23 +985,23 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     height: 4,
                     decoration: BoxDecoration(
                       color: p.hairline,
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(AppRadii.r2),
                     ),
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: AppSpacing.xl),
                 Icon(Icons.equalizer_rounded, color: p.textTertiary, size: 48),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
                 Text(context.l10n.hwFxUnavailable,
                   style: TextStyle(
-                      fontSize: 18,
+                      fontSize: AppFontSize.title,
                       fontWeight: FontWeight.w800,
                       color: p.textPrimary),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.xs),
                 Text(context.l10n.hwFxDesc,
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: p.textSecondary, fontSize: 13),
+                  style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                 ),
               ],
             ),
@@ -1059,7 +1062,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               child: Material(
                 color: p.surface,
                 borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(28)),
+                    const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
                 clipBehavior: Clip.antiAlias,
                 child: SafeArea(
                   top: false,
@@ -1067,7 +1070,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     children: [
                       // Top Handle & Inspector Bar
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                        padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.s10, AppSpacing.md, AppSpacing.xxs),
                         child: Row(
                           children: [
                             IconButton(
@@ -1091,7 +1094,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                               height: 4,
                               decoration: BoxDecoration(
                                 color: p.hairline,
-                                borderRadius: BorderRadius.circular(2),
+                                borderRadius: BorderRadius.circular(AppRadii.r2),
                               ),
                             ),
                             const Spacer(),
@@ -1101,7 +1104,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                   color: p.accent, size: 20),
                               color: p.surfaceContainer,
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16)),
+                                  borderRadius: BorderRadius.circular(AppRadii.r16)),
                               onSelected: (value) {
                                 switch (value) {
                                   case 'save':
@@ -1125,11 +1128,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                     children: [
                                       Icon(Icons.save_rounded,
                                           size: 18, color: p.textPrimary),
-                                      const SizedBox(width: 10),
+                                      const SizedBox(width: AppSpacing.s10),
                                       Text(context.l10n.saveCustomEqPreset,
                                           style: TextStyle(
                                               color: p.textPrimary,
-                                              fontSize: 13)),
+                                              fontSize: AppFontSize.bodySmall)),
                                     ],
                                   ),
                                 ),
@@ -1139,11 +1142,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                     children: [
                                       Icon(Icons.upload_rounded,
                                           size: 18, color: p.textPrimary),
-                                      const SizedBox(width: 10),
+                                      const SizedBox(width: AppSpacing.s10),
                                       Text(context.l10n.exportPresetJson,
                                           style: TextStyle(
                                               color: p.textPrimary,
-                                              fontSize: 13)),
+                                              fontSize: AppFontSize.bodySmall)),
                                     ],
                                   ),
                                 ),
@@ -1153,11 +1156,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                     children: [
                                       Icon(Icons.download_rounded,
                                           size: 18, color: p.textPrimary),
-                                      const SizedBox(width: 10),
+                                      const SizedBox(width: AppSpacing.s10),
                                       Text(context.l10n.importPresetJson,
                                           style: TextStyle(
                                               color: p.textPrimary,
-                                              fontSize: 13)),
+                                              fontSize: AppFontSize.bodySmall)),
                                     ],
                                   ),
                                 ),
@@ -1168,10 +1171,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                     children: [
                                       Icon(Icons.sensors_rounded,
                                           size: 18, color: p.accent),
-                                      const SizedBox(width: 10),
+                                      const SizedBox(width: AppSpacing.s10),
                                       Text(context.l10n.dspInspector,
                                           style: TextStyle(
-                                              color: p.accent, fontSize: 13)),
+                                              color: p.accent, fontSize: AppFontSize.bodySmall)),
                                     ],
                                   ),
                                 ),
@@ -1180,11 +1183,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           ],
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: AppSpacing.s6),
 
                       // Essential vs Studio Mode Switcher
                       _buildModeSwitcher(context, p, isStudio),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: AppSpacing.s6),
 
                       if (!isStudio)
                         Expanded(
@@ -1199,7 +1202,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       else ...[
                         // Separated EQ and DSP Master Toggles
                         Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                         child: Column(
                           children: [
                             // 1. Equalizer (EQ) Toggle Card
@@ -1210,7 +1213,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                   color: state.isEqEnabled
                                       ? p.accent.withValues(alpha: 0.08)
                                       : p.surfaceContainer,
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(AppRadii.r12),
                                   border: Border.all(
                                     color: state.isEqEnabled
                                         ? p.accent.withValues(alpha: 0.35)
@@ -1218,7 +1221,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                   ),
                                 ),
                                 child: InkWell(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(AppRadii.r12),
                                   onTap: dspBlockedGlobal != null &&
                                           !state.isEqEnabled
                                       ? null
@@ -1228,16 +1231,17 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                         },
                                   child: Padding(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 8),
+
+                                        horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
                                     child: Row(
                                       children: [
                                         Container(
-                                          padding: const EdgeInsets.all(6),
+                                          padding: const EdgeInsets.all(AppSpacing.s6),
                                           decoration: BoxDecoration(
                                             color: state.isEqEnabled
                                                 ? p.accent.withValues(alpha: 0.2)
                                                 : p.surfaceContainerHigh,
-                                            borderRadius: BorderRadius.circular(8),
+                                            borderRadius: BorderRadius.circular(AppRadii.r8),
                                           ),
                                           child: Icon(
                                             Icons.graphic_eq_rounded,
@@ -1247,7 +1251,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                             size: 18,
                                           ),
                                         ),
-                                        const SizedBox(width: 10),
+                                        const SizedBox(width: AppSpacing.s10),
                                         Expanded(
                                           child: Column(
                                             crossAxisAlignment:
@@ -1257,17 +1261,17 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                                 children: [
                                                   Text(context.l10n.equalizerTitle,
                                                     style: TextStyle(
-                                                      fontSize: 13,
+                                                      fontSize: AppFontSize.bodySmall,
                                                       fontWeight: FontWeight.w700,
                                                       color: p.textPrimary,
                                                     ),
                                                   ),
-                                                  const SizedBox(width: 6),
+                                                  const SizedBox(width: AppSpacing.s6),
                                                   Container(
                                                     padding:
                                                         const EdgeInsets.symmetric(
-                                                            horizontal: 5,
-                                                            vertical: 1.5),
+                                                            horizontal: AppSpacing.s6,
+                                                            vertical: AppSpacing.s2),
                                                     decoration: BoxDecoration(
                                                       color: state.isEqEnabled
                                                           ? (dspBlockedGlobal != null
@@ -1277,7 +1281,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                                                   alpha: 0.2))
                                                           : p.surfaceContainerHigh,
                                                       borderRadius:
-                                                          BorderRadius.circular(4),
+                                                          BorderRadius.circular(AppRadii.r4),
                                                     ),
                                                     child: Text(
                                                       dspBlockedGlobal != null
@@ -1286,7 +1290,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                                               ? context.l10n.dspStatOn
                                                               : context.l10n.dspStatOff),
                                                       style: TextStyle(
-                                                        fontSize: 9.5,
+                                                        fontSize: AppFontSize.tiny,
                                                         fontWeight: FontWeight.w800,
                                                         color:
                                                             dspBlockedGlobal != null
@@ -1299,7 +1303,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                                   ),
                                                 ],
                                               ),
-                                              const SizedBox(height: 2),
+                                              const SizedBox(height: AppSpacing.s2),
                                               Text(
                                                 dspBlockedGlobal != null
                                                     ? context.l10n.dspBlockedBitPerfect
@@ -1310,7 +1314,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                                             : '${context.l10n.dspPresetLabel} ${state.eqPreset.name}')
                                                         : context.l10n.dspEqCurvesBypassed),
                                                 style: TextStyle(
-                                                  fontSize: 11,
+                                                  fontSize: AppFontSize.caption,
                                                   color: dspBlockedGlobal != null
                                                       ? p.error
                                                       : p.textTertiary,
@@ -1356,7 +1360,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 6),
+                            const SizedBox(height: AppSpacing.s6),
 
                             // 2. DSP & Spatial Effects Toggle Card
                             Material(
@@ -1366,7 +1370,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                   color: state.isDspEffectsActive
                                       ? p.accent.withValues(alpha: 0.08)
                                       : p.surfaceContainer,
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(AppRadii.r12),
                                   border: Border.all(
                                     color: state.isDspEffectsActive
                                         ? p.accent.withValues(alpha: 0.35)
@@ -1374,7 +1378,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                   ),
                                 ),
                                 child: InkWell(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(AppRadii.r12),
                                   onTap: dspBlockedGlobal != null &&
                                           !state.isDspEffectsActive
                                       ? null
@@ -1385,16 +1389,17 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                         },
                                   child: Padding(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 8),
+
+                                        horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
                                     child: Row(
                                       children: [
                                         Container(
-                                          padding: const EdgeInsets.all(6),
+                                          padding: const EdgeInsets.all(AppSpacing.s6),
                                           decoration: BoxDecoration(
                                             color: state.isDspEffectsActive
                                                 ? p.accent.withValues(alpha: 0.2)
                                                 : p.surfaceContainerHigh,
-                                            borderRadius: BorderRadius.circular(8),
+                                            borderRadius: BorderRadius.circular(AppRadii.r8),
                                           ),
                                           child: Icon(
                                             Icons.multitrack_audio_rounded,
@@ -1404,7 +1409,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                             size: 18,
                                           ),
                                         ),
-                                        const SizedBox(width: 10),
+                                        const SizedBox(width: AppSpacing.s10),
                                         Expanded(
                                           child: Column(
                                             crossAxisAlignment:
@@ -1414,17 +1419,17 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                                 children: [
                                                   Text(context.l10n.dspSpatialTitle,
                                                     style: TextStyle(
-                                                      fontSize: 13,
+                                                      fontSize: AppFontSize.bodySmall,
                                                       fontWeight: FontWeight.w700,
                                                       color: p.textPrimary,
                                                     ),
                                                   ),
-                                                  const SizedBox(width: 6),
+                                                  const SizedBox(width: AppSpacing.s6),
                                                   Container(
                                                     padding:
                                                         const EdgeInsets.symmetric(
-                                                            horizontal: 5,
-                                                            vertical: 1.5),
+                                                            horizontal: AppSpacing.s6,
+                                                            vertical: AppSpacing.s2),
                                                     decoration: BoxDecoration(
                                                       color: state.isDspEffectsActive
                                                           ? (dspBlockedGlobal != null
@@ -1434,7 +1439,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                                                   alpha: 0.2))
                                                           : p.surfaceContainerHigh,
                                                       borderRadius:
-                                                          BorderRadius.circular(4),
+                                                          BorderRadius.circular(AppRadii.r4),
                                                     ),
                                                     child: Text(
                                                       dspBlockedGlobal != null
@@ -1443,7 +1448,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                                               ? context.l10n.dspStatOn
                                                               : context.l10n.dspStatOff),
                                                       style: TextStyle(
-                                                        fontSize: 9.5,
+                                                        fontSize: AppFontSize.tiny,
                                                         fontWeight: FontWeight.w800,
                                                         color:
                                                             dspBlockedGlobal != null
@@ -1456,7 +1461,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                                   ),
                                                 ],
                                               ),
-                                              const SizedBox(height: 2),
+                                              const SizedBox(height: AppSpacing.s2),
                                               Text(
                                                 dspBlockedGlobal != null
                                                     ? context.l10n.dspBlockedBitPerfect
@@ -1464,7 +1469,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                                         ? '${state.activeDspEffectStagesCount} ${context.l10n.dspActiveEffects}'
                                                         : context.l10n.dspAllEffectsBypassed),
                                                 style: TextStyle(
-                                                  fontSize: 11,
+                                                  fontSize: AppFontSize.caption,
                                                   color: dspBlockedGlobal != null
                                                       ? p.error
                                                       : p.textTertiary,
@@ -1512,11 +1517,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           ],
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: AppSpacing.s6),
 
                       // Top Hardware Device Profile Bar (JamesDSP parity)
                       _buildHardwareDeviceProfileBar(context, cubit, state, p),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: AppSpacing.xs),
 
                       // The AutoEq and Spatial & DSP tabs are intentionally not
                       // exposed in the Equalizer dialog. Headphone correction is
@@ -1527,12 +1532,12 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           children: [
                             Padding(
                               padding:
-                                  const EdgeInsets.symmetric(horizontal: 16),
+                                  const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                               child: Container(
                                 height: 38,
                                 decoration: BoxDecoration(
                                   color: p.surfaceContainer,
-                                  borderRadius: BorderRadius.circular(19),
+                                  borderRadius: BorderRadius.circular(AppRadii.r20),
                                   border: Border.all(color: p.hairline),
                                 ),
                                 child: TabBar(
@@ -1540,14 +1545,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                   tabAlignment: TabAlignment.fill,
                                   indicator: BoxDecoration(
                                     color: p.accent,
-                                    borderRadius: BorderRadius.circular(19),
+                                    borderRadius: BorderRadius.circular(AppRadii.r20),
                                   ),
                                   indicatorSize: TabBarIndicatorSize.tab,
                                   labelColor: p.onAccent,
                                   unselectedLabelColor: p.textSecondary,
                                   labelStyle: const TextStyle(
                                       fontWeight: FontWeight.w700,
-                                      fontSize: 12),
+                                      fontSize: AppFontSize.label),
                                   dividerColor: Colors.transparent,
                                   tabs: [
                                     Tab(text: context.l10n.equalizer),
@@ -1557,7 +1562,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: AppSpacing.xs),
                             Expanded(
                               child: TabBarView(
                                 controller: _tabController,
@@ -1592,13 +1597,13 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   // ---------------------------------------------------------------------------
   Widget _buildModeSwitcher(BuildContext context, PulsrPalette p, bool isStudio) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
       child: Container(
         height: 38,
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
           color: p.surfaceContainer,
-          borderRadius: BorderRadius.circular(19),
+          borderRadius: BorderRadius.circular(AppRadii.r20),
           border: Border.all(color: p.hairline),
         ),
         child: Row(
@@ -1613,7 +1618,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   duration: context.motionMs(200),
                   decoration: BoxDecoration(
                     color: !isStudio ? p.accent : Colors.transparent,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(AppRadii.r16),
                     boxShadow: !isStudio
                         ? [
                             BoxShadow(
@@ -1633,11 +1638,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           size: 14,
                           color: !isStudio ? p.onAccent : p.textSecondary,
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: AppSpacing.s6),
                         Text(
                           context.l10n.eqModeEssential,
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: AppFontSize.label,
                             fontWeight:
                                 !isStudio ? FontWeight.w800 : FontWeight.w600,
                             color: !isStudio ? p.onAccent : p.textSecondary,
@@ -1659,7 +1664,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   duration: context.motionMs(200),
                   decoration: BoxDecoration(
                     color: isStudio ? p.accent : Colors.transparent,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(AppRadii.r16),
                     boxShadow: isStudio
                         ? [
                             BoxShadow(
@@ -1679,11 +1684,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           size: 14,
                           color: isStudio ? p.onAccent : p.textSecondary,
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: AppSpacing.s6),
                         Text(
                           context.l10n.eqModeStudioPro,
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: AppFontSize.label,
                             fontWeight:
                                 isStudio ? FontWeight.w800 : FontWeight.w600,
                             color: isStudio ? p.onAccent : p.textSecondary,
@@ -1719,14 +1724,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     final trebleVal = _getTrebleGain(state);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
+      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.s6, AppSpacing.md, AppSpacing.lg),
       physics: const BouncingScrollPhysics(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (dspBlocked != null) ...[
             _conflictBanner(dspBlocked, p),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
           ],
 
           // 1. Master Equalizer Toggle Card
@@ -1737,7 +1742,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 color: state.isEqEnabled
                     ? p.accent.withValues(alpha: 0.08)
                     : p.surfaceContainer,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(AppRadii.r16),
                 border: Border.all(
                   color: state.isEqEnabled
                       ? p.accent.withValues(alpha: 0.35)
@@ -1745,22 +1750,22 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 ),
               ),
               child: InkWell(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(AppRadii.r16),
                 onTap: dspBlocked != null && !state.isEqEnabled
                     ? null
                     : () => cubit.setEqualizerEnabled(!state.isEqEnabled),
                 child: Padding(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.s14, vertical: AppSpacing.s10),
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(AppSpacing.xs),
                         decoration: BoxDecoration(
                           color: state.isEqEnabled
                               ? p.accent.withValues(alpha: 0.2)
                               : p.surfaceContainerHigh,
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(AppRadii.r10),
                         ),
                         child: Icon(
                           Icons.graphic_eq_rounded,
@@ -1769,7 +1774,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           size: 20,
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: AppSpacing.sm),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1777,14 +1782,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                             Text(
                               context.l10n.equalizer,
                               style: TextStyle(
-                                fontSize: 14,
+                                fontSize: AppFontSize.body,
                                 fontWeight: FontWeight.w700,
                                 color: state.isEqEnabled
                                     ? p.textPrimary
                                     : p.textSecondary,
                               ),
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: AppSpacing.s2),
                             Text(
                               state.isEqEnabled
                                   ? (state.selectedHeadphoneProfile != null
@@ -1792,7 +1797,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                       : preset.name)
                                   : context.l10n.dspAllEffectsBypassed,
                               style: TextStyle(
-                                fontSize: 11.5,
+                                fontSize: AppFontSize.label,
                                 color: state.isEqEnabled
                                     ? p.accent
                                     : p.textTertiary,
@@ -1819,7 +1824,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             ),
           ),
 
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.s14),
 
           // 2. Sound Profiles Presets Carousel
           Row(
@@ -1828,9 +1833,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               Text(
                 context.l10n.eqSoundProfiles,
                 style: TextStyle(
-                  fontSize: 10.5,
+                  fontSize: AppFontSize.tiny,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: 1.0,
+                  letterSpacing: AppTracking.wide,
                   color: p.textTertiary,
                 ),
               ),
@@ -1841,7 +1846,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   child: Text(
                     context.l10n.resetToFlat,
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: AppFontSize.caption,
                       fontWeight: FontWeight.w700,
                       color: p.accent,
                     ),
@@ -1849,7 +1854,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           SizedBox(
             height: 36,
             child: ListView.builder(
@@ -1861,7 +1866,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 final isSelected = state.selectedHeadphoneProfile == null &&
                     preset.name == item.name;
                 return Padding(
-                  padding: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsetsDirectional.only(end: AppSpacing.xs),
                   child: ChoiceChip(
                     label: Text(item.name),
                     selected: isSelected,
@@ -1876,7 +1881,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       color: isSelected ? p.accent : p.textSecondary,
                       fontWeight:
                           isSelected ? FontWeight.w800 : FontWeight.w600,
-                      fontSize: 12,
+                      fontSize: AppFontSize.label,
                     ),
                     onSelected: dspBlocked != null
                         ? null
@@ -1892,14 +1897,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             ),
           ),
 
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.s14),
 
           // 3. Quick Headphone Target Profile Card
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(AppSpacing.sm),
             decoration: BoxDecoration(
               color: p.surfaceContainer,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(AppRadii.r16),
               border: Border.all(
                 color: state.selectedHeadphoneProfile != null
                     ? p.accent.withValues(alpha: 0.35)
@@ -1909,12 +1914,12 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(AppSpacing.xs),
                   decoration: BoxDecoration(
                     color: state.selectedHeadphoneProfile != null
                         ? p.accent.withValues(alpha: 0.16)
                         : p.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(AppRadii.r10),
                   ),
                   child: Icon(
                     Icons.headphones_rounded,
@@ -1924,7 +1929,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     size: 20,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1934,7 +1939,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                             ? 'AutoEQ: ${state.selectedHeadphoneProfile!.name}'
                             : 'Headphone Calibration',
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: AppFontSize.bodySmall,
                           fontWeight: FontWeight.w700,
                           color: state.selectedHeadphoneProfile != null
                               ? p.accent
@@ -1943,13 +1948,13 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: AppSpacing.s2),
                       Text(
                         state.selectedHeadphoneProfile != null
                             ? '${state.selectedHeadphoneProfile!.brand} • Target Curve Applied'
                             : 'Auto-calibrate frequency response for your headphones',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: AppFontSize.caption,
                           color: p.textSecondary,
                         ),
                         maxLines: 1,
@@ -1958,7 +1963,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.xs),
                 if (state.selectedHeadphoneProfile != null)
                   IconButton(
                     tooltip: 'Clear Headphone Calibration',
@@ -1983,14 +1988,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             ),
           ),
 
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.s14),
 
           // 4. Live Frequency Curve Visualizer Card
           Container(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+            padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s14, AppSpacing.sm, AppSpacing.s14, AppSpacing.s10),
             decoration: BoxDecoration(
               color: p.surfaceContainer,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(AppRadii.r16),
               border: Border.all(color: p.hairline),
             ),
             child: Column(
@@ -2002,23 +2007,23 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     Text(
                       context.l10n.eqFreqResponseCurve,
                       style: TextStyle(
-                        fontSize: 10.5,
+                        fontSize: AppFontSize.tiny,
                         fontWeight: FontWeight.w800,
-                        letterSpacing: 0.8,
+                        letterSpacing: AppTracking.overline,
                         color: p.textTertiary,
                       ),
                     ),
                     Text(
                       isEnabled ? 'Active' : 'Bypassed',
                       style: TextStyle(
-                        fontSize: 10.5,
+                        fontSize: AppFontSize.tiny,
                         fontWeight: FontWeight.w700,
                         color: isEnabled ? p.accent : p.textTertiary,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.s10),
                 SizedBox(
                   height: 86,
                   child: EqCurveVisualizer(
@@ -2033,19 +2038,19 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             ),
           ),
 
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.s14),
 
           // 5. Macro Sound Tuning Sliders (Bass, Vocals, Treble)
           Text(
             context.l10n.eqQuickToneDials,
             style: TextStyle(
-              fontSize: 10.5,
+              fontSize: AppFontSize.tiny,
               fontWeight: FontWeight.w800,
-              letterSpacing: 1.0,
+              letterSpacing: AppTracking.wide,
               color: p.textTertiary,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.s10),
 
           _buildMacroSliderRow(
             context: context,
@@ -2057,7 +2062,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             p: p,
             onChanged: (val) => _setBassMacro(cubit, state, val),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.s10),
 
           _buildMacroSliderRow(
             context: context,
@@ -2065,11 +2070,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             title: 'Vocal & Presence',
             subtitle: 'Lead vocals & acoustic presence (500 Hz – 2 kHz)',
             value: midVal,
-            accentColor: const Color(0xFF00E5FF),
+            accentColor: AppColors.accentCyan,
             p: p,
             onChanged: (val) => _setMidMacro(cubit, state, val),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.s10),
 
           _buildMacroSliderRow(
             context: context,
@@ -2077,22 +2082,22 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             title: 'Clarity & Air',
             subtitle: 'Treble shimmer & spatial detail (4 kHz – 16 kHz)',
             value: trebleVal,
-            accentColor: const Color(0xFFFFB300),
+            accentColor: AppColors.warning,
             p: p,
             onChanged: (val) => _setTrebleMacro(cubit, state, val),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
 
           // 6. Pro Banner: "Switch to Studio Console"
           InkWell(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadii.r16),
             onTap: () {
               HapticFeedback.lightImpact();
               setState(() => _isStudioModeOverride = true);
             },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14, vertical: AppSpacing.sm),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
@@ -2102,20 +2107,20 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(AppRadii.r16),
                 border: Border.all(color: p.accent.withValues(alpha: 0.28)),
               ),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(AppSpacing.xs),
                     decoration: BoxDecoration(
                       color: p.accent.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(AppRadii.r10),
                     ),
                     child: Icon(Icons.tune_rounded, color: p.accent, size: 20),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2123,16 +2128,16 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         Text(
                           context.l10n.eqUnlockStudioConsole,
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: AppFontSize.bodySmall,
                             fontWeight: FontWeight.w700,
                             color: p.textPrimary,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: AppSpacing.s2),
                         Text(
                           context.l10n.eqUnlockStudioDesc,
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: AppFontSize.caption,
                             color: p.textSecondary,
                           ),
                         ),
@@ -2163,10 +2168,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     final gainText = '$sign${value.toStringAsFixed(1)} dB';
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s14, AppSpacing.sm, AppSpacing.s14, AppSpacing.xs),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadii.r16),
         border: Border.all(color: p.hairline),
       ),
       child: Column(
@@ -2174,14 +2179,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(6),
+                padding: const EdgeInsets.all(AppSpacing.s6),
                 decoration: BoxDecoration(
                   color: accentColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(AppRadii.r8),
                 ),
                 child: Icon(icon, color: accentColor, size: 16),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: AppSpacing.s10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -2189,14 +2194,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     Text(
                       title,
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: AppFontSize.bodySmall,
                         fontWeight: FontWeight.w700,
                         color: p.textPrimary,
                       ),
                     ),
                     Text(
                       subtitle,
-                      style: TextStyle(fontSize: 10.5, color: p.textTertiary),
+                      style: TextStyle(fontSize: AppFontSize.tiny, color: p.textTertiary),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -2204,17 +2209,17 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                 decoration: BoxDecoration(
                   color: accentColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(AppRadii.r8),
                   border:
                       Border.all(color: accentColor.withValues(alpha: 0.3)),
                 ),
                 child: Text(
                   gainText,
                   style: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: AppFontSize.label,
                     fontWeight: FontWeight.w800,
                     color: accentColor,
                     fontFeatures: const [FontFeature.tabularFigures()],
@@ -2223,7 +2228,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: AppSpacing.xxs),
           SliderTheme(
             data: SliderTheme.of(context).copyWith(
               activeTrackColor: accentColor,
@@ -2231,15 +2236,19 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               overlayColor: accentColor.withValues(alpha: 0.18),
               trackHeight: 4,
             ),
-            child: Slider(
-              value: value.clamp(-12.0, 12.0),
-              min: -12.0,
-              max: 12.0,
-              divisions: 48,
-              onChanged: (v) {
-                HapticFeedback.selectionClick();
-                onChanged(v);
-              },
+            child: Semantics(
+              label: title,
+              value: gainText,
+              child: Slider(
+                value: value.clamp(-12.0, 12.0),
+                min: -12.0,
+                max: 12.0,
+                divisions: 48,
+                onChanged: (v) {
+                  HapticFeedback.selectionClick();
+                  onChanged(v);
+                },
+              ),
             ),
           ),
         ],
@@ -2266,27 +2275,28 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     final isOverSafe = state.volumeBoost > safeMaxBoost;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.xs, AppSpacing.s20, AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (dspBlocked != null) _conflictBanner(dspBlocked, p),
           if (dspBlocked != null)
             Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.only(bottom: AppSpacing.xs),
               child: Row(
                 children: [
-                  IconButton(
-                      icon: Icon(Icons.info_outline_rounded,
-                          size: 18, color: p.accent),
-                      onPressed: () => _showFeatureInfo(
-                          context, AudioFeatureRegistry.equalizer,
-                          conflictReason: dspBlocked)),
-                  const SizedBox(width: 4),
+                    IconButton(
+                        icon: Icon(Icons.info_outline_rounded,
+                            size: 18, color: p.accent),
+                        tooltip: context.l10n.learnMore,
+                        onPressed: () => _showFeatureInfo(
+                            context, AudioFeatureRegistry.equalizer,
+                            conflictReason: dspBlocked)),
+                  const SizedBox(width: AppSpacing.xxs),
                   Expanded(
                       child: Text(context.l10n.dspDisabledBp,
                           style:
-                              TextStyle(color: p.textSecondary, fontSize: 11))),
+                              TextStyle(color: p.textSecondary, fontSize: AppFontSize.caption))),
                 ],
               ),
             ),
@@ -2305,7 +2315,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           state.selectedHeadphoneProfile == null &&
                               preset.name == presetItem.name;
                       return Padding(
-                        padding: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsetsDirectional.only(end: AppSpacing.xs),
                         child: ChoiceChip(
                           label: Text(presetItem.name),
                           selected: isSelected,
@@ -2319,7 +2329,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           labelStyle: TextStyle(
                             color: isSelected ? p.accent : p.textSecondary,
                             fontWeight: FontWeight.w700,
-                            fontSize: 12,
+                            fontSize: AppFontSize.label,
                           ),
                           onSelected: dspBlocked != null
                               ? null
@@ -2335,7 +2345,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppSpacing.xs),
               // A/B Comparison Toggle
               IgnorePointer(
                 ignoring: dspBlocked != null,
@@ -2356,16 +2366,17 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 7),
+
+                          horizontal: AppSpacing.s10, vertical: AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: _isAbComparing ? p.accent : p.surfaceContainer,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(AppRadii.r10),
                         border: Border.all(
                             color: _isAbComparing ? p.accent : p.hairline),
                       ),
                       child: Text(context.l10n.abFlat,
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: AppFontSize.caption,
                           fontWeight: FontWeight.w700,
                           color: _isAbComparing ? p.onAccent : p.textSecondary,
                         ),
@@ -2374,7 +2385,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   ),
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: AppSpacing.s6),
               // Reset to Flat button
               TextButton.icon(
                 onPressed:
@@ -2383,15 +2394,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     size: 16, color: p.textSecondary),
                 label: Text(context.l10n.reset,
                     style: TextStyle(
-                        fontSize: 11,
+                        fontSize: AppFontSize.caption,
                         color: p.textSecondary,
                         fontWeight: FontWeight.w600)),
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
                   visualDensity: VisualDensity.compact,
                 ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: AppSpacing.xxs),
               // Save Custom Preset button
               TextButton.icon(
                 onPressed: dspBlocked != null
@@ -2401,17 +2412,17 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     Icon(Icons.bookmark_add_rounded, size: 16, color: p.accent),
                 label: Text(context.l10n.save,
                     style: TextStyle(
-                        fontSize: 11,
+                        fontSize: AppFontSize.caption,
                         color: p.accent,
                         fontWeight: FontWeight.w700)),
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
                   visualDensity: VisualDensity.compact,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.s10),
 
           // A/B/C/D 4-Slot Comparison & Studio Tools Row
           SingleChildScrollView(
@@ -2423,7 +2434,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   padding: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
                     color: p.surfaceContainer,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(AppRadii.r10),
                     border: Border.all(color: p.hairline),
                   ),
                   child: Row(
@@ -2431,19 +2442,20 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       for (final slot in ComparisonSlot.values) ...[
                         InkWell(
                           onTap: () => cubit.switchComparisonSlot(slot),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(AppRadii.r8),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4),
+
+                                horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
                             decoration: BoxDecoration(
                               color: Colors.transparent,
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(AppRadii.r8),
                             ),
                             child: Text(
                               slot.name.toUpperCase(),
                               style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
+                                fontSize: AppFontSize.caption,
+                                fontWeight: FontWeight.w700,
                                 color: p.textPrimary,
                               ),
                             ),
@@ -2453,18 +2465,18 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.xs),
 
                 // AutoEQ Online Search
                 ActionChip(
                   avatar: Icon(Icons.search_rounded, size: 14, color: p.accent),
                   label: Text(context.l10n.autoEqSearch,
                       style:
-                          TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          TextStyle(fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
                   backgroundColor: p.surfaceContainer,
                   side: BorderSide(color: p.hairline),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(AppRadii.r10)),
                   onPressed: () {
                     PulsrSheetHelper.showPulsrSheet<void>(
                       context: context,
@@ -2475,7 +2487,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     );
                   },
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.xs),
 
                 // Studio Dynamics Compressor
                 ActionChip(
@@ -2483,11 +2495,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       Icon(Icons.compress_rounded, size: 14, color: p.primary),
                   label: Text(context.l10n.dynamicsCompressor,
                       style:
-                          TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          TextStyle(fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
                   backgroundColor: p.surfaceContainer,
                   side: BorderSide(color: p.hairline),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(AppRadii.r10)),
                   onPressed: () {
                     final blocked = _dspBlockedReason(context);
                     if (blocked != null) {
@@ -2508,7 +2520,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     );
                   },
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.xs),
 
                 // F-37: room-correction entry with FIR export.
                 ActionChip(
@@ -2516,16 +2528,16 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       Icon(Icons.graphic_eq_rounded, size: 14, color: p.accent),
                   label: Text(context.l10n.roomCorrection,
                       style:
-                          TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          TextStyle(fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
                   backgroundColor: p.surfaceContainer,
                   side: BorderSide(color: p.hairline),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(AppRadii.r10)),
                   onPressed: dspBlocked != null
                       ? null
                       : () => _showRoomCorrectionActions(cubit),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.xs),
 
                 // ViPER-DDC
                 ActionChip(
@@ -2539,8 +2551,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         ? 'DDC: ${state.viperDdcProfileName}'
                         : 'ViPER-DDC',
                     style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
+                      fontSize: AppFontSize.caption,
+                      fontWeight: FontWeight.w700,
                       color: state.isViperDdcEnabled ? p.accent : p.textPrimary,
                     ),
                   ),
@@ -2551,7 +2563,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     color: state.isViperDdcEnabled ? p.accent : p.hairline,
                   ),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(AppRadii.r10)),
                   onPressed: () {
                     PulsrSheetHelper.showPulsrSheet<void>(
                       context: context,
@@ -2560,7 +2572,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     );
                   },
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.xs),
 
                 // Arbitrary Response EQ
                 ActionChip(
@@ -2571,8 +2583,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           : p.textSecondary),
                   label: Text(context.l10n.arbitraryEq,
                     style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
+                      fontSize: AppFontSize.caption,
+                      fontWeight: FontWeight.w700,
                       color:
                           state.isArbitraryEqEnabled ? p.accent : p.textPrimary,
                     ),
@@ -2584,7 +2596,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     color: state.isArbitraryEqEnabled ? p.accent : p.hairline,
                   ),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(AppRadii.r10)),
                   onPressed: () {
                     PulsrSheetHelper.showPulsrSheet<void>(
                       context: context,
@@ -2593,7 +2605,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     );
                   },
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.xs),
 
                 // Live Programmable DSP
                 ActionChip(
@@ -2603,8 +2615,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           state.isLiveProgEnabled ? p.accent : p.textSecondary),
                   label: Text(context.l10n.liveProgDsp,
                     style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
+                      fontSize: AppFontSize.caption,
+                      fontWeight: FontWeight.w700,
                       color: state.isLiveProgEnabled ? p.accent : p.textPrimary,
                     ),
                   ),
@@ -2615,7 +2627,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     color: state.isLiveProgEnabled ? p.accent : p.hairline,
                   ),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(AppRadii.r10)),
                   onPressed: () {
                     PulsrSheetHelper.showPulsrSheet<void>(
                       context: context,
@@ -2624,7 +2636,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     );
                   },
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.xs),
 
                 // Dynamic Bass
                 ActionChip(
@@ -2635,8 +2647,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           : p.textSecondary),
                   label: Text(context.l10n.dynamicBass,
                     style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
+                      fontSize: AppFontSize.caption,
+                      fontWeight: FontWeight.w700,
                       color:
                           state.isDynamicBassEnabled ? p.accent : p.textPrimary,
                     ),
@@ -2648,7 +2660,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     color: state.isDynamicBassEnabled ? p.accent : p.hairline,
                   ),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(AppRadii.r10)),
                   onPressed: dspBlocked != null || !_nativePcmEffectsAvailable
                       ? null
                       : () {
@@ -2656,7 +2668,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           cubit.setDynamicBass(!state.isDynamicBassEnabled);
                         },
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.xs),
 
                 // DSP Inspector
                 ActionChip(
@@ -2664,17 +2676,17 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       Icon(Icons.insights_rounded, size: 14, color: p.accent),
                   label: Text(context.l10n.dspChain,
                       style:
-                          TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          TextStyle(fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
                   backgroundColor: p.surfaceContainer,
                   side: BorderSide(color: p.hairline),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(AppRadii.r10)),
                   onPressed: () => DspInspectorSheet.show(context),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.s14),
 
           // Active Profile Banner if AutoEq is selected
           // OEM Audio Double-Processing Warning Banner
@@ -2685,7 +2697,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   state.isVirtualizerEnabled ||
                   state.isDynamicsEnabled)) ...[
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(AppSpacing.sm),
               decoration: BoxDecoration(
                 color: p.warning.withValues(alpha: 0.12),
                 borderRadius: AppRadii.cardRadius,
@@ -2696,7 +2708,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 children: [
                   Icon(Icons.warning_amber_rounded,
                       color: p.warning, size: 20),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: AppSpacing.s10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2704,15 +2716,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         Text(
                           '${state.detectedOemEngines.join(", ")} ${context.l10n.activeLabel}',
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: AppFontSize.label,
                             fontWeight: FontWeight.w700,
                             color: p.warning,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: AppSpacing.s2),
                         Text(context.l10n.systemFxActive,
                           style:
-                              TextStyle(fontSize: 11, color: p.textSecondary),
+                              TextStyle(fontSize: AppFontSize.caption, color: p.textSecondary),
                         ),
                       ],
                     ),
@@ -2720,12 +2732,12 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
           ],
 
           if (state.selectedHeadphoneProfile != null) ...[
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14, vertical: AppSpacing.s10),
               decoration: BoxDecoration(
                 color: p.accent.withValues(alpha: 0.12),
                 borderRadius: AppRadii.cardRadius,
@@ -2734,7 +2746,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               child: Row(
                 children: [
                   Icon(Icons.headphones_rounded, color: p.accent, size: 20),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: AppSpacing.s10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2742,7 +2754,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         Text(
                           'AutoEq: ${state.selectedHeadphoneProfile!.name}',
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: AppFontSize.label,
                             fontWeight: FontWeight.w700,
                             color: p.accent,
                           ),
@@ -2750,7 +2762,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         Text(
                           '${state.selectedHeadphoneProfile!.brand} Ã¢Â€Â¢ '
                           '${context.l10n.preampLabel}: ${state.selectedHeadphoneProfile!.preampGain.toStringAsFixed(1)} dB',
-                          style: TextStyle(fontSize: 10, color: p.textTertiary),
+                          style: TextStyle(fontSize: AppFontSize.tiny, color: p.textTertiary),
                         ),
                       ],
                     ),
@@ -2758,16 +2770,16 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   TextButton(
                     onPressed: () => cubit.resetToFlat(),
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
                       minimumSize: Size.zero,
                     ),
                     child: Text(context.l10n.reset,
-                        style: TextStyle(color: p.textSecondary, fontSize: 11)),
+                        style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.caption)),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
           ],
 
           // Real-time Frequency Response Curve Visualizer.
@@ -2777,7 +2789,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           // ancestor layers during drags.
           Container(
             height: 64,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.s6),
             decoration: BoxDecoration(
               color: p.surfaceContainer,
               borderRadius: AppRadii.cardRadius,
@@ -2794,30 +2806,30 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               ),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.s14),
 
           // F-32: 10 / 32 / 64-band mode toggle + custom frequency editor.
           Row(
             children: [
               Text(context.l10n.bandsLabel,
                 style: TextStyle(
-                    fontSize: 12,
+                    fontSize: AppFontSize.label,
                     fontWeight: FontWeight.w700,
                     color: p.textSecondary),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppSpacing.xs),
               Container(
-                padding: const EdgeInsets.all(2),
+                padding: const EdgeInsets.all(AppSpacing.s2),
                 decoration: BoxDecoration(
                   color: p.surfaceContainer,
-                  borderRadius: BorderRadius.circular(9),
+                  borderRadius: BorderRadius.circular(AppRadii.r8),
                   border: Border.all(color: p.hairline),
                 ),
                 child: Row(
                   children: [
                     for (final bandCount in const [10, 32, 64])
                       InkWell(
-                        borderRadius: BorderRadius.circular(7),
+                        borderRadius: BorderRadius.circular(AppRadii.r8),
                         onTap: dspBlocked != null
                             ? null
                             : () async {
@@ -2831,17 +2843,18 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                               },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
+
+                              horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
                           decoration: BoxDecoration(
                             color: _activeBandCount(state) == bandCount
                                 ? p.accent
                                 : Colors.transparent,
-                            borderRadius: BorderRadius.circular(7),
+                            borderRadius: BorderRadius.circular(AppRadii.r8),
                           ),
                           child: Text(
                             '$bandCount',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: AppFontSize.caption,
                               fontWeight: FontWeight.w800,
                               color: _activeBandCount(state) == bandCount
                                   ? p.onAccent
@@ -2861,22 +2874,22 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 icon: Icon(Icons.tune_rounded, size: 16, color: p.accent),
                 label: Text(context.l10n.frequencies,
                     style: TextStyle(
-                        fontSize: 11,
+                        fontSize: AppFontSize.caption,
                         color: p.accent,
                         fontWeight: FontWeight.w700)),
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
                   visualDensity: VisualDensity.compact,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
 
           // Equalizer band sliders — 10-band ISO, 32-band 1/3-octave or
           // 64-band log-spaced. Non-10 plans render in a horizontal scroll.
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 6),
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.md, horizontal: AppSpacing.s6),
             decoration: BoxDecoration(
               color: p.surfaceContainer,
               borderRadius: AppRadii.cardRadius,
@@ -2908,7 +2921,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       cubit: cubit,
                     );
                     return compact
-                        ? SizedBox(width: 40, child: control)
+                        ? SizedBox(width: AppSpacing.s40, child: control)
                         : Expanded(child: control);
                   }),
                 );
@@ -2920,7 +2933,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               },
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
 
           // F-33: manual preamp / gain staging with clipping warning.
           Builder(
@@ -2935,7 +2948,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 final clipRisk = currentPreamp + maxBoost > 0.0;
                 return Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
                   decoration: BoxDecoration(
                     color: p.surfaceContainer,
                     borderRadius: AppRadii.cardRadius,
@@ -2951,11 +2964,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(AppSpacing.xs),
                             decoration: BoxDecoration(
                               color: (clipRisk ? p.error : p.accent)
                                   .withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(AppRadii.r8),
                             ),
                             child: Icon(
                               Icons.vertical_align_center_rounded,
@@ -2963,7 +2976,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                               size: 20,
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: AppSpacing.sm),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2971,7 +2984,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                 Text(context.l10n.preampLabel,
                                   style: TextStyle(
                                       fontWeight: FontWeight.w700,
-                                      fontSize: 13,
+                                      fontSize: AppFontSize.bodySmall,
                                       color: p.textPrimary),
                                 ),
                                 Text(
@@ -2980,14 +2993,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                           '${state.selectedHeadphoneProfile!.preampGain.toStringAsFixed(1)} dB)'
                                       : 'Output gain applied before the EQ',
                                   style: TextStyle(
-                                      fontSize: 11, color: p.textTertiary),
+                                      fontSize: AppFontSize.caption, color: p.textTertiary),
                                 ),
                               ],
                             ),
                           ),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
+
+                                horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                             decoration: BoxDecoration(
                               color: (clipRisk
                                       ? p.error
@@ -2995,7 +3009,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                           ? p.accent
                                           : p.surface))
                                   .withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(AppRadii.r8),
                               border: Border.all(
                                 color: clipRisk
                                     ? p.error.withValues(alpha: 0.4)
@@ -3012,12 +3026,12 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                     : (currentPreamp.abs() > 0.05
                                         ? p.accent
                                         : p.textSecondary),
-                                fontSize: 11,
+                                fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: AppSpacing.xxs),
                           IconButton(
                             icon: Icon(Icons.settings_backup_restore,
                                 size: 16,
@@ -3044,7 +3058,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           ),
                         ],
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: AppSpacing.s6),
                       Semantics(
                         slider: true,
                         label: context.l10n.preampLabel,
@@ -3082,12 +3096,12 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       ),
                       if (clipRisk)
                         Padding(
-                          padding: const EdgeInsets.only(top: 2, left: 4),
+                          padding: const EdgeInsetsDirectional.only(top: AppSpacing.s2, start: AppSpacing.xxs),
                           child: Row(
                             children: [
                               Icon(Icons.warning_amber_rounded,
                                   color: p.error, size: 13),
-                              const SizedBox(width: 6),
+                              const SizedBox(width: AppSpacing.s6),
                               Expanded(
                                 child: Text(
                                   context.l10n.dspPreampClipWarning(
@@ -3096,7 +3110,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                   ),
                                   style: TextStyle(
                                       color: p.error,
-                                      fontSize: 10,
+                                      fontSize: AppFontSize.tiny,
                                       fontWeight: FontWeight.w600),
                                 ),
                               ),
@@ -3109,11 +3123,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               },
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
 
           // Bass Boost Slider
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
             decoration: BoxDecoration(
               color: p.surfaceContainer,
               borderRadius: AppRadii.cardRadius,
@@ -3125,15 +3139,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadii.r8),
                       ),
                       child: Icon(Icons.speaker_group_rounded,
                           color: p.accent, size: 20),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3144,7 +3158,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                 child: Text(context.l10n.bassEnhancer,
                                   style: TextStyle(
                                       fontWeight: FontWeight.w700,
-                                      fontSize: 13,
+                                      fontSize: AppFontSize.bodySmall,
                                       color: p.textPrimary),
                                 ),
                               ),
@@ -3164,7 +3178,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                 ? '${(preset.bassBoost * 100).round()}% punch'
                                 : 'Bass boost bypassed',
                             style:
-                                TextStyle(fontSize: 11, color: p.textTertiary),
+                                TextStyle(fontSize: AppFontSize.caption, color: p.textTertiary),
                           ),
                         ],
                       ),
@@ -3174,11 +3188,12 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
+
+                              horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                           decoration: BoxDecoration(
                             color: (preset.bassBoost > 0 ? p.accent : p.surface)
                                 .withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(AppRadii.r8),
                             border: Border.all(
                               color: preset.bassBoost > 0
                                   ? p.accent.withValues(alpha: 0.3)
@@ -3193,12 +3208,12 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                               color: preset.bassBoost > 0
                                   ? p.accent
                                   : p.textSecondary,
-                              fontSize: 11,
+                              fontSize: AppFontSize.caption,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: AppSpacing.xxs),
                         IconButton(
                           icon: Icon(Icons.settings_backup_restore,
                               size: 16,
@@ -3221,7 +3236,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: AppSpacing.s6),
                 SliderTheme(
                   data: SliderTheme.of(context).copyWith(
                     trackHeight: 4,
@@ -3255,11 +3270,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
 
           // Volume Boost Slider (LoudnessEnhancer)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
             decoration: BoxDecoration(
               color: p.surfaceContainer,
               borderRadius: AppRadii.cardRadius,
@@ -3271,11 +3286,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: (isOverSafe ? p.error : p.accent)
                             .withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadii.r8),
                       ),
                       child: Icon(
                         Icons.volume_up_rounded,
@@ -3283,7 +3298,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         size: 20,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3294,7 +3309,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                 child: Text(context.l10n.volumeBoost,
                                   style: TextStyle(
                                       fontWeight: FontWeight.w700,
-                                      fontSize: 13,
+                                      fontSize: AppFontSize.bodySmall,
                                       color: p.textPrimary),
                                 ),
                               ),
@@ -3313,7 +3328,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                 ? '+${(state.volumeBoost * 10).toStringAsFixed(1)} dB hardware gain'
                                 : 'Hardware gain bypassed',
                             style:
-                                TextStyle(fontSize: 11, color: p.textTertiary),
+                                TextStyle(fontSize: AppFontSize.caption, color: p.textTertiary),
                           ),
                         ],
                       ),
@@ -3323,7 +3338,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
+
+                              horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                           decoration: BoxDecoration(
                             color: (isOverSafe
                                     ? p.error
@@ -3331,7 +3347,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                         ? p.accent
                                         : p.surface))
                                 .withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(AppRadii.r8),
                             border: Border.all(
                               color: isOverSafe
                                   ? p.error.withValues(alpha: 0.4)
@@ -3350,12 +3366,12 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                   : (state.volumeBoost > 0
                                       ? p.accent
                                       : p.textSecondary),
-                              fontSize: 11,
+                              fontSize: AppFontSize.caption,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: AppSpacing.xxs),
                         IconButton(
                           icon: Icon(Icons.settings_backup_restore,
                               size: 16,
@@ -3378,7 +3394,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: AppSpacing.s6),
                 SliderTheme(
                   data: SliderTheme.of(context).copyWith(
                     trackHeight: 4,
@@ -3411,19 +3427,19 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 ),
                 if (isOverSafe)
                   Padding(
-                    padding: const EdgeInsets.only(top: 2, left: 4),
+                    padding: const EdgeInsetsDirectional.only(top: AppSpacing.s2, start: AppSpacing.xxs),
                     child: Row(
                       children: [
                         Icon(Icons.warning_amber_rounded,
                             color: p.error, size: 13),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: AppSpacing.s6),
                         Expanded(
                           child: Text(
                             context.l10n.dspVolumeClipWarning(
                                 preampDb.toStringAsFixed(1)),
                             style: TextStyle(
                                 color: p.error,
-                                fontSize: 10,
+                                fontSize: AppFontSize.tiny,
                                 fontWeight: FontWeight.w600),
                           ),
                         ),
@@ -3432,17 +3448,17 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   )
                 else if (state.volumeBoost > 0.6)
                   Padding(
-                    padding: const EdgeInsets.only(top: 2, left: 4),
+                    padding: const EdgeInsetsDirectional.only(top: AppSpacing.s2, start: AppSpacing.xxs),
                     child: Row(
                       children: [
                         Icon(Icons.warning_amber_rounded,
                             color: p.error, size: 13),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: AppSpacing.s6),
                         Expanded(
                           child: Text(context.l10n.highBoostWarn,
                             style: TextStyle(
                                 color: p.error,
-                                fontSize: 10,
+                                fontSize: AppFontSize.tiny,
                                 fontWeight: FontWeight.w600),
                           ),
                         ),
@@ -3453,11 +3469,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
 
           // Honest Spatializer / Soundstage Widening Section
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
             decoration: BoxDecoration(
               color: p.surfaceContainer,
               borderRadius: AppRadii.cardRadius,
@@ -3466,15 +3482,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(AppSpacing.xs),
                   decoration: BoxDecoration(
                     color: p.accent.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppRadii.r8),
                   ),
                   child: Icon(Icons.spatial_tracking_rounded,
                       color: p.accent, size: 20),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -3488,29 +3504,30 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                   : 'Soundstage Widening',
                               style: TextStyle(
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 13,
+                                  fontSize: AppFontSize.bodySmall,
                                   color: p.textPrimary),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: AppSpacing.s6),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
+
+                                horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                             decoration: BoxDecoration(
                               color: (state.isSpatializerSupported
                                       ? p.accent
                                       : p.textTertiary)
                                   .withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(6),
+                              borderRadius: BorderRadius.circular(AppRadii.r6),
                             ),
                             child: Text(
                               state.isSpatializerSupported
                                   ? 'Spatial API'
                                   : 'Emulated',
                               style: TextStyle(
-                                fontSize: 9,
+                                fontSize: AppFontSize.micro,
                                 fontWeight: FontWeight.w700,
                                 color: state.isSpatializerSupported
                                     ? p.accent
@@ -3524,7 +3541,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         state.isSpatializerSupported
                             ? 'Android Spatializer API with head tracking'
                             : 'Stereo field expansion via hardware virtualizer',
-                        style: TextStyle(fontSize: 11, color: p.textTertiary),
+                        style: TextStyle(fontSize: AppFontSize.caption, color: p.textTertiary),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -3567,12 +3584,12 @@ class _EqualizerSheetState extends State<EqualizerSheet>
       children: [
         // Search bar
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.xs),
           child: Container(
             height: 40,
             decoration: BoxDecoration(
               color: p.surfaceContainer,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadii.r12),
               border: Border.all(color: p.hairline),
             ),
             child: TextField(
@@ -3582,18 +3599,19 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   _searchQuery = val;
                 });
               },
-              style: TextStyle(fontSize: 13, color: p.textPrimary),
+              style: TextStyle(fontSize: AppFontSize.bodySmall, color: p.textPrimary),
               decoration: InputDecoration(
                 hintText: context.l10n.dspSearchHeadphonesHint,
-                hintStyle: TextStyle(fontSize: 12, color: p.textTertiary),
+                hintStyle: TextStyle(fontSize: AppFontSize.label, color: p.textTertiary),
                 prefixIcon:
                     Icon(Icons.search_rounded, color: p.textTertiary, size: 18),
                 suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: Icon(Icons.clear_rounded,
-                            color: p.textTertiary, size: 16),
-                        onPressed: () {
-                          _searchController.clear();
+                      ? IconButton(
+                          icon: Icon(Icons.clear_rounded,
+                              color: p.textTertiary, size: 16),
+                          tooltip: context.l10n.clear,
+                          onPressed: () {
+                            _searchController.clear();
                           setState(() {
                             _searchQuery = '';
                           });
@@ -3601,7 +3619,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       )
                     : null,
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                contentPadding: const EdgeInsets.symmetric(vertical: AppSpacing.s10),
               ),
             ),
           ),
@@ -3612,13 +3630,13 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           height: 34,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             itemCount: categories.length,
             itemBuilder: (context, index) {
               final cat = categories[index];
               final isSelected = _selectedCategory == cat;
               return Padding(
-                padding: const EdgeInsets.only(right: 6),
+                padding: const EdgeInsetsDirectional.only(end: AppSpacing.s6),
                 child: FilterChip(
                   label: Text(cat),
                   selected: isSelected,
@@ -3631,7 +3649,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   ),
                   labelStyle: TextStyle(
                     color: isSelected ? p.accent : p.textSecondary,
-                    fontSize: 11,
+                    fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w600,
                   ),
                   onSelected: (_) {
@@ -3644,14 +3662,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             },
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.xs),
 
         // Active Profile Banner (if applied)
         if (state.selectedHeadphoneProfile != null)
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.xs),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14, vertical: AppSpacing.s10),
               decoration: BoxDecoration(
                 color: p.accent.withValues(alpha: 0.12),
                 borderRadius: AppRadii.cardRadius,
@@ -3660,21 +3678,21 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               child: Row(
                 children: [
                   Icon(Icons.tune_rounded, color: p.accent, size: 18),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: AppSpacing.s10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(context.l10n.appliedTuningProfile,
                           style: TextStyle(
-                              fontSize: 10,
+                              fontSize: AppFontSize.tiny,
                               fontWeight: FontWeight.w700,
                               color: p.accent),
                         ),
                         Text(
                           state.selectedHeadphoneProfile!.name,
                           style: TextStyle(
-                              fontSize: 12,
+                              fontSize: AppFontSize.label,
                               fontWeight: FontWeight.w700,
                               color: p.textPrimary),
                           maxLines: 1,
@@ -3687,16 +3705,17 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     onTap: () => cubit.resetToFlat(),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
+
+                          horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
                       decoration: BoxDecoration(
                         color: p.surfaceContainer,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppRadii.r12),
                         border: Border.all(color: p.hairline),
                       ),
                       child: Text(context.l10n.resetToFlat,
                         style: TextStyle(
                             color: p.textSecondary,
-                            fontSize: 11,
+                            fontSize: AppFontSize.caption,
                             fontWeight: FontWeight.w600),
                       ),
                     ),
@@ -3711,11 +3730,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           child: filteredProfiles.isEmpty
               ? Center(
                   child: Text(context.l10n.noHpProfiles,
-                    style: TextStyle(color: p.textTertiary, fontSize: 13),
+                    style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.bodySmall),
                   ),
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                  padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xxs, AppSpacing.md, AppSpacing.lg),
                   itemCount: filteredProfiles.length,
                   itemBuilder: (context, index) {
                     final profile = filteredProfiles[index];
@@ -3723,7 +3742,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         state.selectedHeadphoneProfile?.id == profile.id;
 
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
                       child: Material(
                         color: Colors.transparent,
                         child: InkWell(
@@ -3740,7 +3759,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           borderRadius: AppRadii.cardRadius,
                           child: Ink(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 12),
+
+                                horizontal: AppSpacing.s14, vertical: AppSpacing.sm),
                             decoration: BoxDecoration(
                               color: isApplied
                                   ? p.accent.withValues(alpha: 0.14)
@@ -3771,7 +3791,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                     size: 18,
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: AppSpacing.sm),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment:
@@ -3780,7 +3800,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                       Text(
                                         profile.name,
                                         style: TextStyle(
-                                          fontSize: 13,
+                                          fontSize: AppFontSize.bodySmall,
                                           fontWeight: FontWeight.w700,
                                           color: isApplied
                                               ? p.accent
@@ -3789,11 +3809,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
-                                      const SizedBox(height: 2),
+                                      const SizedBox(height: AppSpacing.s2),
                                       Text(
                                         '${profile.brand} Ã¢Â€Â¢ ${profile.category}',
                                         style: TextStyle(
-                                            fontSize: 11,
+                                            fontSize: AppFontSize.caption,
                                             color: p.textTertiary),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
@@ -3814,15 +3834,16 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                       if (mounted) setState(() {});
                                     },
                                   ),
-                                  const SizedBox(width: 4),
+                                  const SizedBox(width: AppSpacing.xxs),
                                 ],
                                 if (isApplied)
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 5),
+
+                                        horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
                                     decoration: BoxDecoration(
                                       color: p.accent,
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(AppRadii.r12),
                                       boxShadow: [
                                         BoxShadow(
                                           color:
@@ -3837,11 +3858,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                       children: [
                                         Icon(Icons.check_rounded,
                                             color: p.onAccent, size: 13),
-                                        const SizedBox(width: 4),
+                                        const SizedBox(width: AppSpacing.xxs),
                                         Text(context.l10n.activeLabel,
                                           style: TextStyle(
                                             color: p.onAccent,
-                                            fontSize: 11,
+                                            fontSize: AppFontSize.caption,
                                             fontWeight: FontWeight.w800,
                                           ),
                                         ),
@@ -3851,16 +3872,17 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                 else
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 5),
+
+                                        horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
                                     decoration: BoxDecoration(
                                       color: p.surfaceContainerHigh,
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(AppRadii.r12),
                                       border: Border.all(color: p.hairline),
                                     ),
                                     child: Text(context.l10n.apply,
                                       style: TextStyle(
                                         color: p.textSecondary,
-                                        fontSize: 11,
+                                        fontSize: AppFontSize.caption,
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
@@ -3888,20 +3910,20 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     final dspBlocked = _dspBlockedReason(context);
     final spatializerAvailable = _spatializerToggleAvailable(state);
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.xs, AppSpacing.s20, AppSpacing.xl),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (dspBlocked != null) _conflictBanner(dspBlocked, p),
           if (dspBlocked != null)
             Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.only(bottom: AppSpacing.xs),
               child: Text(context.l10n.allDspBypassed,
-                  style: TextStyle(color: p.textSecondary, fontSize: 11)),
+                  style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.caption)),
             ),
           // Support Detection Banner
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14, vertical: AppSpacing.s10),
             decoration: BoxDecoration(
               color: state.isSpatializerSupported
                   ? p.accent.withValues(alpha: 0.12)
@@ -3923,7 +3945,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       state.isSpatializerSupported ? p.accent : p.textSecondary,
                   size: 18,
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: AppSpacing.s10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -3933,7 +3955,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                             ? 'Hardware Spatializer Detected'
                             : 'Emulated 3D Widening Mode',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: AppFontSize.label,
                           fontWeight: FontWeight.w700,
                           color: state.isSpatializerSupported
                               ? p.accent
@@ -3944,7 +3966,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         state.isSpatializerSupported
                             ? 'Android Spatializer API with multi-channel soundstage'
                             : 'Stereo field widening active via hardware virtualizer',
-                        style: TextStyle(fontSize: 10, color: p.textTertiary),
+                        style: TextStyle(fontSize: AppFontSize.tiny, color: p.textTertiary),
                       ),
                     ],
                   ),
@@ -3952,12 +3974,12 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               ],
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.s14),
 
           // Dolby Atmos / Hardware Spatial Audio Card (when supported by device)
           if (state.isSpatializerSupported) ...[
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpacing.md),
               decoration: BoxDecoration(
                 color: p.surfaceContainer,
                 borderRadius: AppRadii.cardRadius,
@@ -3966,15 +3988,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(AppSpacing.xs),
                     decoration: BoxDecoration(
                       color: p.accent.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppRadii.r8),
                     ),
                     child: Icon(Icons.spatial_tracking_rounded,
                         color: p.accent, size: 20),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3985,23 +4007,24 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                               child: Text(context.l10n.spatialAudio,
                                 style: TextStyle(
                                     fontWeight: FontWeight.w700,
-                                    fontSize: 14,
+                                    fontSize: AppFontSize.body,
                                     color: p.textPrimary),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: AppSpacing.s6),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
+
+                                  horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                               decoration: BoxDecoration(
                                 color: p.accent.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(6),
+                                borderRadius: BorderRadius.circular(AppRadii.r6),
                               ),
                               child: Text(context.l10n.spatialApi,
                                 style: TextStyle(
-                                  fontSize: 9,
+                                  fontSize: AppFontSize.micro,
                                   fontWeight: FontWeight.w700,
                                   color: p.accent,
                                 ),
@@ -4010,7 +4033,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           ],
                         ),
                         Text(context.l10n.spatialApiDesc,
-                          style: TextStyle(fontSize: 11, color: p.textTertiary),
+                          style: TextStyle(fontSize: AppFontSize.caption, color: p.textTertiary),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -4025,7 +4048,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       onPressed: () => _showFeatureInfo(
                           context, AudioFeatureRegistry.spatializer,
                           conflictReason: dspBlocked)),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: AppSpacing.xxs),
                   Switch.adaptive(
                     value: dspBlocked == null && state.isSpatializerEnabled,
                     activeTrackColor: p.accent,
@@ -4039,18 +4062,18 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             ),
             if (dspBlocked != null)
               Padding(
-                  padding: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.only(top: AppSpacing.xs),
                   child: Text(context.l10n.blockedByBitPerfectShort,
                       style: TextStyle(
                           color: p.error,
-                          fontSize: 10,
+                          fontSize: AppFontSize.tiny,
                           fontWeight: FontWeight.w600))),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
           ],
 
           // Stereo Soundstage Expansion (Virtualizer)
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
               color: p.surfaceContainer,
               borderRadius: AppRadii.cardRadius,
@@ -4066,15 +4089,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(AppSpacing.xs),
                             decoration: BoxDecoration(
                               color: p.accent.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(AppRadii.r8),
                             ),
                             child: Icon(Icons.surround_sound_rounded,
                                 color: p.accent, size: 20),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: AppSpacing.sm),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -4082,14 +4105,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                 Text(context.l10n.soundstageWidening,
                                   style: TextStyle(
                                       fontWeight: FontWeight.w700,
-                                      fontSize: 14,
+                                      fontSize: AppFontSize.body,
                                       color: p.textPrimary),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 Text(context.l10n.virtualizerDesc,
                                   style: TextStyle(
-                                      fontSize: 11, color: p.textTertiary),
+                                      fontSize: AppFontSize.caption, color: p.textTertiary),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -4107,7 +4130,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         onPressed: () => _showFeatureInfo(
                             context, AudioFeatureRegistry.virtualizer,
                             conflictReason: dspBlocked)),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: AppSpacing.xxs),
                     Switch.adaptive(
                       value: dspBlocked == null && state.isVirtualizerEnabled,
                       activeTrackColor: p.accent,
@@ -4121,13 +4144,13 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 ),
                 if (dspBlocked != null)
                   Padding(
-                      padding: const EdgeInsets.only(top: 6, bottom: 8),
+                      padding: const EdgeInsets.only(top: AppSpacing.s6, bottom: AppSpacing.xs),
                       child: Text(context.l10n.blockedByBitPerfectShort,
                           style: TextStyle(
                               color: p.error,
-                              fontSize: 10,
+                              fontSize: AppFontSize.tiny,
                               fontWeight: FontWeight.w600))),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
 
                 // Soundstage visual slider
                 Opacity(
@@ -4141,7 +4164,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         children: [
                           Text(context.l10n.width,
                               style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: AppFontSize.label,
                                   color: p.textSecondary,
                                   fontWeight: FontWeight.w600)),
                           Row(
@@ -4150,11 +4173,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                               Text(
                                 '${(state.virtualizerStrength * 100).round()}%',
                                 style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: AppFontSize.label,
                                     fontWeight: FontWeight.w700,
                                     color: p.accent),
                               ),
-                              const SizedBox(width: 4),
+                              const SizedBox(width: AppSpacing.xxs),
                               IconButton(
                                 icon: Icon(Icons.settings_backup_restore,
                                     size: 15,
@@ -4207,11 +4230,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
 
           // Studio Dynamics (DynamicsProcessing)
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
               color: p.surfaceContainer,
               borderRadius: AppRadii.cardRadius,
@@ -4227,15 +4250,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(AppSpacing.xs),
                             decoration: BoxDecoration(
                               color: p.accent.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(AppRadii.r8),
                             ),
                             child: Icon(Icons.compress_rounded,
                                 color: p.accent, size: 20),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: AppSpacing.sm),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -4243,14 +4266,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                 Text(context.l10n.studioDynamics,
                                   style: TextStyle(
                                       fontWeight: FontWeight.w700,
-                                      fontSize: 14,
+                                      fontSize: AppFontSize.body,
                                       color: p.textPrimary),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 Text(context.l10n.multibandDesc,
                                   style: TextStyle(
-                                      fontSize: 11, color: p.textTertiary),
+                                      fontSize: AppFontSize.caption, color: p.textTertiary),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -4268,7 +4291,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         onPressed: () => _showFeatureInfo(
                             context, AudioFeatureRegistry.dynamics,
                             conflictReason: dspBlocked)),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: AppSpacing.xxs),
                     Switch.adaptive(
                       value: dspBlocked == null && state.isDynamicsEnabled,
                       activeTrackColor: p.accent,
@@ -4292,14 +4315,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 ),
                 if (dspBlocked != null)
                   Padding(
-                      padding: const EdgeInsets.only(top: 6),
+                      padding: const EdgeInsets.only(top: AppSpacing.s6),
                       child: Text(context.l10n.blockedByBitPerfectShort,
                           style: TextStyle(
                               color: p.error,
-                              fontSize: 10,
+                              fontSize: AppFontSize.tiny,
                               fontWeight: FontWeight.w600))),
                 _effectNotAppliedNotice('dynamics', p),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.s14),
 
                 // Dynamics Preset Cards Grid
                 Opacity(
@@ -4313,7 +4336,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       final isSelected = state.isDynamicsEnabled &&
                           state.dynamicsPreset == preset;
                       return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.only(bottom: AppSpacing.xs),
                         child: InkWell(
                           onTap:
                               dspBlocked != null || !state.isDynamicsSupported
@@ -4322,15 +4345,16 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                       ? () => cubit.setDynamicsPreset(preset,
                                           enabled: true)
                                       : null),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(AppRadii.r10),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 10),
+
+                                horizontal: AppSpacing.sm, vertical: AppSpacing.s10),
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? p.accent.withValues(alpha: 0.15)
                                   : p.surface,
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(AppRadii.r10),
                               border: Border.all(
                                 color: isSelected
                                     ? p.accent.withValues(alpha: 0.5)
@@ -4346,7 +4370,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                   color: isSelected ? p.accent : p.textTertiary,
                                   size: 18,
                                 ),
-                                const SizedBox(width: 10),
+                                const SizedBox(width: AppSpacing.s10),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment:
@@ -4355,18 +4379,18 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                       Text(
                                         preset.label,
                                         style: TextStyle(
-                                          fontSize: 12,
+                                          fontSize: AppFontSize.label,
                                           fontWeight: FontWeight.w700,
                                           color: isSelected
                                               ? p.accent
                                               : p.textPrimary,
                                         ),
                                       ),
-                                      const SizedBox(height: 2),
+                                      const SizedBox(height: AppSpacing.s2),
                                       Text(
                                         preset.description,
                                         style: TextStyle(
-                                            fontSize: 10,
+                                            fontSize: AppFontSize.tiny,
                                             color: p.textTertiary),
                                       ),
                                     ],
@@ -4383,11 +4407,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
 
           // 1. Headphone Crossfeed (Chu Moy / Linkwitz-Riley)
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
               color: p.surfaceContainer,
               borderRadius: AppRadii.cardRadius,
@@ -4403,15 +4427,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(AppSpacing.xs),
                             decoration: BoxDecoration(
                               color: p.accent.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(AppRadii.r8),
                             ),
                             child: Icon(Icons.headphones_rounded,
                                 color: p.accent, size: 20),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: AppSpacing.sm),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -4419,14 +4443,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                 Text(context.l10n.crossfeedHp,
                                   style: TextStyle(
                                       fontWeight: FontWeight.w700,
-                                      fontSize: 14,
+                                      fontSize: AppFontSize.body,
                                       color: p.textPrimary),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 Text(context.l10n.crossfeedNatural,
                                   style: TextStyle(
-                                      fontSize: 11, color: p.textTertiary),
+                                      fontSize: AppFontSize.caption, color: p.textTertiary),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -4447,7 +4471,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                 (_nativePcmEffectsAvailable
                                     ? null
                                     : 'Requires PCM DSP path - not audible yet'))),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: AppSpacing.xxs),
                     Switch.adaptive(
                       value: dspBlocked == null &&
                           _nativePcmEffectsAvailable &&
@@ -4463,25 +4487,25 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 ),
                 if (dspBlocked != null)
                   Padding(
-                      padding: const EdgeInsets.only(top: 6),
+                      padding: const EdgeInsets.only(top: AppSpacing.s6),
                       child: Text(context.l10n.blockedByBitPerfectShort,
                           style: TextStyle(
                               color: p.error,
-                              fontSize: 10,
+                              fontSize: AppFontSize.tiny,
                               fontWeight: FontWeight.w600))),
                 if (dspBlocked == null &&
                     _nativePcmEffectsAvailable &&
                     state.isCrossfeedEnabled) ...[
-                  const SizedBox(height: 14),
+                  const SizedBox(height: AppSpacing.s14),
                   // BS2B Preset Selector Chips
                   Text(context.l10n.crossfeedAlgorithm,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: AppFontSize.label,
                       color: p.textSecondary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.xs),
                   Wrap(
                     spacing: 6,
                     runSpacing: 6,
@@ -4496,7 +4520,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                               state.crossfeedMode == 0 ? p.accent : p.hairline,
                         ),
                         labelStyle: TextStyle(
-                          fontSize: 11,
+                          fontSize: AppFontSize.caption,
                           fontWeight: FontWeight.w600,
                           color: state.crossfeedMode == 0
                               ? p.accent
@@ -4514,7 +4538,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                               state.crossfeedMode == 1 ? p.accent : p.hairline,
                         ),
                         labelStyle: TextStyle(
-                          fontSize: 11,
+                          fontSize: AppFontSize.caption,
                           fontWeight: FontWeight.w600,
                           color: state.crossfeedMode == 1
                               ? p.accent
@@ -4532,7 +4556,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                               state.crossfeedMode == 2 ? p.accent : p.hairline,
                         ),
                         labelStyle: TextStyle(
-                          fontSize: 11,
+                          fontSize: AppFontSize.caption,
                           fontWeight: FontWeight.w600,
                           color: state.crossfeedMode == 2
                               ? p.accent
@@ -4550,7 +4574,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                               state.crossfeedMode == 3 ? p.accent : p.hairline,
                         ),
                         labelStyle: TextStyle(
-                          fontSize: 11,
+                          fontSize: AppFontSize.caption,
                           fontWeight: FontWeight.w600,
                           color: state.crossfeedMode == 3
                               ? p.accent
@@ -4561,23 +4585,24 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     ],
                   ),
                   if (state.crossfeedMode < 3) ...[
-                    const SizedBox(height: 10),
+                    const SizedBox(height: AppSpacing.s10),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 8),
+
+                          horizontal: AppSpacing.s10, vertical: AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(AppRadii.r10),
                       ),
                       child: Row(
                         children: [
                           Icon(Icons.auto_awesome_rounded,
                               color: p.accent, size: 16),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: AppSpacing.xs),
                           Expanded(
                             child: Text(context.l10n.bs2bActive,
                               style: TextStyle(
-                                  color: p.textSecondary, fontSize: 11),
+                                  color: p.textSecondary, fontSize: AppFontSize.caption),
                             ),
                           ),
                         ],
@@ -4585,14 +4610,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     ),
                   ],
                   if (state.crossfeedMode == 3) ...[
-                    const SizedBox(height: 14),
+                    const SizedBox(height: AppSpacing.s14),
                     // Delay slider
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(context.l10n.delayTime,
                             style: TextStyle(
-                                fontSize: 12,
+                                fontSize: AppFontSize.label,
                                 color: p.textSecondary,
                                 fontWeight: FontWeight.w600)),
                         Row(
@@ -4601,11 +4626,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                             Text(
                               '${state.crossfeedDelayUs.round()} µs',
                               style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: AppFontSize.label,
                                   fontWeight: FontWeight.w700,
                                   color: p.accent),
                             ),
-                            const SizedBox(width: 4),
+                            const SizedBox(width: AppSpacing.xxs),
                             IconButton(
                               icon: Icon(Icons.settings_backup_restore,
                                   size: 15,
@@ -4657,7 +4682,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       children: [
                         Text(context.l10n.oppositeEarBleed,
                             style: TextStyle(
-                                fontSize: 12,
+                                fontSize: AppFontSize.label,
                                 color: p.textSecondary,
                                 fontWeight: FontWeight.w600)),
                         Row(
@@ -4666,11 +4691,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                             Text(
                               '${state.crossfeedFeedDb.toStringAsFixed(1)} dB',
                               style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: AppFontSize.label,
                                   fontWeight: FontWeight.w700,
                                   color: p.accent),
                             ),
-                            const SizedBox(width: 4),
+                            const SizedBox(width: AppSpacing.xxs),
                             IconButton(
                               icon: Icon(Icons.settings_backup_restore,
                                   size: 15,
@@ -4721,11 +4746,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
 
           // 2. Lookahead Brickwall Limiter
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
               color: p.surfaceContainer,
               borderRadius: AppRadii.cardRadius,
@@ -4741,15 +4766,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(AppSpacing.xs),
                             decoration: BoxDecoration(
                               color: p.accent.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(AppRadii.r8),
                             ),
                             child: Icon(Icons.security_rounded,
                                 color: p.accent, size: 20),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: AppSpacing.sm),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -4757,14 +4782,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                 Text(context.l10n.lookaheadLimiter,
                                   style: TextStyle(
                                       fontWeight: FontWeight.w700,
-                                      fontSize: 14,
+                                      fontSize: AppFontSize.body,
                                       color: p.textPrimary),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 Text(context.l10n.lookaheadDesc,
                                   style: TextStyle(
-                                      fontSize: 11, color: p.textTertiary),
+                                      fontSize: AppFontSize.caption, color: p.textTertiary),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -4782,7 +4807,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         onPressed: () => _showFeatureInfo(
                             context, AudioFeatureRegistry.limiter,
                             conflictReason: dspBlocked)),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: AppSpacing.xxs),
                     Switch.adaptive(
                       value: dspBlocked == null && state.isLimiterEnabled,
                       activeTrackColor: p.accent,
@@ -4795,20 +4820,20 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 ),
                 if (dspBlocked != null)
                   Padding(
-                      padding: const EdgeInsets.only(top: 6),
+                      padding: const EdgeInsets.only(top: AppSpacing.s6),
                       child: Text(context.l10n.blockedByBitPerfectShort,
                           style: TextStyle(
                               color: p.error,
-                              fontSize: 10,
+                              fontSize: AppFontSize.tiny,
                               fontWeight: FontWeight.w600))),
                 if (dspBlocked == null && state.isLimiterEnabled) ...[
-                  const SizedBox(height: 14),
+                  const SizedBox(height: AppSpacing.s14),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(context.l10n.ceilingThreshold,
                           style: TextStyle(
-                              fontSize: 12,
+                              fontSize: AppFontSize.label,
                               color: p.textSecondary,
                               fontWeight: FontWeight.w600)),
                       Row(
@@ -4817,11 +4842,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           Text(
                             '${state.limiterThresholdDb.toStringAsFixed(1)} dBFS',
                             style: TextStyle(
-                                fontSize: 12,
+                                fontSize: AppFontSize.label,
                                 fontWeight: FontWeight.w700,
                                 color: p.accent),
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: AppSpacing.xxs),
                           IconButton(
                             icon: Icon(Icons.settings_backup_restore,
                                 size: 15,
@@ -4872,7 +4897,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     children: [
                       Text(context.l10n.releaseTime,
                           style: TextStyle(
-                              fontSize: 12,
+                              fontSize: AppFontSize.label,
                               color: p.textSecondary,
                               fontWeight: FontWeight.w600)),
                       Row(
@@ -4881,11 +4906,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           Text(
                             '${state.limiterReleaseMs.round()} ms',
                             style: TextStyle(
-                                fontSize: 12,
+                                fontSize: AppFontSize.label,
                                 fontWeight: FontWeight.w700,
                                 color: p.accent),
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: AppSpacing.xxs),
                           IconButton(
                             icon: Icon(Icons.settings_backup_restore,
                                 size: 15,
@@ -4934,11 +4959,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
 
           // 3. Stereo Balance & Mono Mix
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
               color: p.surfaceContainer,
               borderRadius: AppRadii.cardRadius,
@@ -4954,15 +4979,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(AppSpacing.xs),
                             decoration: BoxDecoration(
                               color: p.accent.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(AppRadii.r8),
                             ),
                             child: Icon(Icons.compare_arrows_rounded,
                                 color: p.accent, size: 20),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: AppSpacing.sm),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -4973,7 +4998,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                       child: Text(context.l10n.stereoBalanceMono,
                                         style: TextStyle(
                                             fontWeight: FontWeight.w700,
-                                            fontSize: 14,
+                                            fontSize: AppFontSize.body,
                                             color: p.textPrimary),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
@@ -4995,7 +5020,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                 ),
                                 Text(context.l10n.panDesc,
                                   style: TextStyle(
-                                      fontSize: 11, color: p.textTertiary),
+                                      fontSize: AppFontSize.caption, color: p.textTertiary),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -5005,17 +5030,17 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: AppSpacing.xs),
                     Row(
                       children: [
                         Text(context.l10n.monoLabel,
                             style: TextStyle(
-                                fontSize: 12,
+                                fontSize: AppFontSize.label,
                                 fontWeight: FontWeight.w700,
                                 color: state.monoMix
                                     ? p.accent
                                     : p.textSecondary)),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: AppSpacing.xxs),
                         Switch.adaptive(
                           value: dspBlocked == null &&
                               _nativePcmEffectsAvailable &&
@@ -5033,27 +5058,27 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 ),
                 if (dspBlocked != null)
                   Padding(
-                      padding: const EdgeInsets.only(top: 6),
+                      padding: const EdgeInsets.only(top: AppSpacing.s6),
                       child: Text(context.l10n.blockedByBitPerfectShort,
                           style: TextStyle(
                               color: p.error,
-                              fontSize: 10,
+                              fontSize: AppFontSize.tiny,
                               fontWeight: FontWeight.w600)))
                 else if (!_nativePcmEffectsAvailable)
                   Padding(
-                      padding: const EdgeInsets.only(top: 6),
+                      padding: const EdgeInsets.only(top: AppSpacing.s6),
                       child: Text(context.l10n.nativeDspUnavailable,
                           style: TextStyle(
                               color: p.textTertiary,
-                              fontSize: 10,
+                              fontSize: AppFontSize.tiny,
                               fontWeight: FontWeight.w600))),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.s14),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text('L',
                         style: TextStyle(
-                            fontSize: 12,
+                            fontSize: AppFontSize.label,
                             fontWeight: FontWeight.w800,
                             color: dspBlocked != null
                                 ? p.textTertiary
@@ -5072,11 +5097,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                       ? 'Left ${(-state.stereoBalance * 100).round()}%'
                                       : 'Right ${(state.stereoBalance * 100).round()}%')),
                           style: TextStyle(
-                              fontSize: 12,
+                              fontSize: AppFontSize.label,
                               fontWeight: FontWeight.w700,
                               color: dspBlocked != null ? p.error : p.accent),
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: AppSpacing.xxs),
                         IconButton(
                           icon: Icon(Icons.settings_backup_restore,
                               size: 15,
@@ -5100,7 +5125,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     ),
                     Text('R',
                         style: TextStyle(
-                            fontSize: 12,
+                            fontSize: AppFontSize.label,
                             fontWeight: FontWeight.w800,
                             color: dspBlocked != null
                                 ? p.textTertiary
@@ -5143,11 +5168,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
 
           // 4. Convolution Reverb & Room Acoustics
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
               color: p.surfaceContainer,
               borderRadius: AppRadii.cardRadius,
@@ -5163,15 +5188,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(AppSpacing.xs),
                             decoration: BoxDecoration(
                               color: p.accent.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(AppRadii.r8),
                             ),
                             child: Icon(Icons.meeting_room_rounded,
                                 color: p.accent, size: 20),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: AppSpacing.sm),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -5179,14 +5204,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                 Text(context.l10n.roomConv,
                                   style: TextStyle(
                                       fontWeight: FontWeight.w700,
-                                      fontSize: 14,
+                                      fontSize: AppFontSize.body,
                                       color: p.textPrimary),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 Text(context.l10n.irDesc,
                                   style: TextStyle(
-                                      fontSize: 11, color: p.textTertiary),
+                                      fontSize: AppFontSize.caption, color: p.textTertiary),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -5207,7 +5232,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                 (_nativePcmEffectsAvailable
                                     ? null
                                     : 'Requires PCM DSP path - not audible yet'))),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: AppSpacing.xxs),
                     Switch.adaptive(
                       value: dspBlocked == null &&
                           _nativePcmEffectsAvailable &&
@@ -5223,24 +5248,24 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 ),
                 if (dspBlocked != null)
                   Padding(
-                      padding: const EdgeInsets.only(top: 6),
+                      padding: const EdgeInsets.only(top: AppSpacing.s6),
                       child: Text(context.l10n.blockedByBitPerfectShort,
                           style: TextStyle(
                               color: p.error,
-                              fontSize: 10,
+                              fontSize: AppFontSize.tiny,
                               fontWeight: FontWeight.w600)))
                 else if (!_nativePcmEffectsAvailable)
                   Padding(
-                      padding: const EdgeInsets.only(top: 6),
+                      padding: const EdgeInsets.only(top: AppSpacing.s6),
                       child: Text(context.l10n.nativeDspUnavailable,
                           style: TextStyle(
                               color: p.textTertiary,
-                              fontSize: 10,
+                              fontSize: AppFontSize.tiny,
                               fontWeight: FontWeight.w600))),
                 if (dspBlocked == null &&
                     _nativePcmEffectsAvailable &&
                     state.isReverbEnabled) ...[
-                  const SizedBox(height: 14),
+                  const SizedBox(height: AppSpacing.s14),
                   // Room presets chips. Ordinals are the C++ ReverbPreset
                   // enum, so the synthesized IR always matches the label.
                   Wrap(
@@ -5251,13 +5276,13 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         _buildReverbChip(preset, state.reverbPreset, cubit, p),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.sm),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(context.l10n.wetDryMix,
                           style: TextStyle(
-                              fontSize: 12,
+                              fontSize: AppFontSize.label,
                               color: p.textSecondary,
                               fontWeight: FontWeight.w600)),
                       Row(
@@ -5266,11 +5291,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           Text(
                             '${(state.reverbWetDry * 100).round()}% Wet',
                             style: TextStyle(
-                                fontSize: 12,
+                                fontSize: AppFontSize.label,
                                 fontWeight: FontWeight.w700,
                                 color: p.accent),
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: AppSpacing.xxs),
                           IconButton(
                             icon: Icon(Icons.settings_backup_restore,
                                 size: 15,
@@ -5314,48 +5339,48 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
 
           // 3. Harmonic Saturation / Exciter (Phase 1 DSP expansion)
           _buildSaturationCard(context, state, cubit, dspBlocked, p),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
 
           // 4. Stereo Width — Mid/Side (Phase 1 DSP expansion)
           _buildStereoWidthCard(context, state, cubit, dspBlocked, p),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
 
           // 5. Subwoofer Crossover — bass redirection (Phase 1 DSP expansion)
           _buildSubCrossoverCard(context, state, cubit, dspBlocked, p),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
 
           // Dynamic Bass (Dynamic System / ViPER4Android parity)
           _buildDynamicBassCard(context, state, cubit, dspBlocked, p),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
 
           // 6. Dynamic EQ (Phase 1 DSP expansion)
           _buildDynamicEqCard(context, state, cubit, dspBlocked, p),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
 
           // 7. Loudness Contour (Fletcher-Munson) — previously persisted with
           // no reachable control.
           _buildLoudnessContourCard(context, state, cubit, dspBlocked, p),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
 
           // 8. TPDF Dither — previously persisted with no reachable control.
           _buildDitherCard(context, state, cubit, dspBlocked, p),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
 
           // 9. Sinc Resampler — previously persisted with no reachable control.
           _buildSincResamplerCard(context, state, cubit, dspBlocked, p),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
 
           // 10. ViPER-DDC Headphone Correction (JamesDSP parity)
           _buildViperDdcCard(context, state, cubit, dspBlocked, p),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
 
           // 11. Arbitrary Response EQ / GraphicEq (JamesDSP parity)
           _buildArbitraryEqCard(context, state, cubit, dspBlocked, p),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
 
           // 12. Live Programmable DSP / EEL VM (JamesDSP parity)
           _buildLiveProgCard(context, state, cubit, dspBlocked, p),
@@ -5378,7 +5403,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
         labelStyle: TextStyle(
           color: isSelected ? p.accent : p.textSecondary,
           fontWeight: FontWeight.w700,
-          fontSize: 11,
+          fontSize: AppFontSize.caption,
         ),
         onPressed: () => cubit.pickAndLoadCustomIrFile(),
       );
@@ -5394,7 +5419,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
       labelStyle: TextStyle(
         color: isSelected ? p.accent : p.textSecondary,
         fontWeight: FontWeight.w700,
-        fontSize: 11,
+        fontSize: AppFontSize.caption,
       ),
       onSelected: (_) => cubit.setReverb(true, preset: preset.wireValue),
     );
@@ -5425,7 +5450,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           children: [
             Text(label,
                 style: TextStyle(
-                    fontSize: 12,
+                    fontSize: AppFontSize.label,
                     color: p.textSecondary,
                     fontWeight: FontWeight.w600)),
             Row(
@@ -5433,11 +5458,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               children: [
                 Text(valueText,
                     style: TextStyle(
-                        fontSize: 12,
+                        fontSize: AppFontSize.label,
                         fontWeight: FontWeight.w700,
                         color: p.accent)),
                 if (defaultValue != null) ...[
-                  const SizedBox(width: 4),
+                  const SizedBox(width: AppSpacing.xxs),
                   IconButton(
                     icon: Icon(Icons.settings_backup_restore,
                         size: 15,
@@ -5485,7 +5510,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
       PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
     final l10n = context.l10n;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
         borderRadius: AppRadii.cardRadius,
@@ -5501,15 +5526,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadii.r8),
                       ),
                       child:
                           Icon(Icons.waves_rounded, color: p.accent, size: 20),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -5517,13 +5542,13 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           Text(l10n.dspSaturationTitle,
                               style: TextStyle(
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 14,
+                                  fontSize: AppFontSize.body,
                                   color: p.textPrimary),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis),
                           Text(l10n.dspSaturationSubtitle,
                               style: TextStyle(
-                                  fontSize: 11, color: p.textTertiary),
+                                  fontSize: AppFontSize.caption, color: p.textTertiary),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis),
                         ],
@@ -5543,7 +5568,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           (_nativePcmEffectsAvailable
                               ? null
                               : 'Requires PCM DSP path - not audible yet'))),
-              const SizedBox(width: 4),
+              const SizedBox(width: AppSpacing.xxs),
               Switch.adaptive(
                 value: dspBlocked == null &&
                     _nativePcmEffectsAvailable &&
@@ -5558,16 +5583,16 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           ),
           if (dspBlocked != null)
             Padding(
-                padding: const EdgeInsets.only(top: 6),
+                padding: const EdgeInsets.only(top: AppSpacing.s6),
                 child: Text(l10n.blockedByBitPerfectShort,
                     style: TextStyle(
                         color: p.error,
-                        fontSize: 10,
+                        fontSize: AppFontSize.tiny,
                         fontWeight: FontWeight.w600))),
           if (dspBlocked == null &&
               _nativePcmEffectsAvailable &&
               state.isSaturationEnabled) ...[
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.s14),
             _buildDspSliderRow(
               context: context,
               p: p,
@@ -5604,7 +5629,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               divisions: 20,
               onChanged: (val) => cubit.setSaturation(true, tilt: val),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -5613,13 +5638,13 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   children: [
                     Text(context.l10n.multibandWarmth,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: AppFontSize.label,
                         color: p.textSecondary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     Text(context.l10n.saturationBandDesc,
-                      style: TextStyle(fontSize: 10, color: p.textTertiary),
+                      style: TextStyle(fontSize: AppFontSize.tiny, color: p.textTertiary),
                     ),
                   ],
                 ),
@@ -5641,7 +5666,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
       PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
     final l10n = context.l10n;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
         borderRadius: AppRadii.cardRadius,
@@ -5657,15 +5682,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadii.r8),
                       ),
                       child: Icon(Icons.compare_arrows_rounded,
                           color: p.accent, size: 20),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -5673,13 +5698,13 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           Text(l10n.dspStereoWidthTitle,
                               style: TextStyle(
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 14,
+                                  fontSize: AppFontSize.body,
                                   color: p.textPrimary),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis),
                           Text(l10n.dspStereoWidthSubtitle,
                               style: TextStyle(
-                                  fontSize: 11, color: p.textTertiary),
+                                  fontSize: AppFontSize.caption, color: p.textTertiary),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis),
                         ],
@@ -5699,7 +5724,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           (_nativePcmEffectsAvailable
                               ? null
                               : 'Requires PCM DSP path - not audible yet'))),
-              const SizedBox(width: 4),
+              const SizedBox(width: AppSpacing.xxs),
               Switch.adaptive(
                 value: dspBlocked == null &&
                     _nativePcmEffectsAvailable &&
@@ -5714,16 +5739,16 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           ),
           if (dspBlocked != null)
             Padding(
-                padding: const EdgeInsets.only(top: 6),
+                padding: const EdgeInsets.only(top: AppSpacing.s6),
                 child: Text(l10n.blockedByBitPerfectShort,
                     style: TextStyle(
                         color: p.error,
-                        fontSize: 10,
+                        fontSize: AppFontSize.tiny,
                         fontWeight: FontWeight.w600))),
           if (dspBlocked == null &&
               _nativePcmEffectsAvailable &&
               state.isStereoWidthEnabled) ...[
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.s14),
             _buildDspSliderRow(
               context: context,
               p: p,
@@ -5736,12 +5761,12 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               divisions: 40,
               onChanged: (val) => cubit.setStereoWidth(true, width: val),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.s6),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(context.l10n.dspMultibandLabel,
-                    style: TextStyle(fontSize: 12, color: p.textSecondary)),
+                    style: TextStyle(fontSize: AppFontSize.label, color: p.textSecondary)),
                 Switch.adaptive(
                   value: state.stereoWidthMultiband,
                   activeTrackColor: p.accent,
@@ -5802,7 +5827,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
       PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
     final l10n = context.l10n;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
         borderRadius: AppRadii.cardRadius,
@@ -5818,15 +5843,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadii.r8),
                       ),
                       child: Icon(Icons.speaker_rounded,
                           color: p.accent, size: 20),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -5834,13 +5859,13 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           Text(l10n.dspSubCrossoverTitle,
                               style: TextStyle(
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 14,
+                                  fontSize: AppFontSize.body,
                                   color: p.textPrimary),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis),
                           Text(l10n.dspSubCrossoverSubtitle,
                               style: TextStyle(
-                                  fontSize: 11, color: p.textTertiary),
+                                  fontSize: AppFontSize.caption, color: p.textTertiary),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis),
                         ],
@@ -5860,7 +5885,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           (_nativePcmEffectsAvailable
                               ? null
                               : 'Requires PCM DSP path - not audible yet'))),
-              const SizedBox(width: 4),
+              const SizedBox(width: AppSpacing.xxs),
               Switch.adaptive(
                 value: dspBlocked == null &&
                     _nativePcmEffectsAvailable &&
@@ -5875,20 +5900,20 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           ),
           if (dspBlocked != null)
             Padding(
-                padding: const EdgeInsets.only(top: 6),
+                padding: const EdgeInsets.only(top: AppSpacing.s6),
                 child: Text(l10n.blockedByBitPerfectShort,
                     style: TextStyle(
                         color: p.error,
-                        fontSize: 10,
+                        fontSize: AppFontSize.tiny,
                         fontWeight: FontWeight.w600))),
           if (dspBlocked == null &&
               _nativePcmEffectsAvailable &&
               state.isSubCrossoverEnabled) ...[
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.s14),
             // Honest copy: this is bass redirection, not multichannel LFE.
             Text(l10n.dspSubCrossoverNote,
-                style: TextStyle(fontSize: 10, color: p.textTertiary)),
-            const SizedBox(height: 10),
+                style: TextStyle(fontSize: AppFontSize.tiny, color: p.textTertiary)),
+            const SizedBox(height: AppSpacing.s10),
             _buildDspSliderRow(
               context: context,
               p: p,
@@ -5914,9 +5939,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               onChanged: (val) => cubit.setSubCrossover(true, gain: val),
             ),
             SwitchListTile.adaptive(
-              title: Text(context.l10n.bassMono, style: TextStyle(fontSize: 14)),
+              title: Text(context.l10n.bassMono, style: TextStyle(fontSize: AppFontSize.body)),
               subtitle: Text(context.l10n.bassMonoDesc,
-                  style: TextStyle(fontSize: 11, color: p.textTertiary)),
+                  style: TextStyle(fontSize: AppFontSize.caption, color: p.textTertiary)),
               value: state.subCrossoverBassMono,
               activeThumbColor: p.onAccent,
               activeTrackColor: p.accent,
@@ -5931,9 +5956,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               ),
             ),
             SwitchListTile.adaptive(
-              title: Text(context.l10n.antiPop, style: TextStyle(fontSize: 14)),
+              title: Text(context.l10n.antiPop, style: TextStyle(fontSize: AppFontSize.body)),
               subtitle: Text(context.l10n.antiPopDesc,
-                  style: TextStyle(fontSize: 11, color: p.textTertiary)),
+                  style: TextStyle(fontSize: AppFontSize.caption, color: p.textTertiary)),
               value: state.subCrossoverAntiPop,
               activeThumbColor: p.onAccent,
               activeTrackColor: p.accent,
@@ -5957,7 +5982,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
       PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
     final l10n = context.l10n;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
         borderRadius: AppRadii.cardRadius,
@@ -5973,15 +5998,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadii.r8),
                       ),
                       child: Icon(Icons.graphic_eq_rounded,
                           color: p.accent, size: 20),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -5989,13 +6014,13 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           Text(l10n.dspDynamicEqTitle,
                               style: TextStyle(
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 14,
+                                  fontSize: AppFontSize.body,
                                   color: p.textPrimary),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis),
                           Text(l10n.dspDynamicEqSubtitle,
                               style: TextStyle(
-                                  fontSize: 11, color: p.textTertiary),
+                                  fontSize: AppFontSize.caption, color: p.textTertiary),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis),
                         ],
@@ -6015,7 +6040,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           (_nativePcmEffectsAvailable
                               ? null
                               : 'Requires PCM DSP path - not audible yet'))),
-              const SizedBox(width: 4),
+              const SizedBox(width: AppSpacing.xxs),
               Switch.adaptive(
                 value: dspBlocked == null &&
                     _nativePcmEffectsAvailable &&
@@ -6030,22 +6055,22 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           ),
           if (dspBlocked != null)
             Padding(
-                padding: const EdgeInsets.only(top: 6),
+                padding: const EdgeInsets.only(top: AppSpacing.s6),
                 child: Text(l10n.blockedByBitPerfectShort,
                     style: TextStyle(
                         color: p.error,
-                        fontSize: 10,
+                        fontSize: AppFontSize.tiny,
                         fontWeight: FontWeight.w600))),
           if (dspBlocked == null &&
               _nativePcmEffectsAvailable &&
               state.isDynamicEqEnabled) ...[
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.s14),
             for (int i = 0; i < state.dynamicEqBands.length; i++) ...[
-              if (i > 0) const SizedBox(height: 8),
+              if (i > 0) const SizedBox(height: AppSpacing.xs),
               _buildDynamicEqBandSection(context, state.dynamicEqBands[i], i, cubit, p),
             ],
             if (state.dynamicEqBands.length < 8) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.sm),
               Center(
                 child: FilledButton.tonalIcon(
                   onPressed: () => cubit.addDynamicEqBand(),
@@ -6071,14 +6096,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
-        tilePadding: const EdgeInsets.symmetric(horizontal: 8),
+        tilePadding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
         collapsedBackgroundColor: p.surfaceContainerHigh,
         backgroundColor: p.surfaceContainerHigh,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.r8)),
+        collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.r8)),
         title: Text(context.l10n.eqBandLabel(index + 1),
             style: TextStyle(
-                fontSize: 14,
+                fontSize: AppFontSize.body,
                 fontWeight: FontWeight.w600,
                 color: band.enabled ? p.textPrimary : p.textTertiary)),
         leading: Switch.adaptive(
@@ -6087,21 +6112,22 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           onChanged: (val) =>
               cubit.setDynamicEqBand(index, band.copyWith(enabled: val)),
         ),
-        trailing: IconButton(
-          icon: Icon(Icons.delete_outline, size: 18, color: p.error),
-          onPressed: () => cubit.removeDynamicEqBand(index),
-        ),
+          trailing: IconButton(
+            icon: Icon(Icons.delete_outline, size: 18, color: p.error),
+            tooltip: context.l10n.delete,
+            onPressed: () => cubit.removeDynamicEqBand(index),
+          ),
         children: [
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(AppSpacing.sm),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Mode Toggle
                 Row(
                   children: [
-                    Text('${context.l10n.modeLabel}:', style: TextStyle(fontSize: 12, color: p.textSecondary)),
-                    const SizedBox(width: 12),
+                    Text('${context.l10n.modeLabel}:', style: TextStyle(fontSize: AppFontSize.label, color: p.textSecondary)),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: SegmentedButton<int>(
                         segments: [
@@ -6122,20 +6148,20 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.sm),
                 
                 // Filter Type Dropdown
                 Row(
                   children: [
-                    Text('${context.l10n.filterLabel}:', style: TextStyle(fontSize: 12, color: p.textSecondary)),
-                    const SizedBox(width: 12),
+                    Text('${context.l10n.filterLabel}:', style: TextStyle(fontSize: AppFontSize.label, color: p.textSecondary)),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: DropdownButtonFormField<int>(
                         initialValue: band.filterType,
                         decoration: InputDecoration(
                           isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadii.r8)),
                         ),
                         items: [
                           DropdownMenuItem(value: 0, child: Text(context.l10n.peakingFilter)),
@@ -6151,7 +6177,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.sm),
                 
                 _buildDspSliderRow(
                   context: context,
@@ -6273,7 +6299,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
       PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
     final available = dspBlocked == null && _nativePcmEffectsAvailable;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
         borderRadius: AppRadii.cardRadius,
@@ -6289,15 +6315,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadii.r8),
                       ),
                       child: Icon(Icons.volume_up_rounded,
                           color: p.accent, size: 20),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -6305,13 +6331,13 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           Text(context.l10n.loudnessContour,
                               style: TextStyle(
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 14,
+                                  fontSize: AppFontSize.body,
                                   color: p.textPrimary),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis),
                           Text(context.l10n.loudnessContourDesc,
                               style: TextStyle(
-                                  fontSize: 11, color: p.textTertiary),
+                                  fontSize: AppFontSize.caption, color: p.textTertiary),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis),
                         ],
@@ -6320,7 +6346,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   ],
                 ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: AppSpacing.xxs),
               Switch.adaptive(
                 value: available && state.isLoudnessContourEnabled,
                 activeTrackColor: p.accent,
@@ -6332,22 +6358,22 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           ),
           if (dspBlocked != null)
             Padding(
-                padding: const EdgeInsets.only(top: 6),
+                padding: const EdgeInsets.only(top: AppSpacing.s6),
                 child: Text(context.l10n.blockedByBitPerfectShort,
                     style: TextStyle(
                         color: p.error,
-                        fontSize: 10,
+                        fontSize: AppFontSize.tiny,
                         fontWeight: FontWeight.w600)))
           else if (!_nativePcmEffectsAvailable)
             Padding(
-                padding: const EdgeInsets.only(top: 6),
+                padding: const EdgeInsets.only(top: AppSpacing.s6),
                 child: Text(context.l10n.nativeDspUnavailable,
                     style: TextStyle(
                         color: p.textTertiary,
-                        fontSize: 10,
+                        fontSize: AppFontSize.tiny,
                         fontWeight: FontWeight.w600))),
           if (available && state.isLoudnessContourEnabled) ...[
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.s14),
             _buildDspSliderRow(
               context: context,
               p: p,
@@ -6373,7 +6399,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
       PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
     final available = dspBlocked == null && _nativePcmEffectsAvailable;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
         borderRadius: AppRadii.cardRadius,
@@ -6389,15 +6415,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadii.r8),
                       ),
                       child:
                           Icon(Icons.grain_rounded, color: p.accent, size: 20),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -6405,13 +6431,13 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           Text(context.l10n.tpdfDither,
                               style: TextStyle(
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 14,
+                                  fontSize: AppFontSize.body,
                                   color: p.textPrimary),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis),
                           Text(context.l10n.ditherDesc,
                               style: TextStyle(
-                                  fontSize: 11, color: p.textTertiary),
+                                  fontSize: AppFontSize.caption, color: p.textTertiary),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis),
                         ],
@@ -6420,7 +6446,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   ],
                 ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: AppSpacing.xxs),
               Switch.adaptive(
                 value: available && state.isDitherEnabled,
                 activeTrackColor: p.accent,
@@ -6431,28 +6457,28 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           ),
           if (dspBlocked != null)
             Padding(
-                padding: const EdgeInsets.only(top: 6),
+                padding: const EdgeInsets.only(top: AppSpacing.s6),
                 child: Text(context.l10n.blockedByBitPerfectShort,
                     style: TextStyle(
                         color: p.error,
-                        fontSize: 10,
+                        fontSize: AppFontSize.tiny,
                         fontWeight: FontWeight.w600)))
           else if (!_nativePcmEffectsAvailable)
             Padding(
-                padding: const EdgeInsets.only(top: 6),
+                padding: const EdgeInsets.only(top: AppSpacing.s6),
                 child: Text(context.l10n.nativeDspUnavailable,
                     style: TextStyle(
                         color: p.textTertiary,
-                        fontSize: 10,
+                        fontSize: AppFontSize.tiny,
                         fontWeight: FontWeight.w600))),
           if (available && state.isDitherEnabled) ...[
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.s14),
             Text(context.l10n.targetBitDepth,
                 style: TextStyle(
-                    fontSize: 12,
+                    fontSize: AppFontSize.label,
                     color: p.textSecondary,
                     fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             Wrap(
               spacing: 8,
               runSpacing: 6,
@@ -6473,7 +6499,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           ? p.accent
                           : p.textSecondary,
                       fontWeight: FontWeight.w700,
-                      fontSize: 11,
+                      fontSize: AppFontSize.caption,
                     ),
                     onSelected: (_) =>
                         cubit.setDither(true, targetBitDepth: bits),
@@ -6491,7 +6517,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
       PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
     final available = dspBlocked == null && _nativePcmEffectsAvailable;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
         borderRadius: AppRadii.cardRadius,
@@ -6507,15 +6533,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadii.r8),
                       ),
                       child: Icon(Icons.sync_alt_rounded,
                           color: p.accent, size: 20),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -6523,13 +6549,13 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           Text(context.l10n.sincResampler,
                               style: TextStyle(
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 14,
+                                  fontSize: AppFontSize.body,
                                   color: p.textPrimary),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis),
                           Text(context.l10n.sincDesc,
                               style: TextStyle(
-                                  fontSize: 11, color: p.textTertiary),
+                                  fontSize: AppFontSize.caption, color: p.textTertiary),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis),
                         ],
@@ -6538,7 +6564,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   ],
                 ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: AppSpacing.xxs),
               Switch.adaptive(
                 value: available && state.isSincResamplerEnabled,
                 activeTrackColor: p.accent,
@@ -6550,19 +6576,19 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           ),
           if (dspBlocked != null)
             Padding(
-                padding: const EdgeInsets.only(top: 6),
+                padding: const EdgeInsets.only(top: AppSpacing.s6),
                 child: Text(context.l10n.blockedByBitPerfectShort,
                     style: TextStyle(
                         color: p.error,
-                        fontSize: 10,
+                        fontSize: AppFontSize.tiny,
                         fontWeight: FontWeight.w600)))
           else if (!_nativePcmEffectsAvailable)
             Padding(
-                padding: const EdgeInsets.only(top: 6),
+                padding: const EdgeInsets.only(top: AppSpacing.s6),
                 child: Text(context.l10n.nativeDspUnavailable,
                     style: TextStyle(
                         color: p.textTertiary,
-                        fontSize: 10,
+                        fontSize: AppFontSize.tiny,
                         fontWeight: FontWeight.w600))),
         ],
       ),
@@ -6589,11 +6615,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
         devName.contains('speaker');
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s6, vertical: AppSpacing.xxs),
       decoration: BoxDecoration(
         color: p.surfaceContainer.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadii.r16),
         border: Border.all(color: p.hairline),
       ),
       child: Row(
@@ -6657,14 +6683,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppRadii.r12),
       child: AnimatedContainer(
         duration: context.motionMs(200),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
         decoration: BoxDecoration(
           color:
               isActive ? p.accent.withValues(alpha: 0.18) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadii.r12),
           border: Border.all(
             color: isActive ? p.accent : Colors.transparent,
             width: 1,
@@ -6678,17 +6704,17 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               size: 14,
               color: isActive ? p.accent : p.textTertiary,
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: AppSpacing.xxs),
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: AppFontSize.caption,
                 fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
                 color: isActive ? p.accent : p.textSecondary,
               ),
             ),
             if (isActive) ...[
-              const SizedBox(width: 4),
+              const SizedBox(width: AppSpacing.xxs),
               Container(
                 width: 5,
                 height: 5,
@@ -6708,7 +6734,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
       PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
     final hasProfile = state.viperDdcProfileName.isNotEmpty;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
         borderRadius: AppRadii.cardRadius,
@@ -6724,15 +6750,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadii.r8),
                       ),
                       child: Icon(Icons.headphones_rounded,
                           color: p.accent, size: 20),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -6740,7 +6766,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           Text(AudioFeatureRegistry.viperDdc.title,
                               style: TextStyle(
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 14,
+                                  fontSize: AppFontSize.body,
                                   color: p.textPrimary),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis),
@@ -6749,7 +6775,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                 ? state.viperDdcProfileName
                                 : AudioFeatureRegistry.viperDdc.subtitle,
                             style:
-                                TextStyle(fontSize: 11, color: p.textTertiary),
+                                TextStyle(fontSize: AppFontSize.caption, color: p.textTertiary),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -6773,7 +6799,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           : 'Requires PCM DSP path - not audible yet'),
                 ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: AppSpacing.xxs),
               Switch.adaptive(
                 value: dspBlocked == null &&
                     _nativePcmEffectsAvailable &&
@@ -6788,26 +6814,26 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           ),
           if (dspBlocked != null)
             Padding(
-              padding: const EdgeInsets.only(top: 6),
+              padding: const EdgeInsets.only(top: AppSpacing.s6),
               child: Text(context.l10n.blockedByBitPerfectShort,
                 style: TextStyle(
-                    color: p.error, fontSize: 10, fontWeight: FontWeight.w600),
+                    color: p.error, fontSize: AppFontSize.tiny, fontWeight: FontWeight.w600),
               ),
             )
           else if (!_nativePcmEffectsAvailable)
             Padding(
-              padding: const EdgeInsets.only(top: 6),
+              padding: const EdgeInsets.only(top: AppSpacing.s6),
               child: Text(context.l10n.nativeDspUnavailable,
                 style: TextStyle(
                     color: p.textTertiary,
-                    fontSize: 10,
+                    fontSize: AppFontSize.tiny,
                     fontWeight: FontWeight.w600),
               ),
             ),
           if (dspBlocked == null &&
               _nativePcmEffectsAvailable &&
               state.isViperDdcEnabled) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
             OutlinedButton.icon(
               icon: const Icon(Icons.folder_open_rounded, size: 16),
               label: Text(
@@ -6821,10 +6847,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 foregroundColor: p.accent,
                 side: BorderSide(color: p.accent.withValues(alpha: 0.5)),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppRadii.r10),
                 ),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
               ),
               onPressed: () {
                 PulsrSheetHelper.showPulsrSheet<void>(
@@ -6843,7 +6869,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   Widget _buildArbitraryEqCard(BuildContext context, PlayerState state,
       PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
         borderRadius: AppRadii.cardRadius,
@@ -6859,15 +6885,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadii.r8),
                       ),
                       child: Icon(Icons.auto_graph_rounded,
                           color: p.accent, size: 20),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -6875,14 +6901,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           Text(AudioFeatureRegistry.arbitraryEq.title,
                               style: TextStyle(
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 14,
+                                  fontSize: AppFontSize.body,
                                   color: p.textPrimary),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis),
                           Text(
                             AudioFeatureRegistry.arbitraryEq.subtitle,
                             style:
-                                TextStyle(fontSize: 11, color: p.textTertiary),
+                                TextStyle(fontSize: AppFontSize.caption, color: p.textTertiary),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -6906,7 +6932,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           : 'Requires PCM DSP path - not audible yet'),
                 ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: AppSpacing.xxs),
               Switch.adaptive(
                 value: dspBlocked == null &&
                     _nativePcmEffectsAvailable &&
@@ -6921,26 +6947,26 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           ),
           if (dspBlocked != null)
             Padding(
-              padding: const EdgeInsets.only(top: 6),
+              padding: const EdgeInsets.only(top: AppSpacing.s6),
               child: Text(context.l10n.blockedByBitPerfectShort,
                 style: TextStyle(
-                    color: p.error, fontSize: 10, fontWeight: FontWeight.w600),
+                    color: p.error, fontSize: AppFontSize.tiny, fontWeight: FontWeight.w600),
               ),
             )
           else if (!_nativePcmEffectsAvailable)
             Padding(
-              padding: const EdgeInsets.only(top: 6),
+              padding: const EdgeInsets.only(top: AppSpacing.s6),
               child: Text(context.l10n.nativeDspUnavailable,
                 style: TextStyle(
                     color: p.textTertiary,
-                    fontSize: 10,
+                    fontSize: AppFontSize.tiny,
                     fontWeight: FontWeight.w600),
               ),
             ),
           if (dspBlocked == null &&
               _nativePcmEffectsAvailable &&
               state.isArbitraryEqEnabled) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
             OutlinedButton.icon(
               icon: const Icon(Icons.edit_note_rounded, size: 16),
               label: Text(context.l10n.editGraphicEq,
@@ -6951,10 +6977,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 foregroundColor: p.accent,
                 side: BorderSide(color: p.accent.withValues(alpha: 0.5)),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppRadii.r10),
                 ),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
               ),
               onPressed: () {
                 PulsrSheetHelper.showPulsrSheet<void>(
@@ -6973,7 +6999,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   Widget _buildLiveProgCard(BuildContext context, PlayerState state,
       PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
         borderRadius: AppRadii.cardRadius,
@@ -6989,15 +7015,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadii.r8),
                       ),
                       child:
                           Icon(Icons.code_rounded, color: p.accent, size: 20),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -7005,7 +7031,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           Text(AudioFeatureRegistry.liveProg.title,
                               style: TextStyle(
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 14,
+                                  fontSize: AppFontSize.body,
                                   color: p.textPrimary),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis),
@@ -7014,7 +7040,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                 ? state.liveProgStatus
                                 : AudioFeatureRegistry.liveProg.subtitle,
                             style:
-                                TextStyle(fontSize: 11, color: p.textTertiary),
+                                TextStyle(fontSize: AppFontSize.caption, color: p.textTertiary),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -7038,7 +7064,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           : 'Requires PCM DSP path - not audible yet'),
                 ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: AppSpacing.xxs),
               Switch.adaptive(
                 value: dspBlocked == null &&
                     _nativePcmEffectsAvailable &&
@@ -7053,26 +7079,26 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           ),
           if (dspBlocked != null)
             Padding(
-              padding: const EdgeInsets.only(top: 6),
+              padding: const EdgeInsets.only(top: AppSpacing.s6),
               child: Text(context.l10n.blockedByBitPerfectShort,
                 style: TextStyle(
-                    color: p.error, fontSize: 10, fontWeight: FontWeight.w600),
+                    color: p.error, fontSize: AppFontSize.tiny, fontWeight: FontWeight.w600),
               ),
             )
           else if (!_nativePcmEffectsAvailable)
             Padding(
-              padding: const EdgeInsets.only(top: 6),
+              padding: const EdgeInsets.only(top: AppSpacing.s6),
               child: Text(context.l10n.nativeDspUnavailable,
                 style: TextStyle(
                     color: p.textTertiary,
-                    fontSize: 10,
+                    fontSize: AppFontSize.tiny,
                     fontWeight: FontWeight.w600),
               ),
             ),
           if (dspBlocked == null &&
               _nativePcmEffectsAvailable &&
               state.isLiveProgEnabled) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
             OutlinedButton.icon(
               icon: const Icon(Icons.terminal_rounded, size: 16),
               label: Text(context.l10n.openEelEditor,
@@ -7083,10 +7109,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 foregroundColor: p.accent,
                 side: BorderSide(color: p.accent.withValues(alpha: 0.5)),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppRadii.r10),
                 ),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
               ),
               onPressed: () {
                 PulsrSheetHelper.showPulsrSheet<void>(
@@ -7105,7 +7131,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   Widget _buildDynamicBassCard(BuildContext context, PlayerState state,
       PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
         borderRadius: AppRadii.cardRadius,
@@ -7121,15 +7147,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadii.r8),
                       ),
                       child: Icon(Icons.speaker_group_rounded,
                           color: p.accent, size: 20),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -7137,14 +7163,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           Text(AudioFeatureRegistry.dynamicBass.title,
                               style: TextStyle(
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 14,
+                                  fontSize: AppFontSize.body,
                                   color: p.textPrimary),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis),
                           Text(
                             AudioFeatureRegistry.dynamicBass.subtitle,
                             style:
-                                TextStyle(fontSize: 11, color: p.textTertiary),
+                                TextStyle(fontSize: AppFontSize.caption, color: p.textTertiary),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -7168,7 +7194,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           : 'Requires PCM DSP path - not audible yet'),
                 ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: AppSpacing.xxs),
               Switch.adaptive(
                 value: dspBlocked == null &&
                     _nativePcmEffectsAvailable &&
@@ -7183,26 +7209,26 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           ),
           if (dspBlocked != null)
             Padding(
-              padding: const EdgeInsets.only(top: 6),
+              padding: const EdgeInsets.only(top: AppSpacing.s6),
               child: Text(context.l10n.blockedByBitPerfectShort,
                 style: TextStyle(
-                    color: p.error, fontSize: 10, fontWeight: FontWeight.w600),
+                    color: p.error, fontSize: AppFontSize.tiny, fontWeight: FontWeight.w600),
               ),
             )
           else if (!_nativePcmEffectsAvailable)
             Padding(
-              padding: const EdgeInsets.only(top: 6),
+              padding: const EdgeInsets.only(top: AppSpacing.s6),
               child: Text(context.l10n.nativeDspUnavailable,
                 style: TextStyle(
                     color: p.textTertiary,
-                    fontSize: 10,
+                    fontSize: AppFontSize.tiny,
                     fontWeight: FontWeight.w600),
               ),
             ),
           if (dspBlocked == null &&
               _nativePcmEffectsAvailable &&
               state.isDynamicBassEnabled) ...[
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.s14),
             _buildDspSliderRow(
               context: context,
               p: p,
@@ -7215,15 +7241,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               divisions: 70,
               onChanged: (val) => cubit.setDynamicBass(true, strength: val),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
             Text(context.l10n.acousticCalibModel,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: AppFontSize.label,
                 color: p.textSecondary,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
@@ -7242,14 +7268,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           ? p.accent
                           : p.textSecondary,
                       fontWeight: FontWeight.w700,
-                      fontSize: 11,
+                      fontSize: AppFontSize.caption,
                     ),
                     onSelected: (_) => cubit.setDynamicBass(
                       true,
                       preset: 0,
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: AppSpacing.s6),
                   for (final item in DynamicBassConfig.builtinPresets) ...[
                     ChoiceChip(
                       label: Text(item.name),
@@ -7266,14 +7292,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                             ? p.accent
                             : p.textSecondary,
                         fontWeight: FontWeight.w700,
-                        fontSize: 11,
+                        fontSize: AppFontSize.caption,
                       ),
                       onSelected: (_) => cubit.setDynamicBass(
                         true,
                         preset: item.id,
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: AppSpacing.s6),
                   ],
                 ],
               ),
@@ -7351,23 +7377,23 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
         FittedBox(
           fit: BoxFit.scaleDown,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
             decoration: BoxDecoration(
               color: (gain.abs() > 0.1 ? widget.accentColor : widget.trackColor)
                   .withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(AppRadii.r6),
             ),
             child: Text(
               '${gain > 0 ? '+' : ''}${gain.toStringAsFixed(1)}',
               style: TextStyle(
-                fontSize: 10,
+                fontSize: AppFontSize.tiny,
                 color: gain.abs() > 0.1 ? widget.accentColor : widget.textColor,
                 fontWeight: FontWeight.w700,
               ),
             ),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.xs),
 
         // Vertical Slider Track
         SizedBox(
@@ -7432,7 +7458,7 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
             },
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.xs),
 
         // Frequency Label + Modification Indicator Dot
         FittedBox(
@@ -7443,7 +7469,7 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
               Text(
                 widget.label,
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: AppFontSize.caption,
                   fontWeight: FontWeight.w700,
                   color: widget.textColor,
                 ),
@@ -7452,7 +7478,7 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
                 Container(
                   width: 5,
                   height: 5,
-                  margin: const EdgeInsets.only(top: 3),
+                  margin: const EdgeInsets.only(top: AppSpacing.xxs),
                   decoration: BoxDecoration(
                     color: widget.accentColor,
                     shape: BoxShape.circle,

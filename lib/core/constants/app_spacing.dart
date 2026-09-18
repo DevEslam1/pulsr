@@ -31,5 +31,5 @@ abstract class AppSpacing {
   static const double s64 = 64;
 
   /// Bottom padding so content clears the mini-player + nav dock.
-  static const double scrollBottom = 140;
+  static const double scrollBottom = 160;
 }

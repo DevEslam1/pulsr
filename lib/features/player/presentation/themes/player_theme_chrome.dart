@@ -26,6 +26,10 @@ import '../widgets/quran_mode_button.dart';
 import '../widgets/speed_picker_sheet.dart';
 import '../../../../domain/services/cast_service.dart';
 import 'player_theme.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 /// Visual tokens that differ between the copies of the dock icon button.
 ///
@@ -130,7 +134,7 @@ class PlayerSwitcherItem extends StatelessWidget {
         constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadii.r20),
           child: AnimatedContainer(
             duration: context.motionMs(200),
             curve: context.motionCurve(Curves.easeOutCubic),
@@ -139,7 +143,7 @@ class PlayerSwitcherItem extends StatelessWidget {
               color: isSelected
                   ? activeColor.withValues(alpha: 0.22)
                   : Colors.transparent,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(AppRadii.r20),
               border: isSelected
                   ? Border.all(
                       color: activeColor.withValues(alpha: 0.45),
@@ -156,35 +160,35 @@ class PlayerSwitcherItem extends StatelessWidget {
                   size: isTablet ? 16 : 14,
                   color: isSelected ? activeColor : p.textSecondary,
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: AppSpacing.xxs),
                 Flexible(
                   child: Text(
                     label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: isTablet ? 13 : 11.5,
+                      fontSize: isTablet ? AppFontSize.bodySmall : AppFontSize.label,
                       fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                       color: isSelected ? p.textPrimary : p.textSecondary,
-                      letterSpacing: 0.2,
+                      letterSpacing: AppTracking.label,
                     ),
                   ),
                 ),
                 if (badgeCount != null && badgeCount! > 0) ...[
-                  const SizedBox(width: 4),
+                  const SizedBox(width: AppSpacing.xxs),
                   Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1),
+                        const EdgeInsets.symmetric(horizontal: 4.5, vertical: AppSpacing.s2),
                     decoration: BoxDecoration(
                       color: isSelected
                           ? activeColor
                           : p.textPrimary.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppRadii.r8),
                     ),
                     child: Text(
                       '$badgeCount',
                       style: TextStyle(
-                        fontSize: 9.5,
+                        fontSize: AppFontSize.tiny,
                         fontWeight: FontWeight.w800,
                         color: isSelected ? p.onAccent : p.textSecondary,
                       ),
@@ -309,12 +313,12 @@ class PlayerDockIconButton extends StatelessWidget {
             ),
           ),
           if (badgeText != null)
-            Positioned(
+            PositionedDirectional(
               top: -2,
-              right: style.badgeRight,
+              end: style.badgeRight,
               child: Container(
                 padding: EdgeInsets.symmetric(
-                    horizontal: style.badgeHPadding, vertical: 1),
+                    horizontal: style.badgeHPadding, vertical: AppSpacing.s2),
                 decoration: BoxDecoration(
                   color: activeColor,
                   borderRadius: BorderRadius.circular(style.badgeRadius),
@@ -634,8 +638,8 @@ class PlayerBottomActionDock extends StatelessWidget {
                       badgeText: isCast ? 'CAST' : (isUsb ? 'DAC' : null),
                       isActive: isCast || isUsb,
                       activeColor: isCast
-                          ? const Color(0xFF00E5FF)
-                          : const Color(0xFFFFD700),
+                          ? AppColors.accentCyan
+                          : AppColors.dacGold,
                       inactiveColor: p.textSecondary,
                       isTablet: isTablet,
                       style: dockIconStyle,

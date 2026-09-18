@@ -15,6 +15,10 @@ import '../../../domain/repositories/music_repository_interface.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../cubit/library_cubit.dart';
 import '../cubit/library_state.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 class LibraryStatsScreen extends StatefulWidget {
   const LibraryStatsScreen({super.key});
@@ -89,7 +93,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
           elevation: 0,
           leading: const PulsrBackButton(),
           title: Text(context.l10n.listeningStats,
-            style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.bold),
+            style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700),
           ),
           actions: [
             IconButton(
@@ -156,7 +160,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                 .toList();
 
             return ListView(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+              padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, 120),
               children: [
                 // Top Metrics Grid
                 Row(
@@ -171,7 +175,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                         p: p,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: _buildMetricCard(
                         context,
@@ -184,7 +188,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.sm),
                 Row(
                   children: [
                     Expanded(
@@ -197,7 +201,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                         p: p,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: _buildMetricCard(
                         context,
@@ -210,14 +214,14 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.s20),
 
                 // Audio Quality & Library Breakdown
                 Container(
-                  padding: const EdgeInsets.all(18),
+                  padding: const EdgeInsets.all(AppSpacing.s18),
                   decoration: BoxDecoration(
                     color: p.surfaceCard,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(AppRadii.r20),
                     border: Border.all(color: p.hairline),
                   ),
                   child: Column(
@@ -227,11 +231,11 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                         children: [
                           Icon(Icons.high_quality_rounded,
                               color: p.primary, size: 22),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: AppSpacing.xs),
                           Text(context.l10n.audioQualityTiers,
                             style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
+                              fontSize: AppFontSize.callout,
+                              fontWeight: FontWeight.w700,
                               color: p.textPrimary,
                             ),
                           ),
@@ -239,13 +243,13 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                           Text(
                             '${albums.length} ${context.l10n.albums} · ${artists.length} ${context.l10n.artists}',
                             style:
-                                TextStyle(fontSize: 12, color: p.textSecondary),
+                                TextStyle(fontSize: AppFontSize.label, color: p.textSecondary),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: AppSpacing.s14),
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadii.r8),
                         child: Row(
                           children: [
                             if (songs.isNotEmpty) ...[
@@ -267,14 +271,14 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AppSpacing.sm),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
                             '${context.l10n.browseLosslessHiRes} $losslessCount ${context.l10n.browseTracks}',
                             style: const TextStyle(
-                              fontSize: 12,
+                              fontSize: AppFontSize.label,
                               color: Color(0xFF64D2FF),
                               fontWeight: FontWeight.w600,
                             ),
@@ -282,14 +286,14 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                           Text(
                             '${context.l10n.browseStandardLossy} $lossyCount ${context.l10n.browseTracks}',
                             style: TextStyle(
-                                fontSize: 12, color: p.textSecondary),
+                                fontSize: AppFontSize.label, color: p.textSecondary),
                           ),
                         ],
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: AppSpacing.lg),
 
                 // Top Played Songs Section
                 _buildSectionHeader(
@@ -298,19 +302,19 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                   icon: Icons.leaderboard_rounded,
                   p: p,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.sm),
                 if (topSongs.isEmpty)
                   Container(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(AppSpacing.s20),
                     decoration: BoxDecoration(
                       color: p.surfaceCard,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(AppRadii.r16),
                       border: Border.all(color: p.hairline),
                     ),
                     child: Center(
                       child: Text(context.l10n.noPlayHistory,
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: p.textSecondary, fontSize: 13),
+                        style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                       ),
                     ),
                   )
@@ -325,7 +329,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                       p: p,
                     );
                   }),
-                const SizedBox(height: 24),
+                const SizedBox(height: AppSpacing.lg),
 
                 // Top Artists Section
                 if (topArtists.isNotEmpty) ...[
@@ -335,11 +339,11 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                     icon: Icons.person_search_rounded,
                     p: p,
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.sm),
                   Container(
                     decoration: BoxDecoration(
                       color: p.surfaceCard,
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: BorderRadius.circular(AppRadii.r18),
                       border: Border.all(color: p.hairline),
                     ),
                     child: Column(
@@ -361,8 +365,8 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                                   '#${idx + 1}',
                                   style: TextStyle(
                                     color: _getRankColor(idx + 1, p),
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: AppFontSize.label,
                                   ),
                                 ),
                               ),
@@ -373,27 +377,28 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                                 style: TextStyle(
                                   color: p.textPrimary,
                                   fontWeight: FontWeight.w600,
-                                  fontSize: 14,
+                                  fontSize: AppFontSize.body,
                                 ),
                               ),
                               subtitle: Text(
                                 '$trackCount ${context.l10n.browseTracksInLibrary}',
                                 style: TextStyle(
-                                    color: p.textSecondary, fontSize: 12),
+                                    color: p.textSecondary, fontSize: AppFontSize.label),
                               ),
                               trailing: Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 4),
+
+                                    horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
                                 decoration: BoxDecoration(
                                   color: p.accent.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(AppRadii.r12),
                                 ),
                                 child: Text(
                                   '$plays ${context.l10n.browsePlays}',
                                   style: TextStyle(
                                     color: p.accent,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
+                                    fontSize: AppFontSize.label,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ),
@@ -409,7 +414,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                       }),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: AppSpacing.lg),
                 ],
 
                 // Recently Played Section
@@ -420,7 +425,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                     icon: Icons.history_rounded,
                     p: p,
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.sm),
                   ...List.generate(recentlyPlayed.length, (index) {
                     final song = recentlyPlayed[index];
                     return _buildSongLeaderboardTile(
@@ -450,14 +455,14 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(AppSpacing.xs),
           decoration: BoxDecoration(
             color: p.accent.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppRadii.r10),
           ),
           child: Icon(icon, color: p.accent, size: 20),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -465,14 +470,14 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
               Text(
                 title,
                 style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                  fontSize: AppFontSize.bodyLarge,
+                  fontWeight: FontWeight.w700,
                   color: p.textPrimary,
                 ),
               ),
               Text(
                 subtitle,
-                style: TextStyle(fontSize: 12, color: p.textSecondary),
+                style: TextStyle(fontSize: AppFontSize.label, color: p.textSecondary),
               ),
             ],
           ),
@@ -484,7 +489,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
   Color _getRankColor(int rank, PulsrPalette p) {
     switch (rank) {
       case 1:
-        return const Color(0xFFFFD700); // Gold
+        return AppColors.dacGold; // Gold
       case 2:
         return const Color(0xFFC0C0C0); // Silver
       case 3:
@@ -502,36 +507,35 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
     required PulsrPalette p,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadii.r14),
           onTap: () {
             context.read<PlayerCubit>().playSong(song, queue: queue);
           },
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
             decoration: BoxDecoration(
               color: p.surfaceCard,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppRadii.r14),
               border: Border.all(color: p.hairline),
             ),
             child: Row(
               children: [
                 if (rank != null) ...[
-                  SizedBox(
-                    width: 28,
+                  SizedBox(width: AppSpacing.s28,
                     child: Text(
                       '#$rank',
                       style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
+                        fontSize: AppFontSize.bodySmall,
+                        fontWeight: FontWeight.w700,
                         color: _getRankColor(rank, p),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: AppSpacing.s6),
                 ],
                 CachedArtwork(
                   id: song.id,
@@ -540,7 +544,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                   size: 44,
                   borderRadius: 10,
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -550,41 +554,42 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
+                          fontSize: AppFontSize.body,
+                          fontWeight: FontWeight.w700,
                           color: p.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: AppSpacing.s2),
                       Text(
                         song.artist,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12, color: p.textSecondary),
+                        style: TextStyle(fontSize: AppFontSize.label, color: p.textSecondary),
                       ),
                     ],
                   ),
                 ),
                 if (song.playCount > 0) ...[
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.xs),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
+
+                        horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                     decoration: BoxDecoration(
                       color: p.accent.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppRadii.r8),
                     ),
                     child: Text(
                       '${song.playCount} ${context.l10n.browsePlays}',
                       style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
+                        fontSize: AppFontSize.caption,
+                        fontWeight: FontWeight.w700,
                         color: p.accent,
                       ),
                     ),
                   ),
                 ],
-                const SizedBox(width: 6),
+                const SizedBox(width: AppSpacing.s6),
                 Icon(Icons.play_circle_outline_rounded,
                     color: p.accent, size: 22),
               ],
@@ -604,35 +609,35 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
     required PulsrPalette p,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: p.surfaceCard,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppRadii.r18),
         border: Border.all(color: p.hairline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(AppSpacing.xs),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(AppRadii.r10),
             ),
             child: Icon(icon, color: color, size: 20),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
           Text(
             value,
             style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
+              fontSize: AppFontSize.titleLarge,
+              fontWeight: FontWeight.w700,
               color: p.textPrimary,
             ),
           ),
           Text(
             title,
-            style: TextStyle(fontSize: 12, color: p.textSecondary),
+            style: TextStyle(fontSize: AppFontSize.label, color: p.textSecondary),
           ),
         ],
       ),

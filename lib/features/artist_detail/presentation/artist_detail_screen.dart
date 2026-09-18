@@ -19,6 +19,9 @@ import '../../player/cubit/player_cubit.dart';
 import '../../sheets/song_info_sheet.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/services/artist_bio_service.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class ArtistDetailScreen extends StatefulWidget {
   final ArtistsTableData artist;
@@ -65,12 +68,12 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
           child: ConstrainedBox(
             constraints: Adaptive.contentConstraints(context),
             child: ListView(
-              padding: const EdgeInsets.only(bottom: 160),
+              padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom),
               children: [
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
                 Center(
                   child: Container(
-                    padding: const EdgeInsets.all(4),
+                    padding: const EdgeInsets.all(AppSpacing.xxs),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
@@ -92,7 +95,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.s14),
                 Center(
                   child: Text(
                     artist.name,
@@ -100,14 +103,14 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpacing.xxs),
                 Center(
                   child: Text(
                     Formatters.formatTrackCount(artist.songCount),
-                    style: TextStyle(color: p.textSecondary, fontSize: 13),
+                    style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.sm),
 
                 // Artist Biography & HD Info
                 FutureBuilder(
@@ -117,11 +120,12 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                       final bio = snapshot.data!.bio!;
                       return Container(
                         margin: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 8),
-                        padding: const EdgeInsets.all(14),
+
+                            horizontal: AppSpacing.s20, vertical: AppSpacing.xs),
+                        padding: const EdgeInsets.all(AppSpacing.s14),
                         decoration: BoxDecoration(
                           color: p.surfaceContainer.withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(AppRadii.r16),
                           border: Border.all(color: p.hairline),
                         ),
                         child: Column(
@@ -131,23 +135,23 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                               children: [
                                 Icon(Icons.info_outline_rounded,
                                     size: 16, color: p.accent),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: AppSpacing.s6),
                                 Text(context.l10n.aboutArtist,
                                   style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: AppFontSize.label,
                                     fontWeight: FontWeight.w700,
                                     color: p.accent,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 6),
+                            const SizedBox(height: AppSpacing.s6),
                             Text(
                               bio,
                               maxLines: 4,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: AppFontSize.label,
                                 color: p.textSecondary,
                                 height: 1.4,
                               ),
@@ -159,13 +163,16 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                     return const SizedBox.shrink();
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
 
                 // Discography (Albums)
                 StreamBuilder<Result<List<AlbumsTableData>>>(
                   stream: _useCase.watchArtistAlbums(artist.id),
                   builder: (context, snapshot) {
-                    if (snapshot.hasError) {
+                    final loadFailed = snapshot.hasError ||
+                        (snapshot.data?.fold((l) => true, (_) => false) ??
+                            false);
+                    if (loadFailed) {
                       return _ErrorSection(
                         title: context.l10n.albums,
                         message: context.l10n.browseCouldNotLoadAlbums,
@@ -192,9 +199,9 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                               final album = albums[index];
                               return Container(
                                 width: 120,
-                                margin: const EdgeInsets.only(right: 14),
+                                margin: const EdgeInsetsDirectional.only(end: AppSpacing.s14),
                                 child: InkWell(
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(AppRadii.r16),
                                   onTap: () =>
                                       context.push('/album', extra: album),
                                   child: Column(
@@ -205,21 +212,21 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                                           type: ArtworkType.ALBUM,
                                           size: 120,
                                           borderRadius: 16),
-                                      const SizedBox(height: 8),
+                                      const SizedBox(height: AppSpacing.xs),
                                       Text(album.title,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
                                               color: p.textPrimary,
                                               fontWeight: FontWeight.w700,
-                                              fontSize: 13)),
-                                      const SizedBox(height: 2),
+                                              fontSize: AppFontSize.bodySmall)),
+                                      const SizedBox(height: AppSpacing.s2),
                                       Text(
                                           Formatters.formatTrackCount(
                                               album.songCount),
                                           style: TextStyle(
                                               color: p.textSecondary,
-                                              fontSize: 11)),
+                                              fontSize: AppFontSize.caption)),
                                     ],
                                   ),
                                 ),
@@ -227,7 +234,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                             },
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.sm),
                       ],
                     );
                   },
@@ -237,7 +244,10 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                 StreamBuilder<Result<List<SongsTableData>>>(
                   stream: _useCase.watchArtistSongs(artist.id),
                   builder: (context, snapshot) {
-                    if (snapshot.hasError) {
+                    final loadFailed = snapshot.hasError ||
+                        (snapshot.data?.fold((l) => true, (_) => false) ??
+                            false);
+                    if (loadFailed) {
                       return _ErrorSection(
                         title: context.l10n.browseTopTracks,
                         message: context.l10n.browseCouldNotLoadTopTracks,
@@ -288,27 +298,27 @@ class _ErrorSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SectionHeader(title: title),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s14),
             decoration: BoxDecoration(
               color: p.error.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppRadii.r14),
               border: Border.all(color: p.error.withValues(alpha: 0.3)),
             ),
             child: Row(
               children: [
                 Icon(Icons.error_outline_rounded, color: p.error),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Text(
                     message,
-                    style: TextStyle(color: p.textSecondary, fontSize: 13),
+                    style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                   ),
                 ),
                 TextButton(

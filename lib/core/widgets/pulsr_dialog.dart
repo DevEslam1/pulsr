@@ -6,6 +6,8 @@ import '../constants/app_radii.dart';
 import '../theme/aura_theme.dart';
 import 'glass_container.dart';
 import 'pulsr_modal_tracker.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 /// Uniform dialog entry-points used across the entire app.
 ///
@@ -78,13 +80,13 @@ class PulsrDialogHelper {
           : null,
       title: Text(
         title,
-        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: AppFontSize.title),
       ),
       content: Text(
         message,
         style: TextStyle(
           color: context.palette.textSecondary,
-          fontSize: 14,
+          fontSize: AppFontSize.body,
           height: 1.45,
         ),
       ),
@@ -93,7 +95,7 @@ class PulsrDialogHelper {
           onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
           style: TextButton.styleFrom(
             foregroundColor: context.palette.textSecondary,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
           ),
           child: Text(cancelLabel, style: const TextStyle(fontWeight: FontWeight.w600)),
         ),
@@ -107,9 +109,9 @@ class PulsrDialogHelper {
                 ? context.palette.error
                 : context.palette.accent,
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadii.r12),
             ),
           ),
           child: Text(
@@ -206,7 +208,7 @@ class _PulsrInputDialogState extends State<_PulsrInputDialog> {
           : null,
       title: Text(
         widget.title,
-        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: AppFontSize.title),
       ),
       content: SingleChildScrollView(
         child: Column(
@@ -216,14 +218,14 @@ class _PulsrInputDialogState extends State<_PulsrInputDialog> {
             if (widget.message != null) ...[
               Text(
                 widget.message!,
-                style: TextStyle(color: p.textSecondary, fontSize: 13.5),
+                style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: AppSpacing.s14),
             ],
             Container(
               decoration: BoxDecoration(
                 color: p.surfaceContainerHigh.withValues(alpha: 0.6),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadii.r12),
                 border: Border.all(color: p.hairline),
               ),
               child: TextField(
@@ -232,16 +234,17 @@ class _PulsrInputDialogState extends State<_PulsrInputDialog> {
                 keyboardType: widget.keyboardType,
                 style: TextStyle(
                   color: p.textPrimary,
-                  fontSize: 15,
+                  fontSize: AppFontSize.callout,
                   fontWeight: FontWeight.w600,
                 ),
                 decoration: InputDecoration(
                   hintText: widget.hintText,
-                  hintStyle: TextStyle(color: p.textTertiary, fontSize: 14),
+                  hintStyle: TextStyle(color: p.textTertiary, fontSize: AppFontSize.body),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 12,
+
+                    horizontal: AppSpacing.s14,
+                    vertical: AppSpacing.sm,
                   ),
                 ),
                 onSubmitted: (_) => _submit(),
@@ -264,9 +267,9 @@ class _PulsrInputDialogState extends State<_PulsrInputDialog> {
           style: FilledButton.styleFrom(
             backgroundColor: p.accent,
             foregroundColor: p.onAccent,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadii.r12),
             ),
           ),
           child: Text(
@@ -318,7 +321,7 @@ class PulsrDialog extends StatelessWidget {
     return Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.lg),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
         child: GlassContainer(
@@ -340,7 +343,7 @@ class PulsrDialog extends StatelessWidget {
               // Optional top icon badge
               if (iconWidget != null) ...[
                 Padding(
-                  padding: const EdgeInsets.only(top: 24),
+                  padding: const EdgeInsets.only(top: AppSpacing.lg),
                   child: Center(
                     child: Container(
                       width: 52,
@@ -363,19 +366,14 @@ class PulsrDialog extends StatelessWidget {
               // Dialog Title
               if (titleWidget != null)
                 Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    24,
-                    iconWidget != null ? 14 : 24,
-                    24,
-                    0,
-                  ),
+                  padding: EdgeInsetsDirectional.fromSTEB(AppSpacing.lg, iconWidget != null ? 14 : 24, AppSpacing.lg, 0, ),
                   child: DefaultTextStyle.merge(
                     textAlign: iconWidget != null ? TextAlign.center : TextAlign.start,
                     style: TextStyle(
                       color: p.textPrimary,
-                      fontSize: 19,
+                      fontSize: AppFontSize.title,
                       fontWeight: FontWeight.w800,
-                      letterSpacing: -0.3,
+                      letterSpacing: AppTracking.title,
                     ),
                     child: titleWidget,
                   ),
@@ -384,16 +382,11 @@ class PulsrDialog extends StatelessWidget {
               // Dialog Content
               if (content != null)
                 Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    24,
-                    title != null ? 14 : 24,
-                    24,
-                    16,
-                  ),
+                  padding: EdgeInsetsDirectional.fromSTEB(AppSpacing.lg, title != null ? 14 : 24, AppSpacing.lg, AppSpacing.md, ),
                   child: DefaultTextStyle.merge(
                     style: TextStyle(
                       color: p.textSecondary,
-                      fontSize: 14,
+                      fontSize: AppFontSize.body,
                       height: 1.45,
                     ),
                     child: content!,
@@ -403,9 +396,9 @@ class PulsrDialog extends StatelessWidget {
               // Action Buttons
               if (actions != null && actions!.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
+                  padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.xs, AppSpacing.s20, AppSpacing.s18),
                   child: Align(
-                    alignment: Alignment.centerRight,
+                    alignment: AlignmentDirectional.centerEnd,
                     child: Wrap(
                       alignment: WrapAlignment.end,
                       crossAxisAlignment: WrapCrossAlignment.center,

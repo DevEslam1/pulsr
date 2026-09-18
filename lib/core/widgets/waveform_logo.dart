@@ -1,5 +1,6 @@
 // lib/core/widgets/waveform_logo.dart
 import 'package:flutter/material.dart';
+import '../motion/pulsr_motion.dart';
 
 class WaveformLogo extends StatefulWidget {
   final double size;
@@ -45,6 +46,20 @@ class _WaveformLogoState extends State<WaveformLogo>
         _controller?.dispose();
         _controller = null;
       }
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final c = _controller;
+    if (c == null) return;
+    c.duration = context.motionMs(800);
+    if (!context.motionEnabled) {
+      c.stop();
+      c.value = 0;
+    } else if (!c.isAnimating) {
+      c.repeat(reverse: true);
     }
   }
 

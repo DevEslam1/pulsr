@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 /// A labeled settings slider with a trailing "restore default" affordance.
 ///
@@ -57,7 +59,7 @@ class SettingSliderRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 12, 14),
+      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.sm, AppSpacing.sm, AppSpacing.s14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -74,23 +76,23 @@ class SettingSliderRow extends StatelessWidget {
                       const BoxConstraints(minWidth: 24, minHeight: 24),
                   onPressed: onInfo,
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: AppSpacing.xxs),
               ],
               Expanded(
                 child: Text(label,
                     style: TextStyle(
                         color: enabled ? p.textPrimary : p.textTertiary,
                         fontWeight: FontWeight.w700,
-                        fontSize: 14)),
+                        fontSize: AppFontSize.body)),
               ),
               Text(
                 _fmt(value),
                 style: TextStyle(
                     color: enabled ? p.accent : p.textTertiary,
                     fontWeight: FontWeight.w800,
-                    fontSize: 12),
+                    fontSize: AppFontSize.label),
               ),
-              const SizedBox(width: 2),
+              const SizedBox(width: AppSpacing.s2),
               IconButton(
                 icon: Icon(Icons.settings_backup_restore,
                     size: 18,
@@ -105,13 +107,13 @@ class SettingSliderRow extends StatelessWidget {
             ],
           ),
           if (subtitle != null) ...[
-            const SizedBox(height: 2),
+            const SizedBox(height: AppSpacing.s2),
             Padding(
-              padding: const EdgeInsets.only(right: 4),
+              padding: const EdgeInsetsDirectional.only(end: AppSpacing.xxs),
               child: Text(subtitle!,
                   style: TextStyle(
                       color: p.error,
-                      fontSize: 11,
+                      fontSize: AppFontSize.caption,
                       fontWeight: FontWeight.w600)),
             ),
           ],
@@ -124,6 +126,7 @@ class SettingSliderRow extends StatelessWidget {
                 min: min,
                 max: max,
                 divisions: divisions,
+                semanticLabel: '$label ${_fmt(value)}',
                 onChanged: onChanged,
               ),
             ),

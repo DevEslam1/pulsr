@@ -23,6 +23,8 @@ import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/formatters.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../player/cubit/player_state.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class QueueScreen extends StatelessWidget {
   const QueueScreen({super.key});
@@ -162,11 +164,11 @@ class QueueScreen extends StatelessWidget {
                 }
               },
               itemBuilder: (c) => [
-                PopupMenuItem(value: 'shuffle', child: Row(children: [const Icon(Icons.shuffle), const SizedBox(width: 8), Text(context.l10n.shuffle)])),
-                PopupMenuItem(value: 'autodj', child: Row(children: [const Icon(Icons.auto_awesome_rounded), const SizedBox(width: 8), Text(context.l10n.autoMix)])),
-                PopupMenuItem(value: 'save', child: Row(children: [const Icon(Icons.playlist_add), const SizedBox(width: 8), Text(context.l10n.saveAsPlaylist)])),
+                PopupMenuItem(value: 'shuffle', child: Row(children: [const Icon(Icons.shuffle), const SizedBox(width: AppSpacing.xs), Text(context.l10n.shuffle)])),
+                PopupMenuItem(value: 'autodj', child: Row(children: [const Icon(Icons.auto_awesome_rounded), const SizedBox(width: AppSpacing.xs), Text(context.l10n.autoMix)])),
+                PopupMenuItem(value: 'save', child: Row(children: [const Icon(Icons.playlist_add), const SizedBox(width: AppSpacing.xs), Text(context.l10n.saveAsPlaylist)])),
                 const PopupMenuDivider(),
-                PopupMenuItem(value: 'clear', child: Row(children: [Icon(Icons.clear_all, color: p.error), const SizedBox(width: 8), Text(context.l10n.clearQueueConfirm.split('?').first, style: TextStyle(color: p.error))])),
+                PopupMenuItem(value: 'clear', child: Row(children: [Icon(Icons.clear_all, color: p.error), const SizedBox(width: AppSpacing.xs), Text(context.l10n.clearQueueConfirm.split('?').first, style: TextStyle(color: p.error))])),
               ],
             );
           }),
@@ -201,9 +203,10 @@ class QueueScreen extends StatelessWidget {
               constraints: Adaptive.contentConstraints(context),
               child: ReorderableListView.builder(
                 padding: EdgeInsets.symmetric(
+
                   horizontal: context.pagePadding,
-                  vertical: 8,
-                ).copyWith(bottom: 160),
+                  vertical: AppSpacing.xs,
+                ).copyWith(bottom: AppSpacing.scrollBottom),
                 itemCount: queue.length,
                 // ignore: deprecated_member_use — onReorderItem is 3.41+; keep onReorder for stable channel compat
                 onReorder: (oldIdx, newIdx) => context.read<PlayerCubit>().reorderQueue(oldIdx, newIdx),
@@ -216,9 +219,9 @@ class QueueScreen extends StatelessWidget {
                     dismissDirection: DismissDirection.endToStart,
                     endToStartLabel: context.l10n.delete,
                     secondaryBackgroundBuilder: (context, isConfirming) => Container(
-                      alignment: Alignment.centerRight,
-                      padding: const EdgeInsets.only(right: 20),
-                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      alignment: AlignmentDirectional.centerEnd,
+                      padding: const EdgeInsetsDirectional.only(end: AppSpacing.s20),
+                      margin: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
                       decoration: BoxDecoration(
                         color: p.error.withValues(alpha: isConfirming ? 0.35 : 0.15),
                         borderRadius: AppRadii.cardRadius,
@@ -234,7 +237,7 @@ class QueueScreen extends StatelessWidget {
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: AppSpacing.xs),
                           ],
                           Icon(
                             isConfirming
@@ -250,7 +253,7 @@ class QueueScreen extends StatelessWidget {
                       return true;
                     },
                     child: Container(
-                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      margin: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
                       child: Material(
                         color: isCurrent ? p.accentContainer : p.surfaceContainer,
                         shape: RoundedRectangleBorder(
@@ -279,7 +282,7 @@ class QueueScreen extends StatelessWidget {
                               color: isCurrent ? p.accent : p.textPrimary,
                               fontWeight:
                                   isCurrent ? FontWeight.w700 : FontWeight.w500,
-                              fontSize: 14,
+                              fontSize: AppFontSize.body,
                             ),
                           ),
                           subtitle: Text(
@@ -287,7 +290,7 @@ class QueueScreen extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style:
-                                TextStyle(color: p.textSecondary, fontSize: 12),
+                                TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
                           ),
                           trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                             Icon(
@@ -296,7 +299,7 @@ class QueueScreen extends StatelessWidget {
                                   : Icons.music_note_rounded,
                               color: isCurrent ? p.accent : p.textTertiary,
                             ),
-                            const SizedBox(width: 4),
+                            const SizedBox(width: AppSpacing.xxs),
                             Semantics(
                               label: 'Reorder ${song.title}',
                               child: Icon(Icons.drag_handle_rounded, color: p.textTertiary.withValues(alpha: 0.5), size: 18),

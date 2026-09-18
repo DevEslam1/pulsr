@@ -5,6 +5,9 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../domain/models/download_settings.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 /// Concurrency picker for the download queue.
 ///
@@ -59,7 +62,7 @@ class _DownloadConcurrencyTileState extends State<DownloadConcurrencyTile> {
                   onTap: () => Navigator.of(sheetContext).pop(i),
                 ),
               ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
           ],
         ),
       ),
@@ -74,35 +77,35 @@ class _DownloadConcurrencyTileState extends State<DownloadConcurrencyTile> {
   Widget build(BuildContext context) {
     final p = context.palette;
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s2),
       leading: Icon(Icons.download_for_offline_rounded, color: p.accent),
       title: Text(
         context.l10n.settingsDownloadConcurrent,
         style: const TextStyle(
           fontWeight: FontWeight.w600,
-          fontSize: 14.5,
-          letterSpacing: -0.1,
+          fontSize: AppFontSize.body,
+          letterSpacing: AppTracking.none,
         ),
       ),
       subtitle: Text(
         context.l10n.settingsDownloadConcurrentSubtitle,
-        style: TextStyle(color: p.textSecondary, fontSize: 12.5, height: 1.32),
+        style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label, height: 1.32),
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
             margin: const EdgeInsetsDirectional.only(end: 6),
             decoration: BoxDecoration(
               color: p.accent.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(AppRadii.r6),
             ),
             child: Text(
               '$_value',
               style: TextStyle(
                 color: p.accent,
-                fontSize: 10,
+                fontSize: AppFontSize.tiny,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -127,20 +130,20 @@ class DownloadLocationTile extends StatelessWidget {
     final p = context.palette;
     return ListTile(
       enabled: false,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s2),
       leading: Icon(Icons.folder_outlined, color: p.textTertiary),
       title: Text(
         context.l10n.settingsDownloadLocation,
         style: TextStyle(
           fontWeight: FontWeight.w600,
-          fontSize: 14.5,
-          letterSpacing: -0.1,
+          fontSize: AppFontSize.body,
+          letterSpacing: AppTracking.none,
           color: p.textSecondary,
         ),
       ),
       subtitle: Text(
         context.l10n.settingsDownloadLocationUnsupported,
-        style: TextStyle(color: p.textTertiary, fontSize: 12.5, height: 1.32),
+        style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label, height: 1.32),
       ),
     );
   }

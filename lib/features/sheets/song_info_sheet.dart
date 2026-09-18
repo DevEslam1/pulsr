@@ -27,6 +27,9 @@ import '../../domain/models/eq_preset.dart';
 import '../player/cubit/player_cubit.dart';
 import '../player/presentation/widgets/audio_quality_badge.dart';
 import '../../core/widgets/pulsr_bottom_sheet.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class SongInfoSheet extends StatelessWidget {
   final SongsTableData song;
@@ -91,6 +94,7 @@ class SongInfoSheet extends StatelessWidget {
         'type': type,
       });
       if (context.mounted && (success ?? false)) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(context.l10n.ringtoneSet)),
         );
@@ -98,6 +102,7 @@ class SongInfoSheet extends StatelessWidget {
     } on PlatformException catch (e) {
       if (!context.mounted) return;
       if (e.code == 'PERMISSION_DENIED') {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(context.l10n.ringtoneFailed),
@@ -110,6 +115,7 @@ class SongInfoSheet extends StatelessWidget {
           ),
         );
       } else {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(
@@ -118,6 +124,7 @@ class SongInfoSheet extends StatelessWidget {
       }
     } catch (e) {
       if (!context.mounted) return;
+      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${context.l10n.ringtoneFailed} $e')),
       );
@@ -133,7 +140,7 @@ class SongInfoSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12.0),
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
               child: Text(
                 context.l10n.setAudioAs,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -142,7 +149,7 @@ class SongInfoSheet extends StatelessWidget {
                     ),
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: AppSpacing.xxs),
             ListTile(
               leading: Icon(Icons.ring_volume_rounded, color: p.accent),
               title: Text(context.l10n.phoneRingtone,
@@ -171,7 +178,7 @@ class SongInfoSheet extends StatelessWidget {
                 _setRingtone(context, 'alarm');
               },
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
           ],
         );
       },
@@ -187,7 +194,7 @@ class SongInfoSheet extends StatelessWidget {
           maxHeight: MediaQuery.of(context).size.height * 0.85,
         ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.s10, AppSpacing.s20, AppSpacing.lg),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -201,7 +208,7 @@ class SongInfoSheet extends StatelessWidget {
                         size: 64,
                         borderRadius: 14,
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: AppSpacing.md),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -218,22 +225,22 @@ class SongInfoSheet extends StatelessWidget {
                                     color: p.textPrimary,
                                   ),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: AppSpacing.xxs),
                             Text(
                               song.artist,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                  color: p.textSecondary, fontSize: 13),
+                                  color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                             ),
                           ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: AppSpacing.s20),
                   Divider(color: p.hairline),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.xs),
                   Builder(
                     builder: (context) {
                       final quality = AudioQualityInfo.fromSong(song);
@@ -246,9 +253,9 @@ class SongInfoSheet extends StatelessWidget {
                               Text(
                                 context.l10n.qualityAndCodec,
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: AppFontSize.caption,
                                   fontWeight: FontWeight.w800,
-                                  letterSpacing: 1.2,
+                                  letterSpacing: AppTracking.wide,
                                   color: p.textSecondary,
                                 ),
                               ),
@@ -258,7 +265,7 @@ class SongInfoSheet extends StatelessWidget {
                                   compact: true),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: AppSpacing.xs),
                           _buildInfoRow(
                               context.l10n.audioFormat, quality.format, p),
                           if (quality.bitrateKbps != null)
@@ -270,9 +277,9 @@ class SongInfoSheet extends StatelessWidget {
                               '${quality.bitDepth} / ${quality.sampleRate}', p),
                           _buildInfoRow(
                               context.l10n.channels, quality.channels, p),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: AppSpacing.s6),
                           Divider(color: p.hairline),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: AppSpacing.s6),
                         ],
                       );
                     },
@@ -293,15 +300,15 @@ class SongInfoSheet extends StatelessWidget {
                         p),
                   _buildAudioOverridesSection(context, p),
                   _buildPlaybackToolsSection(context, p),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.sm),
                   Row(
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(AppRadii.r14),
                             ),
                             side: BorderSide(color: p.hairline),
                           ),
@@ -317,13 +324,13 @@ class SongInfoSheet extends StatelessWidget {
                         ),
                       ),
                       if (PlatformCapabilities.hasRingtoneManager) ...[
-                        const SizedBox(width: 12),
+                        const SizedBox(width: AppSpacing.sm),
                         Expanded(
                           child: OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(AppRadii.r14),
                               ),
                               side: BorderSide(color: p.hairline),
                             ),
@@ -341,7 +348,7 @@ class SongInfoSheet extends StatelessWidget {
                       ],
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.sm),
                   if (PlatformCapabilities.hasTagEditor)
                     SizedBox(
                       width: double.infinity,
@@ -349,9 +356,9 @@ class SongInfoSheet extends StatelessWidget {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: p.accent,
                           foregroundColor: p.onAccent,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s14),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(AppRadii.r14),
                           ),
                         ),
                         onPressed: () {
@@ -362,7 +369,7 @@ class SongInfoSheet extends StatelessWidget {
                         label: Text(
                           context.l10n.editTags,
                           style: const TextStyle(
-                              fontWeight: FontWeight.w700, fontSize: 15),
+                              fontWeight: FontWeight.w700, fontSize: AppFontSize.callout),
                         ),
                       ),
                     ),
@@ -401,11 +408,11 @@ class SongInfoSheet extends StatelessWidget {
         final currentBpm = bpmStore.getBpmForTrack(trackKey);
 
         return Container(
-          margin: const EdgeInsets.symmetric(vertical: 10),
-          padding: const EdgeInsets.all(14),
+          margin: const EdgeInsets.symmetric(vertical: AppSpacing.s10),
+          padding: const EdgeInsets.all(AppSpacing.s14),
           decoration: BoxDecoration(
             color: p.surfaceContainer,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadii.r16),
             border: Border.all(color: p.hairline),
           ),
           child: Column(
@@ -417,7 +424,7 @@ class SongInfoSheet extends StatelessWidget {
                 children: [
                   Text(context.l10n.trackRating,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: AppFontSize.label,
                       fontWeight: FontWeight.w700,
                       color: p.textSecondary,
                     ),
@@ -436,7 +443,7 @@ class SongInfoSheet extends StatelessWidget {
                           setLocalState(() {});
                         },
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s2),
                           child: Icon(
                             isFilled
                                 ? Icons.star_rounded
@@ -450,9 +457,9 @@ class SongInfoSheet extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: AppSpacing.s10),
               Divider(color: p.hairline, height: 1),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
 
               // Per-Track EQ Preset Override
               Row(
@@ -460,7 +467,7 @@ class SongInfoSheet extends StatelessWidget {
                 children: [
                   Text(context.l10n.trackEqOverride,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: AppFontSize.label,
                       fontWeight: FontWeight.w700,
                       color: p.textSecondary,
                     ),
@@ -472,7 +479,7 @@ class SongInfoSheet extends StatelessWidget {
                     icon: Icon(Icons.arrow_drop_down, color: p.accent),
                     style: TextStyle(
                       color: currentEq != null ? p.accent : p.textPrimary,
-                      fontSize: 12,
+                      fontSize: AppFontSize.label,
                       fontWeight: FontWeight.w600,
                     ),
                     items: [
@@ -509,9 +516,9 @@ class SongInfoSheet extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
               Divider(color: p.hairline, height: 1),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
 
               // Per-Track Volume Offset
               Row(
@@ -519,7 +526,7 @@ class SongInfoSheet extends StatelessWidget {
                 children: [
                   Text(context.l10n.trackVolumeOffset,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: AppFontSize.label,
                       fontWeight: FontWeight.w700,
                       color: p.textSecondary,
                     ),
@@ -529,7 +536,7 @@ class SongInfoSheet extends StatelessWidget {
                         ? '0.0 dB'
                         : '${currentSliderVol > 0 ? '+' : ''}${currentSliderVol.toStringAsFixed(1)} dB',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: AppFontSize.label,
                       fontWeight: FontWeight.w700,
                       color: currentSliderVol.abs() < 0.1 ? p.textSecondary : p.accent,
                     ),
@@ -541,6 +548,7 @@ class SongInfoSheet extends StatelessWidget {
                 min: -12.0,
                 max: 6.0,
                 divisions: 36,
+                semanticLabel: context.l10n.trackVolumeOffset,
                 onChanged: (val) {
                   currentSliderVol = val;
                   setLocalState(() {});
@@ -553,25 +561,25 @@ class SongInfoSheet extends StatelessWidget {
                   setLocalState(() {});
                 },
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
               Divider(color: p.hairline, height: 1),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
 
               // Per-Track BPM (feeds BPM-synced crossfade)
               InkWell(
                 onTap: () => _showBpmDialog(
                     context, bpmStore, playerCubit, currentBpm,
                     onSaved: setLocalState),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppRadii.r8),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
                         context.l10n.trackBpm,
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: AppFontSize.label,
                           fontWeight: FontWeight.w700,
                           color: p.textSecondary,
                         ),
@@ -584,14 +592,14 @@ class SongInfoSheet extends StatelessWidget {
                                 ? context.l10n.browseNotSet
                                 : '${currentBpm.toStringAsFixed(0)} BPM',
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: AppFontSize.label,
                               fontWeight: FontWeight.w700,
                               color: currentBpm == null
                                   ? p.textSecondary
                                   : p.accent,
                             ),
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: AppSpacing.xxs),
                           Icon(Icons.edit_rounded,
                               size: 14, color: p.textTertiary),
                         ],
@@ -617,11 +625,11 @@ class SongInfoSheet extends StatelessWidget {
     final cubit = playerCubit;
 
     return Container(
-      margin: const EdgeInsets.only(top: 10),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(top: AppSpacing.s10),
+      padding: const EdgeInsets.all(AppSpacing.s14),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadii.r16),
         border: Border.all(color: p.hairline),
       ),
       child: Column(
@@ -629,30 +637,31 @@ class SongInfoSheet extends StatelessWidget {
         children: [
           Text(context.l10n.playbackTools,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: AppFontSize.label,
               fontWeight: FontWeight.w700,
               color: p.textSecondary,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           // F-28: manual DSP snapshot save for the current album.
           InkWell(
             onTap: () async {
               await cubit.saveDspSnapshot();
               if (!context.mounted) return;
+              ScaffoldMessenger.of(context).clearSnackBars();
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text(context.l10n.dspSavedAlbum)),
               );
             },
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(AppRadii.r8),
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.s6),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(context.l10n.saveDspAlbum,
                     style: TextStyle(
-                        fontSize: 12,
+                        fontSize: AppFontSize.label,
                         fontWeight: FontWeight.w600,
                         color: p.textPrimary),
                   ),
@@ -661,9 +670,9 @@ class SongInfoSheet extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.s6),
           Divider(color: p.hairline, height: 1),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.s6),
           // F-57: bookmark controls for the currently playing track.
           _buildBookmarkRow(context, p, cubit),
         ],
@@ -675,7 +684,7 @@ class SongInfoSheet extends StatelessWidget {
     final current = cubit.state.currentSong;
     if (current == null || current.id != song.id) {
       return Text(context.l10n.bookmarkHint,
-        style: TextStyle(color: p.textSecondary, fontSize: 12),
+        style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
       );
     }
 
@@ -694,7 +703,7 @@ class SongInfoSheet extends StatelessWidget {
               children: [
                 Text(context.l10n.bookmarkLabel,
                   style: TextStyle(
-                      fontSize: 12,
+                      fontSize: AppFontSize.label,
                       fontWeight: FontWeight.w700,
                       color: p.textSecondary),
                 ),
@@ -703,13 +712,13 @@ class SongInfoSheet extends StatelessWidget {
                       ? storedLabel
                       : context.l10n.resumeAtTpl(storedLabel),
                   style: TextStyle(
-                      fontSize: 12,
+                      fontSize: AppFontSize.label,
                       fontWeight: FontWeight.w700,
                       color: stored == null ? p.textSecondary : p.accent),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             Wrap(
               spacing: 8,
               runSpacing: 4,
@@ -736,6 +745,7 @@ class SongInfoSheet extends StatelessWidget {
                   onPressed: () async {
                     final saved = await cubit.saveBookmark();
                     if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).clearSnackBars();
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       content: Text(saved
                           ? context.l10n.bookmarkSaved
@@ -755,6 +765,7 @@ class SongInfoSheet extends StatelessWidget {
                     onPressed: () async {
                       await cubit.clearBookmark();
                       if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).clearSnackBars();
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text(context.l10n.bookmarkCleared)),
                       );
@@ -810,6 +821,7 @@ class SongInfoSheet extends StatelessWidget {
     await bpmStore.setBpmForTrack(song.id.toString(), bpm);
     await playerCubit?.setTrackBpm(song, bpm);
     if (context.mounted && bpm == null) {
+      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(context.l10n.bpmCleared)),
       );
@@ -838,7 +850,7 @@ class SongInfoSheet extends StatelessWidget {
 
   Widget _buildInfoRow(String label, String value, PulsrPalette p) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.s6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -848,17 +860,17 @@ class SongInfoSheet extends StatelessWidget {
               label,
               style: TextStyle(
                   color: p.textSecondary,
-                  fontSize: 13,
+                  fontSize: AppFontSize.bodySmall,
                   fontWeight: FontWeight.w500),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
               value,
               style: TextStyle(
                   color: p.textPrimary,
-                  fontSize: 13,
+                  fontSize: AppFontSize.bodySmall,
                   fontWeight: FontWeight.w600),
             ),
           ),
@@ -927,9 +939,9 @@ class _BpmOverrideDialogState extends State<_BpmOverrideDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(context.l10n.bpmXfadeDesc,
-              style: TextStyle(color: p.textSecondary, fontSize: 13.5),
+              style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
             TextField(
               controller: _controller,
               autofocus: true,
@@ -943,15 +955,15 @@ class _BpmOverrideDialogState extends State<_BpmOverrideDialog> {
                 filled: true,
                 fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadii.r12),
                   borderSide: BorderSide(color: p.hairline),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadii.r12),
                   borderSide: BorderSide(color: p.hairline),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadii.r12),
                   borderSide: BorderSide(color: p.accent, width: 1.5),
                 ),
               ),
@@ -984,7 +996,7 @@ class _BpmOverrideDialogState extends State<_BpmOverrideDialog> {
             backgroundColor: p.accent,
             foregroundColor: p.onAccent,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadii.r12),
             ),
           ),
           child: Text(context.l10n.save),

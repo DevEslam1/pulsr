@@ -6,6 +6,9 @@ import '../../../../data/audio/equalizer_manager.dart';
 import '../../../../domain/models/audio_effects_config.dart';
 
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class CompressorLimiterSheet extends StatefulWidget {
   final EqualizerManager equalizerManager;
@@ -91,10 +94,10 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
     final p = context.palette;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, AppSpacing.xl),
       decoration: BoxDecoration(
         color: p.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
       ),
       child: SingleChildScrollView(
         child: Column(
@@ -106,23 +109,23 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                 height: 4,
                 decoration: BoxDecoration(
                   color: p.textSecondary.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
+                  borderRadius: BorderRadius.circular(AppRadii.r2),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
                   children: [
                     Icon(Icons.tune_rounded, color: p.primary),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: AppSpacing.s10),
                     Text(context.l10n.studioCompressor,
                       style: TextStyle(
                         color: p.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                        fontSize: AppFontSize.title,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
@@ -138,17 +141,17 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             Text(context.l10n.studioCompressorDesc,
-              style: TextStyle(color: p.textSecondary, fontSize: 13),
+              style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
             ),
             if (!_advancedSupported) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(AppSpacing.s10),
                 decoration: BoxDecoration(
                   color: p.surfaceCard,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppRadii.r10),
                   border: Border.all(color: p.hairline),
                 ),
                 child: Row(
@@ -156,12 +159,12 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                   children: [
                     Icon(Icons.info_outline_rounded,
                         size: 16, color: p.textTertiary),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: AppSpacing.xs),
                     Expanded(
                       child: Text(context.l10n.compressorLimitDesc,
                         style: TextStyle(
                             color: p.textTertiary,
-                            fontSize: 11,
+                            fontSize: AppFontSize.caption,
                             height: 1.35),
                       ),
                     ),
@@ -169,7 +172,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                 ),
               ),
             ],
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.lg),
 
             // Threshold Slider
             _buildParamRow(
@@ -246,16 +249,16 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
               },
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton(
                 style: OutlinedButton.styleFrom(
                   foregroundColor: p.textPrimary,
                   side: BorderSide(color: p.primary.withValues(alpha: 0.4)),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.s14),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+                      borderRadius: BorderRadius.circular(AppRadii.r14)),
                 ),
                 onPressed: () {
                   setState(() {
@@ -270,21 +273,21 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                 child: Text(context.l10n.resetStudioDefaults),
               ),
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: AppSpacing.s28),
             Divider(color: p.hairline),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
                   children: [
                     Icon(Icons.graphic_eq_rounded, color: p.primary),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: AppSpacing.s10),
                     Text(context.l10n.compressorTitle,
                       style: TextStyle(
                         color: p.textPrimary,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                        fontSize: AppFontSize.bodyLarge,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
@@ -299,11 +302,11 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: AppSpacing.xxs),
             Text(context.l10n.compressorDesc,
-              style: TextStyle(color: p.textSecondary, fontSize: 12.5),
+              style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
             _buildParamRow(
               title: context.l10n.dspCrossoverLow,
               valueDisplay: '${_mbcF0.toStringAsFixed(0)} Hz',
@@ -343,21 +346,21 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                 _applyMbc();
               },
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             Text(
               context.l10n.mbcPerBandTitle,
               style: TextStyle(
                 color: p.textPrimary,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
+                fontSize: AppFontSize.body,
+                fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: AppSpacing.xxs),
             Text(
               context.l10n.mbcPerBandSubtitle,
-              style: TextStyle(color: p.textSecondary, fontSize: 12),
+              style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             ...List.generate(_mbcBands.length, (i) {
               final bandNames = [
                 context.l10n.mbcBandLow,
@@ -367,23 +370,23 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
               ];
               final band = _mbcBands[i];
               return Container(
-                margin: const EdgeInsets.only(bottom: 8),
+                margin: const EdgeInsets.only(bottom: AppSpacing.xs),
                 decoration: BoxDecoration(
                   color: p.surfaceContainer,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(AppRadii.r14),
                   border: Border.all(color: p.hairline),
                 ),
                 child: ExpansionTile(
                   dense: true,
                   tilePadding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.s14, vertical: AppSpacing.s2),
                   childrenPadding:
-                      const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                      const EdgeInsetsDirectional.fromSTEB(AppSpacing.s14, 0, AppSpacing.s14, AppSpacing.sm),
                   title: Text(
                     i < bandNames.length ? bandNames[i] : 'Band ${i + 1}',
                     style: TextStyle(
                       color: p.textPrimary,
-                      fontSize: 13,
+                      fontSize: AppFontSize.bodySmall,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -391,7 +394,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                     '${band.thresholdDb.toStringAsFixed(1)} dB · ${band.ratio.toStringAsFixed(1)}:1 · +${band.makeupGainDb.toStringAsFixed(1)} dB',
                     style: TextStyle(
                         color: p.textSecondary,
-                        fontSize: 11,
+                        fontSize: AppFontSize.caption,
                         fontFamily: 'monospace'),
                   ),
                   children: [
@@ -484,7 +487,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
     final isDefault =
         defaultValue != null && (value - defaultValue).abs() < 0.001;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Column(
         children: [
           Row(
@@ -494,7 +497,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                 title,
                 style: TextStyle(
                   color: enabled ? p.textPrimary : p.textTertiary,
-                  fontSize: 14,
+                  fontSize: AppFontSize.body,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -505,12 +508,12 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                     valueDisplay,
                     style: TextStyle(
                       color: enabled ? p.primary : p.textTertiary,
-                      fontSize: 14,
+                      fontSize: AppFontSize.body,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   if (defaultValue != null) ...[
-                    const SizedBox(width: 4),
+                    const SizedBox(width: AppSpacing.xxs),
                     IconButton(
                       icon: Icon(Icons.settings_backup_restore,
                           size: 16,

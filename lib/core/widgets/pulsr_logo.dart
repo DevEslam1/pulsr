@@ -1,6 +1,7 @@
 // lib/core/widgets/pulsr_logo.dart
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../motion/pulsr_motion.dart';
 
 /// Highly optimized, scalable native vector rendering of the official Pulsr App Icon.
 /// Renders with full neon glow, ambient concentric wave ripples, inner mesh, and theme-adaptive coloring.
@@ -53,6 +54,20 @@ class _PulsrLogoState extends State<PulsrLogo>
       } else {
         _controller?.stop();
       }
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final c = _controller;
+    if (c == null) return;
+    c.duration = context.motionMs(2400);
+    if (!context.motionEnabled) {
+      c.stop();
+      c.value = 0;
+    } else if (!c.isAnimating) {
+      c.repeat();
     }
   }
 

@@ -10,6 +10,7 @@ import '../../../../core/services/hires_audio_service.dart';
 import '../../../../core/services/settings_profiles_service.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../player/cubit/player_cubit.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
 
 /// Phase 3: per-output-device profile links and the auto-switch master
 /// toggle. Read/write goes through [DeviceProfileService]; applying a
@@ -156,7 +157,7 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
     final l10n = context.l10n;
     if (_loading) {
       return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 12),
+        padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
         child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
       );
     }
@@ -164,7 +165,7 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 4),
+          padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
           child: Text(
             l10n.deviceProfilesSubtitle,
             style: Theme.of(context).textTheme.bodySmall,
@@ -178,7 +179,7 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
         ),
         if (_devices.isEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
             child: Text(
               l10n.noDevicesSeen,
               style: Theme.of(context).textTheme.bodySmall,
@@ -187,7 +188,7 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
         else
           for (final device in _devices)
             _deviceRow(context, device, l10n),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.xs),
         Text(
           l10n.customProfilesTitle,
           style: Theme.of(context)
@@ -195,7 +196,7 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
               .labelSmall
               ?.copyWith(fontWeight: FontWeight.w700),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: AppSpacing.xxs),
         for (final profile in _profiles)
           _profileRow(context, profile, l10n),
         Align(
@@ -253,7 +254,7 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
                 ),
                 if (isCurrent)
                   Padding(
-                    padding: const EdgeInsets.only(left: 6),
+                    padding: const EdgeInsetsDirectional.only(start: AppSpacing.s6),
                     child: Text(
                       l10n.currentDeviceBadge,
                       style: Theme.of(context).textTheme.labelSmall,

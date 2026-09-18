@@ -15,6 +15,10 @@ import 'ytm_web_login_sheet.dart';
 import 'ytm_oauth_login_sheet.dart';
 
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 class AuthSheet extends StatefulWidget {
   const AuthSheet({super.key});
@@ -36,6 +40,36 @@ class _AuthSheetState extends State<AuthSheet> {
   final _passwordController = TextEditingController();
   bool _isSignUp = false;
   bool _obscurePassword = true;
+  bool _isSendingReset = false;
+
+  Future<void> _handlePasswordReset(AuthCubit cubit) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final email = _emailController.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      messenger.clearSnackBars();
+      messenger.showSnackBar(
+        SnackBar(content: Text(context.l10n.enterEmailFirst)),
+      );
+      return;
+    }
+    if (_isSendingReset) return;
+    setState(() => _isSendingReset = true);
+    try {
+      final ok = await cubit.sendPasswordReset(email);
+      if (!mounted) return;
+      messenger.clearSnackBars();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(ok
+              ? '${context.l10n.browsePasswordResetSent} $email'
+              : cubit.state.errorMessage ??
+                  'Failed to send reset link. Please try again.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSendingReset = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -53,27 +87,31 @@ class _AuthSheetState extends State<AuthSheet> {
       listener: (context, state) {
         if (state.status == AuthStatus.authenticated) {
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                    '${context.l10n.signedInAs} ${state.user?.email ?? state.user?.displayName ?? context.l10n.browseUser}'),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+            ScaffoldMessenger.of(context)
+              ..clearSnackBars()
+              ..showSnackBar(
+                SnackBar(
+                  content: Text(
+                      '${context.l10n.signedInAs} ${state.user?.email ?? state.user?.displayName ?? context.l10n.browseUser}'),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
           }
           if (context.mounted && Navigator.of(context).canPop()) {
             Navigator.of(context).pop();
           }
         } else if (state.status == AuthStatus.error &&
             state.errorMessage != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                  resolveUiErrorMessage(context, state.errorMessage!)),
-              backgroundColor: p.error,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          ScaffoldMessenger.of(context)
+            ..clearSnackBars()
+            ..showSnackBar(
+              SnackBar(
+                content: Text(
+                    resolveUiErrorMessage(context, state.errorMessage!)),
+                backgroundColor: p.error,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
         }
       },
       builder: (context, state) {
@@ -85,11 +123,11 @@ class _AuthSheetState extends State<AuthSheet> {
             constraints: BoxConstraints(
                 maxWidth: Adaptive.sheetConstraints(context).maxWidth),
             child: Container(
-              padding: EdgeInsets.fromLTRB(24, 16, 24, bottomInset + 24),
+              padding: EdgeInsetsDirectional.fromSTEB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, bottomInset + 24),
               decoration: BoxDecoration(
                 color: p.surfaceContainer,
                 borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(28)),
+                    const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
                 border: Border.all(color: p.hairline),
               ),
               child: SingleChildScrollView(
@@ -106,11 +144,11 @@ class _AuthSheetState extends State<AuthSheet> {
                           height: 4,
                           decoration: BoxDecoration(
                             color: p.textTertiary.withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(2),
+                            borderRadius: BorderRadius.circular(AppRadii.r2),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: AppSpacing.s20),
 
                       // Header
                       Row(
@@ -125,7 +163,7 @@ class _AuthSheetState extends State<AuthSheet> {
                             child: Icon(Icons.cloud_sync_rounded,
                                 color: p.accent, size: 24),
                           ),
-                          const SizedBox(width: 14),
+                          const SizedBox(width: AppSpacing.s14),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -136,14 +174,14 @@ class _AuthSheetState extends State<AuthSheet> {
                                       : context.l10n.browseSignInToCloud,
                                   style: TextStyle(
                                     color: p.textPrimary,
-                                    fontSize: 18,
+                                    fontSize: AppFontSize.title,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
                                 Text(context.l10n.syncAcrossDevices,
                                   style: TextStyle(
                                     color: p.textSecondary,
-                                    fontSize: 12,
+                                    fontSize: AppFontSize.label,
                                   ),
                                 ),
                               ],
@@ -151,7 +189,7 @@ class _AuthSheetState extends State<AuthSheet> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: AppSpacing.lg),
 
                       // 1-Tap Google Sign In Button
                       FilledButton(
@@ -162,9 +200,9 @@ class _AuthSheetState extends State<AuthSheet> {
                         style: FilledButton.styleFrom(
                           backgroundColor: Colors.white,
                           foregroundColor: Colors.black87,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s14),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(AppRadii.r14),
                           ),
                         ),
                         child: Row(
@@ -183,17 +221,17 @@ class _AuthSheetState extends State<AuthSheet> {
                               child: const Text(
                                 'G',
                                 style: TextStyle(
-                                  fontSize: 14,
+                                  fontSize: AppFontSize.body,
                                   fontWeight: FontWeight.w900,
                                   color: Color(0xFF4285F4),
                                   height: 1.0,
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: AppSpacing.sm),
                             Text(context.l10n.continueWithGoogle,
                               style: TextStyle(
-                                fontSize: 15,
+                                fontSize: AppFontSize.callout,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -201,27 +239,27 @@ class _AuthSheetState extends State<AuthSheet> {
                         ),
                       ),
 
-                      const SizedBox(height: 20),
+                      const SizedBox(height: AppSpacing.s20),
 
                       // Divider with "OR"
                       Row(
                         children: [
                           Expanded(child: Divider(color: p.hairline)),
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                             child: Text(context.l10n.orWithEmail,
                               style: TextStyle(
                                 color: p.textTertiary,
-                                fontSize: 11,
+                                fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w600,
-                                letterSpacing: 0.8,
+                                letterSpacing: AppTracking.overline,
                               ),
                             ),
                           ),
                           Expanded(child: Divider(color: p.hairline)),
                         ],
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: AppSpacing.s18),
 
                       // Email Field
                       TextFormField(
@@ -236,11 +274,11 @@ class _AuthSheetState extends State<AuthSheet> {
                           filled: true,
                           fillColor: p.surface,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(AppRadii.r14),
                             borderSide: BorderSide(color: p.hairline),
                           ),
                           enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(AppRadii.r14),
                             borderSide: BorderSide(color: p.hairline),
                           ),
                         ),
@@ -254,7 +292,7 @@ class _AuthSheetState extends State<AuthSheet> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AppSpacing.sm),
 
                       // Password Field
                       TextFormField(
@@ -266,8 +304,11 @@ class _AuthSheetState extends State<AuthSheet> {
                           hintStyle: TextStyle(color: p.textTertiary),
                           prefixIcon: Icon(Icons.lock_outline_rounded,
                               color: p.textTertiary, size: 20),
-                          suffixIcon: IconButton(
-                            icon: Icon(
+                            suffixIcon: IconButton(
+                              tooltip: _obscurePassword
+                                  ? context.l10n.showPassword
+                                  : context.l10n.hidePassword,
+                              icon: Icon(
                               _obscurePassword
                                   ? Icons.visibility_outlined
                                   : Icons.visibility_off_outlined,
@@ -280,11 +321,11 @@ class _AuthSheetState extends State<AuthSheet> {
                           filled: true,
                           fillColor: p.surface,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(AppRadii.r14),
                             borderSide: BorderSide(color: p.hairline),
                           ),
                           enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(AppRadii.r14),
                             borderSide: BorderSide(color: p.hairline),
                           ),
                         ),
@@ -298,39 +339,28 @@ class _AuthSheetState extends State<AuthSheet> {
 
                       if (!_isSignUp) ...[
                         Align(
-                          alignment: Alignment.centerRight,
+                          alignment: AlignmentDirectional.centerEnd,
                           child: TextButton(
-                            onPressed: () async {
-                              final email = _emailController.text.trim();
-                              if (email.isNotEmpty && email.contains('@')) {
-                                final ok = await context
-                                    .read<AuthCubit>()
-                                    .sendPasswordReset(email);
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                      content: Text(ok
-                                          ? '${context.l10n.browsePasswordResetSent} $email'
-                                          : context
-                                                  .read<AuthCubit>()
-                                                  .state
-                                                  .errorMessage ??
-                                              'Failed to send reset link. Please try again.')),
-                                );
-                              } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                      content: Text(context.l10n.enterEmailFirst)),
-                                );
-                              }
-                            },
-                            child: Text(context.l10n.forgotPassword,
-                              style: TextStyle(color: p.accent, fontSize: 12),
-                            ),
+                            onPressed: (_isSendingReset || isLoading)
+                                ? null
+                                : () => _handlePasswordReset(
+                                    context.read<AuthCubit>()),
+                            child: _isSendingReset
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  )
+                                : Text(context.l10n.forgotPassword,
+                                    style: TextStyle(
+                                        color: p.accent,
+                                        fontSize: AppFontSize.label),
+                                  ),
                           ),
                         ),
                       ] else ...[
-                        const SizedBox(height: 16),
+                        const SizedBox(height: AppSpacing.md),
                       ],
 
                       // Email Submit Button
@@ -355,14 +385,13 @@ class _AuthSheetState extends State<AuthSheet> {
                         style: FilledButton.styleFrom(
                           backgroundColor: p.accent,
                           foregroundColor: p.onAccent,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s14),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(AppRadii.r14),
                           ),
                         ),
                         child: isLoading
-                            ? const SizedBox(
-                                width: 20,
+                            ? const SizedBox(width: AppSpacing.s20,
                                 height: 20,
                                 child: CircularProgressIndicator(
                                     strokeWidth: 2, color: Colors.white),
@@ -372,11 +401,11 @@ class _AuthSheetState extends State<AuthSheet> {
                                     ? context.l10n.browseSignUp
                                     : context.l10n.signIn,
                                 style: const TextStyle(
-                                    fontSize: 15, fontWeight: FontWeight.w600),
+                                    fontSize: AppFontSize.callout, fontWeight: FontWeight.w600),
                               ),
                       ),
 
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AppSpacing.sm),
 
                       // Toggle Sign Up / Sign In
                       TextButton(
@@ -386,32 +415,32 @@ class _AuthSheetState extends State<AuthSheet> {
                               ? context.l10n.browseAlreadyHaveAccount
                               : context.l10n.browseDontHaveAccount,
                           style:
-                              TextStyle(color: p.textSecondary, fontSize: 13),
+                              TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                         ),
                       ),
 
                       if (AppConfig.ytmEnabled) ...[
-                        const SizedBox(height: 8),
+                        const SizedBox(height: AppSpacing.xs),
                         Row(
                           children: [
                             Expanded(child: Divider(color: p.hairline)),
                             Padding(
                               padding:
-                                  const EdgeInsets.symmetric(horizontal: 12),
+                                  const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                               child: Text(
                                 context.l10n.ytmHeader,
                                 style: TextStyle(
                                   color: p.textTertiary,
-                                  fontSize: 10,
+                                  fontSize: AppFontSize.tiny,
                                   fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.8,
+                                  letterSpacing: AppTracking.overline,
                                 ),
                               ),
                             ),
                             Expanded(child: Divider(color: p.hairline)),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.sm),
                         ValueListenableBuilder<bool>(
                           valueListenable: getIt<YtmAccountService>().loginState,
                           builder: (context, isLoggedIn, _) {
@@ -424,19 +453,21 @@ class _AuthSheetState extends State<AuthSheet> {
                                   final ok =
                                       await YtmWebLoginSheet.show(context);
                                   if (ok == true && context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content:
-                                            Text(context.l10n.ytmConnected),
-                                        behavior: SnackBarBehavior.floating,
-                                      ),
-                                    );
+                                    ScaffoldMessenger.of(context)
+                                      ..clearSnackBars()
+                                      ..showSnackBar(
+                                        SnackBar(
+                                          content:
+                                              Text(context.l10n.ytmConnected),
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      );
                                   }
                                 }
                               },
                               icon: const Icon(
                                 Icons.play_circle_fill_rounded,
-                                color: Color(0xFFFF0000),
+                                color: AppColors.ytRed,
                                 size: 20,
                               ),
                               label: Text(
@@ -445,34 +476,36 @@ class _AuthSheetState extends State<AuthSheet> {
                                     : context.l10n.connectYtm,
                                 style: TextStyle(
                                   color: p.textPrimary,
-                                  fontSize: 13.5,
+                                  fontSize: AppFontSize.bodySmall,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
                               style: OutlinedButton.styleFrom(
                                 padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
+                                    const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                                 side: BorderSide(color: p.hairline),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(AppRadii.r14),
                                 ),
                               ),
                             );
                           },
                         ),
                         if (!getIt<YtmAccountService>().loginState.value) ...[
-                          const SizedBox(height: 8),
+                          const SizedBox(height: AppSpacing.xs),
                           TextButton.icon(
                             onPressed: () async {
                               final ok =
                                   await YtmOAuthLoginSheet.show(context);
                               if (ok == true && context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(context.l10n.ytmConnected),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
+                                ScaffoldMessenger.of(context)
+                                  ..clearSnackBars()
+                                  ..showSnackBar(
+                                    SnackBar(
+                                      content: Text(context.l10n.ytmConnected),
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
                               }
                             },
                             icon: Icon(Icons.phonelink_setup_rounded,
@@ -481,7 +514,7 @@ class _AuthSheetState extends State<AuthSheet> {
                               context.l10n.authUseCodeSignIn,
                               style: TextStyle(
                                 color: p.textSecondary,
-                                fontSize: 12.5,
+                                fontSize: AppFontSize.label,
                               ),
                             ),
                           ),

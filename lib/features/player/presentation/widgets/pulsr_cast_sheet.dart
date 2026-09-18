@@ -10,6 +10,9 @@ import '../../../../core/utils/platform_capabilities.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../domain/services/cast_service.dart';
 import '../../cubit/player_cubit.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class PulsrCastSheet extends StatefulWidget {
   const PulsrCastSheet({super.key});
@@ -192,24 +195,24 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
       final p = context.palette;
       return SafeArea(
         child: Container(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.lg, AppSpacing.s20, AppSpacing.xl),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.cast_rounded, size: 40, color: p.textTertiary),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.sm),
               Text(
                 context.l10n.settingsGoogleCast,
                 style: TextStyle(
                     color: p.textPrimary,
-                    fontSize: 18,
+                    fontSize: AppFontSize.title,
                     fontWeight: FontWeight.w700),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
               Text(
                 context.l10n.castAndroidOnly,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: p.textSecondary, fontSize: 13),
+                style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
               ),
             ],
           ),
@@ -224,13 +227,13 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
 
     return SafeArea(
       child: Container(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, AppSpacing.lg),
         constraints: BoxConstraints(
           maxWidth: Adaptive.sheetConstraints(context).maxWidth,
         ),
         decoration: BoxDecoration(
           color: p.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -241,10 +244,10 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
               child: Container(
                 width: 40,
                 height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
+                margin: const EdgeInsets.only(bottom: AppSpacing.md),
                 decoration: BoxDecoration(
                   color: p.textSecondary.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
+                  borderRadius: BorderRadius.circular(AppRadii.r2),
                 ),
               ),
             ),
@@ -253,7 +256,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(AppSpacing.s10),
                   decoration: BoxDecoration(
                     color: isConnected
                         ? p.accent.withValues(alpha: 0.20)
@@ -268,7 +271,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                     size: 22,
                   ),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: AppSpacing.s14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -277,7 +280,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                         l10n.settingsGoogleCast,
                         style: TextStyle(
                           color: p.textPrimary,
-                          fontSize: 18,
+                          fontSize: AppFontSize.title,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -289,7 +292,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                                 : l10n.castDevice),
                         style: TextStyle(
                           color: isConnected ? p.accent : p.textSecondary,
-                          fontSize: 13,
+                          fontSize: AppFontSize.bodySmall,
                         ),
                       ),
                     ],
@@ -297,8 +300,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                 ),
                 IconButton(
                   icon: _scanning
-                      ? SizedBox(
-                          width: 18,
+                      ? SizedBox(width: AppSpacing.s18,
                           height: 18,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
@@ -312,42 +314,42 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
               ],
             ),
 
-            const SizedBox(height: 18),
+            const SizedBox(height: AppSpacing.s18),
 
             // mDNS direct-device fallback: honest capability note.
             if (!_sdk && !isConnected) ...[
               Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
                 decoration: BoxDecoration(
                   color: p.textTertiary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppRadii.r10),
                 ),
                 child: Row(
                   children: [
                     Icon(Icons.info_outline_rounded,
                         size: 14, color: p.textTertiary),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: AppSpacing.s6),
                     Expanded(
                       child: Text(
                         context.l10n.castDirectDeviceMode,
                         style: TextStyle(
-                            fontSize: 11.5, color: p.textSecondary),
+                            fontSize: AppFontSize.label, color: p.textSecondary),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.sm),
             ],
 
             // Connected Session Controls Card
             if (isConnected) ...[
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(AppSpacing.md),
                 decoration: BoxDecoration(
                   color: p.accent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(AppRadii.r18),
                   border: Border.all(color: p.accent.withValues(alpha: 0.35)),
                 ),
                 child: Column(
@@ -363,17 +365,17 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                                 _session.deviceName ?? l10n.castDevice,
                                 style: TextStyle(
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 16,
+                                  fontSize: AppFontSize.bodyLarge,
                                   color: p.textPrimary,
                                 ),
                               ),
-                              const SizedBox(height: 2),
+                              const SizedBox(height: AppSpacing.s2),
                               Text(
                                 _session.playing
                                     ? l10n.castConnected
                                     : l10n.castDevice,
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: AppFontSize.label,
                                   color: p.accent,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -388,12 +390,13 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                           style: TextButton.styleFrom(
                             foregroundColor: p.error,
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
+
+                                horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.sm),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
@@ -401,9 +404,9 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                           backgroundColor: p.accent,
                           foregroundColor: p.onAccent,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(AppRadii.r12),
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                         ),
                         onPressed: _busy ? null : _castCurrentSong,
                         icon: const Icon(Icons.play_circle_filled_rounded,
@@ -417,24 +420,24 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.md),
             ],
 
             // Device list
             if (!hasDevices && !_scanning) ...[
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 24),
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
                 child: Center(
                   child: Column(
                     children: [
                       Icon(Icons.speaker_group_outlined,
                           size: 44, color: p.textTertiary),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: AppSpacing.s10),
                       Text(
                         l10n.scanningCastDevices,
-                        style: TextStyle(color: p.textSecondary, fontSize: 14),
+                        style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.body),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AppSpacing.sm),
                       OutlinedButton.icon(
                         onPressed: _rescan,
                         icon: const Icon(Icons.refresh_rounded, size: 16),
@@ -448,21 +451,21 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
               Text(
                 l10n.castDevice.toUpperCase(),
                 style: TextStyle(
-                  fontSize: 11,
-                  letterSpacing: 1.2,
+                  fontSize: AppFontSize.caption,
+                  letterSpacing: AppTracking.wide,
                   fontWeight: FontWeight.w800,
                   color: p.textSecondary,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
               Container(
                 decoration: BoxDecoration(
                   color: p.surfaceContainer,
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(AppRadii.r18),
                   border: Border.all(color: p.hairline),
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(AppRadii.r18),
                   child: Column(
                     children: [
                       if (_sdk) ...[
@@ -518,7 +521,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                                   ? _devices[i].model
                                   : _devices[i].host,
                               style: TextStyle(
-                                  color: p.textSecondary, fontSize: 12),
+                                  color: p.textSecondary, fontSize: AppFontSize.label),
                             ),
                             onTap: _busy
                                 ? null

@@ -1,5 +1,6 @@
 // lib/features/player/presentation/widgets/eq_curve_visualizer.dart
 import 'package:flutter/material.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
 
 class EqCurveVisualizer extends StatelessWidget {
   final List<double> gains;
@@ -62,7 +63,7 @@ class _EqCurvePainter extends CustomPainter {
         final y = size.height - barH;
         final rect = RRect.fromRectAndRadius(
           Rect.fromLTWH(x, y, specWidth - 2.0, barH),
-          const Radius.circular(2),
+          const Radius.circular(AppRadii.r2),
         );
         canvas.drawRRect(rect, specPaint);
       }

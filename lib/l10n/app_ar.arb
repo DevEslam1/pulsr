@@ -323,6 +323,13 @@
   "exportFormatWmpLabel": "Windows Media Player",
   "libraryGridView": "عرض شبكي",
   "libraryListView": "عرض القائمة",
+  "pressBackAgainToExit": "اضغط رجوع مرة أخرى للخروج",
+  "refresh": "تحديث",
+  "showPassword": "إظهار كلمة المرور",
+  "hidePassword": "إخفاء كلمة المرور",
+  "learnMore": "معرفة المزيد",
+  "zoomIn": "تكبير",
+  "zoomOut": "تصغير",
   "authUseCodeSignIn": "هل تواجه مشكلة؟ استخدم تسجيل الدخول بالرمز",
   "castAndroidOnly": "البث (Cast) متاح على Android فقط في هذا الإصدار.",
   "castDirectDeviceMode": "وضع الجهاز المباشر: يبث المقطع الحالي. تتطلب القائمة ومستوى الصوت عن بُعد Cast SDK.",
@@ -740,6 +747,17 @@
   },
   "radioCuratedUpToDate": "جميع المحطات المختارة موجودة بالفعل في قائمتك",
   "radioCuratedTitle": "محطات مختارة",
+  "radioEditStation": "تعديل المحطة",
+  "radioEdit": "تعديل",
+  "radioSave": "حفظ",
+  "radioUrlRequired": "أدخل رابط البث",
+  "radioUrlMalformed": "تعذّر تحليل الرابط",
+  "radioUrlScheme": "يُدعم فقط بث http:// و https://",
+  "radioUrlNoHost": "الرابط يفتقد اسم المضيف",
+  "settingsRebuildSearchIndexTitle": "إعادة بناء فهرس البحث",
+  "settingsRebuildSearchIndexSubtitle": "أصل نتائج البحث المفقودة عبر إعادة بناء فهرس النص الكامل",
+  "settingsSearchIndexRebuilt": "تمت إعادة بناء فهرس البحث",
+  "settingsSearchIndexRebuildFailed": "تعذّر إعادة بناء فهرس البحث",
   "followTrackSampleRateTitle": "متابعة معدل عينات المسار",
   "followTrackSampleRateSubtitle": "إعادة ضبط الإخراج إلى المعدل الأصلي لكل مسار؛ يتم تخطيه في البلوتوث وبدون تكرار",
   "followTrackSampleRateBluetooth": "يتم تخطيه في البلوتوث — رابط الترميز/AVRCP يتحكم في معدل العينات",
@@ -781,6 +799,8 @@
   "notificationPermissionRationale": "اسمح بالإشعارات ليتمكن Pulsr من إظهار عناصر التحكم بالتشغيل على شاشة القفل وفي درج الإشعارات.",
   "notificationPermissionAllow": "السماح",
   "notificationPermissionNotNow": "ليس الآن",
+  "onboardingNotificationDenied": "الإشعارات متوقفة. يمكنك تفعيلها لاحقًا من الإعدادات.",
+  "onboardingScanFailed": "تعذّر فحص مكتبتك. يمكنك إعادة المحاولة من الإعدادات.",
   "onboardingPermissionRationale": "بدون الوصول إلى الصوت ستكون مكتبتك فارغة. يمكنك المتابعة بوصول محدود ومنح الإذن لاحقا من الإعدادات.",
   "@onboardingPermissionRationale": {
     "description": "Explains denied permission with limited-access option"
@@ -1819,6 +1839,19 @@
       "count": {}
     }
   },
+  "unlimited": "غير محدود",
+  "invalidNumber": "أدخل عددًا صحيحًا أكبر من 0",
+  "previewTruncated": "عرض أول {count} مطابقة",
+  "@previewTruncated": {
+    "description": "Smart playlist preview is capped",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "expandPlayer": "توسيع المشغل",
+  "dismissPlayer": "إغلاق المشغل",
+  "loadMore": "تحميل المزيد",
+  "loadingMoreSongs": "جارٍ تحميل المزيد من الأغاني…",
   "btCalibrated": "زمن البلوتوث {ms}ms",
   "@btCalibrated": {
     "description": "tranche7 tpl",

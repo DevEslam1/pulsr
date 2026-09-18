@@ -8,6 +8,7 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/db/app_database.dart';
 import '../../cubit/ytm_download_cubit.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
 
 /// Per-result download control: shows an idle download icon, a determinate
 /// progress ring while transferring, a check once it lands in the library, and
@@ -57,8 +58,7 @@ class YtmDownloadButton extends StatelessWidget {
         final isAlreadyLocal = song.source == SongSource.local &&
             (song.remoteId != null && song.remoteId!.isNotEmpty);
         if (isAlreadyLocal || item.status == YtDownloadStatus.done) {
-          return SizedBox(
-            width: 40,
+          return SizedBox(width: AppSpacing.s40,
             height: 40,
             child: Icon(Icons.download_done_rounded,
                 size: iconSize, color: tintColor),
@@ -68,8 +68,7 @@ class YtmDownloadButton extends StatelessWidget {
         switch (item.status) {
           case YtDownloadStatus.queued:
           case YtDownloadStatus.running:
-            return SizedBox(
-              width: 40,
+            return SizedBox(width: AppSpacing.s40,
               height: 40,
               child: Center(
                 child: SizedBox(
@@ -86,8 +85,7 @@ class YtmDownloadButton extends StatelessWidget {
               ),
             );
           case YtDownloadStatus.done:
-            return SizedBox(
-              width: 40,
+            return SizedBox(width: AppSpacing.s40,
               height: 40,
               child: Icon(Icons.download_done_rounded,
                   size: iconSize, color: tintColor),

@@ -15,6 +15,9 @@ import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/repositories/music_repository_interface.dart';
 import '../../player/cubit/player_cubit.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class DuplicateFinderScreen extends StatefulWidget {
   const DuplicateFinderScreen({super.key});
@@ -198,13 +201,12 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
           leading: const PulsrBackButton(),
           title: Text(
             context.l10n.duplicateCleaner,
-            style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.bold),
+            style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700),
           ),
           actions: [
             IconButton(
               icon: _isFetchingArtwork
-                  ? SizedBox(
-                      width: 20,
+                  ? SizedBox(width: AppSpacing.s20,
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
@@ -246,23 +248,23 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     if (_duplicateGroups.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(24, 96, 24, 24),
+        padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.lg, 96, AppSpacing.lg, AppSpacing.lg),
         children: [
           Icon(Icons.check_circle_outline_rounded, size: 64, color: p.accent),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
           Text(
             context.l10n.noDuplicatesFound,
             textAlign: TextAlign.center,
             style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+                fontSize: AppFontSize.title,
+                fontWeight: FontWeight.w700,
                 color: p.textPrimary),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.s6),
           Text(
             context.l10n.libraryCleanlyOrganized,
             textAlign: TextAlign.center,
-            style: TextStyle(color: p.textSecondary, fontSize: 13),
+            style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
           ),
         ],
       );
@@ -270,17 +272,17 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
 
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, 120),
       itemCount: _duplicateGroups.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 16),
+      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
       itemBuilder: (context, index) {
         final group = _duplicateGroups[index];
         final keptId = _keptSongByGroup[group.key];
         return Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(AppSpacing.sm),
           decoration: BoxDecoration(
             color: p.surfaceCard,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadii.r16),
             border: Border.all(color: p.hairline),
           ),
           child: Column(
@@ -293,28 +295,28 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                     child: Text(
                       group.reason,
                       style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
+                        fontSize: AppFontSize.bodySmall,
+                        fontWeight: FontWeight.w700,
                         color: p.primary,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.xs),
                   Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
                     decoration: BoxDecoration(
                       color: p.surfaceContainer,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppRadii.r8),
                     ),
                     child: Text(
                       context.l10n.tracksCount(group.songs.length),
-                      style: TextStyle(fontSize: 11, color: p.textSecondary),
+                      style: TextStyle(fontSize: AppFontSize.caption, color: p.textSecondary),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
               for (final song in group.songs)
                 SongTile(
                   song: song,
@@ -326,16 +328,17 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                       if (song.id == keptId)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
+
+                              horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                           decoration: BoxDecoration(
                             color: p.accent.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(AppRadii.r8),
                           ),
                           child: Text(
                             context.l10n.kept,
                             style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
+                              fontSize: AppFontSize.caption,
+                              fontWeight: FontWeight.w700,
                               color: p.accent,
                             ),
                           ),
@@ -358,7 +361,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                               children: [
                                 Icon(Icons.check_circle_outline_rounded,
                                     size: 20, color: p.accent),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: AppSpacing.sm),
                                 Text(context.l10n.keepThisOne),
                               ],
                             ),
@@ -369,7 +372,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                               children: [
                                 Icon(Icons.delete_outline_rounded,
                                     size: 20, color: p.error),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: AppSpacing.sm),
                                 Text(context.l10n.deleteFile),
                               ],
                             ),

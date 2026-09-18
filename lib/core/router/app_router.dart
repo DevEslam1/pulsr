@@ -4,10 +4,14 @@ import 'package:go_router/go_router.dart';
 import '../../data/db/app_database.dart';
 import '../../data/scanner/media_scanner_service.dart';
 import '../config/app_config.dart';
+import '../errors/failures.dart';
 import '../utils/l10n_extensions.dart';
 import '../../domain/models/genre_item.dart';
 import '../../domain/models/year_item.dart';
 import '../../domain/usecases/folder_usecases.dart';
+import '../di/injection.dart';
+import '../../domain/repositories/music_repository_interface.dart';
+import '../widgets/entity_by_id_loader.dart';
 import '../../features/album_detail/presentation/album_detail_screen.dart';
 import '../../features/artist_detail/presentation/artist_detail_screen.dart';
 import '../../features/folder_detail/presentation/folder_detail_screen.dart';
@@ -47,6 +51,8 @@ import '../../features/quran_mode/presentation/quran_mode_screen.dart';
 import '../motion/pulsr_motion.dart';
 import '../services/ytm_account_service.dart';
 import '../widgets/pulsr_modal_tracker.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -116,6 +122,70 @@ Page<dynamic> _buildPulsrPageRoute({
   );
 }
 
+/// A calm cross-fade + lift between the five shell tabs. Unlike the instant
+/// [NoTransitionPage] this makes switching Home ⇄ Library ⇄ Search feel
+/// intentional; it honours Reduce Motion by returning the child directly.
+Page<dynamic> _buildTabPage({
+  required LocalKey key,
+  required Widget child,
+}) {
+  return CustomTransitionPage<void>(
+    key: key,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 240),
+    reverseTransitionDuration: const Duration(milliseconds: 200),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      if (!context.motionEnabled) return child;
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+      return FadeTransition(
+        opacity: curved,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0.0, 0.012),
+            end: Offset.zero,
+          ).animate(curved),
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
+/// Resolves a detail screen either from a typed route `extra` or, when absent,
+/// from an `?id=` query parameter so album/artist/playlist pages can be
+/// deep-linked, restored and shared.
+Page<dynamic> _resolveById<T>({
+  required LocalKey pageKey,
+  required String? id,
+  required Stream<Result<List<T>>> Function() watch,
+  required bool Function(T item) match,
+  required Widget Function(BuildContext context, T item) builder,
+  required String notFoundMessage,
+}) {
+  if (id == null || id.isEmpty) {
+    return _buildPulsrPageRoute(
+      key: pageKey,
+      child: Scaffold(
+        appBar: AppBar(),
+        body: Center(child: Text(notFoundMessage)),
+      ),
+    );
+  }
+  return _buildPulsrPageRoute(
+    key: pageKey,
+    child: EntityByIdLoader<T>(
+      watch: watch,
+      match: match,
+      builder: builder,
+      notFoundMessage: notFoundMessage,
+    ),
+  );
+}
+
 GoRouter createRouter(MediaScannerService scannerService) {
   return GoRouter(
     navigatorKey: rootNavigatorKey,
@@ -140,11 +210,11 @@ GoRouter createRouter(MediaScannerService scannerService) {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(Icons.music_off_outlined, size: 64, color: Colors.grey),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
             Text(
                 context.l10n.pageNotFoundMessage(state.uri.toString()),
-                style: const TextStyle(fontSize: 16)),
-            const SizedBox(height: 16),
+                style: const TextStyle(fontSize: AppFontSize.bodyLarge)),
+            const SizedBox(height: AppSpacing.md),
             ElevatedButton(
               onPressed: () => context.go('/'),
               child: Text(context.l10n.goHome),
@@ -177,8 +247,9 @@ GoRouter createRouter(MediaScannerService scannerService) {
               GoRoute(
                 path: '/',
                 name: 'home',
-                pageBuilder: (context, state) => const NoTransitionPage(
-                  child: HomeScreen(),
+                pageBuilder: (context, state) => _buildTabPage(
+                  key: state.pageKey,
+                  child: const HomeScreen(),
                 ),
               ),
             ],
@@ -191,8 +262,9 @@ GoRouter createRouter(MediaScannerService scannerService) {
               GoRoute(
                 path: '/library',
                 name: 'library',
-                pageBuilder: (context, state) => const NoTransitionPage(
-                  child: LibraryScreen(),
+                pageBuilder: (context, state) => _buildTabPage(
+                  key: state.pageKey,
+                  child: const LibraryScreen(),
                 ),
               ),
             ],
@@ -205,8 +277,9 @@ GoRouter createRouter(MediaScannerService scannerService) {
               GoRoute(
                 path: '/search',
                 name: 'search',
-                pageBuilder: (context, state) => const NoTransitionPage(
-                  child: SearchScreen(),
+                pageBuilder: (context, state) => _buildTabPage(
+                  key: state.pageKey,
+                  child: const SearchScreen(),
                 ),
               ),
             ],
@@ -219,8 +292,9 @@ GoRouter createRouter(MediaScannerService scannerService) {
               GoRoute(
                 path: '/playlists',
                 name: 'playlists',
-                pageBuilder: (context, state) => const NoTransitionPage(
-                  child: PlaylistsScreen(),
+                pageBuilder: (context, state) => _buildTabPage(
+                  key: state.pageKey,
+                  child: const PlaylistsScreen(),
                 ),
               ),
             ],
@@ -233,8 +307,9 @@ GoRouter createRouter(MediaScannerService scannerService) {
               GoRoute(
                 path: '/settings',
                 name: 'settings',
-                pageBuilder: (context, state) => const NoTransitionPage(
-                  child: SettingsScreen(),
+                pageBuilder: (context, state) => _buildTabPage(
+                  key: state.pageKey,
+                  child: const SettingsScreen(),
                 ),
               ),
             ],
@@ -273,18 +348,20 @@ GoRouter createRouter(MediaScannerService scannerService) {
           final album = state.extra is AlbumsTableData
               ? state.extra as AlbumsTableData
               : null;
-          if (album == null) {
+          if (album != null) {
             return _buildPulsrPageRoute(
               key: state.pageKey,
-              child: Scaffold(
-                appBar: AppBar(),
-                body: Center(child: Text(context.l10n.albumNotFoundHint)),
-              ),
+              child: AlbumDetailScreen(album: album),
             );
           }
-          return _buildPulsrPageRoute(
-            key: state.pageKey,
-            child: AlbumDetailScreen(album: album),
+          final id = state.uri.queryParameters['id'];
+          return _resolveById<AlbumsTableData>(
+            pageKey: state.pageKey,
+            id: id,
+            watch: () => getIt<IMusicRepository>().watchAlbums(),
+            match: (a) => a.id.toString() == id,
+            builder: (context, a) => AlbumDetailScreen(album: a),
+            notFoundMessage: context.l10n.albumNotFoundHint,
           );
         },
       ),
@@ -296,18 +373,20 @@ GoRouter createRouter(MediaScannerService scannerService) {
           final artist = state.extra is ArtistsTableData
               ? state.extra as ArtistsTableData
               : null;
-          if (artist == null) {
+          if (artist != null) {
             return _buildPulsrPageRoute(
               key: state.pageKey,
-              child: Scaffold(
-                appBar: AppBar(),
-                body: Center(child: Text(context.l10n.artistNotFoundHint)),
-              ),
+              child: ArtistDetailScreen(artist: artist),
             );
           }
-          return _buildPulsrPageRoute(
-            key: state.pageKey,
-            child: ArtistDetailScreen(artist: artist),
+          final id = state.uri.queryParameters['id'];
+          return _resolveById<ArtistsTableData>(
+            pageKey: state.pageKey,
+            id: id,
+            watch: () => getIt<IMusicRepository>().watchArtists(),
+            match: (a) => a.id.toString() == id,
+            builder: (context, a) => ArtistDetailScreen(artist: a),
+            notFoundMessage: context.l10n.artistNotFoundHint,
           );
         },
       ),
@@ -362,18 +441,20 @@ GoRouter createRouter(MediaScannerService scannerService) {
           final playlist = state.extra is PlaylistsTableData
               ? state.extra as PlaylistsTableData
               : null;
-          if (playlist == null) {
+          if (playlist != null) {
             return _buildPulsrPageRoute(
               key: state.pageKey,
-              child: Scaffold(
-                appBar: AppBar(),
-                body: Center(child: Text(context.l10n.playlistNotFoundHint)),
-              ),
+              child: PlaylistDetailScreen(playlist: playlist),
             );
           }
-          return _buildPulsrPageRoute(
-            key: state.pageKey,
-            child: PlaylistDetailScreen(playlist: playlist),
+          final id = state.uri.queryParameters['id'];
+          return _resolveById<PlaylistsTableData>(
+            pageKey: state.pageKey,
+            id: id,
+            watch: () => getIt<IMusicRepository>().watchPlaylists(),
+            match: (p) => p.id.toString() == id,
+            builder: (context, p) => PlaylistDetailScreen(playlist: p),
+            notFoundMessage: context.l10n.playlistNotFoundHint,
           );
         },
       ),

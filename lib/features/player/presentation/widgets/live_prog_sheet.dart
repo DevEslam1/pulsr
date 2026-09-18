@@ -6,6 +6,9 @@ import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class LiveProgSheet extends StatefulWidget {
   const LiveProgSheet({super.key});
@@ -124,10 +127,10 @@ spl1 = spl1 + lp1 * amount;''',
         final cubit = context.read<PlayerCubit>();
 
         return Container(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, AppSpacing.xl),
           decoration: BoxDecoration(
             color: p.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
           ),
           child: SingleChildScrollView(
             child: Column(
@@ -139,23 +142,23 @@ spl1 = spl1 + lp1 * amount;''',
                     height: 4,
                     decoration: BoxDecoration(
                       color: p.textSecondary.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(AppRadii.r2),
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Row(
                       children: [
                         Icon(Icons.terminal_rounded, color: p.primary),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: AppSpacing.s10),
                         Text(context.l10n.liveProgDspTitle,
                           style: TextStyle(
                             color: p.textPrimary,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                            fontSize: AppFontSize.title,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ],
@@ -172,16 +175,16 @@ spl1 = spl1 + lp1 * amount;''',
                 ),
                 Text(
                   AudioFeatureRegistry.liveProg.subtitle,
-                  style: TextStyle(color: p.textSecondary, fontSize: 13),
+                  style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
 
                 // Script Code Editor
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(AppSpacing.sm),
                   decoration: BoxDecoration(
                     color: p.surfaceContainer,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(AppRadii.r16),
                     border: Border.all(color: p.hairline),
                   ),
                   child: Column(
@@ -193,34 +196,35 @@ spl1 = spl1 + lp1 * amount;''',
                           Text(context.l10n.eelEditor,
                             style: TextStyle(
                               color: p.textSecondary,
-                              fontSize: 12,
+                              fontSize: AppFontSize.label,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
+
+                                horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                             decoration: BoxDecoration(
                               color: p.primary.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(6),
+                              borderRadius: BorderRadius.circular(AppRadii.r6),
                             ),
                             child: Text(context.l10n.bytecodeJit,
                               style: TextStyle(
                                 color: p.primary,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
+                                fontSize: AppFontSize.tiny,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: AppSpacing.xs),
                       TextField(
                         controller: _codeController,
                         maxLines: 8,
                         style: TextStyle(
                           fontFamily: 'monospace',
-                          fontSize: 11,
+                          fontSize: AppFontSize.caption,
                           color: p.textPrimary,
                         ),
                         decoration: InputDecoration(
@@ -228,22 +232,22 @@ spl1 = spl1 + lp1 * amount;''',
                           hintStyle: TextStyle(
                             color: p.textTertiary,
                             fontFamily: 'monospace',
-                            fontSize: 11,
+                            fontSize: AppFontSize.caption,
                           ),
                           filled: true,
                           fillColor: p.surface,
-                          contentPadding: const EdgeInsets.all(12),
+                          contentPadding: const EdgeInsets.all(AppSpacing.sm),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(AppRadii.r10),
                             borderSide: BorderSide(color: p.hairline),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(AppRadii.r10),
                             borderSide: BorderSide(color: p.primary),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: AppSpacing.s10),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
@@ -255,7 +259,7 @@ spl1 = spl1 + lp1 * amount;''',
                               backgroundColor: p.primary,
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(AppRadii.r10),
                               ),
                               visualDensity: VisualDensity.compact,
                             ),
@@ -265,17 +269,17 @@ spl1 = spl1 + lp1 * amount;''',
                     ],
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.s20),
 
                 // Real-time Slider Controls (slider1, slider2)
                 Text(context.l10n.liveSliders,
                   style: TextStyle(
                     color: p.textPrimary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
+                    fontSize: AppFontSize.body,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.xs),
                 _buildSlider(
                   label: context.l10n.dspSlider1Label,
                   value: _sliderValues[1] ?? 5.0,
@@ -298,19 +302,19 @@ spl1 = spl1 + lp1 * amount;''',
                   },
                   p: p,
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.s20),
 
                 Text(context.l10n.exampleScripts,
                   style: TextStyle(
                     color: p.textPrimary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
+                    fontSize: AppFontSize.body,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.s10),
                 ..._scriptPresets.entries.map((entry) {
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
                     child: InkWell(
                       onTap: () {
                         setState(() {
@@ -318,13 +322,14 @@ spl1 = spl1 + lp1 * amount;''',
                         });
                         cubit.setLiveProgEnabled(true, code: entry.value);
                       },
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppRadii.r14),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
+
+                            horizontal: AppSpacing.s14, vertical: AppSpacing.sm),
                         decoration: BoxDecoration(
                           color: p.surfaceContainer,
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(AppRadii.r14),
                           border: Border.all(color: p.hairline),
                         ),
                         child: Row(
@@ -334,13 +339,13 @@ spl1 = spl1 + lp1 * amount;''',
                               color: p.primary,
                               size: 18,
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: AppSpacing.sm),
                             Expanded(
                               child: Text(
                                 entry.key,
                                 style: TextStyle(
                                   color: p.textPrimary,
-                                  fontSize: 13,
+                                  fontSize: AppFontSize.bodySmall,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -373,11 +378,11 @@ spl1 = spl1 + lp1 * amount;''',
     required PulsrPalette p,
   }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadii.r12),
         border: Border.all(color: p.hairline),
       ),
       child: Column(
@@ -388,15 +393,15 @@ spl1 = spl1 + lp1 * amount;''',
             children: [
               Text(
                 label,
-                style: TextStyle(color: p.textSecondary, fontSize: 12),
+                style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
               ),
               Text(
                 value.toStringAsFixed(2),
                 style: TextStyle(
                   color: p.textPrimary,
-                  fontSize: 12,
+                  fontSize: AppFontSize.label,
                   fontFamily: 'monospace',
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],

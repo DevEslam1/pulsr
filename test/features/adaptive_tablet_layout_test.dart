@@ -154,7 +154,7 @@ void main() {
         ),
       );
 
-      // Verify all 5 destinations are rendered
+      // Verify all 5 destinations are rendered.
       expect(find.byType(PulsrBottomNavBar), findsOneWidget);
       expect(find.byIcon(Icons.home_rounded), findsOneWidget);
       expect(find.byIcon(Icons.library_music_outlined), findsOneWidget);

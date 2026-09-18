@@ -6,6 +6,8 @@ import 'package:on_audio_query/on_audio_query.dart';
 import '../../core/theme/aura_theme.dart';
 import '../../core/utils/l10n_extensions.dart';
 import '../../core/widgets/cached_artwork.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
 
 class ArtworkPicker extends StatelessWidget {
   final int songId;
@@ -43,7 +45,7 @@ class ArtworkPicker extends StatelessWidget {
                 width: 150,
                 height: 150,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadii.r20),
                   color: p.surfaceContainer,
                   boxShadow: [
                     BoxShadow(
@@ -87,16 +89,16 @@ class ArtworkPicker extends StatelessWidget {
               Positioned.fill(
                 child: Container(
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(AppRadii.r20),
                     color: Colors.black.withAlpha(70),
                   ),
                 ),
               ),
               InkWell(
                 onTap: onPick,
-                borderRadius: BorderRadius.circular(50),
+                borderRadius: AppRadii.full,
                 child: Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(AppSpacing.sm),
                   decoration: BoxDecoration(
                     color: p.accent.withAlpha(200),
                     shape: BoxShape.circle,
@@ -107,7 +109,7 @@ class ArtworkPicker extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -120,7 +122,7 @@ class ArtworkPicker extends StatelessWidget {
                 ),
               ),
               if ((hasCustomNewImage || hasBytesImage) && !removeArtwork) ...[
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.xs),
                 TextButton.icon(
                   onPressed: onRemove,
                   icon: const Icon(Icons.delete_outline, size: 18),

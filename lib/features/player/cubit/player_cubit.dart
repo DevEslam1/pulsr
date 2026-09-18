@@ -66,6 +66,8 @@ import '../../../domain/models/quran_mode_profile.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../widgets/widget_service.dart';
 import 'player_state.dart';
+import 'player_scrobble_coordinator.dart';
+import 'player_widget_coordinator.dart';
 import 'quran_restore_snapshot.dart';
 import 'queue_slot_codec.dart';
 part 'player_queue_mixin.dart';
@@ -138,8 +140,18 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   SponsorBlockService get _sponsorBlock => _sponsorBlockService;
 
   StreamSubscription<void>? _widgetClickSub;
-  DateTime? _lastWidgetUpdateTime;
   DateTime? _lastSlotPersistAt;
+  PlayerWidgetCoordinator? _widgetCoordinator;
+  PlayerWidgetCoordinator get _widgetUpdater =>
+      _widgetCoordinator ??= PlayerWidgetCoordinator(_widgetService);
+  PlayerScrobbleCoordinator? _scrobbleCoordinator;
+  PlayerScrobbleCoordinator get _scrobble =>
+      _scrobbleCoordinator ??= PlayerScrobbleCoordinator(
+        service: () => _scrobblerService,
+        isQuranMode: () => state.isQuranModeEnabled,
+        isClosed: () => isClosed,
+        interval: _scrobbleInterval,
+      );
   int _mediaItemResolutionGen = 0;
   int _localMatchSwapGen = 0;
   List<SponsorBlockSegment> _currentSponsorSegments = const [];
@@ -150,25 +162,10 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   DateTime? _lastSponsorSkipTime;
 
   Timer? _persistQueueDebounce;
-  Timer? _scrobbleDebounce;
   @override
   Timer? _seekThrottleTimer;
   @override
   Duration? _pendingSeek;
-  int? _lastScrobbleSongId;
-  bool? _lastScrobbleIsPlaying;
-  // FIX(BUG-15): Track position in milliseconds to avoid precision loss on sub-second seeks
-  int? _lastScrobblePosMs;
-  // Latest pending values for the debounced minor-tick flush. Read at fire
-  // time so the flush reports the newest position, not the first tick's.
-  SongsTableData? _pendingScrobbleSong;
-  int _pendingScrobblePosMs = 0;
-  bool _pendingScrobbleIsPlaying = false;
-  List<String>? _cachedNextTitles;
-  int? _cachedNextTitlesIndex;
-  int? _cachedQueueLength;
-  int? _cachedCurrentSongId;
-  int? _cachedQueueVersion;
 
   /// T2: last sample rate successfully pushed for follow-track. Used to
   /// de-dupe so tracks sharing a rate do not trigger redundant native churn.
@@ -587,63 +584,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   }
 
   void _debouncedScrobble(
-      SongsTableData song, Duration position, bool isPlaying) {
-    if (isClosed) return;
-    final posMs = position.inMilliseconds;
-    final isSongChange = _lastScrobbleSongId != song.id;
-    final isPlayStateChange = _lastScrobbleIsPlaying != isPlaying;
-    // FIX(BUG-15): Compare milliseconds (>= 5000 ms) instead of integer seconds
-    final isMajorSeek = _lastScrobblePosMs != null &&
-        (posMs - _lastScrobblePosMs!).abs() >= 5000;
-
-    // Always update tracking state
-    _lastScrobbleSongId = song.id;
-    _lastScrobbleIsPlaying = isPlaying;
-    _lastScrobblePosMs = posMs;
-
-    if (isSongChange || isPlayStateChange || isMajorSeek) {
-      // Major update: immediate flush + reset timer
-      _scrobbleDebounce?.cancel();
-      _scrobbleDebounce = null;
-      _pendingScrobbleSong = null;
-      _scrobblerService?.notifyPlaybackState(
-        id: song.id,
-        artist: song.artist,
-        track: song.title,
-        album: song.album,
-        durationMs: song.durationMs,
-        positionMs: position.inMilliseconds,
-        isPlaying: isPlaying,
-        isQuran: state.isQuranModeEnabled,
-      );
-      return;
-    }
-
-    // Minor progress tick: schedule debounced flush with the LATEST position.
-    // The timer callback reads the pending snapshot at fire time instead of
-    // the first tick's captured values, so the flush is never up to 5s stale.
-    _pendingScrobbleSong = song;
-    _pendingScrobblePosMs = posMs;
-    _pendingScrobbleIsPlaying = isPlaying;
-    _scrobbleDebounce ??= autoTimer(Timer(_scrobbleInterval, () {
-      if (isClosed) return;
-      final pendingSong = _pendingScrobbleSong;
-      if (pendingSong != null) {
-        _scrobblerService?.notifyPlaybackState(
-          id: pendingSong.id,
-          artist: pendingSong.artist,
-          track: pendingSong.title,
-          album: pendingSong.album,
-          durationMs: pendingSong.durationMs,
-          positionMs: _pendingScrobblePosMs,
-          isPlaying: _pendingScrobbleIsPlaying,
-          isQuran: state.isQuranModeEnabled,
-        );
-      }
-      _pendingScrobbleSong = null;
-      _scrobbleDebounce = null;
-    }));
-  }
+          SongsTableData song, Duration position, bool isPlaying) =>
+      _scrobble.debouncedScrobble(song, position, isPlaying);
 
   void _listenToWidgetClicks() {
     _widgetClickSub = _widgetService?.listenToWidgetClicks((uri) {
@@ -673,76 +615,12 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     });
   }
 
-  List<String>? _getNextTitles(PlayerState s) {
-    if (s.queue.isEmpty || s.currentIndex + 1 >= s.queue.length) {
-      _cachedNextTitles = null;
-      _cachedNextTitlesIndex = null;
-      _cachedQueueLength = 0;
-      _cachedCurrentSongId = null;
-      return null;
-    }
-    if (_cachedQueueVersion == _queueVersion &&
-        _cachedNextTitlesIndex == s.currentIndex &&
-        _cachedQueueLength == s.queue.length &&
-        _cachedCurrentSongId == s.currentSong?.id) {
-      return _cachedNextTitles;
-    }
-    _cachedQueueVersion = _queueVersion;
-    _cachedNextTitlesIndex = s.currentIndex;
-    _cachedQueueLength = s.queue.length;
-    _cachedCurrentSongId = s.currentSong?.id;
-    _cachedNextTitles = s.queue
-        .skip(s.currentIndex + 1)
-        .take(3)
-        .map((item) => item.artist.isNotEmpty && item.artist != 'Unknown Artist'
-            ? '${item.title} • ${item.artist}'
-            : item.title)
-        .toList();
-    return _cachedNextTitles;
-  }
-
-  DateTime? _lastWidgetProgressUpdateTime;
-
   @override
-  void _updateWidgetThrottled({bool force = false}) {
-    final now = DateTime.now();
-    if (!force &&
-        _lastWidgetUpdateTime != null &&
-        now.difference(_lastWidgetUpdateTime!).inMilliseconds < 1000) {
-      return;
-    }
-    _lastWidgetUpdateTime = now;
-    _lastWidgetProgressUpdateTime = now;
-    final nextTitles = _getNextTitles(state);
-    _widgetService?.updateNowPlaying(
-      song: state.currentSong,
-      isPlaying: state.isPlaying,
-      position: state.position,
-      duration: state.duration,
-      isFavorite: state.currentSong?.isFavorite ?? false,
-      isShuffle: state.isShuffle,
-      repeatMode: switch (state.repeatMode) {
-        PlayerRepeatMode.one => 'one',
-        PlayerRepeatMode.all => 'all',
-        PlayerRepeatMode.off => 'off',
-      },
-      nextQueueTitles: nextTitles,
-    );
-  }
+  void _updateWidgetThrottled({bool force = false}) =>
+      _widgetUpdater.updateThrottled(state, _queueVersion, force: force);
 
-  void _updateWidgetProgressThrottled() {
-    final now = DateTime.now();
-    if (_lastWidgetProgressUpdateTime != null &&
-        now.difference(_lastWidgetProgressUpdateTime!).inMilliseconds < 1000) {
-      return;
-    }
-    _lastWidgetProgressUpdateTime = now;
-    _widgetService?.updateProgress(
-      isPlaying: state.isPlaying,
-      position: state.position,
-      duration: state.duration,
-    );
-  }
+  void _updateWidgetProgressThrottled() =>
+      _widgetUpdater.updateProgressThrottled(state);
 
   bool _notificationPermissionPrompted = false;
 
@@ -2320,7 +2198,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   @override
   Future<void> close() async {
     _persistQueueDebounce?.cancel();
-    _scrobbleDebounce?.cancel();
+    _scrobbleCoordinator?.dispose();
     _seekThrottleTimer?.cancel();
     _seekThrottleTimer = null;
     _pendingSeek = null;

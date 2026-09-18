@@ -1,3 +1,4 @@
+
 // ignore_for_file: unused_element_parameter
 part of '../library_screen.dart';
 
@@ -20,7 +21,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
       child: isGrid
           ? GridView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16,
+              padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context), 16,
                   Adaptive.pagePadding(context), 160),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount:
@@ -32,8 +33,11 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
               itemCount: albums.length,
               itemBuilder: (context, index) {
                 final album = albums[index];
-                return InkWell(
-                  borderRadius: BorderRadius.circular(18),
+                return StaggeredReveal(
+                  index: index,
+                  groupKey: '${state.sortBy}-${state.ascending}',
+                  child: InkWell(
+                  borderRadius: BorderRadius.circular(AppRadii.r18),
                   onTap: () => context.push('/album', extra: album),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -48,39 +52,42 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                               borderRadius: 18),
                         ),
                       ),
-                      const SizedBox(height: 9),
+                      const SizedBox(height: AppSpacing.xs),
                       Text(album.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                               color: p.textPrimary,
                               fontWeight: FontWeight.w700,
-                              fontSize: 13.5)),
-                      const SizedBox(height: 2),
+                              fontSize: AppFontSize.bodySmall)),
+                      const SizedBox(height: AppSpacing.s2),
                       Text(
                           '${album.artist} • ${Formatters.formatTrackCount(album.songCount)}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                              color: p.textSecondary, fontSize: 11.5)),
+                              color: p.textSecondary, fontSize: AppFontSize.label)),
                     ],
                   ),
-                );
+                ));
               },
             )
           : ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.only(bottom: 160, top: 8),
+              padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom, top: AppSpacing.xs),
               itemCount: albums.length,
               itemBuilder: (context, index) {
                 final album = albums[index];
-                return Padding(
+                return StaggeredReveal(
+                  index: index,
+                  groupKey: '${state.sortBy}-${state.ascending}',
+                  child: Padding(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xxs),
                   child: Material(
                     color: p.surfaceContainer,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(AppRadii.r16),
                       side: BorderSide(color: p.hairline),
                     ),
                     child: ListTile(
@@ -92,18 +99,18 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                       title: Text(album.title,
                           style: TextStyle(
                               fontWeight: FontWeight.w700,
-                              fontSize: 14,
+                              fontSize: AppFontSize.body,
                               color: p.textPrimary)),
                       subtitle: Text(
                           '${album.artist} • ${Formatters.formatTrackCount(album.songCount)}',
                           style:
-                              TextStyle(color: p.textSecondary, fontSize: 12)),
+                              TextStyle(color: p.textSecondary, fontSize: AppFontSize.label)),
                       trailing: Icon(Icons.chevron_right_rounded,
                           color: p.textTertiary),
                       onTap: () => context.push('/album', extra: album),
                     ),
                   ),
-                );
+                ));
               },
             ),
     );
@@ -127,7 +134,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
       child: isGrid
           ? GridView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16,
+              padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context), 16,
                   Adaptive.pagePadding(context), 160),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: Adaptive.gridColumns(context,
@@ -139,8 +146,11 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
               itemCount: artists.length,
               itemBuilder: (context, index) {
                 final artist = artists[index];
-                return InkWell(
-                  borderRadius: BorderRadius.circular(18),
+                return StaggeredReveal(
+                  index: index,
+                  groupKey: '${state.sortBy}-${state.ascending}',
+                  child: InkWell(
+                  borderRadius: BorderRadius.circular(AppRadii.r18),
                   onTap: () => context.push('/artist', extra: artist),
                   child: Column(
                     children: [
@@ -152,7 +162,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                             borderRadius: 999,
                             fallbackIcon: Icons.person_rounded),
                       ),
-                      const SizedBox(height: 9),
+                      const SizedBox(height: AppSpacing.xs),
                       Text(artist.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -160,28 +170,31 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                           style: TextStyle(
                               color: p.textPrimary,
                               fontWeight: FontWeight.w700,
-                              fontSize: 13)),
+                              fontSize: AppFontSize.bodySmall)),
                       Text(Formatters.formatTrackCount(artist.songCount),
                           style:
-                              TextStyle(color: p.textSecondary, fontSize: 11)),
+                              TextStyle(color: p.textSecondary, fontSize: AppFontSize.caption)),
                     ],
                   ),
-                );
+                ));
               },
             )
           : ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.only(bottom: 160, top: 8),
+              padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom, top: AppSpacing.xs),
               itemCount: artists.length,
               itemBuilder: (context, index) {
                 final artist = artists[index];
-                return Padding(
+                return StaggeredReveal(
+                  index: index,
+                  groupKey: '${state.sortBy}-${state.ascending}',
+                  child: Padding(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xxs),
                   child: Material(
                     color: p.surfaceContainer,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(AppRadii.r16),
                       side: BorderSide(color: p.hairline),
                     ),
                     child: ListTile(
@@ -194,18 +207,18 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                       title: Text(artist.name,
                           style: TextStyle(
                               fontWeight: FontWeight.w700,
-                              fontSize: 14,
+                              fontSize: AppFontSize.body,
                               color: p.textPrimary)),
                       subtitle: Text(
                           Formatters.formatTrackCount(artist.songCount),
                           style:
-                              TextStyle(color: p.textSecondary, fontSize: 12)),
+                              TextStyle(color: p.textSecondary, fontSize: AppFontSize.label)),
                       trailing: Icon(Icons.chevron_right_rounded,
                           color: p.textTertiary),
                       onTap: () => context.push('/artist', extra: artist),
                     ),
                   ),
-                );
+                ));
               },
             ),
     );
@@ -285,7 +298,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
     required ValueChanged<bool> onChanged,
   }) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(
+      padding: EdgeInsetsDirectional.fromSTEB(
         Adaptive.pagePadding(context),
         10,
         Adaptive.pagePadding(context),
@@ -300,7 +313,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
             selected: !hierarchySelected,
             onTap: () => onChanged(false),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.xs),
           _LayoutToggleButton(
             icon: hierarchyIcon,
             label: hierarchyLabel,
@@ -329,7 +342,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
           icon: Icons.calendar_today_rounded,
           title: '${y.year}',
           subtitle: Formatters.formatTrackCount(y.songCount),
-          color: const Color(0xFF40C4FF),
+          color: AppColors.skyBlue,
           onTap: () => context.push('/year', extra: y),
         );
       },
@@ -343,7 +356,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
       onRefresh: () => _handleRefresh(context),
       child: GridView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16,
+        padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context), 16,
             Adaptive.pagePadding(context), 160),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount:

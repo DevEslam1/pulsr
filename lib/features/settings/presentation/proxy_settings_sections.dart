@@ -1,3 +1,4 @@
+
 // ignore_for_file: unused_element_parameter
 part of 'proxy_settings_screen.dart';
 
@@ -12,7 +13,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(6, 0, 0, 8),
+          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s6, 0, 0, AppSpacing.xs),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -21,24 +22,25 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                   Text(context.l10n.savedProxyPool,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: p.textTertiary,
-                          letterSpacing: 0.5,
+                          letterSpacing: AppTracking.medium,
                           fontWeight: FontWeight.w700,
                         ),
                   ),
                   if (proxyList.isNotEmpty) ...[
-                    const SizedBox(width: 8),
+                    const SizedBox(width: AppSpacing.xs),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 7, vertical: 2),
+
+                          horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
                       decoration: BoxDecoration(
                         color: p.accentContainer,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadii.r8),
                       ),
                       child: Text(
                         '${proxyList.length}',
                         style: TextStyle(
                           color: p.accent,
-                          fontSize: 11,
+                          fontSize: AppFontSize.caption,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -62,14 +64,14 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                       context.read<SettingsCubit>().clearProxyList();
                     }
                   },
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(AppRadii.r6),
                   child: Padding(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        const EdgeInsets.symmetric(horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                     child: Text(context.l10n.clearAll,
                         style: TextStyle(
                             color: p.error,
-                            fontSize: 12,
+                            fontSize: AppFontSize.label,
                             fontWeight: FontWeight.w600)),
                   ),
                 ),
@@ -79,12 +81,12 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
         Material(
           color: p.surfaceContainer,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(AppRadii.r20),
             side: BorderSide(color: p.hairline),
           ),
           clipBehavior: Clip.antiAlias,
           child: Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(AppSpacing.s14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -100,14 +102,15 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                         backgroundColor: p.accent,
                         foregroundColor: p.onAccent,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
+                            borderRadius: BorderRadius.circular(AppRadii.r10)),
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 9),
+
+                            horizontal: AppSpacing.s14, vertical: AppSpacing.xs),
                       ),
                       icon: const Icon(Icons.file_upload_outlined, size: 16),
                       label: Text(context.l10n.importPaste,
                           style: TextStyle(
-                              fontSize: 13, fontWeight: FontWeight.w700)),
+                              fontSize: AppFontSize.bodySmall, fontWeight: FontWeight.w700)),
                     ),
                     if (proxyList.isNotEmpty) ...[
                       FilledButton.tonalIcon(
@@ -120,13 +123,13 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                           foregroundColor: p.accent,
                           side: BorderSide(color: p.hairline),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
+                              borderRadius: BorderRadius.circular(AppRadii.r10)),
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 9),
+
+                              horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
                         ),
                         icon: isTestingAll
-                            ? SizedBox(
-                                width: 14,
+                            ? SizedBox(width: AppSpacing.s14,
                                 height: 14,
                                 child: CircularProgressIndicator(
                                     strokeWidth: 2, color: p.accent),
@@ -135,7 +138,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                         label: Text(
                           isTestingAll ? context.l10n.settingsTestingAll : context.l10n.settingsTestAllSpeeds,
                           style: const TextStyle(
-                              fontSize: 12, fontWeight: FontWeight.w600),
+                              fontSize: AppFontSize.label, fontWeight: FontWeight.w600),
                         ),
                       ),
                       FilledButton.tonalIcon(
@@ -147,35 +150,37 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                           foregroundColor: p.textPrimary,
                           side: BorderSide(color: p.hairline),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
+                              borderRadius: BorderRadius.circular(AppRadii.r10)),
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 9),
+
+                              horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
                         ),
                         icon: const Icon(Icons.sort_rounded, size: 16),
                         label: Text(context.l10n.sortBySpeed,
                             style: TextStyle(
-                                fontSize: 12, fontWeight: FontWeight.w600)),
+                                fontSize: AppFontSize.label, fontWeight: FontWeight.w600)),
                       ),
                     ],
                   ],
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.s14),
 
                 if (proxyList.isEmpty)
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
-                        vertical: 28, horizontal: 16),
+
+                        vertical: AppSpacing.s28, horizontal: AppSpacing.md),
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: p.surface,
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppRadii.r14),
                       border: Border.all(color: p.hairline),
                     ),
                     child: Column(
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(AppSpacing.sm),
                           decoration: BoxDecoration(
                             color: p.surfaceContainerHigh,
                             shape: BoxShape.circle,
@@ -183,21 +188,21 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                           child: Icon(Icons.hub_outlined,
                               color: p.textTertiary, size: 32),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.sm),
                         Text(context.l10n.noProxiesPool,
                           style: TextStyle(
                               color: p.textPrimary,
                               fontWeight: FontWeight.w700,
-                              fontSize: 14),
+                              fontSize: AppFontSize.body),
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: AppSpacing.s6),
                         ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 420),
                           child: Text(context.l10n.importProxiesDesc,
                             textAlign: TextAlign.center,
                             style: TextStyle(
                                 color: p.textSecondary,
-                                fontSize: 12,
+                                fontSize: AppFontSize.label,
                                 height: 1.4),
                           ),
                         ),
@@ -209,7 +214,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: proxyList.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.xs),
                     itemBuilder: (context, index) {
                       final item = proxyList[index];
                       final isActive = state.proxyEnabled &&
@@ -231,7 +236,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
     return Material(
       color: isActive ? p.accentContainer.withValues(alpha: 0.3) : p.surface,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadii.r14),
         side: BorderSide(
           color: isActive ? p.accent : p.hairline,
           width: isActive ? 1.5 : 1.0,
@@ -250,7 +255,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
           );
         },
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.s10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -273,7 +278,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                         ? Icon(Icons.check_rounded, color: p.onAccent, size: 14)
                         : null,
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: AppSpacing.s10),
 
                   // Host:Port display
                   Expanded(
@@ -285,27 +290,27 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                             style: TextStyle(
                               color: p.textPrimary,
                               fontWeight: FontWeight.w700,
-                              fontSize: 13,
+                              fontSize: AppFontSize.bodySmall,
                               fontFamily: 'monospace',
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         if (isActive) ...[
-                          const SizedBox(width: 6),
+                          const SizedBox(width: AppSpacing.s6),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 5, vertical: 1),
+                                horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                             decoration: BoxDecoration(
                               color: p.accent,
-                              borderRadius: BorderRadius.circular(4),
+                              borderRadius: BorderRadius.circular(AppRadii.r4),
                             ),
                             child: Text(context.l10n.activeLabel,
                               style: TextStyle(
                                 color: p.onAccent,
-                                fontSize: 8,
+                                fontSize: AppFontSize.micro,
                                 fontWeight: FontWeight.w900,
-                                letterSpacing: 0.5,
+                                letterSpacing: AppTracking.medium,
                               ),
                             ),
                           ),
@@ -314,23 +319,21 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                     ),
                   ),
 
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.xs),
 
                   // Latency Chip
                   _buildLatencyChip(p, item),
 
-                  const SizedBox(width: 4),
+                  const SizedBox(width: AppSpacing.xxs),
 
                   // Test Button
-                  SizedBox(
-                    width: 32,
+                  SizedBox(width: AppSpacing.xl,
                     height: 32,
                     child: IconButton(
                       padding: EdgeInsets.zero,
                       tooltip: context.l10n.settingsTestLatency,
                       icon: item.isTesting
-                          ? SizedBox(
-                              width: 14,
+                          ? SizedBox(width: AppSpacing.s14,
                               height: 14,
                               child: CircularProgressIndicator(
                                   strokeWidth: 2, color: p.accent),
@@ -346,8 +349,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                   ),
 
                   // Delete Button
-                  SizedBox(
-                    width: 32,
+                  SizedBox(width: AppSpacing.xl,
                     height: 32,
                     child: IconButton(
                       padding: EdgeInsets.zero,
@@ -364,7 +366,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
 
               // Bottom Details Row: Protocol tag + username (if auth exists)
               Padding(
-                padding: const EdgeInsets.only(left: 32, top: 4),
+                padding: const EdgeInsetsDirectional.only(start: AppSpacing.xl, top: AppSpacing.xxs),
                 child: Wrap(
                   spacing: 6,
                   runSpacing: 4,
@@ -372,16 +374,17 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 1.5),
+
+                          horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                       decoration: BoxDecoration(
                         color: p.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(AppRadii.r4),
                       ),
                       child: Text(
                         item.type == AppProxyType.socks5 ? context.l10n.socks5 : context.l10n.settingsHttpLabel,
                         style: TextStyle(
                           color: p.textSecondary,
-                          fontSize: 10,
+                          fontSize: AppFontSize.tiny,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -389,22 +392,23 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                     if (item.hasAuth)
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 1.5),
+
+                            horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                         decoration: BoxDecoration(
                           color: p.accentContainer.withValues(alpha: 0.4),
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(AppRadii.r4),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.lock_outline_rounded,
                                 size: 10, color: p.accent),
-                            const SizedBox(width: 3),
+                            const SizedBox(width: AppSpacing.xxs),
                             Text(
                               item.username,
                               style: TextStyle(
                                   color: p.accent,
-                                  fontSize: 10,
+                                  fontSize: AppFontSize.tiny,
                                   fontWeight: FontWeight.w600),
                             ),
                           ],
@@ -423,25 +427,24 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
   Widget _buildLatencyChip(PulsrPalette p, ProxyEntry item) {
     if (item.isTesting) {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
         decoration: BoxDecoration(
           color: p.accentContainer.withValues(alpha: 0.3),
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(AppRadii.r6),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
-              width: 8,
+            SizedBox(width: AppSpacing.xs,
               height: 8,
               child:
                   CircularProgressIndicator(strokeWidth: 1.5, color: p.accent),
             ),
-            const SizedBox(width: 5),
+            const SizedBox(width: AppSpacing.s6),
             Text(context.l10n.testingLabel,
                 style: TextStyle(
                     color: p.accent,
-                    fontSize: 10,
+                    fontSize: AppFontSize.tiny,
                     fontWeight: FontWeight.w600)),
           ],
         ),
@@ -455,10 +458,10 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
           : (latency < 6000 ? p.warning : p.error);
 
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(AppRadii.r6),
           border: Border.all(color: color.withValues(alpha: 0.35)),
         ),
         child: Row(
@@ -469,12 +472,12 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
               height: 5,
               decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: AppSpacing.xxs),
             Text(
               '${latency}ms',
               style: TextStyle(
                 color: color,
-                fontSize: 10,
+                fontSize: AppFontSize.tiny,
                 fontWeight: FontWeight.w700,
                 fontFamily: 'monospace',
               ),
@@ -486,20 +489,20 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
 
     if (item.isWorking == false) {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
         decoration: BoxDecoration(
           color: p.error.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(AppRadii.r6),
           border: Border.all(color: p.error.withValues(alpha: 0.35)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.error_outline_rounded, color: p.error, size: 10),
-            const SizedBox(width: 3),
+            const SizedBox(width: AppSpacing.xxs),
             Text(context.l10n.failedLabel,
               style: TextStyle(
-                  color: p.error, fontSize: 10, fontWeight: FontWeight.w700),
+                  color: p.error, fontSize: AppFontSize.tiny, fontWeight: FontWeight.w700),
             ),
           ],
         ),
@@ -507,14 +510,14 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
       decoration: BoxDecoration(
         color: p.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(AppRadii.r6),
       ),
       child: Text(context.l10n.unverifiedLabel,
         style: TextStyle(
-            color: p.textTertiary, fontSize: 10, fontWeight: FontWeight.w600),
+            color: p.textTertiary, fontSize: AppFontSize.tiny, fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -524,7 +527,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
       p: p,
       title: context.l10n.settingsActiveProxyProtocol,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -538,14 +541,14 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                     value: AppProxyType.http,
                     label: Text(context.l10n.httpHttps,
                         style: TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 13)),
+                            fontWeight: FontWeight.w600, fontSize: AppFontSize.bodySmall)),
                     icon: Icon(Icons.http_rounded, size: 18),
                   ),
                   ButtonSegment(
                     value: AppProxyType.socks5,
                     label: Text(context.l10n.socks5,
                         style: TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 13)),
+                            fontWeight: FontWeight.w600, fontSize: AppFontSize.bodySmall)),
                     icon: Icon(Icons.shield_outlined, size: 18),
                   ),
                 ],
@@ -575,23 +578,23 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                   side: WidgetStatePropertyAll(BorderSide(color: p.hairline)),
                   shape: WidgetStatePropertyAll(
                     RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(AppRadii.r12)),
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
             Row(
               children: [
                 Icon(Icons.info_outline_rounded,
                     size: 14, color: p.textTertiary),
-                const SizedBox(width: 6),
+                const SizedBox(width: AppSpacing.s6),
                 Expanded(
                   child: Text(
                     _type == AppProxyType.http
                         ? context.l10n.settingsProxyHttpDesc
                         : context.l10n.settingsProxySocksDesc,
-                    style: TextStyle(color: p.textTertiary, fontSize: 12),
+                    style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label),
                   ),
                 ),
               ],
@@ -607,7 +610,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
       p: p,
       title: context.l10n.settingsActiveServerConfig,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -617,7 +620,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
 
                 final hostField = TextFormField(
                   controller: _hostController,
-                  style: TextStyle(color: p.textPrimary, fontSize: 14),
+                  style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
                   decoration: InputDecoration(
                     labelText: context.l10n.settingsServerHost,
                     hintText: context.l10n.settingsServerHostHint,
@@ -628,19 +631,20 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                     filled: true,
                     fillColor: p.surface,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadii.r12),
                       borderSide: BorderSide(color: p.hairline),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadii.r12),
                       borderSide: BorderSide(color: p.hairline),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadii.r12),
                       borderSide: BorderSide(color: p.accent, width: 2),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 14),
+
+                        horizontal: AppSpacing.s14, vertical: AppSpacing.s14),
                   ),
                   validator: (value) {
                     if (_enabled && (value == null || value.trim().isEmpty)) {
@@ -652,7 +656,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
 
                 final portField = TextFormField(
                   controller: _portController,
-                  style: TextStyle(color: p.textPrimary, fontSize: 14),
+                  style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   decoration: InputDecoration(
@@ -665,19 +669,20 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                     filled: true,
                     fillColor: p.surface,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadii.r12),
                       borderSide: BorderSide(color: p.hairline),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadii.r12),
                       borderSide: BorderSide(color: p.hairline),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadii.r12),
                       borderSide: BorderSide(color: p.accent, width: 2),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 14),
+
+                        horizontal: AppSpacing.s14, vertical: AppSpacing.s14),
                   ),
                   validator: (value) {
                     if (_enabled) {
@@ -695,7 +700,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(flex: 3, child: hostField),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: AppSpacing.sm),
                       Expanded(flex: 1, child: portField),
                     ],
                   );
@@ -704,24 +709,24 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                 return Column(
                   children: [
                     hostField,
-                    const SizedBox(height: 14),
+                    const SizedBox(height: AppSpacing.s14),
                     portField,
                   ],
                 );
               },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
 
             // Quick Presets Header
             Text(context.l10n.quickPresets,
               style: TextStyle(
                 color: p.textTertiary,
-                fontSize: 11,
+                fontSize: AppFontSize.caption,
                 fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
+                letterSpacing: AppTracking.medium,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
 
             // Presets Wrap
             Wrap(
@@ -796,14 +801,14 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
       p: p,
       title: context.l10n.settingsAuthenticationOptional,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.md),
         child: LayoutBuilder(
           builder: (context, constraints) {
             final isWide = constraints.maxWidth > 480;
 
             final usernameField = TextFormField(
               controller: _usernameController,
-              style: TextStyle(color: p.textPrimary, fontSize: 14),
+              style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
               decoration: InputDecoration(
                 labelText: context.l10n.settingsUsernameLabel,
                 hintText: context.l10n.settingsLeaveBlankAuth,
@@ -814,25 +819,25 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                 filled: true,
                 fillColor: p.surface,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadii.r12),
                   borderSide: BorderSide(color: p.hairline),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadii.r12),
                   borderSide: BorderSide(color: p.hairline),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadii.r12),
                   borderSide: BorderSide(color: p.accent, width: 2),
                 ),
                 contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    const EdgeInsets.symmetric(horizontal: AppSpacing.s14, vertical: AppSpacing.s14),
               ),
             );
 
             final passwordField = TextFormField(
               controller: _passwordController,
-              style: TextStyle(color: p.textPrimary, fontSize: 14),
+              style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
               obscureText: _obscurePassword,
               decoration: InputDecoration(
                 labelText: context.l10n.settingsPasswordLabel,
@@ -857,19 +862,19 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                 filled: true,
                 fillColor: p.surface,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadii.r12),
                   borderSide: BorderSide(color: p.hairline),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadii.r12),
                   borderSide: BorderSide(color: p.hairline),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadii.r12),
                   borderSide: BorderSide(color: p.accent, width: 2),
                 ),
                 contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    const EdgeInsets.symmetric(horizontal: AppSpacing.s14, vertical: AppSpacing.s14),
               ),
             );
 
@@ -877,7 +882,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
               return Row(
                 children: [
                   Expanded(child: usernameField),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.sm),
                   Expanded(child: passwordField),
                 ],
               );
@@ -886,7 +891,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
             return Column(
               children: [
                 usernameField,
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.s14),
                 passwordField,
               ],
             );
@@ -901,13 +906,13 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
       p: p,
       title: context.l10n.proxyBypass,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             TextFormField(
               controller: _bypassController,
-              style: TextStyle(color: p.textPrimary, fontSize: 14),
+              style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
               decoration: InputDecoration(
                 labelText: context.l10n.settingsBypassList,
                 hintText: 'localhost, 127.0.0.1, *.local',
@@ -918,22 +923,22 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                 filled: true,
                 fillColor: p.surface,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadii.r12),
                   borderSide: BorderSide(color: p.hairline),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadii.r12),
                   borderSide: BorderSide(color: p.hairline),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadii.r12),
                   borderSide: BorderSide(color: p.accent, width: 2),
                 ),
                 contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    const EdgeInsets.symmetric(horizontal: AppSpacing.s14, vertical: AppSpacing.s14),
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.s10),
             Wrap(
               spacing: 6,
               runSpacing: 6,
@@ -943,15 +948,15 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                 _bypassChip('*.local', p),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             Row(
               children: [
                 Icon(Icons.info_outline_rounded,
                     size: 14, color: p.textTertiary),
-                const SizedBox(width: 6),
+                const SizedBox(width: AppSpacing.s6),
                 Expanded(
                   child: Text(context.l10n.bypassHostsDesc,
-                    style: TextStyle(color: p.textTertiary, fontSize: 12),
+                    style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label),
                   ),
                 ),
               ],
@@ -965,23 +970,23 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
   Widget _bypassChip(String host, PulsrPalette p) {
     return InkWell(
       onTap: () => _appendBypassHost(host),
-      borderRadius: BorderRadius.circular(6),
+      borderRadius: BorderRadius.circular(AppRadii.r6),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
         decoration: BoxDecoration(
           color: p.surface,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(AppRadii.r6),
           border: Border.all(color: p.hairline),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.add_rounded, size: 12, color: p.accent),
-            const SizedBox(width: 3),
+            const SizedBox(width: AppSpacing.xxs),
             Text(host,
                 style: TextStyle(
                     color: p.textSecondary,
-                    fontSize: 11,
+                    fontSize: AppFontSize.caption,
                     fontFamily: 'monospace')),
           ],
         ),

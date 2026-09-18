@@ -6,16 +6,35 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_page_pop_scope.dart';
-import '../../../../domain/models/lyrics_line.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 import 'audio_visualizer.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
-class KaraokeModeScreen extends StatelessWidget {
-  final List<LyricsLine> lyrics;
+class KaraokeModeScreen extends StatefulWidget {
+  const KaraokeModeScreen({super.key});
 
-  const KaraokeModeScreen({super.key, required this.lyrics});
+  @override
+  State<KaraokeModeScreen> createState() => _KaraokeModeScreenState();
+}
+
+class _KaraokeModeScreenState extends State<KaraokeModeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Immersive, distraction-free singing: hide the system status/nav bars.
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  }
+
+  @override
+  void dispose() {
+    // Restore the app's edge-to-edge chrome on the way out.
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,33 +97,34 @@ class KaraokeModeScreen extends StatelessWidget {
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.close_rounded, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
-            ),
+              leading: IconButton(
+                icon: const Icon(Icons.close_rounded, color: Colors.white),
+                tooltip: context.l10n.close,
+                onPressed: () => Navigator.pop(context),
+              ),
             title: Text(
               song?.title ?? context.l10n.dspKaraokeMode,
               style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.bold),
+                  color: Colors.white, fontWeight: FontWeight.w700),
             ),
             actions: [
               Container(
-                margin: const EdgeInsets.only(right: 16),
+                margin: const EdgeInsetsDirectional.only(end: AppSpacing.md),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
                 decoration: BoxDecoration(
                   color: p.primary.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppRadii.r10),
                   border: Border.all(color: p.primary),
                 ),
                 child: Row(
                   children: [
                     Icon(Icons.timelapse_rounded, size: 16, color: p.primary),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: AppSpacing.xxs),
                     Text(
                       '$progressPct%',
                       style: TextStyle(
-                          fontSize: 11,
+                          fontSize: AppFontSize.caption,
                           fontWeight: FontWeight.w900,
                           color: p.primary),
                     ),
@@ -118,14 +138,14 @@ class KaraokeModeScreen extends StatelessWidget {
               const Spacer(),
               if (effectiveLyrics.isEmpty)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
                   child: Text(
                     state.isLoadingLyrics
                         ? context.l10n.dspLoadingLyrics
                         : context.l10n.noLyricsFound,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: AppFontSize.bodyLarge,
                       fontWeight: FontWeight.w600,
                       color: Colors.white.withValues(alpha: 0.55),
                     ),
@@ -134,22 +154,23 @@ class KaraokeModeScreen extends StatelessWidget {
               // Active Lyric Line with Glow & Tap-to-Seek
               if (activeLine != null)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
                   child: InkWell(
                     onTap: () {
                       HapticFeedback.selectionClick();
                       context.read<PlayerCubit>().seek(activeLine.timestamp);
                     },
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(AppRadii.r16),
                     splashColor: p.primary.withValues(alpha: 0.2),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                          vertical: 8, horizontal: 12),
+
+                          vertical: AppSpacing.xs, horizontal: AppSpacing.sm),
                       child: Text(
                         activeLine.text,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 32,
+                          fontSize: AppFontSize.displayLarge,
                           fontWeight: FontWeight.w900,
                           color: p.primary,
                           shadows: [
@@ -163,7 +184,7 @@ class KaraokeModeScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-              const SizedBox(height: 24),
+              const SizedBox(height: AppSpacing.lg),
               // Next Upcoming Line (Tappable)
               if (nextLine != null)
                 Padding(
@@ -173,16 +194,17 @@ class KaraokeModeScreen extends StatelessWidget {
                       HapticFeedback.selectionClick();
                       context.read<PlayerCubit>().seek(nextLine.timestamp);
                     },
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadii.r12),
                     splashColor: p.primary.withValues(alpha: 0.15),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                          vertical: 6, horizontal: 12),
+
+                          vertical: AppSpacing.s6, horizontal: AppSpacing.sm),
                       child: Text(
                         nextLine.text,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: AppFontSize.title,
                           fontWeight: FontWeight.w600,
                           color: Colors.white.withValues(alpha: 0.45),
                         ),
@@ -194,7 +216,7 @@ class KaraokeModeScreen extends StatelessWidget {
 
               // Audio / Mic Level Visualizer
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 child: AudioVisualizer(
                   style: VisualizerStyle.wave,
                   color: p.primary,
@@ -202,11 +224,11 @@ class KaraokeModeScreen extends StatelessWidget {
                   isPlaying: state.isPlaying,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.md),
 
               // Bottom Progress Bar & Time
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 28),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s28),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -214,18 +236,18 @@ class KaraokeModeScreen extends StatelessWidget {
                       Formatters.formatDuration(pos),
                       style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.7),
-                          fontSize: 13),
+                          fontSize: AppFontSize.bodySmall),
                     ),
                     Text(
                       Formatters.formatDuration(state.duration),
                       style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.7),
-                          fontSize: 13),
+                          fontSize: AppFontSize.bodySmall),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: AppSpacing.xl),
             ],
           ),
         ),

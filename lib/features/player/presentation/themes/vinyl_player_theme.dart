@@ -28,6 +28,10 @@ import '../widgets/player_controls.dart';
 import '../widgets/player_seek_bar.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 class VinylPlayerTheme extends StatefulWidget {
   final PlayerThemeProps props;
@@ -195,10 +199,34 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                     excludeSemantics: true,
                     child: GestureDetector(
                     onTap: () => cubit.togglePlayPause(),
+                    onDoubleTap: () {
+                      switch (settingsState.nowPlayingDoubleTap) {
+                        case NowPlayingDoubleTapAction.toggleFavorite:
+                          final s = state.currentSong;
+                          if (s != null) cubit.toggleFavorite(s.id);
+                          break;
+                        case NowPlayingDoubleTapAction.toggleLyrics:
+                          cubit.toggleLyricsVisibility();
+                          break;
+                        case NowPlayingDoubleTapAction.none:
+                          break;
+                      }
+                    },
+                    onHorizontalDragEnd: (details) {
+                      if (settingsState.nowPlayingArtworkSwipe ==
+                              NowPlayingArtworkSwipeAction.nextPrev &&
+                          details.primaryVelocity != null) {
+                        if (details.primaryVelocity! < -200) {
+                          cubit.next();
+                        } else if (details.primaryVelocity! > 200) {
+                          cubit.previous();
+                        }
+                      }
+                    },
                     child: Container(
                       decoration: BoxDecoration(
                         color: const Color(0xFF14151C),
-                        borderRadius: BorderRadius.circular(22),
+                        borderRadius: BorderRadius.circular(AppRadii.r22),
                         border: Border.all(
                           color: const Color(0xFF282B37),
                           width: 1.5,
@@ -221,9 +249,9 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                         clipBehavior: Clip.none,
                         children: [
                           // 1. Plinth Studio Branding & Active Status
-                          Positioned(
+                          PositionedDirectional(
                             top: 14,
-                            left: 16,
+                            start: 16,
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -247,13 +275,13 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                                         : null,
                                   ),
                                 ),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: AppSpacing.s6),
                                 const Text(
                                   'STUDIO • DIRECT DRIVE',
                                   style: TextStyle(
-                                    fontSize: 8.5,
+                                    fontSize: AppFontSize.micro,
                                     fontWeight: FontWeight.w800,
-                                    letterSpacing: 1.2,
+                                    letterSpacing: AppTracking.wide,
                                     color: Colors.white38,
                                   ),
                                 ),
@@ -262,8 +290,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                           ),
 
                           // 2. Platter Strobe Rim
-                          Positioned(
-                            left: vinylLeft - 4,
+                          PositionedDirectional(
+                            start: vinylLeft - 4,
                             top: vinylTop - 4,
                             width: vinylSize + 8,
                             height: vinylSize + 8,
@@ -273,8 +301,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                           ),
 
                           // 3. Spinning Vinyl Record
-                          Positioned(
-                            left: vinylLeft,
+                          PositionedDirectional(
+                            start: vinylLeft,
                             top: vinylTop,
                             width: vinylSize,
                             height: vinylSize,
@@ -333,7 +361,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                                                 colors: [
                                                   Colors.grey.shade400,
                                                   Colors.grey.shade800,
-                                                  const Color(0xFF14172B),
+                                                  AppColors.darkSurface,
                                                 ],
                                                 stops: const [0.0, 0.6, 1.0],
                                               ),
@@ -387,20 +415,21 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                           ),
 
                           // 5. Bottom Plinth RPM Badge (33⅓ RPM / Standby)
-                          Positioned(
+                          PositionedDirectional(
                             bottom: 12,
-                            left: 14,
+                            start: 14,
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 4),
+
+                                      horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                                   decoration: BoxDecoration(
                                     color: state.isPlaying
                                         ? activeColor.withValues(alpha: 0.15)
                                         : const Color(0xFF181A22),
-                                    borderRadius: BorderRadius.circular(6),
+                                    borderRadius: BorderRadius.circular(AppRadii.r6),
                                     border: Border.all(
                                       color: state.isPlaying
                                           ? activeColor.withValues(alpha: 0.5)
@@ -420,15 +449,15 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                                             ? activeColor
                                             : Colors.white38,
                                       ),
-                                      const SizedBox(width: 4),
+                                      const SizedBox(width: AppSpacing.xxs),
                                       Text(
                                         state.isPlaying
                                             ? '33⅓ RPM'
                                             : context.l10n.dspStandby,
                                         style: TextStyle(
-                                          fontSize: 8.5,
+                                          fontSize: AppFontSize.micro,
                                           fontWeight: FontWeight.w800,
-                                          letterSpacing: 0.8,
+                                          letterSpacing: AppTracking.overline,
                                           color: state.isPlaying
                                               ? activeColor
                                               : Colors.white38,
@@ -477,8 +506,9 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
             // Symmetrical Track Header: [Download/Playlist] Title/Artist [Favorite]
             Padding(
               padding: EdgeInsets.symmetric(
+
                 horizontal: isTablet ? 28 : 16,
-                vertical: 2,
+                vertical: AppSpacing.s2,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -525,7 +555,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                       // Center: Title & Artist (Symmetric & Centered)
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -533,19 +563,19 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                                 text: song?.title ?? context.l10n.noTrackSelected,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontSize: isTablet ? 23 : 19,
+                                  fontSize: isTablet ? AppFontSize.headline : AppFontSize.title,
                                   fontWeight: FontWeight.w900,
                                   color: p.textPrimary,
                                   height: 1.22,
-                                  letterSpacing: -0.3,
+                                  letterSpacing: AppTracking.title,
                                 ),
                               ),
-                              const SizedBox(height: 3),
+                              const SizedBox(height: AppSpacing.xxs),
                               MarqueeText(
                                 text: song?.artist ?? context.l10n.unknownArtist,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontSize: isTablet ? 15 : 13.5,
+                                  fontSize: isTablet ? AppFontSize.callout : AppFontSize.bodySmall,
                                   fontWeight: FontWeight.w600,
                                   color: p.textSecondary,
                                 ),
@@ -556,8 +586,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                       ),
 
                       // Right Symmetrical Action: Animated Favorite Button
-                      SizedBox(
-                        width: 48,
+                      SizedBox(width: AppSpacing.xxl,
                         height: 48,
                         child: Material(
                           color: Colors.white.withValues(alpha: 0.06),
@@ -584,7 +613,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
 
                   // Symmetrical Audio Quality Badge
                   if (song != null) ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: AppSpacing.s6),
                     Center(
                       child: AudioQualityBadge(
                         song: song,
@@ -606,6 +635,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
               activeColor: activeColor,
               songId: song?.id,
               filePath: song?.path,
+              loopPointA: state.abPointA,
+              loopPointB: state.abPointB,
               onSeek: (pos) => cubit.seek(pos),
             ),
 
@@ -642,7 +673,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
         if (isLandscape) {
           return SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -663,7 +694,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                       ],
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: AppSpacing.md),
                   Expanded(
                     flex: 6,
                     child: SingleChildScrollView(
@@ -681,14 +712,14 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
             children: [
               // Top Pull-down Handle Indicator
               Padding(
-                padding: const EdgeInsets.only(top: 4, bottom: 2),
+                padding: const EdgeInsets.only(top: AppSpacing.xxs, bottom: AppSpacing.s2),
                 child: Center(
                   child: Container(
                     width: 38,
                     height: 4,
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.22),
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(AppRadii.r2),
                     ),
                   ),
                 ),
@@ -697,8 +728,9 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
               // Top App Bar - Symmetrical Left/Right Targets & Centered Header
               Padding(
                 padding: EdgeInsets.symmetric(
+
                   horizontal: isTablet ? 28 : 20,
-                  vertical: 2,
+                  vertical: AppSpacing.s2,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -734,7 +766,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                     // Center: "PLAYING FROM" / Album Header
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -748,15 +780,15 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                                       : p.textSecondary,
                                   animate: state.isPlaying,
                                 ),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: AppSpacing.s6),
                                 Text(
                                   context.l10n.playingFrom.toUpperCase(),
                                   style: Theme.of(context)
                                       .textTheme
                                       .bodySmall
                                       ?.copyWith(
-                                        fontSize: 10,
-                                        letterSpacing: 1.2,
+                                        fontSize: AppFontSize.tiny,
+                                        letterSpacing: AppTracking.wide,
                                         fontWeight: FontWeight.w800,
                                         color: p.textSecondary
                                             .withValues(alpha: 0.8),
@@ -764,7 +796,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: AppSpacing.s2),
                             Text(
                               (song?.album != null &&
                                       song!.album.trim().isNotEmpty)
@@ -781,7 +813,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                                   .titleSmall
                                   ?.copyWith(
                                     fontWeight: FontWeight.w800,
-                                    fontSize: isTablet ? 14 : 13,
+                                    fontSize: isTablet ? AppFontSize.body : AppFontSize.bodySmall,
                                     color: p.textPrimary,
                                   ),
                             ),
@@ -861,11 +893,11 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                 ),
               ),
 
-              const SizedBox(height: 4),
+              const SizedBox(height: AppSpacing.xxs),
 
               // Bottom Controls Section
               Padding(
-                padding: const EdgeInsets.only(bottom: 4),
+                padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
                 child: controlsColumn,
               ),
             ],
@@ -1108,7 +1140,7 @@ class _TonearmPainter extends CustomPainter {
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         const Rect.fromLTWH(-2.5, -34, 5, 34),
-        const Radius.circular(2),
+        const Radius.circular(AppRadii.r2),
       ),
       stemPaint,
     );
@@ -1128,7 +1160,7 @@ class _TonearmPainter extends CustomPainter {
         stops: [0.0, 0.35, 0.75, 1.0],
       ).createShader(weightRect);
     canvas.drawRRect(
-      RRect.fromRectAndRadius(weightRect, const Radius.circular(3)),
+      RRect.fromRectAndRadius(weightRect, const Radius.circular(AppRadii.r4)),
       weightPaint,
     );
 
@@ -1287,7 +1319,7 @@ class _TonearmPainter extends CustomPainter {
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromCenter(center: pos, width: 8, height: 14),
-        const Radius.circular(2),
+        const Radius.circular(AppRadii.r2),
       ),
       postPaint,
     );

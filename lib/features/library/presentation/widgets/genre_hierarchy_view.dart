@@ -4,6 +4,9 @@ import '../../../../core/utils/l10n_extensions.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../domain/models/genre_item.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class GenreCategory {
   final String name;
@@ -91,11 +94,11 @@ class GenreHierarchyView extends StatelessWidget {
     final p = context.palette;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, 120),
       children: [
         for (final category in _categories(context)) ...[
           _buildCategoryGroup(context, category, p),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
         ],
         // Remaining uncategorized genres
         _buildUncategorizedGroup(context, p),
@@ -115,14 +118,14 @@ class GenreHierarchyView extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: p.surfaceCard,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppRadii.r18),
         border: Border.all(color: p.hairline),
       ),
       child: ExpansionTile(
         initiallyExpanded: true,
         shape: const Border(),
         leading: Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(AppSpacing.xs),
           decoration: BoxDecoration(
             color: p.primary.withValues(alpha: 0.12),
             shape: BoxShape.circle,
@@ -133,17 +136,17 @@ class GenreHierarchyView extends StatelessWidget {
           cat.name,
           style: TextStyle(
             color: p.textPrimary,
-            fontSize: 15,
-            fontWeight: FontWeight.bold,
+            fontSize: AppFontSize.callout,
+            fontWeight: FontWeight.w700,
           ),
         ),
         subtitle: Text(
           '${matching.length} ${context.l10n.browseSubGenres} • ${matching.fold<int>(0, (sum, g) => sum + g.songCount)} ${context.l10n.songs}',
-          style: TextStyle(color: p.textSecondary, fontSize: 12),
+          style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
         ),
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.sm, 0, AppSpacing.sm, AppSpacing.sm),
             child: Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -152,11 +155,11 @@ class GenreHierarchyView extends StatelessWidget {
                   backgroundColor: p.surfaceContainer,
                   side: BorderSide(color: p.hairline),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(AppRadii.r12)),
                   label: Text(
                     '${g.name} (${g.songCount})',
                     style: TextStyle(
-                        fontSize: 12,
+                        fontSize: AppFontSize.label,
                         color: p.textPrimary,
                         fontWeight: FontWeight.w600),
                   ),
@@ -183,13 +186,13 @@ class GenreHierarchyView extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: p.surfaceCard,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppRadii.r18),
         border: Border.all(color: p.hairline),
       ),
       child: ExpansionTile(
         shape: const Border(),
         leading: Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(AppSpacing.xs),
           decoration: BoxDecoration(
             color: p.accent.withValues(alpha: 0.12),
             shape: BoxShape.circle,
@@ -199,17 +202,17 @@ class GenreHierarchyView extends StatelessWidget {
         title: Text(context.l10n.otherGenres,
           style: TextStyle(
             color: p.textPrimary,
-            fontSize: 15,
-            fontWeight: FontWeight.bold,
+            fontSize: AppFontSize.callout,
+            fontWeight: FontWeight.w700,
           ),
         ),
         subtitle: Text(
           '${uncategorized.length} ${context.l10n.genres}',
-          style: TextStyle(color: p.textSecondary, fontSize: 12),
+          style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
         ),
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.sm, 0, AppSpacing.sm, AppSpacing.sm),
             child: Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -218,11 +221,11 @@ class GenreHierarchyView extends StatelessWidget {
                   backgroundColor: p.surfaceContainer,
                   side: BorderSide(color: p.hairline),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(AppRadii.r12)),
                   label: Text(
                     '${g.name} (${g.songCount})',
                     style: TextStyle(
-                        fontSize: 12,
+                        fontSize: AppFontSize.label,
                         color: p.textPrimary,
                         fontWeight: FontWeight.w600),
                   ),

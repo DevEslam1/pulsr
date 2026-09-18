@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../motion/pulsr_motion.dart';
 import 'package:flutter/services.dart';
 import '../constants/app_radii.dart';
 import '../theme/aura_theme.dart';
 import 'glass_container.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 /// Lightweight, floating pill notification HUD styled in Pulsr's glass aesthetic.
 /// Provides immediate, non-intrusive feedback for actions like "Added to queue",
@@ -121,6 +124,13 @@ class _ToastWidgetState extends State<_ToastWidget>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _animController.duration = context.motionMs(260);
+    if (!context.motionEnabled) _animController.value = 1.0;
+  }
+
+  @override
   void dispose() {
     _animController.dispose();
     super.dispose();
@@ -156,7 +166,7 @@ class _ToastWidgetState extends State<_ToastWidget>
                     width: 1.2,
                   ),
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.s18, vertical: AppSpacing.sm),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -166,7 +176,7 @@ class _ToastWidgetState extends State<_ToastWidget>
                           color: accentColor,
                           size: 18,
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: AppSpacing.s10),
                       ],
                       Flexible(
                         child: Text(
@@ -176,7 +186,7 @@ class _ToastWidgetState extends State<_ToastWidget>
                           style: TextStyle(
                             color: p.textPrimary,
                             fontWeight: FontWeight.w600,
-                            fontSize: 13.5,
+                            fontSize: AppFontSize.bodySmall,
                           ),
                         ),
                       ),
