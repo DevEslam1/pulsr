@@ -147,9 +147,16 @@ class YtmErrorClassifier {
         return YtmBlockSignal.ipBlocked;
       case 400:
         return YtmBlockSignal.clientDeprecated;
+      case 408:
+        // Request timeout — transient, retry like a network blip rather than
+        // falling through to the terminal "something went wrong" branch.
+        return YtmBlockSignal.networkUnavailable;
       case 404:
       case 410:
         return YtmBlockSignal.videoGone;
+      case 451:
+        // Unavailable for legal reasons — geo/regional block; skip the track.
+        return YtmBlockSignal.geoBlocked;
       default:
         return null;
     }
@@ -200,7 +207,12 @@ class YtmErrorClassifier {
 
     // 1. Bot challenges / verification
     if (errStr.contains('not a bot') ||
-        errStr.contains('confirm you') ||
+        // Narrowed from the bare `confirm you`, which also matched benign
+        // "confirm your email/subscription" text; both apostrophe forms of the
+        // real "confirm you're not a robot" interstitial are covered.
+        errStr.contains("confirm you're") ||
+        errStr.contains('confirm you’re') ||
+        errStr.contains('sign in to confirm') ||
         errStr.contains('recaptcha') ||
         errStr.contains('bot_block') ||
         errStr.contains('botguard') ||
@@ -371,10 +383,13 @@ class YtmErrorClassifier {
         // to rotateIdentity instead of the correct invalidatePoTokenAndRetry.
         combined.contains('sign in to confirm') ||
         combined.contains("confirm you're not") ||
+        combined.contains('confirm you’re not') ||
         combined.contains('not a bot') ||
         combined.contains('automated queries') ||
-        combined.contains('bot_block') ||
-        combined.contains('confirm you')) {
+        combined.contains('bot_block')) {
+      // Dropped the bare `confirm you` catch-all: the narrower phrases above
+      // cover the real interstitial without misrouting benign "confirm your
+      // email/subscription" text into a poToken invalidation.
       return _mapSignal(YtmBlockSignal.botChallenge, details, traceId);
     }
     if (combined.contains('too many requests') ||

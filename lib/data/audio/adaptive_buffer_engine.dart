@@ -51,7 +51,6 @@ class AdaptiveBufferEngine {
   static const int targetBufferMs = 8000; // 8s sweet spot
 
   static const double _alpha = 0.3; // EWMA weight for recent throughput
-  final List<int> _recentBitrates = [];
   bool _isInitialized = false;
   double _ewmaMbps = 10.0;
   double _varianceMbps = 0.0;
@@ -77,7 +76,7 @@ class AdaptiveBufferEngine {
   void forceBucket(BufferBucket bucket) {
     if (_forcedBucket != bucket) {
       _forcedBucket = bucket;
-      _bucketController.add(bucket);
+      if (!_bucketController.isClosed) _bucketController.add(bucket);
     }
   }
 
@@ -85,13 +84,25 @@ class AdaptiveBufferEngine {
   void releaseForce() {
     if (_forcedBucket != null) {
       _forcedBucket = null;
-      _bucketController.add(_currentBucket);
+      if (!_bucketController.isClosed) _bucketController.add(_currentBucket);
     }
   }
 
   /// Computes the recommended [BufferBucket] given network and storage type.
+  /// Honours an active force; use [_environmentBucket] for the raw network-
+  /// derived value that ignores the override.
   BufferBucket bucketFor({required bool isWifi, required bool isLocal}) {
     if (_forcedBucket != null) return _forcedBucket!;
+    return _environmentBucket(isWifi: isWifi, isLocal: isLocal);
+  }
+
+  /// The bucket derived purely from network/storage conditions, ignoring any
+  /// active force. Kept separate so [evaluateBucket] can track the real
+  /// environment bucket in `_currentBucket` while a force is held — otherwise
+  /// `bucketFor` returned the forced value, `evaluateBucket` wrote that back
+  /// into `_currentBucket`, and `releaseForce` then emitted the stale forced
+  /// value instead of the true environment bucket.
+  BufferBucket _environmentBucket({required bool isWifi, required bool isLocal}) {
     if (isLocal) return BufferBucket.minimal;
     final stdDev = math.sqrt(_varianceMbps);
     final jittery = stdDev > _ewmaMbps * 0.4; // swinging link -> larger buffer
@@ -103,10 +114,10 @@ class AdaptiveBufferEngine {
 
   /// Evaluates and updates the current bucket based on environment.
   void evaluateBucket({required bool isWifi, required bool isLocal}) {
-    final next = bucketFor(isWifi: isWifi, isLocal: isLocal);
+    final next = _environmentBucket(isWifi: isWifi, isLocal: isLocal);
     if (_currentBucket != next) {
       _currentBucket = next;
-      if (_forcedBucket == null) {
+      if (_forcedBucket == null && !_bucketController.isClosed) {
         _bucketController.add(next);
       }
     }
@@ -187,11 +198,6 @@ class AdaptiveBufferEngine {
       _varianceMbps = (1 - _alpha) * (_varianceMbps + _alpha * delta * delta);
       _avgNetworkSpeedMbps = _ewmaMbps;
     }
-
-    _recentBitrates.add((speedMbps * 1000).toInt());
-    if (_recentBitrates.length > 10) {
-      _recentBitrates.removeAt(0);
-    }
   }
 
   /// Records a buffer underrun/rebuffer event. If 2 or more underruns occur
@@ -219,7 +225,6 @@ class AdaptiveBufferEngine {
 
   /// Resets network history to default baseline.
   void reset() {
-    _recentBitrates.clear();
     _recentUnderruns.clear();
     _isInitialized = false;
     _ewmaMbps = 10.0;

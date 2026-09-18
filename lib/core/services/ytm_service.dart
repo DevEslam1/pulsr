@@ -459,9 +459,12 @@ class YtmService {
         () => _channel.invokeMethod<bool>('isWifiConnected'),
         timeout: const Duration(seconds: 3),
       );
-      return value ?? true;
+      // Fail closed: this gates Wi-Fi-only mode, a data-cost decision. If we
+      // can't confirm Wi-Fi, assuming "connected" would silently permit metered
+      // streaming against the user's explicit setting. Treat unknown as not-Wi-Fi.
+      return value ?? false;
     } on YtmException {
-      return true;
+      return false;
     }
   }
 
@@ -769,11 +772,39 @@ class YtmService {
           ? getIt<PlaybackLatencyTracker>()
           : null;
 
+  /// In-flight non-force resolves, keyed `videoId:quality`, so two concurrent
+  /// callers for the same track (e.g. the foreground play and a prefetch of the
+  /// same id, or a double-tap) share one native chain instead of each launching
+  /// their own — which doubled native thread-pool pressure.
+  final Map<String, Future<YtmStream>> _inFlightStreamResolves = {};
+
   /// Resolves audio stream using multi-tier fallback:
   /// (1) Direct authenticated account stream (if logged in)
   /// (2) Native Multi-Client Extractor (NewPipe -> WEB_REMIX -> ANDROID -> IOS -> TV)
   /// Remote yt-dlp backend (Engine 3) is decommissioned.
+  ///
+  /// Coalesces concurrent identical non-force resolves. A `forceRefresh` bypasses
+  /// coalescing so it always performs a fresh resolve.
   Future<YtmStream> resolveStream(String videoId,
+      {String quality = 'high', bool forceRefresh = false}) {
+    if (forceRefresh) {
+      return _resolveStreamInner(videoId,
+          quality: quality, forceRefresh: true);
+    }
+    final key = '$videoId:${quality.toLowerCase()}';
+    final existing = _inFlightStreamResolves[key];
+    if (existing != null) return existing;
+    final fut =
+        _resolveStreamInner(videoId, quality: quality, forceRefresh: false);
+    _inFlightStreamResolves[key] = fut;
+    return fut.whenComplete(() {
+      if (identical(_inFlightStreamResolves[key], fut)) {
+        _inFlightStreamResolves.remove(key);
+      }
+    });
+  }
+
+  Future<YtmStream> _resolveStreamInner(String videoId,
       {String quality = 'high', bool forceRefresh = false}) async {
     // Check Task 2 in-memory URL cache first
     final urlCache =
@@ -788,9 +819,6 @@ class YtmService {
       }
     }
 
-    // Remember the first classified failure so the caller gets an actionable
-    // error (e.g. BOT_CHALLENGE → "verification" + poToken recovery) instead
-    // of a generic YTM_FAILED that maps to recoveryAction.none (dead end).
     // Remember the first classified failure so the caller gets an actionable
     // error (e.g. BOT_CHALLENGE → "verification" + poToken recovery) instead
     // of a generic YTM_FAILED that maps to recoveryAction.none (dead end).
@@ -910,12 +938,18 @@ class YtmService {
         // Check poToken state heuristically: if we have a cached token, this is warm
         _tracker?.markStage(PlaybackStage.poTokenNeeded);
       } catch (_) {}
+      // maxRetries: 0 — the native side already runs its own multi-client
+      // hedged chain with internal retries. A Dart-level timeout retry can't
+      // cancel the still-running native call, so it just stacks a *second* full
+      // 9-client chain on top of the first, the thread-pool starvation this
+      // class is trying to avoid. Let a timeout fall through to the Dart tier.
       final raw = await _guard(
         () => _channel.invokeMethod<Map<Object?, Object?>>('resolveStream', {
           'videoId': videoId,
           'quality': quality,
         }),
         timeout: _defaultResolveTimeout,
+        maxRetries: 0,
       );
 
       final stream = raw == null ? null : YtmStream.fromChannel(raw);
@@ -955,12 +989,15 @@ class YtmService {
         await invalidatePoToken().timeout(const Duration(seconds: 3));
         final ready = await ensurePoTokenReady().timeout(const Duration(seconds: 6));
         if (ready) {
+          // maxRetries: 0 — this tier IS the single deliberate retry; a
+          // timeout retry here would stack a second native chain (see tier 2).
           final raw = await _guard(
             () => _channel.invokeMethod<Map<Object?, Object?>>('resolveStream', {
               'videoId': videoId,
               'quality': quality,
             }),
             timeout: _defaultResolveTimeout,
+            maxRetries: 0,
           );
           final stream = raw == null ? null : YtmStream.fromChannel(raw);
           if (stream != null) {

@@ -78,27 +78,39 @@ class AdaptiveQualityManager {
       DateTime.now().difference(_lastSwitchAt!) >= cooldown;
 
   Future<String?> reportUnderrun() async {
-    if (!enabled || !_cooledDown) return null;
+    if (!enabled) return null;
+    // Keep feeding observations into the policy even during cooldown so the
+    // counters reflect reality; only the *apply* is gated on the cooldown.
+    // Returning early before touching the policy discarded every event that
+    // arrived inside the window, resetting progress toward a step decision.
     final next = policy.onBufferUnderrun(currentQuality);
-    if (next != null) return _apply(next);
+    if (next != null && _cooledDown) return _apply(next);
     return null;
   }
 
   Future<String?> reportHealthy() async {
-    if (!enabled || !_cooledDown) return null;
+    if (!enabled) return null;
     final next = policy.onHealthyWindow(currentQuality);
-    if (next != null) return _apply(next);
+    if (next != null && _cooledDown) return _apply(next);
     return null;
   }
 
   Future<String?> _apply(String next) async {
-    currentQuality = next;
+    final previous = currentQuality;
     _lastSwitchAt = DateTime.now();
     policy.reset();
-    if (!_switchSubject.isClosed) _switchSubject.add(next);
     try {
       await onSwitchRequested?.call(next);
-    } catch (_) {}
+    } catch (_) {
+      // The hot-swap/re-resolve failed. Stay truthful about the quality that
+      // is actually playing: committing `next` here made every later ladder
+      // decision (qualityRank, step-up ceiling) reason against a quality we
+      // never reached, and the failed switch would never be retried.
+      currentQuality = previous;
+      return null;
+    }
+    currentQuality = next;
+    if (!_switchSubject.isClosed) _switchSubject.add(next);
     return next;
   }
 

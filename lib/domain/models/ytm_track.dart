@@ -175,9 +175,12 @@ class YtmStream {
           raw = segments[index + 1];
         }
       }
-      final epochSeconds = int.tryParse(raw ?? '');
-      if (epochSeconds != null && epochSeconds > 0) {
-        return epochSeconds * 1000;
+      final rawEpoch = int.tryParse(raw ?? '');
+      if (rawEpoch != null && rawEpoch > 0) {
+        // Accept both epoch seconds (the usual googlevideo form) and epoch
+        // millis, matching YtmUrlCache.parseUrlExpiryStamp. Multiplying a value
+        // that is already millis pushed the stamp to ~year 5000 (never expires).
+        return rawEpoch >= 100000000000 ? rawEpoch : rawEpoch * 1000;
       }
     } catch (_) {}
     return null;

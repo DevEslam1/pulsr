@@ -1818,6 +1818,13 @@ class PulsrAudioHandler extends BaseAudioHandler
     final quality = prefs.getString('setting_streaming_quality') ?? 'high';
     final cacheKey = '$videoId:${quality.toLowerCase()}';
 
+    // Snapshot the resolve epoch. If a network-path or quality change bumps it
+    // while this resolve is in flight, the result is bound to a now-stale egress
+    // IP / rendition, so we must not write it back into the cache after the
+    // caller already cleared it (that repopulated the cache with a URL that then
+    // 403s on the new path).
+    final resolveEpoch = _resolveEpoch;
+
     if (!forceRefresh) {
       final cached = _streamCache[cacheKey];
       if (cached != null && cached.expires.isAfter(DateTime.now())) {
@@ -1873,15 +1880,17 @@ class PulsrAudioHandler extends BaseAudioHandler
         expireAt = DateTime.now().add(const Duration(hours: 5));
       }
       final safeExpiry = expireAt.subtract(const Duration(minutes: 5));
-      if (safeExpiry.isAfter(DateTime.now())) {
+      // Drop the write if a network-path/quality change invalidated caches
+      // while we were resolving — otherwise we'd repopulate with a stale URL.
+      if (_resolveEpoch == resolveEpoch && safeExpiry.isAfter(DateTime.now())) {
         _addToStreamCache(cacheKey, (
           url: stream.url,
           expires: safeExpiry,
           userAgent: stream.userAgent,
           cookies: stream.cookies
         ));
+        AudioMemoryManager.trimStreamCache(_streamCache);
       }
-      AudioMemoryManager.trimStreamCache(_streamCache);
       try {
         _latencyTracker?.markStage(PlaybackStage.urlObtained);
       } catch (_) {}
@@ -1893,11 +1902,19 @@ class PulsrAudioHandler extends BaseAudioHandler
       );
     }();
 
-    _inFlightResolves[cacheKey] = future;
+    // Only non-force resolves participate in dedup, and removal is by identity.
+    // A force-refresh must not overwrite (and then, on completion, evict) an
+    // in-flight normal resolve's entry, which left later callers un-deduped and
+    // firing a redundant native chain.
+    if (!forceRefresh) {
+      _inFlightResolves[cacheKey] = future;
+    }
     try {
       return await future;
     } finally {
-      _inFlightResolves.remove(cacheKey);
+      if (identical(_inFlightResolves[cacheKey], future)) {
+        _inFlightResolves.remove(cacheKey);
+      }
     }
   }
 
@@ -1907,6 +1924,12 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   @override
   int _prefetchGeneration = 0;
+
+  /// Bumped whenever a network-path or streaming-quality change invalidates the
+  /// URL caches, so a resolve already in flight won't write its now-stale result
+  /// back after the caches were cleared. See [_resolveStreamUrl].
+  @override
+  int _resolveEpoch = 0;
 
 
   /// Track key shared with the per-song stores (id-based).

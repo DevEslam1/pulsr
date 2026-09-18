@@ -134,9 +134,32 @@ class YtmUrlCache {
         final expiresAt = DateTime.fromMillisecondsSinceEpoch(expiryRaw);
         if (expiresAt.difference(now) < _restoreMinTtl) continue;
         final userAgent = item['userAgent'] as String?;
+        // Rebuild the rich stream from persisted metadata when present, so a
+        // restored entry isn't served with Duration.zero and a guessed
+        // container/bitrate.
+        YtmStream? rebuilt;
+        final mimeType = item['mimeType'] as String?;
+        if (mimeType != null) {
+          rebuilt = YtmStream(
+            videoId: videoId,
+            url: url,
+            mimeType: mimeType,
+            container: item['container'] as String? ?? 'm4a',
+            bitrateKbps: (item['bitrateKbps'] as num?)?.toInt() ?? 0,
+            duration:
+                Duration(milliseconds: (item['durationMs'] as num?)?.toInt() ?? 0),
+            title: item['title'] as String? ?? 'YouTube Track',
+            artist: item['artist'] as String? ?? 'YouTube Music',
+            userAgent: userAgent,
+            expiresAt: expiresAt.millisecondsSinceEpoch,
+          );
+        }
         // Reuse put() so URL stamp parsing / safety margins stay authoritative.
         put(videoId, url,
-            quality: quality, explicitExpiry: expiresAt, userAgent: userAgent);
+            quality: quality,
+            explicitExpiry: expiresAt,
+            userAgent: userAgent,
+            stream: rebuilt);
       }
       debugPrint('[YtmUrlCache] Restored ${_cache.length} cached stream URL(s)');
     } catch (e) {
@@ -161,12 +184,24 @@ class YtmUrlCache {
         if (entry.cookies != null && entry.cookies!.isNotEmpty) continue;
         final sep = e.key.lastIndexOf(':');
         final quality = sep >= 0 ? e.key.substring(sep + 1) : 'high';
+        final s = entry.stream;
         list.add({
           'videoId': entry.videoId,
           'url': entry.url,
           'quality': quality,
           'expiresAt': entry.expiresAt.millisecondsSinceEpoch,
           if (entry.userAgent != null) 'userAgent': entry.userAgent,
+          // Persist the resolved stream metadata so a restored entry rebuilds a
+          // faithful YtmStream instead of one with Duration.zero and a
+          // container/bitrate guessed from the URL.
+          if (s != null) ...{
+            'mimeType': s.mimeType,
+            'container': s.container,
+            'bitrateKbps': s.bitrateKbps,
+            'durationMs': s.duration.inMilliseconds,
+            'title': s.title,
+            'artist': s.artist,
+          },
         });
       }
       await file.writeAsString(jsonEncode(list), flush: false);
@@ -204,8 +239,18 @@ class YtmUrlCache {
   }
 
   /// Checks if a valid, unexpired entry exists in cache.
+  ///
+  /// Unlike [get], a pure existence check does not promote the entry to MRU —
+  /// probing whether something is cached should not reset its eviction aging.
   bool contains(String videoId, {String quality = 'high'}) {
-    return get(videoId, quality: quality) != null;
+    final key = _buildKey(videoId, quality);
+    final entry = _cache[key];
+    if (entry == null) return false;
+    if (entry.isExpired(_clock.now())) {
+      _cache.remove(key);
+      return false;
+    }
+    return true;
   }
 
   /// Stores a resolved stream URL into the LRU cache.
