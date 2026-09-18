@@ -176,8 +176,12 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     // stale higher-quality URL (previously only _streamCache was cleared).
     _streamCache.clear();
     _inFlightResolves.clear();
-    _prefetching.clear();
     _preloadScheduler.clear();
+    // Cancel in-flight prefetches (bumps the prefetch generation) and fence any
+    // in-flight foreground resolve at the old quality so it can't write a
+    // stale-rendition URL back into the freshly-cleared cache.
+    cancelPrefetches();
+    _resolveEpoch++;
     try {
       if (getIt.isRegistered<YtmUrlCache>()) {
         final urlCache = getIt<YtmUrlCache>();
@@ -580,6 +584,10 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     _inFlightResolves.clear();
     _prefetching.clear();
     cancelPrefetches();
+    // Fence any in-flight resolve started before the path change so its result
+    // (bound to the old egress IP) can't repopulate the cache with a URL that
+    // will 403 on the new path.
+    _resolveEpoch++;
   }
 
   // --- SkipSilence + Normalization (InnerTune parity) ---
@@ -784,10 +792,18 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     }
     _lastSmartPrefetchMs = nowMs;
     _lastSmartPrefetchKey = key;
+    // Forward the player's shuffle order so the scheduler warms the tracks that
+    // actually play next in shuffle, instead of uniformly-random picks. Only
+    // pass it when it lines up with our queue; otherwise the scheduler falls
+    // back to random on its own.
+    final shuffleOrder = _activePlayer.shuffleIndices;
+    final shuffleIndices =
+        shuffleOrder.length == _songs.length ? shuffleOrder : null;
     _preloadScheduler.schedulePreloads(
       queue: _songs,
       currentIndex: _currentIndex,
       isShuffle: _activePlayer.shuffleModeEnabled,
+      shuffleIndices: shuffleIndices,
       position: _activePlayer.position,
       duration: _activePlayer.duration ?? Duration.zero,
       preloadCount: _preloadCountForCurrentBucket,
@@ -1184,6 +1200,11 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   // Requires: provided by the composing class (same library).
   int get _prefetchGeneration;
   set _prefetchGeneration(int value);
+
+  // Requires: provided by the composing class (same library).
+  // Bumped on network-path/quality changes to fence stale in-flight resolves.
+  int get _resolveEpoch;
+  set _resolveEpoch(int value);
 
   // Requires: provided by the composing class (same library).
   AudioPlayer get _prefetchPlayer;

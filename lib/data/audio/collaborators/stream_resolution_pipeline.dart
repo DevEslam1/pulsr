@@ -26,6 +26,15 @@ class StreamResolutionPipeline {
   final Map<String, CachedStreamUrl> _streamCache = {};
   final Map<String, Future<({String url, String? userAgent, String? cookies, String quality})>> _inFlightResolves = {};
 
+  /// Cap on the in-memory URL cache. Without a bound it grew for every distinct
+  /// `videoId:quality` seen in a session.
+  static const int _maxCacheEntries = 128;
+
+  /// Treat a cached URL that expires within this window as already stale, so we
+  /// re-resolve rather than hand just_audio a URL that 403s a moment into
+  /// playback.
+  static const Duration _expirySafetyMargin = Duration(seconds: 60);
+
   StreamResolutionPipeline({
     required this.ytmService,
     this.getLatencyTracker,
@@ -35,7 +44,20 @@ class StreamResolutionPipeline {
   Map<String, CachedStreamUrl> get streamCache => _streamCache;
 
   void invalidateCache(String videoId) {
-    _streamCache.removeWhere((k, _) => k.startsWith(videoId));
+    // Keys are `videoId:quality`; anchor the prefix to the separator so a
+    // shorter id can never match a sibling key.
+    _streamCache.removeWhere((k, _) => k.startsWith('$videoId:'));
+  }
+
+  /// Evicts expired entries first, then oldest-inserted, to keep the URL cache
+  /// bounded across a long session.
+  void _pruneCache() {
+    if (_streamCache.length <= _maxCacheEntries) return;
+    final now = DateTime.now();
+    _streamCache.removeWhere((_, v) => !v.expires.isAfter(now));
+    while (_streamCache.length > _maxCacheEntries) {
+      _streamCache.remove(_streamCache.keys.first);
+    }
   }
 
   Future<({String url, String? userAgent, String? cookies, String quality})> resolveStreamUrl(
@@ -71,7 +93,8 @@ class StreamResolutionPipeline {
 
     if (!forceRefresh) {
       final cached = _streamCache[cacheKey];
-      if (cached != null && cached.expires.isAfter(DateTime.now())) {
+      if (cached != null &&
+          cached.expires.isAfter(DateTime.now().add(_expirySafetyMargin))) {
         try {
           getLatencyTracker?.call()?.markStage(PlaybackStage.urlObtained);
         } catch (_) {}
@@ -124,6 +147,7 @@ class StreamResolutionPipeline {
         userAgent: stream.userAgent,
         cookies: stream.cookies,
       );
+      _pruneCache();
 
       try {
         getLatencyTracker?.call()?.markStage(PlaybackStage.urlObtained);
@@ -137,11 +161,19 @@ class StreamResolutionPipeline {
       );
     }();
 
-    _inFlightResolves[cacheKey] = future;
+    // Only register non-force resolves for dedup, and remove by identity. A
+    // force-refresh must not overwrite an in-flight normal resolve's entry,
+    // and a completing resolve must not evict a *different* future that
+    // replaced it in the map (which left later callers un-deduped).
+    if (!forceRefresh) {
+      _inFlightResolves[cacheKey] = future;
+    }
     try {
       return await future;
     } finally {
-      _inFlightResolves.remove(cacheKey);
+      if (identical(_inFlightResolves[cacheKey], future)) {
+        _inFlightResolves.remove(cacheKey);
+      }
     }
   }
 

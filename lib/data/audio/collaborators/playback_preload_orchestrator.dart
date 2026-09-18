@@ -61,11 +61,13 @@ class PlaybackPreloadOrchestrator {
     required bool isShuffle,
     required Duration position,
     required Duration duration,
+    List<int>? shuffleIndices,
   }) {
     scheduler.schedulePreloads(
       queue: queue,
       currentIndex: currentIndex,
       isShuffle: isShuffle,
+      shuffleIndices: shuffleIndices,
       position: position,
       duration: duration,
     );

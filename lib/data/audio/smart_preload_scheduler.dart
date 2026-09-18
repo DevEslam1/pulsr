@@ -32,6 +32,7 @@ class SmartPreloadScheduler {
     required bool isShuffle,
     required Duration position,
     required Duration duration,
+    List<int>? shuffleIndices,
     int preloadCount = 3,
   }) {
     if (queue.isEmpty || currentIndex < 0 || currentIndex >= queue.length) {
@@ -50,6 +51,23 @@ class SmartPreloadScheduler {
 
     final effectiveCount = preloadCount.clamp(1, 5);
     if (isShuffle) {
+      // Preload the tracks that actually play next in shuffle order when the
+      // shuffle mapping is known. Falling back to random picks warmed tracks
+      // that mostly won't play next and missed the real next track.
+      if (shuffleIndices != null && shuffleIndices.isNotEmpty) {
+        final pos = shuffleIndices.indexOf(currentIndex);
+        if (pos >= 0) {
+          for (int i = 1; i <= effectiveCount; i++) {
+            final p = pos + i;
+            if (p >= shuffleIndices.length) break;
+            final idx = shuffleIndices[p];
+            if (idx >= 0 && idx < queue.length) {
+              _preloadTrack(queue[idx], priority: i);
+            }
+          }
+          return;
+        }
+      }
       _preloadRandomTracks(queue, currentIndex, count: effectiveCount);
     } else {
       for (int i = 1; i <= effectiveCount; i++) {
