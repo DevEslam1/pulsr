@@ -255,7 +255,7 @@ internal class InnertubeClient(
 
         // These are written from up to three pool threads during the hedged
         // race, so they cannot be plain captured vars.
-        val lastSignalRef = java.util.concurrent.atomic.AtomicReference(YtmBlockSignal.RateLimited)
+        val lastSignalRef = java.util.concurrent.atomic.AtomicReference<YtmBlockSignal?>(null)
         val lastExceptionRef = java.util.concurrent.atomic.AtomicReference<Throwable?>(null)
 
         // Priority-based signal update: a BotChallenge seen on client 1 must not
@@ -281,7 +281,7 @@ internal class InnertubeClient(
         fun updateBestSignal(newSignal: YtmBlockSignal?) {
             if (newSignal == null) return
             lastSignalRef.updateAndGet { current ->
-                if (signalPriority(newSignal) > signalPriority(current)) newSignal else current
+                if (current == null || signalPriority(newSignal) > signalPriority(current)) newSignal else current
             }
         }
 
@@ -337,8 +337,8 @@ internal class InnertubeClient(
                         // still valid just burns a BotGuard round trip and churns
                         // state for an IP-level verdict the token cannot change.
                         val now = android.os.SystemClock.elapsedRealtime()
-                        if (now - lastBotRefreshTriggerMs > 30_000L) {
-                            lastBotRefreshTriggerMs = now
+                        val prev = lastBotRefreshTriggerMs.get()
+                        if (now - prev > 30_000L && lastBotRefreshTriggerMs.compareAndSet(prev, now)) {
                             PoTokenManager.invalidate()
                             PoTokenManager.triggerBackgroundRefresh()
                         }
@@ -371,12 +371,12 @@ internal class InnertubeClient(
                     if (isEgressBlock || guestSignInAsBlock) {
                         blockClients.add(client.name)
                         val count = blockSignalCount.incrementAndGet()
-                        if (count >= 3) {
+                        if (count >= 6) {
                             Log.w(TAG, "[$traceId] Short-circuiting chain: $count block signals ($parsedSignal) from (${blockClients.joinToString()}) for $videoId")
                             shortCircuit.compareAndSet(
                                 null,
                                 InnertubeException(
-                                    signal = lastSignalRef.get(),
+                                    signal = lastSignalRef.get() ?: YtmBlockSignal.NetworkUnavailable,
                                     message = "Blocked by $count clients (${blockClients.joinToString()}) for video $videoId",
                                     traceId = traceId
                                 )
@@ -541,8 +541,8 @@ internal class InnertubeClient(
         // datasyncId it harvested still benefits the chain below.
         if (cookieStore.isSessionValid() && PoTokenManager.dataSyncId.isEmpty()) {
             val now = android.os.SystemClock.elapsedRealtime()
-            if (now - lastDataSyncBootstrapMs > DATASYNC_BOOTSTRAP_INTERVAL_MS) {
-                lastDataSyncBootstrapMs = now
+            val prev = lastDataSyncBootstrapMs.get()
+            if (now - prev > DATASYNC_BOOTSTRAP_INTERVAL_MS && lastDataSyncBootstrapMs.compareAndSet(prev, now)) {
                 val bootstrapped = attemptClient(ClientType.WEB_REMIX)
                 if (bootstrapped != null) {
                     winnerStore.recordWinningClient(trackType, ClientType.WEB_REMIX)
@@ -692,7 +692,7 @@ internal class InnertubeClient(
         }
 
         shortCircuit.get()?.let { sc ->
-            if (sc.signal == YtmBlockSignal.BotChallenge) {
+            if (sc.signal == YtmBlockSignal.BotChallenge || sc.signal == YtmBlockSignal.PoTokenInvalid) {
                 tryPoTokenRecovery()?.let { return it }
             }
             throw sc
@@ -709,7 +709,7 @@ internal class InnertubeClient(
                 winnerStore.recordFailure(trackType, client)
             }
             shortCircuit.get()?.let { sc ->
-                if (sc.signal == YtmBlockSignal.BotChallenge) {
+                if (sc.signal == YtmBlockSignal.BotChallenge || sc.signal == YtmBlockSignal.PoTokenInvalid) {
                     tryPoTokenRecovery()?.let { return it }
                 }
                 throw sc
@@ -719,7 +719,7 @@ internal class InnertubeClient(
         tryPoTokenRecovery()?.let { return it }
 
         throw InnertubeException(
-            signal = lastSignalRef.get(),
+            signal = lastSignalRef.get() ?: YtmBlockSignal.NetworkUnavailable,
             message = "All Innertube client fallback resolutions failed for video $videoId",
             traceId = traceId,
             cause = lastExceptionRef.get()
@@ -980,6 +980,11 @@ internal class InnertubeClient(
                 if (code in 500..599) {
                     Log.w(TAG, "[$traceId] Server error ($code) on attempt $attempt. Retrying...")
                     response.close()
+                    lastError = InnertubeException(
+                        signal = YtmBlockSignal.NetworkUnavailable,
+                        message = "Server error ($code) from ${clientType.name}",
+                        traceId = traceId
+                    )
                     val sleepMs = (1000L shl attempt) + (0..500).random()
                     sleepAfterAttemptMs = sleepMs
                     continue
@@ -1242,10 +1247,8 @@ internal class InnertubeClient(
         const val HEDGE_RACE_TIMEOUT_MS = 3000L
         private const val DATASYNC_BOOTSTRAP_INTERVAL_MS = 300_000L
         // Last bot-refresh trigger across all resolve calls (throttle).
-        @Volatile
-        private var lastBotRefreshTriggerMs = 0L
-        @Volatile
-        private var lastDataSyncBootstrapMs = 0L
+        private val lastBotRefreshTriggerMs = java.util.concurrent.atomic.AtomicLong(0L)
+        private val lastDataSyncBootstrapMs = java.util.concurrent.atomic.AtomicLong(0L)
         var API_KEY: String = YtmConfig.getYtmApiKey()
         @Volatile
         private var _streamResolverPool: java.util.concurrent.ExecutorService? = null

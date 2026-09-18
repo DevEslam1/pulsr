@@ -182,6 +182,7 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     // stale-rendition URL back into the freshly-cleared cache.
     cancelPrefetches();
     _resolveEpoch++;
+    _streamResolutionPipeline.clearNetworkCaches();
     try {
       if (getIt.isRegistered<YtmUrlCache>()) {
         final urlCache = getIt<YtmUrlCache>();
@@ -588,6 +589,7 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     // (bound to the old egress IP) can't repopulate the cache with a URL that
     // will 403 on the new path.
     _resolveEpoch++;
+    _streamResolutionPipeline.clearNetworkCaches();
   }
 
   // --- SkipSilence + Normalization (InnerTune parity) ---
@@ -1236,6 +1238,9 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
 
   // Requires: provided by the composing class (same library).
   StreamPreResolver get _streamPreResolver;
+
+  // Requires: provided by the composing class (same library).
+  StreamResolutionPipeline get _streamResolutionPipeline;
 
   // Requires: provided by the composing class (same library).
   YtmService get _ytmService;

@@ -160,6 +160,11 @@ internal class ResolutionStrategy(
                 val cap = ClientCapabilityMatrix.getCapability(it)
                 (!cap.requiresJsSignature || hasJsEngine) && (!limitedMode || !cap.requiresPoToken)
             }.ifEmpty {
+                baseChain.filter {
+                    val cap = ClientCapabilityMatrix.getCapability(it)
+                    (!cap.requiresJsSignature || hasJsEngine) && (!limitedMode || !cap.requiresPoToken)
+                }
+            }.ifEmpty {
                 listOf(InnertubeClient.ClientType.IOS_MUSIC)
             }
         }

@@ -34,7 +34,10 @@ class StreamPreResolver {
     this.qualityProvider = _defaultQuality,
     this.debounceDuration = const Duration(milliseconds: 100),
     this.isAlreadyPrefetching,
+    this.repeatQueueProvider,
   });
+
+  final bool Function()? repeatQueueProvider;
 
   static String _defaultQuality() => 'high';
 
@@ -120,11 +123,13 @@ class StreamPreResolver {
   }) {
     if (queue.isEmpty || currentIndex < 0) return;
 
+    final repeatQueue = repeatQueueProvider?.call() ?? false;
     final nextSong = _determineNextSong(
       queue: queue,
       currentIndex: currentIndex,
       isShuffle: isShuffle,
       shuffleIndices: shuffleIndices,
+      repeatQueue: repeatQueue,
     );
 
     if (nextSong == null) return;
@@ -185,6 +190,7 @@ class StreamPreResolver {
     required int currentIndex,
     required bool isShuffle,
     List<int>? shuffleIndices,
+    bool repeatQueue = false,
   }) {
     if (queue.isEmpty) return null;
 
@@ -196,6 +202,11 @@ class StreamPreResolver {
         if (nextOriginalIndex >= 0 && nextOriginalIndex < queue.length) {
           return queue[nextOriginalIndex];
         }
+      } else if (repeatQueue && shuffleIndices.isNotEmpty) {
+        final firstOriginalIndex = shuffleIndices.first;
+        if (firstOriginalIndex >= 0 && firstOriginalIndex < queue.length) {
+          return queue[firstOriginalIndex];
+        }
       }
     }
 
@@ -203,8 +214,8 @@ class StreamPreResolver {
     final nextIndex = currentIndex + 1;
     if (nextIndex < queue.length) {
       return queue[nextIndex];
-    } else if (queue.length > 1) {
-      // Loop around to head if repeat queue or wrap
+    } else if (queue.length > 1 && repeatQueue) {
+      // Loop around to head only if repeat queue is enabled
       return queue.first;
     }
     return null;

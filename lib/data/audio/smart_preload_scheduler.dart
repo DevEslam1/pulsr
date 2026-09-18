@@ -8,11 +8,18 @@ class SmartPreloadScheduler {
   final Future<void> Function(SongsTableData song, {required int priority})
       onPreloadRequested;
   final String Function()? qualityProvider;
+  final void Function()? onCancelRequested;
 
   final Map<String, DateTime> _scheduledKeys = {};
   static const _keyTtl = Duration(hours: 4);
+  int _generation = 0;
+  int get generation => _generation;
 
-  SmartPreloadScheduler({required this.onPreloadRequested, this.qualityProvider});
+  SmartPreloadScheduler({
+    required this.onPreloadRequested,
+    this.qualityProvider,
+    this.onCancelRequested,
+  });
 
   String _dedupKey(SongsTableData song) {
     // Unified with AudioHandler's `videoId:quality` cache keys so a quality
@@ -120,8 +127,13 @@ class SmartPreloadScheduler {
     onPreloadRequested(song, priority: priority);
   }
 
-  /// Clears scheduled cache keys on queue changes.
+  /// Clears scheduled cache keys and cancels in-flight preloads on queue changes.
   void clear() {
     _scheduledKeys.clear();
+    _generation++;
+    onCancelRequested?.call();
   }
+
+  /// Cancels in-flight preloads and clears state.
+  void cancel() => clear();
 }
