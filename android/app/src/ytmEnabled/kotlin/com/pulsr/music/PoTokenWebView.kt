@@ -426,6 +426,13 @@ internal class PoTokenWebView private constructor(
         } catch (e: TimeoutException) {
             onTimeout()
             throw PoTokenException("Timed out after ${timeoutSeconds}s $what")
+        } catch (e: InterruptedException) {
+            // The caller's wait was interrupted (e.g. a hedged resolver thread
+            // being cancelled). Drop this identifier's pending future so a later
+            // mint cannot be matched to a stale waiter, then restore the flag.
+            onTimeout()
+            Thread.currentThread().interrupt()
+            throw PoTokenException("Interrupted while $what")
         }
     }
 }

@@ -11,6 +11,7 @@ abstract class SmartPlaylistBuilderState with _$SmartPlaylistBuilderState {
     @Default('') String name,
     @Default(SmartCriteria()) SmartCriteria criteria,
     @Default([]) List<SongsTableData> previewSongs,
+    @Default(false) bool previewTruncated,
     @Default(false) bool isSubmitting,
     @Default(false) bool isEditing,
     int? editingPlaylistId,

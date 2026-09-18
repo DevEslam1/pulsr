@@ -7,6 +7,9 @@ import '../../../../core/services/ytm_cache_manager.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 /// Storage & Cache section widget: displays album artwork cache size,
 /// YouTube stream cache size (if YTM enabled), cache clearing affordances,
@@ -79,27 +82,27 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
       children: [
         ListTile(
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
           leading: Container(
             width: 38,
             height: 38,
             decoration: BoxDecoration(
               color: p.accentContainer,
-              borderRadius: BorderRadius.circular(11),
+              borderRadius: BorderRadius.circular(AppRadii.r12),
             ),
             child: Icon(Icons.photo_size_select_actual_rounded,
                 color: p.accent, size: 20),
           ),
           title: Text(
             context.l10n.artworkCache,
-            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: AppFontSize.body),
           ),
           subtitle: Text(
             _isLoading
                 ? context.l10n.calculating
                 : context.l10n.cacheUsedOfMax(
                     _formatSize(_artCacheSizeBytes), maxMb),
-            style: TextStyle(color: p.textSecondary, fontSize: 12),
+            style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
           ),
           trailing: TextButton.icon(
             style: TextButton.styleFrom(
@@ -124,27 +127,27 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
         if (AppConfig.ytmEnabled) ...[
           ListTile(
             contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
             leading: Container(
               width: 38,
               height: 38,
               decoration: BoxDecoration(
                 color: p.error.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(11),
+                borderRadius: BorderRadius.circular(AppRadii.r12),
               ),
               child: Icon(Icons.cloud_download_rounded,
                   color: p.error, size: 20),
             ),
             title: Text(
               context.l10n.youtubeStreamDiskCache,
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: AppFontSize.body),
             ),
             subtitle: Text(
               _isLoading
                   ? context.l10n.calculating
                   : context.l10n.streamCacheCachedForReplay(
                       _formatSize(_streamCacheSizeBytes)),
-              style: TextStyle(color: p.textSecondary, fontSize: 12),
+              style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
             ),
             trailing: TextButton.icon(
               style: TextButton.styleFrom(
@@ -171,24 +174,24 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
         ],
         ListTile(
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
           leading: Container(
             width: 38,
             height: 38,
             decoration: BoxDecoration(
               color: p.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(11),
+              borderRadius: BorderRadius.circular(AppRadii.r12),
             ),
             child:
                 Icon(Icons.disc_full_rounded, color: p.textSecondary, size: 20),
           ),
           title: Text(
             context.l10n.maximumArtworkCacheLimit,
-            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: AppFontSize.body),
           ),
           subtitle: Text(
             context.l10n.maxMbAutoEvicts(maxMb),
-            style: TextStyle(color: p.textSecondary, fontSize: 12),
+            style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
           ),
           trailing: Icon(Icons.chevron_right_rounded,
               size: 20, color: p.textTertiary),
@@ -208,23 +211,23 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
       builder: (ctx) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 20),
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.s20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
                   child: Text(
                     context.l10n.maximumArtworkCacheLimit,
                     style: TextStyle(
                       color: p.textPrimary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      fontSize: AppFontSize.title,
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.sm),
                 ...options.map((limit) {
                   final isSelected = manager.maxCacheSizeMb == limit;
                   return ListTile(
@@ -233,7 +236,7 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
                       style: TextStyle(
                         color: isSelected ? p.accent : p.textPrimary,
                         fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.normal,
+                            isSelected ? FontWeight.w700 : FontWeight.normal,
                       ),
                     ),
                     trailing: isSelected

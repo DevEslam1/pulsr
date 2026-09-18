@@ -9,6 +9,9 @@ import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class ViperDdcSheet extends StatefulWidget {
   const ViperDdcSheet({super.key});
@@ -95,10 +98,10 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
         final cubit = context.read<PlayerCubit>();
 
         return Container(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, AppSpacing.xl),
           decoration: BoxDecoration(
             color: p.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
           ),
           child: SingleChildScrollView(
             child: Column(
@@ -110,24 +113,24 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                     height: 4,
                     decoration: BoxDecoration(
                       color: p.textSecondary.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(AppRadii.r2),
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Row(
                       children: [
                         Icon(Icons.headphones_rounded, color: p.primary),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: AppSpacing.s10),
                         Text(
                           'ViPER-DDC',
                           style: TextStyle(
                             color: p.textPrimary,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                            fontSize: AppFontSize.title,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ],
@@ -143,16 +146,16 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                 ),
                 Text(
                   AudioFeatureRegistry.viperDdc.subtitle,
-                  style: TextStyle(color: p.textSecondary, fontSize: 13),
+                  style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
 
                 // Current loaded profile card
                 Container(
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.all(AppSpacing.s14),
                   decoration: BoxDecoration(
                     color: p.surfaceContainer,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(AppRadii.r16),
                     border: Border.all(
                       color: state.isViperDdcEnabled
                           ? p.primary.withValues(alpha: 0.3)
@@ -162,7 +165,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(10),
+                        padding: const EdgeInsets.all(AppSpacing.s10),
                         decoration: BoxDecoration(
                           color: (state.isViperDdcEnabled ? p.primary : p.textSecondary)
                               .withValues(alpha: 0.12),
@@ -174,7 +177,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                           size: 22,
                         ),
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: AppSpacing.s14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -182,11 +185,11 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                             Text(context.l10n.activeProfile,
                               style: TextStyle(
                                 color: p.textTertiary,
-                                fontSize: 11,
+                                fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: AppSpacing.s2),
                             Text(
                               state.viperDdcProfileName.isNotEmpty
                                   ? state.viperDdcProfileName
@@ -195,8 +198,8 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                 color: state.viperDdcProfileName.isNotEmpty
                                     ? p.textPrimary
                                     : p.textTertiary,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
+                                fontSize: AppFontSize.body,
+                                fontWeight: FontWeight.w700,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -212,7 +215,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                           backgroundColor: p.primary,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(AppRadii.r12),
                           ),
                           visualDensity: VisualDensity.compact,
                         ),
@@ -220,20 +223,20 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.s20),
 
                 Text(context.l10n.refHpProfiles,
                   style: TextStyle(
                     color: p.textPrimary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
+                    fontSize: AppFontSize.body,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.s10),
                 ..._builtInProfiles.entries.map((entry) {
                   final isSelected = state.viperDdcProfileName == entry.key;
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
                     child: InkWell(
                       onTap: () {
                         cubit.setViperDdcEnabled(
@@ -242,15 +245,16 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                           coeffs: entry.value,
                         );
                       },
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppRadii.r14),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
+
+                            horizontal: AppSpacing.s14, vertical: AppSpacing.sm),
                         decoration: BoxDecoration(
                           color: isSelected
                               ? p.primary.withValues(alpha: 0.12)
                               : p.surfaceContainer,
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(AppRadii.r14),
                           border: Border.all(
                             color: isSelected
                                 ? p.primary
@@ -266,7 +270,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                               color: isSelected ? p.primary : p.textSecondary,
                               size: 18,
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: AppSpacing.sm),
                             Expanded(
                               child: Text(
                                 entry.key,
@@ -274,9 +278,9 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                   color: isSelected
                                       ? p.textPrimary
                                       : p.textSecondary,
-                                  fontSize: 13,
+                                  fontSize: AppFontSize.bodySmall,
                                   fontWeight: isSelected
-                                      ? FontWeight.bold
+                                      ? FontWeight.w700
                                       : FontWeight.normal,
                                 ),
                               ),
@@ -284,16 +288,17 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                             if (isSelected)
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 2),
+
+                                    horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
                                 decoration: BoxDecoration(
                                   color: p.primary,
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(AppRadii.r8),
                                 ),
                                 child: Text(context.l10n.activeLabel,
                                   style: TextStyle(
                                     color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
+                                    fontSize: AppFontSize.tiny,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ),

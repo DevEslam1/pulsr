@@ -11,6 +11,9 @@ import '../../cubit/player_state.dart';
 
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_switch.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 /// Bottom sheet entry point for Quran Mode.
 class QuranModeSheet extends StatelessWidget {
@@ -31,7 +34,7 @@ class QuranModeSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             QuranModePanel(),
-            SizedBox(height: 16),
+            SizedBox(height: AppSpacing.md),
           ],
         ),
       ),
@@ -76,19 +79,19 @@ class _QuranModePanelState extends State<QuranModePanel> {
           children: [
             // Header
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+              padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.xxs, AppSpacing.s20, 0),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(AppSpacing.s10),
                     decoration: BoxDecoration(
                       color: p.accent.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppRadii.r14),
                     ),
                     child: Icon(Icons.menu_book_rounded,
                         color: p.accent, size: 22),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -96,12 +99,12 @@ class _QuranModePanelState extends State<QuranModePanel> {
                         Text(context.l10n.quranMode,
                             style: TextStyle(
                               color: p.textPrimary,
-                              fontSize: 18,
+                              fontSize: AppFontSize.title,
                               fontWeight: FontWeight.w800,
                             )),
                         Text(context.l10n.reciterDesc,
                           style:
-                              TextStyle(color: p.textSecondary, fontSize: 12),
+                              TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
                         ),
                       ],
                     ),
@@ -113,27 +116,26 @@ class _QuranModePanelState extends State<QuranModePanel> {
                 ],
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.s14),
 
             // Reciter styles
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
               child: Text(context.l10n.reciterStyle,
                   style: TextStyle(
                     color: p.textSecondary,
-                    fontSize: 11,
+                    fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: 0.6,
+                    letterSpacing: AppTracking.overline,
                   )),
             ),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 40,
+            const SizedBox(height: AppSpacing.xs),
+            SizedBox(height: AppSpacing.s40,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
                 itemCount: QuranReciterStyle.values.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs),
                 itemBuilder: (context, i) {
                   final s = QuranReciterStyle.values[i];
                   final selected = s == style;
@@ -144,7 +146,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
                     labelStyle: TextStyle(
                       color: selected ? p.onAccent : p.textPrimary,
                       fontWeight: FontWeight.w700,
-                      fontSize: 12,
+                      fontSize: AppFontSize.label,
                     ),
                     backgroundColor: p.surfaceContainer,
                     selectedColor: p.accent,
@@ -154,15 +156,15 @@ class _QuranModePanelState extends State<QuranModePanel> {
                 },
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.s6),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
               child: Text(
                 '${style.tagline} • ${style.description}',
-                style: TextStyle(color: p.textTertiary, fontSize: 11.5),
+                style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
 
             // Tuning sliders
             _QuranSliderTile(
@@ -191,11 +193,11 @@ class _QuranModePanelState extends State<QuranModePanel> {
 
             // Learning speed
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
+              padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.s6, AppSpacing.s20, 0),
               child: Row(
                 children: [
                   Icon(Icons.speed_rounded, color: p.textSecondary, size: 20),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -203,20 +205,20 @@ class _QuranModePanelState extends State<QuranModePanel> {
                         Text(context.l10n.learningSpeed,
                             style: TextStyle(
                                 color: p.textPrimary,
-                                fontSize: 14,
+                                fontSize: AppFontSize.body,
                                 fontWeight: FontWeight.w700)),
                         Text(context.l10n.reciterSpeedDesc,
                             style: TextStyle(
-                                color: p.textSecondary, fontSize: 12)),
+                                color: p.textSecondary, fontSize: AppFontSize.label)),
                       ],
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
               child: SegmentedButton<double>(
                 segments: const [
                   ButtonSegment(value: 0.5, label: Text('0.5x')),
@@ -238,22 +240,22 @@ class _QuranModePanelState extends State<QuranModePanel> {
                 ),
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: AppSpacing.s18),
 
             // Detected output hardware
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
               child: Text(context.l10n.outputHardware,
                   style: TextStyle(
                     color: p.textSecondary,
-                    fontSize: 11,
+                    fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: 0.6,
+                    letterSpacing: AppTracking.overline,
                   )),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
               child: FutureBuilder<EarbudCapabilities>(
                 future: _capsFuture,
                 builder: (context, snap) {
@@ -261,12 +263,12 @@ class _QuranModePanelState extends State<QuranModePanel> {
                     return _card(
                       p,
                       Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
                         child: Text(
                           context.l10n.outputHardware,
                           style: TextStyle(
                             color: p.textSecondary,
-                            fontSize: 12,
+                            fontSize: AppFontSize.label,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -278,9 +280,8 @@ class _QuranModePanelState extends State<QuranModePanel> {
                       p,
                       const Center(
                         child: Padding(
-                          padding: EdgeInsets.all(16),
-                          child: SizedBox(
-                            width: 18,
+                          padding: EdgeInsets.all(AppSpacing.md),
+                          child: SizedBox(width: AppSpacing.s18,
                             height: 18,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           ),
@@ -307,13 +308,13 @@ class _QuranModePanelState extends State<QuranModePanel> {
                           context.l10n.dspLatency,
                           caps.isBluetooth ? '~${caps.latencyMs} ms' : '—',
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: AppSpacing.s6),
                         Text(
                           caps.isBluetooth
                               ? context.l10n.dspBluetoothCompensationDesc
                               : context.l10n.dspWiredCompensationDesc,
                           style:
-                              TextStyle(color: p.textTertiary, fontSize: 11),
+                              TextStyle(color: p.textTertiary, fontSize: AppFontSize.caption),
                         ),
                       ],
                     ),
@@ -321,11 +322,11 @@ class _QuranModePanelState extends State<QuranModePanel> {
                 },
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
 
             // Reset
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
               child: Row(
                 children: [
                   Expanded(
@@ -345,11 +346,11 @@ class _QuranModePanelState extends State<QuranModePanel> {
                 ],
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.s6),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
               child: Text(context.l10n.sibilanceDesc,
-                style: TextStyle(color: p.textTertiary, fontSize: 10.5),
+                style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.tiny),
               ),
             ),
           ],
@@ -361,10 +362,10 @@ class _QuranModePanelState extends State<QuranModePanel> {
   Widget _card(PulsrPalette p, Widget child) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(AppSpacing.s14),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadii.r14),
         border: Border.all(color: p.hairline),
       ),
       child: child,
@@ -373,20 +374,20 @@ class _QuranModePanelState extends State<QuranModePanel> {
 
   Widget _kv(PulsrPalette p, String k, String v) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.s2),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
             width: 66,
             child:
-                Text(k, style: TextStyle(color: p.textTertiary, fontSize: 12)),
+                Text(k, style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label)),
           ),
           Expanded(
             child: Text(v,
                 style: TextStyle(
                     color: p.textPrimary,
-                    fontSize: 12,
+                    fontSize: AppFontSize.label,
                     fontWeight: FontWeight.w600)),
           ),
         ],
@@ -420,14 +421,14 @@ class _QuranSliderTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, 0, AppSpacing.s20, AppSpacing.xxs),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Icon(icon, color: p.textSecondary, size: 20),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -435,18 +436,18 @@ class _QuranSliderTile extends StatelessWidget {
                     Text(title,
                         style: TextStyle(
                             color: p.textPrimary,
-                            fontSize: 14,
+                            fontSize: AppFontSize.body,
                             fontWeight: FontWeight.w700)),
                     Text(subtitle,
                         style:
-                            TextStyle(color: p.textSecondary, fontSize: 12)),
+                            TextStyle(color: p.textSecondary, fontSize: AppFontSize.label)),
                   ],
                 ),
               ),
               Text(valueLabel,
                   style: TextStyle(
                       color: p.accent,
-                      fontSize: 12,
+                      fontSize: AppFontSize.label,
                       fontWeight: FontWeight.w700)),
             ],
           ),

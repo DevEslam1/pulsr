@@ -11,6 +11,9 @@ import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../settings/cubit/settings_cubit.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 class CustomThemeBuilderScreen extends StatefulWidget {
   const CustomThemeBuilderScreen({super.key});
@@ -92,16 +95,16 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(context.l10n.pasteThemeJson,
-              style: TextStyle(color: p.textSecondary, fontSize: 13),
+              style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
             TextField(
               controller: controller,
               maxLines: 6,
               style: TextStyle(
                 color: p.textPrimary,
                 fontFamily: 'monospace',
-                fontSize: 12,
+                fontSize: AppFontSize.label,
               ),
               decoration: InputDecoration(
                 hintText: '{\n  "accentColor": 4288388853,\n  "cornerRadius": 24.0,\n  ...\n}',
@@ -109,7 +112,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                 filled: true,
                 fillColor: p.surfaceCard,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadii.r12),
                   borderSide: BorderSide(color: p.hairline),
                 ),
               ),
@@ -185,7 +188,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
           elevation: 0,
           leading: const PulsrBackButton(),
           title: Text(context.l10n.themeStudio,
-            style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.bold),
+            style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700),
           ),
           actions: [
             IconButton(
@@ -201,14 +204,14 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
           ],
         ),
         body: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, 120),
           children: [
             // Live Theme Preview Card
             Container(
               height: 220,
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpacing.md),
               decoration: BoxDecoration(
-                color: const Color(0xFF14172B),
+                color: AppColors.darkSurface,
                 borderRadius: BorderRadius.circular(_cornerRadius),
                 border: Border.all(
                     color: Color(_accentColor).withValues(alpha: 0.4),
@@ -237,7 +240,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                         child: Icon(Icons.music_note_rounded,
                             color: Color(_accentColor), size: 32),
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: AppSpacing.s14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -245,15 +248,15 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                             Text(context.l10n.livePreview,
                               style: TextStyle(
                                   color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold),
+                                  fontSize: AppFontSize.bodyLarge,
+                                  fontWeight: FontWeight.w700),
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: AppSpacing.s2),
                             Text(
                               context.l10n.dspPulsrAudiophileEdition,
                               style: TextStyle(
                                   color: Colors.white.withValues(alpha: 0.7),
-                                  fontSize: 12),
+                                  fontSize: AppFontSize.label),
                             ),
                           ],
                         ),
@@ -267,15 +270,15 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                     valueColor:
                         AlwaysStoppedAnimation<Color>(Color(_accentColor)),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.sm),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Icon(Icons.skip_previous_rounded,
                           color: Colors.white, size: 28),
-                      const SizedBox(width: 24),
+                      const SizedBox(width: AppSpacing.lg),
                       Container(
-                        padding: const EdgeInsets.all(10),
+                        padding: const EdgeInsets.all(AppSpacing.s10),
                         decoration: BoxDecoration(
                           color: Color(_accentColor),
                           shape: BoxShape.circle,
@@ -283,7 +286,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                         child: const Icon(Icons.play_arrow_rounded,
                             color: Colors.black, size: 28),
                       ),
-                      const SizedBox(width: 24),
+                      const SizedBox(width: AppSpacing.lg),
                       const Icon(Icons.skip_next_rounded,
                           color: Colors.white, size: 28),
                     ],
@@ -291,15 +294,15 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.lg),
 
             Text(context.l10n.accentPalette,
               style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
+                  fontSize: AppFontSize.callout,
+                  fontWeight: FontWeight.w700,
                   color: p.textPrimary),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
             Wrap(
               spacing: 12,
               runSpacing: 12,
@@ -331,13 +334,13 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                 );
               }).toList(),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.lg),
 
             Text(
               context.l10n.cornerRadiusLabel(_cornerRadius.round()),
               style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
+                  fontSize: AppFontSize.callout,
+                  fontWeight: FontWeight.w700,
                   color: p.textPrimary),
             ),
             Slider(
@@ -349,14 +352,14 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
               onChangeEnd: (val) =>
                   context.read<SettingsCubit>().setCustomThemeRadius(val),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
 
             SwitchListTile(
               title: Text(context.l10n.ambientGlow,
                   style: TextStyle(
                       color: p.textPrimary, fontWeight: FontWeight.w600)),
               subtitle: Text(context.l10n.glowDesc,
-                  style: TextStyle(color: p.textSecondary, fontSize: 12)),
+                  style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label)),
               value: _glowEnabled,
               activeThumbColor: Color(_accentColor),
               onChanged: (val) {

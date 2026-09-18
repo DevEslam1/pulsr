@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
@@ -15,6 +16,8 @@ import '../../../domain/usecases/get_albums_usecase.dart';
 import '../../../core/errors/failures.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../sheets/song_info_sheet.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class AlbumDetailScreen extends StatefulWidget {
   final AlbumsTableData album;
@@ -38,6 +41,33 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   void initState() {
     super.initState();
     _useCase = widget.getAlbumsUseCase ?? getIt<GetAlbumsUseCase>();
+    _loadSortPreference();
+  }
+
+  String _sortPrefsKey(int albumId) => 'album_sort_$albumId';
+
+  Future<void> _loadSortPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final stored = prefs.getString(_sortPrefsKey(widget.album.id));
+      if (stored == null) return;
+      final matches =
+          _AlbumSort.values.where((e) => e.name == stored).toList();
+      if (matches.isNotEmpty && mounted) {
+        setState(() => _sort = matches.first);
+      }
+    } catch (_) {
+      // Preference load is best-effort; keep the default sort on failure.
+    }
+  }
+
+  Future<void> _persistSort(_AlbumSort sort) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_sortPrefsKey(widget.album.id), sort.name);
+    } catch (_) {
+      // Persisting the preference is best-effort.
+    }
   }
 
   List<SongsTableData> _sorted(List<SongsTableData> songs) {
@@ -72,7 +102,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         body: StreamBuilder<Result<List<SongsTableData>>>(
           stream: _useCase.watchAlbumSongs(album.id),
           builder: (context, snapshot) {
-            if (snapshot.hasError) {
+            final loadFailed = snapshot.hasError ||
+                (snapshot.data?.fold((l) => true, (_) => false) ?? false);
+            if (loadFailed) {
               return _AlbumErrorView(onRetry: () => setState(() {}));
             }
             final rawSongs =
@@ -111,18 +143,18 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                                   borderRadius: 24,
                                 ),
                               ),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: AppSpacing.sm),
                               Text(album.title,
                                   textAlign: TextAlign.center,
                                   style: Theme.of(context)
                                       .textTheme
                                       .headlineSmall),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: AppSpacing.xxs),
                               Text(
                                   '${album.artist} • ${Formatters.formatTrackCount(songs.length)}',
                                   style: TextStyle(
-                                      color: p.textSecondary, fontSize: 13)),
-                              const SizedBox(height: 16),
+                                      color: p.textSecondary, fontSize: AppFontSize.bodySmall)),
+                              const SizedBox(height: AppSpacing.md),
                             ],
                           ),
                         ),
@@ -146,7 +178,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                               label: Text(context.l10n.playAll),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: AppSpacing.sm),
                           Expanded(
                             child: OutlinedButton.icon(
                               onPressed: songs.isEmpty
@@ -178,7 +210,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                             context.l10n.queue,
                             style: TextStyle(
                                 color: p.textSecondary,
-                                fontSize: 12,
+                                fontSize: AppFontSize.label,
                                 fontWeight: FontWeight.w700),
                           ),
                           const Spacer(),
@@ -200,7 +232,10 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                                   child: Text(context.l10n.sortDuration)),
                             ],
                             onChanged: (v) {
-                              if (v != null) setState(() => _sort = v);
+                              if (v != null) {
+                                setState(() => _sort = v);
+                                _persistSort(v);
+                              }
                             },
                           ),
                           // Album-level queue actions (gap 07-03).
@@ -249,7 +284,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                     ),
                   ),
                   SliverPadding(
-                    padding: const EdgeInsets.only(top: 8, bottom: 160),
+                    padding: const EdgeInsets.only(top: AppSpacing.xs, bottom: AppSpacing.scrollBottom),
                     sliver: SliverList.builder(
                       itemCount: songs.length,
                       itemBuilder: (context, index) {
@@ -265,12 +300,12 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                             if (showDiscHeader &&
                                 songs.any((s) => (s.discNumber ?? 1) > 1))
                               Padding(
-                                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                                padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xxs),
                                 child: Text(
                                   '${context.l10n.browseDisc} ${song.discNumber ?? 1}',
                                   style: TextStyle(
                                       color: p.textSecondary,
-                                      fontSize: 12,
+                                      fontSize: AppFontSize.label,
                                       fontWeight: FontWeight.w800),
                                 ),
                               ),
@@ -334,26 +369,26 @@ class _AlbumErrorView extends StatelessWidget {
         appBar: AppBar(leading: const PulsrBackButton()),
       body: Center(
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: const EdgeInsets.all(AppSpacing.xl),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.error_outline_rounded, color: p.error, size: 48),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.md),
               Text(
                 context.l10n.couldNotLoadAlbumSongs,
                 style: TextStyle(
                     color: p.textPrimary,
                     fontWeight: FontWeight.w700,
-                    fontSize: 16),
+                    fontSize: AppFontSize.bodyLarge),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
               Text(
                 context.l10n.libraryReadError,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: p.textSecondary, fontSize: 13),
+                style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: AppSpacing.s20),
               ElevatedButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh_rounded),

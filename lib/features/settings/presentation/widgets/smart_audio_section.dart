@@ -6,9 +6,13 @@ import '../../../../core/services/hires_audio_service.dart';
 import '../../../../core/services/smart_audio_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../domain/services/smart_audio_plan.dart';
 import '../../../../data/audio/headphone_profiles_repository.dart';
 import '../../../../domain/services/device_profile_service.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 /// Settings surface for the Smart Audio coordinator.
 ///
@@ -82,12 +86,12 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.only(bottom: AppSpacing.xs),
           child: Text(
             l10n.smartAudioSubtitle,
             style: TextStyle(
               color: p.textSecondary,
-              fontSize: 12.5,
+              fontSize: AppFontSize.label,
             ),
           ),
         ),
@@ -116,17 +120,17 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
             },
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: AppSpacing.s10),
         SizedBox(
           height: 38,
           child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
+            duration: context.motionMs(200),
             child: Text(
               isAuto ? l10n.smartAudioAutoDesc : l10n.smartAudioManualDesc,
               key: ValueKey<bool>(isAuto),
               style: TextStyle(
                 color: p.textSecondary,
-                fontSize: 12,
+                fontSize: AppFontSize.label,
                 height: 1.35,
               ),
               maxLines: 2,
@@ -135,12 +139,12 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
           ),
         ),
         if (_deviceName != null) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
             decoration: BoxDecoration(
               color: p.surfaceContainerHigh.withValues(alpha: 0.45),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(AppRadii.r10),
               border: Border.all(color: p.hairline),
             ),
             child: Column(
@@ -155,12 +159,12 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
                       size: 15,
                       color: isAuto ? p.accent : p.textSecondary,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: AppSpacing.xs),
                     Expanded(
                       child: Text(
                         l10n.smartAudioDetectedDevice(_deviceName!),
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: AppFontSize.label,
                           fontWeight: FontWeight.w600,
                           color: p.textPrimary,
                         ),
@@ -169,16 +173,17 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
+
+                          horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                       decoration: BoxDecoration(
                         color: (isAuto ? p.accent : p.textTertiary)
                             .withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(AppRadii.r6),
                       ),
                       child: Text(
                         isAuto ? l10n.smartAudioAuto : l10n.smartAudioManual,
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: AppFontSize.tiny,
                           fontWeight: FontWeight.w700,
                           color: isAuto ? p.accent : p.textSecondary,
                         ),
@@ -186,9 +191,9 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: AppSpacing.xxs),
                 AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
+                  duration: context.motionMs(200),
                   child: Text(
                     isAuto
                         ? (_matchedProfileName != null
@@ -202,7 +207,7 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
                           : 'manual_bypassed',
                     ),
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: AppFontSize.caption,
                       color: p.textTertiary,
                     ),
                     maxLines: 1,

@@ -9,6 +9,9 @@ import '../../../player/presentation/widgets/audio_visualizer.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 
 // ============================================================================
@@ -207,46 +210,46 @@ void showThemePickerSheet(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
             Center(
               child: Container(
                 width: 38,
                 height: 4,
                 decoration: BoxDecoration(
                   color: outlineColor.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(2),
+                  borderRadius: BorderRadius.circular(AppRadii.r2),
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20, vertical: AppSpacing.xxs),
               child: Text(context.l10n.selectPlayerTheme,
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: AppFontSize.title,
                   fontWeight: FontWeight.w900,
                   color: textPrimary,
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
             Flexible(
               child: ListView.builder(
                 shrinkWrap: true,
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                 itemCount: themes.length,
                 itemBuilder: (context, index) {
                   final t = themes[index];
                   final isSelected = t.mode == currentMode;
                   return Container(
-                    margin: const EdgeInsets.only(bottom: 8),
+                    margin: const EdgeInsets.only(bottom: AppSpacing.xs),
                     child: Material(
                       color: isSelected
                           ? primaryColor.withValues(alpha: 0.12)
                           : cardColor,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(AppRadii.r16),
                         side: BorderSide(
                           color: isSelected ? primaryColor : outlineColor,
                           width: isSelected ? 1.5 : 1.0,
@@ -266,7 +269,7 @@ void showThemePickerSheet(
                         ),
                         subtitle: Text(
                           t.subtitle,
-                          style: TextStyle(fontSize: 12, color: textSecondary),
+                          style: TextStyle(fontSize: AppFontSize.label, color: textSecondary),
                         ),
                         trailing: isSelected
                             ? Icon(Icons.check_circle_rounded,
@@ -282,7 +285,7 @@ void showThemePickerSheet(
                 },
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
           ],
         ),
       ),
@@ -340,32 +343,32 @@ void showLanguagePickerSheet(
         ),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s20, horizontal: AppSpacing.md),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                 child: Text(
                   context.l10n.appLanguage,
                   style: const TextStyle(
-                    fontSize: 18,
+                    fontSize: AppFontSize.title,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.sm),
               ...languages.map((lang) {
                 final isSelected = lang.code == currentCode;
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
+                  margin: const EdgeInsets.only(bottom: AppSpacing.xs),
                   child: Material(
                     color: isSelected
                         ? primaryColor.withValues(alpha: 0.12)
                         : cardColor,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(AppRadii.r16),
                       side: BorderSide(
                         color: isSelected ? primaryColor : outlineColor,
                         width: isSelected ? 1.5 : 1.0,
@@ -385,7 +388,7 @@ void showLanguagePickerSheet(
                       ),
                       subtitle: Text(
                         lang.nativeName,
-                        style: TextStyle(fontSize: 12, color: textSecondary),
+                        style: TextStyle(fontSize: AppFontSize.label, color: textSecondary),
                       ),
                       trailing: isSelected
                           ? Icon(Icons.check_circle_rounded, color: primaryColor)
@@ -450,31 +453,31 @@ void showColorSourcePickerSheet(
         ),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s20, horizontal: AppSpacing.md),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                 child: Text(context.l10n.appColorSource,
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: AppFontSize.title,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.sm),
               ...sources.map((s) {
                 final isSelected = s.source == currentSource;
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
+                  margin: const EdgeInsets.only(bottom: AppSpacing.xs),
                   child: Material(
                     color: isSelected
                         ? primaryColor.withValues(alpha: 0.12)
                         : cardColor,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(AppRadii.r16),
                       side: BorderSide(
                         color: isSelected ? primaryColor : outlineColor,
                         width: isSelected ? 1.5 : 1.0,
@@ -494,7 +497,7 @@ void showColorSourcePickerSheet(
                       ),
                       subtitle: Text(
                         s.subtitle,
-                        style: TextStyle(fontSize: 12, color: textSecondary),
+                        style: TextStyle(fontSize: AppFontSize.label, color: textSecondary),
                       ),
                       trailing: isSelected
                           ? Icon(Icons.check_circle_rounded, color: primaryColor)
@@ -595,31 +598,31 @@ void showVisualizerStylePickerSheet(
         ),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s20, horizontal: AppSpacing.md),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                 child: Text(context.l10n.visualizerStyleLabel,
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: AppFontSize.title,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.sm),
               ...styles.map((s) {
                 final isSelected = s.style == currentStyle;
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
+                  margin: const EdgeInsets.only(bottom: AppSpacing.xs),
                   child: Material(
                     color: isSelected
                         ? primaryColor.withValues(alpha: 0.12)
                         : cardColor,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(AppRadii.r16),
                       side: BorderSide(
                         color: isSelected ? primaryColor : outlineColor,
                         width: isSelected ? 1.5 : 1.0,
@@ -639,7 +642,7 @@ void showVisualizerStylePickerSheet(
                       ),
                       subtitle: Text(
                         s.subtitle,
-                        style: TextStyle(fontSize: 12, color: textSecondary),
+                        style: TextStyle(fontSize: AppFontSize.label, color: textSecondary),
                       ),
                       trailing: isSelected
                           ? Icon(Icons.check_circle_rounded, color: primaryColor)
@@ -653,11 +656,11 @@ void showVisualizerStylePickerSheet(
                 );
               }),
               Container(
-                margin: const EdgeInsets.only(bottom: 8),
+                margin: const EdgeInsets.only(bottom: AppSpacing.xs),
                 child: Material(
                   color: cardColor,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(AppRadii.r16),
                     side: BorderSide(color: outlineColor),
                   ),
                   child: ListTile(
@@ -667,7 +670,7 @@ void showVisualizerStylePickerSheet(
                           TextStyle(fontWeight: FontWeight.w700, color: textPrimary),
                     ),
                     subtitle: Text(context.l10n.loadMilkDesc,
-                      style: TextStyle(fontSize: 12, color: textSecondary),
+                      style: TextStyle(fontSize: AppFontSize.label, color: textSecondary),
                     ),
                     onTap: () async {
                       final preset = await MilkdropPresetStore().importFromFile();
@@ -688,11 +691,11 @@ void showVisualizerStylePickerSheet(
                 ),
               ),
               Container(
-                margin: const EdgeInsets.only(bottom: 8),
+                margin: const EdgeInsets.only(bottom: AppSpacing.xs),
                 child: Material(
                   color: cardColor,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(AppRadii.r16),
                     side: BorderSide(color: outlineColor),
                   ),
                   child: ListTile(
@@ -702,7 +705,7 @@ void showVisualizerStylePickerSheet(
                           TextStyle(fontWeight: FontWeight.w700, color: textPrimary),
                     ),
                     subtitle: Text(context.l10n.loadJsonVizDesc,
-                      style: TextStyle(fontSize: 12, color: textSecondary),
+                      style: TextStyle(fontSize: AppFontSize.label, color: textSecondary),
                     ),
                     onTap: () async {
                       final preset = await VisualizerPresetStore().importFromFile();

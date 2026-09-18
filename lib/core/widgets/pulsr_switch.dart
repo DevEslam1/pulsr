@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
 import 'pulsr_pressable.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 /// A unified, flagship-grade tactile toggle inspired by Apple iOS & Material 3.
 ///
@@ -149,11 +151,11 @@ class _PulsrSwitchState extends State<PulsrSwitch>
                       : null,
                 ),
                 child: Align(
-                  alignment: Alignment.centerLeft,
+                  alignment: AlignmentDirectional.centerStart,
                   child: Transform.translate(
                     offset: Offset(_slideAnimation.value * maxSlide, 0),
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 140),
+                      duration: context.motionMs(140),
                       width: _isPressed ? thumbRadius * 2.3 : thumbRadius * 2.0,
                       height: thumbRadius * 2.0,
                       decoration: BoxDecoration(
@@ -213,12 +215,12 @@ class PulsrSwitchListTile extends StatelessWidget {
       pressedScale: 0.985,
       child: Padding(
         padding: contentPadding ??
-            const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+            const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s10),
         child: Row(
           children: [
             if (leading != null) ...[
               leading!,
-              const SizedBox(width: 14),
+              const SizedBox(width: AppSpacing.s14),
             ],
             Expanded(
               child: Column(
@@ -230,21 +232,21 @@ class PulsrSwitchListTile extends StatelessWidget {
                       Flexible(
                         child: DefaultTextStyle.merge(
                           style: TextStyle(
-                            fontSize: 14.5,
+                            fontSize: AppFontSize.body,
                             fontWeight: FontWeight.w700,
                             color: p.textPrimary,
-                            letterSpacing: -0.2,
+                            letterSpacing: AppTracking.title,
                           ),
                           child: title,
                         ),
                       ),
                       if (onInfoTap != null) ...[
-                        const SizedBox(width: 6),
+                        const SizedBox(width: AppSpacing.s6),
                         GestureDetector(
                           onTap: onInfoTap,
                           behavior: HitTestBehavior.opaque,
                           child: Padding(
-                            padding: const EdgeInsets.all(2.0),
+                            padding: const EdgeInsets.all(AppSpacing.s2),
                             child: Icon(
                               Icons.info_outline_rounded,
                               size: 16,
@@ -256,10 +258,10 @@ class PulsrSwitchListTile extends StatelessWidget {
                     ],
                   ),
                   if (subtitle != null) ...[
-                    const SizedBox(height: 3),
+                    const SizedBox(height: AppSpacing.xxs),
                     DefaultTextStyle.merge(
                       style: TextStyle(
-                        fontSize: 12.0,
+                        fontSize: AppFontSize.label,
                         color: p.textSecondary,
                         height: 1.3,
                       ),
@@ -267,11 +269,11 @@ class PulsrSwitchListTile extends StatelessWidget {
                     ),
                   ],
                   if (disabledReason != null) ...[
-                    const SizedBox(height: 3),
+                    const SizedBox(height: AppSpacing.xxs),
                     Text(
                       disabledReason!,
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: AppFontSize.label,
                         fontWeight: FontWeight.w600,
                         color: p.error,
                       ),
@@ -280,7 +282,7 @@ class PulsrSwitchListTile extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.sm),
             PulsrSwitch(
               value: value,
               onChanged: isDisabled ? null : onChanged,

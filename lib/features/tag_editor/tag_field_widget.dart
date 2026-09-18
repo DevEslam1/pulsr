@@ -2,6 +2,9 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/l10n_extensions.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class TagFieldWidget extends StatelessWidget {
   final String label;
@@ -27,7 +30,7 @@ class TagFieldWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -35,11 +38,11 @@ class TagFieldWidget extends StatelessWidget {
             label,
             style: TextStyle(
               color: p.textSecondary,
-              fontSize: 13,
+              fontSize: AppFontSize.bodySmall,
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.s6),
           TextFormField(
             initialValue: initialValue,
             onChanged: onChanged,
@@ -47,14 +50,14 @@ class TagFieldWidget extends StatelessWidget {
             maxLines: maxLines,
             style: TextStyle(
               color: p.textPrimary,
-              fontSize: 14,
+              fontSize: AppFontSize.body,
               fontWeight: FontWeight.w500,
             ),
             decoration: InputDecoration(
               hintText: hintText ?? '${context.l10n.browseEnter} $label',
               hintStyle: TextStyle(
                 color: p.textSecondary,
-                fontSize: 13,
+                fontSize: AppFontSize.bodySmall,
               ),
               prefixIcon: icon != null
                   ? Icon(icon, color: p.textSecondary, size: 20)
@@ -62,17 +65,17 @@ class TagFieldWidget extends StatelessWidget {
               filled: true,
               fillColor: p.surfaceContainer,
               contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s14),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppRadii.r14),
                 borderSide: BorderSide.none,
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppRadii.r14),
                 borderSide: BorderSide.none,
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppRadii.r14),
                 borderSide: BorderSide(color: p.accent, width: 1.5),
               ),
             ),

@@ -1,5 +1,6 @@
 // lib/features/auth/cubit/auth_cubit.dart
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 import '../../../core/services/auth_service.dart';
@@ -143,6 +144,37 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   String _mapAuthError(Object e) {
+    // Prefer the typed Firebase error code over parsing `toString()`; the
+    // message wording is not a stable API and the code is exhaustive.
+    if (e is FirebaseAuthException) {
+      switch (e.code) {
+        case 'user-not-found':
+          return 'No account found with this email.';
+        case 'wrong-password':
+        case 'invalid-credential':
+        case 'invalid-email':
+          return 'Incorrect email or password.';
+        case 'email-already-in-use':
+          return 'This email is already registered.';
+        case 'weak-password':
+          return 'Password must be at least 6 characters.';
+        case 'network-request-failed':
+          return 'Network error. Check your internet connection.';
+        case 'too-many-requests':
+          return 'Too many attempts. Please try again later.';
+        case 'user-disabled':
+          return 'This account has been disabled.';
+        case 'operation-not-allowed':
+          return 'Email sign-in is not enabled for this app.';
+        default:
+          final message = e.message?.trim();
+          if (message != null && message.isNotEmpty) return message;
+          return 'Sign-in failed. Please try again.';
+      }
+    }
+
+    // Fallback for non-Firebase errors (Google Sign-In, PlatformException,
+    // wrapped exceptions) where only the string form is available.
     final s = e.toString().toLowerCase();
     if (s.contains('user-not-found') || s.contains('user not found')) {
       return 'No account found with this email.';

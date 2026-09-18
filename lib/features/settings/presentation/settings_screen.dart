@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/constants/app_radii.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/missing_artwork_service.dart';
@@ -37,6 +38,8 @@ import 'widgets/settings_picker_sheets.dart';
 import 'widgets/storage_cache_section.dart';
 import 'widgets/theme_schedule_row.dart';
 import 'widgets/ytm_account_disconnect_dialog.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 part 'settings_category_sections_a.dart';
 part 'settings_category_sections_b.dart';
 
@@ -137,7 +140,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     final horizontalPad = Adaptive.pagePadding(context);
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(horizontalPad, 16, horizontalPad, 8),
+      padding: EdgeInsetsDirectional.fromSTEB(horizontalPad, AppSpacing.md, horizontalPad, AppSpacing.xs),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -151,17 +154,17 @@ class _SettingsScreenState extends State<SettingsScreen>
                       context.l10n.settings,
                       style: TextStyle(
                         color: p.textPrimary,
-                        fontSize: 28,
+                        fontSize: AppFontSize.display,
                         fontWeight: FontWeight.w900,
-                        letterSpacing: -0.6,
+                        letterSpacing: AppTracking.heading,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: AppSpacing.s2),
                     Text(
                       context.l10n.settingsHeaderTagline(AppConfig.appVersion),
                       style: TextStyle(
                         color: p.textTertiary,
-                        fontSize: 12,
+                        fontSize: AppFontSize.label,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -170,7 +173,7 @@ class _SettingsScreenState extends State<SettingsScreen>
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
           // Search Box
           Container(
             height: 44,
@@ -188,14 +191,14 @@ class _SettingsScreenState extends State<SettingsScreen>
               controller: _searchController,
               style: TextStyle(
                 color: p.textPrimary,
-                fontSize: 14,
+                fontSize: AppFontSize.body,
                 fontWeight: FontWeight.w600,
               ),
               decoration: InputDecoration(
                 hintText: context.l10n.settingsSearchPlaceholder,
                 hintStyle: TextStyle(
                   color: p.textTertiary,
-                  fontSize: 13.5,
+                  fontSize: AppFontSize.bodySmall,
                   fontWeight: FontWeight.w400,
                 ),
                 prefixIcon: Icon(
@@ -204,17 +207,18 @@ class _SettingsScreenState extends State<SettingsScreen>
                   size: 20,
                 ),
                 suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: Icon(Icons.clear_rounded,
-                            color: p.textSecondary, size: 18),
-                        onPressed: () {
+                      ? IconButton(
+                          icon: Icon(Icons.clear_rounded,
+                              color: p.textSecondary, size: 18),
+                          tooltip: context.l10n.clear,
+                          onPressed: () {
                           _searchController.clear();
                           setState(() => _searchQuery = '');
                         },
                       )
                     : null,
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                contentPadding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
               ),
             ),
           ),
@@ -331,7 +335,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         padding:
             EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
         itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs),
         itemBuilder: (context, i) {
           final item = items[i];
           final isSelected = _selectedCategoryId == item.id;
@@ -347,14 +351,15 @@ class _SettingsScreenState extends State<SettingsScreen>
               setState(() => _selectedCategoryId = item.id);
             },
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
+              duration: context.motionMs(180),
               curve: Curves.easeOutCubic,
-              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
               decoration: BoxDecoration(
                 color: isSelected
                     ? p.accent.withValues(alpha: 0.16)
                     : p.surfaceContainer,
-                borderRadius: BorderRadius.circular(999),
+                borderRadius: AppRadii.full,
                 border: Border.all(
                   color: isSelected ? p.accent : p.hairline,
                   width: isSelected ? 1.5 : 1.0,
@@ -368,12 +373,12 @@ class _SettingsScreenState extends State<SettingsScreen>
                     size: 15,
                     color: isSelected ? p.accent : item.color,
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: AppSpacing.s6),
                   Text(
                     item.title,
                     style: TextStyle(
                       color: isSelected ? p.accent : p.textPrimary,
-                      fontSize: 12.5,
+                      fontSize: AppFontSize.label,
                       fontWeight:
                           isSelected ? FontWeight.w800 : FontWeight.w600,
                     ),
@@ -413,18 +418,18 @@ class _SettingsScreenState extends State<SettingsScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildTabletMasterHeader(context),
-              const SizedBox(height: 6),
+              const SizedBox(height: AppSpacing.s6),
               Expanded(
                 child: ListView.separated(
-                  padding: EdgeInsets.fromLTRB(
-                    14,
-                    4,
-                    14,
+                  padding: EdgeInsetsDirectional.fromSTEB(
+                    AppSpacing.s14,
+                    AppSpacing.xxs,
+                    AppSpacing.s14,
                     140 + MediaQuery.paddingOf(context).bottom,
                   ),
                   physics: const BouncingScrollPhysics(),
                   itemCount: categories.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 4),
+                  separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.xxs),
                   itemBuilder: (context, i) {
                     final cat = categories[i];
                     final isSelected = activeCatId == cat.id;
@@ -442,10 +447,11 @@ class _SettingsScreenState extends State<SettingsScreen>
                         });
                       },
                       child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
+                        duration: context.motionMs(180),
                         curve: Curves.easeOutCubic,
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
+
+                            horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
                         decoration: BoxDecoration(
                           color: isSelected
                               ? p.accent.withValues(alpha: 0.14)
@@ -466,7 +472,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                               decoration: BoxDecoration(
                                 color: cat.tintColor.withValues(
                                     alpha: isSelected ? 0.22 : 0.12),
-                                borderRadius: BorderRadius.circular(11),
+                                borderRadius: BorderRadius.circular(AppRadii.r12),
                               ),
                               child: Icon(
                                 cat.icon,
@@ -474,7 +480,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                                 color: cat.tintColor,
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: AppSpacing.sm),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -487,20 +493,20 @@ class _SettingsScreenState extends State<SettingsScreen>
                                       color: isSelected
                                           ? p.accent
                                           : p.textPrimary,
-                                      fontSize: 13.5,
+                                      fontSize: AppFontSize.bodySmall,
                                       fontWeight: isSelected
                                           ? FontWeight.w800
                                           : FontWeight.w600,
                                     ),
                                   ),
-                                  const SizedBox(height: 1),
+                                  const SizedBox(height: AppSpacing.s2),
                                   Text(
                                     cat.subtitle,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       color: p.textSecondary,
-                                      fontSize: 11,
+                                      fontSize: AppFontSize.caption,
                                     ),
                                   ),
                                 ],
@@ -544,7 +550,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     final p = context.palette;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xxs),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -555,39 +561,40 @@ class _SettingsScreenState extends State<SettingsScreen>
                   context.l10n.settings,
                   style: TextStyle(
                     color: p.textPrimary,
-                    fontSize: 24,
+                    fontSize: AppFontSize.headline,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: -0.5,
+                    letterSpacing: AppTracking.heading,
                   ),
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
                 decoration: BoxDecoration(
                   color: p.accentContainer,
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(AppRadii.r6),
                 ),
                 child: Text(
                   'v${AppConfig.appVersion}',
                   style: TextStyle(
                     color: p.accent,
-                    fontSize: 10.5,
+                    fontSize: AppFontSize.tiny,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: AppSpacing.s2),
           Text(
             context.l10n.settingsHeaderTaglineShort(AppConfig.appVersion),
             style: TextStyle(
               color: p.textTertiary,
-              fontSize: 11.5,
+              fontSize: AppFontSize.label,
               fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
           // Search Box
           Container(
             height: 40,
@@ -604,14 +611,14 @@ class _SettingsScreenState extends State<SettingsScreen>
               controller: _searchController,
               style: TextStyle(
                 color: p.textPrimary,
-                fontSize: 13,
+                fontSize: AppFontSize.bodySmall,
                 fontWeight: FontWeight.w600,
               ),
               decoration: InputDecoration(
                 hintText: context.l10n.settingsSearchPlaceholder,
                 hintStyle: TextStyle(
                   color: p.textTertiary,
-                  fontSize: 12.5,
+                  fontSize: AppFontSize.label,
                   fontWeight: FontWeight.w400,
                 ),
                 prefixIcon: Icon(
@@ -620,17 +627,18 @@ class _SettingsScreenState extends State<SettingsScreen>
                   size: 18,
                 ),
                 suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: Icon(Icons.clear_rounded,
-                            color: p.textSecondary, size: 16),
-                        onPressed: () {
+                      ? IconButton(
+                          icon: Icon(Icons.clear_rounded,
+                              color: p.textSecondary, size: 16),
+                          tooltip: context.l10n.clear,
+                          onPressed: () {
                           _searchController.clear();
                           setState(() => _searchQuery = '');
                         },
                       )
                     : null,
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 9),
+                contentPadding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
               ),
             ),
           ),
@@ -653,7 +661,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     final bottomInset = 140 + MediaQuery.paddingOf(context).bottom;
 
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 220),
+      duration: context.motionMs(220),
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
       transitionBuilder: (child, animation) => FadeTransition(
@@ -672,16 +680,16 @@ class _SettingsScreenState extends State<SettingsScreen>
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 820),
             child: ListView(
-              padding: EdgeInsets.fromLTRB(
+              padding: EdgeInsetsDirectional.fromSTEB(
                 Adaptive.pagePadding(context),
-                18,
+                AppSpacing.md,
                 Adaptive.pagePadding(context),
                 bottomInset,
               ),
               physics: const BouncingScrollPhysics(),
               children: [
                 _buildCategoryHeroHeader(context, currentCat),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
                 if (activeCatId == 'audio') ...[
                   _experienceModeCard(context),
                 ],
@@ -706,7 +714,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           children: [
             _buildTopHeader(context),
             if (_searchQuery.isEmpty) _buildCategoryFilterBar(context, state),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.md),
             Expanded(
               child: _searchQuery.isNotEmpty
                   ? _buildSearchResultsList(context, state, cubit)
@@ -730,11 +738,12 @@ class _SettingsScreenState extends State<SettingsScreen>
       return ListView(
         controller: _scrollController,
         physics: const BouncingScrollPhysics(),
-        padding: EdgeInsets.only(
+        padding: EdgeInsetsDirectional.only(
+
           bottom: bottomInset,
-          top: 10,
-          left: horizontalPad,
-          right: horizontalPad,
+          top: AppSpacing.md,
+          start: horizontalPad,
+          end: horizontalPad,
         ),
         children: [
           if (AppConfig.isCloudSyncAllowed || AppConfig.ytmEnabled)
@@ -762,7 +771,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
 
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 220),
+      duration: context.motionMs(220),
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
       transitionBuilder: (child, animation) => FadeTransition(
@@ -779,15 +788,16 @@ class _SettingsScreenState extends State<SettingsScreen>
         key: ValueKey(_selectedCategoryId),
         child: ListView(
           physics: const BouncingScrollPhysics(),
-          padding: EdgeInsets.only(
+          padding: EdgeInsetsDirectional.only(
+
             bottom: bottomInset,
-            top: 10,
-            left: horizontalPad,
-            right: horizontalPad,
+            top: AppSpacing.md,
+            start: horizontalPad,
+            end: horizontalPad,
           ),
           children: [
             _buildCategoryHeroHeader(context, currentCat),
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.md),
             if (_selectedCategoryId == 'audio') ...[
               _experienceModeCard(context),
             ],
@@ -805,7 +815,8 @@ class _SettingsScreenState extends State<SettingsScreen>
   ) {
     final p = context.palette;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md, vertical: AppSpacing.sm),
       decoration: BoxDecoration(
         color: p.surfaceContainer.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(AppRadii.card),
@@ -818,11 +829,11 @@ class _SettingsScreenState extends State<SettingsScreen>
             height: 44,
             decoration: BoxDecoration(
               color: cat.tintColor.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadii.r12),
             ),
             child: Icon(cat.icon, color: cat.tintColor, size: 22),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -831,17 +842,17 @@ class _SettingsScreenState extends State<SettingsScreen>
                   cat.title,
                   style: TextStyle(
                     color: p.textPrimary,
-                    fontSize: 17,
+                    fontSize: AppFontSize.bodyLarge,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: -0.3,
+                    letterSpacing: AppTracking.title,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: AppSpacing.s2),
                 Text(
                   cat.subtitle,
                   style: TextStyle(
                     color: p.textSecondary,
-                    fontSize: 12,
+                    fontSize: AppFontSize.label,
                   ),
                 ),
               ],
@@ -859,7 +870,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         context.l10n.experienceModeSubtitle,
         [
           const Padding(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+            padding: EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
             child: ExperienceModeSection(),
           ),
         ],
@@ -880,7 +891,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             context.l10n.settingsSmartAudioSectionSubtitle,
             [
               const Padding(
-                padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+                padding: EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
                 child: SmartAudioSection(),
               ),
             ],
@@ -919,7 +930,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             context.l10n.settingsDeviceProfilesSectionSubtitle,
             [
               const Padding(
-                padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+                padding: EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
                 child: DeviceProfilesSection(),
               ),
             ],
@@ -1118,22 +1129,23 @@ class _SettingsScreenState extends State<SettingsScreen>
     return KeyedSubtree(
       key: key,
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 20),
+        padding: const EdgeInsets.only(bottom: AppSpacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+              padding: const EdgeInsetsDirectional.fromSTEB(
+                  AppSpacing.md, 0, AppSpacing.md, AppSpacing.xs),
               child: Row(
                 children: [
                   if (icon != null) ...[
                     Container(
                       width: 24,
                       height: 24,
-                      margin: const EdgeInsets.only(right: 8),
+                      margin: const EdgeInsetsDirectional.only(end: AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.14),
-                        borderRadius: BorderRadius.circular(7),
+                        borderRadius: BorderRadius.circular(AppRadii.r8),
                       ),
                       child: Icon(icon, size: 13, color: p.accent),
                     ),
@@ -1148,18 +1160,18 @@ class _SettingsScreenState extends State<SettingsScreen>
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: p.textSecondary,
-                            fontSize: 12,
+                            fontSize: AppFontSize.label,
                             fontWeight: FontWeight.w800,
-                            letterSpacing: 0.8,
+                            letterSpacing: AppTracking.overline,
                           ),
                         ),
                         if (subtitle.isNotEmpty) ...[
-                          const SizedBox(height: 2),
+                          const SizedBox(height: AppSpacing.s2),
                           Text(
                             subtitle,
                             style: TextStyle(
                               color: p.textTertiary,
-                              fontSize: 11.5,
+                              fontSize: AppFontSize.label,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -1200,7 +1212,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       height: 40,
       decoration: BoxDecoration(
         color: p.accentContainer,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadii.r12),
       ),
       child: Icon(icon, color: p.accent, size: 20),
     );
@@ -1222,25 +1234,25 @@ class _SettingsScreenState extends State<SettingsScreen>
       onTap: onTap,
       child: ListTile(
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+            const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s2),
         leading: _iconBox(context, icon),
         title: Text(
           title,
           style: const TextStyle(
             fontWeight: FontWeight.w600,
-            fontSize: 14.5,
-            letterSpacing: -0.1,
+            fontSize: AppFontSize.body,
+            letterSpacing: AppTracking.none,
           ),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 1),
+            const SizedBox(height: AppSpacing.s2),
             Text(
               subtitle,
               style: TextStyle(
                 color: p.textSecondary,
-                fontSize: 12.5,
+                fontSize: AppFontSize.label,
                 height: 1.32,
               ),
             ),
@@ -1253,19 +1265,19 @@ class _SettingsScreenState extends State<SettingsScreen>
                 if (trailingBadge != null)
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 7, vertical: 2.5),
-                    margin: const EdgeInsets.only(right: 6),
+                        horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
+                    margin: const EdgeInsetsDirectional.only(end: AppSpacing.s6),
                     decoration: BoxDecoration(
                       color: p.accent.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(AppRadii.r6),
                     ),
                     child: Text(
                       trailingBadge,
                       style: TextStyle(
                         color: p.accent,
-                        fontSize: 10,
+                        fontSize: AppFontSize.tiny,
                         fontWeight: FontWeight.w800,
-                        letterSpacing: 0.3,
+                        letterSpacing: AppTracking.label,
                       ),
                     ),
                   ),
@@ -1295,25 +1307,25 @@ class _SettingsScreenState extends State<SettingsScreen>
       onTap: () => onChanged(!value),
       child: ListTile(
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+            const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s2),
         leading: _iconBox(context, icon),
         title: Text(
           title,
           style: const TextStyle(
             fontWeight: FontWeight.w600,
-            fontSize: 14.5,
-            letterSpacing: -0.1,
+            fontSize: AppFontSize.body,
+            letterSpacing: AppTracking.none,
           ),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 1),
+            const SizedBox(height: AppSpacing.s2),
             Text(
               subtitle,
               style: TextStyle(
                 color: p.textSecondary,
-                fontSize: 12.5,
+                fontSize: AppFontSize.label,
                 height: 1.32,
               ),
             ),
@@ -1369,12 +1381,13 @@ class _SettingsScreenState extends State<SettingsScreen>
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
             PulsrSlider(
               value: selected.toDouble(),
               min: 0,
               max: 120,
               divisions: 12,
+              semanticLabel: context.l10n.excludeTracksUnder(selected),
               onChanged: (val) {
                 setDialogState(() => selected = val.toInt());
               },

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -9,6 +10,7 @@ import '../../../core/di/injection.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/services/ytm_service.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/motion/pulsr_motion.dart';
 import '../../auth/cubit/auth_cubit.dart';
 import '../../auth/presentation/ytm_web_login_sheet.dart';
 import '../../../core/utils/adaptive.dart';
@@ -17,8 +19,10 @@ import '../../../core/utils/song_classification.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/song_tile.dart';
+import '../../../core/widgets/staggered_reveal.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_dismissible.dart';
+import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../data/db/app_database.dart';
 import '../../../core/utils/formatters.dart';
@@ -36,6 +40,11 @@ import 'widgets/category_card.dart';
 import 'widgets/folder_browser_tab.dart';
 import 'widgets/folder_tree_browser_tab.dart';
 import 'widgets/genre_hierarchy_view.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
+import '../../../core/utils/error_logger.dart';
 part 'tabs/library_songs_tab.dart';
 part 'tabs/library_collections_tabs.dart';
 part 'tabs/library_favorites_tab.dart';
@@ -56,6 +65,8 @@ class _LibraryScreenState extends State<LibraryScreen>
   @override
   int _favTabFilter = 0; // 0: Local, 1: Online
 
+  int _lastPersistedTab = 0;
+
   static const String _genreHierarchyPrefKey = 'library_genre_hierarchy';
   static const String _folderTreePrefKey = 'library_folder_tree';
 
@@ -67,15 +78,43 @@ class _LibraryScreenState extends State<LibraryScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 8, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
+    _tabController.addListener(_onTabChanged);
     _songsScrollController.addListener(_onSongsScrollNearBottom);
     _loadLayoutPreferences();
+  }
+
+  static const String _tabIndexPrefKey = 'library_tab_index';
+
+  /// Remember the user's last library surface so reopening Library resumes
+  /// where they left off (e.g. Albums) instead of always snapping to Songs.
+  void _onTabChanged() => unawaited(_persistSelectedTab());
+
+  Future<void> _persistSelectedTab() async {    if (_tabController.indexIsChanging) return;
+    final index = _tabController.index;
+    if (index == _lastPersistedTab) return;
+    _lastPersistedTab = index;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_tabIndexPrefKey, index);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist library tab index',
+          error: e, stackTrace: st, category: 'Library');
+    }
   }
 
   Future<void> _loadLayoutPreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       if (!mounted) return;
+      final savedTab = prefs.getInt(_tabIndexPrefKey);
+      if (savedTab != null &&
+          savedTab >= 0 &&
+          savedTab < _tabController.length &&
+          savedTab != _tabController.index) {
+        _lastPersistedTab = savedTab;
+        _tabController.animateTo(savedTab);
+      }
       setState(() {
         _genreHierarchy = prefs.getBool(_genreHierarchyPrefKey) ?? false;
         _folderTree = prefs.getBool(_folderTreePrefKey) ?? false;
@@ -107,6 +146,7 @@ class _LibraryScreenState extends State<LibraryScreen>
   @override
   void dispose() {
     _songsScrollController.removeListener(_onSongsScrollNearBottom);
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     _songsScrollController.dispose();
     super.dispose();
@@ -146,7 +186,7 @@ class _LibraryScreenState extends State<LibraryScreen>
     final maxScroll = _songsScrollController.position.maxScrollExtent;
     _songsScrollController.animateTo(
       target.clamp(0.0, maxScroll),
-      duration: const Duration(milliseconds: 250),
+      duration: context.motionMs(250),
       curve: Curves.easeOut,
     );
   }
@@ -266,19 +306,20 @@ class _LibraryScreenState extends State<LibraryScreen>
                             if (state.songs
                                 .where((s) => s.isDownloaded == true)
                                 .isNotEmpty) ...[
-                              const SizedBox(width: 6),
+                              const SizedBox(width: AppSpacing.s6),
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
+
+                                    horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                                 decoration: BoxDecoration(
                                   color: p.accent.withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius: BorderRadius.circular(AppRadii.r10),
                                 ),
                                 child: Text(
                                   '${state.songs.where((s) => s.isDownloaded == true).length}',
                                   style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
+                                    fontSize: AppFontSize.caption,
+                                    fontWeight: FontWeight.w700,
                                     color: p.accent,
                                   ),
                                 ),
@@ -290,9 +331,6 @@ class _LibraryScreenState extends State<LibraryScreen>
                       Tab(text: context.l10n.albums),
                       Tab(text: context.l10n.artists),
                       Tab(text: context.l10n.favorites),
-                      Tab(text: context.l10n.folders),
-                      Tab(text: context.l10n.genres),
-                      Tab(text: context.l10n.years),
                     ],
                   ),
                 ),
@@ -307,15 +345,44 @@ class _LibraryScreenState extends State<LibraryScreen>
                   _buildAlbumsTab(context, state),
                   _buildArtistsTab(context, state),
                   _buildFavoritesTab(context, state, playerCubit),
-                  _buildFoldersTab(context),
-                  _buildGenresTab(context, state),
-                  _buildYearsTab(context, state),
                 ],
               ),
             ),
           ),
         );
       },
+    );
+  }
+
+  /// Folders / Genres / Years are no longer primary tabs; they open as a large
+  /// bottom sheet so the tab bar stays scannable (Apple/Spotify pattern).
+  void _openSecondaryCategory(BuildContext context, int index) {
+    final state = context.read<LibraryCubit>().state;
+    final Widget body;
+    final String title;
+    switch (index) {
+      case 5:
+        title = context.l10n.folders;
+        body = _buildFoldersTab(context);
+        break;
+      case 6:
+        title = context.l10n.genres;
+        body = _buildGenresTab(context, state);
+        break;
+      default:
+        title = context.l10n.years;
+        body = _buildYearsTab(context, state);
+        break;
+    }
+    PulsrSheetHelper.showPulsrSheet<void>(
+      context: context,
+      builder: (sheetContext) => PulsrBottomSheetContainer(
+        title: Text(title),
+        child: SizedBox(
+          height: MediaQuery.sizeOf(sheetContext).height * 0.7,
+          child: body,
+        ),
+      ),
     );
   }
 
@@ -331,6 +398,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         subtitle: Formatters.formatSongCount(state.songs.length),
         icon: Icons.music_note_rounded,
         color: p.accent,
+        secondary: false,
       ),
       (
         index: 1,
@@ -338,6 +406,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         subtitle: '$downloadedCount ${context.l10n.downloaded.toLowerCase()}',
         icon: Icons.download_done_rounded,
         color: const Color(0xFF26A69A),
+        secondary: false,
       ),
       (
         index: 2,
@@ -345,6 +414,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         subtitle: '${state.albums.length} ${context.l10n.albums.toLowerCase()}',
         icon: Icons.album_rounded,
         color: const Color(0xFFFF9800),
+        secondary: false,
       ),
       (
         index: 3,
@@ -352,6 +422,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         subtitle: '${state.artists.length} ${context.l10n.artists.toLowerCase()}',
         icon: Icons.person_rounded,
         color: const Color(0xFFAB47BC),
+        secondary: false,
       ),
       (
         index: 4,
@@ -359,13 +430,15 @@ class _LibraryScreenState extends State<LibraryScreen>
         subtitle: Formatters.formatSongCount(state.favorites.length),
         icon: Icons.favorite_rounded,
         color: const Color(0xFFEF5350),
+        secondary: false,
       ),
       (
         index: 5,
         title: context.l10n.folders,
         subtitle: '${state.folders.length} ${context.l10n.folders.toLowerCase()}',
         icon: Icons.folder_rounded,
-        color: const Color(0xFFFFB300),
+        color: AppColors.warning,
+        secondary: true,
       ),
       (
         index: 6,
@@ -373,6 +446,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         subtitle: '${state.genres.length} ${context.l10n.genres.toLowerCase()}',
         icon: Icons.category_rounded,
         color: const Color(0xFF29B6F6),
+        secondary: true,
       ),
       (
         index: 7,
@@ -380,6 +454,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         subtitle: '${state.years.length} ${context.l10n.years.toLowerCase()}',
         icon: Icons.calendar_today_rounded,
         color: const Color(0xFF5C6BC0),
+        secondary: true,
       ),
     ];
 
@@ -389,7 +464,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         return PulsrBottomSheetContainer(
           title: Text(context.l10n.navLibrary),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.lg),
             child: GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -412,7 +487,11 @@ class _LibraryScreenState extends State<LibraryScreen>
                   onTap: () {
                     HapticFeedback.selectionClick();
                     Navigator.of(sheetContext).pop();
-                    _tabController.animateTo(cat.index);
+                    if (cat.secondary) {
+                      _openSecondaryCategory(context, cat.index);
+                    } else {
+                      _tabController.animateTo(cat.index);
+                    }
                   },
                 );
               },
@@ -475,85 +554,6 @@ class _LibraryScreenState extends State<LibraryScreen>
 
 }
 
-class _FavTabButton extends StatelessWidget {
-  final String label;
-  final int count;
-  final IconData icon;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _FavTabButton({
-    required this.label,
-    required this.count,
-    required this.icon,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? p.accent : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: p.accent.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: isSelected ? p.onAccent : p.textSecondary,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? p.onAccent : p.textPrimary,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                fontSize: 13.5,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? p.onAccent.withValues(alpha: 0.25)
-                    : p.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '$count',
-                style: TextStyle(
-                  color: isSelected ? p.onAccent : p.textSecondary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _LayoutToggleButton extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -572,12 +572,12 @@ class _LayoutToggleButton extends StatelessWidget {
     final p = context.palette;
     return Material(
       color: selected ? p.accent : p.surfaceContainer,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppRadii.r12),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadii.r12),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: AppSpacing.xs),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -586,11 +586,11 @@ class _LayoutToggleButton extends StatelessWidget {
                 size: 16,
                 color: selected ? p.onAccent : p.textSecondary,
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: AppSpacing.s6),
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: AppFontSize.label,
                   fontWeight: FontWeight.w700,
                   color: selected ? p.onAccent : p.textSecondary,
                 ),

@@ -9,6 +9,9 @@ import '../../../../domain/usecases/folder_usecases.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../cubit/library_cubit.dart';
 import '../../cubit/library_state.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class FolderTreeBrowserTab extends StatefulWidget {
   const FolderTreeBrowserTab({super.key});
@@ -84,7 +87,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
             // Breadcrumbs bar
             Container(
               height: 48,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
               color: p.surfaceContainer.withValues(alpha: 0.4),
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
@@ -101,17 +104,18 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                       onTap: isLast
                           ? null
                           : () => setState(() => _currentPath = crumbPath),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppRadii.r8),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 4),
+
+                            horizontal: AppSpacing.s6, vertical: AppSpacing.xxs),
                         child: Text(
                           breadcrumbs[index],
                           style: TextStyle(
                             color: isLast ? p.primary : p.textSecondary,
                             fontWeight:
-                                isLast ? FontWeight.bold : FontWeight.normal,
-                            fontSize: 13,
+                                isLast ? FontWeight.w700 : FontWeight.normal,
+                            fontSize: AppFontSize.bodySmall,
                           ),
                         ),
                       ),
@@ -124,7 +128,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
             // Content list (sub-folders + files)
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+                padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, 120),
                 children: [
                   // Parent folder button
                   if (breadcrumbs.length > 1) ...[
@@ -190,7 +194,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
 
                   if (childFolders.isEmpty && childSongs.isEmpty)
                     Padding(
-                      padding: const EdgeInsets.all(32.0),
+                      padding: const EdgeInsets.all(AppSpacing.xl),
                       child: Center(
                         child: Text(context.l10n.folderEmpty,
                             style: TextStyle(color: p.textSecondary)),

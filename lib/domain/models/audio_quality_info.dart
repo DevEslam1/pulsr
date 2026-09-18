@@ -4,6 +4,7 @@ import '../../core/constants/audio_formats.dart';
 import '../../data/audio/mqa_decoder_helper.dart';
 import '../../data/db/app_database.dart';
 import 'ytm_audio_quality.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 enum AudioQualityTier {
   hiResLossless,
@@ -85,7 +86,7 @@ class AudioQualityInfo {
         tierLabel: 'Standard Audio',
         shortBadgeLabel: 'STANDARD',
         description: 'Standard stereo audio playback',
-        badgeColor: Color(0xFF64748B),
+        badgeColor: AppColors.slate,
         icon: Icons.graphic_eq_rounded,
       );
     }
@@ -247,7 +248,7 @@ class AudioQualityInfo {
               '(0x05/0xFA markers) for a compatible USB DAC — no PCM conversion.'
           : 'DSD → PCM: 1-bit High Density Studio Master decoded to PCM. '
               'DoP output is off, or no compatible USB DAC is connected.';
-      badgeColor = const Color(0xFFFFB800);
+      badgeColor = AppColors.amberDeep;
       icon = Icons.stars_rounded;
       sampleRate =
           explicitSampleRate != null ? resolvedSampleRate : '2.8 MHz / 5.6 MHz';
@@ -265,7 +266,7 @@ class AudioQualityInfo {
           : '$formatLabel • HI-RES';
       description =
           'Studio Master 24-bit • Up to 192 kHz lossless bit-perfect stream';
-      badgeColor = const Color(0xFFFFB800); // Gold Shimmer
+      badgeColor = AppColors.amberDeep; // Gold Shimmer
       icon = Icons.workspace_premium_rounded;
       sampleRate = resolvedSampleRate;
       bitDepth = resolvedBitDepth;
@@ -328,7 +329,7 @@ class AudioQualityInfo {
       description =
           'Recognized $formatLabel file. Playback requires a native decoder '
           'that is not bundled in this build, so it is not playable.';
-      badgeColor = const Color(0xFF64748B);
+      badgeColor = AppColors.slate;
       icon = Icons.extension_off_rounded;
       sampleRate = 'Unavailable';
       bitDepth = 'Unavailable';
@@ -356,7 +357,7 @@ class AudioQualityInfo {
         tierLabel = 'Compact MP3';
         shortBadgeLabel = 'MP3 • ${kbps}k';
         description = 'Compact size encoded audio';
-        badgeColor = const Color(0xFF64748B);
+        badgeColor = AppColors.slate;
         icon = Icons.audiotrack_rounded;
       }
       sampleRate = '44.1 kHz';

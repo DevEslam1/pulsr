@@ -26,6 +26,9 @@ import '../widgets/player_controls.dart';
 import '../widgets/player_seek_bar.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class CassettePlayerTheme extends StatefulWidget {
   final PlayerThemeProps props;
@@ -149,10 +152,10 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
             child: AspectRatio(
               aspectRatio: 1.5,
               child: Container(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(AppSpacing.s14),
                 decoration: BoxDecoration(
                   color: const Color(0xFF1E2028),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadii.r20),
                   border: Border.all(color: const Color(0xFF323646), width: 3),
                   boxShadow: [
                     BoxShadow(
@@ -168,10 +171,11 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
+
+                          horizontal: AppSpacing.sm, vertical: AppSpacing.s6),
                       decoration: BoxDecoration(
                         color: activeColor.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadii.r8),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -179,33 +183,33 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                           const Text(
                             'SIDE A • TYPE II (CrO2)',
                             style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
+                              fontSize: AppFontSize.tiny,
+                              fontWeight: FontWeight.w700,
                               color: Colors.white70,
-                              letterSpacing: 1.2,
+                              letterSpacing: AppTracking.wide,
                             ),
                           ),
                           Text(
                             'PULSR TAPE',
                             style: TextStyle(
-                              fontSize: 10,
+                              fontSize: AppFontSize.tiny,
                               fontWeight: FontWeight.w900,
                               color: activeColor,
-                              letterSpacing: 1.5,
+                              letterSpacing: AppTracking.wide,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.sm),
 
                     // Cassette Center Window with Spinning Spools
                     Expanded(
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
                         decoration: BoxDecoration(
                           color: const Color(0xFF0F1116),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadii.r12),
                           border: Border.all(color: Colors.white12),
                         ),
                         child: Row(
@@ -219,7 +223,7 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                               height: 36,
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.05),
-                                borderRadius: BorderRadius.circular(6),
+                                borderRadius: BorderRadius.circular(AppRadii.r6),
                                 border: Border.all(color: Colors.white10),
                               ),
                               child: Center(
@@ -236,7 +240,7 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppSpacing.xs),
 
                     // Track Title on Cassette Body
                     Text(
@@ -244,7 +248,7 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: AppFontSize.label,
                         fontWeight: FontWeight.w700,
                         color: Colors.white70,
                       ),
@@ -270,9 +274,35 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                   ? const NowPlayingQueueView(
                       key: ValueKey('queue_view'),
                     )
-                  : Center(
-                      key: const ValueKey('cassette_view'),
-                      child: cassetteBody,
+                  : GestureDetector(
+                      onTap: () => cubit.togglePlayPause(),
+                      onDoubleTap: () {
+                        switch (settingsState.nowPlayingDoubleTap) {
+                          case NowPlayingDoubleTapAction.toggleFavorite:
+                            if (song != null) cubit.toggleFavorite(song.id);
+                            break;
+                          case NowPlayingDoubleTapAction.toggleLyrics:
+                            cubit.toggleLyricsVisibility();
+                            break;
+                          case NowPlayingDoubleTapAction.none:
+                            break;
+                        }
+                      },
+                      onHorizontalDragEnd: (details) {
+                        if (settingsState.nowPlayingArtworkSwipe ==
+                                NowPlayingArtworkSwipeAction.nextPrev &&
+                            details.primaryVelocity != null) {
+                          if (details.primaryVelocity! < -200) {
+                            cubit.next();
+                          } else if (details.primaryVelocity! > 200) {
+                            cubit.previous();
+                          }
+                        }
+                      },
+                      child: Center(
+                        key: const ValueKey('cassette_view'),
+                        child: cassetteBody,
+                      ),
                     ),
         );
 
@@ -282,8 +312,9 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
             // Symmetrical Track Header: [Download/Playlist] Title/Artist [Favorite]
             Padding(
               padding: EdgeInsets.symmetric(
+
                 horizontal: isTablet ? 28 : 16,
-                vertical: 2,
+                vertical: AppSpacing.s2,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -330,7 +361,7 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                       // Center: Title & Artist (Symmetric & Centered)
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -338,19 +369,19 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                                 text: song?.title ?? context.l10n.noTrackSelected,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontSize: isTablet ? 23 : 19,
+                                  fontSize: isTablet ? AppFontSize.headline : AppFontSize.title,
                                   fontWeight: FontWeight.w900,
                                   color: p.textPrimary,
                                   height: 1.22,
-                                  letterSpacing: -0.3,
+                                  letterSpacing: AppTracking.title,
                                 ),
                               ),
-                              const SizedBox(height: 3),
+                              const SizedBox(height: AppSpacing.xxs),
                               MarqueeText(
                                 text: song?.artist ?? context.l10n.unknownArtist,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontSize: isTablet ? 15 : 13.5,
+                                  fontSize: isTablet ? AppFontSize.callout : AppFontSize.bodySmall,
                                   fontWeight: FontWeight.w600,
                                   color: p.textSecondary,
                                 ),
@@ -361,8 +392,7 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                       ),
 
                       // Right Symmetrical Action: Animated Favorite Button
-                      SizedBox(
-                        width: 48,
+                      SizedBox(width: AppSpacing.xxl,
                         height: 48,
                         child: Material(
                           color: Colors.white.withValues(alpha: 0.06),
@@ -389,7 +419,7 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
 
                   // Symmetrical Audio Quality Badge
                   if (song != null) ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: AppSpacing.s6),
                     Center(
                       child: AudioQualityBadge(
                         song: song,
@@ -411,6 +441,8 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
               activeColor: activeColor,
               songId: song?.id,
               filePath: song?.path,
+              loopPointA: state.abPointA,
+              loopPointB: state.abPointB,
               onSeek: (pos) => cubit.seek(pos),
             ),
 
@@ -447,7 +479,7 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
         if (isLandscape) {
           return SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -468,7 +500,7 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                       ],
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: AppSpacing.md),
                   Expanded(
                     flex: 6,
                     child: SingleChildScrollView(
@@ -486,14 +518,14 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
             children: [
               // Top Pull-down Handle Indicator
               Padding(
-                padding: const EdgeInsets.only(top: 4, bottom: 2),
+                padding: const EdgeInsets.only(top: AppSpacing.xxs, bottom: AppSpacing.s2),
                 child: Center(
                   child: Container(
                     width: 38,
                     height: 4,
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.22),
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(AppRadii.r2),
                     ),
                   ),
                 ),
@@ -502,8 +534,9 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
               // Top App Bar - Symmetrical Left/Right Targets & Centered Header
               Padding(
                 padding: EdgeInsets.symmetric(
+
                   horizontal: isTablet ? 28 : 20,
-                  vertical: 2,
+                  vertical: AppSpacing.s2,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -539,7 +572,7 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                     // Center: "PLAYING FROM" / Album Header
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -553,15 +586,15 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                                       : p.textSecondary,
                                   animate: state.isPlaying,
                                 ),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: AppSpacing.s6),
                                 Text(
                                   context.l10n.playingFrom.toUpperCase(),
                                   style: Theme.of(context)
                                       .textTheme
                                       .bodySmall
                                       ?.copyWith(
-                                        fontSize: 10,
-                                        letterSpacing: 1.2,
+                                        fontSize: AppFontSize.tiny,
+                                        letterSpacing: AppTracking.wide,
                                         fontWeight: FontWeight.w800,
                                         color: p.textSecondary
                                             .withValues(alpha: 0.8),
@@ -569,7 +602,7 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: AppSpacing.s2),
                             Text(
                               (song?.album != null &&
                                       song!.album.trim().isNotEmpty)
@@ -586,7 +619,7 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                                   .titleSmall
                                   ?.copyWith(
                                     fontWeight: FontWeight.w800,
-                                    fontSize: isTablet ? 14 : 13,
+                                    fontSize: isTablet ? AppFontSize.body : AppFontSize.bodySmall,
                                     color: p.textPrimary,
                                   ),
                             ),
@@ -667,11 +700,11 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                 ),
               ),
 
-              const SizedBox(height: 4),
+              const SizedBox(height: AppSpacing.xxs),
 
               // Bottom Controls Section
               Padding(
-                padding: const EdgeInsets.only(bottom: 4),
+                padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
                 child: controlsColumn,
               ),
             ],

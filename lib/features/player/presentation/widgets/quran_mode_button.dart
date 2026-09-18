@@ -7,6 +7,7 @@ import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../cubit/player_cubit.dart';
 import 'quran_mode_sheet.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
 
 /// Bottom-dock toggle for Quran Mode, styled to sit beside the existing
 /// equalizer / output / speed actions. Mirrors the private `_DockIconButton`
@@ -39,7 +40,7 @@ class QuranModeDockButton extends StatelessWidget {
         HapticFeedback.lightImpact();
         QuranModeSheet.show(context);
       },
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(AppRadii.r20),
       child: Tooltip(
         message: label,
         child: Center(

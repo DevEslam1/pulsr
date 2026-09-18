@@ -891,6 +891,27 @@ class AppLocalizationsAr extends AppLocalizations {
   String get libraryListView => 'عرض القائمة';
 
   @override
+  String get pressBackAgainToExit => 'اضغط رجوع مرة أخرى للخروج';
+
+  @override
+  String get refresh => 'تحديث';
+
+  @override
+  String get showPassword => 'إظهار كلمة المرور';
+
+  @override
+  String get hidePassword => 'إخفاء كلمة المرور';
+
+  @override
+  String get learnMore => 'معرفة المزيد';
+
+  @override
+  String get zoomIn => 'تكبير';
+
+  @override
+  String get zoomOut => 'تصغير';
+
+  @override
   String get authUseCodeSignIn => 'هل تواجه مشكلة؟ استخدم تسجيل الدخول بالرمز';
 
   @override
@@ -2148,6 +2169,40 @@ class AppLocalizationsAr extends AppLocalizations {
   String get radioCuratedTitle => 'محطات مختارة';
 
   @override
+  String get radioEditStation => 'تعديل المحطة';
+
+  @override
+  String get radioEdit => 'تعديل';
+
+  @override
+  String get radioSave => 'حفظ';
+
+  @override
+  String get radioUrlRequired => 'أدخل رابط البث';
+
+  @override
+  String get radioUrlMalformed => 'تعذّر تحليل الرابط';
+
+  @override
+  String get radioUrlScheme => 'يُدعم فقط بث http:// و https://';
+
+  @override
+  String get radioUrlNoHost => 'الرابط يفتقد اسم المضيف';
+
+  @override
+  String get settingsRebuildSearchIndexTitle => 'إعادة بناء فهرس البحث';
+
+  @override
+  String get settingsRebuildSearchIndexSubtitle =>
+      'أصل نتائج البحث المفقودة عبر إعادة بناء فهرس النص الكامل';
+
+  @override
+  String get settingsSearchIndexRebuilt => 'تمت إعادة بناء فهرس البحث';
+
+  @override
+  String get settingsSearchIndexRebuildFailed => 'تعذّر إعادة بناء فهرس البحث';
+
+  @override
   String get followTrackSampleRateTitle => 'متابعة معدل عينات المسار';
 
   @override
@@ -2290,6 +2345,14 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get notificationPermissionNotNow => 'ليس الآن';
+
+  @override
+  String get onboardingNotificationDenied =>
+      'الإشعارات متوقفة. يمكنك تفعيلها لاحقًا من الإعدادات.';
+
+  @override
+  String get onboardingScanFailed =>
+      'تعذّر فحص مكتبتك. يمكنك إعادة المحاولة من الإعدادات.';
 
   @override
   String get onboardingPermissionRationale =>
@@ -3071,6 +3134,29 @@ class AppLocalizationsAr extends AppLocalizations {
   String previewTrackCount(Object count) {
     return '$count مسار';
   }
+
+  @override
+  String get unlimited => 'غير محدود';
+
+  @override
+  String get invalidNumber => 'أدخل عددًا صحيحًا أكبر من 0';
+
+  @override
+  String previewTruncated(Object count) {
+    return 'عرض أول $count مطابقة';
+  }
+
+  @override
+  String get expandPlayer => 'توسيع المشغل';
+
+  @override
+  String get dismissPlayer => 'إغلاق المشغل';
+
+  @override
+  String get loadMore => 'تحميل المزيد';
+
+  @override
+  String get loadingMoreSongs => 'جارٍ تحميل المزيد من الأغاني…';
 
   @override
   String btCalibrated(Object ms) {

@@ -237,6 +237,11 @@ tasks.register("testNative") {
             "LoudnessContour.cpp",
             "SubCrossover.cpp",
             "DynamicEQ.cpp",
+            "MultibandCompressor.cpp",
+            "DynamicBass.cpp",
+            "ViperDdc.cpp",
+            "ArbitraryResponseEq.cpp",
+            "LiveProg.cpp",
             "AudioDspEngine.cpp"
         ).map { file("${mainDir.absolutePath}/$it").absolutePath }
 

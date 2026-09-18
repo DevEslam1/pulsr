@@ -151,17 +151,21 @@ class SmartCriteria {
     }
   }
 
+  /// Sentinel so [copyWith] can distinguish "leave limit unchanged" from
+  /// "clear the limit". Passing `limit: null` explicitly now clears it.
+  static const Object _unsetLimit = Object();
+
   SmartCriteria copyWith({
     List<SmartRule>? rules,
     bool? matchAll,
-    int? limit,
+    Object? limit = _unsetLimit,
     String? sortBy,
     bool? sortAscending,
   }) {
     return SmartCriteria(
       rules: rules ?? this.rules,
       matchAll: matchAll ?? this.matchAll,
-      limit: limit ?? this.limit,
+      limit: identical(limit, _unsetLimit) ? this.limit : limit as int?,
       sortBy: sortBy ?? this.sortBy,
       sortAscending: sortAscending ?? this.sortAscending,
     );

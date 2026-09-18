@@ -8,6 +8,7 @@ import '../../../../domain/services/usb_exclusive_service.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
 import 'settings_tiles.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
 
 /// USB DAC controls: hardware volume (UAC Feature Unit) plus the optional
 /// exclusive-interface claim. Renders nothing on non-Android platforms or when
@@ -137,7 +138,7 @@ class _UsbDacSectionState extends State<UsbDacSection> {
         ),
         if (enabled && hasHwVolume)
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xxs, AppSpacing.md, AppSpacing.xs),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

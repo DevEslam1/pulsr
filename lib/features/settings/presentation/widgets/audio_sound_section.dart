@@ -29,6 +29,10 @@ import 'settings_section.dart';
 import 'settings_slider_row.dart';
 import 'settings_tiles.dart';
 import 'usb_dac_section.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 part 'audio_sound_dop_selector.dart';
 
 /// Sound engine: equalizer, DSP engine, output device / bit-perfect,
@@ -177,12 +181,12 @@ class AudioSoundSection extends StatelessWidget {
         settingsCardDivider(p),
         // Audiophile & Hi-Res Output Card & Controls
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.s6),
           child: Material(
             color: p.surfaceContainer.withValues(alpha: 0.6),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(AppRadii.r14),
             child: InkWell(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppRadii.r14),
               onTap: () {
                 final playerState = context.read<PlayerCubit>().state;
                 final currentSong = playerState.currentSong ??
@@ -203,9 +207,9 @@ class AudioSoundSection extends StatelessWidget {
                 AudioQualitySheet.show(context, currentSong, p.accent);
               },
               child: Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(AppSpacing.sm),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(AppRadii.r14),
                   border: Border.all(
                     color: state.currentOutputDevice?.isUsbDac == true
                         ? p.warning.withValues(alpha: 0.5)
@@ -226,7 +230,7 @@ class AudioSoundSection extends StatelessWidget {
                               : p.accent,
                           size: 18,
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: AppSpacing.xs),
                         Expanded(
                           child: Text(
                             state.currentOutputDevice?.deviceName ??
@@ -234,7 +238,7 @@ class AudioSoundSection extends StatelessWidget {
                             style: TextStyle(
                               color: p.textPrimary,
                               fontWeight: FontWeight.w800,
-                              fontSize: 13,
+                              fontSize: AppFontSize.bodySmall,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -244,35 +248,36 @@ class AudioSoundSection extends StatelessWidget {
                             true)
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
+
+                                horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFFD700)
+                              color: AppColors.dacGold
                                   .withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(6),
+                              borderRadius: BorderRadius.circular(AppRadii.r6),
                               border: Border.all(
-                                  color: const Color(0xFFFFD700)
+                                  color: AppColors.dacGold
                                       .withValues(alpha: 0.6)),
                             ),
                             child: Text(context.l10n.bitPerfectLabel,
                               style: TextStyle(
                                 color: p.warning,
                                 fontWeight: FontWeight.w900,
-                                fontSize: 9,
-                                letterSpacing: 0.5,
+                                fontSize: AppFontSize.micro,
+                                letterSpacing: AppTracking.medium,
                               ),
                             ),
                           ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: AppSpacing.s6),
                         Icon(Icons.tune_rounded,
                             size: 16, color: p.textSecondary),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppSpacing.xxs),
                     Text(
                       context.l10n.settingsOutputDeviceConfigHint((state.currentOutputDevice?.sampleRate ?? 44100) ~/ 1000, state.currentOutputDevice?.bitDepth ?? 16),
                       style: TextStyle(
                         color: p.textSecondary,
-                        fontSize: 11,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -386,7 +391,7 @@ class AudioSoundSection extends StatelessWidget {
         // T4: DSD (DSF/DFF) output mode. Disabled with a truthful reason
         // whenever the native probe has not confirmed a DoP-capable USB DAC.
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.sm),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -399,14 +404,14 @@ class AudioSoundSection extends StatelessWidget {
                         ? p.textTertiary
                         : p.accent,
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: AppSpacing.s10),
                   Expanded(
                     child: Text(
                       context.l10n.dsdOutputModeTitle,
                       style: TextStyle(
                         color: p.textPrimary,
                         fontWeight: FontWeight.w700,
-                        fontSize: 14,
+                        fontSize: AppFontSize.body,
                       ),
                     ),
                   ),
@@ -427,16 +432,16 @@ class AudioSoundSection extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: AppSpacing.xxs),
               Text(
                 !isAndroid
                     ? unsupported
                     : state.dsdDopSupported
                         ? context.l10n.dsdOutputModeSubtitle
                         : context.l10n.dsdDopRequiresUsbDac,
-                style: TextStyle(color: p.textSecondary, fontSize: 12),
+                style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
               SizedBox(
                 width: double.infinity,
                 child: SegmentedButton<DsdOutputMode>(
@@ -444,7 +449,7 @@ class AudioSoundSection extends StatelessWidget {
                   style: const ButtonStyle(
                     visualDensity: VisualDensity.compact,
                     padding: WidgetStatePropertyAll(
-                      EdgeInsets.symmetric(horizontal: 4),
+                      EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
                     ),
                   ),
                   segments: [
@@ -453,7 +458,7 @@ class AudioSoundSection extends StatelessWidget {
                       label: Text(
                         context.l10n.dsdOutputPcm,
                         style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: AppFontSize.caption,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -463,7 +468,7 @@ class AudioSoundSection extends StatelessWidget {
                       label: Text(
                         context.l10n.dsdOutputDop,
                         style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: AppFontSize.caption,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -482,7 +487,7 @@ class AudioSoundSection extends StatelessWidget {
               if (isAndroid &&
                   state.dsdDopSupported &&
                   state.dsdOutputMode == DsdOutputMode.dop) ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.xs),
                 const _DopContainerSelector(),
               ],
             ],
@@ -497,7 +502,7 @@ class AudioSoundSection extends StatelessWidget {
             device: state.currentOutputDevice,
           );
           return Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.sm),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -507,7 +512,7 @@ class AudioSoundSection extends StatelessWidget {
                         color:
                             rgBlocked != null ? p.textTertiary : p.accent,
                         size: 20),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: AppSpacing.s10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -521,17 +526,18 @@ class AudioSoundSection extends StatelessWidget {
                                         ? p.textTertiary
                                         : p.textPrimary,
                                     fontWeight: FontWeight.w700,
-                                    fontSize: 14,
+                                    fontSize: AppFontSize.body,
                                   ),
                                 ),
                               ),
-                              IconButton(
-                                icon: Icon(Icons.info_outline_rounded,
-                                    size: 18, color: p.textTertiary),
-                                visualDensity: VisualDensity.compact,
-                                onPressed: () => showAudioFeatureInfoDialog(
-                                    context, AudioFeatureRegistry.replayGain,
-                                    conflictReason: rgBlocked),
+                                IconButton(
+                                  icon: Icon(Icons.info_outline_rounded,
+                                      size: 18, color: p.textTertiary),
+                                  tooltip: context.l10n.learnMore,
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: () => showAudioFeatureInfoDialog(
+                                      context, AudioFeatureRegistry.replayGain,
+                                      conflictReason: rgBlocked),
                               ),
                             ],
                           ),
@@ -540,7 +546,7 @@ class AudioSoundSection extends StatelessWidget {
                                 context.l10n.settingsReplayGainDesc,
                             style: TextStyle(
                               color: rgBlocked != null ? p.error : p.textSecondary,
-                              fontSize: 12,
+                              fontSize: AppFontSize.label,
                               fontWeight: rgBlocked != null
                                   ? FontWeight.w600
                                   : FontWeight.normal,
@@ -553,7 +559,7 @@ class AudioSoundSection extends StatelessWidget {
                 ),
                 if (rgBlocked != null)
                   Padding(
-                    padding: const EdgeInsets.only(top: 8),
+                    padding: const EdgeInsets.only(top: AppSpacing.xs),
                     child: SettingsConflictCard(
                       reason: rgBlocked,
                       resolveLabel: context.l10n.settingsDisableBitPerfectBypass,
@@ -561,7 +567,7 @@ class AudioSoundSection extends StatelessWidget {
                           _resolveReplayGainConflict(context, cubit),
                     ),
                   ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.sm),
                 SizedBox(
                   width: double.infinity,
                   child: SegmentedButton<ReplayGainMode>(
@@ -569,7 +575,7 @@ class AudioSoundSection extends StatelessWidget {
                     style: const ButtonStyle(
                       visualDensity: VisualDensity.compact,
                       padding: WidgetStatePropertyAll(
-                        EdgeInsets.symmetric(horizontal: 4),
+                        EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
                       ),
                     ),
                     segments: [
@@ -577,25 +583,25 @@ class AudioSoundSection extends StatelessWidget {
                         value: ReplayGainMode.off,
                         label: Text(context.l10n.rgOff,
                             style: TextStyle(
-                                fontSize: 11, fontWeight: FontWeight.w700)),
+                                fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
                       ),
                       ButtonSegment(
                         value: ReplayGainMode.track,
                         label: Text(context.l10n.rgTrack,
                             style: TextStyle(
-                                fontSize: 11, fontWeight: FontWeight.w700)),
+                                fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
                       ),
                       ButtonSegment(
                         value: ReplayGainMode.album,
                         label: Text(context.l10n.rgAlbum,
                             style: TextStyle(
-                                fontSize: 11, fontWeight: FontWeight.w700)),
+                                fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
                       ),
                       ButtonSegment(
                         value: ReplayGainMode.auto,
                         label: Text(context.l10n.rgAuto,
                             style: TextStyle(
-                                fontSize: 11, fontWeight: FontWeight.w700)),
+                                fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
                       ),
                     ],
                     selected: {state.replayGainMode},
@@ -657,7 +663,7 @@ class AudioSoundSection extends StatelessWidget {
             device: state.currentOutputDevice,
           );
           return Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.sm),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -666,7 +672,7 @@ class AudioSoundSection extends StatelessWidget {
                     Icon(Icons.hearing_rounded,
                         color: lcBlocked != null ? p.textTertiary : p.accent,
                         size: 20),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: AppSpacing.s10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -681,17 +687,18 @@ class AudioSoundSection extends StatelessWidget {
                                         ? p.textTertiary
                                         : p.textPrimary,
                                     fontWeight: FontWeight.w700,
-                                    fontSize: 14,
+                                    fontSize: AppFontSize.body,
                                   ),
                                 ),
                               ),
-                              IconButton(
-                                icon: Icon(Icons.info_outline_rounded,
-                                    size: 18, color: p.textTertiary),
-                                visualDensity: VisualDensity.compact,
-                                onPressed: () => showAudioFeatureInfoDialog(
-                                    context, AudioFeatureRegistry.loudnessContour,
-                                    conflictReason: lcBlocked),
+                                IconButton(
+                                  icon: Icon(Icons.info_outline_rounded,
+                                      size: 18, color: p.textTertiary),
+                                  tooltip: context.l10n.learnMore,
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: () => showAudioFeatureInfoDialog(
+                                      context, AudioFeatureRegistry.loudnessContour,
+                                      conflictReason: lcBlocked),
                               ),
                             ],
                           ),
@@ -700,7 +707,7 @@ class AudioSoundSection extends StatelessWidget {
                             style: TextStyle(
                               color:
                                   lcBlocked != null ? p.error : p.textSecondary,
-                              fontSize: 12,
+                              fontSize: AppFontSize.label,
                               fontWeight: lcBlocked != null
                                   ? FontWeight.w600
                                   : FontWeight.normal,
@@ -722,7 +729,7 @@ class AudioSoundSection extends StatelessWidget {
                 if (lcBlocked == null &&
                     AudioEffectsChannel().hasPcmDspPath &&
                     isLoudnessContourEnabled) ...[
-                  const SizedBox(height: 4),
+                  const SizedBox(height: AppSpacing.xxs),
                   SettingSliderRow(
                     label: l10n.dspLoudnessIntensity,
                     value: loudnessContourIntensity,
@@ -734,10 +741,10 @@ class AudioSoundSection extends StatelessWidget {
                     onChanged: (v) =>
                         playerCubit.setLoudnessContour(true, intensity: v),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: AppSpacing.s6),
                   Text(
                     l10n.dspLoudnessReplayGainNote,
-                    style: TextStyle(color: p.textTertiary, fontSize: 10),
+                    style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.tiny),
                   ),
                 ],
               ],
@@ -751,7 +758,7 @@ class AudioSoundSection extends StatelessWidget {
           child: InkWell(
             onTap: isAndroid ? () => RoomCorrectionSheet.show(context) : null,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s10),
               child: Row(
                 children: [
                   Icon(
@@ -759,7 +766,7 @@ class AudioSoundSection extends StatelessWidget {
                     size: 20,
                     color: isAndroid ? p.accent : p.textTertiary,
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: AppSpacing.s10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -774,35 +781,36 @@ class AudioSoundSection extends StatelessWidget {
                                       ? p.textPrimary
                                       : p.textTertiary,
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 14,
+                                  fontSize: AppFontSize.body,
                                 ),
                               ),
                             ),
-                            IconButton(
-                              icon: Icon(Icons.info_outline_rounded,
-                                  size: 18, color: p.textTertiary),
-                              visualDensity: VisualDensity.compact,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              onPressed: () => showAudioFeatureInfoDialog(
+                              IconButton(
+                                icon: Icon(Icons.info_outline_rounded,
+                                    size: 18, color: p.textTertiary),
+                                tooltip: context.l10n.learnMore,
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                onPressed: () => showAudioFeatureInfoDialog(
                                 context,
                                 AudioFeatureRegistry.roomCorrection,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: AppSpacing.s2),
                         Text(
                           isAndroid ? context.l10n.rcSubtitle : unsupported,
                           style: TextStyle(
                             color: p.textSecondary,
-                            fontSize: 12,
+                            fontSize: AppFontSize.label,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: AppSpacing.s6),
                   Icon(
                     Icons.chevron_right_rounded,
                     color: p.textTertiary,
@@ -820,7 +828,7 @@ class AudioSoundSection extends StatelessWidget {
           child: InkWell(
             onTap: isAndroid ? () => DspInspectorSheet.show(context) : null,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s10),
               child: Row(
                 children: [
                   Icon(
@@ -828,7 +836,7 @@ class AudioSoundSection extends StatelessWidget {
                     size: 20,
                     color: isAndroid ? p.accent : p.textTertiary,
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: AppSpacing.s10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -838,23 +846,23 @@ class AudioSoundSection extends StatelessWidget {
                             color:
                                 isAndroid ? p.textPrimary : p.textTertiary,
                             fontWeight: FontWeight.w700,
-                            fontSize: 14,
+                            fontSize: AppFontSize.body,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: AppSpacing.s2),
                         Text(
                           isAndroid
                               ? context.l10n.settingsDspInspectorDesc
                               : unsupported,
                           style: TextStyle(
                             color: p.textSecondary,
-                            fontSize: 12,
+                            fontSize: AppFontSize.label,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: AppSpacing.s6),
                   Icon(
                     Icons.chevron_right_rounded,
                     color: p.textTertiary,
@@ -868,27 +876,27 @@ class AudioSoundSection extends StatelessWidget {
         settingsCardDivider(p),
         // System Audio Effects (Dolby Atmos / OEM DAP Controller)
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
                   Icon(Icons.surround_sound_rounded, size: 20, color: p.accent),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.xs),
                   Expanded(
                     child: Text(
                       context.l10n.systemEffectsTitle,
                       style: TextStyle(
                         color: p.textPrimary,
                         fontWeight: FontWeight.w700,
-                        fontSize: 14,
+                        fontSize: AppFontSize.body,
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: AppSpacing.xxs),
               Text(
                 !isAndroid
                     ? unsupported
@@ -904,10 +912,10 @@ class AudioSoundSection extends StatelessWidget {
                   color: state.systemEffectsStatus == 'bypassed'
                       ? p.success
                       : p.textSecondary,
-                  fontSize: 12,
+                  fontSize: AppFontSize.label,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
               SizedBox(
                 width: double.infinity,
                 child: SegmentedButton<String>(
@@ -915,21 +923,21 @@ class AudioSoundSection extends StatelessWidget {
                   style: const ButtonStyle(
                     visualDensity: VisualDensity.compact,
                     padding: WidgetStatePropertyAll(
-                      EdgeInsets.symmetric(horizontal: 4),
+                      EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
                     ),
                   ),
                   segments: [
                     ButtonSegment(
                       value: 'auto',
-                      label: Text(context.l10n.systemEffectsAuto, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                      label: Text(context.l10n.systemEffectsAuto, style: const TextStyle(fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
                     ),
                     ButtonSegment(
                       value: 'tryDisable',
-                      label: Text(context.l10n.systemEffectsTryDisable, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                      label: Text(context.l10n.systemEffectsTryDisable, style: const TextStyle(fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
                     ),
                     ButtonSegment(
                       value: 'leaveOn',
-                      label: Text(context.l10n.systemEffectsLeaveOn, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                      label: Text(context.l10n.systemEffectsLeaveOn, style: const TextStyle(fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
                     ),
                   ],
                   selected: {state.systemEffectsPolicy},
@@ -948,35 +956,35 @@ class AudioSoundSection extends StatelessWidget {
         settingsCardDivider(p),
         // Bluetooth Wireless Quality & Latency Sync
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
                   Icon(Icons.bluetooth_audio_rounded, size: 20, color: p.accent),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.xs),
                   Expanded(
                     child: Text(
                       context.l10n.bluetoothLatencyTitle,
                       style: TextStyle(
                         color: p.textPrimary,
                         fontWeight: FontWeight.w700,
-                        fontSize: 14,
+                        fontSize: AppFontSize.body,
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: AppSpacing.xxs),
               Text(
                 isAndroid
                     ? context.l10n
                         .bluetoothLatencySubtitle(state.bluetoothLatencyOffsetMs)
                     : unsupported,
-                style: TextStyle(color: p.textSecondary, fontSize: 12),
+                style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: AppSpacing.s6),
               SettingSliderRow(
                 label: context.l10n.settingsSyncOffset,
                 value: state.bluetoothLatencyOffsetMs.toDouble(),
@@ -1196,25 +1204,25 @@ class AudioSoundSection extends StatelessWidget {
       context: context,
       builder: (sheetContext) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s20, horizontal: AppSpacing.md),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 context.l10n.dspEnginePreference,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: const TextStyle(fontSize: AppFontSize.title, fontWeight: FontWeight.w700),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.md),
               ...options.map((opt) {
                 final isSelected = currentPref == opt.$1;
                 return ListTile(
                   title: Text(opt.$2,
                       style: TextStyle(
                           fontWeight:
-                              isSelected ? FontWeight.bold : FontWeight.normal)),
+                              isSelected ? FontWeight.w700 : FontWeight.normal)),
                   subtitle: Text(opt.$3,
-                      style: TextStyle(color: p.textSecondary, fontSize: 12)),
+                      style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label)),
                   trailing: isSelected
                       ? Icon(Icons.check_circle, color: p.accent)
                       : null,

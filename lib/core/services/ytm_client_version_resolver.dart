@@ -29,6 +29,10 @@ class YtmClientVersionResolver {
     } catch (_) {}
   }
 
+  /// Build-time fallbacks. Both are overridable via `--dart-define` so release
+  /// pipelines can inject their own values from CI secrets rather than relying
+  /// on the public defaults baked into source (I18). The live scraped values
+  /// still take precedence once [init] refreshes them.
   static const String fallbackClientVersion = String.fromEnvironment(
     'YTM_CLIENT_VERSION',
     defaultValue: '1.20250820.01.00',

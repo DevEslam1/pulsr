@@ -1098,7 +1098,12 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
     if (_isManualSkip) {
       _isManualSkip = false;
       _rapidGaplessChangeCount = 0;
-      _consecutiveFailures = 0;
+      // Do NOT zero _consecutiveFailures here. Error-driven skips also call
+      // skipToNext(), which sets _isManualSkip, so clearing the budget on every
+      // such advance made the "stop after N failed tracks" guards in
+      // _handleStreamResolutionError / _failCurrentPlayback unreachable and a
+      // dead queue skipped forever. Healthy playback clears it via the position
+      // listener (pos > 2s, ready).
     } else {
       final now = DateTime.now();
       if (_lastGaplessChangeTime != null &&
@@ -1119,7 +1124,6 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
         }
       } else {
         _rapidGaplessChangeCount = 0;
-        _consecutiveFailures = 0;
       }
       _lastGaplessChangeTime = now;
     }

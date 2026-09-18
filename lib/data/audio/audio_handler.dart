@@ -982,6 +982,24 @@ class PulsrAudioHandler extends BaseAudioHandler
       last == null ||
       now.difference(last) >= const Duration(milliseconds: 1500);
 
+  /// Guard for the automatic-skip cascade: halt once enough consecutive tracks
+  /// have failed (or the whole queue has), or when the rapid-advance circuit
+  /// breaker has tripped.
+  ///
+  /// Extracted so the invariant that error-driven gapless advances must NOT
+  /// reset the failure budget is covered by a unit test: if a caller zeroes the
+  /// counter on every auto-advance (as `_onGaplessIndexChanged` used to), this
+  /// predicate can never become true and a dead queue skips forever.
+  @visibleForTesting
+  static bool shouldHaltFailureCascade({
+    required int consecutiveFailures,
+    required int rapidGaplessChanges,
+    required int queueLength,
+  }) =>
+      consecutiveFailures >= 3 ||
+      (queueLength > 0 && consecutiveFailures >= queueLength) ||
+      rapidGaplessChanges >= 1;
+
 
   Future<void> onAppPaused() async {
     await saveCurrentPositionImmediate();

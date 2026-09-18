@@ -6,6 +6,9 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../domain/models/download_task.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../cubit/downloads_cubit.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class DownloadTile extends StatelessWidget {
   final DownloadTask task;
@@ -62,17 +65,17 @@ class DownloadTile extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: p.surfaceContainer,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadii.r16),
           border: Border.all(color: p.hairline),
         ),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Icon(statusIcon, color: statusColor, size: 22),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -84,42 +87,42 @@ class DownloadTile extends StatelessWidget {
                         style: TextStyle(
                           color: p.textPrimary,
                           fontWeight: FontWeight.w600,
-                          fontSize: 15,
+                          fontSize: AppFontSize.callout,
                         ),
                       ),
                       if (task.artist.isNotEmpty) ...[
-                        const SizedBox(height: 2),
+                        const SizedBox(height: AppSpacing.s2),
                         Text(
                           task.artist,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: p.textSecondary,
-                            fontSize: 13,
+                            fontSize: AppFontSize.bodySmall,
                           ),
                         ),
                       ],
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.xs),
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppRadii.r8),
                   ),
                   child: Text(
                     statusLabel,
                     style: TextStyle(
                       color: statusColor,
-                      fontSize: 11,
+                      fontSize: AppFontSize.caption,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: AppSpacing.xxs),
                 // FIX-A12: Direct cancel button during active download or queued state
                 if (task.status == DownloadStatus.downloading ||
                     task.status == DownloadStatus.tagging ||
@@ -164,7 +167,7 @@ class DownloadTile extends StatelessWidget {
                             children: [
                               Icon(Icons.pause_rounded,
                                   size: 18, color: p.textPrimary),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: AppSpacing.s10),
                               Text(l10n.pause),
                             ],
                           ),
@@ -176,7 +179,7 @@ class DownloadTile extends StatelessWidget {
                             children: [
                               Icon(Icons.play_arrow_rounded,
                                   size: 18, color: p.textPrimary),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: AppSpacing.s10),
                               Text(l10n.resume),
                             ],
                           ),
@@ -188,7 +191,7 @@ class DownloadTile extends StatelessWidget {
                             children: [
                               Icon(Icons.refresh_rounded,
                                   size: 18, color: p.textPrimary),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: AppSpacing.s10),
                               Text(l10n.retry),
                             ],
                           ),
@@ -199,7 +202,7 @@ class DownloadTile extends StatelessWidget {
                           children: [
                             Icon(Icons.delete_outline_rounded,
                                 size: 18, color: p.error),
-                            const SizedBox(width: 10),
+                            const SizedBox(width: AppSpacing.s10),
                             Text(l10n.delete, style: TextStyle(color: p.error)),
                           ],
                         ),
@@ -211,9 +214,9 @@ class DownloadTile extends StatelessWidget {
             ),
             if (task.status == DownloadStatus.downloading ||
                 task.status == DownloadStatus.tagging) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.sm),
               ClipRRect(
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(AppRadii.r4),
                 child: LinearProgressIndicator(
                   value: task.status == DownloadStatus.tagging
                       ? null
@@ -224,7 +227,7 @@ class DownloadTile extends StatelessWidget {
                 ),
               ),
               if (task.status == DownloadStatus.downloading) ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.xs),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -232,36 +235,36 @@ class DownloadTile extends StatelessWidget {
                       '${(task.progress * 100).toStringAsFixed(0)}%',
                       style: TextStyle(
                         color: p.textSecondary,
-                        fontSize: 12,
+                        fontSize: AppFontSize.label,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     if (task.speedKbps != null && task.speedKbps! > 0)
                       Text(
                         '${task.speedKbps!.toStringAsFixed(0)} KB/s',
-                        style: TextStyle(color: p.textTertiary, fontSize: 12),
+                        style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label),
                       ),
                     if (task.etaSeconds != null && task.etaSeconds! > 0)
                       Text(
                         '${l10n.browseEta} ${task.etaSeconds}s',
-                        style: TextStyle(color: p.textTertiary, fontSize: 12),
+                        style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label),
                       ),
                   ],
                 ),
               ],
             ],
             if (task.error != null && task.error!.isNotEmpty) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
               Row(
                 children: [
                   Icon(Icons.warning_amber_rounded, size: 14, color: p.error),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: AppSpacing.s6),
                   Expanded(
                     child: Text(
                       resolveUiErrorMessage(context, task.error!),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: p.error, fontSize: 12),
+                      style: TextStyle(color: p.error, fontSize: AppFontSize.label),
                     ),
                   ),
                 ],

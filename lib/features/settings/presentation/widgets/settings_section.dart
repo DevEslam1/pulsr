@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/theme/aura_theme.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 /// A titled, card-wrapped settings group.
 ///
@@ -28,22 +30,23 @@ class SettingsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+            padding: const EdgeInsetsDirectional.fromSTEB(
+                AppSpacing.md, 0, AppSpacing.md, AppSpacing.xs),
             child: Row(
               children: [
                 if (icon != null) ...[
                   Container(
                     width: 24,
                     height: 24,
-                    margin: const EdgeInsets.only(right: 8),
+                    margin: const EdgeInsetsDirectional.only(end: AppSpacing.xs),
                     decoration: BoxDecoration(
                       color: p.accent.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(7),
+                      borderRadius: BorderRadius.circular(AppRadii.r8),
                     ),
                     child: Icon(icon, size: 13, color: p.accent),
                   ),
@@ -58,18 +61,18 @@ class SettingsSection extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: p.textSecondary,
-                          fontSize: 12,
+                          fontSize: AppFontSize.label,
                           fontWeight: FontWeight.w800,
-                          letterSpacing: 0.8,
+                          letterSpacing: AppTracking.overline,
                         ),
                       ),
                       if (subtitle != null && subtitle!.isNotEmpty) ...[
-                        const SizedBox(height: 2),
+                        const SizedBox(height: AppSpacing.s2),
                         Text(
                           subtitle!,
                           style: TextStyle(
                             color: p.textTertiary,
-                            fontSize: 11.5,
+                            fontSize: AppFontSize.label,
                             fontWeight: FontWeight.w500,
                           ),
                         ),

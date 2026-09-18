@@ -1,7 +1,10 @@
 // lib/core/widgets/pulsr_dismissible.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../motion/pulsr_motion.dart';
 import 'package:flutter/services.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
 
 /// Two-swipe confirmation wrapper for list tiles and cards.
 ///
@@ -72,10 +75,10 @@ class PulsrDismissible extends StatefulWidget {
     final effectiveIcon = isConfirming ? Icons.check_circle_outline_rounded : icon;
 
     return Container(
-      margin: margin ?? const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      margin: margin ?? const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
       decoration: BoxDecoration(
         color: backgroundColor,
-        borderRadius: borderRadius ?? BorderRadius.circular(16),
+        borderRadius: borderRadius ?? BorderRadius.circular(AppRadii.r16),
       ),
       alignment: isEnd ? AlignmentDirectional.centerEnd : AlignmentDirectional.centerStart,
       padding: EdgeInsetsDirectional.only(
@@ -98,12 +101,12 @@ class PulsrDismissible extends StatefulWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.xs),
                 Icon(effectiveIcon, color: color),
               ]
             : [
                 Icon(effectiveIcon, color: color),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.xs),
                 Flexible(
                   child: Text(
                     effectiveLabel,
@@ -199,6 +202,8 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _offsetController.duration = context.motionMs(250);
+    _resizeController.duration = context.motionMs(260);
     final newPosition = Scrollable.maybeOf(context)?.position;
     if (_scrollPosition != newPosition) {
       _scrollPosition?.removeListener(_handleScroll);
@@ -237,7 +242,7 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
       });
       _offsetController.animateTo(
         0.0,
-        duration: const Duration(milliseconds: 250),
+        duration: context.motionMs(250),
         curve: Curves.easeOutCubic,
       );
     }
@@ -264,7 +269,7 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
       });
       _offsetController.animateTo(
         target,
-        duration: const Duration(milliseconds: 260),
+        duration: context.motionMs(260),
         curve: Curves.easeOutCubic,
       );
     }
@@ -285,7 +290,7 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
           content: Row(
             children: [
               const Icon(Icons.swipe_rounded, size: 18, color: Colors.white),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppSpacing.xs),
               Expanded(
                 child: Text(
                   message,
@@ -296,7 +301,7 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
           ),
           duration: widget.confirmTimeout,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.r10)),
         ),
       );
     }
@@ -319,7 +324,7 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
 
     await _offsetController.animateTo(
       targetOffset,
-      duration: const Duration(milliseconds: 200),
+      duration: context.motionMs(200),
       curve: Curves.easeOutCubic,
     );
 
@@ -343,7 +348,7 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
         });
         await _offsetController.animateTo(
           0.0,
-          duration: const Duration(milliseconds: 320),
+          duration: context.motionMs(320),
           curve: Curves.easeOutCubic,
         );
       }
@@ -519,7 +524,7 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
                       child: IgnorePointer(
                         ignoring: isRevealed,
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(AppRadii.r16),
                           child: widget.child,
                         ),
                       ),

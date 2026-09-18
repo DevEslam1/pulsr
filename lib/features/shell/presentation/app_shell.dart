@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/errors/error_message_resolver.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_toast.dart';
+import '../../player/cubit/player_cubit.dart';
+import '../../player/cubit/player_state.dart';
 import '../../player/presentation/widgets/tablet_player_bar.dart';
 import 'widgets/landscape_sidebar.dart';
 import 'widgets/stacked_bottom_dock.dart';
@@ -42,87 +47,111 @@ class _AppShellState extends State<AppShell> {
   Widget build(BuildContext context) {
     final isTablet = Adaptive.isTablet(context);
     final isLandscape = context.isLandscape;
-    final isTabletLandscape = isTablet && isLandscape;
     final width = Adaptive.widthOf(context);
-    final extendedRail = _isSidebarExtended ?? (width >= 1100);
+    final height = Adaptive.heightOf(context);
+    // Tablets get the side rail in both orientations (iPad-style); phones keep
+    // the bottom dock portrait *and* landscape so a wide-but-short landscape
+    // phone is never handed a cramped desktop rail.
+    final useRail = isTablet && (!isLandscape || height >= 600);
+    final canShowInspector = useRail && (isLandscape || width >= 900);
+    final extendedRail =
+        _isSidebarExtended ?? (width >= Adaptive.railExtendedBreakpoint);
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) async {
-        if (didPop) return;
-
-        // 1. If any dialog, bottom sheet, or modal route is open on the root navigator, pop it first:
-        final rootNav = rootNavigatorKey.currentState;
-        if (rootNav != null && rootNav.canPop()) {
-          rootNav.pop();
-          return;
-        }
-
-        // 2. If side inspector is open in landscape mode, close it first:
-        if (_isSideInspectorOpen) {
-          setState(() => _isSideInspectorOpen = false);
-          return;
-        }
-
-        // 3. Back navigation through tab history until Home:
-        if (_tabHistory.length > 1) {
-          _tabHistory.removeLast();
-          final prevIndex = _tabHistory.last;
-          widget.navigationShell.goBranch(prevIndex);
-          setState(() {});
-          return;
-        }
-
-        // 4. If not on the Home tab (0), go back to Home:
-        if (widget.navigationShell.currentIndex != 0) {
-          _tabHistory.clear();
-          _tabHistory.add(0);
-          widget.navigationShell.goBranch(0);
-          setState(() {});
-          return;
-        }
-
-        // 5. On Home tab: double back press to exit application safely
-        final now = DateTime.now();
-        if (_lastBackPressTime == null ||
-            now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
-          _lastBackPressTime = now;
-          PulsrToast.show(
-            context,
-            message: 'Press back again to exit',
-            icon: Icons.exit_to_app_rounded,
-          );
-          return;
-        }
-
-        await SystemNavigator.pop();
+    return BlocListener<PlayerCubit, PlayerState>(
+      // Playback errors (bot/verification blocks, "multiple tracks failed",
+      // stream resolution failures) were only stored in state.errorMessage and
+      // never displayed, so playback appeared to stop or skip for no reason.
+      listenWhen: (prev, curr) =>
+          curr.errorMessage != null && curr.errorMessage != prev.errorMessage,
+      listener: (context, state) {
+        final message = state.errorMessage;
+        if (message == null) return;
+        PulsrToast.show(
+          context,
+          message: resolveUiErrorMessage(context, message),
+          icon: Icons.error_outline_rounded,
+          isError: true,
+        );
       },
-      child: _buildShellContent(
-        context,
-        isLandscape: isLandscape,
-        isTabletLandscape: isTabletLandscape,
-        extendedRail: extendedRail,
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) async {
+          if (didPop) return;
+
+          // 1. If any dialog, bottom sheet, or modal route is open on the root navigator, pop it first:
+          final rootNav = rootNavigatorKey.currentState;
+          if (rootNav != null && rootNav.canPop()) {
+            rootNav.pop();
+            return;
+          }
+
+          // 2. If side inspector is open in landscape mode, close it first:
+          if (_isSideInspectorOpen) {
+            setState(() => _isSideInspectorOpen = false);
+            return;
+          }
+
+          // 3. Back navigation through tab history until Home:
+          if (_tabHistory.length > 1) {
+            _tabHistory.removeLast();
+            final prevIndex = _tabHistory.last;
+            widget.navigationShell.goBranch(prevIndex);
+            setState(() {});
+            return;
+          }
+
+          // 4. If not on the Home tab (0), go back to Home:
+          if (widget.navigationShell.currentIndex != 0) {
+            _tabHistory.clear();
+            _tabHistory.add(0);
+            widget.navigationShell.goBranch(0);
+            setState(() {});
+            return;
+          }
+
+          // 5. On Home tab: double back press to exit application safely
+          final now = DateTime.now();
+          if (_lastBackPressTime == null ||
+              now.difference(_lastBackPressTime!) >
+                  const Duration(seconds: 2)) {
+            _lastBackPressTime = now;
+            PulsrToast.show(
+              context,
+              message: context.l10n.pressBackAgainToExit,
+              icon: Icons.exit_to_app_rounded,
+            );
+            return;
+          }
+
+          await SystemNavigator.pop();
+        },
+        child: _buildShellContent(
+          context,
+          useRail: useRail,
+          canShowInspector: canShowInspector,
+          extendedRail: extendedRail,
+        ),
       ),
     );
   }
 
   Widget _buildShellContent(
     BuildContext context, {
-    required bool isLandscape,
-    required bool isTabletLandscape,
+    required bool useRail,
+    required bool canShowInspector,
     required bool extendedRail,
   }) {
 
-    // ── Portrait Layout (Phone & Tablet Portrait) ──────────────────────
-    if (!isLandscape) {
+    // ── Phone / Compact Layout (bottom dock) ───────────────────────────
+    if (!useRail) {
       return Scaffold(
         resizeToAvoidBottomInset: false,
         body: Stack(
           children: [
             Positioned.fill(child: widget.navigationShell),
-            Positioned(
-              left: 0,
-              right: 0,
+            PositionedDirectional(
+              start: 0,
+              end: 0,
               bottom: 0,
               child: StackedBottomDock(
                 currentIndex: widget.navigationShell.currentIndex,
@@ -137,7 +166,7 @@ class _AppShellState extends State<AppShell> {
       );
     }
 
-    // ── Tablet / Desktop Landscape Layout (Widescreen Music Experience) ─
+    // ── Tablet Layout (side rail + docked player bar) ──────────────────
     return Scaffold(
       body: SafeArea(
         child: Row(
@@ -150,7 +179,7 @@ class _AppShellState extends State<AppShell> {
               onToggleExtended: () =>
                   setState(() => _isSidebarExtended = !extendedRail),
               onOpenNowPlaying: () => _openNowPlaying(context),
-              onToggleSideInspector: isTabletLandscape
+              onToggleSideInspector: canShowInspector
                   ? () => setState(
                       () => _isSideInspectorOpen = !_isSideInspectorOpen)
                   : null,
@@ -166,7 +195,7 @@ class _AppShellState extends State<AppShell> {
                     child: Row(
                       children: [
                         Expanded(child: widget.navigationShell),
-                        if (_isSideInspectorOpen && isTabletLandscape) ...[
+                        if (_isSideInspectorOpen && canShowInspector) ...[
                           TabletSideInspector(
                             onClose: () =>
                                 setState(() => _isSideInspectorOpen = false),
@@ -179,7 +208,7 @@ class _AppShellState extends State<AppShell> {
                   // Bottom Docked Tablet Player Bar
                   TabletPlayerBar(
                     onOpenNowPlaying: () => _openNowPlaying(context),
-                    onToggleSideInspector: isTabletLandscape
+                    onToggleSideInspector: canShowInspector
                         ? () => setState(
                             () => _isSideInspectorOpen = !_isSideInspectorOpen)
                         : null,

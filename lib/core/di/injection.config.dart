@@ -313,11 +313,6 @@ extension GetItInjectableX on _i174.GetIt {
           ytmAccountService: gh<_i631.YtmAccountService>(),
           mediaScannerService: gh<_i483.MediaScannerService>(),
         ));
-    gh.singletonAsync<_i873.YtmDownloadCubit>(
-        () async => _i873.YtmDownloadCubit(
-              gh<_i742.YtDownloadService>(),
-              await getAsync<_i147.PlayerCubit>(),
-            ));
     gh.singletonAsync<_i134.FileIntentHandler>(
         () async => _i134.FileIntentHandler(
               gh<_i320.IMusicRepository>(),
@@ -333,6 +328,12 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i59.GetDownloadStorageStatsUseCase>(),
           gh<_i783.IDownloadRepository>(),
         ));
+    gh.singletonAsync<_i873.YtmDownloadCubit>(
+        () async => _i873.YtmDownloadCubit(
+              gh<_i742.YtDownloadService>(),
+              await getAsync<_i147.PlayerCubit>(),
+              downloadsCubit: gh<_i752.DownloadsCubit>(),
+            ));
     return this;
   }
 }

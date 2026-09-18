@@ -16,6 +16,8 @@ import '../../../domain/usecases/folder_usecases.dart';
 import '../../library/cubit/library_cubit.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../sheets/song_info_sheet.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class FolderDetailScreen extends StatefulWidget {
   final FolderItem folder;
@@ -88,30 +90,32 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
       body: StreamBuilder<Result<List<SongsTableData>>>(
         stream: _useCase.watchFolderSongs(folder.path),
         builder: (context, snapshot) {
-          if (snapshot.hasError) {
+          final loadFailed = snapshot.hasError ||
+              (snapshot.data?.fold((l) => true, (_) => false) ?? false);
+          if (loadFailed) {
             return Center(
               child: Padding(
-                padding: const EdgeInsets.all(32),
+                padding: const EdgeInsets.all(AppSpacing.xl),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.error_outline_rounded, color: p.error, size: 48),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.md),
                     Text(
                       context.l10n.couldNotLoadFolderSongs,
                       style: TextStyle(
                         color: p.textPrimary,
                         fontWeight: FontWeight.w700,
-                        fontSize: 16,
+                        fontSize: AppFontSize.bodyLarge,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       context.l10n.libraryReadError,
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: p.textSecondary, fontSize: 13),
+                      style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: AppSpacing.s20),
                     ElevatedButton.icon(
                       onPressed: () => setState(() {}),
                       icon: const Icon(Icons.refresh_rounded),
@@ -130,9 +134,9 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
             child: ConstrainedBox(
               constraints: Adaptive.contentConstraints(context),
               child: ListView(
-                padding: const EdgeInsets.only(bottom: 160),
+                padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom),
                 children: [
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.md),
                   Center(
                     child: Container(
                       width: 100,
@@ -159,10 +163,10 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.md),
                   Center(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                       child: Text(
                         folder.name,
                         textAlign: TextAlign.center,
@@ -173,30 +177,30 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: AppSpacing.xxs),
                   Center(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
                       child: Text(
                         folder.path,
                         textAlign: TextAlign.center,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: p.textTertiary, fontSize: 11.5),
+                        style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: AppSpacing.s6),
                   Center(
                     child: Text(
                       Formatters.formatTrackCount(songs.length),
                       style: TextStyle(
                           color: p.textSecondary,
-                          fontSize: 13,
+                          fontSize: AppFontSize.bodySmall,
                           fontWeight: FontWeight.w600),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: AppSpacing.s20),
 
                   // Action Buttons (Play All, Shuffle)
                   Padding(
@@ -216,7 +220,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                             label: Text(context.l10n.playAll),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: AppSpacing.sm),
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: songs.isNotEmpty
@@ -237,12 +241,12 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: AppSpacing.s20),
 
                   // Songs List
                   if (songs.isEmpty)
                     Padding(
-                      padding: const EdgeInsets.all(32),
+                      padding: const EdgeInsets.all(AppSpacing.xl),
                       child: EmptyStateWidget(
                         icon: Icons.music_off_rounded,
                         title: context.l10n.browseNoTracksFound,

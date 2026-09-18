@@ -323,6 +323,13 @@
   "exportFormatWmpLabel": "Windows Media Player",
   "libraryGridView": "Grid view",
   "libraryListView": "List view",
+  "pressBackAgainToExit": "Press back again to exit",
+  "refresh": "Refresh",
+  "showPassword": "Show password",
+  "hidePassword": "Hide password",
+  "learnMore": "Learn more",
+  "zoomIn": "Zoom in",
+  "zoomOut": "Zoom out",
   "authUseCodeSignIn": "Having trouble? Use code sign-in instead",
   "castAndroidOnly": "Casting is available on Android only in this build.",
   "castDirectDeviceMode": "Direct device mode: casts the current track. Queue and remote volume need the Cast SDK.",
@@ -980,6 +987,17 @@
   },
   "radioCuratedUpToDate": "All curated stations are already in your list",
   "radioCuratedTitle": "Curated Stations",
+  "radioEditStation": "Edit Station",
+  "radioEdit": "Edit",
+  "radioSave": "Save",
+  "radioUrlRequired": "Enter a stream URL",
+  "radioUrlMalformed": "That URL could not be parsed",
+  "radioUrlScheme": "Only http:// and https:// streams are supported",
+  "radioUrlNoHost": "The URL is missing a host name",
+  "settingsRebuildSearchIndexTitle": "Rebuild search index",
+  "settingsRebuildSearchIndexSubtitle": "Fix missing search results by rebuilding the full-text index",
+  "settingsSearchIndexRebuilt": "Search index rebuilt",
+  "settingsSearchIndexRebuildFailed": "Could not rebuild the search index",
   "followTrackSampleRateTitle": "Follow track sample rate",
   "followTrackSampleRateSubtitle": "Reconfigure the output to each track's native rate; de-duplicated and skipped on Bluetooth",
   "followTrackSampleRateBluetooth": "Skipped on Bluetooth — the codec/AVRCP link owns the sample rate",
@@ -1066,6 +1084,8 @@
   "notificationPermissionRationale": "Allow notifications so Pulsr can show playback controls on your lock screen and in the notification shade.",
   "notificationPermissionAllow": "Allow",
   "notificationPermissionNotNow": "Not now",
+  "onboardingNotificationDenied": "Notifications are off. You can enable them later in Settings.",
+  "onboardingScanFailed": "Could not scan your library. You can retry from Settings.",
   "onboardingPermissionRationale": "Without audio access your library will be empty. You can continue with limited access and grant permission later from Settings.",
   "@onboardingPermissionRationale": {
     "description": "Explains denied permission with limited-access option"
@@ -2104,6 +2124,19 @@
       "count": {}
     }
   },
+  "unlimited": "Unlimited",
+  "invalidNumber": "Enter a whole number greater than 0",
+  "previewTruncated": "Showing first {count} matches",
+  "@previewTruncated": {
+    "description": "Smart playlist preview is capped",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "expandPlayer": "Expand player",
+  "dismissPlayer": "Dismiss player",
+  "loadMore": "Load more",
+  "loadingMoreSongs": "Loading more songs…",
   "btCalibrated": "Bluetooth latency calibrated to {ms} ms",
   "@btCalibrated": {
     "description": "tranche7 tpl",

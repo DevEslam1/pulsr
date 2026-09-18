@@ -9,6 +9,8 @@ import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/pulsr_segmented_control.dart';
+import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
@@ -20,6 +22,8 @@ import '../../ytm_search/cubit/ytm_search_state.dart';
 import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import '../cubit/search_cubit.dart';
 import '../cubit/search_state.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -34,6 +38,12 @@ class _SearchScreenState extends State<SearchScreen> {
   /// 0 = Local Music, 1 = Online Stream
   int _selectedTab = 0;
   StreamSubscription? _settingsSub;
+
+  // Memoised derived headers. The results list object is stable within a single
+  // emission, so this avoids recomputing the artist/album sets for every row.
+  List<Object?>? _derivedCacheFor;
+  List<String> _derivedArtistsCache = const [];
+  List<String> _derivedAlbumsCache = const [];
 
   bool _isOnlineAvailable(BuildContext context) {
     final offlineOnly =
@@ -157,7 +167,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   children: [
                     // ---------- Header ----------
                     Padding(
-                      padding: EdgeInsets.fromLTRB(
+                      padding: EdgeInsetsDirectional.fromSTEB(
                           Adaptive.pagePadding(context),
                           16,
                           Adaptive.pagePadding(context),
@@ -170,44 +180,27 @@ class _SearchScreenState extends State<SearchScreen> {
 
                     // ---------- Segmented Tab Selector (Local vs Online) ----------
                     if (showOnline) ...[
-                      const SizedBox(height: 14),
-                      Container(
+                      const SizedBox(height: AppSpacing.s14),
+                      PulsrSegmentedControl(
                         margin: EdgeInsets.symmetric(
                             horizontal: Adaptive.pagePadding(context)),
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: p.surfaceContainer,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: p.hairline),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: _buildTabButton(
-                                title: context.l10n.localMusic,
-                                icon: Icons.library_music_rounded,
-                                isSelected: currentTab == 0,
-                                p: p,
-                                onTap: () => _onTabChanged(0),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: _buildTabButton(
-                                title: context.l10n.onlineStream,
-                                icon: Icons.public_rounded,
-                                isSelected: currentTab == 1,
-                                p: p,
-                                onTap: () => _onTabChanged(1),
-                              ),
-                            ),
-                          ],
-                        ),
+                        selectedIndex: currentTab,
+                        onChanged: _onTabChanged,
+                        segments: [
+                          PulsrSegment(
+                            label: context.l10n.localMusic,
+                            icon: Icons.library_music_rounded,
+                          ),
+                          PulsrSegment(
+                            label: context.l10n.onlineStream,
+                            icon: Icons.public_rounded,
+                          ),
+                        ],
                       ),
                     ],
 
                     // ---------- Search Input Field ----------
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.sm),
                     Padding(
                       padding: EdgeInsets.symmetric(
                           horizontal: Adaptive.pagePadding(context)),
@@ -221,11 +214,12 @@ class _SearchScreenState extends State<SearchScreen> {
                           prefixIcon:
                               Icon(Icons.search_rounded, color: p.textTertiary),
                           suffixIcon: _searchController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: Icon(Icons.clear_rounded,
-                                      color: p.textTertiary),
-                                  onPressed: () => _clear(context),
-                                )
+                                ? IconButton(
+                                    icon: Icon(Icons.clear_rounded,
+                                        color: p.textTertiary),
+                                    tooltip: context.l10n.clear,
+                                    onPressed: () => _clear(context),
+                                  )
                               : null,
                         ),
                       ),
@@ -233,7 +227,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
                     // ---------- Filter Chips (Local Tab Only) ----------
                     if (currentTab == 0) ...[
-                      const SizedBox(height: 8),
+                      const SizedBox(height: AppSpacing.xs),
                       Padding(
                         padding: EdgeInsets.symmetric(
                             horizontal: Adaptive.pagePadding(context)),
@@ -244,8 +238,8 @@ class _SearchScreenState extends State<SearchScreen> {
                             children: [
                               for (final filter in _localFilters)
                                 Padding(
-                                  padding:
-                                      const EdgeInsetsDirectional.only(end: 8),
+                                  padding: const EdgeInsetsDirectional.only(
+                                      end: AppSpacing.xs),
                                   child: _buildChip(context, state, filter, p),
                                 ),
                             ],
@@ -254,7 +248,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       ),
                     ],
 
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppSpacing.xs),
 
                     // ---------- Search Content Body ----------
                     Expanded(
@@ -272,54 +266,6 @@ class _SearchScreenState extends State<SearchScreen> {
               },
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTabButton({
-    required String title,
-    required IconData icon,
-    required bool isSelected,
-    required PulsrPalette p,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? p.accent : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: p.glow.withValues(alpha: 0.35),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 17,
-              color: isSelected ? p.onAccent : p.textSecondary,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: TextStyle(
-                color: isSelected ? p.onAccent : p.textSecondary,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                fontSize: 13,
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -357,44 +303,44 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _buildLocalBody(BuildContext context, SearchState state,
       PlayerCubit playerCubit, PulsrPalette p) {
     if (state.isLoading) {
-      return Center(child: CircularProgressIndicator(color: p.accent));
+      return const SkeletonList(padding: EdgeInsets.only(top: AppSpacing.xs));
     }
     if (state.results.isEmpty) {
       if (state.query.isEmpty) {
         return Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xl),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.search_rounded, size: 48, color: p.textTertiary),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.sm),
                 Text(
                   context.l10n.search,
                   style: TextStyle(
-                      fontSize: 18,
+                      fontSize: AppFontSize.title,
                       fontWeight: FontWeight.w800,
                       color: p.textPrimary),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: AppSpacing.s6),
                 Text(
                   context.l10n.searchPlaceholder,
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: p.textSecondary, fontSize: 13),
+                  style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: AppSpacing.lg),
                 if (state.history.isNotEmpty) ...[
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(context.l10n.recentSearches,
                         style: TextStyle(
-                            fontSize: 11,
+                            fontSize: AppFontSize.caption,
                             fontWeight: FontWeight.w800,
                             color: p.textTertiary,
-                            letterSpacing: 1.2),
+                            letterSpacing: AppTracking.wide),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: AppSpacing.xs),
                       GestureDetector(
                         onTap: () =>
                             context.read<SearchCubit>().clearHistory(),
@@ -403,21 +349,26 @@ class _SearchScreenState extends State<SearchScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.sm),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     alignment: WrapAlignment.center,
                     children: [
                       for (final h in state.history)
-                        ActionChip(
+                        InputChip(
                           label: Text(h),
                           backgroundColor: p.surfaceContainer,
                           side: BorderSide(color: p.hairline),
+                          deleteIcon: const Icon(Icons.close_rounded, size: 16),
+                          deleteIconColor: p.textTertiary,
                           labelStyle: TextStyle(
                               color: p.textPrimary,
-                              fontSize: 12,
+                              fontSize: AppFontSize.label,
                               fontWeight: FontWeight.w600),
+                          onDeleted: () => context
+                              .read<SearchCubit>()
+                              .removeHistoryQuery(h),
                           onPressed: () {
                             _searchController.text = h;
                             context.read<SearchCubit>().useHistoryQuery(h);
@@ -425,16 +376,16 @@ class _SearchScreenState extends State<SearchScreen> {
                         ),
                     ],
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: AppSpacing.lg),
                 ],
                 Text(context.l10n.quickDiscovery,
                   style: TextStyle(
-                      fontSize: 11,
+                      fontSize: AppFontSize.caption,
                       fontWeight: FontWeight.w800,
                       color: p.textTertiary,
-                      letterSpacing: 1.2),
+                      letterSpacing: AppTracking.wide),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.sm),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -456,7 +407,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         side: BorderSide(color: p.hairline),
                         labelStyle: TextStyle(
                             color: p.accent,
-                            fontSize: 12,
+                            fontSize: AppFontSize.label,
                             fontWeight: FontWeight.w700),
                         onPressed: () {
                           _searchController.text = tag;
@@ -479,15 +430,23 @@ class _SearchScreenState extends State<SearchScreen> {
         onPrimaryAction: () => _clear(context),
       );
     }
+    final filter = state.selectedFilter;
+    final derivedArtists = (filter == 'All' || filter == 'Artists')
+        ? _derivedArtists(state).take(3).toList()
+        : const <String>[];
+    final derivedAlbums = (filter == 'All' || filter == 'Albums')
+        ? _derivedAlbums(state).take(3).toList()
+        : const <String>[];
+    final headerCount = derivedArtists.length + derivedAlbums.length;
     return ListView.builder(
-        padding: const EdgeInsets.only(bottom: 160, top: 4),
-        itemCount: state.results.length + _derivedHeaderCount(context, state),
+        padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom, top: AppSpacing.xxs),
+        itemCount: state.results.length + headerCount,
         itemBuilder: (context, index) {
-          final headerOffset =
-              _buildDerivedHeaders(context, state, index, playerCubit, p);
-          if (headerOffset != null) return headerOffset;
-          final song =
-              state.results[index - _derivedHeaderCount(context, state)];
+          if (index < headerCount) {
+            return _buildDerivedHeader(
+                context, index, derivedArtists, derivedAlbums, p);
+          }
+          final song = state.results[index - headerCount];
           return SongTile(
             song: song,
             subtitleOverride: '${song.artist} • ${song.album}',
@@ -498,54 +457,35 @@ class _SearchScreenState extends State<SearchScreen> {
       );
     }
 
-    int _derivedHeaderCount(BuildContext context, SearchState state) {
-      if (state.query.trim().isEmpty || state.results.isEmpty) return 0;
-      final filter = state.selectedFilter;
-      if (filter == 'Songs') return 0;
-      var count = 0;
-      if (filter == 'All' || filter == 'Artists') {
-        count += _derivedArtists(state).take(3).length;
+    void _ensureDerivedCache(SearchState state) {
+      if (identical(_derivedCacheFor, state.results)) return;
+      _derivedCacheFor = state.results;
+      final artists = <String>[];
+      final albums = <String>[];
+      final seenA = <String>{};
+      final seenB = <String>{};
+      for (final s in state.results) {
+        final a = s.artist.trim();
+        if (a.isNotEmpty && seenA.add(a.toLowerCase())) artists.add(a);
+        final b = s.album.trim();
+        if (b.isNotEmpty && seenB.add(b.toLowerCase())) albums.add(b);
       }
-      if (filter == 'All' || filter == 'Albums') {
-        count += _derivedAlbums(state).take(3).length;
-      }
-      return count;
+      _derivedArtistsCache = artists;
+      _derivedAlbumsCache = albums;
     }
 
     List<String> _derivedArtists(SearchState state) {
-      final seen = <String>[];
-      for (final s in state.results) {
-        final a = s.artist.trim();
-        if (a.isNotEmpty &&
-            !seen.any((e) => e.toLowerCase() == a.toLowerCase())) {
-          seen.add(a);
-        }
-      }
-      return seen;
+      _ensureDerivedCache(state);
+      return _derivedArtistsCache;
     }
 
     List<String> _derivedAlbums(SearchState state) {
-      final seen = <String>[];
-      for (final s in state.results) {
-        final a = s.album.trim();
-        if (a.isNotEmpty &&
-            !seen.any((e) => e.toLowerCase() == a.toLowerCase())) {
-          seen.add(a);
-        }
-      }
-      return seen;
+      _ensureDerivedCache(state);
+      return _derivedAlbumsCache;
     }
 
-    Widget? _buildDerivedHeaders(BuildContext context, SearchState state,
-        int index, PlayerCubit playerCubit, PulsrPalette p) {
-      final filter = state.selectedFilter;
-      if (filter == 'Songs') return null;
-      final artists = (filter == 'All' || filter == 'Artists')
-          ? _derivedArtists(state).take(3).toList()
-          : const <String>[];
-      final albums = (filter == 'All' || filter == 'Albums')
-          ? _derivedAlbums(state).take(3).toList()
-          : const <String>[];
+    Widget? _buildDerivedHeader(BuildContext context, int index,
+        List<String> artists, List<String> albums, PulsrPalette p) {
       final total = artists.length + albums.length;
       if (index >= total) return null;
       if (index < artists.length) {
@@ -561,7 +501,7 @@ class _SearchScreenState extends State<SearchScreen> {
               style:
                   TextStyle(color: p.textPrimary, fontWeight: FontWeight.w600)),
           subtitle: Text(context.l10n.artist,
-              style: TextStyle(color: p.textTertiary, fontSize: 12)),
+              style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label)),
           trailing:
               Icon(Icons.chevron_right_rounded, color: p.textTertiary),
           onTap: () => _openDerivedArtist(context, name),
@@ -579,7 +519,7 @@ class _SearchScreenState extends State<SearchScreen> {
             style:
                 TextStyle(color: p.textPrimary, fontWeight: FontWeight.w600)),
         subtitle: Text(context.l10n.album,
-            style: TextStyle(color: p.textTertiary, fontSize: 12)),
+            style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label)),
         trailing: Icon(Icons.chevron_right_rounded, color: p.textTertiary),
         onTap: () => _openDerivedAlbum(context, album),
       );
@@ -632,7 +572,7 @@ class _OnlineResults extends StatelessWidget {
     return BlocBuilder<YtmSearchCubit, YtmSearchState>(
       builder: (context, state) {
         if (state.isLoading) {
-          return Center(child: CircularProgressIndicator(color: p.accent));
+          return const SkeletonList(padding: EdgeInsets.only(top: AppSpacing.xs));
         }
 
         if (state.errorMessage != null) {
@@ -658,33 +598,33 @@ class _OnlineResults extends StatelessWidget {
 
           return Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xl),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.travel_explore_rounded,
                       size: 48, color: p.textTertiary),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.sm),
                   Text(context.l10n.searchYtm,
                     style: TextStyle(
-                        fontSize: 18,
+                        fontSize: AppFontSize.title,
                         fontWeight: FontWeight.w800,
                         color: p.textPrimary),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: AppSpacing.s6),
                   Text(context.l10n.ytmSearchDesc,
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: p.textSecondary, fontSize: 13),
+                    style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: AppSpacing.lg),
                   Text(context.l10n.popularSearches,
                     style: TextStyle(
-                        fontSize: 11,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w800,
                         color: p.textTertiary,
-                        letterSpacing: 1.2),
+                        letterSpacing: AppTracking.wide),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.sm),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
@@ -706,7 +646,7 @@ class _OnlineResults extends StatelessWidget {
                           side: BorderSide(color: p.hairline),
                           labelStyle: TextStyle(
                               color: p.accent,
-                              fontSize: 12,
+                              fontSize: AppFontSize.label,
                               fontWeight: FontWeight.w700),
                           onPressed: () => onSelectTag?.call(tag),
                         ),
@@ -720,7 +660,7 @@ class _OnlineResults extends StatelessWidget {
 
         final songs = [for (final track in state.results) track.toSongData()];
         return ListView.builder(
-          padding: const EdgeInsets.only(bottom: 160, top: 4),
+          padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom, top: AppSpacing.xxs),
           itemCount: songs.length,
           itemBuilder: (context, index) {
             final song = songs[index];

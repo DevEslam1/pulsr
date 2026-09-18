@@ -478,6 +478,7 @@ void runDspStressTest() {
 #include "test_sr_change.cpp"
 #include "test_snapshot_race.cpp"
 #include "test_custom_ir_budget.cpp"
+#include "test_dsp_correctness.cpp"
 
 // Phase 2C: dither correctness. Verifies (a) a lone dither toggle acts through
 // its own STAGE_DITHER bit, (b) dither-off is bit-transparent, and (c) the
@@ -714,6 +715,10 @@ int main() {
     runDitherStandaloneTest();
     runDitherBitDepthTest();
     runDitherBluetoothSkipTest();
+    runSaturationHarmonicsTest();
+    runArbitraryEqResponseTest();
+    runViperDdcConventionTest();
+    runReverbDryWetAlignmentTest();
 
     std::cout << "\n====================================================" << std::endl;
     std::cout << "  [PASS] ALL NATIVE DSP SUITE TESTS PASSED 100%!" << std::endl;

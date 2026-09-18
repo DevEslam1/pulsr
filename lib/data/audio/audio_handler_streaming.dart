@@ -249,10 +249,18 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
       return;
     }
     if (info.recoveryAction == YtmRecoveryAction.skipToNextTrack) {
-      // Already 2 rapid gaps means 3rd song in your loop → pause instead of skip
-      if (_consecutiveFailures >= 2 || _rapidGaplessChangeCount >= 1) {
+      // Count this failure before deciding. The previous code only read the
+      // counter, which the following gapless advance reset, so a queue full of
+      // blocked/unavailable tracks skipped forever without ever tripping.
+      _consecutiveFailures++;
+      if (PulsrAudioHandler.shouldHaltFailureCascade(
+        consecutiveFailures: _consecutiveFailures,
+        rapidGaplessChanges: _rapidGaplessChangeCount,
+        queueLength: _songs.length,
+      )) {
         _consecutiveFailures = 0;
         _rapidGaplessChangeCount = 0;
+        _errorSubject.add('Playback stopped: multiple tracks could not be played.');
         _activePlayer.pause().ignore();
         _broadcastState(_activePlayer.playbackEvent);
         return;

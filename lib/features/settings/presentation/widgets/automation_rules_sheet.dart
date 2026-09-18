@@ -8,6 +8,9 @@ import '../../../../core/services/settings_profiles_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_switch.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 void showAutomationRulesSheet(BuildContext context) {
   PulsrSheetHelper.showPulsrSheet<void>(
@@ -72,7 +75,7 @@ class _AutomationRulesSheetState extends State<AutomationRulesSheet> {
           maxHeight: MediaQuery.of(context).size.height * 0.8,
         ),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.s20, AppSpacing.s20, AppSpacing.lg),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -80,30 +83,30 @@ class _AutomationRulesSheetState extends State<AutomationRulesSheet> {
               Row(
                 children: [
                   Icon(Icons.auto_awesome_rounded, color: p.accent, size: 24),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: AppSpacing.s10),
                   Text(context.l10n.automationRules,
                     style: TextStyle(
                       color: p.textPrimary,
                       fontWeight: FontWeight.w800,
-                      fontSize: 18,
+                      fontSize: AppFontSize.title,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: AppSpacing.s6),
               Text(context.l10n.automationRulesDesc,
-                style: TextStyle(color: p.textSecondary, fontSize: 12.5),
+                style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.md),
               if (_loading)
                 const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
+                  padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
                   child: Center(
                       child: CircularProgressIndicator(strokeWidth: 2)),
                 )
               else if (_rules.isEmpty)
                 Text(context.l10n.noAutomationRules,
-                  style: TextStyle(color: p.textSecondary, fontSize: 13),
+                  style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                 )
               else
                 Flexible(
@@ -138,10 +141,10 @@ class _AutomationRulesSheetState extends State<AutomationRulesSheet> {
         break;
     }
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: AppSpacing.s10),
       decoration: BoxDecoration(
         color: p.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadii.r16),
         border: Border.all(color: p.hairline),
       ),
       child: PulsrSwitchListTile(
@@ -156,14 +159,14 @@ class _AutomationRulesSheetState extends State<AutomationRulesSheet> {
           style: TextStyle(
             color: p.textPrimary,
             fontWeight: FontWeight.w700,
-            fontSize: 14,
+            fontSize: AppFontSize.body,
           ),
         ),
         subtitle: Text(
           supported ? context.l10n.settingsApplyProfileName(profileName) : context.l10n.settingsNotDetectable,
           style: TextStyle(
             color: supported ? p.textSecondary : p.error,
-            fontSize: 12,
+            fontSize: AppFontSize.label,
           ),
         ),
       ),

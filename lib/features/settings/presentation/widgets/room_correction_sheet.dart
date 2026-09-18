@@ -17,6 +17,10 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 /// In-memory measurement sweep playable through a dedicated [AudioPlayer]
 /// (NOT the app handler) so the measurement never touches the user's queue,
@@ -205,14 +209,14 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
           ),
           child: Material(
             color: p.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
             clipBehavior: Clip.antiAlias,
             child: SafeArea(
               top: false,
               child: Padding(
-                padding: EdgeInsets.only(
-                  left: 20,
-                  right: 20,
+                padding: EdgeInsetsDirectional.only(
+                  start: 20,
+                  end: 20,
                   top: 12,
                   bottom: 20 + MediaQuery.of(context).viewInsets.bottom,
                 ),
@@ -227,11 +231,11 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                         height: 4,
                         decoration: BoxDecoration(
                           color: p.hairline,
-                          borderRadius: BorderRadius.circular(2),
+                          borderRadius: BorderRadius.circular(AppRadii.r2),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.md),
 
                     // Header
                     Row(
@@ -241,12 +245,12 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                           height: 38,
                           decoration: BoxDecoration(
                             color: p.accentContainer,
-                            borderRadius: BorderRadius.circular(11),
+                            borderRadius: BorderRadius.circular(AppRadii.r12),
                           ),
                           child: Icon(Icons.graphic_eq_rounded,
                               color: p.accent, size: 20),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: AppSpacing.sm),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -254,16 +258,16 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                               Text(
                                 l10n.rcTitle,
                                 style: TextStyle(
-                                  fontSize: 17,
+                                  fontSize: AppFontSize.bodyLarge,
                                   fontWeight: FontWeight.w800,
                                   color: p.textPrimary,
                                 ),
                               ),
-                              const SizedBox(height: 2),
+                              const SizedBox(height: AppSpacing.s2),
                               Text(
                                 l10n.rcSubtitle,
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: AppFontSize.label,
                                   color: p.textSecondary,
                                 ),
                               ),
@@ -278,17 +282,17 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: AppSpacing.s18),
 
                     if (_phase == _RcPhase.idle) ...[
                       if (_error != null)
                         Container(
                           width: double.infinity,
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                          padding: const EdgeInsets.all(AppSpacing.sm),
                           decoration: BoxDecoration(
                             color: p.error.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(AppRadii.r12),
                             border: Border.all(
                                 color: p.error.withValues(alpha: 0.3)),
                           ),
@@ -296,21 +300,21 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                             children: [
                               Icon(Icons.error_outline_rounded,
                                   color: p.error, size: 18),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: AppSpacing.xs),
                               Expanded(
                                 child: Text(_error!,
                                     style: TextStyle(
-                                        color: p.error, fontSize: 12)),
+                                        color: p.error, fontSize: AppFontSize.label)),
                               ),
                             ],
                           ),
                         ),
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(AppSpacing.sm),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.04),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadii.r12),
                           border: Border.all(color: p.hairline),
                         ),
                         child: Row(
@@ -318,13 +322,13 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                           children: [
                             Icon(Icons.volume_off_rounded,
                                 color: p.accent, size: 18),
-                            const SizedBox(width: 10),
+                            const SizedBox(width: AppSpacing.s10),
                             Expanded(
                               child: Text(
                                 l10n.rcQuietHint,
                                 style: TextStyle(
                                   color: p.textSecondary,
-                                  fontSize: 12,
+                                  fontSize: AppFontSize.label,
                                   height: 1.4,
                                 ),
                               ),
@@ -332,7 +336,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: AppSpacing.s18),
                       SizedBox(
                         width: double.infinity,
                         height: 48,
@@ -341,14 +345,14 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                             backgroundColor: p.accent,
                             foregroundColor: p.onAccent,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(AppRadii.r14),
                             ),
                           ),
                           icon: const Icon(Icons.graphic_eq_rounded, size: 20),
                           label: Text(
                             l10n.rcStart,
                             style: const TextStyle(
-                                fontWeight: FontWeight.w700, fontSize: 15),
+                                fontWeight: FontWeight.w700, fontSize: AppFontSize.callout),
                           ),
                           onPressed: _start,
                         ),
@@ -358,18 +362,18 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                       Center(
                         child: Column(
                           children: [
-                            const SizedBox(height: 8),
+                            const SizedBox(height: AppSpacing.xs),
                             Text(
                               l10n.rcMeasuring,
                               style: TextStyle(
                                 color: p.textPrimary,
                                 fontWeight: FontWeight.w700,
-                                fontSize: 14,
+                                fontSize: AppFontSize.body,
                               ),
                             ),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: AppSpacing.s14),
                             ClipRRect(
-                              borderRadius: BorderRadius.circular(6),
+                              borderRadius: BorderRadius.circular(AppRadii.r6),
                               child: LinearProgressIndicator(
                                 value: _phase == _RcPhase.measuring
                                     ? _progress
@@ -379,7 +383,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                                 minHeight: 8,
                               ),
                             ),
-                            const SizedBox(height: 18),
+                            const SizedBox(height: AppSpacing.s18),
                           ],
                         ),
                       ),
@@ -389,16 +393,16 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                         style: TextStyle(
                           color: p.textPrimary,
                           fontWeight: FontWeight.w700,
-                          fontSize: 14,
+                          fontSize: AppFontSize.body,
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: AppSpacing.s10),
                       Container(
                         height: 130,
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(AppSpacing.xs),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.03),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadii.r12),
                           border: Border.all(color: p.hairline),
                         ),
                         child: CustomPaint(
@@ -409,35 +413,35 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: AppSpacing.xs),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Container(
                               width: 10,
                               height: 10,
-                              color: const Color(0xFF7C4DFF)),
-                          const SizedBox(width: 6),
+                              color: AppColors.ldacViolet),
+                          const SizedBox(width: AppSpacing.s6),
                           Text(l10n.rcMeasuredResponse,
                               style: TextStyle(
-                                  color: p.textSecondary, fontSize: 11)),
-                          const SizedBox(width: 16),
+                                  color: p.textSecondary, fontSize: AppFontSize.caption)),
+                          const SizedBox(width: AppSpacing.md),
                           Container(
                               width: 10,
                               height: 10,
-                              color: const Color(0xFF2BB673)),
-                          const SizedBox(width: 6),
+                              color: AppColors.emeraldDeep),
+                          const SizedBox(width: AppSpacing.s6),
                           Text(l10n.rcFittedEqGain,
                               style: TextStyle(
-                                  color: p.textSecondary, fontSize: 11)),
+                                  color: p.textSecondary, fontSize: AppFontSize.caption)),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: AppSpacing.xs),
                       Text(
                         l10n.rcKeepPlayerPaused,
-                        style: TextStyle(color: p.textTertiary, fontSize: 11),
+                        style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.caption),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: AppSpacing.xxs),
                       CheckboxListTile(
                         contentPadding: EdgeInsets.zero,
                         dense: true,
@@ -449,15 +453,15 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                         title: Text(
                           l10n.rcStackWithHeadphoneEq,
                           style: TextStyle(
-                              color: p.textPrimary, fontSize: 13),
+                              color: p.textPrimary, fontSize: AppFontSize.bodySmall),
                         ),
                         subtitle: Text(
                           l10n.rcStackWithHeadphoneEqSubtitle,
                           style: TextStyle(
-                              color: p.textSecondary, fontSize: 11),
+                              color: p.textSecondary, fontSize: AppFontSize.caption),
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: AppSpacing.xs),
                       Row(
                         children: [
                           Expanded(
@@ -468,7 +472,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                                   foregroundColor: p.textSecondary,
                                   side: BorderSide(color: p.hairline),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(AppRadii.r12),
                                   ),
                                 ),
                                 onPressed: () => Navigator.of(context).pop(),
@@ -476,7 +480,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: AppSpacing.sm),
                           Expanded(
                             child: SizedBox(
                               height: 46,
@@ -485,7 +489,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                                   backgroundColor: p.accent,
                                   foregroundColor: p.onAccent,
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(AppRadii.r12),
                                   ),
                                 ),
                                 icon:
@@ -502,7 +506,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                         ],
                       ),
                     ],
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppSpacing.xs),
                   ],
                 ),
               ),
@@ -537,7 +541,7 @@ class _ResponsePainter extends CustomPainter {
       final h = r * (size.height / 2 - 4);
       canvas.drawRect(
         Rect.fromLTRB(i * barW + 1, mid - h, (i + 1) * barW - 1, mid),
-        Paint()..color = const Color(0xFF7C4DFF),
+        Paint()..color = AppColors.ldacViolet,
       );
     }
     for (var i = 0; i < fit.length; i++) {
@@ -545,7 +549,7 @@ class _ResponsePainter extends CustomPainter {
       final h = g * (size.height / 2 - 4);
       canvas.drawRect(
         Rect.fromLTRB(i * barW + 1, mid, (i + 1) * barW - 1, mid + h),
-        Paint()..color = const Color(0xFF2BB673),
+        Paint()..color = AppColors.emeraldDeep,
       );
     }
   }

@@ -18,6 +18,9 @@ import 'headset_controls_section.dart';
 import 'settings_section.dart';
 import 'settings_slider_row.dart';
 import 'settings_tiles.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 /// Playback behavior: sleep timer, gapless, crossfade, resume, waveform seek.
 class PlaybackSection extends StatelessWidget {
@@ -385,7 +388,7 @@ class _SponsorBlockSettingTileState extends State<_SponsorBlockSettingTile> {
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) => SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
+              padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.sm, AppSpacing.sm, AppSpacing.sm, AppSpacing.s20),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -394,24 +397,24 @@ class _SponsorBlockSettingTileState extends State<_SponsorBlockSettingTile> {
                     child: Container(
                       width: 40,
                       height: 4,
-                      margin: const EdgeInsets.only(bottom: 14),
+                      margin: const EdgeInsets.only(bottom: AppSpacing.s14),
                       decoration: BoxDecoration(
                         color: p.hairline,
-                        borderRadius: BorderRadius.circular(2),
+                        borderRadius: BorderRadius.circular(AppRadii.r2),
                       ),
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                     child: Text(context.l10n.sponsorBlockCategoriesLabel,
                       style: TextStyle(
                         color: p.textPrimary,
-                        fontSize: 16,
+                        fontSize: AppFontSize.bodyLarge,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: AppSpacing.xxs),
                   ...SponsorBlockService.supportedCategories.map(
                     (category) => CheckboxListTile(
                       dense: true,
@@ -419,7 +422,7 @@ class _SponsorBlockSettingTileState extends State<_SponsorBlockSettingTile> {
                       value: selected.contains(category),
                       title: Text(
                         _labels(context)[category] ?? category,
-                        style: TextStyle(color: p.textPrimary, fontSize: 14),
+                        style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
                       ),
                       onChanged: (checked) {
                         setSheetState(() {
@@ -432,9 +435,9 @@ class _SponsorBlockSettingTileState extends State<_SponsorBlockSettingTile> {
                       },
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.xs),
                   Align(
-                    alignment: Alignment.centerRight,
+                    alignment: AlignmentDirectional.centerEnd,
                     child: FilledButton(
                       style: FilledButton.styleFrom(backgroundColor: p.accent),
                       onPressed: () =>
@@ -628,7 +631,7 @@ class _PlaybackPresetsTile extends StatelessWidget {
         Row(
           children: [
             Icon(Icons.tune_rounded, color: p.textTertiary, size: 20),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -637,16 +640,16 @@ class _PlaybackPresetsTile extends StatelessWidget {
                       style: TextStyle(
                           color: p.textPrimary,
                           fontWeight: FontWeight.w600,
-                          fontSize: 14.5)),
+                          fontSize: AppFontSize.body)),
                   Text(context.l10n.playbackPresetsSubtitle,
                       style: TextStyle(
-                          color: p.textTertiary, fontSize: 12.5, height: 1.32)),
+                          color: p.textTertiary, fontSize: AppFontSize.label, height: 1.32)),
                 ],
               ),
             ),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: AppSpacing.s10),
         Wrap(
           spacing: 8,
           runSpacing: 8,

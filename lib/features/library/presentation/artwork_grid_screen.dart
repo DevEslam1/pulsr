@@ -11,6 +11,9 @@ import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../cubit/library_cubit.dart';
 import '../cubit/library_state.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class ArtworkGridScreen extends StatefulWidget {
   const ArtworkGridScreen({super.key});
@@ -61,13 +64,14 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
           elevation: 0,
           leading: const PulsrBackButton(),
           title: Text(context.l10n.artworkWall,
-          style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.bold),
+          style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700),
         ),
         actions: [
           Row(
             children: [
-              IconButton(
-                icon: const Icon(Icons.zoom_out_rounded),
+                IconButton(
+                  icon: const Icon(Icons.zoom_out_rounded),
+                  tooltip: context.l10n.zoomOut,
                 onPressed: () {
                   if (_columnCount < maxCols) {
                     setState(() => _columnCount =
@@ -75,8 +79,9 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
                   }
                 },
               ),
-              IconButton(
-                icon: const Icon(Icons.zoom_in_rounded),
+                IconButton(
+                  icon: const Icon(Icons.zoom_in_rounded),
+                  tooltip: context.l10n.zoomIn,
                 onPressed: () {
                   if (_columnCount > minCols) {
                     setState(() => _columnCount =
@@ -135,11 +140,11 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
                     return InkWell(
                       onTap: () =>
                           context.push('/album', extra: album),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppRadii.r14),
                       child: Container(
                         decoration: BoxDecoration(
                           color: p.surfaceCard,
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(AppRadii.r14),
                         ),
                         clipBehavior: Clip.antiAlias,
                         child: Column(
@@ -155,7 +160,7 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
                               ),
                             ),
                             Padding(
-                              padding: const EdgeInsets.all(6.0),
+                              padding: const EdgeInsets.all(AppSpacing.s6),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -164,7 +169,7 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      fontSize: 12,
+                                      fontSize: AppFontSize.label,
                                       fontWeight: FontWeight.w600,
                                       color: p.textPrimary,
                                     ),
@@ -174,7 +179,7 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      fontSize: 10.5,
+                                      fontSize: AppFontSize.tiny,
                                       color: p.textSecondary,
                                     ),
                                   ),

@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../cubit/settings_cubit.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 /// Lets the user pick the start/end hour of the automatic dark theme window.
 ///
@@ -63,25 +65,25 @@ class _ThemeScheduleRowState extends State<ThemeScheduleRow> {
     final p = context.palette;
     if (!_loaded) return const SizedBox.shrink();
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.s10, AppSpacing.md, AppSpacing.sm),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Icon(Icons.schedule_rounded, size: 20, color: p.accent),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.sm),
               Text(
                 context.l10n.themeScheduleTitle,
                 style: TextStyle(
                   color: p.textPrimary,
                   fontWeight: FontWeight.w700,
-                  fontSize: 14,
+                  fontSize: AppFontSize.body,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           Row(
             children: [
               Expanded(
@@ -91,7 +93,7 @@ class _ThemeScheduleRowState extends State<ThemeScheduleRow> {
                   onChanged: (v) => _apply(v, _end),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: _HourDropdown(
                   label: context.l10n.themeScheduleEndLabel,
@@ -126,9 +128,9 @@ class _HourDropdown extends StatelessWidget {
       children: [
         Text(
           label,
-          style: TextStyle(color: p.textSecondary, fontSize: 11.5),
+          style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: AppSpacing.s2),
         DropdownButton<int>(
           isExpanded: true,
           underline: const SizedBox.shrink(),

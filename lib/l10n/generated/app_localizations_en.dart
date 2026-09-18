@@ -885,6 +885,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get libraryListView => 'List view';
 
   @override
+  String get pressBackAgainToExit => 'Press back again to exit';
+
+  @override
+  String get refresh => 'Refresh';
+
+  @override
+  String get showPassword => 'Show password';
+
+  @override
+  String get hidePassword => 'Hide password';
+
+  @override
+  String get learnMore => 'Learn more';
+
+  @override
+  String get zoomIn => 'Zoom in';
+
+  @override
+  String get zoomOut => 'Zoom out';
+
+  @override
   String get authUseCodeSignIn => 'Having trouble? Use code sign-in instead';
 
   @override
@@ -2128,6 +2149,42 @@ class AppLocalizationsEn extends AppLocalizations {
   String get radioCuratedTitle => 'Curated Stations';
 
   @override
+  String get radioEditStation => 'Edit Station';
+
+  @override
+  String get radioEdit => 'Edit';
+
+  @override
+  String get radioSave => 'Save';
+
+  @override
+  String get radioUrlRequired => 'Enter a stream URL';
+
+  @override
+  String get radioUrlMalformed => 'That URL could not be parsed';
+
+  @override
+  String get radioUrlScheme =>
+      'Only http:// and https:// streams are supported';
+
+  @override
+  String get radioUrlNoHost => 'The URL is missing a host name';
+
+  @override
+  String get settingsRebuildSearchIndexTitle => 'Rebuild search index';
+
+  @override
+  String get settingsRebuildSearchIndexSubtitle =>
+      'Fix missing search results by rebuilding the full-text index';
+
+  @override
+  String get settingsSearchIndexRebuilt => 'Search index rebuilt';
+
+  @override
+  String get settingsSearchIndexRebuildFailed =>
+      'Could not rebuild the search index';
+
+  @override
   String get followTrackSampleRateTitle => 'Follow track sample rate';
 
   @override
@@ -2270,6 +2327,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notificationPermissionNotNow => 'Not now';
+
+  @override
+  String get onboardingNotificationDenied =>
+      'Notifications are off. You can enable them later in Settings.';
+
+  @override
+  String get onboardingScanFailed =>
+      'Could not scan your library. You can retry from Settings.';
 
   @override
   String get onboardingPermissionRationale =>
@@ -3076,6 +3141,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String previewTrackCount(Object count) {
     return '$count tracks';
   }
+
+  @override
+  String get unlimited => 'Unlimited';
+
+  @override
+  String get invalidNumber => 'Enter a whole number greater than 0';
+
+  @override
+  String previewTruncated(Object count) {
+    return 'Showing first $count matches';
+  }
+
+  @override
+  String get expandPlayer => 'Expand player';
+
+  @override
+  String get dismissPlayer => 'Dismiss player';
+
+  @override
+  String get loadMore => 'Load more';
+
+  @override
+  String get loadingMoreSongs => 'Loading more songs…';
 
   @override
   String btCalibrated(Object ms) {

@@ -11,6 +11,7 @@ import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_dismissible.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
+import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
 import '../../player/cubit/player_cubit.dart';
@@ -18,6 +19,10 @@ import '../../sheets/song_info_sheet.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../cubit/library_cubit.dart';
 import '../cubit/library_state.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -83,7 +88,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               ? TextField(
                   controller: _searchController,
                   autofocus: true,
-                  style: TextStyle(color: p.textPrimary, fontSize: 16),
+                  style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.bodyLarge),
                   decoration: InputDecoration(
                     hintText: '${l10n.search}...',
                     hintStyle: TextStyle(color: p.textTertiary),
@@ -96,11 +101,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
           actions: [
-            IconButton(
-              icon: Icon(
-                _isSearchOpen ? Icons.close_rounded : Icons.search_rounded,
-                color: p.textPrimary,
-              ),
+              IconButton(
+                icon: Icon(
+                  _isSearchOpen ? Icons.close_rounded : Icons.search_rounded,
+                  color: p.textPrimary,
+                ),
+                tooltip: _isSearchOpen ? context.l10n.close : context.l10n.search,
               onPressed: () {
                 setState(() {
                   if (_isSearchOpen) {
@@ -137,79 +143,64 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 constraints: Adaptive.contentConstraints(context),
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.only(bottom: 140),
+                  padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom),
                   children: [
                     // ---------- Local / Online Tabs Switcher ----------
                     Padding(
-                      padding: EdgeInsets.fromLTRB(
+                      padding: EdgeInsetsDirectional.fromSTEB(
                         Adaptive.pagePadding(context),
                         8,
                         Adaptive.pagePadding(context),
                         12,
                       ),
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: p.surfaceContainer,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: p.hairline),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: _FavTabButton(
-                                label: l10n.local,
-                                count: localFavorites.length,
-                                icon: Icons.folder_rounded,
-                                isSelected: _favTabFilter == 0,
-                                onTap: () => setState(() => _favTabFilter = 0),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: _FavTabButton(
-                                label: l10n.online,
-                                count: onlineFavorites.length,
-                                icon: Icons.cloud_rounded,
-                                isSelected: _favTabFilter == 1,
-                                onTap: () => setState(() => _favTabFilter = 1),
-                              ),
-                            ),
-                          ],
-                        ),
+                      child: PulsrSegmentedControl(
+                        selectedIndex: _favTabFilter,
+                        onChanged: (i) => setState(() => _favTabFilter = i),
+                        segments: [
+                          PulsrSegment(
+                            label: l10n.local,
+                            icon: Icons.folder_rounded,
+                            count: localFavorites.length,
+                          ),
+                          PulsrSegment(
+                            label: l10n.online,
+                            icon: Icons.cloud_rounded,
+                            count: onlineFavorites.length,
+                          ),
+                        ],
                       ),
                     ),
 
                     // ---------- Hero Banner Card ----------
                     Padding(
-                      padding: EdgeInsets.fromLTRB(
+                      padding: EdgeInsetsDirectional.fromSTEB(
                         Adaptive.pagePadding(context),
                         0,
                         Adaptive.pagePadding(context),
                         16,
                       ),
                       child: Container(
-                        padding: const EdgeInsets.all(20),
+                        padding: const EdgeInsets.all(AppSpacing.s20),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: _favTabFilter == 0
                                 ? [
                                     p.favorite.withValues(alpha: 0.88),
-                                    const Color(0xFFB0316B),
+                                    AppColors.roseDeep,
                                   ]
                                 : [
-                                    const Color(0xFFE50914),
-                                    const Color(0xFF8B0000),
+                                    AppColors.netflixRed,
+                                    AppColors.ytRedDeep,
                                   ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
-                          borderRadius: BorderRadius.circular(24),
+                          borderRadius: BorderRadius.circular(AppRadii.r24),
                           boxShadow: [
                             BoxShadow(
                               color: (_favTabFilter == 0
                                       ? p.favorite
-                                      : const Color(0xFFE50914))
+                                      : AppColors.netflixRed)
                                   .withValues(alpha: 0.35),
                               blurRadius: 20,
                               offset: const Offset(0, 8),
@@ -226,7 +217,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                   height: 48,
                                   decoration: BoxDecoration(
                                     color: Colors.white.withValues(alpha: 0.22),
-                                    borderRadius: BorderRadius.circular(14),
+                                    borderRadius: BorderRadius.circular(AppRadii.r14),
                                   ),
                                   child: Icon(
                                     _favTabFilter == 0
@@ -257,28 +248,28 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                   ),
                               ],
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: AppSpacing.md),
                             Text(
                               _favTabFilter == 0
                                   ? l10n.favorites
                                   : '${l10n.online} ${l10n.favorites}',
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 24,
+                                fontSize: AppFontSize.headline,
                                 fontWeight: FontWeight.w900,
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: AppSpacing.xxs),
                             Text(
                               '${l10n.tracksCount(songs.length)}${songs.isNotEmpty ? ' • ${Formatters.formatDuration(Duration(milliseconds: totalDurationMs))}' : ''}',
                               style: TextStyle(
                                 color: Colors.white.withValues(alpha: 0.85),
-                                fontSize: 13,
+                                fontSize: AppFontSize.bodySmall,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                             if (songs.isNotEmpty) ...[
-                              const SizedBox(height: 16),
+                              const SizedBox(height: AppSpacing.md),
                               Row(
                                 children: [
                                   Expanded(
@@ -287,10 +278,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                         backgroundColor: Colors.white,
                                         foregroundColor: Colors.black87,
                                         padding: const EdgeInsets.symmetric(
-                                            vertical: 12),
+
+                                            vertical: AppSpacing.sm),
                                         shape: RoundedRectangleBorder(
                                           borderRadius:
-                                              BorderRadius.circular(14),
+                                              BorderRadius.circular(AppRadii.r14),
                                         ),
                                       ),
                                       icon: const Icon(
@@ -307,16 +299,16 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
+                                  const SizedBox(width: AppSpacing.sm),
                                   IconButton.filled(
                                     style: IconButton.styleFrom(
                                       backgroundColor: Colors.white
                                           .withValues(alpha: 0.2),
                                       foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.all(12),
+                                      padding: const EdgeInsets.all(AppSpacing.sm),
                                       shape: RoundedRectangleBorder(
                                         borderRadius:
-                                          BorderRadius.circular(14),
+                                          BorderRadius.circular(AppRadii.r14),
                                       ),
                                     ),
                                     icon: const Icon(Icons.shuffle_rounded,
@@ -343,7 +335,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                     // ---------- Song List or Empty State ----------
                     if (currentTabFavorites.isEmpty)
                       Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 40),
+                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s40),
                         child: Center(
                           child: EmptyStateWidget(
                             icon: _favTabFilter == 0
@@ -363,7 +355,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       )
                     else if (songs.isEmpty && _searchQuery.isNotEmpty)
                       Padding(
-                        padding: const EdgeInsets.all(32),
+                        padding: const EdgeInsets.all(AppSpacing.xl),
                         child: Center(
                           child: Text(
                             '${context.l10n.browseNoSongsMatch} "$_searchQuery"',
@@ -410,11 +402,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                             index: index + 1,
                             onTap: () => playerCubit.playSong(song, queue: songs),
                             onMorePressed: () => SongInfoSheet.show(context, song: song),
-                            trailing: IconButton(
-                              icon: Icon(
-                                song.isFavorite
-                                    ? Icons.favorite_rounded
-                                    : Icons.favorite_border_rounded,
+                              trailing: IconButton(
+                                tooltip: context.l10n.favorite,
+                                icon: Icon(
+                                  song.isFavorite
+                                      ? Icons.favorite_rounded
+                                      : Icons.favorite_border_rounded,
                                 color: song.isFavorite ? p.favorite : p.textTertiary,
                                 size: 20,
                               ),
@@ -435,81 +428,3 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   }
 }
 
-class _FavTabButton extends StatelessWidget {
-  final String label;
-  final int count;
-  final IconData icon;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _FavTabButton({
-    required this.label,
-    required this.count,
-    required this.icon,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? p.accent : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: p.accent.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: isSelected ? p.onAccent : p.textSecondary,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? p.onAccent : p.textPrimary,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                fontSize: 13.5,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? p.onAccent.withValues(alpha: 0.25)
-                    : p.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '$count',
-                style: TextStyle(
-                  color: isSelected ? p.onAccent : p.textSecondary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

@@ -8,6 +8,7 @@ import '../../../core/errors/failures.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../core/widgets/glass_container.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
@@ -16,6 +17,8 @@ import '../../../core/widgets/staggered_list_item.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/usecases/get_songs_usecase.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class ManagePlaylistScreen extends StatefulWidget {
   final PlaylistsTableData playlist;
@@ -117,12 +120,12 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(context.l10n.managePlaylist,
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                    style: TextStyle(fontSize: AppFontSize.bodySmall, fontWeight: FontWeight.w500),
                   ),
                   Text(
                     widget.playlist.name,
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: AppFontSize.bodyLarge,
                       fontWeight: FontWeight.w700,
                       color: p.accent,
                     ),
@@ -161,18 +164,14 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
                     style: TextStyle(
                       color: p.accent,
                       fontWeight: FontWeight.w700,
-                      fontSize: 13,
+                      fontSize: AppFontSize.bodySmall,
                     ),
                   ),
                 ),
               ],
             ),
             body: _isLoading
-                ? Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(p.accent),
-                    ),
-                  )
+                ? const SkeletonList(padding: EdgeInsets.only(top: AppSpacing.xs))
                 : _loadError != null
                     ? EmptyStateWidget(
                         icon: Icons.error_outline_rounded,
@@ -199,22 +198,23 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
                                   children: [
                                     Icon(Icons.search_off_rounded,
                                         size: 48, color: p.textTertiary),
-                                    const SizedBox(height: 12),
+                                    const SizedBox(height: AppSpacing.sm),
                                     Text(
                                       _searchQuery.isEmpty
                                           ? context.l10n.browseNoSongsInLibrary
                                           : '${context.l10n.browseNoSongsMatch} "$_searchQuery"',
                                       style: TextStyle(
                                         color: p.textSecondary,
-                                        fontSize: 14,
+                                        fontSize: AppFontSize.body,
                                       ),
                                     ),
                                   ],
                                 ),
                               )
                             : ListView.builder(
-                                padding: const EdgeInsets.only(
-                                    top: 8, bottom: 100, left: 12, right: 12),
+                                padding: const EdgeInsetsDirectional.only(
+
+                                    top: AppSpacing.xs, bottom: 100, start: AppSpacing.sm, end: AppSpacing.sm),
                                 itemCount: visibleSongs.length,
                                 itemBuilder: (context, index) {
                                   final song = visibleSongs[index];
@@ -224,7 +224,7 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
                           return StaggeredListItem(
                             index: index,
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
                               child: Material(
                                 color: Colors.transparent,
                                 child: InkWell(
@@ -240,7 +240,8 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
                                   },
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 8),
+
+                                        horizontal: AppSpacing.s10, vertical: AppSpacing.xs),
                                     decoration: BoxDecoration(
                                       borderRadius: AppRadii.cardRadius,
                                       color: isSelected
@@ -263,7 +264,7 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
                                           checkColor: p.onAccent,
                                           shape: RoundedRectangleBorder(
                                             borderRadius:
-                                                BorderRadius.circular(6),
+                                                BorderRadius.circular(AppRadii.r6),
                                           ),
                                           onChanged: (val) {
                                             setState(() {
@@ -275,7 +276,7 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
                                             });
                                           },
                                         ),
-                                        const SizedBox(width: 6),
+                                        const SizedBox(width: AppSpacing.s6),
                                         // Artwork
                                         CachedArtwork(
                                           id: song.id,
@@ -284,7 +285,7 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
                                           size: 44,
                                           borderRadius: 10,
                                         ),
-                                        const SizedBox(width: 12),
+                                        const SizedBox(width: AppSpacing.sm),
                                         // Track details
                                         Expanded(
                                           child: Column(
@@ -298,17 +299,17 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
                                                 style: TextStyle(
                                                   color: p.textPrimary,
                                                   fontWeight: FontWeight.w600,
-                                                  fontSize: 14,
+                                                  fontSize: AppFontSize.body,
                                                 ),
                                               ),
-                                              const SizedBox(height: 2),
+                                              const SizedBox(height: AppSpacing.s2),
                                               Text(
                                                 song.artist,
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(
                                                   color: p.textSecondary,
-                                                  fontSize: 12,
+                                                  fontSize: AppFontSize.label,
                                                 ),
                                               ),
                                             ],
@@ -335,18 +336,18 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
 
   Widget _buildSearchBar(PulsrPalette p) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
       child: GlassContainer(
         blur: 16,
         opacity: p.isDark ? 0.9 : 0.95,
         borderRadius: AppRadii.full,
         color: p.surfaceContainer,
         border: Border.all(color: p.hairline, width: 1),
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
         child: Row(
           children: [
             Icon(Icons.search_rounded, color: p.textSecondary, size: 20),
-            const SizedBox(width: 10),
+            const SizedBox(width: AppSpacing.s10),
             Expanded(
               child: TextField(
                 controller: _searchController,
@@ -356,19 +357,20 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
                     if (mounted) setState(() => _searchQuery = val);
                   });
                 },
-                style: TextStyle(color: p.textPrimary, fontSize: 14),
+                style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
                 decoration: InputDecoration(
                   hintText: context.l10n.browseSearchSongsHint,
-                  hintStyle: TextStyle(color: p.textTertiary, fontSize: 13.5),
+                  hintStyle: TextStyle(color: p.textTertiary, fontSize: AppFontSize.bodySmall),
                   border: InputBorder.none,
                   isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                 ),
               ),
             ),
             if (_searchQuery.isNotEmpty)
-              IconButton(
-                icon: Icon(Icons.close_rounded, color: p.textSecondary, size: 18),
+                IconButton(
+                  icon: Icon(Icons.close_rounded, color: p.textSecondary, size: 18),
+                  tooltip: context.l10n.clear,
                 onPressed: () {
                   _searchDebounce?.cancel();
                   _searchController.clear();
@@ -389,12 +391,12 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
     if (!hasChanges) return const SizedBox.shrink();
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xxs, AppSpacing.md, AppSpacing.xs),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14, vertical: AppSpacing.xs),
         decoration: BoxDecoration(
           color: p.accent.withValues(alpha: p.isDark ? 0.14 : 0.1),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadii.r12),
           border: Border.all(
             color: p.accent.withValues(alpha: 0.28),
             width: 1,
@@ -403,13 +405,13 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
         child: Row(
           children: [
             Icon(Icons.info_outline_rounded, color: p.accent, size: 18),
-            const SizedBox(width: 10),
+            const SizedBox(width: AppSpacing.s10),
             Expanded(
               child: Text(
                 '${context.l10n.browseWillAdd}: $toAdd ${context.l10n.browseTracks} • ${context.l10n.browseWillRemove}: $toRemove ${context.l10n.browseTracks}',
                 style: TextStyle(
                   color: p.textPrimary,
-                  fontSize: 12.5,
+                  fontSize: AppFontSize.label,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -426,7 +428,7 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
     final hasChanges = toAdd > 0 || toRemove > 0;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.lg),
       decoration: BoxDecoration(
         color: p.surface,
         border: Border(top: BorderSide(color: p.hairline, width: 1)),
@@ -443,8 +445,7 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
         child: ElevatedButton.icon(
           onPressed: hasChanges && !_isSaving ? _applyChanges : null,
           icon: _isSaving
-              ? SizedBox(
-                  width: 18,
+              ? SizedBox(width: AppSpacing.s18,
                   height: 18,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
@@ -456,13 +457,13 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
             hasChanges
                 ? '${context.l10n.browseApplyChanges} (+$toAdd / -$toRemove)'
                 : context.l10n.browseNoChangesToSave,
-            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: AppFontSize.body),
           ),
           style: ElevatedButton.styleFrom(
             backgroundColor: hasChanges ? p.accent : p.surfaceContainerHigh,
             foregroundColor: hasChanges ? p.onAccent : p.textTertiary,
             elevation: hasChanges ? 3 : 0,
-            padding: const EdgeInsets.symmetric(vertical: 14),
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.s14),
             shape: RoundedRectangleBorder(
               borderRadius: AppRadii.buttonRadius,
             ),

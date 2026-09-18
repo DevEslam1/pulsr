@@ -18,6 +18,7 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
+import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../domain/models/smart_playlist_criteria.dart';
@@ -34,6 +35,11 @@ import '../../settings/cubit/settings_cubit.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../cubit/playlist_cubit.dart';
 import '../cubit/playlist_state.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
+import '../../../core/widgets/staggered_reveal.dart';
 
 enum _PlaylistTabMode { local, online }
 
@@ -450,11 +456,11 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                                 children: [
                                   Icon(Icons.queue_music_rounded,
                                       size: 64, color: p.textTertiary),
-                                  const SizedBox(height: 16),
+                                  const SizedBox(height: AppSpacing.md),
                                   Text(context.l10n.selectPlaylistHint,
                                     style: TextStyle(
                                       color: p.textSecondary,
-                                      fontSize: 16,
+                                      fontSize: AppFontSize.bodyLarge,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -506,7 +512,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       },
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 160, top: 12),
+        padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom, top: AppSpacing.sm),
         children: [
           // Liked songs hero card (Local favorites)
           Padding(
@@ -516,7 +522,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               title: context.l10n.favorites,
               subtitle: context.l10n.likedTracks,
               icon: Icons.favorite_rounded,
-              colors: [p.favorite, const Color(0xFFB0316B)],
+              colors: [p.favorite, AppColors.roseDeep],
               onTap: () => context.push('/favorites'),
             ),
           ),
@@ -525,9 +531,9 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
           // at least one suggestion).
           if (_suggestions.isNotEmpty) ...[
             Padding(
-              padding: EdgeInsets.only(
-                left: Adaptive.pagePadding(context),
-                right: Adaptive.pagePadding(context),
+              padding: EdgeInsetsDirectional.only(
+                start: Adaptive.pagePadding(context),
+                end: Adaptive.pagePadding(context),
                 top: 24,
                 bottom: 10,
               ),
@@ -545,7 +551,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                 padding: EdgeInsets.symmetric(
                     horizontal: Adaptive.pagePadding(context)),
                 itemCount: _suggestions.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
                 itemBuilder: (context, index) {
                   final suggestion = _suggestions[index];
                   return _SuggestionCard(
@@ -559,9 +565,9 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
 
           // SMART PLAYLISTS Header
           Padding(
-            padding: EdgeInsets.only(
-              left: Adaptive.pagePadding(context),
-              right: Adaptive.pagePadding(context),
+            padding: EdgeInsetsDirectional.only(
+              start: Adaptive.pagePadding(context),
+              end: Adaptive.pagePadding(context),
               top: 24,
               bottom: 10,
             ),
@@ -578,22 +584,23 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                 if (smartPlaylists.isEmpty)
                   InkWell(
                     onTap: () => context.push('/smart-playlist-builder'),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppRadii.r8),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
+
+                          horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(Icons.add_rounded,
                               size: 14, color: p.accent),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: AppSpacing.xxs),
                           Text(
                             context.l10n.createSmartPlaylist,
                             style: TextStyle(
                               color: p.accent,
                               fontWeight: FontWeight.w700,
-                              fontSize: 11,
+                              fontSize: AppFontSize.caption,
                             ),
                           ),
                         ],
@@ -622,7 +629,10 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                 itemBuilder: (context, index) {
                   final pl = smartPlaylists[index];
                   final count = state.smartPlaylistCounts[pl.id] ?? 0;
-                  return _PlaylistCard(
+                  return StaggeredReveal(
+                    index: index,
+                    groupKey: smartPlaylists.length,
+                    child: _PlaylistCard(
                     name: pl.name,
                     subtitle:
                         '${context.l10n.tracksCount(count)} • ${context.l10n.browseSmart}',
@@ -655,14 +665,14 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                         _confirmDelete(context, cubit, pl);
                       }
                     },
-                  );
+                  ));
                 },
               ),
             ),
 
           // ── YOUR PLAYLISTS SECTION ──────────────────────────────
           Padding(
-            padding: EdgeInsets.fromLTRB(
+            padding: EdgeInsetsDirectional.fromSTEB(
                 Adaptive.pagePadding(context),
                 28,
                 Adaptive.pagePadding(context),
@@ -685,44 +695,30 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
           Padding(
             padding: EdgeInsets.symmetric(
                 horizontal: Adaptive.pagePadding(context)),
-            child: SizedBox(
-              width: double.infinity,
-              child: SegmentedButton<_PlaylistTabMode>(
-                showSelectedIcon: false,
-                style: const ButtonStyle(
-                  visualDensity: VisualDensity.compact,
-                  padding: WidgetStatePropertyAll(
-                    EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  ),
+            child: PulsrSegmentedControl(
+              selectedIndex: _selectedTab == _PlaylistTabMode.local ? 0 : 1,
+              onChanged: (i) {
+                final mode =
+                    i == 0 ? _PlaylistTabMode.local : _PlaylistTabMode.online;
+                setState(() => _selectedTab = mode);
+                if (mode == _PlaylistTabMode.online) {
+                  cubit.autoFetchOnlineLibrary();
+                }
+              },
+              segments: [
+                PulsrSegment(
+                  label: context.l10n.local,
+                  icon: Icons.folder_rounded,
                 ),
-                segments: [
-                  ButtonSegment(
-                    value: _PlaylistTabMode.local,
-                    label: Text(context.l10n.local,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700)),
-                    icon: const Icon(Icons.folder_rounded, size: 16),
-                  ),
-                  ButtonSegment(
-                    value: _PlaylistTabMode.online,
-                    label: Text(context.l10n.online,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700)),
-                    icon: const Icon(Icons.cloud_rounded, size: 16),
-                  ),
-                ],
-                selected: {_selectedTab},
-                onSelectionChanged: (sel) {
-                  setState(() => _selectedTab = sel.first);
-                  if (sel.first == _PlaylistTabMode.online) {
-                    cubit.autoFetchOnlineLibrary();
-                  }
-                },
-              ),
+                PulsrSegment(
+                  label: context.l10n.online,
+                  icon: Icons.cloud_rounded,
+                ),
+              ],
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
 
           // ── TAB CONTENT ─────────────────────────────────────────
           if (_selectedTab == _PlaylistTabMode.local) ...[
@@ -775,7 +771,10 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                   itemCount: userPlaylists.length,
                   itemBuilder: (context, index) {
                     final pl = userPlaylists[index];
-                    return _PlaylistCard(
+                    return StaggeredReveal(
+                      index: index,
+                      groupKey: userPlaylists.length,
+                      child: _PlaylistCard(
                       name: pl.name,
                       subtitle: context.l10n.browseOfflinePlaylist,
                       icon: Icons.queue_music_rounded,
@@ -807,7 +806,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                           _confirmDelete(context, cubit, pl);
                         }
                       },
-                    );
+                    ));
                   },
                 ),
               ),
@@ -964,16 +963,16 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                       vertical: 12,
                     ),
                     child: Container(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(AppSpacing.s20),
                       decoration: BoxDecoration(
                         color: p.surfaceContainer,
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(AppRadii.r20),
                         border: Border.all(color: p.hairline),
                       ),
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(12),
+                            padding: const EdgeInsets.all(AppSpacing.sm),
                             decoration: BoxDecoration(
                               color: p.accent.withValues(alpha: 0.12),
                               shape: BoxShape.circle,
@@ -981,29 +980,29 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                             child: Icon(Icons.cloud_sync_rounded,
                                 size: 28, color: p.accent),
                           ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: AppSpacing.md),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(context.l10n.connectYtm,
                                   style: TextStyle(
-                                    fontSize: 15,
+                                    fontSize: AppFontSize.callout,
                                     fontWeight: FontWeight.w800,
                                     color: p.textPrimary,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: AppSpacing.xxs),
                                 Text(context.l10n.signInToSync,
                                   style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: AppFontSize.label,
                                     color: p.textSecondary,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: AppSpacing.xs),
                           FilledButton(
                             onPressed: () async {
                               final ok = await YtmWebLoginSheet.show(context);
@@ -1013,12 +1012,13 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                             },
                             style: FilledButton.styleFrom(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 8),
+
+                                  horizontal: AppSpacing.s14, vertical: AppSpacing.xs),
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
+                                  borderRadius: BorderRadius.circular(AppRadii.r12)),
                             ),
                             child: Text(context.l10n.signIn,
-                                style: const TextStyle(fontSize: 12.5)),
+                                style: const TextStyle(fontSize: AppFontSize.label)),
                           ),
                         ],
                       ),
@@ -1051,7 +1051,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
 
                   // ── ACCOUNT PLAYLISTS SECTION ─────────────────────────
                   Padding(
-                    padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context),
+                    padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
                         24, Adaptive.pagePadding(context), 10),
                     child: Row(
                       children: [
@@ -1064,8 +1064,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                           ),
                         ),
                         if (online.accountStatus == YtmFetchStatus.loading)
-                          SizedBox(
-                            width: 14,
+                          SizedBox(width: AppSpacing.s14,
                             height: 14,
                             child: CircularProgressIndicator(
                                 strokeWidth: 2, color: p.accent),
@@ -1076,7 +1075,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                                 online.accountPlaylists.length),
                             style: TextStyle(
                                 color: p.textTertiary,
-                                fontSize: 11,
+                                fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w600),
                           ),
                       ],
@@ -1086,19 +1085,18 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                   if (online.accountStatus == YtmFetchStatus.loading &&
                       online.accountPlaylists.isEmpty)
                     Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
                       child: Center(
                         child: Column(
                           children: [
-                            SizedBox(
-                                width: 24,
+                            SizedBox(width: AppSpacing.lg,
                                 height: 24,
                                 child: CircularProgressIndicator(
                                     strokeWidth: 2.5, color: p.accent)),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: AppSpacing.sm),
                             Text(context.l10n.fetchingAccount,
                                 style: TextStyle(
-                                    color: p.textSecondary, fontSize: 13)),
+                                    color: p.textSecondary, fontSize: AppFontSize.bodySmall)),
                           ],
                         ),
                       ),
@@ -1110,23 +1108,23 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                           horizontal: Adaptive.pagePadding(context),
                           vertical: 10),
                       child: Container(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(AppSpacing.md),
                         decoration: BoxDecoration(
                           color: p.surfaceContainer,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(AppRadii.r16),
                           border: Border.all(color: p.hairline),
                         ),
                         child: Row(
                           children: [
                             Icon(Icons.error_outline_rounded,
                                 color: p.error, size: 22),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: AppSpacing.sm),
                             Expanded(
                               child: Text(
                                 online.accountError ??
                                     context.l10n.browseFailedToLoadAccountPlaylists,
                                 style: TextStyle(
-                                    color: p.textSecondary, fontSize: 12.5),
+                                    color: p.textSecondary, fontSize: AppFontSize.label),
                               ),
                             ),
                             TextButton(
@@ -1142,21 +1140,21 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                       padding: EdgeInsets.symmetric(
                           horizontal: Adaptive.pagePadding(context)),
                       child: Container(
-                        padding: const EdgeInsets.all(18),
+                        padding: const EdgeInsets.all(AppSpacing.s18),
                         decoration: BoxDecoration(
                           color: p.surfaceContainer,
-                          borderRadius: BorderRadius.circular(18),
+                          borderRadius: BorderRadius.circular(AppRadii.r18),
                           border: Border.all(color: p.hairline),
                         ),
                         child: Row(
                           children: [
                             Icon(Icons.playlist_remove_rounded,
                                 color: p.textTertiary, size: 26),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: AppSpacing.sm),
                             Expanded(
                               child: Text(context.l10n.noAccountPlaylists,
                                 style: TextStyle(
-                                    color: p.textSecondary, fontSize: 13),
+                                    color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                               ),
                             ),
                           ],
@@ -1194,7 +1192,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                 // ── ADDED PLAYLISTS SECTION ─────────────────────────────
                 if (online.customPlaylists.isNotEmpty) ...[
                   Padding(
-                    padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context),
+                    padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
                         24, Adaptive.pagePadding(context), 10),
                     child: Text(context.l10n.addedPlaylists,
                       style: Theme.of(context)
@@ -1233,24 +1231,24 @@ class _OnlinePlaylistsContent extends StatelessWidget {
 
                 // Add YouTube Playlist Button
                 Padding(
-                  padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context),
+                  padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
                       16, Adaptive.pagePadding(context), 0),
                   child: InkWell(
                     onTap: onAddPlaylist,
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(AppRadii.r18),
                     child: DashedBorderCard(
-                      color: const Color(0xFFFF0000),
+                      color: AppColors.ytRed,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           const Icon(Icons.add_rounded,
-                              color: Color(0xFFFF0000), size: 20),
-                          const SizedBox(width: 8),
+                              color: AppColors.ytRed, size: 20),
+                          const SizedBox(width: AppSpacing.xs),
                           Text(context.l10n.addYtmUrl,
                             style: TextStyle(
-                              color: Color(0xFFFF0000),
+                              color: AppColors.ytRed,
                               fontWeight: FontWeight.w800,
-                              fontSize: 14,
+                              fontSize: AppFontSize.body,
                             ),
                           ),
                         ],
@@ -1285,15 +1283,15 @@ class _AccountPlaylistCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    const gradientColors = [Color(0xFFE50914), Color(0xFF8B0000)];
+    const gradientColors = [AppColors.netflixRed, AppColors.ytRedDeep];
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(AppRadii.r20),
       child: Container(
         decoration: BoxDecoration(
           color: p.surfaceContainer,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadii.r20),
           border: Border.all(color: p.hairline),
         ),
         child: Column(
@@ -1305,7 +1303,7 @@ class _AccountPlaylistCard extends StatelessWidget {
                 children: [
                   ClipRRect(
                     borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(19)),
+                        const BorderRadius.vertical(top: Radius.circular(AppRadii.r20)),
                     child: playlist.artworkUrl != null
                         ? Image.network(
                             playlist.artworkUrl!,
@@ -1339,13 +1337,13 @@ class _AccountPlaylistCard extends StatelessWidget {
                           ),
                   ),
                   if (onDownload != null)
-                    Positioned(
+                    PositionedDirectional(
                       top: 8,
-                      right: 8,
+                      end: 8,
                       child: GestureDetector(
                         onTap: onDownload,
                         child: Container(
-                          padding: const EdgeInsets.all(6),
+                          padding: const EdgeInsets.all(AppSpacing.s6),
                           decoration: BoxDecoration(
                             color: Colors.black.withValues(alpha: 0.55),
                             shape: BoxShape.circle,
@@ -1359,7 +1357,7 @@ class _AccountPlaylistCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+              padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s14, AppSpacing.s10, AppSpacing.s14, AppSpacing.sm),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1370,15 +1368,15 @@ class _AccountPlaylistCard extends StatelessWidget {
                     style: TextStyle(
                       color: p.textPrimary,
                       fontWeight: FontWeight.w800,
-                      fontSize: 13,
+                      fontSize: AppFontSize.bodySmall,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: AppSpacing.s2),
                   Text(
                     playlist.subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: p.textSecondary, fontSize: 11.5),
+                    style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
                   ),
                 ],
               ),
@@ -1442,16 +1440,16 @@ class _LikedMusicOnlineCard extends StatelessWidget {
                           error!.toLowerCase().contains('expired'))
                   ? () => YtmWebLoginSheet.show(context)
                   : onFetch)),
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(AppRadii.r22),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(AppSpacing.s20),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: gradientColors,
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(AppRadii.r22),
           boxShadow: [
             BoxShadow(
               color: gradientColors.first.withValues(alpha: 0.35),
@@ -1464,7 +1462,7 @@ class _LikedMusicOnlineCard extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(AppSpacing.sm),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
@@ -1472,7 +1470,7 @@ class _LikedMusicOnlineCard extends StatelessWidget {
               child: const Icon(Icons.thumb_up_alt_rounded,
                   color: Colors.white, size: 26),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1481,25 +1479,24 @@ class _LikedMusicOnlineCard extends StatelessWidget {
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w900,
-                      fontSize: 18,
-                      letterSpacing: -0.3,
+                      fontSize: AppFontSize.title,
+                      letterSpacing: AppTracking.title,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: AppSpacing.s2),
                   Text(
                     subtitle,
                     style: TextStyle(
                       color: Colors.white.withValues(
                           alpha: status == YtmFetchStatus.error ? 0.7 : 0.85),
-                      fontSize: 12.5,
+                      fontSize: AppFontSize.label,
                     ),
                   ),
                 ],
               ),
             ),
             if (status == YtmFetchStatus.loading)
-              const SizedBox(
-                width: 40,
+              const SizedBox(width: AppSpacing.s40,
                 height: 40,
                 child: CircularProgressIndicator(
                     color: Colors.white, strokeWidth: 2.5),
@@ -1522,7 +1519,7 @@ class _LikedMusicOnlineCard extends StatelessWidget {
                             color: Colors.white, size: 22),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: AppSpacing.s10),
                   ],
                   Container(
                     width: 40,
@@ -1575,15 +1572,15 @@ class _OnlinePlaylistCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    const ytRed = Color(0xFFFF0000);
+    const ytRed = AppColors.ytRed;
     return InkWell(
       onTap: onTap,
       onLongPress: onRemove,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(AppRadii.r20),
       child: Container(
         decoration: BoxDecoration(
           color: p.surfaceContainer,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadii.r20),
           border: Border.all(color: p.hairline),
         ),
         child: Column(
@@ -1601,7 +1598,7 @@ class _OnlinePlaylistCard extends StatelessWidget {
                     end: Alignment.bottomRight,
                   ),
                   borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(19)),
+                      const BorderRadius.vertical(top: Radius.circular(AppRadii.r20)),
                 ),
                 child: Stack(
                   children: [
@@ -1609,13 +1606,13 @@ class _OnlinePlaylistCard extends StatelessWidget {
                         child: Icon(Icons.queue_music_rounded,
                             color: Colors.white, size: 40)),
                     if (onDownload != null)
-                      Positioned(
+                      PositionedDirectional(
                         top: 8,
-                        left: 8,
+                        start: 8,
                         child: GestureDetector(
                           onTap: onDownload,
                           child: Container(
-                            padding: const EdgeInsets.all(4),
+                            padding: const EdgeInsets.all(AppSpacing.xxs),
                             decoration: BoxDecoration(
                               color: Colors.black.withValues(alpha: 0.35),
                               shape: BoxShape.circle,
@@ -1625,13 +1622,13 @@ class _OnlinePlaylistCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                    Positioned(
+                    PositionedDirectional(
                       top: 8,
-                      right: 8,
+                      end: 8,
                       child: GestureDetector(
                         onTap: onRemove,
                         child: Container(
-                          padding: const EdgeInsets.all(4),
+                          padding: const EdgeInsets.all(AppSpacing.xxs),
                           decoration: BoxDecoration(
                             color: Colors.black.withValues(alpha: 0.35),
                             shape: BoxShape.circle,
@@ -1646,7 +1643,7 @@ class _OnlinePlaylistCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+              padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s14, AppSpacing.s10, AppSpacing.s14, AppSpacing.sm),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1657,11 +1654,11 @@ class _OnlinePlaylistCard extends StatelessWidget {
                     style: TextStyle(
                         color: p.textPrimary,
                         fontWeight: FontWeight.w800,
-                        fontSize: 13),
+                        fontSize: AppFontSize.bodySmall),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: AppSpacing.s2),
                   Text(context.l10n.entryAdded(entry.tracks.length),
-                      style: TextStyle(color: p.textSecondary, fontSize: 11.5)),
+                      style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label)),
                 ],
               ),
             ),
@@ -1695,15 +1692,15 @@ class _PlaylistHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(AppRadii.r22),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(AppSpacing.s20),
         decoration: BoxDecoration(
           gradient: LinearGradient(
               colors: colors,
               begin: Alignment.topLeft,
               end: Alignment.bottomRight),
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(AppRadii.r22),
           boxShadow: [
             BoxShadow(
               color: colors.first.withValues(alpha: 0.35),
@@ -1716,13 +1713,13 @@ class _PlaylistHeroCard extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(AppSpacing.sm),
               decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.2),
                   shape: BoxShape.circle),
               child: Icon(icon, color: Colors.white, size: 26),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1732,14 +1729,14 @@ class _PlaylistHeroCard extends StatelessWidget {
                     style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w900,
-                        fontSize: 18,
-                        letterSpacing: -0.3),
+                        fontSize: AppFontSize.title,
+                        letterSpacing: AppTracking.title),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: AppSpacing.s2),
                   Text(subtitle,
                       style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.8),
-                          fontSize: 12.5)),
+                          fontSize: AppFontSize.label)),
                 ],
               ),
             ),
@@ -1769,13 +1766,13 @@ class _SuggestionCard extends StatelessWidget {
     final p = context.palette;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppRadii.r16),
       child: Container(
         width: 230,
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(AppSpacing.s14),
         decoration: BoxDecoration(
           color: p.surfaceContainer,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadii.r16),
           border: Border.all(color: p.hairline),
         ),
         child: Column(
@@ -1784,7 +1781,7 @@ class _SuggestionCard extends StatelessWidget {
             Row(
               children: [
                 Icon(Icons.auto_awesome_rounded, color: p.accent, size: 18),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.xs),
                 Expanded(
                   child: Text(
                     suggestion.title,
@@ -1793,23 +1790,23 @@ class _SuggestionCard extends StatelessWidget {
                     style: TextStyle(
                       color: p.textPrimary,
                       fontWeight: FontWeight.w800,
-                      fontSize: 13.5,
+                      fontSize: AppFontSize.bodySmall,
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             Text(
               suggestion.description,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: p.textSecondary, fontSize: 12),
+              style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
             ),
             const Spacer(),
             Text(
               context.l10n.tapToCreate(suggestion.songs.length),
-              style: TextStyle(color: p.textTertiary, fontSize: 11),
+              style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.caption),
             ),
           ],
         ),
@@ -1867,11 +1864,11 @@ class _PlaylistCard extends StatelessWidget {
     final p = context.palette;
     final card = InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(AppRadii.r20),
       child: Container(
         decoration: BoxDecoration(
           color: p.surfaceContainer,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadii.r20),
           border: Border.all(
             color: isSelected ? p.accent : p.hairline,
             width: isSelected ? 2.2 : 1.0,
@@ -1897,7 +1894,7 @@ class _PlaylistCard extends StatelessWidget {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight),
                   borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(19)),
+                      const BorderRadius.vertical(top: Radius.circular(AppRadii.r20)),
                 ),
                 child: Center(
                   child: Icon(icon,
@@ -1906,7 +1903,7 @@ class _PlaylistCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+              padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s14, AppSpacing.s10, AppSpacing.s14, AppSpacing.sm),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1921,12 +1918,12 @@ class _PlaylistCard extends StatelessWidget {
                           style: TextStyle(
                               color: p.textPrimary,
                               fontWeight: FontWeight.w800,
-                              fontSize: 14),
+                              fontSize: AppFontSize.body),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: AppSpacing.s2),
                         Text(subtitle,
                             style: TextStyle(
-                                color: p.textSecondary, fontSize: 11.5)),
+                                color: p.textSecondary, fontSize: AppFontSize.label)),
                       ],
                     ),
                   ),
@@ -1973,7 +1970,7 @@ class DashedBorderCard extends StatelessWidget {
       height: 64,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppRadii.r18),
         border: Border.all(color: color.withValues(alpha: 0.5), width: 1.4),
         color: color.withValues(alpha: 0.05),
       ),

@@ -177,13 +177,22 @@ void ArbitraryResponseEq::synthesizeFir() {
         float mag = static_cast<float>(std::pow(10.0, gainDb / 20.0));
         if (!std::isfinite(mag)) mag = 1.0f;
 
-        double phase = -2.0 * M_PI * static_cast<double>(k) * delay / static_cast<double>(FFT_SIZE);
-        spectrum[k] = FftUtil::Complex(
-            mag * static_cast<float>(std::cos(phase)),
-            mag * static_cast<float>(std::sin(phase))
-        );
-        if (k > 0 && k < half) {
-            spectrum[FFT_SIZE - k] = std::conj(spectrum[k]);
+        if (k == half) {
+            // Nyquist bin must be real for a real-valued impulse response.
+            spectrum[k] = FftUtil::Complex(mag, 0.0f);
+        } else {
+            // FftUtil's inverse transform computes h[n] = (1/N) Σ X[k] e^{-j2πkn/N},
+            // so a POSITIVE phase term e^{+j2πkd/N} places the impulse at n = d.
+            // (The previous negative phase placed it at n = N-d, so keeping the
+            // first FIR_TAPS samples captured the wrapped tail, not the kernel.)
+            double phase = 2.0 * M_PI * static_cast<double>(k) * delay / static_cast<double>(FFT_SIZE);
+            spectrum[k] = FftUtil::Complex(
+                mag * static_cast<float>(std::cos(phase)),
+                mag * static_cast<float>(std::sin(phase))
+            );
+            if (k > 0) {
+                spectrum[FFT_SIZE - k] = std::conj(spectrum[k]);
+            }
         }
     }
 

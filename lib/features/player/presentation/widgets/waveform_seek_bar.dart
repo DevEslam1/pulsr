@@ -4,6 +4,9 @@ import 'package:flutter/services.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 /// Interactive gesture-driven waveform seek bar widget with pinch-to-zoom and chapter marker support.
 class WaveformSeekBar extends StatefulWidget {
@@ -133,7 +136,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
       textDirection: TextDirection.ltr,
       child: RepaintBoundary(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -198,26 +201,68 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                     child: SizedBox(
                       height: widget.height,
                       width: double.infinity,
-                      child: CustomPaint(
-                        painter: _WaveformPainter(
-                          samples: widget.samples,
-                          progress: progressPercent,
-                          activeColor: widget.activeColor,
-                          inactiveColor: inactiveColor,
-                          chapterMarkers: widget.chapterMarkers,
-                          duration: widget.duration,
-                          loopPointA: widget.loopPointA,
-                          loopPointB: widget.loopPointB,
-                          zoomScale: _zoomScale,
-                          visibleStart: window.startIndex,
-                          visibleCount: window.visibleCount,
-                        ),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Positioned.fill(
+                            child: CustomPaint(
+                              painter: _WaveformPainter(
+                                samples: widget.samples,
+                                progress: progressPercent,
+                                activeColor: widget.activeColor,
+                                inactiveColor: inactiveColor,
+                                chapterMarkers: widget.chapterMarkers,
+                                duration: widget.duration,
+                                loopPointA: widget.loopPointA,
+                                loopPointB: widget.loopPointB,
+                                zoomScale: _zoomScale,
+                                visibleStart: window.startIndex,
+                                visibleCount: window.visibleCount,
+                              ),
+                            ),
+                          ),
+                          // Scrub preview bubble follows the finger while dragging.
+                          if (_dragValue != null)
+                            PositionedDirectional(
+                              top: -30,
+                              start: (progressPercent * trackWidth - 32)
+                                  .clamp(0.0, (trackWidth - 64).clamp(0.0, trackWidth)),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.xs,
+                                    vertical: AppSpacing.s2),
+                                decoration: BoxDecoration(
+                                  color: context.palette.surfaceContainerHigh,
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadii.r8),
+                                  border:
+                                      Border.all(color: context.palette.hairline),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black
+                                          .withValues(alpha: 0.25),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Text(
+                                  Formatters.formatDuration(currentDuration),
+                                  style: TextStyle(
+                                    color: context.palette.textPrimary,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   );
                 },
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: AppSpacing.xxs),
               // Timestamps Row
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -230,7 +275,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                     ),
                     style: TextStyle(
                       color: context.palette.textSecondary,
-                      fontSize: 12,
+                      fontSize: AppFontSize.label,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -238,7 +283,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                     Formatters.formatDuration(widget.duration),
                     style: TextStyle(
                       color: context.palette.textSecondary,
-                      fontSize: 12,
+                      fontSize: AppFontSize.label,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -288,7 +333,7 @@ class _WaveformPainter extends CustomPainter {
     if (totalCount < 2) {
       final rect = RRect.fromRectAndRadius(
         Rect.fromLTWH(0, (size.height - 4) / 2, size.width, 4),
-        const Radius.circular(2),
+        const Radius.circular(AppRadii.r2),
       );
       canvas.drawRRect(rect, Paint()..color = inactiveColor);
       return;
@@ -325,7 +370,7 @@ class _WaveformPainter extends CustomPainter {
 
       final rect = RRect.fromRectAndRadius(
         Rect.fromLTWH(x, y, barWidth, barHeight),
-        const Radius.circular(2),
+        const Radius.circular(AppRadii.r2),
       );
       canvas.drawRRect(rect, inactivePaint);
     }
@@ -345,7 +390,7 @@ class _WaveformPainter extends CustomPainter {
 
         final rect = RRect.fromRectAndRadius(
           Rect.fromLTWH(x, y, barWidth, barHeight),
-          const Radius.circular(2),
+          const Radius.circular(AppRadii.r2),
         );
         canvas.drawRRect(rect, activePaint);
       }
@@ -362,8 +407,8 @@ class _WaveformPainter extends CustomPainter {
     // 3. Render Chapter Markers
     if (chapterMarkers != null && duration.inMilliseconds > 0) {
       final markerPaint = Paint()
-        ..color = Colors.amber
-        ..strokeWidth = 2.0;
+        ..color = activeColor.withValues(alpha: 0.5)
+        ..strokeWidth = 1.5;
 
       for (final marker in chapterMarkers!) {
         final markerRatio =
@@ -376,27 +421,40 @@ class _WaveformPainter extends CustomPainter {
       }
     }
 
-    // 4. Render A-B Loop Points
+    // 4. Render A-B Loop Points (region + edges, theme-aware)
     if (duration.inMilliseconds > 0) {
       final loopPaint = Paint()
-        ..color = const Color(0xFF05FFA1)
+        ..color = activeColor
         ..strokeWidth = 2.5;
 
+      double? xA;
+      double? xB;
       if (loopPointA != null) {
-        final ratioA = (loopPointA!.inMilliseconds / duration.inMilliseconds)
-            .clamp(0.0, 1.0);
-        final xA = mapToVisibleX(ratioA);
-        if (xA != null) {
-          canvas.drawLine(Offset(xA, 0), Offset(xA, size.height), loopPaint);
-        }
+        xA = mapToVisibleX(
+            (loopPointA!.inMilliseconds / duration.inMilliseconds)
+                .clamp(0.0, 1.0));
       }
       if (loopPointB != null) {
-        final ratioB = (loopPointB!.inMilliseconds / duration.inMilliseconds)
-            .clamp(0.0, 1.0);
-        final xB = mapToVisibleX(ratioB);
-        if (xB != null) {
-          canvas.drawLine(Offset(xB, 0), Offset(xB, size.height), loopPaint);
-        }
+        xB = mapToVisibleX(
+            (loopPointB!.inMilliseconds / duration.inMilliseconds)
+                .clamp(0.0, 1.0));
+      }
+
+      // Shade the looping region so the A-B span reads at a glance.
+      if (xA != null && xB != null) {
+        final left = xA < xB ? xA : xB;
+        final right = xA < xB ? xB : xA;
+        canvas.drawRect(
+          Rect.fromLTRB(left, 0, right, size.height),
+          Paint()..color = activeColor.withValues(alpha: 0.12),
+        );
+      }
+
+      if (xA != null) {
+        canvas.drawLine(Offset(xA, 0), Offset(xA, size.height), loopPaint);
+      }
+      if (xB != null) {
+        canvas.drawLine(Offset(xB, 0), Offset(xB, size.height), loopPaint);
       }
     }
   }

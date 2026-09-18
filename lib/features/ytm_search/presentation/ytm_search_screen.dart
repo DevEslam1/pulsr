@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/di/injection.dart';
@@ -9,12 +7,16 @@ import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
+import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../cubit/ytm_download_cubit.dart';
 import '../cubit/ytm_search_cubit.dart';
 import '../cubit/ytm_search_state.dart';
 import 'widgets/ytm_download_button.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class YtmSearchScreen extends StatelessWidget {
   const YtmSearchScreen({super.key});
@@ -42,17 +44,11 @@ class _YtmSearchView extends StatefulWidget {
 class _YtmSearchViewState extends State<_YtmSearchView> {
   final TextEditingController _searchController = TextEditingController();
   Future<List<String>>? _historyFuture;
-  Timer? _healthTimer;
 
   @override
   void initState() {
     super.initState();
     _refreshHistory();
-    // statusMessage polls YtmService.isBotCoolingDown which lives outside
-    // Bloc state — repaint periodically so the cooldown strip appears /
-    // clears without requiring another search.
-    _healthTimer =
-        Timer.periodic(const Duration(seconds: 5), (_) => mounted ? setState(() {}) : null);
   }
 
   void _refreshHistory() {
@@ -65,7 +61,6 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
 
   @override
   void dispose() {
-    _healthTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -98,7 +93,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Padding(
-                      padding: EdgeInsets.fromLTRB(
+                      padding: EdgeInsetsDirectional.fromSTEB(
                           Adaptive.pagePadding(context),
                           12,
                           Adaptive.pagePadding(context),
@@ -113,10 +108,11 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                           prefixIcon:
                               Icon(Icons.search_rounded, color: p.textTertiary),
                           suffixIcon: state.query.isNotEmpty
-                              ? IconButton(
-                                  icon: Icon(Icons.clear_rounded,
-                                      color: p.textTertiary),
-                                  onPressed: () {
+                                ? IconButton(
+                                    icon: Icon(Icons.clear_rounded,
+                                        color: p.textTertiary),
+                                    tooltip: context.l10n.clear,
+                                    onPressed: () {
                                     _searchController.clear();
                                     cubit.clearQuery();
                                   },
@@ -154,7 +150,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
           );
         }
         return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 160),
+          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xxs, AppSpacing.md, 160),
           children: [
             Row(
               children: [
@@ -163,7 +159,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                     context.l10n.history,
                     style: TextStyle(
                       color: p.textSecondary,
-                      fontSize: 12,
+                      fontSize: AppFontSize.label,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -194,10 +190,10 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                   ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
             Text(
               context.l10n.browseYtmSearchScreenDesc,
-              style: TextStyle(color: p.textTertiary, fontSize: 12.5),
+              style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label),
             ),
           ],
         );
@@ -212,9 +208,10 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
     PlayerCubit playerCubit,
     PulsrPalette p,
   ) {
-    if (state.isLoading && state.results.isEmpty) {
-      return Center(child: CircularProgressIndicator(color: p.accent));
-    }
+      if (state.isLoading && state.results.isEmpty) {
+        return const SkeletonList(
+            padding: EdgeInsets.only(top: AppSpacing.xs));
+      }
 
     if (state.errorMessage != null) {
       return EmptyStateWidget(
@@ -238,26 +235,31 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
           : _buildHistory(context, p);
     }
 
-    final status = cubit.statusMessage;
     final songs = [for (final track in state.results) track.toSongData()];
     return Column(
       children: [
-        if (status != null)
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.fromLTRB(12, 4, 12, 4),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: p.accent.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: p.accent.withValues(alpha: 0.35)),
-            ),
-            child: Text(
-              status,
-              style: TextStyle(fontSize: 11.5, color: p.textSecondary),
-            ),
-          ),
+        ValueListenableBuilder<bool>(
+          valueListenable: cubit.botCooldown,
+          builder: (context, coolingDown, _) {
+            final status = cubit.statusMessageFor(coolingDown);
+            if (status == null) return const SizedBox.shrink();
+            return Container(
+              width: double.infinity,
+              margin: const EdgeInsetsDirectional.fromSTEB(AppSpacing.sm, AppSpacing.xxs, AppSpacing.sm, AppSpacing.xxs),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+              decoration: BoxDecoration(
+                color: p.accent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(AppRadii.r10),
+                border: Border.all(color: p.accent.withValues(alpha: 0.35)),
+              ),
+              child: Text(
+                status,
+                style: TextStyle(fontSize: AppFontSize.label, color: p.textSecondary),
+              ),
+            );
+          },
+        ),
         Expanded(
           child: RefreshIndicator(
             onRefresh: () async {
@@ -266,7 +268,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
             },
             child: ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.only(bottom: 160, top: 4),
+              padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom, top: AppSpacing.xxs),
               itemCount: songs.length,
               itemBuilder: (context, index) {
                 final song = songs[index];

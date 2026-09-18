@@ -4,6 +4,7 @@ import '../../../core/utils/l10n_extensions.dart';
 
 import '../../../core/theme/aura_theme.dart';
 import '../../player/presentation/widgets/quran_mode_sheet.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
 
 /// Full-screen Quran Mode surface. The interactive controls live in the shared
 /// [QuranModePanel] so the sheet and this screen never drift apart.
@@ -23,7 +24,7 @@ class QuranModeScreen extends StatelessWidget {
             style: TextStyle(fontWeight: FontWeight.w800)),
       ),
       body: const SingleChildScrollView(
-        padding: EdgeInsets.only(top: 4, bottom: 32),
+        padding: EdgeInsets.only(top: AppSpacing.xxs, bottom: AppSpacing.xl),
         child: QuranModePanel(),
       ),
     );

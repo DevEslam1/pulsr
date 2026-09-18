@@ -15,7 +15,7 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
       [
         // Theme selector segment
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xs),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -23,12 +23,12 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
                 context.l10n.themeModeLabel,
                 style: TextStyle(
                   color: p.textSecondary,
-                  fontSize: 11,
+                  fontSize: AppFontSize.caption,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: 0.6,
+                  letterSpacing: AppTracking.overline,
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: AppSpacing.s10),
               SizedBox(
                 width: double.infinity,
                 child: SegmentedButton<AppThemeMode>(
@@ -46,7 +46,7 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
                     ),
                     shape: WidgetStatePropertyAll(
                       RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppRadii.r12),
                       ),
                     ),
                   ),
@@ -58,7 +58,7 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
                         maxLines: 1,
                         softWrap: false,
                         style: TextStyle(
-                          fontSize: 11.5,
+                          fontSize: AppFontSize.label,
                           fontWeight: state.themeMode == AppThemeMode.system
                               ? FontWeight.w800
                               : FontWeight.w600,
@@ -73,7 +73,7 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
                         maxLines: 1,
                         softWrap: false,
                         style: TextStyle(
-                          fontSize: 11.5,
+                          fontSize: AppFontSize.label,
                           fontWeight: state.themeMode == AppThemeMode.light
                               ? FontWeight.w800
                               : FontWeight.w600,
@@ -88,7 +88,7 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
                         maxLines: 1,
                         softWrap: false,
                         style: TextStyle(
-                          fontSize: 11.5,
+                          fontSize: AppFontSize.label,
                           fontWeight: state.themeMode == AppThemeMode.dark
                               ? FontWeight.w800
                               : FontWeight.w600,
@@ -103,7 +103,7 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
                         maxLines: 1,
                         softWrap: false,
                         style: TextStyle(
-                          fontSize: 11.5,
+                          fontSize: AppFontSize.label,
                           fontWeight: state.themeMode == AppThemeMode.amoled
                               ? FontWeight.w800
                               : FontWeight.w600,
@@ -122,7 +122,7 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
 
         // Accent Color Palette
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.md),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -134,7 +134,7 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
                     style: TextStyle(
                       color: p.textPrimary,
                       fontWeight: FontWeight.w700,
-                      fontSize: 13.5,
+                      fontSize: AppFontSize.bodySmall,
                     ),
                   ),
                   Container(
@@ -148,7 +148,7 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.sm),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
@@ -157,11 +157,11 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
                     final isSelected =
                         state.customAccentColorValue == color.toARGB32();
                     return Padding(
-                      padding: const EdgeInsets.only(right: 12),
+                      padding: const EdgeInsetsDirectional.only(end: AppSpacing.sm),
                       child: GestureDetector(
                         onTap: () => cubit.setCustomAccentColor(color),
                         child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
+                          duration: context.motionMs(200),
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
@@ -235,14 +235,14 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
         ),
         _divider(p),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
                   Icon(Icons.blur_on_rounded, size: 22, color: p.accent),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: AppSpacing.s14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -255,12 +255,12 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
                               style: TextStyle(
                                 color: p.textPrimary,
                                 fontWeight: FontWeight.w700,
-                                fontSize: 15,
+                                fontSize: AppFontSize.callout,
                               ),
                             );
                           },
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: AppSpacing.s2),
                         Builder(
                           builder: (_) {
                             final subtitle =
@@ -269,7 +269,7 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
                               subtitle,
                               style: TextStyle(
                                 color: p.textSecondary,
-                                fontSize: 12.5,
+                                fontSize: AppFontSize.label,
                               ),
                             );
                           },
@@ -282,12 +282,12 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
                     style: TextStyle(
                       color: p.accent,
                       fontWeight: FontWeight.w800,
-                      fontSize: 13,
+                      fontSize: AppFontSize.bodySmall,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
               SliderTheme(
                 data: SliderTheme.of(context).copyWith(
                   activeTrackColor: p.accent,
@@ -457,17 +457,18 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
                     final progress = (snapshot.data ?? 0.0).clamp(0.0, 1.0);
                     return Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
+
+                          horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(AppRadii.r10),
                       ),
                       child: Text(
                         '${(progress * 100).round()}%',
                         style: TextStyle(
                           color: p.accent,
                           fontWeight: FontWeight.w800,
-                          fontSize: 12,
+                          fontSize: AppFontSize.label,
                         ),
                       ),
                     );
@@ -485,6 +486,24 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
           trailingBadge: '${state.minDurationSec}s',
           onTap: () =>
               _showDurationFilterDialog(context, cubit, state.minDurationSec),
+        ),
+        _divider(p),
+        _navTile(
+          context,
+          Icons.manage_search_rounded,
+          context.l10n.settingsRebuildSearchIndexTitle,
+          context.l10n.settingsRebuildSearchIndexSubtitle,
+          onTap: () async {
+            final messenger = ScaffoldMessenger.of(context);
+            final rebuiltMsg = context.l10n.settingsSearchIndexRebuilt;
+            final failedMsg = context.l10n.settingsSearchIndexRebuildFailed;
+            final ok = await cubit.rebuildSearchIndex();
+            messenger
+              ..clearSnackBars()
+              ..showSnackBar(
+                SnackBar(content: Text(ok ? rebuiltMsg : failedMsg)),
+              );
+          },
         ),
         _divider(p),
         _navTile(

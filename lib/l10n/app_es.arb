@@ -323,6 +323,13 @@
   "exportFormatWmpLabel": "Windows Media Player",
   "libraryGridView": "Vista de cuadrícula",
   "libraryListView": "Vista de lista",
+  "pressBackAgainToExit": "Presiona atrás de nuevo para salir",
+  "refresh": "Actualizar",
+  "showPassword": "Mostrar contraseña",
+  "hidePassword": "Ocultar contraseña",
+  "learnMore": "Más información",
+  "zoomIn": "Acercar",
+  "zoomOut": "Alejar",
   "authUseCodeSignIn": "¿Problemas? Usa el inicio de sesión con código",
   "castAndroidOnly": "La transmisión (Cast) solo está disponible en Android en esta compilación.",
   "castDirectDeviceMode": "Modo de dispositivo directo: transmite la pista actual. La cola y el volumen remoto requieren el SDK de Cast.",
@@ -740,6 +747,17 @@
   },
   "radioCuratedUpToDate": "Todas las emisoras seleccionadas ya están en tu lista",
   "radioCuratedTitle": "Emisoras seleccionadas",
+  "radioEditStation": "Editar emisora",
+  "radioEdit": "Editar",
+  "radioSave": "Guardar",
+  "radioUrlRequired": "Introduce una URL de emisión",
+  "radioUrlMalformed": "No se pudo interpretar la URL",
+  "radioUrlScheme": "Solo se admiten emisiones http:// y https://",
+  "radioUrlNoHost": "A la URL le falta el nombre del host",
+  "settingsRebuildSearchIndexTitle": "Reconstruir índice de búsqueda",
+  "settingsRebuildSearchIndexSubtitle": "Corrige resultados de búsqueda faltantes reconstruyendo el índice de texto completo",
+  "settingsSearchIndexRebuilt": "Índice de búsqueda reconstruido",
+  "settingsSearchIndexRebuildFailed": "No se pudo reconstruir el índice de búsqueda",
   "followTrackSampleRateTitle": "Seguir la frecuencia de muestreo de la pista",
   "followTrackSampleRateSubtitle": "Reconfigura la salida a la frecuencia nativa de cada pista; se omite en Bluetooth y no repite cambios",
   "followTrackSampleRateBluetooth": "Se omite en Bluetooth: el enlace del códec/AVRCP controla la frecuencia",
@@ -781,6 +799,8 @@
   "notificationPermissionRationale": "Permite las notificaciones para que Pulsr muestre los controles de reproducción en la pantalla de bloqueo y en el panel de notificaciones.",
   "notificationPermissionAllow": "Permitir",
   "notificationPermissionNotNow": "Ahora no",
+  "onboardingNotificationDenied": "Las notificaciones están desactivadas. Puedes activarlas más tarde en Ajustes.",
+  "onboardingScanFailed": "No se pudo escanear tu biblioteca. Puedes reintentarlo desde Ajustes.",
   "onboardingPermissionRationale": "Sin acceso al audio tu biblioteca estara vacia. Puedes continuar con acceso limitado y conceder el permiso mas tarde desde Ajustes.",
   "@onboardingPermissionRationale": {
     "description": "Explains denied permission with limited-access option"
@@ -1819,6 +1839,19 @@
       "count": {}
     }
   },
+  "unlimited": "Ilimitado",
+  "invalidNumber": "Introduce un número entero mayor que 0",
+  "previewTruncated": "Mostrando las primeras {count} coincidencias",
+  "@previewTruncated": {
+    "description": "Smart playlist preview is capped",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "expandPlayer": "Expandir reproductor",
+  "dismissPlayer": "Cerrar reproductor",
+  "loadMore": "Cargar más",
+  "loadingMoreSongs": "Cargando más canciones…",
   "btCalibrated": "Latencia: {ms} ms",
   "@btCalibrated": {
     "description": "tranche7 tpl",

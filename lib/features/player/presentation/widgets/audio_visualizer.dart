@@ -16,6 +16,9 @@ import '../../../../data/visualizer/milkdrop_preset_store.dart';
 import '../../../../data/visualizer/visualizer_preset_store.dart';
 import '../../../../domain/models/milkdrop_preset.dart';
 import '../../../../domain/models/visualizer_preset.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 enum VisualizerStyle {
   off,
@@ -124,6 +127,11 @@ class _AudioVisualizerState extends State<AudioVisualizer>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // Cosmetic audio-reactive animation: stop entirely under Reduce Motion.
+    if (!context.motionEnabled) {
+      _stopAnimation();
+      return;
+    }
     // Motion decisions must not read MediaQuery during initState.
     if (widget.isPlaying && widget.style != VisualizerStyle.off) {
       _startAnimation();
@@ -443,16 +451,16 @@ class _AudioVisualizerState extends State<AudioVisualizer>
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.55),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(AppRadii.r8),
                 ),
                 child: Padding(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                   child: Text(
                     context.l10n.visualizerCpuFallbackBadge,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 10,
+                      fontSize: AppFontSize.tiny,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

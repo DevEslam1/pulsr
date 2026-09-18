@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/theme/aura_theme.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
 import '../../../core/utils/adaptive.dart';
 import 'nav_destinations.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class PulsrBottomNavBar extends StatefulWidget {
   final int currentIndex;
@@ -45,7 +48,7 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
       right: false,
       bottom: widget.includeSafeArea,
       child: Padding(
-        padding: EdgeInsets.fromLTRB(
+        padding: EdgeInsetsDirectional.fromSTEB(
           isTablet ? 24 : 14,
           3,
           isTablet ? 24 : 14,
@@ -115,7 +118,7 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                           ),
                         ),
                         padding:
-                            const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
@@ -183,8 +186,9 @@ class _NavTabItem extends StatelessWidget {
             duration: context.motionMs(250),
             curve: context.motionCurve(Curves.easeOutCubic),
             padding: EdgeInsets.symmetric(
+
               horizontal: isTablet ? 10 : 6,
-              vertical: 4,
+              vertical: AppSpacing.xxs,
             ),
             decoration: BoxDecoration(
               gradient: isSelected
@@ -214,40 +218,67 @@ class _NavTabItem extends StatelessWidget {
                     ]
                   : null,
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                AnimatedScale(
-                  scale: isSelected ? 1.08 : 1.0,
-                  duration: context.motionMs(220),
-                  curve: context.motionCurve(Curves.easeOutBack),
-                  child: Icon(
-                    isSelected ? item.activeIcon : item.icon,
-                    size: iconSize,
-                    color: isSelected ? p.accent : p.textTertiary,
+            child: MediaQuery.withClampedTextScaling(
+              minScaleFactor: 0.8,
+              maxScaleFactor: 1.15,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Selection indicator capsule: grows and lights up when active.
+                  AnimatedContainer(
+                    duration: context.motionMs(220),
+                    curve: context.motionCurve(Curves.easeOutCubic),
+                    height: 2,
+                    width: isSelected ? 18 : 6,
+                    margin: const EdgeInsets.only(bottom: AppSpacing.s2),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? p.accent
+                          : p.textTertiary.withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(AppRadii.r2),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: p.accent.withValues(alpha: 0.55),
+                                blurRadius: 6,
+                              ),
+                            ]
+                          : null,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                AnimatedDefaultTextStyle(
-                  duration: context.motionMs(200),
-                  style: TextStyle(
-                    fontSize: isTablet ? 11.5 : 10.5,
-                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-                    color: isSelected
-                        ? p.accent
-                        : p.textTertiary.withValues(alpha: 0.85),
-                    letterSpacing: 0.2,
-                    fontFamily:
-                        Theme.of(context).textTheme.bodySmall?.fontFamily,
+                  AnimatedScale(
+                    scale: isSelected ? 1.08 : 1.0,
+                    duration: context.motionMs(220),
+                    curve: context.motionCurve(Curves.easeOutBack),
+                    child: Icon(
+                      isSelected ? item.activeIcon : item.icon,
+                      size: iconSize,
+                      color: isSelected ? p.accent : p.textTertiary,
+                    ),
                   ),
-                  child: Text(
-                    item.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  const SizedBox(height: 1),
+                  AnimatedDefaultTextStyle(
+                    duration: context.motionMs(200),
+                    style: TextStyle(
+                      fontSize: isTablet ? AppFontSize.label : AppFontSize.tiny,
+                      height: 1.1,
+                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                      color: isSelected
+                          ? p.accent
+                          : p.textTertiary.withValues(alpha: 0.85),
+                      letterSpacing: AppTracking.label,
+                      fontFamily:
+                          Theme.of(context).textTheme.bodySmall?.fontFamily,
+                    ),
+                    child: Text(
+                      item.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

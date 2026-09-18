@@ -21,7 +21,11 @@ class PulsrDestination {
   });
 }
 
-/// The 5 primary destinations, in dock order.
+/// The primary destinations, in dock order.
+///
+/// Settings is a primary destination again so it is always reachable from the
+/// phone dock and the tablet rail; it is also still available from the Home
+/// header gear.
 List<PulsrDestination> pulsrDestinations(BuildContext context) => [
       PulsrDestination(
         index: 0,
@@ -54,3 +58,6 @@ List<PulsrDestination> pulsrDestinations(BuildContext context) => [
         label: context.l10n.navSettings,
       ),
     ];
+
+/// Settings' fixed shell branch index.
+const int settingsDestinationIndex = 4;

@@ -13,6 +13,9 @@ import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_logo.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../data/scanner/media_scanner_service.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 class OnboardingScreen extends StatefulWidget {
   final MediaScannerService scannerService;
@@ -65,14 +68,49 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           );
           if (allow == true) {
             try {
-              await Permission.notification.request();
+              final status = await Permission.notification.request();
+              if (mounted &&
+                  (status.isDenied || status.isPermanentlyDenied)) {
+                ScaffoldMessenger.of(context)
+                  ..clearSnackBars()
+                  ..showSnackBar(
+                    SnackBar(
+                        content: Text('${context.l10n.onboardingNotificationDenied} Notifications are needed for playback controls.'),
+                        behavior: SnackBarBehavior.floating,
+                        action: SnackBarAction(label: 'OK', onPressed: () {}),
+                    ),
+                  );
+              }
             } catch (e, st) {
               ErrorLogger.log('Notification permission request failed',
                   error: e, stackTrace: st, category: 'Onboarding');
+              if (mounted) {
+                ScaffoldMessenger.of(context)
+                  ..clearSnackBars()
+                  ..showSnackBar(
+                    SnackBar(
+                        content: Text(context.l10n.onboardingNotificationDenied),
+                        behavior: SnackBarBehavior.floating,
+                        action: SnackBarAction(label: 'OK', onPressed: () {}),
+                    ),
+                  );
+              }
             }
           }
         }
-        await widget.scannerService.scanDeviceLibrary();
+        try {
+          await widget.scannerService.scanDeviceLibrary();
+        } catch (e, st) {
+          ErrorLogger.log('Library scan failed during onboarding',
+              error: e, stackTrace: st, category: 'Onboarding');
+          if (mounted) {
+            ScaffoldMessenger.of(context)
+              ..clearSnackBars()
+              ..showSnackBar(
+                SnackBar(content: Text(context.l10n.onboardingScanFailed)),
+              );
+          }
+        }
       } else {
         if (mounted) {
           // No dead end (defect 02-01): explain + offer Settings AND a
@@ -152,16 +190,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           children: [
             // Top Bar with Skip Button
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
                     'PULSR',
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: AppFontSize.bodyLarge,
                       fontWeight: FontWeight.w900,
-                      letterSpacing: 2,
+                      letterSpacing: AppTracking.widest,
                       color: p.accent,
                     ),
                   ),
@@ -176,7 +214,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                     )
                   else
-                    const SizedBox(height: 36),
+                    const SizedBox(height: AppSpacing.s40),
                 ],
               ),
             ),
@@ -200,7 +238,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
             // Bottom Navigation & Page Indicators
             Padding(
-              padding: const EdgeInsets.fromLTRB(28, 0, 28, 24),
+              padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s28, 0, AppSpacing.s28, AppSpacing.lg),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -211,17 +249,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       final isActive = index == _currentPage;
                       return AnimatedContainer(
                         duration: context.motionMs(300),
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
                         height: 8,
                         width: isActive ? 24 : 8,
                         decoration: BoxDecoration(
                           color: isActive ? p.accent : p.hairline,
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(AppRadii.r4),
                         ),
                       );
                     }),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: AppSpacing.lg),
 
                   // Navigation Button
                   SizedBox(
@@ -251,11 +289,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                     children: [
                                       const Icon(Icons.shield_rounded,
                                           size: 20),
-                                      const SizedBox(width: 8),
+                                      const SizedBox(width: AppSpacing.xs),
                                       Text(
                                         context.l10n.grantAccess,
                                         style: const TextStyle(
-                                          fontSize: 16,
+                                          fontSize: AppFontSize.bodyLarge,
                                           fontWeight: FontWeight.w800,
                                         ),
                                       ),
@@ -277,10 +315,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 Text(
                                   context.l10n.next,
                                   style: const TextStyle(
-                                      fontSize: 16,
+                                      fontSize: AppFontSize.bodyLarge,
                                       fontWeight: FontWeight.w700),
                                 ),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: AppSpacing.xs),
                                 Icon(Icons.adaptive.arrow_forward_rounded,
                                     size: 20, color: p.accent),
                               ],
@@ -300,7 +338,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget _buildPage1(BuildContext context) {
     final p = context.palette;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28.0),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s28),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -310,7 +348,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             height: 104,
             decoration: BoxDecoration(
               color: p.surfaceContainer,
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(AppRadii.r28),
               border: Border.all(color: p.hairline, width: 1.5),
               boxShadow: [
                 BoxShadow(
@@ -331,15 +369,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ).animate().scale(
               duration: context.motionMs(600),
               curve: context.motionCurve(Curves.easeOutBack)),
-          const SizedBox(height: 36),
+          const SizedBox(height: AppSpacing.s40),
           Text(context.l10n.onboardingHeading,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
+                  letterSpacing: AppTracking.heading,
                 ),
           ).animate().fadeIn(delay: context.motionMs(200)).slideY(begin: 0.1, end: 0),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
           Text(context.l10n.onboardingPrivacyDesc,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -347,9 +385,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   height: 1.5,
                 ),
           ).animate().fadeIn(delay: context.motionMs(400)).slideY(begin: 0.1, end: 0),
-          const SizedBox(height: 32),
+          const SizedBox(height: AppSpacing.xl),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s14),
             decoration: BoxDecoration(
               color: p.surfaceContainer,
               borderRadius: AppRadii.cardRadius,
@@ -358,12 +396,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             child: Row(
               children: [
                 Icon(Icons.lock_rounded, color: p.accent, size: 22),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Text(context.l10n.privacyGuarantee,
                     style: TextStyle(
                       color: p.textPrimary,
-                      fontSize: 13,
+                      fontSize: AppFontSize.bodySmall,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -381,7 +419,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget _buildPage2(BuildContext context) {
     final p = context.palette;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28.0),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s28),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -389,10 +427,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           // Graphic container representing EQ & Audio Controls
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg, horizontal: AppSpacing.s20),
             decoration: BoxDecoration(
               color: p.surfaceContainer,
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(AppRadii.r24),
               border: Border.all(
                   color: p.accent.withValues(alpha: 0.3), width: 1.5),
               boxShadow: [
@@ -418,15 +456,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               .animate()
               .fadeIn(duration: context.motionMs(500))
               .scale(begin: const Offset(0.9, 0.9)),
-          const SizedBox(height: 36),
+          const SizedBox(height: AppSpacing.s40),
           Text(context.l10n.onboardingPowerful,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
+                  letterSpacing: AppTracking.heading,
                 ),
           ).animate().fadeIn(delay: context.motionMs(200)).slideY(begin: 0.1, end: 0),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
           Text(context.l10n.onboardingPowerfulDesc,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -434,7 +472,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   height: 1.5,
                 ),
           ).animate().fadeIn(delay: context.motionMs(400)).slideY(begin: 0.1, end: 0),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpacing.lg),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -456,17 +494,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget _buildPage3(BuildContext context) {
     final p = context.palette;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28.0),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s28),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Spacer(),
           // Theme swatches visual container
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(AppSpacing.s20),
             decoration: BoxDecoration(
               color: p.surfaceContainer,
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(AppRadii.r24),
               border: Border.all(color: p.hairline, width: 1.5),
               boxShadow: [
                 BoxShadow(
@@ -482,18 +520,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(Icons.palette_rounded, color: p.accent, size: 24),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: AppSpacing.xs),
                     Text(context.l10n.onboardingThemes,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: AppFontSize.label,
                         fontWeight: FontWeight.w800,
-                        letterSpacing: 1.2,
+                        letterSpacing: AppTracking.wide,
                         color: p.textPrimary,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
@@ -504,7 +542,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     _buildThemeSwatch('Dynamic Palette',
                         const [Color(0xFFFF9100), Color(0xFFFF4081)]),
                     _buildThemeSwatch('Cyberpunk Aura',
-                        const [Color(0xFFD500F9), Color(0xFF40C4FF)]),
+                        const [Color(0xFFD500F9), AppColors.skyBlue]),
                   ],
                 ),
               ],
@@ -513,15 +551,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               .animate()
               .fadeIn(duration: context.motionMs(500))
               .scale(begin: const Offset(0.9, 0.9)),
-          const SizedBox(height: 36),
+          const SizedBox(height: AppSpacing.s40),
           Text(context.l10n.onboardingBeautiful,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
+                  letterSpacing: AppTracking.heading,
                 ),
           ).animate().fadeIn(delay: context.motionMs(200)).slideY(begin: 0.1, end: 0),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
           Text(context.l10n.onboardingBeautifulDesc,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -549,12 +587,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           child: Icon(icon, color: color, size: 28),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.xs),
         Text(
           label,
           style: TextStyle(
             color: p.textPrimary,
-            fontSize: 12,
+            fontSize: AppFontSize.label,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -585,9 +623,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 6),
-        SizedBox(
-          width: 64,
+        const SizedBox(height: AppSpacing.s6),
+        SizedBox(width: AppSpacing.s64,
           child: Text(
             name,
             textAlign: TextAlign.center,
@@ -595,7 +632,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: p.textSecondary,
-              fontSize: 10,
+              fontSize: AppFontSize.tiny,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -614,17 +651,17 @@ class _FeatureBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.s6),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadii.r20),
         border: Border.all(color: p.hairline),
       ),
       child: Text(
         label,
         style: TextStyle(
           color: p.textPrimary,
-          fontSize: 12,
+          fontSize: AppFontSize.label,
           fontWeight: FontWeight.w600,
         ),
       ),

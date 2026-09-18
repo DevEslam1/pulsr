@@ -463,6 +463,63 @@ void main() {
     });
   });
 
+  group('Failure-cascade halt guard', () {
+    test('keeps skipping while failures are below the threshold', () {
+      expect(
+        PulsrAudioHandler.shouldHaltFailureCascade(
+          consecutiveFailures: 2,
+          rapidGaplessChanges: 0,
+          queueLength: 100,
+        ),
+        isFalse,
+      );
+    });
+
+    test('halts after three consecutive failed tracks', () {
+      expect(
+        PulsrAudioHandler.shouldHaltFailureCascade(
+          consecutiveFailures: 3,
+          rapidGaplessChanges: 0,
+          queueLength: 100,
+        ),
+        isTrue,
+      );
+    });
+
+    test('halts once every track in a short queue has failed', () {
+      expect(
+        PulsrAudioHandler.shouldHaltFailureCascade(
+          consecutiveFailures: 2,
+          rapidGaplessChanges: 0,
+          queueLength: 2,
+        ),
+        isTrue,
+      );
+    });
+
+    test('halts when the rapid-advance circuit breaker has tripped', () {
+      expect(
+        PulsrAudioHandler.shouldHaltFailureCascade(
+          consecutiveFailures: 1,
+          rapidGaplessChanges: 1,
+          queueLength: 100,
+        ),
+        isTrue,
+      );
+    });
+
+    test('does not halt on an empty queue with no failures', () {
+      expect(
+        PulsrAudioHandler.shouldHaltFailureCascade(
+          consecutiveFailures: 0,
+          rapidGaplessChanges: 0,
+          queueLength: 0,
+        ),
+        isFalse,
+      );
+    });
+  });
+
   group('Sleep timer completion dedup', () {
     test('collapses duplicate boundary signals inside the debounce window', () {
       final now = DateTime(2026, 1, 1, 12, 0, 0);

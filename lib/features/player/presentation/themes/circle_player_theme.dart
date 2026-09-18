@@ -28,6 +28,9 @@ import '../widgets/player_controls.dart';
 import '../widgets/player_seek_bar.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class CirclePlayerTheme extends StatefulWidget {
   final PlayerThemeProps props;
@@ -292,8 +295,9 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                 // Symmetrical Track Header: [Download/Playlist] Title/Artist [Favorite]
                 Padding(
                   padding: EdgeInsets.symmetric(
+
                     horizontal: isTablet ? 28 : 16,
-                    vertical: 2,
+                    vertical: AppSpacing.s2,
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -340,7 +344,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                           // Center: Title & Artist (Symmetric & Centered)
                           Expanded(
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -348,19 +352,19 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                                     text: song?.title ?? context.l10n.noTrackSelected,
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
-                                      fontSize: isTablet ? 23 : 19,
+                                      fontSize: isTablet ? AppFontSize.headline : AppFontSize.title,
                                       fontWeight: FontWeight.w900,
                                       color: p.textPrimary,
                                       height: 1.22,
-                                      letterSpacing: -0.3,
+                                      letterSpacing: AppTracking.title,
                                     ),
                                   ),
-                                  const SizedBox(height: 3),
+                                  const SizedBox(height: AppSpacing.xxs),
                                   MarqueeText(
                                     text: song?.artist ?? context.l10n.unknownArtist,
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
-                                      fontSize: isTablet ? 15 : 13.5,
+                                      fontSize: isTablet ? AppFontSize.callout : AppFontSize.bodySmall,
                                       fontWeight: FontWeight.w600,
                                       color: p.textSecondary,
                                     ),
@@ -371,8 +375,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                           ),
 
                           // Right Symmetrical Action: Animated Favorite Button
-                          SizedBox(
-                            width: 48,
+                          SizedBox(width: AppSpacing.xxl,
                             height: 48,
                             child: Material(
                               color: Colors.white.withValues(alpha: 0.06),
@@ -399,7 +402,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
 
                       // Symmetrical Audio Quality Badge
                       if (song != null) ...[
-                        const SizedBox(height: 6),
+                        const SizedBox(height: AppSpacing.s6),
                         Center(
                           child: AudioQualityBadge(
                             song: song,
@@ -421,6 +424,8 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                   activeColor: activeColor,
                   songId: song?.id,
                   filePath: song?.path,
+                  loopPointA: state.abPointA,
+                  loopPointB: state.abPointB,
                   onSeek: (pos) => cubit.seek(pos),
                 ),
 
@@ -456,7 +461,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
 
             if (isLandscape) {
               return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
@@ -477,7 +482,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                         ],
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: AppSpacing.md),
                     Expanded(
                       flex: 6,
                       child: SingleChildScrollView(
@@ -493,14 +498,14 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
               children: [
                 // Top Pull-down Handle Indicator
                 Padding(
-                  padding: const EdgeInsets.only(top: 4, bottom: 2),
+                  padding: const EdgeInsets.only(top: AppSpacing.xxs, bottom: AppSpacing.s2),
                   child: Center(
                     child: Container(
                       width: 38,
                       height: 4,
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.22),
-                        borderRadius: BorderRadius.circular(2),
+                        borderRadius: BorderRadius.circular(AppRadii.r2),
                       ),
                     ),
                   ),
@@ -509,8 +514,9 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                 // Top App Bar - Symmetrical Left/Right Targets & Centered Header
                 Padding(
                   padding: EdgeInsets.symmetric(
+
                     horizontal: isTablet ? 28 : 20,
-                    vertical: 2,
+                    vertical: AppSpacing.s2,
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -546,7 +552,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                       // Center: "PLAYING FROM" / Album Header
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -560,15 +566,15 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                                         : p.textSecondary,
                                     animate: state.isPlaying,
                                   ),
-                                  const SizedBox(width: 6),
+                                  const SizedBox(width: AppSpacing.s6),
                                   Text(
                                     context.l10n.playingFrom.toUpperCase(),
                                     style: Theme.of(context)
                                         .textTheme
                                         .bodySmall
                                         ?.copyWith(
-                                          fontSize: 10,
-                                          letterSpacing: 1.2,
+                                          fontSize: AppFontSize.tiny,
+                                          letterSpacing: AppTracking.wide,
                                           fontWeight: FontWeight.w800,
                                           color: p.textSecondary
                                               .withValues(alpha: 0.8),
@@ -576,7 +582,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 2),
+                              const SizedBox(height: AppSpacing.s2),
                               Text(
                                 (song?.album != null &&
                                         song!.album.trim().isNotEmpty)
@@ -593,7 +599,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                                     .titleSmall
                                     ?.copyWith(
                                       fontWeight: FontWeight.w800,
-                                      fontSize: isTablet ? 14 : 13,
+                                      fontSize: isTablet ? AppFontSize.body : AppFontSize.bodySmall,
                                       color: p.textPrimary,
                                     ),
                               ),
@@ -673,11 +679,11 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                   ),
                 ),
 
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpacing.xxs),
 
                 // Bottom Controls Section
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
+                  padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
                   child: controlsColumn,
                 ),
               ],

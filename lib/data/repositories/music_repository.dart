@@ -230,12 +230,11 @@ class MusicRepository implements IMusicRepository {
           return Right<AppFailure, List<SongsTableData>>(songs);
         }).handleError(
           (e) {
-            // Missing/corrupt FTS (e.g. failed migration rebuild): repair
-            // once per session, then report. Next watch re-subscribes onto
-            // the rebuilt index instead of failing silently forever.
-            if (AppDatabase.ftsRebuildFailed) {
-              unawaited(_db.repairFtsIndex());
-            }
+            // Missing/corrupt FTS (failed migration rebuild or a damaged
+            // index): attempt a bounded repair, then report. The next watch
+            // re-subscribes onto the rebuilt index. repairFtsIndex caps its
+            // own attempts per session, so this cannot loop.
+            unawaited(_db.repairFtsIndex());
             return Left<AppFailure, List<SongsTableData>>(
                 DatabaseFailure('Failed to watch songs (FTS)', e));
           },
@@ -1316,11 +1315,28 @@ class MusicRepository implements IMusicRepository {
           batch.insertAllOnConflictUpdate(_db.artistsTable, artists);
         });
       });
-      // FIX: Deduplicate by file path after scan — prevents downloaded song appearing twice when scanner
-      // inserts a new row for a path already owned by a reconciled YTM row. Keep the downloaded/isDownloaded or lowest id.
+      // FIX: Deduplicate by file path after scan — prevents a downloaded song
+      // appearing twice when the scanner inserts a new row for a path already
+      // owned by a reconciled YTM row. Keep, per path, a downloaded row in
+      // preference to a plain scanned row, then the lowest id so play history
+      // survives. Only touched when a path genuinely has >1 local row (the
+      // UNIQUE(path,cue) index makes this unreachable in normal operation, so
+      // this is purely defensive against pre-index rows).
       try {
         await _db.customStatement(
-          "DELETE FROM songs WHERE id NOT IN (SELECT MIN(id) FROM songs WHERE path != '' AND path NOT LIKE 'ytmusic://%' AND cue_start_ms IS NULL GROUP BY lower(path)) AND path != '' AND path NOT LIKE 'ytmusic://%' AND cue_start_ms IS NULL AND lower(path) IN (SELECT lower(path) FROM songs WHERE path != '' AND path NOT LIKE 'ytmusic://%' AND cue_start_ms IS NULL GROUP BY lower(path) HAVING COUNT(*) > 1);",
+          "DELETE FROM songs WHERE id NOT IN ("
+          "SELECT s1.id FROM songs s1 "
+          "WHERE s1.path != '' AND s1.path NOT LIKE 'ytmusic://%' AND s1.cue_start_ms IS NULL "
+          "AND NOT EXISTS ("
+          "SELECT 1 FROM songs s2 WHERE s2.path != '' AND s2.path NOT LIKE 'ytmusic://%' "
+          "AND s2.cue_start_ms IS NULL AND lower(s2.path) = lower(s1.path) "
+          "AND ((s2.is_downloaded = 1 AND s1.is_downloaded = 0) "
+          "OR (s2.is_downloaded = s1.is_downloaded AND s2.id < s1.id))"
+          ")) "
+          "AND path != '' AND path NOT LIKE 'ytmusic://%' AND cue_start_ms IS NULL "
+          "AND lower(path) IN (SELECT lower(path) FROM songs "
+          "WHERE path != '' AND path NOT LIKE 'ytmusic://%' AND cue_start_ms IS NULL "
+          "GROUP BY lower(path) HAVING COUNT(*) > 1);",
         );
       } catch (_) {}
       return const Right(null);

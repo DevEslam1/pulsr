@@ -8,9 +8,13 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/widgets/pulsr_back_button.dart';
 import '../../../../core/widgets/pulsr_page_pop_scope.dart';
+import '../../../../core/widgets/shimmer_skeleton.dart';
 import '../../../data/db/app_database.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class YtmBrowseScreen extends StatefulWidget {
   const YtmBrowseScreen({super.key});
@@ -78,33 +82,34 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
           title: Text(context.l10n.ytmExplore,
           style: TextStyle(
             color: p.textPrimary,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
+            fontSize: AppFontSize.titleLarge,
+            fontWeight: FontWeight.w700,
           ),
         ),
         actions: [
-          IconButton(
-            icon: Icon(Icons.refresh_rounded, color: p.textPrimary),
-            onPressed: _loadFeed,
-          ),
+            IconButton(
+              icon: Icon(Icons.refresh_rounded, color: p.textPrimary),
+              tooltip: context.l10n.refresh,
+              onPressed: _loadFeed,
+            ),
         ],
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: p.primary))
-          : (_error != null && _loadFailed)
+        body: _isLoading
+            ? const SkeletonList(padding: EdgeInsets.only(top: AppSpacing.xs))
+            : (_error != null && _loadFailed)
               ? Center(
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(AppSpacing.lg),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.cloud_off_rounded,
                             color: p.textSecondary, size: 40),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.sm),
                         Text(_error!,
                             textAlign: TextAlign.center,
                             style: TextStyle(color: p.textSecondary)),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.sm),
                         FilledButton(
                             onPressed: _loadFeed,
                             child: Text(context.l10n.retry)),
@@ -115,18 +120,18 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
               : _sections.isEmpty
                   ? Center(
                       child: Padding(
-                        padding: const EdgeInsets.all(24),
+                        padding: const EdgeInsets.all(AppSpacing.lg),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.explore_off_rounded,
                                 color: p.textSecondary, size: 40),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: AppSpacing.sm),
                             Text(context.l10n.browseNoRecommendations,
                                 textAlign: TextAlign.center,
                                 style:
                                     TextStyle(color: p.textSecondary)),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: AppSpacing.sm),
                             FilledButton(
                                 onPressed: _loadFeed,
                                 child: Text(context.l10n.retry)),
@@ -142,16 +147,16 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                 child: ConstrainedBox(
                   constraints: Adaptive.contentConstraints(context),
                   child: ListView.separated(
-                    padding: const EdgeInsets.only(top: 16, bottom: 160),
+                    padding: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.scrollBottom),
                     itemCount: _sections.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 24),
+                    separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.lg),
                     itemBuilder: (context, index) {
                       final section = _sections[index];
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -159,33 +164,33 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                                   section.title,
                                   style: TextStyle(
                                     color: p.textPrimary,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
+                                    fontSize: AppFontSize.title,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                                 if (section.subtitle != null) ...[
-                                  const SizedBox(height: 2),
+                                  const SizedBox(height: AppSpacing.s2),
                                   Text(
                                     section.subtitle!,
                                     style: TextStyle(
                                       color: p.textSecondary,
-                                      fontSize: 12,
+                                      fontSize: AppFontSize.label,
                                     ),
                                   ),
                                 ],
                               ],
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: AppSpacing.sm),
                           SizedBox(
                             height: 210,
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
                               padding:
-                                  const EdgeInsets.symmetric(horizontal: 20),
+                                  const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
                               itemCount: section.items.length,
                               separatorBuilder: (_, __) =>
-                                  const SizedBox(width: 14),
+                                  const SizedBox(width: AppSpacing.s14),
                               itemBuilder: (context, i) {
                                 final item = section.items[i];
                                 final queueSongs = [
@@ -215,7 +220,7 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
       width: 140,
       decoration: BoxDecoration(
         color: p.surfaceCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadii.r16),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -248,11 +253,11 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                         child: Icon(Icons.music_note_rounded,
                             color: p.primary, size: 36),
                       ),
-                Positioned(
+                PositionedDirectional(
                   bottom: 6,
-                  right: 6,
+                  end: 6,
                   child: Container(
-                    padding: const EdgeInsets.all(6),
+                    padding: const EdgeInsets.all(AppSpacing.s6),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.7),
                       shape: BoxShape.circle,
@@ -261,9 +266,9 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                         color: Colors.white, size: 18),
                   ),
                 ),
-                Positioned(
+                PositionedDirectional(
                   top: 4,
-                  right: 4,
+                  end: 4,
                   child: Container(
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.55),
@@ -275,7 +280,7 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
               ],
             ),
             Padding(
-              padding: const EdgeInsets.all(8.0),
+              padding: const EdgeInsets.all(AppSpacing.xs),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -285,11 +290,11 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: p.textPrimary,
-                      fontSize: 13,
+                      fontSize: AppFontSize.bodySmall,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: AppSpacing.s2),
                   Text(
                     item.hasKnownDuration
                         ? '${item.subtitle} • ${_formatDuration(item.duration)}'
@@ -298,7 +303,7 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: p.textSecondary,
-                      fontSize: 11,
+                      fontSize: AppFontSize.caption,
                     ),
                   ),
                 ],

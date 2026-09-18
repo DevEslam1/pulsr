@@ -16,6 +16,24 @@ abstract class AppColors {
   static const Color warning = Color(0xFFFFB300);
   static const Color info = Color(0xFF40A9FF);
 
+  // Brand & feature accents. These are intentionally fixed (not theme-driven)
+  // because they identify a source/tier rather than a UI surface.
+  static const Color dacGold = Color(0xFFFFD700); // Hi-Res / USB DAC tier
+  static const Color ytRed = Color(0xFFFF0000); // YouTube family
+  static const Color ytRedDeep = Color(0xFF8B0000); // YouTube gradient end
+  static const Color netflixRed = Color(0xFFE50914); // curated online red
+  static const Color studioGreen = Color(0xFF10B981); // DSP attached / studio
+  static const Color ldacViolet = Color(0xFF7C4DFF); // LDAC / correction violet
+  static const Color accentCyan = Color(0xFF00E5FF); // cyan accent / calibration
+  static const Color skyBlue = Color(0xFF40C4FF);
+  static const Color emeraldDeep = Color(0xFF2BB673);
+  static const Color roseDeep = Color(0xFFB0316B);
+  static const Color amberDeep = Color(0xFFFFB800);
+  static const Color slate = Color(0xFF64748B);
+  static const Color darkSurface = Color(0xFF14172B);
+  static const Color mint = Color(0xFF1DE9B6);
+  static const Color azure = Color(0xFF00B0FF);
+
   // Dark surfaces (kept for legacy widgets)
   static const Color background = Color(0xFF0A0C12);
   static const Color surface = Color(0xFF12141D);

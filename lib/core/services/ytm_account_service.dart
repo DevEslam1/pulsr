@@ -132,6 +132,8 @@ class YtmAccountService {
   /// authenticated Innertube response. Used as the account-bound poToken content-binding.
   String? _dataSyncId;
   Timer? _sessionHarvestDebounce;
+  DateTime? _lastDataSyncBootstrapAttempt;
+  bool _dataSyncBootstrapInFlight = false;
 
   /// `visitorData` harvested from an authenticated response; sent in the WEB_REMIX player context.
   String? _sessionVisitorData;
@@ -230,6 +232,14 @@ class YtmAccountService {
 
       _isInitialized = true;
       loginState.value = isLoggedIn;
+
+      // A session restored from storage may have no dataSyncId (validation was
+      // transiently blocked, or the harvest response lacked it). Bootstrap it in
+      // the background so signed-in resolves can mint an account-bound poToken
+      // instead of endlessly falling through to the guest chain.
+      if (isLoggedIn && (_dataSyncId == null || _dataSyncId!.isEmpty)) {
+        unawaited(ensureDataSyncId());
+      }
     } catch (e, st) {
       ErrorLogger.log('Failed to initialize YtmAccountService',
           error: e, stackTrace: st, category: 'YTM_ACCOUNT');
@@ -457,27 +467,25 @@ class YtmAccountService {
     // from the caller's perspective via the outer unawaited) lets us chain a
     // _bootstrapDataSyncId call so the ID is populated in a single background
     // trip rather than waiting until the first resolvePlayerStream call.
-    unawaited(() async {
-      try {
-        await _warmSession();
-      } catch (e) {
-        debugPrint('[YTM_ACCOUNT] Session warming failed (non-fatal): $e');
-      }
-      // If _warmSession didn't harvest a dataSyncId (e.g. home browse returned
-      // an unexpected shape), do an explicit lightweight bootstrap fetch.
-      if (_dataSyncId == null || _dataSyncId!.isEmpty) {
-        debugPrint('[YTM_ACCOUNT] dataSyncId not yet available after warm, bootstrapping...');
-        await _bootstrapDataSyncId();
-      }
-      if (_dataSyncId != null && _dataSyncId!.isNotEmpty) {
-        // The id itself is an account identifier and the poToken binding — log
-        // that it arrived, never its value.
-        debugPrint('[YTM_ACCOUNT] dataSyncId ready after login');
-      } else {
-        debugPrint('[YTM_ACCOUNT] dataSyncId still null after bootstrap — '
-            'Tier-1 will resolve as a guest until populated');
-      }
-    }());
+    try {
+      await _warmSession();
+    } catch (e) {
+      debugPrint('[YTM_ACCOUNT] Session warming failed (non-fatal): $e');
+    }
+    // If _warmSession didn't harvest a dataSyncId (e.g. home browse returned
+    // an unexpected shape), do an explicit lightweight bootstrap fetch.
+    if (_dataSyncId == null || _dataSyncId!.isEmpty) {
+      debugPrint('[YTM_ACCOUNT] dataSyncId not yet available after warm, bootstrapping...');
+      await _bootstrapDataSyncId();
+    }
+    if (_dataSyncId != null && _dataSyncId!.isNotEmpty) {
+      // The id itself is an account identifier and the poToken binding — log
+      // that it arrived, never its value.
+      debugPrint('[YTM_ACCOUNT] dataSyncId ready after login');
+    } else {
+      debugPrint('[YTM_ACCOUNT] dataSyncId still null after bootstrap — '
+          'Tier-1 will resolve as a guest until populated');
+    }
     return true;
   }
 
@@ -1991,6 +1999,11 @@ class YtmAccountService {
     // the session cookies + SAPISIDHASH. Unauthenticated → a guest token bound to guest visitorData.
     final isAuthenticated =
         isLoggedIn && _cookies != null && _cookies!.isNotEmpty;
+
+    if (_dataSyncId == null && isLoggedIn) {
+      await _warmSession().timeout(const Duration(seconds: 3), onTimeout: () {});
+    }
+
     // Warm the native BotGuard attestation once so both the account-bound and
     // guest minting below have a live generator instead of a cold WebView.
     try {
@@ -2064,6 +2077,23 @@ class YtmAccountService {
       guestVisitorData = poState?['visitorData'] as String?;
     } catch (_) {}
 
+    // Web-shaped clients send the token as `serviceIntegrityDimensions`, which
+    // must be bound to the *video*; the visitor-bound streaming token makes
+    // YouTube answer UNPLAYABLE "Video unavailable" even though a token is
+    // attached. Mint the content-bound one up front (null when unavailable, in
+    // which case the request goes out without a token rather than the wrong one).
+    String? playerPoToken;
+    if (!useSessionAuth) {
+      try {
+        playerPoToken = await getIt<YtmService>()
+            .getPlayerPoToken(videoId)
+            .timeout(const Duration(seconds: 4));
+      } catch (e, st) {
+        ErrorLogger.log('Failed to mint content-bound player poToken',
+            error: e, stackTrace: st, category: 'YTM_ACCOUNT');
+      }
+    }
+
     final clientChain = useSessionAuth
         ? [
             'WEB_REMIX', // the only client that carries the session
@@ -2107,8 +2137,11 @@ class YtmAccountService {
         // signed in, and it fed the bot-block short-circuit below.
         final acceptsSessionAuth = useSessionAuth && client == 'WEB_REMIX';
         // The token must be bound to the identity the request is made under:
-        // datasyncId for the authenticated pass, visitorData for a guest one.
-        final poToken = acceptsSessionAuth ? accountPoToken : guestPoToken;
+        // datasyncId for the authenticated pass, the videoId for a guest web
+        // pass (serviceIntegrityDimensions), visitorData for a guest media URL.
+        final poToken = acceptsSessionAuth
+            ? accountPoToken
+            : (isWeb ? playerPoToken : guestPoToken);
         final visitorData =
             acceptsSessionAuth ? accountVisitorData : guestVisitorData;
         // Diagnostics: the bot-gate log below reports whether a token was
@@ -2621,6 +2654,31 @@ class YtmAccountService {
     }
   }
 
+  /// Public, throttled trigger for [_bootstrapDataSyncId].
+  ///
+  /// Called when a resolve needs the account-bound poToken but no dataSyncId is
+  /// known yet. Without this the only harvest sites were login and a cold-start
+  /// `validateSession()`, so a session restored from storage whose validation
+  /// was transiently blocked stayed on the guest chain forever and every
+  /// signed-in resolve fell through to the native tier (where WEB_REMIX pairs
+  /// session cookies with a guest poToken and returns "Video unavailable").
+  Future<void> ensureDataSyncId() async {
+    if (!isLoggedIn) return;
+    final existing = _dataSyncId;
+    if (existing != null && existing.isNotEmpty) return;
+    if (_dataSyncBootstrapInFlight) return;
+    final now = DateTime.now();
+    final last = _lastDataSyncBootstrapAttempt;
+    if (last != null && now.difference(last).inSeconds < 60) return;
+    _lastDataSyncBootstrapAttempt = now;
+    _dataSyncBootstrapInFlight = true;
+    try {
+      await _bootstrapDataSyncId();
+    } finally {
+      _dataSyncBootstrapInFlight = false;
+    }
+  }
+
   /// Bootstraps [_dataSyncId] with one lightweight authenticated `browse` call when it is unknown
   /// (e.g. right after login before any library fetch). The datasyncId is present on any
   /// authenticated response, so a home browse is enough to harvest it.
@@ -2638,7 +2696,19 @@ class YtmAccountService {
         baseTimeoutSeconds: 8,
       );
       if (res.statusCode == 200) {
-        _harvestSessionState(jsonDecode(res.body) as Map<String, dynamic>);
+        final json = jsonDecode(res.body) as Map<String, dynamic>;
+        final before = _dataSyncId;
+        _harvestSessionState(json);
+        if ((_dataSyncId == null || _dataSyncId!.isEmpty) ||
+            _dataSyncId == before) {
+          debugPrint('[YTM_ACCOUNT] datasyncId bootstrap: HTTP 200 but no '
+              'datasyncId in response (loggedIn=${!_isUnauthenticatedResponse(json)}, '
+              'auth=${isOAuthSession ? 'oauth' : 'cookies'}). Account-bound '
+              'playback will stay on the guest pass.');
+        }
+      } else {
+        debugPrint('[YTM_ACCOUNT] datasyncId bootstrap: HTTP ${res.statusCode} '
+            '(auth=${isOAuthSession ? 'oauth' : 'cookies'})');
       }
     } catch (e) {
       debugPrint('[YTM_ACCOUNT] datasyncId bootstrap failed: $e');

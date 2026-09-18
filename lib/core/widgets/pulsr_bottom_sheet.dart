@@ -5,6 +5,8 @@ import '../constants/app_radii.dart';
 import '../theme/aura_theme.dart';
 import '../utils/adaptive.dart';
 import 'pulsr_modal_tracker.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 /// Centralized bottom sheet entry-points and container for the entire app.
 ///
@@ -88,7 +90,7 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                 ? p.surface.withValues(alpha: 0.92)
                 : p.surface.withValues(alpha: 0.96),
             borderRadius: isTablet
-                ? BorderRadius.circular(28)
+                ? BorderRadius.circular(AppRadii.r28)
                 : AppRadii.bottomSheetRadius,
             border: Border.all(
               color: p.hairline,
@@ -104,11 +106,11 @@ class PulsrBottomSheetContainer extends StatelessWidget {
             ],
           ),
           margin: isTablet
-              ? const EdgeInsets.fromLTRB(20, 0, 20, 24)
+              ? const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, 0, AppSpacing.s20, AppSpacing.lg)
               : EdgeInsets.zero,
           child: ClipRRect(
             borderRadius: isTablet
-                ? BorderRadius.circular(28)
+                ? BorderRadius.circular(AppRadii.r28)
                 : AppRadii.bottomSheetRadius,
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
@@ -122,7 +124,7 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                   children: [
                     // Top drag pill
                     if (showDragHandle) ...[
-                      const SizedBox(height: 10),
+                      const SizedBox(height: AppSpacing.s10),
                       Center(
                         child: Container(
                           width: 38,
@@ -130,18 +132,19 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: (p.isDark ? Colors.white : Colors.black)
                                 .withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(999),
+                            borderRadius: AppRadii.full,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: AppSpacing.s10),
                     ],
 
                     // Optional Header
                     if (title != null) ...[
                       Padding(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 20.0, vertical: 6.0),
+
+                            horizontal: AppSpacing.s20, vertical: AppSpacing.s6),
                         child: Row(
                           children: [
                             Expanded(
@@ -151,18 +154,18 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                                   DefaultTextStyle.merge(
                                     style: TextStyle(
                                       color: p.textPrimary,
-                                      fontSize: 18,
+                                      fontSize: AppFontSize.title,
                                       fontWeight: FontWeight.w800,
-                                      letterSpacing: -0.3,
+                                      letterSpacing: AppTracking.title,
                                     ),
                                     child: title!,
                                   ),
                                   if (subtitle != null) ...[
-                                    const SizedBox(height: 2),
+                                    const SizedBox(height: AppSpacing.s2),
                                     DefaultTextStyle.merge(
                                       style: TextStyle(
                                         color: p.textSecondary,
-                                        fontSize: 12.5,
+                                        fontSize: AppFontSize.label,
                                       ),
                                       child: subtitle!,
                                     ),

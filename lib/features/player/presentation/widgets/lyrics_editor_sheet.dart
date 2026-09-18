@@ -8,6 +8,9 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/lyrics_line.dart';
 import '../../cubit/player_cubit.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class LyricsEditorSheet extends StatefulWidget {
   final SongsTableData song;
@@ -103,10 +106,10 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.82,
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, AppSpacing.lg),
       decoration: BoxDecoration(
         color: p.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -117,11 +120,11 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
               height: 4,
               decoration: BoxDecoration(
                 color: p.textSecondary.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(AppRadii.r2),
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -131,24 +134,24 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                   Text(context.l10n.lyricsEditorTitle,
                     style: TextStyle(
                       color: p.textPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                      fontSize: AppFontSize.title,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   Text(context.l10n.nowAtLabel,
                     style: TextStyle(
                         color: p.textSecondary,
-                        fontSize: 12,
+                        fontSize: AppFontSize.label,
                         fontWeight: FontWeight.w600),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: AppSpacing.s6),
                   ValueListenableBuilder<Duration>(
                     valueListenable: _livePosition,
                     builder: (context, pos, _) => Text(
                       Formatters.formatDuration(pos),
                       style: TextStyle(
                           color: p.primary,
-                          fontSize: 12,
+                          fontSize: AppFontSize.label,
                           fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -170,7 +173,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                     style: FilledButton.styleFrom(
                       backgroundColor: p.primary,
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(AppRadii.r12)),
                     ),
                     onPressed: () {
                       final sorted = List<LyricsLine>.from(_lines)
@@ -180,24 +183,24 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                     },
                     child: Text(context.l10n.save,
                         style: TextStyle(
-                            color: Colors.black, fontWeight: FontWeight.bold)),
+                            color: Colors.black, fontWeight: FontWeight.w700)),
                   ),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.s14),
           Expanded(
             child: ListView.separated(
               itemCount: _lines.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.xs),
               itemBuilder: (context, index) {
                 final line = _lines[index];
                 return Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(AppSpacing.sm),
                   decoration: BoxDecoration(
                     color: p.surfaceCard,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppRadii.r14),
                     border: Border.all(color: p.hairline),
                   ),
                   child: Row(
@@ -205,25 +208,26 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                       // Timestamp stamp button
                       InkWell(
                         onTap: () => _stampCurrentPosition(index),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadii.r8),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 6),
+
+                              horizontal: AppSpacing.xs, vertical: AppSpacing.s6),
                           decoration: BoxDecoration(
                             color: p.primary.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(AppRadii.r8),
                           ),
                           child: Text(
                             Formatters.formatDuration(line.timestamp),
                             style: TextStyle(
                               color: p.primary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
+                              fontSize: AppFontSize.label,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: AppSpacing.s10),
                       // Text input field
                         Expanded(
                           child: TextFormField(
@@ -233,7 +237,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                             // via the stamp label beside this field.
                             key: ValueKey('lyric_$index'),
                           initialValue: line.text,
-                          style: TextStyle(color: p.textPrimary, fontSize: 13),
+                          style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.bodySmall),
                           decoration: const InputDecoration(
                             border: InputBorder.none,
                             isDense: true,

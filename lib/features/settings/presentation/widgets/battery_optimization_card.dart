@@ -6,6 +6,8 @@ import '../../../../core/services/battery_optimization_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/platform_capabilities.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 class BatteryOptimizationCard extends StatefulWidget {
   const BatteryOptimizationCard({super.key});
@@ -52,8 +54,8 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard> {
         BatteryOptimizationService.isAggressiveOem(_manufacturer);
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
         borderRadius: AppRadii.cardRadius,
@@ -65,20 +67,21 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard> {
           Row(
             children: [
               Icon(Icons.battery_alert_rounded, color: p.accent, size: 22),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppSpacing.xs),
               Expanded(
                 child: Text(context.l10n.playbackStopsScreenOff,
                   style: TextStyle(
                     color: p.textPrimary,
                     fontWeight: FontWeight.w700,
-                    fontSize: 14,
+                    fontSize: AppFontSize.body,
                   ),
                 ),
               ),
-              IconButton(
-                icon:
-                    Icon(Icons.close_rounded, size: 18, color: p.textTertiary),
-                onPressed: () async {
+                IconButton(
+                  icon:
+                      Icon(Icons.close_rounded, size: 18, color: p.textTertiary),
+                  tooltip: context.l10n.close,
+                  onPressed: () async {
                   await BatteryOptimizationService.dismissCard();
                   setState(() => _isDismissed = true);
                 },
@@ -87,11 +90,11 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           Text(context.l10n.batteryExemptionDesc,
-            style: TextStyle(color: p.textSecondary, fontSize: 12, height: 1.4),
+            style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label, height: 1.4),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
           Row(
             children: [
               FilledButton.tonal(
@@ -99,9 +102,9 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard> {
                   backgroundColor: p.accent,
                   foregroundColor: p.onAccent,
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.s14, vertical: AppSpacing.xs),
                   textStyle: const TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.w700),
+                      fontSize: AppFontSize.label, fontWeight: FontWeight.w700),
                 ),
                 onPressed: () async {
                   await BatteryOptimizationService
@@ -111,7 +114,7 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard> {
                 child: Text(context.l10n.allowBackground),
               ),
               if (isAggressive) ...[
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.xs),
                 TextButton(
                   onPressed: () {
                     final guideUrl =
@@ -137,7 +140,7 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard> {
                   child: Text(context.l10n.deviceGuide,
                     style: TextStyle(
                         color: p.accent,
-                        fontSize: 12,
+                        fontSize: AppFontSize.label,
                         fontWeight: FontWeight.w700),
                   ),
                 ),

@@ -179,6 +179,23 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                     true
                 }
             }
+            "getPlayerPoToken" -> {
+                // Content-bound (videoId) poToken for a /player request. The
+                // visitor-bound `streamingPoToken` must never be used here: a
+                // guest WEB_REMIX player request carrying it answers UNPLAYABLE
+                // "Video unavailable". Dart's account chain needs this because it
+                // previously reused streamingPoToken for its web clients.
+                val videoId = call.argument<String>("videoId")?.trim()
+                if (videoId.isNullOrEmpty() || !VIDEO_ID.matches(videoId)) {
+                    result.success(null)
+                    return
+                }
+                runOffMainThread(result) {
+                    val appContext = context?.applicationContext
+                    if (appContext != null) PoTokenManager.init(appContext)
+                    PoTokenManager.poTokenForSync(videoId)
+                }
+            }
             "isVpnConnected" -> {
                 val ctx = context?.applicationContext
                 val isVpn = if (ctx != null) CellularFailoverHelper.isVpnActive(ctx) else false
@@ -221,6 +238,9 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 runOffMainThread(result) {
                     YtmHttpClient.TtlDnsCache.instance.clear()
                     RateLimiter.shared.resetAfterNetworkChange()
+                    // Player base.js is bound to the egress it was fetched from;
+                    // re-fetch and re-extract after a path change.
+                    PlayerJavaScript.clearCaches()
                     try {
                         val isVpn = context?.let { CellularFailoverHelper.isVpnActive(it) } ?: false
                         if (isVpn || PoTokenManager.isExpired() || PoTokenManager.webViewBroken) {

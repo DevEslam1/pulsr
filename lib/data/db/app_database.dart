@@ -25,24 +25,48 @@ class AppDatabase extends _$AppDatabase {
   /// Set true when the FTS rebuild during migration failed, so the
   /// search index may be incomplete and tracks can be unfindable.
   /// Surfaced instead of only printed (defect 08-04 / 05-01).
-  /// The search path calls [repairFtsIndex] once per session on FTS error.
+  /// The search path calls [repairFtsIndex] on FTS error.
   static bool ftsRebuildFailed = false;
 
-  /// Best-effort FTS repair: recreates the index tables/triggers and
-  /// rebuilds. Returns true on success. Safe when healthy. Once per session.
-  static bool _ftsRepairAttempted = false;
-  Future<bool> repairFtsIndex() async {
-    if (_ftsRepairAttempted) return !ftsRebuildFailed;
-    _ftsRepairAttempted = true;
-    try {
-      await _createFtsTable(customStatement);
-      await customStatement(
-          "INSERT INTO songs_fts(songs_fts) VALUES('rebuild');");
-      ftsRebuildFailed = false;
-      return true;
-    } catch (_) {
-      return false;
+  /// Repair attempts made this session. Bounded so a persistently broken index
+  /// cannot loop forever; a manual `force` rebuild resets the budget.
+  static int _ftsRepairAttempts = 0;
+  static const int _ftsRepairMaxAttempts = 3;
+
+  /// Best-effort FTS repair: recreates the index tables/triggers and rebuilds.
+  /// Retries up to [_ftsRepairMaxAttempts] times with backoff, so a transient
+  /// failure no longer leaves the index dead for the whole session. Returns
+  /// true on success. Pass [force] for the manual Settings action.
+  Future<bool> repairFtsIndex({bool force = false}) async {
+    if (force) _ftsRepairAttempts = 0;
+    if (_ftsRepairAttempts >= _ftsRepairMaxAttempts) {
+      return !ftsRebuildFailed;
     }
+    for (var attempt = _ftsRepairAttempts;
+        attempt < _ftsRepairMaxAttempts;
+        attempt++) {
+      _ftsRepairAttempts++;
+      try {
+        await _createFtsTable(customStatement);
+        await customStatement(
+            "INSERT INTO songs_fts(songs_fts) VALUES('rebuild');");
+        ftsRebuildFailed = false;
+        return true;
+      } catch (e, st) {
+        ErrorLogger.log(
+          'FTS repair attempt $_ftsRepairAttempts/$_ftsRepairMaxAttempts failed',
+          error: e,
+          stackTrace: st,
+          category: 'Database',
+        );
+        if (attempt + 1 < _ftsRepairMaxAttempts) {
+          await Future<void>.delayed(
+              Duration(milliseconds: 200 * (attempt + 1)));
+        }
+      }
+    }
+    ftsRebuildFailed = true;
+    return false;
   }
   @factoryMethod
   AppDatabase() : super(driftDatabase(name: 'pulsr_music_db'));

@@ -405,43 +405,66 @@ class WidgetService {
 
   Future<void> _pruneOldWidgetArtwork(Directory dir) async {
     try {
-      final now = DateTime.now();
-      await for (final entity in dir.list()) {
-        if (entity is File && entity.path.contains('pulsr_widget_art_')) {
-          try {
-            final stat = await entity.stat();
-            if (now.difference(stat.modified).inDays > 7) {
-              await entity.delete();
-            }
-          } catch (e, st) {
-            ErrorLogger.log('_pruneOldWidgetArtwork failed', error: e, stackTrace: st, category: 'WidgetService');
-          }
-        }
-      }
-      // Also enforce total count limit for widget art files
+      // List the directory once, then stat every file concurrently instead of
+      // awaiting stat() sequentially per file (I24).
       final files = <File>[];
       await for (final entity in dir.list()) {
         if (entity is File && entity.path.contains('pulsr_widget_art_')) {
           files.add(entity);
         }
       }
-      if (files.length > _maxCacheSize) {
-        // FIX-G02: Sort by modified timestamp oldest first, not by path
-        final fileStats = await Future.wait(files.map((f) async {
-          final stat = await f.stat();
-          return (file: f, modified: stat.modified);
-        }));
-        fileStats.sort((a, b) => a.modified.compareTo(b.modified));
-        for (int i = 0; i < fileStats.length - _maxCacheSize; i++) {
-          try {
-            await fileStats[i].file.delete();
-          } catch (e, st) {
-            ErrorLogger.log('_pruneOldWidgetArtwork failed', error: e, stackTrace: st, category: 'WidgetService');
-          }
+      if (files.isEmpty) return;
+
+      final now = DateTime.now();
+      final stats = <({File file, DateTime? modified})>[];
+      const batchSize = 20; // limit concurrency
+      for (var i = 0; i < files.length; i += batchSize) {
+        final end = (i + batchSize < files.length) ? i + batchSize : files.length;
+        final batchStats = await Future.wait(
+          files.sublist(i, end).map((f) async {
+            try {
+              final stat = await f.stat();
+              return (file: f, modified: stat.modified);
+            } catch (_) {
+              return (file: f, modified: null);
+            }
+          }),
+        );
+        stats.addAll(batchStats);
+      }
+
+      final stale = <File>[];
+      final survivors = <({File file, DateTime modified})>[];
+      for (final s in stats) {
+        final modified = s.modified;
+        if (modified == null || now.difference(modified).inDays > 7) {
+          stale.add(s.file);
+        } else {
+          survivors.add((file: s.file, modified: modified));
         }
       }
+
+      // Enforce the total-count limit oldest-first.
+      if (survivors.length > _maxCacheSize) {
+        survivors.sort((a, b) => a.modified.compareTo(b.modified));
+        stale.addAll(
+            survivors.take(survivors.length - _maxCacheSize).map((s) => s.file));
+      }
+
+      for (var i = 0; i < stale.length; i += batchSize) {
+        final end = (i + batchSize < stale.length) ? i + batchSize : stale.length;
+        await Future.wait(stale.sublist(i, end).map((f) async {
+          try {
+            await f.delete();
+          } catch (e, st) {
+            ErrorLogger.log('_pruneOldWidgetArtwork failed',
+                error: e, stackTrace: st, category: 'WidgetService');
+          }
+        }));
+      }
     } catch (e, st) {
-      ErrorLogger.log('_pruneOldWidgetArtwork failed', error: e, stackTrace: st, category: 'WidgetService');
+      ErrorLogger.log('_pruneOldWidgetArtwork failed',
+          error: e, stackTrace: st, category: 'WidgetService');
     }
   }
 }

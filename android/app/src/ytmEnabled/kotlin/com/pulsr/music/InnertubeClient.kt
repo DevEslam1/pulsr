@@ -209,7 +209,7 @@ internal class InnertubeClient(
     private fun maybeAppendStreamPot(url: String, client: ClientType): String {
         val host = runCatching { Uri.parse(url).host ?: "" }.getOrDefault("")
         if (!host.contains("googlevideo.com")) return url
-        if (!ClientCapabilityMatrix.getCapability(client).requiresPoToken) return url
+        if (!client.isWeb) return url
         // GVS (streaming URL) poTokens are session-bound, not content-bound: the
         // visitorData for a guest, the account's dataSyncId when signed in. The
         // content-bound /player token minted in buildPlayerBody() must not be
@@ -232,6 +232,17 @@ internal class InnertubeClient(
             uri.buildUpon().appendQueryParameter("pot", token).toString()
         }.getOrDefault(url)
     }
+
+    /**
+     * Whether a request may carry the signed-in session (cookies, SAPISIDHASH,
+     * session visitorData). Only WEB_REMIX is eligible, and only once a
+     * dataSyncId is known: the account-bound poToken is minted against it, and a
+     * session without that token is the mismatch YouTube rejects. Kept as one
+     * predicate so the header, context and player body can never disagree.
+     */
+    private fun isAuthedWeb(clientType: ClientType): Boolean =
+        clientType.acceptsSessionAuth &&
+            cookieStore.isSessionValid()
 
     fun resolvePlayerStream(videoId: String, quality: String = "high"): Map<String, Any?> {
         val clientChain = resolutionStrategy.buildChain(
@@ -295,6 +306,13 @@ internal class InnertubeClient(
                 val playerJson = requestPlayer(videoId, client)
                 if (Thread.currentThread().isInterrupted) return null
 
+                // A playable response carries the exact base.js URL for this
+                // player version; feed it to the Rhino decipher so signature and
+                // `n` transforms run against the right code.
+                PlayerJavaScript.rememberPlayerUrlFromAssets(
+                    playerJson.optJSONObject("assets")?.optString("js")
+                )
+
                 val playability = playerJson.optJSONObject("playabilityStatus")
                 val status = playability?.optString("status") ?: ""
                 val reason = playability?.optString("reason") ?: ""
@@ -353,7 +371,7 @@ internal class InnertubeClient(
                     if (isEgressBlock || guestSignInAsBlock) {
                         blockClients.add(client.name)
                         val count = blockSignalCount.incrementAndGet()
-                        if (count >= 6) {
+                        if (count >= 3) {
                             Log.w(TAG, "[$traceId] Short-circuiting chain: $count block signals ($parsedSignal) from (${blockClients.joinToString()}) for $videoId")
                             shortCircuit.compareAndSet(
                                 null,
@@ -379,8 +397,12 @@ internal class InnertubeClient(
                     for (i in 0 until array.length()) {
                         val format = array.optJSONObject(i) ?: continue
                         val mime = format.optString("mimeType")
+                        // Only audio formats are deciphered: extractUrlFromFormat
+                        // now runs Rhino, and running it over every video format
+                        // was pure waste (dozens of JS invocations per response).
+                        if (!mime.startsWith("audio/")) continue
                         val url = extractUrlFromFormat(format)
-                        if (mime.startsWith("audio/") && !url.isNullOrEmpty()) {
+                        if (!url.isNullOrEmpty()) {
                             audioFormats.add(format to url)
                         }
                     }
@@ -390,6 +412,8 @@ internal class InnertubeClient(
                     // 2026-09: count urls/cipher across ALL formats so SABR-forced
                     // clients (formats present, zero urls, zero cipher) are
                     // classified SabrEnforced instead of VideoGone/PoTokenInvalid.
+                    // Reads raw fields only — never deciphers — so the diagnostic
+                    // does not trigger a Rhino run per format.
                     var totalFormats = 0
                     var totalUrls = 0
                     var cipheredCount = 0
@@ -397,34 +421,53 @@ internal class InnertubeClient(
                         for (i in 0 until array.length()) {
                             val f = array.optJSONObject(i) ?: continue
                             totalFormats++
-                            if (!extractUrlFromFormat(f).isNullOrEmpty()) totalUrls++
+                            if (f.optString("url").isNotEmpty()) totalUrls++
                             if (f.optString("signatureCipher").isNotEmpty() ||
                                 f.optString("cipher").isNotEmpty()) cipheredCount++
                         }
                     }
                     val hadFormatArrays = totalFormats > 0
                     val hadCiphered = cipheredCount > 0
-                    updateBestSignal(
-                        when {
-                            YtmBlockSignal.detectSabrStructural(
-                                hasStreamingData = streamingData != null,
-                                formatCount = totalFormats,
-                                urlCount = totalUrls,
-                                cipherCount = cipheredCount,
-                            ) -> {
-                                // Demote the client for 24h; do NOT invalidate
-                                // poTokens — SABR is not an attestation failure.
-                                SabrDemotionStore.markSabrEnforced(client)
-                                Log.w(TAG, "[$traceId] " + client.name + " SABR-enforced (formats=$totalFormats, urls=0) -> demoted")
-                                YtmBlockSignal.SabrEnforced
+
+                    if (hadCiphered) {
+                        Log.i(TAG, "[$traceId] Retrying decipher after cache clear for $videoId")
+                        PlayerJavaScript.clearCaches()
+                        for (array in formatArrays) {
+                            for (i in 0 until array.length()) {
+                                val format = array.optJSONObject(i) ?: continue
+                                val mime = format.optString("mimeType")
+                                if (!mime.startsWith("audio/")) continue
+                                val url = extractUrlFromFormat(format)
+                                if (!url.isNullOrEmpty()) {
+                                    audioFormats.add(format to url)
+                                }
                             }
-                            hadCiphered -> YtmBlockSignal.SignatureDecipherFailed
-                            hadFormatArrays -> YtmBlockSignal.VideoGone
-                            else -> YtmBlockSignal.PoTokenInvalid
                         }
-                    )
-                    Log.w(TAG, "[$traceId] Client ${client.name} returned no usable audio formats (hadCiphered=$hadCiphered)")
-                    return null
+                    }
+
+                    if (audioFormats.isEmpty()) {
+                        updateBestSignal(
+                            when {
+                                YtmBlockSignal.detectSabrStructural(
+                                    hasStreamingData = streamingData != null,
+                                    formatCount = totalFormats,
+                                    urlCount = totalUrls,
+                                    cipherCount = cipheredCount,
+                                ) -> {
+                                    // Demote the client for 24h; do NOT invalidate
+                                    // poTokens — SABR is not an attestation failure.
+                                    SabrDemotionStore.markSabrEnforced(client)
+                                    Log.w(TAG, "[$traceId] " + client.name + " SABR-enforced (formats=$totalFormats, urls=0) -> demoted")
+                                    YtmBlockSignal.SabrEnforced
+                                }
+                                hadCiphered -> YtmBlockSignal.SignatureDecipherFailed
+                                hadFormatArrays -> YtmBlockSignal.VideoGone
+                                else -> YtmBlockSignal.PoTokenInvalid
+                            }
+                        )
+                        Log.w(TAG, "[$traceId] Client ${client.name} returned no usable audio formats (hadCiphered=$hadCiphered)")
+                        return null
+                    }
                 }
 
                 // Layer 6: Itag Ladder 2026 — Opus 251 (160kbps) preferred over AAC 140,
@@ -530,7 +573,14 @@ internal class InnertubeClient(
         }
 
         fun cancelAll(except: java.util.concurrent.Future<*>? = null) {
-            for (f in activeFutures) { if (f != except) f.cancel(true) }
+            // Do NOT interrupt: a losing candidate is very likely blocked inside
+            // PoTokenWebView.generatePoToken waiting on the shared BotGuard
+            // WebView. `cancel(true)` interrupted that wait, and the mint threw
+            // InterruptedException — producing the "Minting poToken failed with
+            // warm generator: null" storm and throwing away tokens the WebView
+            // had already computed. Cancelling without interruption discards the
+            // result instead, which is all the hedge race needs.
+            for (f in activeFutures) { if (f != except) f.cancel(false) }
             activeFutures.clear()
         }
 
@@ -704,8 +754,12 @@ internal class InnertubeClient(
 
                 if (rawUrl != null) {
                     var resolved = if (sig != null) {
-                        val decipherCache = JsDecipherCache.getInstance(context)
-                        val deciphered = decipherCache.decipherSignature(sig)
+                        // Real Rhino-backed decipher via NewPipeExtractor. Throws
+                        // (caught below) when the player JS cannot be loaded, so
+                        // this format is discarded rather than built with an
+                        // un-deciphered signature (which googlevideo 403s).
+                        val deciphered = PlayerJavaScript.decipherSignature(sig)
+                            ?: throw UndecipherableSignatureException("default")
                         val separator = if (rawUrl.contains("?")) "&" else "?"
                         "$rawUrl$separator$sigParam=${URLEncoder.encode(deciphered, "UTF-8")}"
                     } else {
@@ -729,17 +783,12 @@ internal class InnertubeClient(
             val uri = Uri.parse(url)
             val n = uri.getQueryParameter("n") ?: return url
             if (n.isEmpty()) return url
-            val cache = JsDecipherCache.getInstance(context)
-            val transformed = cache.decipherN(n)
-            if (transformed == n) return url // no rule cached → keep as-is (plays but throttled)
-            // Rebuild URL with transformed n
-            val newUri = uri.buildUpon().clearQuery().apply {
-                for (name in uri.queryParameterNames) {
-                    if (name == "n") appendQueryParameter("n", transformed)
-                    else uri.getQueryParameters(name).forEach { appendQueryParameter(name, it) }
-                }
-            }.build().toString()
-            newUri
+            // NewPipe returns the whole URL with `n` already rewritten. Null or
+            // unchanged means the transform is unavailable: keep the original,
+            // which still plays (throttled) rather than failing the track.
+            val deobfuscated = PlayerJavaScript.deobfuscateN(url) ?: return url
+            if (deobfuscated == url) return url
+            deobfuscated
         } catch (t: Throwable) {
             Log.w(TAG, "n-transform failed: ${t.message}")
             url
@@ -839,8 +888,15 @@ internal class InnertubeClient(
                     reqBuilder.header("X-Goog-RolloutToken", rollout)
                 }
 
-                // Attach visitorData if available
-                val authedWeb = clientType.acceptsSessionAuth && cookieStore.isSessionValid()
+                // Attach visitorData if available.
+                //
+                // The session may only ride a request that can also carry the
+                // account-bound poToken. With no dataSyncId we cannot mint that
+                // token, and pairing session cookies/visitorData with a guest
+                // token is the exact auth-context mismatch YouTube answers with
+                // UNPLAYABLE "Video unavailable" / LOGIN_REQUIRED. Fall back to a
+                // clean guest request instead of sending the poisoned pair.
+                val authedWeb = isAuthedWeb(clientType)
                 val visitorData = if (authedWeb) {
                     PoTokenManager.sessionVisitorData.ifEmpty { PoTokenManager.visitorData }
                 } else {
@@ -1023,7 +1079,7 @@ internal class InnertubeClient(
         }
 
         val playbackContext = JSONObject()
-        val sts = runCatching { JsDecipherCache.getInstance(context).getSignatureTimestamp() }.getOrNull()
+        val sts = PlayerJavaScript.signatureTimestamp()
         val contentPlaybackContext = JSONObject().apply {
             put("html5Preference", "HTML5_PREF_WANTS")
             if (sts != null) put("signatureTimestamp", sts)
@@ -1036,7 +1092,7 @@ internal class InnertubeClient(
         }
         root.put("playbackContext", playbackContext)
 
-        val requiresPo = clientType.isWeb || ClientCapabilityMatrix.getCapability(clientType).requiresPoToken
+        val requiresPo = clientType.isWeb
         if (requiresPo) {
             val hasPo = PoTokenManager.isReady ||
                 (!PoTokenManager.webViewBroken && !PoTokenManager.isLimitedMode && PoTokenManager.ensureReadySync())
@@ -1086,7 +1142,7 @@ internal class InnertubeClient(
             put("clientVersion", clientType.effectiveClientVersion)
             put("hl", fp.hl)
             put("gl", fp.gl)
-            val authedWeb = clientType.acceptsSessionAuth && cookieStore.isSessionValid()
+            val authedWeb = isAuthedWeb(clientType)
             // Must mirror the X-Goog-Visitor-Id header built in postWithRetry.
             // Sending the header without the matching context.client.visitorData
             // is an identity mismatch and reliably provokes a bot challenge.

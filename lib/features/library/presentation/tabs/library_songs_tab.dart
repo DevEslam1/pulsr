@@ -9,7 +9,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
     if (songs.isEmpty) {
       if (state.isLoading) {
         return SkeletonList(
-          padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16,
+          padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context), 16,
               Adaptive.pagePadding(context), 160),
         );
       }
@@ -26,7 +26,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
         onRefresh: () => _handleRefresh(context),
         child: GridView.builder(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16,
+          padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context), 16,
               Adaptive.pagePadding(context), 160),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: Adaptive.gridColumns(context, minItemWidth: 155),
@@ -39,7 +39,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
             final song = songs[index];
             final isSelected = state.selectedSongIds.contains(song.id);
             return InkWell(
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(AppRadii.r18),
               onTap: () {
                 if (state.isMultiSelectMode) {
                   cubit.toggleSongSelection(song.id);
@@ -68,7 +68,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                             child: Container(
                               decoration: BoxDecoration(
                                 color: p.accent.withValues(alpha: 0.45),
-                                borderRadius: BorderRadius.circular(18),
+                                borderRadius: BorderRadius.circular(AppRadii.r18),
                               ),
                               child: const Center(
                                 child: Icon(Icons.check_circle_rounded,
@@ -76,8 +76,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                               ),
                             ),
                           ),
-                        Positioned(
-                          right: 6,
+                        PositionedDirectional(
+                          end: 6,
                           top: 6,
                           child: Material(
                             color: Colors.black.withValues(alpha: 0.5),
@@ -86,7 +86,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                               customBorder: const CircleBorder(),
                               onTap: () => SongInfoSheet.show(context, song: song),
                               child: const Padding(
-                                padding: EdgeInsets.all(6.0),
+                                padding: EdgeInsets.all(AppSpacing.s6),
                                 child: Icon(Icons.more_vert_rounded,
                                     color: Colors.white, size: 18),
                               ),
@@ -96,7 +96,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.xs),
                   Text(
                     song.title,
                     maxLines: 1,
@@ -104,14 +104,14 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                     style: TextStyle(
                         color: p.textPrimary,
                         fontWeight: FontWeight.w700,
-                        fontSize: 13.5),
+                        fontSize: AppFontSize.bodySmall),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: AppSpacing.s2),
                   Text(
                     song.artist,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: p.textSecondary, fontSize: 11.5),
+                    style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
                   ),
                 ],
               ),
@@ -129,17 +129,13 @@ mixin LibrarySongsTab on State<LibraryScreen> {
     final hasMore = cubit.hasMoreSongs;
 
     Widget buildLoadMoreTile() {
-      return SizedBox(
-        height: trackCols > 1 ? 72 : _LibraryScreenState._songRowExtent,
+      if (!state.isLoadingMore) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16.0),
         child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: p.accent),
-            ),
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: p.accent,
           ),
         ),
       );
@@ -201,8 +197,9 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                   controller: _songsScrollController,
                   addAutomaticKeepAlives: false,
                   addRepaintBoundaries: true,
-                  padding: const EdgeInsets.only(
-                      bottom: 160, top: 8, left: 6, right: 6),
+                  padding: const EdgeInsetsDirectional.only(
+
+                      bottom: AppSpacing.scrollBottom, top: AppSpacing.xs, start: AppSpacing.s6, end: AppSpacing.s6),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: trackCols,
                     mainAxisExtent: 72,
@@ -212,7 +209,11 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                   itemCount: songs.length + (hasMore ? 1 : 0),
                   itemBuilder: (context, index) {
                     if (index >= songs.length) return buildLoadMoreTile();
-                    return buildSongItem(songs[index], index);
+                    return StaggeredReveal(
+                      index: index,
+                      groupKey: '${state.sortBy}-${state.ascending}',
+                      child: buildSongItem(songs[index], index),
+                    );
                   },
                 )
               : ListView.builder(
@@ -221,12 +222,17 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                   itemExtent: songs.length > 500 ? _LibraryScreenState._songRowExtent : null,
                   addAutomaticKeepAlives: false,
                   addRepaintBoundaries: true,
-                  padding: const EdgeInsets.only(
-                      bottom: 160, top: 8, left: 4, right: 4),
+                  padding: const EdgeInsetsDirectional.only(
+
+                      bottom: AppSpacing.scrollBottom, top: AppSpacing.xs, start: AppSpacing.xxs, end: AppSpacing.xxs),
                   itemCount: songs.length + (hasMore ? 1 : 0),
                   itemBuilder: (context, index) {
                     if (index >= songs.length) return buildLoadMoreTile();
-                    return buildSongItem(songs[index], index);
+                    return StaggeredReveal(
+                      index: index,
+                      groupKey: '${state.sortBy}-${state.ascending}',
+                      child: buildSongItem(songs[index], index),
+                    );
                   },
                 ),
           if (showAlphabet)
@@ -238,9 +244,9 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                 width: 30,
                 decoration: BoxDecoration(
                     color: p.surfaceContainer.withValues(alpha: 0.7),
-                    borderRadius: BorderRadius.circular(15)),
+                    borderRadius: BorderRadius.circular(AppRadii.r16)),
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.s6),
                   child: Column(
                     children: alphabet
                         .map((l) => Semantics(
@@ -255,7 +261,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                                   child: Center(
                                     child: Text(l,
                                         style: TextStyle(
-                                            fontSize: 10,
+                                            fontSize: AppFontSize.tiny,
                                             fontWeight: FontWeight.w800,
                                             color: p.textTertiary)),
                                   ),
@@ -301,10 +307,10 @@ mixin LibrarySongsTab on State<LibraryScreen> {
         children: [
           // ---------- Header Card with Play All & Shuffle ----------
           Padding(
-            padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 12,
+            padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context), 12,
                 Adaptive.pagePadding(context), 8),
             child: Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpacing.md),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
@@ -314,13 +320,13 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(AppRadii.r20),
                 border: Border.all(color: p.accent.withValues(alpha: 0.25)),
               ),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(AppSpacing.s10),
                     decoration: BoxDecoration(
                       color: p.accent.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
@@ -328,7 +334,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                     child: Icon(Icons.download_done_rounded,
                         color: p.accent, size: 24),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: AppSpacing.s14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -338,15 +344,15 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                           style: TextStyle(
                             color: p.textPrimary,
                             fontWeight: FontWeight.w800,
-                            fontSize: 15,
+                            fontSize: AppFontSize.callout,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: AppSpacing.s2),
                         Text(
                           context.l10n.tracksCount(downloaded.length),
                           style: TextStyle(
                             color: p.textSecondary,
-                            fontSize: 12,
+                            fontSize: AppFontSize.label,
                           ),
                         ),
                       ],
@@ -362,7 +368,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                     onPressed: () => playerCubit.playSong(downloaded.first,
                         queue: downloaded),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: AppSpacing.s6),
                   IconButton.filledTonal(
                     style: IconButton.styleFrom(
                       backgroundColor: p.surfaceContainerHigh,
@@ -386,8 +392,9 @@ mixin LibrarySongsTab on State<LibraryScreen> {
             child: trackCols > 1
                 ? GridView.builder(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.only(
-                        bottom: 160, top: 4, left: 6, right: 6),
+                    padding: const EdgeInsetsDirectional.only(
+
+                        bottom: AppSpacing.scrollBottom, top: AppSpacing.xxs, start: AppSpacing.s6, end: AppSpacing.s6),
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: trackCols,
                       mainAxisExtent: 72,
@@ -446,7 +453,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                 : ListView.builder(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding:
-                        const EdgeInsets.only(bottom: 160, top: 4, left: 4, right: 4),
+                        const EdgeInsetsDirectional.only(bottom: AppSpacing.scrollBottom, top: AppSpacing.xxs, start: AppSpacing.xxs, end: AppSpacing.xxs),
                     itemCount: downloaded.length,
                     itemBuilder: (context, index) {
                       final song = downloaded[index];

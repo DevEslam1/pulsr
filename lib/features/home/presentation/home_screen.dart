@@ -9,8 +9,10 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/pulsr_logo.dart';
+import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
+import '../../../core/widgets/staggered_reveal.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
 import '../../../data/scanner/media_scanner_service.dart';
@@ -26,8 +28,13 @@ import '../../../core/services/ytm_service.dart';
 import '../../../domain/models/ytm_track.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
+import '../cubit/home_cubit.dart';
 
 import 'package:go_router/go_router.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 /// Scales a fixed two-line card title box (34px at the default text size) with
 /// the user's Dynamic Type setting so large text never clips. Pixel-identical
@@ -63,68 +70,22 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedTab = 0; // 0: Local, 1: Online
   String _selectedOnlineCategory = 'Recommended For You';
 
-  YtmService get _ytmService => widget.ytmService ?? getIt<YtmService>();
   YtmAccountService get _ytmAccountService =>
       widget.ytmAccountService ?? getIt<YtmAccountService>();
   GetSongsUseCase get _getSongsUseCase =>
       widget.getSongsUseCase ?? getIt<GetSongsUseCase>();
 
-  /// Resolved once and reused across rebuilds with 10-minute TTL cache.
-  final Map<String, Future<List<YtmTrack>>> _categoryFutures = {};
-  final Map<String, DateTime> _categoryFetchTimestamps = {};
-  static const Duration _categoryTtl = Duration(minutes: 10);
+  late final HomeCubit _homeCubit;
 
-  List<String> get _onlineCategories {
-    final isLoggedIn = _ytmAccountService.isLoggedIn;
-    if (isLoggedIn) {
-      return const [
-        'Recommended For You',
-        'Trending Egypt',
-        'Mahraganat',
-        'Arabic Pop',
-        'Global Top Hits',
-        'New Releases',
-        'Chill & Lo-Fi',
-        'Pop Mix',
-        'Hip-Hop',
-        'Workout Energy',
-        'Rock & Metal',
-        'Acoustic',
-      ];
-    }
-    return const [
-      'Trending Egypt',
-      'Mahraganat',
-      'Arabic Pop',
-      'Global Top Hits',
-      'New Releases',
-      'Chill & Lo-Fi',
-      'Pop Mix',
-      'Hip-Hop',
-      'Workout Energy',
-      'Rock & Metal',
-      'Acoustic',
-    ];
-  }
-
-  static const Map<String, String> _categoryQueries = {
-    'Recommended For You': 'recommended music',
-    'Trending Egypt': 'أغاني مصرية جديدة تريند',
-    'Mahraganat': 'مهرجانات مصرية جديدة',
-    'Arabic Pop': 'أغاني عربي عمرو دياب تامر حسني حماقي',
-    'Global Top Hits': 'global top hits songs',
-    'New Releases': 'new music releases',
-    'Chill & Lo-Fi': 'chill lofi beats',
-    'Pop Mix': 'pop hits playlist',
-    'Hip-Hop': 'arabic hip hop rap ويجز',
-    'Workout Energy': 'workout gym motivation music',
-    'Rock & Metal': 'rock metal playlist',
-    'Acoustic': 'acoustic guitar relax',
-  };
+  List<String> get _onlineCategories => _homeCubit.onlineCategories;
 
   @override
   void initState() {
     super.initState();
+    _homeCubit = HomeCubit(
+      ytmService: widget.ytmService ?? getIt<YtmService>(),
+      accountService: _ytmAccountService,
+    );
     final isLoggedIn = _ytmAccountService.isLoggedIn;
     _selectedOnlineCategory =
         isLoggedIn ? 'Recommended For You' : 'Trending Egypt';
@@ -134,7 +95,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _onLoginStateChanged() {
     if (!mounted) return;
     setState(() {
-      _categoryFutures.clear();
+      _homeCubit.clearCache();
       final isLoggedIn = _ytmAccountService.isLoggedIn;
       _selectedOnlineCategory =
           isLoggedIn ? 'Recommended For You' : 'Trending Egypt';
@@ -144,65 +105,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _ytmAccountService.loginState.removeListener(_onLoginStateChanged);
-    _categoryFutures.clear();
-    _categoryFetchTimestamps.clear();
+    _homeCubit.close();
     super.dispose();
-  }
-
-  Future<List<YtmTrack>> _getCategoryFuture(String category) {
-    final now = DateTime.now();
-    final lastFetch = _categoryFetchTimestamps[category];
-    if (lastFetch != null && now.difference(lastFetch) > _categoryTtl) {
-      _categoryFutures.remove(category);
-      _categoryFetchTimestamps.remove(category);
-    }
-
-    return _categoryFutures.putIfAbsent(
-      category,
-      () async {
-        _categoryFetchTimestamps[category] = DateTime.now();
-        try {
-          if (category == 'Recommended For You') {
-            final account = _ytmAccountService;
-            if (account.isLoggedIn) {
-              try {
-                final recs =
-                    await account.fetchHomeRecommendations(maxTracks: 50);
-                if (recs.isNotEmpty) return recs;
-              } catch (_) {}
-            }
-            try {
-              final trending = await _ytmService.trending(limit: 25);
-              if (trending.isNotEmpty) return trending;
-            } catch (_) {}
-            return await _ytmService.searchWithFallback(
-                _categoryQueries['Recommended For You'] ?? 'top hits music',
-                limit: 25);
-          }
-          if (category == 'Trending Egypt') {
-            try {
-              final trending = await _ytmService.trending(limit: 25);
-              if (trending.isNotEmpty) return trending;
-            } catch (_) {}
-            return await _ytmService.searchWithFallback(
-                _categoryQueries['Trending Egypt'] ?? 'أغاني مصرية جديدة تريند',
-                limit: 25);
-          }
-          final query = _categoryQueries[category] ?? '$category songs';
-          return await _ytmService.searchWithFallback(query, limit: 25);
-        } catch (e) {
-          _categoryFutures.remove(category);
-          _categoryFetchTimestamps.remove(category);
-          rethrow;
-        }
-      },
-    );
-  }
-
-  void _retryCategory(String category) {
-    setState(() {
-      _categoryFutures.remove(category);
-    });
   }
 
   String _getGreeting(BuildContext context) {
@@ -268,6 +172,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   final count =
                       await context.read<SettingsCubit>().rescanLibrary();
                   if (context.mounted) {
+                    ScaffoldMessenger.of(context).clearSnackBars();
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(context.l10n.scanResult(count)),
@@ -277,18 +182,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   }
                 } else {
                   setState(() {
-                    _categoryFutures.clear();
+                    _homeCubit.clearCache();
                   });
                 }
               },
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(
                     parent: BouncingScrollPhysics()),
-                padding: const EdgeInsets.only(bottom: 160),
+                padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom),
                 children: [
                   // ---------- Header ----------
                   Padding(
-                    padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context),
+                    padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
                         16, Adaptive.pagePadding(context), 0),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
@@ -305,7 +210,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     .labelSmall
                                     ?.copyWith(color: p.textTertiary),
                               ),
-                              const SizedBox(height: 6),
+                              const SizedBox(height: AppSpacing.s6),
                               Text(
                                 _getGreeting(context),
                                 style:
@@ -314,11 +219,19 @@ class _HomeScreenState extends State<HomeScreen> {
                             ],
                           ),
                         ),
+                        // Settings lives outside the primary dock now.
+                        IconButton(
+                          tooltip: context.l10n.navSettings,
+                          icon: Icon(Icons.settings_outlined,
+                              color: p.textSecondary),
+                          onPressed: () => context.go('/settings'),
+                        ),
+                        const SizedBox(width: AppSpacing.s2),
                         Container(
-                          padding: const EdgeInsets.all(10),
+                          padding: const EdgeInsets.all(AppSpacing.s10),
                           decoration: BoxDecoration(
                             color: p.accentContainer,
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(AppRadii.r16),
                             border: Border.all(color: p.hairline),
                             boxShadow: [
                               BoxShadow(
@@ -340,64 +253,48 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   // ---------- Segmented Tab Selector (Local vs Online) ----------
                   if (showOnlineTab) ...[
-                    const SizedBox(height: 16),
-                    Container(
+                    const SizedBox(height: AppSpacing.md),
+                    PulsrSegmentedControl(
                       margin: EdgeInsets.symmetric(
                           horizontal: Adaptive.pagePadding(context)),
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: p.surfaceContainer,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: p.hairline),
-                      ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: _buildTabButton(
-                                title: context.l10n.localMusic,
-                                icon: Icons.library_music_rounded,
-                                isSelected: currentTab == 0,
-                                p: p,
-                                onTap: () => setState(() => _selectedTab = 0),
-                              ),
-                            ),
-                            if (showOnlineTab) ...[
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: _buildTabButton(
-                                  title: context.l10n.onlineStream,
-                                  icon: Icons.public_rounded,
-                                  isSelected: currentTab == 1,
-                                  p: p,
-                                  onTap: () =>
-                                      setState(() => _selectedTab = 1),
-                                ),
-                              ),
-                            ],
-                          ],
+                      selectedIndex: currentTab,
+                      onChanged: (i) => setState(() => _selectedTab = i),
+                      segments: [
+                        PulsrSegment(
+                          label: context.l10n.localMusic,
+                          icon: Icons.library_music_rounded,
                         ),
-                      ),
-                      if (!showOnlineTab) ...[
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Icon(Icons.cloud_off_rounded,
-                                size: 14, color: p.textTertiary),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                context.l10n.homeOfflineNotice,
-                                style: TextStyle(
-                                    color: p.textTertiary, fontSize: 12),
-                              ),
-                            ),
-                          ],
+                        PulsrSegment(
+                          label: context.l10n.onlineStream,
+                          icon: Icons.public_rounded,
                         ),
                       ],
+                    ),
+                  ] else if (offlineOnly) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: Adaptive.pagePadding(context)),
+                      child: Row(
+                        children: [
+                          Icon(Icons.cloud_off_rounded,
+                              size: 14, color: p.textTertiary),
+                          const SizedBox(width: AppSpacing.s6),
+                          Expanded(
+                            child: Text(
+                              context.l10n.homeOfflineNotice,
+                              style: TextStyle(
+                                  color: p.textTertiary,
+                                  fontSize: AppFontSize.label),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
 
                   // ---------- Quick Discovery Tools Row ----------
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.md),
                   SizedBox(
                     height: 38,
                     child: ListView(
@@ -413,7 +310,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             iconColor: p.primary,
                             onTap: () => context.push('/ytm-explore'),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: AppSpacing.xs),
                         ],
                         _DiscoveryChip(
                           icon: Icons.radio_rounded,
@@ -421,7 +318,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           iconColor: p.warning,
                           onTap: () => context.push('/radio'),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: AppSpacing.xs),
                         _DiscoveryChip(
                           icon: Icons.queue_music_rounded,
                           label: context.l10n.queue,
@@ -429,7 +326,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           onTap: () => context.push('/queue'),
                         ),
                         if (AppConfig.ytmEnabled && !offlineOnly) ...[
-                          const SizedBox(width: 8),
+                          const SizedBox(width: AppSpacing.xs),
                           _DiscoveryChip(
                             icon: Icons.downloading_rounded,
                             label: context.l10n.downloadsTitle,
@@ -437,7 +334,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             onTap: () => context.push('/downloads'),
                           ),
                         ],
-                        const SizedBox(width: 8),
+                        const SizedBox(width: AppSpacing.xs),
                         _DiscoveryChip(
                           icon: Icons.apps_rounded,
                           label: context.l10n.browseMoreTools,
@@ -447,7 +344,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: AppSpacing.md),
 
                   // ---------- Content (Local vs Online) ----------
                   if (currentTab == 0)
@@ -459,54 +356,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTabButton({
-    required String title,
-    required IconData icon,
-    required bool isSelected,
-    required PulsrPalette p,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? p.accent : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: p.glow.withValues(alpha: 0.35),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 17,
-              color: isSelected ? p.onAccent : p.textSecondary,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: TextStyle(
-                color: isSelected ? p.onAccent : p.textSecondary,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                fontSize: 13,
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -554,11 +403,11 @@ class _HomeScreenState extends State<HomeScreen> {
         final sp = sheetContext.palette;
         return SafeArea(
           child: Container(
-            margin: const EdgeInsets.all(12),
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            margin: const EdgeInsets.all(AppSpacing.sm),
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
             decoration: BoxDecoration(
               color: sp.surface,
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(AppRadii.r24),
               border: Border.all(color: sp.hairline),
             ),
             child: Column(
@@ -567,10 +416,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 Container(
                   width: 38,
                   height: 4,
-                  margin: const EdgeInsets.only(bottom: 8),
+                  margin: const EdgeInsets.only(bottom: AppSpacing.xs),
                   decoration: BoxDecoration(
                     color: sp.hairline,
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(AppRadii.r2),
                   ),
                 ),
                 for (final tool in tools)
@@ -584,7 +433,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppRadii.r14),
                     ),
                     onTap: () {
                       Navigator.of(sheetContext).pop();
@@ -611,8 +460,8 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         // ---------- Quick actions ----------
         Padding(
-          padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 0,
-              Adaptive.pagePadding(context), 16),
+          padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context), 0,
+              Adaptive.pagePadding(context), AppSpacing.md),
           child: Row(
             children: [
               _QuickCard(
@@ -622,7 +471,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: p.favorite,
                 onTap: () => context.push('/favorites'),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: AppSpacing.s10),
               _QuickCard(
                 title: context.l10n.dailyDrive,
                 subtitle: context.l10n.autoMix,
@@ -639,12 +488,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   });
                 },
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: AppSpacing.s10),
               _QuickCard(
                 title: context.l10n.focusFlow,
                 subtitle: context.l10n.topPlayedTracks,
                 icon: Icons.headphones_rounded,
-                color: const Color(0xFF1DE9B6),
+                color: AppColors.mint,
                   onTap: () async {
                     final songs = await getSongsUseCase.getAllSongs();
                     songs.fold((l) => null, (list) {
@@ -673,7 +522,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
 
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
 
         // ---------- Recently added ----------
         StreamBuilder<Result<List<SongsTableData>>>(
@@ -707,18 +556,34 @@ class _HomeScreenState extends State<HomeScreen> {
                       mainAxisSpacing: 4,
                     ),
                     itemCount: songs.take(12).length,
-                    itemBuilder: (context, index) => SongTile(
-                      song: songs[index],
-                      onTap: () => playerCubit.playSong(songs[index], queue: songs),
-                      onMorePressed: () => SongInfoSheet.show(context, song: songs[index]),
+                    itemBuilder: (context, index) => StaggeredReveal(
+                      index: index,
+                      groupKey: songs.isEmpty
+                          ? ''
+                          : '${songs.first.id}-${songs.length}',
+                      child: SongTile(
+                        song: songs[index],
+                        onTap: () =>
+                            playerCubit.playSong(songs[index], queue: songs),
+                        onMorePressed: () =>
+                            SongInfoSheet.show(context, song: songs[index]),
+                      ),
                     ),
                   )
                 else
-                  for (final song in songs.take(10))
-                    SongTile(
-                      song: song,
-                      onTap: () => playerCubit.playSong(song, queue: songs),
-                      onMorePressed: () => SongInfoSheet.show(context, song: song),
+                  for (final entry in songs.take(10).toList().asMap().entries)
+                    StaggeredReveal(
+                      index: entry.key,
+                      groupKey: songs.isEmpty
+                          ? ''
+                          : '${songs.first.id}-${songs.length}',
+                      child: SongTile(
+                        song: entry.value,
+                        onTap: () =>
+                            playerCubit.playSong(entry.value, queue: songs),
+                        onMorePressed: () =>
+                            SongInfoSheet.show(context, song: entry.value),
+                      ),
                     ),
               ],
             );
@@ -740,12 +605,13 @@ class _HomeScreenState extends State<HomeScreen> {
         // ---------- Search YouTube Music Action Banner ----------
         Padding(
           padding: EdgeInsets.symmetric(
-              horizontal: Adaptive.pagePadding(context), vertical: 12),
+              horizontal: Adaptive.pagePadding(context)),
           child: InkWell(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(AppRadii.r20),
             onTap: () => context.push('/ytm-search'),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md, vertical: AppSpacing.sm),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
@@ -755,13 +621,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(AppRadii.r20),
                 border: Border.all(color: p.accent.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(AppSpacing.s10),
                     decoration: BoxDecoration(
                       color: p.accent.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
@@ -769,7 +635,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Icon(Icons.travel_explore_rounded,
                         color: p.accent, size: 22),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: AppSpacing.s14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -778,14 +644,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: TextStyle(
                             color: p.textPrimary,
                             fontWeight: FontWeight.w800,
-                            fontSize: 14.5,
+                            fontSize: AppFontSize.body,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: AppSpacing.s2),
                         Text(context.l10n.ytmPromo,
                           style: TextStyle(
                             color: p.textSecondary,
-                            fontSize: 12,
+                            fontSize: AppFontSize.label,
                           ),
                         ),
                       ],
@@ -799,10 +665,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
 
+        const SizedBox(height: AppSpacing.md),
+
         // ---------- Quick Moods & Vibe Cards ----------
         Padding(
           padding: EdgeInsets.symmetric(
-              horizontal: Adaptive.pagePadding(context), vertical: 6),
+              horizontal: Adaptive.pagePadding(context)),
           child: Row(
             children: [
               _QuickCard(
@@ -817,27 +685,27 @@ class _HomeScreenState extends State<HomeScreen> {
                     : Icons.local_fire_department_rounded,
                 color: _ytmAccountService.isLoggedIn
                     ? p.accent
-                    : const Color(0xFFFF5252),
+                    : AppColors.error,
                 onTap: () => setState(() => _selectedOnlineCategory =
                     _ytmAccountService.isLoggedIn
                         ? 'Recommended For You'
                         : 'Global Top Hits'),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: AppSpacing.s10),
               _QuickCard(
                 title: context.l10n.newReleases,
                 subtitle: context.l10n.browseTrending,
                 icon: Icons.fiber_new_rounded,
-                color: const Color(0xFF00B0FF),
+                color: AppColors.azure,
                 onTap: () =>
                     setState(() => _selectedOnlineCategory = 'New Releases'),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: AppSpacing.s10),
               _QuickCard(
                 title: context.l10n.browseChillLofi,
                 subtitle: context.l10n.browseRelaxing,
                 icon: Icons.spa_rounded,
-                color: const Color(0xFF7C4DFF),
+                color: AppColors.ldacViolet,
                 onTap: () =>
                     setState(() => _selectedOnlineCategory = 'Chill & Lo-Fi'),
               ),
@@ -845,7 +713,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
 
-        const SizedBox(height: 10),
+        const SizedBox(height: AppSpacing.md),
 
         // ---------- Category Chips ----------
         SingleChildScrollView(
@@ -857,7 +725,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               for (final cat in _onlineCategories)
                 Padding(
-                  padding: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsetsDirectional.only(end: AppSpacing.xs),
                   child: ChoiceChip(
                     avatar: cat == 'Recommended For You'
                         ? Icon(Icons.auto_awesome_rounded,
@@ -882,21 +750,21 @@ class _HomeScreenState extends State<HomeScreen> {
                       fontWeight: _selectedOnlineCategory == cat
                           ? FontWeight.w700
                           : FontWeight.w500,
-                      fontSize: 12.5,
+                      fontSize: AppFontSize.label,
                     ),
                     side: BorderSide(
                         color: _selectedOnlineCategory == cat
                             ? p.accent
                             : p.hairline),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
+                        borderRadius: BorderRadius.circular(AppRadii.r14)),
                   ),
                 ),
             ],
           ),
         ),
 
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.md),
 
         // ---------- Online Category Content (Carousel + Top Charts) ----------
         _OnlineCategorySection(
@@ -906,9 +774,12 @@ class _HomeScreenState extends State<HomeScreen> {
               : (_selectedOnlineCategory == 'Trending Egypt'
                   ? context.l10n.browseTrendingInEgypt
                   : '${context.l10n.browsePopular}: ${_categoryLabel(context, _selectedOnlineCategory)}'),
-          future: _getCategoryFuture(_selectedOnlineCategory),
+          future: _homeCubit.categoryFuture(_selectedOnlineCategory),
           playerCubit: playerCubit,
-          onRetry: () => _retryCategory(_selectedOnlineCategory),
+          onRetry: () {
+            _homeCubit.retryCategory(_selectedOnlineCategory);
+            setState(() {});
+          },
         ),
       ],
     );
@@ -952,16 +823,16 @@ class _OnlineCategorySection extends StatelessWidget {
                       horizontal: Adaptive.pagePadding(context)),
                   itemCount: 4,
                   itemBuilder: (context, index) => Padding(
-                    padding: const EdgeInsetsDirectional.only(end: 14),
+                    padding: const EdgeInsetsDirectional.only(end: AppSpacing.s14),
                     child: SizedBox(
                       width: size,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          SkeletonBox(width: size, height: size, radius: 18),
-                          const SizedBox(height: 9),
+                          SkeletonBox(width: size, height: size, radius: AppRadii.r18),
+                          const SizedBox(height: AppSpacing.xs),
                           SkeletonLine(width: size * 0.75, height: 12),
-                          const SizedBox(height: 5),
+                          const SizedBox(height: AppSpacing.s6),
                           SkeletonLine(width: size * 0.45, height: 10),
                         ],
                       ),
@@ -975,18 +846,18 @@ class _OnlineCategorySection extends StatelessWidget {
 
         if (snapshot.hasError || (snapshot.data ?? const []).isEmpty) {
           return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.lg),
             child: Center(
               child: Column(
                 children: [
                   Icon(Icons.wifi_tethering_error_rounded,
                       color: p.textTertiary, size: 38),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: AppSpacing.s10),
                   Text(
                     context.l10n.loadSongsFailed(title),
-                    style: TextStyle(color: p.textSecondary, fontSize: 13),
+                    style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.xs),
                   TextButton.icon(
                     onPressed: onRetry,
                     icon: const Icon(Icons.refresh_rounded, size: 18),
@@ -1015,14 +886,21 @@ class _OnlineCategorySection extends StatelessWidget {
                   itemCount: songs.length,
                   itemBuilder: (context, index) {
                     final song = songs[index];
-                    return _TrendingCard(
-                      song: song,
-                      onTap: () => playerCubit.playSong(song, queue: songs),
+                    return StaggeredReveal(
+                      index: index,
+                      horizontal: true,
+                      groupKey: songs.isEmpty
+                          ? ''
+                          : '${songs.first.id}-${songs.length}',
+                      child: _TrendingCard(
+                        song: song,
+                        onTap: () => playerCubit.playSong(song, queue: songs),
+                      ),
                     );
                   },
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.md),
               SectionHeader(
                   title:
                       '${context.l10n.browseTopChartsSongs} (${songs.length})'),
@@ -1039,22 +917,36 @@ class _OnlineCategorySection extends StatelessWidget {
                     mainAxisSpacing: 4,
                   ),
                   itemCount: songs.length,
-                  itemBuilder: (context, i) => SongTile(
-                    song: songs[i],
-                    index: i + 1,
-                    onTap: () => playerCubit.playSong(songs[i], queue: songs),
-                    trailing: YtmDownloadButton(song: songs[i]),
-                    onMorePressed: () => SongInfoSheet.show(context, song: songs[i]),
+                  itemBuilder: (context, i) => StaggeredReveal(
+                    index: i,
+                    groupKey: songs.isEmpty
+                        ? ''
+                        : '${songs.first.id}-${songs.length}',
+                    child: SongTile(
+                      song: songs[i],
+                      index: i + 1,
+                      onTap: () => playerCubit.playSong(songs[i], queue: songs),
+                      trailing: YtmDownloadButton(song: songs[i]),
+                      onMorePressed: () =>
+                          SongInfoSheet.show(context, song: songs[i]),
+                    ),
                   ),
                 )
               else
                 for (int i = 0; i < songs.length; i++)
-                  SongTile(
-                    song: songs[i],
-                    index: i + 1,
-                    onTap: () => playerCubit.playSong(songs[i], queue: songs),
-                    trailing: YtmDownloadButton(song: songs[i]),
-                    onMorePressed: () => SongInfoSheet.show(context, song: songs[i]),
+                  StaggeredReveal(
+                    index: i,
+                    groupKey: songs.isEmpty
+                        ? ''
+                        : '${songs.first.id}-${songs.length}',
+                    child: SongTile(
+                      song: songs[i],
+                      index: i + 1,
+                      onTap: () => playerCubit.playSong(songs[i], queue: songs),
+                      trailing: YtmDownloadButton(song: songs[i]),
+                      onMorePressed: () =>
+                          SongInfoSheet.show(context, song: songs[i]),
+                    ),
                   ),
             ],
           ),
@@ -1082,26 +974,26 @@ class _DiscoveryChip extends StatelessWidget {
     final p = context.palette;
     return Material(
       color: p.surfaceContainer,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(AppRadii.r14),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadii.r14),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(AppRadii.r14),
             border: Border.all(color: p.hairline),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(icon, size: 15, color: iconColor),
-              const SizedBox(width: 6),
+              const SizedBox(width: AppSpacing.s6),
               Text(
                 label,
                 style: TextStyle(
                   color: p.textPrimary,
-                  fontSize: 12,
+                  fontSize: AppFontSize.label,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -1126,9 +1018,9 @@ class _TrendingCard extends StatelessWidget {
     final size = isTablet ? 158.0 : 138.0;
 
     return Padding(
-      padding: const EdgeInsetsDirectional.only(end: 14),
+      padding: const EdgeInsetsDirectional.only(end: AppSpacing.s14),
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadii.r20),
         onTap: onTap,
         child: SizedBox(
           width: size,
@@ -1142,7 +1034,7 @@ class _TrendingCard extends StatelessWidget {
                     remoteUrl: song.remoteArtworkUrl,
                     type: ArtworkType.AUDIO,
                     size: size,
-                    borderRadius: 18,
+                    borderRadius: AppRadii.r18,
                   ),
                   // Scrim keeps the download icon legible over arbitrary artwork.
                   PositionedDirectional(
@@ -1158,7 +1050,7 @@ class _TrendingCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
               SizedBox(
                 height: _scaledTitleBoxHeight(context),
                 child: Text(
@@ -1168,17 +1060,17 @@ class _TrendingCard extends StatelessWidget {
                   style: TextStyle(
                     color: p.textPrimary,
                     fontWeight: FontWeight.w700,
-                    fontSize: 12.5,
+                    fontSize: AppFontSize.label,
                     height: 1.25,
                   ),
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: AppSpacing.s2),
               Text(
                 song.artist,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: p.textSecondary, fontSize: 11.5),
+                style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
               ),
             ],
           ),
@@ -1211,10 +1103,10 @@ class _QuickCard extends StatelessWidget {
     return Expanded(
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppRadii.r18),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(AppRadii.r18),
           child: Container(
             padding: EdgeInsets.symmetric(
               horizontal: isCompact ? 10 : 12,
@@ -1230,7 +1122,7 @@ class _QuickCard extends StatelessWidget {
                 end: Alignment.bottomRight,
               ),
               color: p.surfaceContainer,
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(AppRadii.r18),
               border: Border.all(color: p.hairline),
             ),
             child: Column(
@@ -1246,30 +1138,24 @@ class _QuickCard extends StatelessWidget {
                   child: Icon(icon, color: color, size: isCompact ? 17 : 19),
                 ),
                 SizedBox(height: isCompact ? 8 : 10),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: AlignmentDirectional.centerStart,
-                  child: Text(
-                    title,
-                    maxLines: 1,
-                    style: TextStyle(
-                      color: p.textPrimary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: isCompact ? 12 : 13,
-                    ),
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: p.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: isCompact ? AppFontSize.label : AppFontSize.bodySmall,
                   ),
                 ),
-                const SizedBox(height: 2),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: AlignmentDirectional.centerStart,
-                  child: Text(
-                    subtitle,
-                    maxLines: 1,
-                    style: TextStyle(
-                      color: p.textSecondary,
-                      fontSize: isCompact ? 10 : 11,
-                    ),
+                const SizedBox(height: AppSpacing.s2),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: p.textSecondary,
+                    fontSize: isCompact ? AppFontSize.tiny : AppFontSize.caption,
                   ),
                 ),
               ],
@@ -1394,18 +1280,17 @@ class _RecentlyPlayedSectionState extends State<_RecentlyPlayedSection> {
                 itemBuilder: (context, index) {
                   if (index >= songs.length) {
                     return Padding(
-                      padding: const EdgeInsetsDirectional.only(end: 14),
+                      padding: const EdgeInsetsDirectional.only(end: AppSpacing.s14),
                       child: Container(
                         width: size,
                         height: size,
                         decoration: BoxDecoration(
                           color: p.surfaceCard.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(18),
+                          borderRadius: BorderRadius.circular(AppRadii.r18),
                           border: Border.all(color: p.hairline),
                         ),
                         child: Center(
-                          child: SizedBox(
-                            width: 24,
+                          child: SizedBox(width: AppSpacing.lg,
                             height: 24,
                             child: CircularProgressIndicator(
                               strokeWidth: 2.5,
@@ -1419,10 +1304,16 @@ class _RecentlyPlayedSectionState extends State<_RecentlyPlayedSection> {
                   }
 
                   final song = songs[index];
-                  return Padding(
-                    padding: const EdgeInsetsDirectional.only(end: 14),
+                  return StaggeredReveal(
+                    index: index,
+                    horizontal: true,
+                    groupKey: songs.isEmpty
+                        ? ''
+                        : '${songs.first.id}-${songs.length}',
+                    child: Padding(
+                    padding: const EdgeInsetsDirectional.only(end: AppSpacing.s14),
                     child: InkWell(
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(AppRadii.r20),
                       onTap: () => playerCubit.playSong(song, queue: songs),
                       child: SizedBox(
                         width: size,
@@ -1436,7 +1327,7 @@ class _RecentlyPlayedSectionState extends State<_RecentlyPlayedSection> {
                                   remoteUrl: song.remoteArtworkUrl,
                                   type: ArtworkType.AUDIO,
                                   size: size,
-                                  borderRadius: 18,
+                                  borderRadius: AppRadii.r18,
                                 ),
                                 PositionedDirectional(
                                   end: 8,
@@ -1460,7 +1351,7 @@ class _RecentlyPlayedSectionState extends State<_RecentlyPlayedSection> {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: AppSpacing.xs),
                             SizedBox(
                               height: _scaledTitleBoxHeight(context),
                               child: Text(
@@ -1470,22 +1361,23 @@ class _RecentlyPlayedSectionState extends State<_RecentlyPlayedSection> {
                                 style: TextStyle(
                                   color: p.textPrimary,
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 12.5,
+                                  fontSize: AppFontSize.label,
                                   height: 1.25,
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: AppSpacing.s2),
                             Text(
                               song.artist,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                  color: p.textSecondary, fontSize: 11.5),
+                                  color: p.textSecondary, fontSize: AppFontSize.label),
                             ),
                           ],
                         ),
                       ),
+                    ),
                     ),
                   );
                 },
@@ -1507,21 +1399,21 @@ class _SectionError extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s14),
         decoration: BoxDecoration(
           color: p.error.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadii.r14),
           border: Border.all(color: p.error.withValues(alpha: 0.3)),
         ),
         child: Row(
           children: [
             Icon(Icons.error_outline_rounded, color: p.error),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Text(context.l10n.libLoadFailed,
-                style: TextStyle(color: p.textSecondary, fontSize: 13),
+                style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
               ),
             ),
             TextButton(
@@ -1596,6 +1488,7 @@ class _EmptyLibraryState extends State<_EmptyLibrary> {
     try {
       final count = await scanner.scanDeviceLibrary();
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(context.l10n.scanComplete(count)),
@@ -1616,7 +1509,7 @@ class _EmptyLibraryState extends State<_EmptyLibrary> {
 
     if (!_hasPermission) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg, horizontal: AppSpacing.md),
         child: EmptyStateWidget(
           icon: Icons.folder_special_rounded,
           title: context.l10n.homePermissionNeeded,
@@ -1634,7 +1527,7 @@ class _EmptyLibraryState extends State<_EmptyLibrary> {
     if (_isScanning) {
       final percent = (_scanProgress * 100).toInt();
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg, horizontal: AppSpacing.md),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1648,11 +1541,11 @@ class _EmptyLibraryState extends State<_EmptyLibrary> {
               primaryActionLabel: context.l10n.homeScanningLabel,
             ),
             if (_scanProgress > 0) ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.md),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 280),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(AppRadii.r8),
                   child: LinearProgressIndicator(
                     value: _scanProgress.clamp(0.0, 1.0),
                     minHeight: 6,
@@ -1668,7 +1561,7 @@ class _EmptyLibraryState extends State<_EmptyLibrary> {
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg, horizontal: AppSpacing.md),
       child: EmptyStateWidget(
         icon: Icons.music_off_rounded,
         title: context.l10n.noMusicYet,

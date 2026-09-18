@@ -148,7 +148,9 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
           (failure) {
             _isLoadingMoreSongs = false;
             safeEmit(state.copyWith(
-                errorMessage: failure.message, isLoading: false));
+                errorMessage: failure.message,
+                isLoading: false,
+                isLoadingMore: false));
           },
           (songs) {
             if (isRatingSort) {
@@ -157,14 +159,18 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
               safeEmit(state.copyWith(
                   songs: _sortByRating(songs, ascending: state.ascending),
                   errorMessage: null,
-                  isLoading: false));
+                  isLoading: false,
+                  isLoadingMore: false));
               return;
             }
               // Hitting the cap means the DB may hold more rows.
               _hasMoreSongs = !isRatingSort && songs.length >= window;
             _isLoadingMoreSongs = false;
             safeEmit(state.copyWith(
-                songs: songs, errorMessage: null, isLoading: false));
+                songs: songs,
+                errorMessage: null,
+                isLoading: false,
+                isLoadingMore: false));
           },
         );
       },
@@ -201,6 +207,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     if (_isLoadingMoreSongs || !_hasMoreSongs || isClosed) return;
     _isLoadingMoreSongs = true;
     _songsLimit += songsPageSize;
+    safeEmit(state.copyWith(isLoadingMore: true));
     _subscribeSongs();
   }
 
@@ -386,40 +393,49 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
       }
     }
 
-    Result<bool> result;
     try {
-      result = await _toggleFavoriteUseCase(songId);
-    } catch (e, st) {
-      // The use case normally returns Left; a raw throw must not leak the
-      // in-flight bookkeeping or crash the awaiting UI.
-      ErrorLogger.log('Favorite toggle failed for song $songId',
-          error: e, stackTrace: st, category: 'LibraryCubit');
-      result = Left(DatabaseFailure('Could not update favorite'));
-    }
-    if (isClosed || _favoriteOpTokens[songId] != opToken) return;
-    _favoriteOpTokens.remove(songId);
-    _pendingFavoriteTargets.remove(songId);
-    final failureMessage = result.fold<String?>((l) => l.message, (_) => null);
-    if (failureMessage == null) {
-      safeEmit(state.copyWith(errorMessage: null));
-      return;
-    }
-    // Rollback restores from the pre-toggle snapshot regardless of whether the
-    // song exists in state.songs — the old code silently dropped favorites for
-    // songs outside the visible (filtered) list until the next emission.
-    final reconciled = List<SongsTableData>.from(state.favorites);
-    if (wasFav) {
-      if (!reconciled.any((s) => s.id == songId)) {
-        reconciled.add(preToggleFav.copyWith(isFavorite: true));
+      Result<bool> result;
+      try {
+        result = await _toggleFavoriteUseCase(songId);
+      } catch (e, st) {
+        // The use case normally returns Left; a raw throw must not leak the
+        // in-flight bookkeeping or crash the awaiting UI.
+        ErrorLogger.log('Favorite toggle failed for song $songId',
+            error: e, stackTrace: st, category: 'LibraryCubit');
+        result = Left(DatabaseFailure('Could not update favorite'));
       }
-    } else {
-      reconciled.removeWhere((s) => s.id == songId);
+      
+      if (isClosed || _favoriteOpTokens[songId] != opToken) return;
+      
+      final failureMessage = result.fold<String?>((l) => l.message, (_) => null);
+      if (failureMessage == null) {
+        safeEmit(state.copyWith(errorMessage: null));
+        return;
+      }
+      
+      // Rollback restores from the pre-toggle snapshot regardless of whether the
+      // song exists in state.songs — the old code silently dropped favorites for
+      // songs outside the visible (filtered) list until the next emission.
+      final reconciled = List<SongsTableData>.from(state.favorites);
+      if (wasFav) {
+        if (!reconciled.any((s) => s.id == songId)) {
+          reconciled.add(preToggleFav.copyWith(isFavorite: true));
+        }
+      } else {
+        reconciled.removeWhere((s) => s.id == songId);
+      }
+      
+      safeEmit(state.copyWith(
+        favorites: reconciled,
+        songs: songsWith(wasFav),
+        errorMessage: failureMessage,
+      ));
+    } finally {
+      if (_favoriteOpTokens[songId] == opToken) {
+        _favoriteOpTokens.remove(songId);
+        _pendingFavoriteTargets.remove(songId);
+      }
     }
-    safeEmit(state.copyWith(
-      favorites: reconciled,
-      songs: songsWith(wasFav),
-      errorMessage: failureMessage,
-    ));
   }
 
   Future<void> toggleFolderExclusion(String folderPath) async {
