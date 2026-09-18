@@ -219,14 +219,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             ],
                           ),
                         ),
-                        // Settings lives outside the primary dock now.
-                        IconButton(
-                          tooltip: context.l10n.navSettings,
-                          icon: Icon(Icons.settings_outlined,
-                              color: p.textSecondary),
-                          onPressed: () => context.go('/settings'),
-                        ),
-                        const SizedBox(width: AppSpacing.s2),
                         Container(
                           padding: const EdgeInsets.all(AppSpacing.s10),
                           decoration: BoxDecoration(

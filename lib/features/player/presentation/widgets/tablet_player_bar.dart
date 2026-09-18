@@ -16,6 +16,7 @@ import 'audio_quality_badge.dart';
 import 'audio_quality_sheet.dart';
 import 'equalizer_sheet.dart';
 import '../../../../core/widgets/pulsr_modal_tracker.dart';
+import '../../../../core/widgets/pulsr_dock_tracker.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -46,6 +47,12 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
   double? _dragSeekValue;
 
   @override
+  void dispose() {
+    PulsrDockTracker.updateDock(height: 0.0, miniPlayer: false);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final p = context.palette;
     final settingsState = context.watch<SettingsCubit>().state;
@@ -53,7 +60,14 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
     return ValueListenableBuilder<bool>(
       valueListenable: PulsrModalTracker.isModalOpen,
       builder: (context, modalOpen, _) {
-        if (modalOpen) return const SizedBox.shrink();
+        if (modalOpen) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              PulsrDockTracker.updateDock(height: 0.0, miniPlayer: false);
+            }
+          });
+          return const SizedBox.shrink();
+        }
         return BlocBuilder<PlayerCubit, PlayerState>(
           buildWhen: (prev, curr) =>
               prev.currentSong?.id != curr.currentSong?.id ||
@@ -69,7 +83,20 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
               prev.isEqEnabled != curr.isEqEnabled,
           builder: (context, state) {
             final song = state.currentSong;
-            if (song == null) return const SizedBox.shrink();
+            if (song == null) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) {
+                  PulsrDockTracker.updateDock(height: 0.0, miniPlayer: false);
+                }
+              });
+              return const SizedBox.shrink();
+            }
+
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                PulsrDockTracker.updateDock(height: 90.0, miniPlayer: true);
+              }
+            });
 
             final cubit = context.read<PlayerCubit>();
             final activeColor = p.accent;

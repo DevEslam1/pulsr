@@ -8,6 +8,7 @@ import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
 import '../../../player/presentation/mini_player.dart';
 import '../../../../core/widgets/pulsr_modal_tracker.dart';
+import '../../../../core/widgets/pulsr_dock_tracker.dart';
 import '../bottom_nav_bar.dart';
 
 enum DockStackMode {
@@ -73,6 +74,12 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
   static const double _peekOffset = 14.0;
   static const double _miniPlayerHeight = 84.0;
 
+  @override
+  void dispose() {
+    PulsrDockTracker.updateDock(height: 0.0, miniPlayer: false);
+    super.dispose();
+  }
+
   void _setMode(DockStackMode nextMode) {
     if (widget.mode == nextMode) return;
     HapticFeedback.lightImpact();
@@ -121,6 +128,14 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
 
         // If no song is active, render only the standalone navigation bar
         if (!hasSong) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              PulsrDockTracker.updateDock(
+                height: navBarTotalHeight,
+                miniPlayer: false,
+              );
+            }
+          });
           return PulsrBottomNavBar(
             currentIndex: widget.currentIndex,
             onTap: widget.onTapNav,
@@ -141,6 +156,15 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
             : (isNavBarOnTop
                 ? (_peekOffset + _miniPlayerHeight)
                 : (navBarTotalHeight + _peekOffset));
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            PulsrDockTracker.updateDock(
+              height: dockHeight,
+              miniPlayer: true,
+            );
+          }
+        });
 
         // Calculate card bottom offsets, scales, and opacities
         final double miniPlayerBottom;
