@@ -56,6 +56,8 @@ void HarmonicSaturation::reset() {
     std::memset(history_, 0, sizeof(history_));
     std::memset(dcX_, 0, sizeof(dcX_));
     std::memset(dcY_, 0, sizeof(dcY_));
+    std::memset(decimHistory_, 0, sizeof(decimHistory_));
+    decimIdx_ = 0;
 }
 
 static inline float shapeSample(float x, double k, float invNorm, int mode) {
@@ -108,10 +110,7 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
         float wetR = inR;
 
         if (k > 1e-9) {
-            float sumL = 0.0f;
-            float sumR = 0.0f;
-
-            // 4x oversampled nonlinear waveshaping with anti-aliasing decimation
+            // 4x oversampled nonlinear waveshaping with polyphase FIR decimation
             for (int p = 0; p < OVERSAMPLE_FACTOR; ++p) {
                 float subL = 0.0f;
                 float subR = 0.0f;
@@ -132,12 +131,26 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
                     emphR = subR + tilt * (subR - hpR);
                 }
 
-                sumL += shapeSample(emphL, k, invNorm, mode);
-                sumR += shapeSample(emphR, k, invNorm, mode);
+                // Store shaped outputs into decimation history ring buffer
+                const int dIdx = (decimIdx_ + p) % DECIM_HISTORY_LEN;
+                decimHistory_[0][dIdx] = shapeSample(emphL, k, invNorm, mode);
+                decimHistory_[1][dIdx] = shapeSample(emphR, k, invNorm, mode);
             }
+            decimIdx_ = (decimIdx_ + OVERSAMPLE_FACTOR) % DECIM_HISTORY_LEN;
 
-            wetL = sumL * (1.0f / static_cast<float>(OVERSAMPLE_FACTOR));
-            wetR = sumR * (1.0f / static_cast<float>(OVERSAMPLE_FACTOR));
+            // Polyphase FIR decimation: convolve shaped history with prototype
+            // filter reconstructed from the polyphase bank.
+            // h_proto[p * TAPS_PER_PHASE + t] = polyphase4x_[p][t]
+            wetL = 0.0f;
+            wetR = 0.0f;
+            for (int p = 0; p < OVERSAMPLE_FACTOR; ++p) {
+                for (int t = 0; t < TAPS_PER_PHASE; ++t) {
+                    const int k_idx = p * TAPS_PER_PHASE + t;
+                    const int hIdx = (decimIdx_ - 1 - k_idx + DECIM_HISTORY_LEN * 2) % DECIM_HISTORY_LEN;
+                    wetL += polyphase4x_[p][t] * decimHistory_[0][hIdx];
+                    wetR += polyphase4x_[p][t] * decimHistory_[1][hIdx];
+                }
+            }
 
             // DC blocker for asymmetric modes
             if (mode != 0) {
@@ -185,8 +198,7 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
             float wet = inSample;
 
             if (k > 1e-9) {
-                float sum = 0.0f;
-
+                // 4x oversampled nonlinear waveshaping with polyphase FIR decimation
                 for (int p = 0; p < OVERSAMPLE_FACTOR; ++p) {
                     float sub = 0.0f;
                     for (int t = 0; t < TAPS_PER_PHASE; ++t) {
@@ -201,10 +213,27 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
                         emph = sub + tilt * (sub - hp);
                     }
 
-                    sum += shapeSample(emph, k, invNorm, mode);
+                    // Store shaped output into decimation history ring buffer
+                    const int dIdx = (decimIdx_ + p) % DECIM_HISTORY_LEN;
+                    decimHistory_[ch][dIdx] = shapeSample(emph, k, invNorm, mode);
+                }
+                // Only advance decimIdx_ once per frame (after all channels processed)
+                if (ch == channels - 1) {
+                    decimIdx_ = (decimIdx_ + OVERSAMPLE_FACTOR) % DECIM_HISTORY_LEN;
                 }
 
-                wet = sum * (1.0f / static_cast<float>(OVERSAMPLE_FACTOR));
+                // Polyphase FIR decimation
+                wet = 0.0f;
+                for (int p = 0; p < OVERSAMPLE_FACTOR; ++p) {
+                    for (int t = 0; t < TAPS_PER_PHASE; ++t) {
+                        const int k_idx = p * TAPS_PER_PHASE + t;
+                        const int curDecimIdx = (ch == channels - 1)
+                            ? decimIdx_
+                            : (decimIdx_ + OVERSAMPLE_FACTOR) % DECIM_HISTORY_LEN;
+                        const int hIdx = (curDecimIdx - 1 - k_idx + DECIM_HISTORY_LEN * 2) % DECIM_HISTORY_LEN;
+                        wet += polyphase4x_[p][t] * decimHistory_[ch][hIdx];
+                    }
+                }
 
                 if (mode != 0) {
                     float y = wet - dcX_[ch] + dcCoeff_ * dcY_[ch];

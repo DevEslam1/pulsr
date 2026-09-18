@@ -65,6 +65,7 @@ private:
     int altSetting_ = 0;
     int sampleRate_ = 48000;
     int channels_ = 2;
+    int bytesPerSample_ = 2;  // 2=S16, 3=S24_3LE, 4=S32
     bool claimed_ = false;
 
     int packetsPerUrb_ = 8;
@@ -80,9 +81,9 @@ private:
     size_t urbStride_ = 0;
     int numUrbs_ = 0;
 
-    // Bounded S16 ring buffer, guarded by ringMutex_.
+    // Bounded byte ring buffer (format-agnostic), guarded by ringMutex_.
     std::mutex ringMutex_;
-    std::vector<int16_t> ring_;
+    std::vector<uint8_t> ring_;
     size_t ringRead_ = 0;
     size_t ringWrite_ = 0;
     size_t ringCount_ = 0;

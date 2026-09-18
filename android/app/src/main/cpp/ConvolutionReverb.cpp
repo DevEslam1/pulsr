@@ -430,11 +430,9 @@ ConvolutionReverb::ConvolutionReverb() {
     accumFreqL_.assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
     accumFreqR_.assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
 
-    // A8 (N-03): Lazy-allocate inputHistoryFreqL_/R_ on publisher thread in preparePartitions()
-    // rather than eagerly allocating 2048 partitions (32MB) in constructor.
-    // Resident memory before enable remains < 1MB.
-    inputHistoryFreqL_.clear();
-    inputHistoryFreqR_.clear();
+    // A8 (N-03): Eagerly allocating 512 partitions to prevent RT allocation
+    inputHistoryFreqL_.resize(MAX_PREALLOC_PARTITIONS, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
+    inputHistoryFreqR_.resize(MAX_PREALLOC_PARTITIONS, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
     directRingL_.assign(1024 * 2 + 16, 0.0f);
     directRingR_.assign(1024 * 2 + 16, 0.0f);
     dryDelayL_.assign(PARTITION_SIZE, 0.0f);
@@ -443,6 +441,13 @@ ConvolutionReverb::ConvolutionReverb() {
     ensureScratchCapacity(32768);
     setPreset(ReverbPreset::Room);
     reset();
+}
+
+void ConvolutionReverb::drainRetiredIrs() {
+    for (int i = 0; i < retiredCount_; ++i) {
+        retiredIrs_[i].reset();
+    }
+    retiredCount_ = 0;
 }
 
 void ConvolutionReverb::ensurePredelayCapacity() {
@@ -526,6 +531,9 @@ void ConvolutionReverb::updatePreparedIr() {
 }
 
 void ConvolutionReverb::setPreparedIrPtr(std::shared_ptr<const PreparedIr> ir) {
+    if (preparedIr_ && retiredCount_ < kMaxRetired) {
+        retiredIrs_[retiredCount_++] = preparedIr_;
+    }
     preparedIr_ = std::move(ir);
     reverbLatencyFrames_.store(
         (preparedIr_ && preparedIr_->numPartitions > 0) ? PARTITION_SIZE : 0,
@@ -613,10 +621,6 @@ void ConvolutionReverb::preparePartitions() {
             "IR partitions (%d) exceed MAX_PREALLOC_PARTITIONS (%d); tail truncated for RT safety",
             preparedIr_->numPartitions, MAX_PREALLOC_PARTITIONS);
 #endif
-    }
-    if (static_cast<int>(inputHistoryFreqL_.size()) < MAX_PREALLOC_PARTITIONS) {
-        inputHistoryFreqL_.resize(MAX_PREALLOC_PARTITIONS, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
-        inputHistoryFreqR_.resize(MAX_PREALLOC_PARTITIONS, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
     }
 
     // Clear history to prevent stale frequency-domain audio from convolving with new IR

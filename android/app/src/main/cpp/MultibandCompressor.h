@@ -36,6 +36,8 @@ private:
     bool enabled_ = false;
     double sampleRate_ = 48000.0;
 
+    std::atomic<bool> paramsChanged_{false};
+    MultibandCompressorParamSet pendingParams_;
     MultibandCompressorParamSet params_;
 
     // 3 Crossovers to split into 4 bands

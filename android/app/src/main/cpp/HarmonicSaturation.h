@@ -62,5 +62,12 @@ private:
     float dcX_[MAX_CHANNELS] = {};
     float dcY_[MAX_CHANNELS] = {};
 
+    // Decimation history: stores shaped oversampled outputs for proper
+    // polyphase FIR decimation (replaces the boxcar average).
+    // DECIM_HISTORY_LEN = TAPS_PER_PHASE * OVERSAMPLE_FACTOR = 24 entries
+    static constexpr int DECIM_HISTORY_LEN = FIR_TAPS;  // 24
+    float decimHistory_[MAX_CHANNELS][DECIM_HISTORY_LEN] = {};
+    int decimIdx_ = 0;
+
     static const float polyphase4x_[OVERSAMPLE_FACTOR][TAPS_PER_PHASE];
 };

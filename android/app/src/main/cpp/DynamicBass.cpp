@@ -56,28 +56,16 @@ void DynamicBass::getPresetValues(int preset, int& xLow, int& xHigh,
 void DynamicBass::setParams(bool enabled, double strength, int xLow, int xHigh,
                             int yLow, int yHigh, double sideGainLow, double sideGainHigh,
                             int devicePreset) {
-    const bool presetChanged = (devicePreset != devicePreset_);
-    enabled_ = enabled;
-    devicePreset_ = devicePreset;
-
-    if (devicePreset_ > 0 && devicePreset_ <= 9) {
-        getPresetValues(devicePreset_, xLow_, xHigh_, yLow_, yHigh_, sideGainLow_, sideGainHigh_);
-    } else {
-        xLow_ = std::clamp(xLow, 20, 2400);
-        xHigh_ = std::clamp(xHigh, 500, 12000);
-        yLow_ = std::clamp(yLow, 20, 200);
-        yHigh_ = std::clamp(yHigh, 30, 300);
-        sideGainLow_ = std::clamp(sideGainLow, 0.0, 1.0);
-        sideGainHigh_ = std::clamp(sideGainHigh, 0.0, 1.0);
-    }
-
-    // strength: 1.0 to 8.0 (default 1.0)
-    strength_ = std::clamp(strength, 0.0, 8.0);
-
-    updateFilters();
-    // Preset changes move the filter cutoffs; clear retained state so the swap
-    // does not click.
-    if (presetChanged) reset();
+    pendingEnabled_ = enabled;
+    pendingStrength_ = strength;
+    pendingXLow_ = xLow;
+    pendingXHigh_ = xHigh;
+    pendingYLow_ = yLow;
+    pendingYHigh_ = yHigh;
+    pendingSideGainLow_ = sideGainLow;
+    pendingSideGainHigh_ = sideGainHigh;
+    pendingDevicePreset_ = devicePreset;
+    paramsChanged_.store(true, std::memory_order_release);
 }
 
 void DynamicBass::updateFilters() {
@@ -96,6 +84,28 @@ void DynamicBass::updateFilters() {
 }
 
 void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
+    if (paramsChanged_.load(std::memory_order_acquire)) {
+        const bool presetChanged = (pendingDevicePreset_ != devicePreset_);
+        enabled_ = pendingEnabled_;
+        devicePreset_ = pendingDevicePreset_;
+
+        if (devicePreset_ > 0 && devicePreset_ <= 9) {
+            getPresetValues(devicePreset_, xLow_, xHigh_, yLow_, yHigh_, sideGainLow_, sideGainHigh_);
+        } else {
+            xLow_ = std::clamp(pendingXLow_, 20, 2400);
+            xHigh_ = std::clamp(pendingXHigh_, 500, 12000);
+            yLow_ = std::clamp(pendingYLow_, 20, 200);
+            yHigh_ = std::clamp(pendingYHigh_, 30, 300);
+            sideGainLow_ = std::clamp(pendingSideGainLow_, 0.0, 1.0);
+            sideGainHigh_ = std::clamp(pendingSideGainHigh_, 0.0, 1.0);
+        }
+
+        strength_ = std::clamp(pendingStrength_, 0.0, 8.0);
+        updateFilters();
+        if (presetChanged) reset();
+        paramsChanged_.store(false, std::memory_order_release);
+    }
+
     if (!enabled_ || channels != 2 || strength_ <= 0.001 || buffer == nullptr || frames <= 0) {
         return;
     }
@@ -129,6 +139,7 @@ void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
             envelope_ = releaseCoeff_ * envelope_ + (1.0 - releaseCoeff_) * absY;
         }
         if (!std::isfinite(envelope_)) envelope_ = 0.0;
+        if (envelope_ < 1e-15) envelope_ = 0.0;
 
         // 4. Dynamic gain computer:
         //    Boosts quiet/medium bass passages with smooth soft saturation (tanh)

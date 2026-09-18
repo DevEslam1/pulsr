@@ -57,8 +57,8 @@ void LookaheadLimiter::setEnabled(bool enabled) {
 }
 
 void LookaheadLimiter::applyParams(const LimiterParamSet& params) {
-    enabled_ = params.enabled;
-    configure(params.lookaheadMs, params.thresholdDb, params.releaseMs, params.truePeakMode);
+    pendingParams_ = params;
+    paramsChanged_.store(true, std::memory_order_release);
 }
 
 void LookaheadLimiter::reset() {
@@ -106,6 +106,12 @@ float LookaheadLimiter::estimateTruePeak(const float* history) {
 }
 
 void LookaheadLimiter::process(float* L, float* R, int frames) {
+    if (paramsChanged_.load(std::memory_order_acquire)) {
+        enabled_ = pendingParams_.enabled;
+        configure(pendingParams_.lookaheadMs, pendingParams_.thresholdDb, pendingParams_.releaseMs, pendingParams_.truePeakMode);
+        paramsChanged_.store(false, std::memory_order_release);
+    }
+
     if (!enabled_ || frames <= 0) return;
 
     constexpr int kMask = MAX_LOOKAHEAD_SAMPLES - 1;
@@ -196,6 +202,12 @@ void LookaheadLimiter::process(float* L, float* R, int frames) {
 }
 
 void LookaheadLimiter::processMono(float* inOut, int frames) {
+    if (paramsChanged_.load(std::memory_order_acquire)) {
+        enabled_ = pendingParams_.enabled;
+        configure(pendingParams_.lookaheadMs, pendingParams_.thresholdDb, pendingParams_.releaseMs, pendingParams_.truePeakMode);
+        paramsChanged_.store(false, std::memory_order_release);
+    }
+
     if (!enabled_ || frames <= 0) return;
 
     constexpr int kMask = MAX_LOOKAHEAD_SAMPLES - 1;
@@ -272,6 +284,12 @@ void LookaheadLimiter::processMono(float* inOut, int frames) {
 }
 
 void LookaheadLimiter::processInterleaved(float* buffer, int frames, int channels) {
+    if (paramsChanged_.load(std::memory_order_acquire)) {
+        enabled_ = pendingParams_.enabled;
+        configure(pendingParams_.lookaheadMs, pendingParams_.thresholdDb, pendingParams_.releaseMs, pendingParams_.truePeakMode);
+        paramsChanged_.store(false, std::memory_order_release);
+    }
+
     if (!enabled_ || frames <= 0) return;
     channels = std::clamp(channels, 1, MAX_CHANNELS);
 

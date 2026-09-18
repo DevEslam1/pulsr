@@ -44,13 +44,16 @@ class AudioEffectsChannel {
   bool get _isAndroid => PlatformCapabilities.isAndroid;
 
   /// Dispose stream controller (call on hot restart / test teardown).
+  ///
+  /// WARNING: AudioEffectsChannel is a static singleton. Closing its
+  /// StreamControllers permanently breaks event streams for the app lifetime.
+  /// In production this should never be called; it exists only for test
+  /// teardown where a fresh isolate is spun up anyway.
   void dispose() {
-    if (!_autoDegradeStreamController.isClosed) {
-      _autoDegradeStreamController.close();
-    }
-    if (!_routeChangedController.isClosed) {
-      _routeChangedController.close();
-    }
+    // Intentionally left empty for production safety.
+    // In tests, the isolate teardown handles cleanup automatically.
+    // Closing a singleton's streams is irreversible and will cause
+    // future observers to silently fail or crash.
   }
 
   bool _isVirtualizerSupported = false;
@@ -1404,8 +1407,8 @@ class AudioEffectsChannel {
   // --- DSD DECODING ---
 
   Future<List<double>?> decodeDsd(
-    List<int> dsdL,
-    List<int> dsdR, {
+    Uint8List dsdL,
+    Uint8List dsdR, {
     int dsdRate = 64,
     int targetSampleRate = 176400,
     // 0 = MSB first (DSF), 1 = LSB first (DFF) - must match eq_jni_bridge.cpp
@@ -1415,8 +1418,8 @@ class AudioEffectsChannel {
     try {
       final List<dynamic>? res = await _channel
           .invokeListMethod<dynamic>('decodeDsd', {
-            'dsdL': Uint8List.fromList(dsdL),
-            'dsdR': Uint8List.fromList(dsdR),
+            'dsdL': dsdL,
+            'dsdR': dsdR,
             'byteCount': dsdL.length,
             'dsdRate': dsdRate,
             'targetSampleRate': targetSampleRate,

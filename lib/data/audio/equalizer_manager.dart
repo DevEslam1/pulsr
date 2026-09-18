@@ -661,23 +661,25 @@ class EqualizerManager {
       if (preampDb != 0.0) {
         pendingFutures.add(_effectsChannel.setEqPreamp(preampDb));
       }
-      if (isVirtualizerEnabled && _effectsChannel.isVirtualizerSupported) {
-        // FIX M-9: skip no-op IPC when virtualizer is not supported
-        pendingFutures.add(_effectsChannel.setVirtualizerEnabled(true));
-        pendingFutures.add(
-          _effectsChannel.setVirtualizerStrength(virtualizerStrength),
-        );
+      if (_effectsChannel.isVirtualizerSupported) {
+        pendingFutures.add(_effectsChannel.setVirtualizerEnabled(isVirtualizerEnabled));
+        if (isVirtualizerEnabled) {
+          pendingFutures.add(
+            _effectsChannel.setVirtualizerStrength(virtualizerStrength),
+          );
+        }
       }
-      if (isSpatializerEnabled) {
-        pendingFutures.add(_applySpatializerWithFallback(true));
-      }
+      
+      pendingFutures.add(_applySpatializerWithFallback(isSpatializerEnabled));
+      
       if (isCrossfeedEnabled) {
         pendingFutures.add(
           _effectsChannel.setCrossfeedParams(crossfeedDelayUs, crossfeedFeedDb),
         );
         pendingFutures.add(_effectsChannel.setCrossfeedMode(crossfeedMode));
-        pendingFutures.add(_effectsChannel.setCrossfeedEnabled(true));
       }
+      pendingFutures.add(_effectsChannel.setCrossfeedEnabled(isCrossfeedEnabled));
+      
       if (isLimiterEnabled) {
         pendingFutures.add(
           _effectsChannel.setLimiterParams(
@@ -690,8 +692,9 @@ class EqualizerManager {
                 _hasStoredCompressorParams ? compressorMakeupGainDb : null,
           ),
         );
-        pendingFutures.add(_effectsChannel.setLimiterEnabled(true));
       }
+      pendingFutures.add(_effectsChannel.setLimiterEnabled(isLimiterEnabled));
+      
       if (isReverbEnabled) {
         pendingFutures.add(_effectsChannel.setReverbPreset(reverbPreset));
         pendingFutures.add(_effectsChannel.setReverbWetDry(reverbWetDry));
@@ -700,17 +703,15 @@ class EqualizerManager {
             _effectsChannel.setReverbCrossChannel(reverbCrossChannel),
           );
         }
-        pendingFutures.add(_effectsChannel.setReverbEnabled(true));
       }
+      pendingFutures.add(_effectsChannel.setReverbEnabled(isReverbEnabled));
+      
       if (stereoBalance != 0.0) {
         pendingFutures.add(_effectsChannel.setStereoBalance(stereoBalance));
       }
-      if (monoMix) {
-        pendingFutures.add(_effectsChannel.setMonoMix(true));
-      }
-      if (!isSincResamplerEnabled) {
-        pendingFutures.add(_effectsChannel.setSincResamplerEnabled(false));
-      }
+      pendingFutures.add(_effectsChannel.setMonoMix(monoMix));
+      pendingFutures.add(_effectsChannel.setSincResamplerEnabled(isSincResamplerEnabled));
+
       if (isSaturationEnabled) {
         pendingFutures.add(
           _effectsChannel.setSaturationParams(
@@ -723,8 +724,9 @@ class EqualizerManager {
         pendingFutures.add(
           _effectsChannel.setSaturationMultiband(saturationMultiband),
         );
-        pendingFutures.add(_effectsChannel.setSaturationEnabled(true));
       }
+      pendingFutures.add(_effectsChannel.setSaturationEnabled(isSaturationEnabled));
+
       if (isStereoWidthEnabled) {
         pendingFutures.add(
           _effectsChannel.setStereoWidthParams(
@@ -737,8 +739,9 @@ class EqualizerManager {
             highCrossoverHz: stereoWidthHighCrossoverHz,
           ),
         );
-        pendingFutures.add(_effectsChannel.setStereoWidthEnabled(true));
       }
+      pendingFutures.add(_effectsChannel.setStereoWidthEnabled(isStereoWidthEnabled));
+
       if (isLoudnessContourEnabled) {
         pendingFutures.add(
           _effectsChannel.setLoudnessContourParams(
@@ -746,8 +749,9 @@ class EqualizerManager {
             loudnessVolumeLinear,
           ),
         );
-        pendingFutures.add(_effectsChannel.setLoudnessContourEnabled(true));
       }
+      pendingFutures.add(_effectsChannel.setLoudnessContourEnabled(isLoudnessContourEnabled));
+
       if (isSubCrossoverEnabled) {
         pendingFutures.add(
           _effectsChannel.setSubCrossoverParams(
@@ -758,57 +762,59 @@ class EqualizerManager {
             antiPop: subCrossoverAntiPop,
           ),
         );
-        pendingFutures.add(_effectsChannel.setSubCrossoverEnabled(true));
       }
+      pendingFutures.add(_effectsChannel.setSubCrossoverEnabled(isSubCrossoverEnabled));
+
       if (isDynamicEqEnabled) {
         pendingFutures.add(_pushDynamicEqConfig());
-        pendingFutures.add(_effectsChannel.setDynamicEqEnabled(true));
       }
+      pendingFutures.add(_effectsChannel.setDynamicEqEnabled(isDynamicEqEnabled));
+
       if (isMultibandCompressorEnabled) {
         pendingFutures.add(_pushMultibandCompressorConfig());
-        pendingFutures.add(
-          _effectsChannel.setMultibandCompressorEnabled(true),
-        );
       }
-      if (isDynamicBassEnabled) {
-        pendingFutures.add(
-          _effectsChannel.setDynamicBassParams(
-            enabled: true,
-            strength: dynamicBassStrength,
-            xLow: dynamicBassXLow,
-            xHigh: dynamicBassXHigh,
-            yLow: dynamicBassYLow,
-            yHigh: dynamicBassYHigh,
-            sideGainLow: dynamicBassSideGainLow,
-            sideGainHigh: dynamicBassSideGainHigh,
-            devicePreset: dynamicBassPreset,
-          ),
-        );
+      pendingFutures.add(
+        _effectsChannel.setMultibandCompressorEnabled(isMultibandCompressorEnabled),
+      );
+
+      pendingFutures.add(
+        _effectsChannel.setDynamicBassParams(
+          enabled: isDynamicBassEnabled,
+          strength: dynamicBassStrength,
+          xLow: dynamicBassXLow,
+          xHigh: dynamicBassXHigh,
+          yLow: dynamicBassYLow,
+          yHigh: dynamicBassYHigh,
+          sideGainLow: dynamicBassSideGainLow,
+          sideGainHigh: dynamicBassSideGainHigh,
+          devicePreset: dynamicBassPreset,
+        ),
+      );
+
+      if (isViperDdcEnabled && viperDdcContent.isNotEmpty) {
+        pendingFutures.add(_effectsChannel.loadViperDdc(
+          ddcContent: viperDdcContent,
+          profileName: viperDdcProfileName,
+        ));
       }
-      if (isViperDdcEnabled) {
-        if (viperDdcContent.isNotEmpty) {
-          pendingFutures.add(_effectsChannel.loadViperDdc(
-            ddcContent: viperDdcContent,
-            profileName: viperDdcProfileName,
-          ));
-        }
-        pendingFutures.add(_effectsChannel.setViperDdcEnabled(true));
-      }
+      pendingFutures.add(_effectsChannel.setViperDdcEnabled(isViperDdcEnabled));
+
       if (isArbitraryEqEnabled && arbitraryEqString.isNotEmpty) {
         pendingFutures.add(_effectsChannel.loadArbitraryEq(
           eqString: arbitraryEqString,
           linearPhase: arbitraryEqLinearPhase,
         ));
-        pendingFutures.add(_effectsChannel.setArbitraryEqEnabled(true));
       }
+      pendingFutures.add(_effectsChannel.setArbitraryEqEnabled(isArbitraryEqEnabled));
+
       if (isLiveProgEnabled && liveProgCode.isNotEmpty) {
         pendingFutures.add(_effectsChannel.loadLiveProgCode(liveProgCode));
-        pendingFutures.add(_effectsChannel.setLiveProgEnabled(true));
         for (final entry in liveProgSliders.entries) {
           pendingFutures
               .add(_effectsChannel.setLiveProgSlider(entry.key, entry.value));
         }
       }
+      pendingFutures.add(_effectsChannel.setLiveProgEnabled(isLiveProgEnabled));
       // Dynamics last — it triggers recalculateActiveStages which disables OEM engine; doing it last prevents intermediate dropout
       // Log individual failures so failed effect stages are diagnosable while allowing remaining stages to complete
       if (pendingFutures.isNotEmpty) {
@@ -1131,54 +1137,56 @@ class EqualizerManager {
 
   Future<void> _flushBandGains(Map<int, double> pending) async {
     if (pending.isEmpty) return;
-    final targetFreqs = activeFrequencies;
-    // Guard against mode-switch race: drop stale indices instead of RangeError.
-    final valid = Map<int, double>.fromEntries(
-      pending.entries.where((e) => e.key >= 0 && e.key < targetFreqs.length),
-    );
-    if (valid.isEmpty) return;
-    try {
-      if (PlatformCapabilities.isAndroid && isEnabled) {
-        if (eqBandCount != 10) {
-          var nativeOk = true;
-          for (final entry in valid.entries) {
-            final ok = await _effectsChannel.setNativeEqBand(
-              entry.key,
-              targetFreqs[entry.key],
-              entry.value,
-              1.414,
-            );
-            if (!ok) nativeOk = false;
-          }
-          // Single-application: skip the interpolated legacy mirror when the
-          // native stage ACKed and owns the curve (defect 13-01).
-          if (!nativeOk || legacyMirrorEnabled) {
-            final tenBandGains = EqPreset.interpolateGains(
-              currentPreset.gains,
-              targetFrequencies: customFrequencies,
-            );
-            await _effectsChannel.setEqBandGains(tenBandGains);
-          }
-        } else {
-          for (final entry in valid.entries) {
-            await _effectsChannel.setEqBandGain(entry.key, entry.value);
-            await _effectsChannel.setNativeEqBand(
-              entry.key,
-              targetFreqs[entry.key],
-              entry.value,
-              1.414,
-            );
+    await _effectsLock.lock(() async {
+      final targetFreqs = activeFrequencies;
+      // Guard against mode-switch race: drop stale indices instead of RangeError.
+      final valid = Map<int, double>.fromEntries(
+        pending.entries.where((e) => e.key >= 0 && e.key < targetFreqs.length),
+      );
+      if (valid.isEmpty) return;
+      try {
+        if (PlatformCapabilities.isAndroid && isEnabled) {
+          if (eqBandCount != 10) {
+            var nativeOk = true;
+            for (final entry in valid.entries) {
+              final ok = await _effectsChannel.setNativeEqBand(
+                entry.key,
+                targetFreqs[entry.key],
+                entry.value,
+                1.414,
+              );
+              if (!ok) nativeOk = false;
+            }
+            // Single-application: skip the interpolated legacy mirror when the
+            // native stage ACKed and owns the curve (defect 13-01).
+            if (!nativeOk || legacyMirrorEnabled) {
+              final tenBandGains = EqPreset.interpolateGains(
+                currentPreset.gains,
+                targetFrequencies: customFrequencies,
+              );
+              await _effectsChannel.setEqBandGains(tenBandGains);
+            }
+          } else {
+            for (final entry in valid.entries) {
+              await _effectsChannel.setEqBandGain(entry.key, entry.value);
+              await _effectsChannel.setNativeEqBand(
+                entry.key,
+                targetFreqs[entry.key],
+                entry.value,
+                1.414,
+              );
+            }
           }
         }
+      } catch (e, st) {
+        ErrorLogger.log(
+          'Failed to flush band gains',
+          error: e,
+          stackTrace: st,
+          category: 'EqualizerManager',
+        );
       }
-    } catch (e, st) {
-      ErrorLogger.log(
-        'Failed to flush band gains',
-        error: e,
-        stackTrace: st,
-        category: 'EqualizerManager',
-      );
-    }
+    });
   }
 
   Future<void> setPreamp(double preampDb) async {

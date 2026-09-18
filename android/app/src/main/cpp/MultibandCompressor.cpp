@@ -18,9 +18,8 @@ void MultibandCompressor::setSampleRate(double sampleRate) {
 }
 
 void MultibandCompressor::applyParams(const MultibandCompressorParamSet& params) {
-    params_ = params;
-    enabled_ = params.enabled;
-    updateCoefficients();
+    pendingParams_ = params;
+    paramsChanged_.store(true, std::memory_order_release);
 }
 
 void MultibandCompressor::updateCoefficients() {
@@ -94,6 +93,13 @@ double MultibandCompressor::computeBandGain(int band, double envDb) {
 }
 
 void MultibandCompressor::processInterleaved(float* buffer, int frames, int channels) {
+    if (paramsChanged_.load(std::memory_order_acquire)) {
+        params_ = pendingParams_;
+        enabled_ = params_.enabled;
+        updateCoefficients();
+        paramsChanged_.store(false, std::memory_order_release);
+    }
+
     if (!enabled_ || !buffer || frames <= 0 || channels != 2) return;
 
     int framesRemaining = frames;

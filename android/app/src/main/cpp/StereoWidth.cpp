@@ -61,6 +61,7 @@ void StereoWidth::process(float* L, float* R, int frames) {
     if (!multiband_) {
         // Broadband mode
         smoothedWidth_ += smoothFactor * (targetWidth_ - smoothedWidth_);
+        if (smoothedWidth_ < 1e-15) smoothedWidth_ = 0.0;
         if (std::abs(smoothedWidth_ - 1.0) < 1e-5 && std::abs(targetWidth_ - 1.0) < 1e-5) return;
 
         const float w = static_cast<float>(smoothedWidth_);
@@ -130,6 +131,7 @@ void StereoWidth::processInterleaved(float* buffer, int frames, int channels) {
     if (!multiband_) {
         // Broadband mode
         smoothedWidth_ += smoothFactor * (targetWidth_ - smoothedWidth_);
+        if (smoothedWidth_ < 1e-15) smoothedWidth_ = 0.0;
         if (std::abs(smoothedWidth_ - 1.0) < 1e-5 && std::abs(targetWidth_ - 1.0) < 1e-5) return;
 
         const float w = static_cast<float>(smoothedWidth_);

@@ -56,9 +56,10 @@ private:
     // Reusable FFT scratch so synthesis never allocates on the audio thread.
     std::vector<FftUtil::Complex> spectrumScratch_;
 
-    // Overlap-add convolution state
+    // Overlap-add convolution state (circular buffer)
     float historyL_[FIR_TAPS] = {};
     float historyR_[FIR_TAPS] = {};
+    int historyIdx_ = 0;  // Circular buffer write position
 
     std::shared_ptr<const std::vector<std::pair<double, double>>> preparedNodesRef_;
 

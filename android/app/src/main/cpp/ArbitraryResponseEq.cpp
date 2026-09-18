@@ -64,6 +64,7 @@ void ArbitraryResponseEq::setSampleRate(double sampleRate) {
 void ArbitraryResponseEq::reset() {
     std::memset(historyL_, 0, sizeof(historyL_));
     std::memset(historyR_, 0, sizeof(historyR_));
+    historyIdx_ = 0;
 }
 
 bool ArbitraryResponseEq::parseGraphicEq(
@@ -242,20 +243,19 @@ void ArbitraryResponseEq::process(float* L, float* R, int frames) {
         if (!std::isfinite(inL)) inL = 0.0f;
         if (!std::isfinite(inR)) inR = 0.0f;
 
-        // Shift history
-        for (int t = taps - 1; t > 0; --t) {
-            historyL_[t] = historyL_[t - 1];
-            historyR_[t] = historyR_[t - 1];
-        }
-        historyL_[0] = inL;
-        historyR_[0] = inR;
+        // Circular buffer write — O(1) instead of O(N) shift
+        historyL_[historyIdx_] = inL;
+        historyR_[historyIdx_] = inR;
 
         float outL = 0.0f;
         float outR = 0.0f;
         for (int t = 0; t < taps; ++t) {
-            outL += h[t] * historyL_[t];
-            outR += h[t] * historyR_[t];
+            int idx = (historyIdx_ - t + taps) % taps;
+            outL += h[t] * historyL_[idx];
+            outR += h[t] * historyR_[idx];
         }
+
+        historyIdx_ = (historyIdx_ + 1) % taps;
 
         L[i] = outL;
         R[i] = outR;
@@ -274,19 +274,19 @@ void ArbitraryResponseEq::processInterleaved(float* buffer, int frames, int chan
         if (!std::isfinite(inL)) inL = 0.0f;
         if (!std::isfinite(inR)) inR = 0.0f;
 
-        for (int t = taps - 1; t > 0; --t) {
-            historyL_[t] = historyL_[t - 1];
-            historyR_[t] = historyR_[t - 1];
-        }
-        historyL_[0] = inL;
-        historyR_[0] = inR;
+        // Circular buffer write — O(1) instead of O(N) shift
+        historyL_[historyIdx_] = inL;
+        historyR_[historyIdx_] = inR;
 
         float outL = 0.0f;
         float outR = 0.0f;
         for (int t = 0; t < taps; ++t) {
-            outL += h[t] * historyL_[t];
-            outR += h[t] * historyR_[t];
+            int idx = (historyIdx_ - t + taps) % taps;
+            outL += h[t] * historyL_[idx];
+            outR += h[t] * historyR_[idx];
         }
+
+        historyIdx_ = (historyIdx_ + 1) % taps;
 
         buffer[i * channels] = outL;
         buffer[i * channels + 1] = outR;

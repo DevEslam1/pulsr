@@ -43,6 +43,7 @@ void SpatialPanner::process(float* L, float* R, int frames) {
     constexpr double kTau = 0.015;
     const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
     smoothedBalance_ += smoothFactor * (targetBalance_ - smoothedBalance_);
+    if (std::abs(smoothedBalance_) < 1e-25) smoothedBalance_ = 0.0;
 
     const double theta = (smoothedBalance_ + 1.0) * (M_PI / 4.0);
     gainL_ = static_cast<float>(std::cos(theta) * std::sqrt(2.0));
@@ -70,6 +71,7 @@ void SpatialPanner::processInterleaved(float* buffer, int frames, int channels) 
     constexpr double kTau = 0.015;
     const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
     smoothedBalance_ += smoothFactor * (targetBalance_ - smoothedBalance_);
+    if (std::abs(smoothedBalance_) < 1e-25) smoothedBalance_ = 0.0;
 
     const double theta = (smoothedBalance_ + 1.0) * (M_PI / 4.0);
     gainL_ = static_cast<float>(std::cos(theta) * std::sqrt(2.0));

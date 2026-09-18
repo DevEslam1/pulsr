@@ -42,6 +42,9 @@ private:
     bool truePeakMode_ = true;
     bool enabled_ = false;
 
+    std::atomic<bool> paramsChanged_{false};
+    LimiterParamSet pendingParams_;
+
     int lookaheadSamples_ = 240;
     float threshold_ = 0.977237f; // pow(10, -0.2 / 20)
     float fastReleaseCoeff_ = 0.998f;

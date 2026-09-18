@@ -18,10 +18,37 @@ namespace {
 constexpr int kNumUrbs = 4;
 constexpr int kPacketsPerUrb = 8; // 8 ms of 1 ms isochronous packets
 
-inline int16_t floatToS16(float v) {
-    if (v > 1.0f) v = 1.0f;
-    if (v < -1.0f) v = -1.0f;
-    return static_cast<int16_t>(std::lround(v * 32767.0f));
+// Clamp float to [-1, 1]
+inline float clampF(float v) {
+    if (v > 1.0f) return 1.0f;
+    if (v < -1.0f) return -1.0f;
+    return v;
+}
+
+// Pack one float sample into dst[] in the given bytesPerSample format (LE).
+// Returns bytesPerSample.
+inline int packSample(float v, uint8_t* dst, int bytesPerSample) {
+    v = clampF(v);
+    if (bytesPerSample == 2) {
+        // S16_LE
+        int16_t s = static_cast<int16_t>(std::lround(v * 32767.0f));
+        dst[0] = static_cast<uint8_t>(s & 0xFF);
+        dst[1] = static_cast<uint8_t>((s >> 8) & 0xFF);
+    } else if (bytesPerSample == 3) {
+        // S24_3LE (packed 24-bit, no padding)
+        int32_t s = static_cast<int32_t>(std::lround(v * 8388607.0));
+        dst[0] = static_cast<uint8_t>(s & 0xFF);
+        dst[1] = static_cast<uint8_t>((s >> 8) & 0xFF);
+        dst[2] = static_cast<uint8_t>((s >> 16) & 0xFF);
+    } else {
+        // S32_LE
+        int32_t s = static_cast<int32_t>(std::lround(v * 2147483647.0));
+        dst[0] = static_cast<uint8_t>(s & 0xFF);
+        dst[1] = static_cast<uint8_t>((s >> 8) & 0xFF);
+        dst[2] = static_cast<uint8_t>((s >> 16) & 0xFF);
+        dst[3] = static_cast<uint8_t>((s >> 24) & 0xFF);
+    }
+    return bytesPerSample;
 }
 } // namespace
 
@@ -63,6 +90,7 @@ bool UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNumber,
     altSetting_ = altSetting;
     sampleRate_ = sampleRate;
     channels_ = channels;
+    bytesPerSample_ = std::clamp(bytesPerSample, 2, 4);
 
     // Claim the AudioStreaming interface (force: detaches the kernel audio
     // driver so the HAL can no longer own the endpoint) and select the alt
@@ -81,14 +109,13 @@ bool UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNumber,
     ioctl(fd_, USBDEVFS_SETINTERFACE, &si);
 
     const int framesPerPacket = std::max(1, sampleRate_ / 1000);
-    bytesPerPacket_ = framesPerPacket * channels_ * bytesPerSample;
+    bytesPerPacket_ = framesPerPacket * channels_ * bytesPerSample_;
     packetsPerUrb_ = kPacketsPerUrb;
     bytesPerUrb_ = bytesPerPacket_ * packetsPerUrb_;
 
-    // ~3 URBs of slack; enough to absorb scheduling jitter without adding
-    // audible latency for a local file source.
-    const size_t ringSamples = static_cast<size_t>(bytesPerUrb_) / 2 * 3;
-    ring_.assign(ringSamples, 0);
+    // ~3 URBs of slack in bytes; enough to absorb scheduling jitter.
+    const size_t ringBytes = static_cast<size_t>(bytesPerUrb_) * 3;
+    ring_.assign(ringBytes, 0);
     ringRead_ = ringWrite_ = ringCount_ = 0;
 
     urbStride_ = sizeof(struct usbdevfs_urb) +
@@ -193,24 +220,22 @@ void UsbAudioSink::workerLoop() {
         if (urb == nullptr) continue;
 
         uint8_t* buf = reinterpret_cast<uint8_t*>(urb->buffer);
-        const size_t samplesPerPacket =
-            static_cast<size_t>(bytesPerPacket_) / sizeof(int16_t);
+        const size_t bytesPerPkt = static_cast<size_t>(bytesPerPacket_);
         {
             std::lock_guard<std::mutex> lock(ringMutex_);
             for (int p = 0; p < packetsPerUrb_; ++p) {
-                int16_t* dst = reinterpret_cast<int16_t*>(
-                    buf + static_cast<size_t>(p) * bytesPerPacket_);
-                if (ringCount_ >= samplesPerPacket) {
-                    for (size_t i = 0; i < samplesPerPacket; ++i) {
+                uint8_t* dst = buf + static_cast<size_t>(p) * bytesPerPkt;
+                if (ringCount_ >= bytesPerPkt) {
+                    for (size_t i = 0; i < bytesPerPkt; ++i) {
                         dst[i] = ring_[ringRead_];
                         ringRead_ = (ringRead_ + 1) % ring_.size();
                     }
-                    ringCount_ -= samplesPerPacket;
+                    ringCount_ -= bytesPerPkt;
                 } else {
-                    std::memset(dst, 0, samplesPerPacket * sizeof(int16_t));
+                    std::memset(dst, 0, bytesPerPkt);
                 }
                 urb->iso_frame_desc[p].length =
-                    static_cast<unsigned int>(bytesPerPacket_);
+                    static_cast<unsigned int>(bytesPerPkt);
                 urb->iso_frame_desc[p].actual_length = 0;
                 urb->iso_frame_desc[p].status = 0;
             }
@@ -228,15 +253,18 @@ void UsbAudioSink::WriteInterleaved(const float* buffer, int frames,
         frames <= 0 || channels <= 0) {
         return;
     }
-    const size_t samples = static_cast<size_t>(frames) * channels;
+    const int bps = bytesPerSample_;
+    const size_t totalSamples = static_cast<size_t>(frames) * channels;
     std::lock_guard<std::mutex> lock(ringMutex_);
     const size_t cap = ring_.size();
-    size_t written = 0;
-    while (written < samples && ringCount_ < cap) {
-        ring_[ringWrite_] = floatToS16(buffer[written]);
-        ringWrite_ = (ringWrite_ + 1) % cap;
-        ringCount_++;
-        ++written;
+    for (size_t s = 0; s < totalSamples && ringCount_ + bps <= cap; ++s) {
+        uint8_t packed[4];
+        packSample(buffer[s], packed, bps);
+        for (int b = 0; b < bps; ++b) {
+            ring_[ringWrite_] = packed[b];
+            ringWrite_ = (ringWrite_ + 1) % cap;
+        }
+        ringCount_ += bps;
     }
 }
 

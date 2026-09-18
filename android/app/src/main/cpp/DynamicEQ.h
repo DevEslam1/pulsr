@@ -59,18 +59,25 @@ private:
         double y1[MAX_CHANNELS] = {}, y2[MAX_CHANNELS] = {};
         double currentGainDb = 0.0; // smoothed dynamic gain (cut <= 0 or boost >= 0)
         double lastCoeffGainDb = 0.0;
+        
+        // Cached terms
+        double cw = 1.0;
+        double alpha = 0.0;
+        double detectB0 = 1.0, detectB1 = 0.0, detectB2 = 0.0;
+        double detectA1 = 0.0, detectA2 = 0.0;
     };
 
+    void updateBandCache(BandState& band);
     void computeBandCoeffs(BandState& band, double gainDb);
-    static double computePeakingCoeffs(double& b0, double& b1, double& b2,
-                                       double& a1, double& a2,
-                                       double f0, double q, double gainDb, double fs);
+    static void computePeakingCoeffs(double& b0, double& b1, double& b2,
+                                     double& a1, double& a2,
+                                     double cw, double alpha, double A);
     static void computeLowShelfCoeffs(double& b0, double& b1, double& b2,
                                       double& a1, double& a2,
-                                      double f0, double q, double gainDb, double fs);
+                                      double cw, double alpha, double A);
     static void computeHighShelfCoeffs(double& b0, double& b1, double& b2,
                                        double& a1, double& a2,
-                                       double f0, double q, double gainDb, double fs);
+                                       double cw, double alpha, double A);
 
     double sampleRate_ = 48000.0;
     int bandCount_ = 1;

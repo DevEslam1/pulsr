@@ -920,6 +920,11 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
     if (!byteBuffer || frameCount <= 0 || channels <= 0 || channels > 8) return 0;
     void* addr = env->GetDirectBufferAddress(byteBuffer);
     if (!addr) return 0;
+    // Validate buffer bounds to prevent overruns from untrusted offset/frameCount.
+    jlong capacity = env->GetDirectBufferCapacity(byteBuffer);
+    jlong requiredBytes = static_cast<jlong>(offsetBytes) +
+        static_cast<jlong>(frameCount) * channels * static_cast<jlong>(sizeof(float));
+    if (capacity < 0 || requiredBytes > capacity) return 0;
     float* floatBuffer = reinterpret_cast<float*>(static_cast<char*>(addr) + offsetBytes);
     auto* engine = reinterpret_cast<AudioDspEngine*>(engineHandle);
     if (!engine) engine = &AudioDspEngine::instance();
