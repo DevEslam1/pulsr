@@ -43,10 +43,11 @@ private:
     static constexpr int DECIMATION_HALF = DECIMATION_TAPS / 2;
     float decimationCoeffs_[DECIMATION_TAPS] = {};
 
-    // CIC stage 1 integrators & combs (signed 64-bit to prevent overflow/drift)
+    // CIC stage 1 integrators & combs (unsigned 64-bit: CIC filters rely on
+    // modular wrap-around arithmetic; signed overflow is UB in C++)
     struct CicState {
-        int64_t int1 = 0, int2 = 0, int3 = 0;
-        int64_t comb1_d = 0, comb2_d = 0, comb3_d = 0;
+        uint64_t int1 = 0, int2 = 0, int3 = 0;
+        uint64_t comb1_d = 0, comb2_d = 0, comb3_d = 0;
     };
     CicState cicL_;
     CicState cicR_;

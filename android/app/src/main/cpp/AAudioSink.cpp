@@ -190,6 +190,8 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
 
     int32_t framesLeft = remaining / bytesPerFrame_;
     const uint8_t* cursor = src;
+    int retries = 0;
+    constexpr int kMaxRetries = 10;
     while (framesLeft > 0) {
         if (releasing_.load() || stream_ == nullptr) return -1;
         aaudio_result_t w = AAudioStream_write(stream_, cursor, framesLeft,
@@ -198,7 +200,9 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
             cursor += w * bytesPerFrame_;
             framesLeft -= w;
             framesWritten_ += w;
+            retries = 0;
         } else if (w == AAUDIO_ERROR_TIMEOUT) {
+            if (++retries > kMaxRetries) break;
             continue;  // loop re-checks releasing_ so Close() is never blocked
         } else {
             lastError_ = std::string("write: ") + AAudio_convertResultToText(w);

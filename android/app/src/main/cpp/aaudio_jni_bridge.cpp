@@ -64,6 +64,9 @@ Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeWrite(
     auto* addr = static_cast<uint8_t*>(
         env->GetDirectBufferAddress(directBuffer));
     if (addr == nullptr || length < 0 || offset < 0) return -1;
+    // Validate buffer bounds to prevent overruns from untrusted offset/length.
+    jlong capacity = env->GetDirectBufferCapacity(directBuffer);
+    if (capacity < 0 || static_cast<jlong>(offset) + length > capacity) return -1;
     return sink->Write(addr + offset, length);
 }
 

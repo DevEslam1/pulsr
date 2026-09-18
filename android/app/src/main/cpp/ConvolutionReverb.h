@@ -59,7 +59,13 @@ public:
     void process(const float* inL, const float* inR, float* outL, float* outR, int frames);
     void processInterleaved(float* buffer, int frames, int channels = 2);
 
+    void drainRetiredIrs();
+
 private:
+    static constexpr int kMaxRetired = 4;
+    std::shared_ptr<const PreparedIr> retiredIrs_[kMaxRetired];
+    int retiredCount_ = 0;
+
     void updatePreparedIr();
     void setPreparedIrPtr(std::shared_ptr<const PreparedIr> ir);
     void preparePartitions();

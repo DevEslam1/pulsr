@@ -128,6 +128,7 @@ void AudioDspEngine::updateParams(SnapshotMutator mutator) {
     updated->generation = ++snapshotGeneration_;
     auto snap = std::const_pointer_cast<const DspParamSnapshot>(updated);
     currentParams_.store(snap);
+    drainRetireQueue();
 
     if (this == &AudioDspEngine::instance()) {
         DspEngineRegistry::instance().broadcastParams(snap);
@@ -156,6 +157,7 @@ void AudioDspEngine::publishParams(std::shared_ptr<const DspParamSnapshot> snaps
     }
     mutableSnap->generation = ++snapshotGeneration_;
     currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(mutableSnap));
+    drainRetireQueue();
 }
 
 std::shared_ptr<const DspParamSnapshot> AudioDspEngine::getParams() const {
@@ -203,7 +205,6 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
             resetInternal();
         }
 
-        reverb_.applyParams(snapshot->reverb);
         const double currentSr = sampleRate_.load(std::memory_order_acquire);
         if (std::abs(snapshot->sampleRate - currentSr) > 0.5) {
             sampleRate_.store(snapshot->sampleRate, std::memory_order_release);
@@ -226,6 +227,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         }
 
         eq_.applyParams(snapshot->eq);
+        reverb_.applyParams(snapshot->reverb);
         panner_.applyParams(snapshot->panner);
         crossfeed_.applyParams(snapshot->crossfeed);
         limiter_.applyParams(snapshot->limiter);
@@ -284,6 +286,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
     const double currentSr = sampleRate_.load(std::memory_order_relaxed);
     const double rgTau = 0.020;
     const double rgSmoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (currentSr * rgTau));
+    const double startReplayGain = smoothedReplayGain_;
     smoothedReplayGain_ += rgSmoothFactor * (targetReplayGain_ - smoothedReplayGain_);
 
     // Net gain check for conditional limiter insertion
@@ -310,15 +313,17 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
     const uint32_t rawStages = snapshot->activeStages;
     const uint32_t degraded = autoDegradedStages_.load();
     const uint32_t stages = rawStages & ~degraded;
-    const bool nonUnityGain = (stages != 0) || (std::abs(smoothedReplayGain_ - 1.0) > 1e-4);
+    const bool nonUnityGain = (stages != 0) || (std::abs(smoothedReplayGain_ - 1.0) > 1e-4) || (std::abs(startReplayGain - 1.0) > 1e-4);
 
     if (nonUnityGain) {
         // Apply smoothed ReplayGain pre-gain before EQ stage
-        if (std::abs(smoothedReplayGain_ - 1.0) > 1e-4) {
-            const float rg = static_cast<float>(smoothedReplayGain_);
+        if (std::abs(smoothedReplayGain_ - 1.0) > 1e-4 || std::abs(startReplayGain - 1.0) > 1e-4) {
             const int totalSamples = frames * channels;
+            double currentRg = startReplayGain;
+            double rgIncrement = (smoothedReplayGain_ - startReplayGain) / totalSamples;
             for (int i = 0; i < totalSamples; ++i) {
-                buffer[i] *= rg;
+                buffer[i] *= static_cast<float>(currentRg);
+                currentRg += rgIncrement;
             }
         }
 
@@ -419,6 +424,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         const double dvcTarget = snapshot->directVolume.enabled
             ? std::clamp(snapshot->directVolume.gainLinear, 0.0, 4.0)
             : 1.0;
+        const double startDvc = smoothedDirectVolume_;
         if (std::abs(dvcTarget - smoothedDirectVolume_) > 1e-5) {
             const double dvcTau = 0.020;
             const double dvcSmooth =
@@ -427,11 +433,13 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         } else {
             smoothedDirectVolume_ = dvcTarget;
         }
-        if (std::abs(smoothedDirectVolume_ - 1.0) > 1e-4) {
-            const float dvc = static_cast<float>(smoothedDirectVolume_);
+        if (std::abs(smoothedDirectVolume_ - 1.0) > 1e-4 || std::abs(startDvc - 1.0) > 1e-4) {
             const int totalSamples = frames * channels;
+            double currentDvc = startDvc;
+            double dvcIncrement = (smoothedDirectVolume_ - startDvc) / totalSamples;
             for (int i = 0; i < totalSamples; ++i) {
-                buffer[i] = std::clamp(buffer[i] * dvc, -1.0f, 1.0f);
+                buffer[i] = std::clamp(buffer[i] * static_cast<float>(currentDvc), -1.0f, 1.0f);
+                currentDvc += dvcIncrement;
             }
         }
     }
@@ -599,6 +607,14 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
             smoothedReplayGain_ = 1.0;
             smoothedDirectVolume_ = 1.0;
         }
+    }
+
+    // Defer destruction of old snapshots off the audio thread
+    int head = retireHead_.load(std::memory_order_relaxed);
+    int next = (head + 1) % kRetireQueueSize;
+    if (next != retireTail_.load(std::memory_order_acquire)) {
+        retireQueue_[head] = std::move(snapshot);
+        retireHead_.store(next, std::memory_order_release);
     }
 
     return frames;

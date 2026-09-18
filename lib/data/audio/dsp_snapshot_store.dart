@@ -68,7 +68,11 @@ class DspSnapshotStore {
     }
   }
 
-  DspSnapshot? recall(String scopeKey) => _snapshots[scopeKey];
+  DspSnapshot? recall(String scopeKey) {
+    final snap = _snapshots.remove(scopeKey);
+    if (snap != null) _snapshots[scopeKey] = snap; // Move to end (MRU)
+    return snap;
+  }
 
   /// Recall precedence: album > artist > genre.
   DspSnapshot? recallFor({

@@ -255,9 +255,12 @@ void LiveProg::applyParams(const LiveProgParamSet& params) {
         }
         return;
     }
-    if (!params.code.empty() && params.code != loadedCode_) {
-        loadCode(params.code);
-    }
+    // Never compile on the audio thread — compilation involves heap allocations,
+    // string parsing, and hash map lookups that violate real-time constraints.
+    // The control thread must always pre-compile via buildProgram().
+    // if (!params.code.empty() && params.code != loadedCode_) {
+    //     loadCode(params.code);
+    // }
 }
 
 std::shared_ptr<const LiveProgProgram> LiveProg::buildProgram() const {

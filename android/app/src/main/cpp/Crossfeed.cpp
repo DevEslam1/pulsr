@@ -171,6 +171,8 @@ void Crossfeed::process(float* L, float* R, int frames) {
 
         if (!std::isfinite(lpL_)) lpL_ = 0.0f;
         if (!std::isfinite(lpR_)) lpR_ = 0.0f;
+        if (std::abs(lpL_) < 1e-25f) lpL_ = 0.0f;
+        if (std::abs(lpR_) < 1e-25f) lpR_ = 0.0f;
 
         currentDelay += delayStep;
         float exactReadPos = static_cast<float>(writeIdx_) - currentDelay;
@@ -246,6 +248,8 @@ void Crossfeed::processInterleaved(float* buffer, int frames) {
 
         if (!std::isfinite(lpL_)) lpL_ = 0.0f;
         if (!std::isfinite(lpR_)) lpR_ = 0.0f;
+        if (std::abs(lpL_) < 1e-25f) lpL_ = 0.0f;
+        if (std::abs(lpR_) < 1e-25f) lpR_ = 0.0f;
 
         currentDelay += delayStep;
         float exactReadPos = static_cast<float>(writeIdx_) - currentDelay;

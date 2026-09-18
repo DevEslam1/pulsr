@@ -25,6 +25,7 @@
 #include <atomic>
 #include <mutex>
 #include <functional>
+#include <array>
 
 enum DspStageMask {
     STAGE_EQ = 1 << 0,
@@ -160,6 +161,15 @@ public:
     void reset();
     void publishParams(std::shared_ptr<const DspParamSnapshot> snapshot);
 
+    void drainRetireQueue() {
+        int tail = retireTail_.load(std::memory_order_relaxed);
+        while (tail != retireHead_.load(std::memory_order_acquire)) {
+            retireQueue_[tail].reset();
+            tail = (tail + 1) % kRetireQueueSize;
+        }
+        retireTail_.store(tail, std::memory_order_release);
+    }
+
 private:
     void setSampleRateInternal(double sampleRate);
     void applySampleRateLocked(double sampleRate);
@@ -169,6 +179,11 @@ private:
     std::atomic<uint64_t> snapshotGeneration_{1};
     std::atomic<uint64_t> lastAppliedGeneration_{0};
     std::atomic<uint32_t> autoDegradedStages_{0};
+
+    static constexpr int kRetireQueueSize = 16;
+    std::array<std::shared_ptr<const DspParamSnapshot>, kRetireQueueSize> retireQueue_;
+    std::atomic<int> retireHead_{0};
+    std::atomic<int> retireTail_{0};
 
     // Rolling RTF monitor (zero heap allocation, preallocated fixed ring buffer)
     static constexpr int kRtfWindowSize = 20;

@@ -70,4 +70,15 @@ private:
     double envelope_ = 0.0;
     double attackCoeff_ = 0.0;
     double releaseCoeff_ = 0.0;
+
+    std::atomic<bool> paramsChanged_{false};
+    bool pendingEnabled_ = false;
+    double pendingStrength_ = 1.0;
+    int pendingXLow_ = 100;
+    int pendingXHigh_ = 5600;
+    int pendingYLow_ = 40;
+    int pendingYHigh_ = 80;
+    double pendingSideGainLow_ = 0.10;
+    double pendingSideGainHigh_ = 0.50;
+    int pendingDevicePreset_ = 0;
 };
