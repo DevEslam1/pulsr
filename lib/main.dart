@@ -146,24 +146,36 @@ Future<void> main() async {
           // Pure builds have no INTERNET permission: skip every online
           // initializer so Pulsr Pure performs zero network work at startup.
           if (onlineAllowed)
-            YtmRateLimiter.shared.restore().timeout(const Duration(seconds: 8)).catchError((e, st) {
+            YtmRateLimiter.shared
+                .restore()
+                .timeout(const Duration(seconds: 8))
+                .catchError((e, st) {
               ErrorLogger.log('YtmRateLimiter restore failed or timed out',
                   error: e, stackTrace: st, category: 'Startup');
             }),
           if (AppConfig.isCloudSyncAllowed && !offlineOnly)
-            getIt<AuthService>().initialize().timeout(const Duration(seconds: 8)).catchError((e, st) {
+            getIt<AuthService>()
+                .initialize()
+                .timeout(const Duration(seconds: 8))
+                .catchError((e, st) {
               ErrorLogger.log('AuthService initialize failed or timed out',
                   error: e, stackTrace: st, category: 'Startup');
             }),
           if (onlineAllowed)
-            getIt<YtmAccountService>().init().timeout(const Duration(seconds: 8)).catchError((e, st) {
+            getIt<YtmAccountService>()
+                .init()
+                .timeout(const Duration(seconds: 8))
+                .catchError((e, st) {
               ErrorLogger.log('YtmAccountService init failed or timed out',
                   error: e, stackTrace: st, category: 'Startup');
             }),
           // Rehydrate guest stream URLs saved by the previous run so a replay
           // or skip-back after launch resolves instantly.
           if (onlineAllowed && getIt.isRegistered<YtmUrlCache>())
-            getIt<YtmUrlCache>().restore().timeout(const Duration(seconds: 8)).catchError((e, st) {
+            getIt<YtmUrlCache>()
+                .restore()
+                .timeout(const Duration(seconds: 8))
+                .catchError((e, st) {
               ErrorLogger.log('YtmUrlCache restore failed or timed out',
                   error: e, stackTrace: st, category: 'Startup');
             }),
@@ -305,8 +317,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
         if (ctx == null || !ctx.mounted) return;
         PulsrToast.show(
           ctx,
-          message:
-              'Background media controls are unavailable on this launch. '
+          message: 'Background media controls are unavailable on this launch. '
               'Playback works, but the lock-screen controls could not start.',
           icon: Icons.warning_amber_rounded,
           isError: true,
@@ -368,7 +379,9 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
       (getIt.get<ArtworkLruCache>() as dynamic)?.trimForMemoryPressure();
     } catch (_) {
       // Fallback direct trim
-      try { ArtworkLruCache().trimForMemoryPressure(); } catch (_) {}
+      try {
+        ArtworkLruCache().trimForMemoryPressure();
+      } catch (_) {}
     }
   }
 
@@ -413,7 +426,8 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
         _networkMonitor = monitor;
         monitor.start();
         _networkChangeSub = monitor.onNetworkChanged.listen((_) async {
-          debugPrint('[PulsrApp] Network path changed — invalidating YTM caches');
+          debugPrint(
+              '[PulsrApp] Network path changed — invalidating YTM caches');
           try {
             if (getIt.isRegistered<YtmService>()) {
               await getIt<YtmService>().handleNetworkChange();
@@ -604,8 +618,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                   if (overlayCtx != null && overlayCtx.mounted) {
                     PulsrToast.show(
                       overlayCtx,
-                      message:
-                          resolveUiErrorMessage(context, message),
+                      message: resolveUiErrorMessage(context, message),
                       icon: Icons.error_outline_rounded,
                       isError: true,
                     );
