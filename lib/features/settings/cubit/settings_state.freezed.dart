@@ -25,6 +25,7 @@ mixin _$SettingsState {
   AppThemeMode get themeMode;
   bool get autoThemeByTime;
   bool get highContrast;
+  bool get dimWhitePoint;
   bool get reduceMotion;
   double get liquidGlassTint;
   String get languageCode;
@@ -135,6 +136,8 @@ mixin _$SettingsState {
                 other.autoThemeByTime == _this.autoThemeByTime) &&
             (identical(other.highContrast, _this.highContrast) ||
                 other.highContrast == _this.highContrast) &&
+            (identical(other.dimWhitePoint, _this.dimWhitePoint) ||
+                other.dimWhitePoint == _this.dimWhitePoint) &&
             (identical(other.reduceMotion, _this.reduceMotion) ||
                 other.reduceMotion == _this.reduceMotion) &&
             (identical(other.liquidGlassTint, _this.liquidGlassTint) ||
@@ -166,8 +169,7 @@ mixin _$SettingsState {
             (identical(other.replayGainPreampWithoutRg, _this.replayGainPreampWithoutRg) ||
                 other.replayGainPreampWithoutRg ==
                     _this.replayGainPreampWithoutRg) &&
-            (identical(other.streamingQuality, _this.streamingQuality) ||
-                other.streamingQuality == _this.streamingQuality) &&
+            (identical(other.streamingQuality, _this.streamingQuality) || other.streamingQuality == _this.streamingQuality) &&
             (identical(other.downloadQuality, _this.downloadQuality) || other.downloadQuality == _this.downloadQuality) &&
             (identical(other.wifiOnlyMode, _this.wifiOnlyMode) || other.wifiOnlyMode == _this.wifiOnlyMode) &&
             (identical(other.offlineOnlyMode, _this.offlineOnlyMode) || other.offlineOnlyMode == _this.offlineOnlyMode) &&
@@ -243,6 +245,7 @@ mixin _$SettingsState {
       _this.themeMode,
       _this.autoThemeByTime,
       _this.highContrast,
+      _this.dimWhitePoint,
       _this.reduceMotion,
       _this.liquidGlassTint,
       _this.languageCode,
@@ -323,7 +326,7 @@ mixin _$SettingsState {
   @override
   String toString() {
     final _this = this as SettingsState;
-    return 'SettingsState(gaplessPlayback: ${_this.gaplessPlayback}, crossfadeSeconds: ${_this.crossfadeSeconds}, minDurationSec: ${_this.minDurationSec}, autoHideSystemMedia: ${_this.autoHideSystemMedia}, themeColorSource: ${_this.themeColorSource}, resumeAfterInterruption: ${_this.resumeAfterInterruption}, waveformSeekBarEnabled: ${_this.waveformSeekBarEnabled}, themeMode: ${_this.themeMode}, autoThemeByTime: ${_this.autoThemeByTime}, highContrast: ${_this.highContrast}, reduceMotion: ${_this.reduceMotion}, liquidGlassTint: ${_this.liquidGlassTint}, languageCode: ${_this.languageCode}, customAccentColorValue: ${_this.customAccentColorValue}, customThemeRadius: ${_this.customThemeRadius}, customThemeGlow: ${_this.customThemeGlow}, playerThemeMode: ${_this.playerThemeMode}, visualizerStyle: ${_this.visualizerStyle}, miniPlayerSwipeLeft: ${_this.miniPlayerSwipeLeft}, miniPlayerSwipeRight: ${_this.miniPlayerSwipeRight}, nowPlayingDoubleTap: ${_this.nowPlayingDoubleTap}, nowPlayingArtworkSwipe: ${_this.nowPlayingArtworkSwipe}, replayGainMode: ${_this.replayGainMode}, replayGainPreampWithRg: ${_this.replayGainPreampWithRg}, replayGainPreampWithoutRg: ${_this.replayGainPreampWithoutRg}, streamingQuality: ${_this.streamingQuality}, downloadQuality: ${_this.downloadQuality}, wifiOnlyMode: ${_this.wifiOnlyMode}, offlineOnlyMode: ${_this.offlineOnlyMode}, isScanning: ${_this.isScanning}, proxyEnabled: ${_this.proxyEnabled}, proxyType: ${_this.proxyType}, proxyHost: ${_this.proxyHost}, proxyPort: ${_this.proxyPort}, proxyUsername: ${_this.proxyUsername}, hasProxyPassword: ${_this.hasProxyPassword}, proxyBypassHosts: ${_this.proxyBypassHosts}, proxyList: ${_this.proxyList}, isTestingAllProxies: ${_this.isTestingAllProxies}, bitPerfectOutput: ${_this.bitPerfectOutput}, bypassDspOnBitPerfect: ${_this.bypassDspOnBitPerfect}, followTrackSampleRate: ${_this.followTrackSampleRate}, strictBitPerfect: ${_this.strictBitPerfect}, dsdOutputMode: ${_this.dsdOutputMode}, experienceMode: ${_this.experienceMode}, dsdDopSupported: ${_this.dsdDopSupported}, currentOutputDevice: ${_this.currentOutputDevice}, scanResultCount: ${_this.scanResultCount}, errorMessage: ${_this.errorMessage}, crossfeedEnabled: ${_this.crossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, limiterEnabled: ${_this.limiterEnabled}, limiterLookaheadMs: ${_this.limiterLookaheadMs}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, reverbEnabled: ${_this.reverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, sincResamplerEnabled: ${_this.sincResamplerEnabled}, dspPreference: ${_this.dspPreference}, systemEffectsPolicy: ${_this.systemEffectsPolicy}, systemEffectsStatus: ${_this.systemEffectsStatus}, systemEffectsBundles: ${_this.systemEffectsBundles}, bluetoothLatencyOffsetMs: ${_this.bluetoothLatencyOffsetMs}, hedgedResolutionEnabled: ${_this.hedgedResolutionEnabled}, adaptiveQualityEnabled: ${_this.adaptiveQualityEnabled}, duckingMode: ${_this.duckingMode}, duckingLevel: ${_this.duckingLevel}, multiOutputMode: ${_this.multiOutputMode}, dspSnapshotEnabled: ${_this.dspSnapshotEnabled}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, sessionLogEnabled: ${_this.sessionLogEnabled}, outputFormatNegotiationEnabled: ${_this.outputFormatNegotiationEnabled}, floatOutputEnabled: ${_this.floatOutputEnabled}, aaudioOutputEnabled: ${_this.aaudioOutputEnabled}, dvcEnabled: ${_this.dvcEnabled}, usbHardwareVolumeEnabled: ${_this.usbHardwareVolumeEnabled}, aaudioPreferExclusive: ${_this.aaudioPreferExclusive}, aaudioTargetBufferMs: ${_this.aaudioTargetBufferMs}, sincResamplerQuality: ${_this.sincResamplerQuality}, bpmSyncCrossfadeEnabled: ${_this.bpmSyncCrossfadeEnabled})';
+    return 'SettingsState(gaplessPlayback: ${_this.gaplessPlayback}, crossfadeSeconds: ${_this.crossfadeSeconds}, minDurationSec: ${_this.minDurationSec}, autoHideSystemMedia: ${_this.autoHideSystemMedia}, themeColorSource: ${_this.themeColorSource}, resumeAfterInterruption: ${_this.resumeAfterInterruption}, waveformSeekBarEnabled: ${_this.waveformSeekBarEnabled}, themeMode: ${_this.themeMode}, autoThemeByTime: ${_this.autoThemeByTime}, highContrast: ${_this.highContrast}, dimWhitePoint: ${_this.dimWhitePoint}, reduceMotion: ${_this.reduceMotion}, liquidGlassTint: ${_this.liquidGlassTint}, languageCode: ${_this.languageCode}, customAccentColorValue: ${_this.customAccentColorValue}, customThemeRadius: ${_this.customThemeRadius}, customThemeGlow: ${_this.customThemeGlow}, playerThemeMode: ${_this.playerThemeMode}, visualizerStyle: ${_this.visualizerStyle}, miniPlayerSwipeLeft: ${_this.miniPlayerSwipeLeft}, miniPlayerSwipeRight: ${_this.miniPlayerSwipeRight}, nowPlayingDoubleTap: ${_this.nowPlayingDoubleTap}, nowPlayingArtworkSwipe: ${_this.nowPlayingArtworkSwipe}, replayGainMode: ${_this.replayGainMode}, replayGainPreampWithRg: ${_this.replayGainPreampWithRg}, replayGainPreampWithoutRg: ${_this.replayGainPreampWithoutRg}, streamingQuality: ${_this.streamingQuality}, downloadQuality: ${_this.downloadQuality}, wifiOnlyMode: ${_this.wifiOnlyMode}, offlineOnlyMode: ${_this.offlineOnlyMode}, isScanning: ${_this.isScanning}, proxyEnabled: ${_this.proxyEnabled}, proxyType: ${_this.proxyType}, proxyHost: ${_this.proxyHost}, proxyPort: ${_this.proxyPort}, proxyUsername: ${_this.proxyUsername}, hasProxyPassword: ${_this.hasProxyPassword}, proxyBypassHosts: ${_this.proxyBypassHosts}, proxyList: ${_this.proxyList}, isTestingAllProxies: ${_this.isTestingAllProxies}, bitPerfectOutput: ${_this.bitPerfectOutput}, bypassDspOnBitPerfect: ${_this.bypassDspOnBitPerfect}, followTrackSampleRate: ${_this.followTrackSampleRate}, strictBitPerfect: ${_this.strictBitPerfect}, dsdOutputMode: ${_this.dsdOutputMode}, experienceMode: ${_this.experienceMode}, dsdDopSupported: ${_this.dsdDopSupported}, currentOutputDevice: ${_this.currentOutputDevice}, scanResultCount: ${_this.scanResultCount}, errorMessage: ${_this.errorMessage}, crossfeedEnabled: ${_this.crossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, limiterEnabled: ${_this.limiterEnabled}, limiterLookaheadMs: ${_this.limiterLookaheadMs}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, reverbEnabled: ${_this.reverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, sincResamplerEnabled: ${_this.sincResamplerEnabled}, dspPreference: ${_this.dspPreference}, systemEffectsPolicy: ${_this.systemEffectsPolicy}, systemEffectsStatus: ${_this.systemEffectsStatus}, systemEffectsBundles: ${_this.systemEffectsBundles}, bluetoothLatencyOffsetMs: ${_this.bluetoothLatencyOffsetMs}, hedgedResolutionEnabled: ${_this.hedgedResolutionEnabled}, adaptiveQualityEnabled: ${_this.adaptiveQualityEnabled}, duckingMode: ${_this.duckingMode}, duckingLevel: ${_this.duckingLevel}, multiOutputMode: ${_this.multiOutputMode}, dspSnapshotEnabled: ${_this.dspSnapshotEnabled}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, sessionLogEnabled: ${_this.sessionLogEnabled}, outputFormatNegotiationEnabled: ${_this.outputFormatNegotiationEnabled}, floatOutputEnabled: ${_this.floatOutputEnabled}, aaudioOutputEnabled: ${_this.aaudioOutputEnabled}, dvcEnabled: ${_this.dvcEnabled}, usbHardwareVolumeEnabled: ${_this.usbHardwareVolumeEnabled}, aaudioPreferExclusive: ${_this.aaudioPreferExclusive}, aaudioTargetBufferMs: ${_this.aaudioTargetBufferMs}, sincResamplerQuality: ${_this.sincResamplerQuality}, bpmSyncCrossfadeEnabled: ${_this.bpmSyncCrossfadeEnabled})';
   }
 }
 
@@ -344,6 +347,7 @@ abstract mixin class $SettingsStateCopyWith<$Res> {
       AppThemeMode themeMode,
       bool autoThemeByTime,
       bool highContrast,
+      bool dimWhitePoint,
       bool reduceMotion,
       double liquidGlassTint,
       String languageCode,
@@ -443,6 +447,7 @@ class _$SettingsStateCopyWithImpl<$Res>
     Object? themeMode = null,
     Object? autoThemeByTime = null,
     Object? highContrast = null,
+    Object? dimWhitePoint = null,
     Object? reduceMotion = null,
     Object? liquidGlassTint = null,
     Object? languageCode = null,
@@ -558,6 +563,10 @@ class _$SettingsStateCopyWithImpl<$Res>
       highContrast: null == highContrast
           ? _self.highContrast
           : highContrast // ignore: cast_nullable_to_non_nullable
+              as bool,
+      dimWhitePoint: null == dimWhitePoint
+          ? _self.dimWhitePoint
+          : dimWhitePoint // ignore: cast_nullable_to_non_nullable
               as bool,
       reduceMotion: null == reduceMotion
           ? _self.reduceMotion
@@ -963,6 +972,7 @@ extension SettingsStatePatterns on SettingsState {
             AppThemeMode themeMode,
             bool autoThemeByTime,
             bool highContrast,
+            bool dimWhitePoint,
             bool reduceMotion,
             double liquidGlassTint,
             String languageCode,
@@ -1054,6 +1064,7 @@ extension SettingsStatePatterns on SettingsState {
             _that.themeMode,
             _that.autoThemeByTime,
             _that.highContrast,
+            _that.dimWhitePoint,
             _that.reduceMotion,
             _that.liquidGlassTint,
             _that.languageCode,
@@ -1159,6 +1170,7 @@ extension SettingsStatePatterns on SettingsState {
             AppThemeMode themeMode,
             bool autoThemeByTime,
             bool highContrast,
+            bool dimWhitePoint,
             bool reduceMotion,
             double liquidGlassTint,
             String languageCode,
@@ -1249,6 +1261,7 @@ extension SettingsStatePatterns on SettingsState {
             _that.themeMode,
             _that.autoThemeByTime,
             _that.highContrast,
+            _that.dimWhitePoint,
             _that.reduceMotion,
             _that.liquidGlassTint,
             _that.languageCode,
@@ -1353,6 +1366,7 @@ extension SettingsStatePatterns on SettingsState {
             AppThemeMode themeMode,
             bool autoThemeByTime,
             bool highContrast,
+            bool dimWhitePoint,
             bool reduceMotion,
             double liquidGlassTint,
             String languageCode,
@@ -1443,6 +1457,7 @@ extension SettingsStatePatterns on SettingsState {
             _that.themeMode,
             _that.autoThemeByTime,
             _that.highContrast,
+            _that.dimWhitePoint,
             _that.reduceMotion,
             _that.liquidGlassTint,
             _that.languageCode,
@@ -1537,6 +1552,7 @@ class _SettingsState extends SettingsState {
       this.themeMode = AppThemeMode.dark,
       this.autoThemeByTime = false,
       this.highContrast = false,
+      this.dimWhitePoint = false,
       this.reduceMotion = false,
       this.liquidGlassTint = 0.80,
       this.languageCode = 'system',
@@ -1645,6 +1661,9 @@ class _SettingsState extends SettingsState {
   @override
   @JsonKey()
   final bool highContrast;
+  @override
+  @JsonKey()
+  final bool dimWhitePoint;
   @override
   @JsonKey()
   final bool reduceMotion;
@@ -1911,6 +1930,8 @@ class _SettingsState extends SettingsState {
                 other.autoThemeByTime == autoThemeByTime) &&
             (identical(other.highContrast, highContrast) ||
                 other.highContrast == highContrast) &&
+            (identical(other.dimWhitePoint, dimWhitePoint) ||
+                other.dimWhitePoint == dimWhitePoint) &&
             (identical(other.reduceMotion, reduceMotion) ||
                 other.reduceMotion == reduceMotion) &&
             (identical(other.liquidGlassTint, liquidGlassTint) ||
@@ -1955,8 +1976,7 @@ class _SettingsState extends SettingsState {
                 other.proxyEnabled == proxyEnabled) &&
             (identical(other.proxyType, proxyType) ||
                 other.proxyType == proxyType) &&
-            (identical(other.proxyHost, proxyHost) ||
-                other.proxyHost == proxyHost) &&
+            (identical(other.proxyHost, proxyHost) || other.proxyHost == proxyHost) &&
             (identical(other.proxyPort, proxyPort) || other.proxyPort == proxyPort) &&
             (identical(other.proxyUsername, proxyUsername) || other.proxyUsername == proxyUsername) &&
             (identical(other.hasProxyPassword, hasProxyPassword) || other.hasProxyPassword == hasProxyPassword) &&
@@ -2024,6 +2044,7 @@ class _SettingsState extends SettingsState {
       themeMode,
       autoThemeByTime,
       highContrast,
+      dimWhitePoint,
       reduceMotion,
       liquidGlassTint,
       languageCode,
@@ -2103,7 +2124,7 @@ class _SettingsState extends SettingsState {
 
   @override
   String toString() {
-    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, autoThemeByTime: $autoThemeByTime, highContrast: $highContrast, reduceMotion: $reduceMotion, liquidGlassTint: $liquidGlassTint, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, customThemeRadius: $customThemeRadius, customThemeGlow: $customThemeGlow, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, hasProxyPassword: $hasProxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, bitPerfectOutput: $bitPerfectOutput, bypassDspOnBitPerfect: $bypassDspOnBitPerfect, followTrackSampleRate: $followTrackSampleRate, strictBitPerfect: $strictBitPerfect, dsdOutputMode: $dsdOutputMode, experienceMode: $experienceMode, dsdDopSupported: $dsdDopSupported, currentOutputDevice: $currentOutputDevice, scanResultCount: $scanResultCount, errorMessage: $errorMessage, crossfeedEnabled: $crossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, limiterEnabled: $limiterEnabled, limiterLookaheadMs: $limiterLookaheadMs, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, reverbEnabled: $reverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, sincResamplerEnabled: $sincResamplerEnabled, dspPreference: $dspPreference, systemEffectsPolicy: $systemEffectsPolicy, systemEffectsStatus: $systemEffectsStatus, systemEffectsBundles: $systemEffectsBundles, bluetoothLatencyOffsetMs: $bluetoothLatencyOffsetMs, hedgedResolutionEnabled: $hedgedResolutionEnabled, adaptiveQualityEnabled: $adaptiveQualityEnabled, duckingMode: $duckingMode, duckingLevel: $duckingLevel, multiOutputMode: $multiOutputMode, dspSnapshotEnabled: $dspSnapshotEnabled, silenceSkipSensitivity: $silenceSkipSensitivity, sessionLogEnabled: $sessionLogEnabled, outputFormatNegotiationEnabled: $outputFormatNegotiationEnabled, floatOutputEnabled: $floatOutputEnabled, aaudioOutputEnabled: $aaudioOutputEnabled, dvcEnabled: $dvcEnabled, usbHardwareVolumeEnabled: $usbHardwareVolumeEnabled, aaudioPreferExclusive: $aaudioPreferExclusive, aaudioTargetBufferMs: $aaudioTargetBufferMs, sincResamplerQuality: $sincResamplerQuality, bpmSyncCrossfadeEnabled: $bpmSyncCrossfadeEnabled)';
+    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, autoThemeByTime: $autoThemeByTime, highContrast: $highContrast, dimWhitePoint: $dimWhitePoint, reduceMotion: $reduceMotion, liquidGlassTint: $liquidGlassTint, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, customThemeRadius: $customThemeRadius, customThemeGlow: $customThemeGlow, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, hasProxyPassword: $hasProxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, bitPerfectOutput: $bitPerfectOutput, bypassDspOnBitPerfect: $bypassDspOnBitPerfect, followTrackSampleRate: $followTrackSampleRate, strictBitPerfect: $strictBitPerfect, dsdOutputMode: $dsdOutputMode, experienceMode: $experienceMode, dsdDopSupported: $dsdDopSupported, currentOutputDevice: $currentOutputDevice, scanResultCount: $scanResultCount, errorMessage: $errorMessage, crossfeedEnabled: $crossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, limiterEnabled: $limiterEnabled, limiterLookaheadMs: $limiterLookaheadMs, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, reverbEnabled: $reverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, sincResamplerEnabled: $sincResamplerEnabled, dspPreference: $dspPreference, systemEffectsPolicy: $systemEffectsPolicy, systemEffectsStatus: $systemEffectsStatus, systemEffectsBundles: $systemEffectsBundles, bluetoothLatencyOffsetMs: $bluetoothLatencyOffsetMs, hedgedResolutionEnabled: $hedgedResolutionEnabled, adaptiveQualityEnabled: $adaptiveQualityEnabled, duckingMode: $duckingMode, duckingLevel: $duckingLevel, multiOutputMode: $multiOutputMode, dspSnapshotEnabled: $dspSnapshotEnabled, silenceSkipSensitivity: $silenceSkipSensitivity, sessionLogEnabled: $sessionLogEnabled, outputFormatNegotiationEnabled: $outputFormatNegotiationEnabled, floatOutputEnabled: $floatOutputEnabled, aaudioOutputEnabled: $aaudioOutputEnabled, dvcEnabled: $dvcEnabled, usbHardwareVolumeEnabled: $usbHardwareVolumeEnabled, aaudioPreferExclusive: $aaudioPreferExclusive, aaudioTargetBufferMs: $aaudioTargetBufferMs, sincResamplerQuality: $sincResamplerQuality, bpmSyncCrossfadeEnabled: $bpmSyncCrossfadeEnabled)';
   }
 }
 
@@ -2126,6 +2147,7 @@ abstract mixin class _$SettingsStateCopyWith<$Res>
       AppThemeMode themeMode,
       bool autoThemeByTime,
       bool highContrast,
+      bool dimWhitePoint,
       bool reduceMotion,
       double liquidGlassTint,
       String languageCode,
@@ -2225,6 +2247,7 @@ class __$SettingsStateCopyWithImpl<$Res>
     Object? themeMode = null,
     Object? autoThemeByTime = null,
     Object? highContrast = null,
+    Object? dimWhitePoint = null,
     Object? reduceMotion = null,
     Object? liquidGlassTint = null,
     Object? languageCode = null,
@@ -2340,6 +2363,10 @@ class __$SettingsStateCopyWithImpl<$Res>
       highContrast: null == highContrast
           ? _self.highContrast
           : highContrast // ignore: cast_nullable_to_non_nullable
+              as bool,
+      dimWhitePoint: null == dimWhitePoint
+          ? _self.dimWhitePoint
+          : dimWhitePoint // ignore: cast_nullable_to_non_nullable
               as bool,
       reduceMotion: null == reduceMotion
           ? _self.reduceMotion

@@ -56,6 +56,7 @@ class PrefsKeys {
   static const String crossfeedEnabled = 'setting_crossfeed_enabled';
   static const String crossfeedDelayUs = 'setting_crossfeed_delay_us';
   static const String crossfeedFeedDb = 'setting_crossfeed_feed_db';
+  static const String crossfeedFcut = 'setting_crossfeed_fcut';
   static const String lookaheadLimiterEnabled =
       'setting_lookahead_limiter_enabled';
   static const String lookaheadLimiterThresholdDb =
@@ -75,6 +76,10 @@ class PrefsKeys {
       'setting_convolution_reverb_preset';
   static const String convolutionReverbWetDry =
       'setting_convolution_reverb_wet_dry';
+  static const String convolutionReverbPredelayMs =
+      'setting_convolution_reverb_predelay_ms';
+  static const String convolutionReverbDamping =
+      'setting_convolution_reverb_damping';
   static const String stereoBalance = 'setting_stereo_balance';
   static const String monoMix = 'setting_mono_mix';
   static const String sincResamplerEnabled = 'setting_sinc_resampler_enabled';

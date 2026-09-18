@@ -227,6 +227,15 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
         _divider(p),
         _switchTile(
           context,
+          Icons.brightness_4_rounded,
+          context.l10n.settingsDimWhitePointTitle,
+          context.l10n.settingsDimWhitePointSubtitle,
+          value: state.dimWhitePoint,
+          onChanged: cubit.setDimWhitePoint,
+        ),
+        _divider(p),
+        _switchTile(
+          context,
           Icons.motion_photos_off_rounded,
           context.l10n.settingsReduceMotionTitle,
           context.l10n.settingsReduceMotionSubtitle,

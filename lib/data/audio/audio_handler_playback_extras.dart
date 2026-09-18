@@ -151,6 +151,10 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
         presetName: _equalizerManager.currentPreset.name,
         gains: List<double>.from(_equalizerManager.currentPreset.gains),
         volumeBoost: _equalizerManager.volumeBoost,
+        bassBoost: _equalizerManager.currentPreset.bassBoost,
+        // Full effect chain (all JamesDSP / Phase-1 stages), not just the EQ
+        // curve, so recall restores saturation/width/reverb/dynamics/etc.
+        effects: _equalizerManager.captureEffectsState(),
         savedAt: DateTime.now(),
       ),
     );
@@ -162,8 +166,15 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
         album: song.album, artist: song.artist, genre: song.genre);
     if (snap == null) return false;
     try {
-      await _equalizerManager.applyPreset(
-          EqPreset(name: snap.presetName, gains: snap.gains));
+      final effects = snap.effects;
+      if (effects != null) {
+        // Full-snapshot path: restore every captured DSP stage.
+        await _equalizerManager.applyEffectsState(effects);
+      } else {
+        // Legacy v1 snapshot — only the graphic-EQ curve was captured.
+        await _equalizerManager.applyPreset(
+            EqPreset(name: snap.presetName, gains: snap.gains));
+      }
       return true;
     } catch (_) {
       return false;

@@ -73,6 +73,10 @@ abstract class SettingsState with _$SettingsState {
     @Default(AppThemeMode.dark) AppThemeMode themeMode,
     @Default(false) bool autoThemeByTime,
     @Default(false) bool highContrast,
+    // Eye comfort: when true, peak white text is softened (dim white point)
+    // so long night-listening sessions are less fatiguing. Contrast stays
+    // well above WCAG AA. Dark/AMOLED only; ignored in light mode.
+    @Default(false) bool dimWhitePoint,
     // Accessibility: when true the app forces reduced motion app-wide (all
     // animations snap to their end state). When false the OS "Reduce motion" /
     // "Remove animations" setting is still honoured — this toggle only ever

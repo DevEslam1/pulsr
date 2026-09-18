@@ -791,13 +791,19 @@ class AudioEffectsChannel {
     }
   }
 
-  Future<void> setCrossfeedParams(double delayUs, double feedDb) async {
+  Future<void> setCrossfeedParams(
+    double delayUs,
+    double feedDb, {
+    double? fcut,
+  }) async {
     if (!_isAndroid) return;
     try {
       await _channel
           .invokeMethod('setCrossfeedParams', {
             'delayUs': delayUs,
             'feedDb': feedDb,
+            // Custom-mode cutoff (Hz). Omitted keeps the native 650 Hz default.
+            if (fcut != null) 'fcut': fcut,
           })
           .timeout(const Duration(seconds: 3));
     } catch (e, st) {
@@ -1411,7 +1417,9 @@ class AudioEffectsChannel {
     Uint8List dsdR, {
     int dsdRate = 64,
     int targetSampleRate = 176400,
-    // 0 = MSB first (DSF), 1 = LSB first (DFF) - must match eq_jni_bridge.cpp
+    // 0 = LSB first (DSF), 1 = MSB first (DFF) - must match eq_jni_bridge.cpp
+    // (the native decodeDsd contract maps 0 -> LSB_FIRST). DSF, the common
+    // format, is LSB-first, so the default 0 is correct.
     int bitOrder = 0,
   }) async {
     if (!_isAndroid) return null;
@@ -1494,6 +1502,34 @@ class AudioEffectsChannel {
     } catch (e, st) {
       ErrorLogger.log(
         'setReverbCrossChannel failed',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+    }
+  }
+
+  /// Pushes reverb predelay, damping and cross-channel blend in one native
+  /// call (Kotlin `setReverbParams` -> nativeSetReverbPredelay/Damping/
+  /// CrossChannel). The native side dedups on the (predelay, damping,
+  /// crossChannel) triple, so re-sending unchanged values is cheap.
+  Future<void> setReverbParams({
+    required double predelayMs,
+    required double damping,
+    required double crossChannel,
+  }) async {
+    if (!_isAndroid) return;
+    try {
+      await _channel
+          .invokeMethod('setReverbParams', {
+            'predelayMs': predelayMs,
+            'damping': damping,
+            'crossChannel': crossChannel,
+          })
+          .timeout(const Duration(seconds: 2));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'setReverbParams failed',
         error: e,
         stackTrace: st,
         category: 'AudioEffectsChannel',

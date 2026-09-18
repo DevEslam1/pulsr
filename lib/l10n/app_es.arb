@@ -3205,6 +3205,8 @@
   "settingsAutoDarkModeSubtitle": "Sigue un horario de 7 p. m. a 6 a. m.",
   "settingsHighContrastTitle": "Alto contraste",
   "settingsHighContrastSubtitle": "Aumenta el contraste con una paleta compatible con AMOLED",
+  "settingsDimWhitePointTitle": "Atenuar punto blanco",
+  "settingsDimWhitePointSubtitle": "Suaviza el texto brillante para escuchar de noche",
   "settingsReduceMotionTitle": "Reducir movimiento",
   "settingsReduceMotionSubtitle": "Aplica animaciones instantáneas en lugar de transiciones",
   "settingsLiquidGlassTitle": "Tinte de vidrio líquido",

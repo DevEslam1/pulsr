@@ -3205,6 +3205,8 @@
   "settingsAutoDarkModeSubtitle": "اتّبع جدولاً من 7 مساءً حتى 6 صباحاً",
   "settingsHighContrastTitle": "تباين عالٍ",
   "settingsHighContrastSubtitle": "زيد التباين بلوحة ألوان مناسبة لـ AMOLED",
+  "settingsDimWhitePointTitle": "تعتيم النقطة البيضاء",
+  "settingsDimWhitePointSubtitle": "تخفيف النص الساطع لتسهيل الاستماع ليلًا",
   "settingsReduceMotionTitle": "تقليل الحركة",
   "settingsReduceMotionSubtitle": "تشغيل الحركات فورًا بدلًا من انتقالها التدريجي",
   "settingsLiquidGlassTitle": "صبغة الزجاج السائل",

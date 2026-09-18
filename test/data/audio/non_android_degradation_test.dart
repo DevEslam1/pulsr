@@ -61,7 +61,12 @@ void main() {
     test('non-bool probes are also honest on non-Android', () async {
       expect(await channel.hasActiveEffects(), isFalse);
       expect(await channel.loadImpulseResponse(const [1.0, 0.0, -1.0]), isFalse);
-      expect(await channel.decodeDsd(const [1, 2, 3], const [4, 5, 6]), isNull);
+      expect(
+          await channel.decodeDsd(
+            Uint8List.fromList([1, 2, 3]),
+            Uint8List.fromList([4, 5, 6]),
+          ),
+          isNull);
     });
   });
 
