@@ -188,15 +188,31 @@ class YtmService {
     return false;
   }
 
+  static const _videoFailureCooldown = Duration(seconds: 30);
+
   // FIX-C01: Record a failure for a specific videoId
   void recordFailure(String videoId, [YtmException? error]) {
-    _noteBotChallenge(error ?? const YtmException('VIDEO_FAILED'), videoId: videoId);
+    final err = error ?? const YtmException('VIDEO_FAILED');
+    if (err.isBotBlocked || err.isIpBlocked || err.isThrottled) {
+      _noteBotChallenge(err, videoId: videoId);
+    } else {
+      // Non-bot failures track per-video without tripping a global bot challenge
+      final now = DateTime.now();
+      final failures = _videoFailures.putIfAbsent(videoId, () => []);
+      failures.removeWhere((t) => now.difference(t).inSeconds > 60);
+      failures.add(now);
+      if (failures.length >= 3) {
+        _videoCooldownUntil[videoId] = now.add(_videoFailureCooldown);
+      }
+    }
   }
 
   bool get isBotCoolingDown => DateTime.now().isBefore(_botChallengeUntil);
 
   void _noteBotChallenge(YtmException e, {String? videoId}) {
-    _lastBotChallenge = e;
+    if (e.isBotBlocked || e.isIpBlocked || e.isThrottled) {
+      _lastBotChallenge = e;
+    }
     final signal = e.signal;
     if (signal != null) breaker.recordFailure(signal);
     final now = DateTime.now();
@@ -207,14 +223,14 @@ class YtmService {
       failures.removeWhere((t) => now.difference(t).inSeconds > 60);
       failures.add(now);
 
-      if (failures.length >= 3 || e.isBotBlocked || e.isIpBlocked) {
+      if (e.isIpBlocked || e.isBotBlocked || e.isThrottled) {
         final cooldown = e.isIpBlocked ? _ipBlockCooldown : _botCooldown;
         _videoCooldownUntil[videoId] = now.add(cooldown);
-        if (e.isIpBlocked || e.isBotBlocked) {
-          _botChallengeUntil = now.add(cooldown);
-        }
+        _botChallengeUntil = now.add(cooldown);
+      } else if (failures.length >= 3) {
+        _videoCooldownUntil[videoId] = now.add(_videoFailureCooldown);
       }
-    } else {
+    } else if (e.isIpBlocked || e.isBotBlocked || e.isThrottled) {
       final cooldown = e.isIpBlocked ? _ipBlockCooldown : _botCooldown;
       _botChallengeUntil = now.add(cooldown);
     }

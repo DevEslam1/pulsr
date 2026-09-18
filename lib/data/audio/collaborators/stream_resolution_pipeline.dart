@@ -25,6 +25,7 @@ class StreamResolutionPipeline {
 
   final Map<String, CachedStreamUrl> _streamCache = {};
   final Map<String, Future<({String url, String? userAgent, String? cookies, String quality})>> _inFlightResolves = {};
+  int _resolveEpoch = 0;
 
   /// Cap on the in-memory URL cache. Without a bound it grew for every distinct
   /// `videoId:quality` seen in a session.
@@ -47,6 +48,14 @@ class StreamResolutionPipeline {
     // Keys are `videoId:quality`; anchor the prefix to the separator so a
     // shorter id can never match a sibling key.
     _streamCache.removeWhere((k, _) => k.startsWith('$videoId:'));
+  }
+
+  /// Clears in-flight and cached stream URLs and advances the epoch so
+  /// in-flight resolutions bound to the old network path cannot write back.
+  void clearNetworkCaches() {
+    _streamCache.clear();
+    _inFlightResolves.clear();
+    _resolveEpoch++;
   }
 
   /// Evicts expired entries first, then oldest-inserted, to keep the URL cache
@@ -90,6 +99,7 @@ class StreamResolutionPipeline {
     }
     final quality = prefs.getString('setting_streaming_quality') ?? 'high';
     final cacheKey = '$videoId:${quality.toLowerCase()}';
+    final resolveEpoch = _resolveEpoch;
 
     if (!forceRefresh) {
       final cached = _streamCache[cacheKey];
@@ -141,13 +151,15 @@ class StreamResolutionPipeline {
           ? DateTime.fromMillisecondsSinceEpoch(stamp)
           : DateTime.now().add(const Duration(hours: 5));
 
-      _streamCache[cacheKey] = CachedStreamUrl(
-        stream.url,
-        expires,
-        userAgent: stream.userAgent,
-        cookies: stream.cookies,
-      );
-      _pruneCache();
+      if (_resolveEpoch == resolveEpoch) {
+        _streamCache[cacheKey] = CachedStreamUrl(
+          stream.url,
+          expires,
+          userAgent: stream.userAgent,
+          cookies: stream.cookies,
+        );
+        _pruneCache();
+      }
 
       try {
         getLatencyTracker?.call()?.markStage(PlaybackStage.urlObtained);

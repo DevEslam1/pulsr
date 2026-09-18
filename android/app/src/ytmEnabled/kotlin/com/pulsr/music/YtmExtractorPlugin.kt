@@ -478,8 +478,10 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 // 9-client retry loop on every subsequent track while on VPN).
                 val m = e.message?.lowercase() ?: ""
                 if (m.contains("not a bot") || m.contains("sign in to confirm") ||
-                    m.contains("confirm you") || m.contains("bot") ||
-                    m.contains("recaptcha") || m.contains("automated")) {
+                    m.contains("confirm you're") || m.contains("confirm you’re") ||
+                    m.contains("bot_block") || m.contains("botguard") ||
+                    m.contains("recaptcha") || m.contains("automated queries") ||
+                    m.contains("unusual traffic")) {
                     "BOT_CHALLENGE"
                 } else {
                     "VIDEO_GONE"
@@ -508,7 +510,6 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 is javax.net.ssl.SSLException,
                 -> return true
             }
-            if (cause is IOException && cause.cause == null) return true
             cause = cause.cause
             depth++
         }

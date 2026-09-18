@@ -4,6 +4,9 @@ import 'dart:async';
 /// Races multiple resolution attempts and returns the first success.
 /// Failures are collected; if all fail, the first error is rethrown.
 class HedgedStreamResolver {
+  /// Default safety ceiling for hedged races so hanging attempts cannot block forever.
+  static const Duration defaultTimeout = Duration(seconds: 30);
+
   /// Race [attempts] with optional stagger between launches.
   /// [hedgeDelay] staggers the 2nd+ attempt so the fast path usually wins
   /// without paying double cost on every resolve.
@@ -13,9 +16,9 @@ class HedgedStreamResolver {
     Duration? timeout,
   }) async {
     if (attempts.isEmpty) throw StateError('No attempts provided');
+    final effectiveTimeout = timeout ?? defaultTimeout;
     if (attempts.length == 1) {
-      final f = attempts.first();
-      return timeout == null ? f : f.timeout(timeout);
+      return attempts.first().timeout(effectiveTimeout);
     }
     final completer = Completer<T>();
     final errors = <Object>[];
@@ -28,9 +31,7 @@ class HedgedStreamResolver {
         if (settled) return;
       }
       try {
-        final value = await (timeout == null
-            ? attempts[index]()
-            : attempts[index]().timeout(timeout));
+        final value = await attempts[index]().timeout(effectiveTimeout);
         if (!settled) {
           settled = true;
           completer.complete(value);
@@ -48,7 +49,7 @@ class HedgedStreamResolver {
     for (var i = 0; i < attempts.length; i++) {
       unawaited(run(i));
     }
-    return completer.future;
+    return completer.future.timeout(effectiveTimeout + hedgeDelay);
   }
 
   /// Convenience: race the same resolver twice (e.g. two Innertube clients

@@ -1122,6 +1122,7 @@ class PulsrAudioHandler extends BaseAudioHandler
           _prefetchStream(song);
         }
       },
+      onCancelRequested: () => cancelPrefetches(),
       qualityProvider: _currentStreamingQuality,
     );
 
@@ -1135,6 +1136,8 @@ class PulsrAudioHandler extends BaseAudioHandler
       isAlreadyPrefetching: (id) =>
           _prefetching.contains('$id:${_currentStreamingQuality().toLowerCase()}') ||
           _prefetching.contains(id),
+      repeatQueueProvider: () =>
+          playbackState.value.repeatMode == AudioServiceRepeatMode.all,
     );
 
     _formatDecoder = FormatAwareDecoder(
@@ -1198,12 +1201,8 @@ class PulsrAudioHandler extends BaseAudioHandler
         _onBufferBucketChanged(bucket);
       }),
     );
-
-    _subscriptions.add(
-      _adaptiveBufferEngine.onStepDownQualityRequested.listen((newQuality) {
-        _onQualityStepDownRequested(newQuality);
-      }),
-    );
+    // Quality step-down decisions are consolidated under AdaptiveQualityManager
+    // (via PlaybackAnalytics -> _maybeAdaptiveStepDown) to avoid duplicate drops or thrashing.
 
     _subscriptions.add(
       Stream.periodic(const Duration(seconds: 45)).listen((_) async {
