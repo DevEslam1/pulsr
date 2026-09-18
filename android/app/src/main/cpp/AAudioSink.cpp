@@ -78,6 +78,23 @@ bool AAudioSink::TryOpen(aaudio_sharing_mode_t sharing,
         AAudioStream_close(stream);
         return false;
     }
+    // Direct/bit-perfect output has no OS resampler, and position/timing math
+    // below uses config_.sampleRate. If the device silently substituted a
+    // different rate or channel count, keeping the requested value would drift
+    // pitch and timing. Reject instead so the Open() ladder falls through to a
+    // SHARED rung (AudioFlinger resamples there) rather than playing distorted.
+    const int32_t negotiatedRate = AAudioStream_getSampleRate(stream);
+    if (negotiatedRate != config_.sampleRate) {
+        lastError_ = "negotiated sample-rate mismatch";
+        AAudioStream_close(stream);
+        return false;
+    }
+    const int32_t negotiatedCh = AAudioStream_getChannelCount(stream);
+    if (negotiatedCh != config_.channelCount) {
+        lastError_ = "negotiated channel-count mismatch";
+        AAudioStream_close(stream);
+        return false;
+    }
     stream_ = stream;
     bytesPerFrame_ =
         ContainerBytesPerFrame(config_.encoding, config_.channelCount);

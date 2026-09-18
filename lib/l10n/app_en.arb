@@ -3518,6 +3518,8 @@
   "settingsAutoDarkModeSubtitle": "Follow a 7 PM – 6 AM day/night schedule",
   "settingsHighContrastTitle": "High Contrast",
   "settingsHighContrastSubtitle": "Boost contrast with an AMOLED-friendly palette",
+  "settingsDimWhitePointTitle": "Dim White Point",
+  "settingsDimWhitePointSubtitle": "Soften bright text for easier night listening",
   "settingsReduceMotionTitle": "Reduce Motion",
   "settingsReduceMotionSubtitle": "Snap animations instead of tweening them",
   "settingsLiquidGlassTitle": "Liquid Glass Tint",

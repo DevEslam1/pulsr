@@ -25,6 +25,7 @@ export 'comparison_slot.dart';
 export 'async_lock.dart' show AsyncLock;
 
 part 'equalizer_preset_ops.dart';
+part 'equalizer_snapshot_ops.dart';
 
 class EqualizerManager {
   final AndroidLoudnessEnhancer? loudnessEnhancerA;
@@ -95,6 +96,7 @@ class EqualizerManager {
   bool isCrossfeedEnabled = false;
   double crossfeedDelayUs = 350.0; // 200 - 700 us
   double crossfeedFeedDb = -9.0; // -15 to -6 dB
+  double crossfeedFcut = 650.0; // 200 - 2000 Hz (Custom-mode cutoff)
   int crossfeedMode = 0; // 0=Bs2bDefault, 1=Bs2bChuMoy, 2=Bs2bJanMeier, 3=Custom
 
   bool isLimiterEnabled = false;
@@ -123,6 +125,8 @@ class EqualizerManager {
   /// reverb synthesizes an impulse response for.
   int reverbPreset = ReverbPreset.studio.wireValue;
   double reverbWetDry = 0.20;
+  double reverbPredelayMs = 0.0; // 0 - 150 ms
+  double reverbDamping = 0.5; // 0.0 - 1.0 (HF absorption)
 
   double stereoBalance = 0.0; // -1.0 to +1.0
   bool monoMix = false;
@@ -890,6 +894,7 @@ class EqualizerManager {
         PrefsKeys.crossfeedEnabled: isCrossfeedEnabled,
         PrefsKeys.crossfeedDelayUs: crossfeedDelayUs,
         PrefsKeys.crossfeedFeedDb: crossfeedFeedDb,
+        PrefsKeys.crossfeedFcut: crossfeedFcut,
         PrefsKeys.crossfeedMode: crossfeedMode,
         PrefsKeys.lookaheadLimiterEnabled: isLimiterEnabled,
         PrefsKeys.lookaheadLimiterThresholdDb: limiterThresholdDb,
@@ -905,6 +910,8 @@ class EqualizerManager {
         PrefsKeys.convolutionReverbEnabled: isReverbEnabled,
         PrefsKeys.convolutionReverbPreset: reverbPreset,
         PrefsKeys.convolutionReverbWetDry: reverbWetDry,
+        PrefsKeys.convolutionReverbPredelayMs: reverbPredelayMs,
+        PrefsKeys.convolutionReverbDamping: reverbDamping,
         PrefsKeys.stereoBalance: stereoBalance,
         PrefsKeys.monoMix: monoMix,
         PrefsKeys.sincResamplerEnabled: isSincResamplerEnabled,
@@ -1487,6 +1494,7 @@ class EqualizerManager {
     bool enabled, {
     double? delayUs,
     double? feedDb,
+    double? fcut,
     int? mode,
   }) async {
     isCrossfeedEnabled = enabled;
@@ -1496,11 +1504,15 @@ class EqualizerManager {
     if (feedDb != null) {
       crossfeedFeedDb = feedDb.clamp(-15.0, -6.0);
     }
+    if (fcut != null) {
+      crossfeedFcut = fcut.clamp(200.0, 2000.0);
+    }
     if (mode != null) crossfeedMode = mode.clamp(0, 3);
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setCrossfeedParams(
         crossfeedDelayUs,
         crossfeedFeedDb,
+        fcut: crossfeedFcut,
       );
       await _effectsChannel.setCrossfeedMode(crossfeedMode);
       await _effectsChannel.setCrossfeedEnabled(enabled);
@@ -1570,7 +1582,13 @@ class EqualizerManager {
     _syncPipeline();
   }
 
-  Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) async {
+  Future<void> setReverb(
+    bool enabled, {
+    int? preset,
+    double? wetDry,
+    double? predelayMs,
+    double? damping,
+  }) async {
     isReverbEnabled = enabled;
     if (preset != null) {
       // Wire values are ReverbPreset ordinals (0..N); anything else has no
@@ -1580,10 +1598,19 @@ class EqualizerManager {
           preset.clamp(0, ReverbPreset.values.length - 1);
     }
     if (wetDry != null) reverbWetDry = wetDry.clamp(0.0, 1.0);
+    if (predelayMs != null) reverbPredelayMs = predelayMs.clamp(0.0, 150.0);
+    if (damping != null) reverbDamping = damping.clamp(0.0, 1.0);
     if (PlatformCapabilities.isAndroid) {
       if (preset != null) await _effectsChannel.setReverbPreset(preset);
       // FIX M-7: always sync wet/dry after preset change so DSP is not stale
       await _effectsChannel.setReverbWetDry(wetDry ?? reverbWetDry);
+      // Predelay, damping and cross-channel share one native call; push the
+      // current values so a preset change never leaves them stale.
+      await _effectsChannel.setReverbParams(
+        predelayMs: reverbPredelayMs,
+        damping: reverbDamping,
+        crossChannel: reverbCrossChannel,
+      );
       await _effectsChannel.setReverbEnabled(enabled);
     }
     _debouncedSavePreferences();

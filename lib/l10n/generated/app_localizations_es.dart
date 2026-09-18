@@ -4286,6 +4286,13 @@ class AppLocalizationsEs extends AppLocalizations {
       'Aumenta el contraste con una paleta compatible con AMOLED';
 
   @override
+  String get settingsDimWhitePointTitle => 'Atenuar punto blanco';
+
+  @override
+  String get settingsDimWhitePointSubtitle =>
+      'Suaviza el texto brillante para escuchar de noche';
+
+  @override
   String get settingsReduceMotionTitle => 'Reducir movimiento';
 
   @override

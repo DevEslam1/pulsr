@@ -35,7 +35,7 @@ abstract class AppColors {
   static const Color azure = Color(0xFF00B0FF);
 
   // Dark surfaces (kept for legacy widgets)
-  static const Color background = Color(0xFF0A0C12);
+  static const Color background = Color(0xFF0B0B0F);
   static const Color surface = Color(0xFF12141D);
   static const Color card = Color(0xFF171B28);
   static const Color surfaceLight = Color(0xFF1E2235);

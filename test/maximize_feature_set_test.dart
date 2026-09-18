@@ -153,6 +153,41 @@ void main() {
       expect(s.recallFor(artist: 'A', genre: 'Rock')!.presetName, 'Ar');
       expect(s.recallFor(genre: 'Rock')!.presetName, 'G');
     });
+
+    test('full effects map survives toMap/fromMap round-trip', () {
+      final now = DateTime.now();
+      final snap = DspSnapshot(
+        presetName: 'Custom',
+        gains: const [1.0, 2.0, 3.0],
+        bassBoost: 0.4,
+        effects: const {
+          'v': 1,
+          'saturationEnabled': true,
+          'saturationDrive': 0.6,
+          'reverbEnabled': true,
+          'reverbPreset': 2,
+          'dynamicEqBands': [
+            {'frequency': 200.0, 'ratio': 4.0}
+          ],
+        },
+        savedAt: now,
+      );
+      final restored = DspSnapshot.fromMap(snap.toMap())!;
+      expect(restored.effects, isNotNull);
+      expect(restored.effects!['saturationEnabled'], isTrue);
+      expect(restored.effects!['reverbPreset'], 2);
+      expect((restored.effects!['dynamicEqBands'] as List).length, 1);
+    });
+
+    test('legacy snapshot without effects map recalls as curve-only', () {
+      final restored = DspSnapshot.fromMap({
+        'preset': 'Flat',
+        'gains': [0.0, 0.0],
+        'savedAt': DateTime.now().millisecondsSinceEpoch,
+      })!;
+      expect(restored.effects, isNull);
+      expect(restored.presetName, 'Flat');
+    });
   });
 
   group('F10 silence skip', () {

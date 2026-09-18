@@ -7715,6 +7715,18 @@ abstract class AppLocalizations {
   /// **'Boost contrast with an AMOLED-friendly palette'**
   String get settingsHighContrastSubtitle;
 
+  /// No description provided for @settingsDimWhitePointTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Dim White Point'**
+  String get settingsDimWhitePointTitle;
+
+  /// No description provided for @settingsDimWhitePointSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Soften bright text for easier night listening'**
+  String get settingsDimWhitePointSubtitle;
+
   /// No description provided for @settingsReduceMotionTitle.
   ///
   /// In en, this message translates to:

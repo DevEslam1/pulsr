@@ -26,6 +26,23 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     try {
       player.dspClearGainCurve().catchError((_) => false);
     } catch (_) {}
+    // A finished track is parked in `completed` at its end; play() alone will
+    // not restart it (which is why skipToNext/skipToPrevious seek to zero before
+    // playing at end-of-queue). Seek to the head first so an explicit play — the
+    // resume tap on the finished song, togglePlayPause, or the notification /
+    // widget play button — replays it instead of no-opping in `completed`.
+    // A merely paused (ready) track is untouched, so it still resumes in place.
+    if (player.processingState == ProcessingState.completed) {
+      return () async {
+        try {
+          await player.seek(Duration.zero);
+        } catch (_) {}
+        final f = player.play();
+        _scheduleFadeInConvergenceGuard(player, generation);
+        _broadcastState(player.playbackEvent);
+        await f;
+      }();
+    }
     final playFuture = player.play();
     _scheduleFadeInConvergenceGuard(player, generation);
     _broadcastState(player.playbackEvent);
@@ -220,7 +237,16 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     final isDoubleTap = _lastPreviousTapTime != null &&
         now.difference(_lastPreviousTapTime!).inMilliseconds < 2500;
     _lastPreviousTapTime = now;
-    final wasPlaying = _activePlayer.playing;
+    // A track that reached the end sits in `completed` with `playing == false`
+    // and its position pinned at the duration. Pressing previous on it should
+    // replay it, not leave it parked as "finished & paused": the restart-current
+    // branches below only call play() when this is true, and seek(0) alone does
+    // not clear the `completed` state. Treating a finished track as "was playing"
+    // makes previous resume it (and clear completed). This is intentionally
+    // scoped to the user-driven skipToPrevious — the auto-advance skipToNext must
+    // stay paused at end-of-queue so it doesn't loop the last track forever.
+    final wasPlaying = _activePlayer.playing ||
+        _activePlayer.processingState == ProcessingState.completed;
 
     if (_crossfadeManager.isCrossfading) {
       await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,

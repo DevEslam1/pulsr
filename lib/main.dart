@@ -624,7 +624,8 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                 Color customAccent,
                 String languageCode,
                 bool highContrast,
-                bool reduceMotion
+                bool reduceMotion,
+                bool dimWhitePoint
               })>(
             selector: (state) => (
               colorSource: state.themeColorSource,
@@ -633,6 +634,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
               languageCode: state.languageCode,
               highContrast: state.highContrast,
               reduceMotion: state.reduceMotion,
+              dimWhitePoint: state.dimWhitePoint,
             ),
             builder: (context, settingsConfig) {
               return BlocSelector<DynamicThemeCubit, DynamicThemeState,
@@ -683,6 +685,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                               isAmoled: settingsConfig.themeMode ==
                                   AppThemeMode.amoled,
                               isBoldText: isBoldText,
+                              dimWhitePoint: settingsConfig.dimWhitePoint,
                             );
 
                       final ThemeMode flutterThemeMode;

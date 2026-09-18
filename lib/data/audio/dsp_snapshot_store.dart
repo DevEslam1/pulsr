@@ -10,12 +10,19 @@ class DspSnapshot {
   final double bassBoost;
   final DateTime savedAt;
 
+  /// Full effect-chain state (all JamesDSP / Phase-1 stages), produced by
+  /// `EqualizerManager.captureEffectsState()`. Null for legacy v1 snapshots
+  /// that only captured the graphic-EQ curve; recall falls back to the
+  /// preset/gains fields above in that case.
+  final Map<String, dynamic>? effects;
+
   const DspSnapshot({
     required this.presetName,
     required this.gains,
     this.volumeBoost = 0.0,
     this.bassBoost = 0.0,
     required this.savedAt,
+    this.effects,
   });
 
   Map<String, dynamic> toMap() => {
@@ -24,11 +31,13 @@ class DspSnapshot {
         'volumeBoost': volumeBoost,
         'bassBoost': bassBoost,
         'savedAt': savedAt.millisecondsSinceEpoch,
+        if (effects != null) 'effects': effects,
       };
 
   static DspSnapshot? fromMap(Map<String, dynamic> m) {
     try {
       final gains = (m['gains'] as List).map((e) => (e as num).toDouble()).toList();
+      final rawEffects = m['effects'];
       return DspSnapshot(
         presetName: m['preset'] as String? ?? 'Flat',
         gains: gains,
@@ -36,6 +45,8 @@ class DspSnapshot {
         bassBoost: (m['bassBoost'] as num?)?.toDouble() ?? 0.0,
         savedAt: DateTime.fromMillisecondsSinceEpoch(
             (m['savedAt'] as num?)?.toInt() ?? 0),
+        effects:
+            rawEffects is Map ? Map<String, dynamic>.from(rawEffects) : null,
       );
     } catch (_) {
       return null;

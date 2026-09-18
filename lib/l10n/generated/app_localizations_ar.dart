@@ -4254,6 +4254,13 @@ class AppLocalizationsAr extends AppLocalizations {
       'زيد التباين بلوحة ألوان مناسبة لـ AMOLED';
 
   @override
+  String get settingsDimWhitePointTitle => 'تعتيم النقطة البيضاء';
+
+  @override
+  String get settingsDimWhitePointSubtitle =>
+      'تخفيف النص الساطع لتسهيل الاستماع ليلًا';
+
+  @override
   String get settingsReduceMotionTitle => 'تقليل الحركة';
 
   @override

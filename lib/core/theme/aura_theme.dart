@@ -159,7 +159,8 @@ class AuraTheme {
   }
 
   static PulsrPalette _palette(
-      Color accent, Brightness brightness, bool isAmoled) {
+      Color accent, Brightness brightness, bool isAmoled,
+      {bool dimWhitePoint = false}) {
     final isDark = brightness == Brightness.dark;
     final onAccent = accent.computeLuminance() > 0.5
         ? const Color(0xFF101223)
@@ -178,7 +179,9 @@ class AuraTheme {
         hairline: const Color(0xFF0F1724).withValues(alpha: 0.09),
         textPrimary: const Color(0xFF101425),
         textSecondary: const Color(0xFF5D6880),
-        textTertiary: const Color(0xFF9AA3B8),
+        // AA-compliant tertiary (>=4.5:1 on white/cards, ~4.2:1 on bg).
+        // Was #9AA3B8 (2.34:1) which failed WCAG for small metadata text.
+        textTertiary: const Color(0xFF6C7690),
         favorite: AppColors.favorite,
         success: AppColors.success,
         error: AppColors.error,
@@ -196,9 +199,13 @@ class AuraTheme {
         surfaceContainer: const Color(0xFF121216),
         surfaceContainerHigh: const Color(0xFF18181E),
         hairline: Colors.white.withValues(alpha: 0.09),
-        textPrimary: const Color(0xFFF5F6FA),
+        // Dim white point softens peak white for night listening (12.8:1,
+        // still well above AA) without touching secondary/tertiary hierarchy.
+        textPrimary:
+            dimWhitePoint ? const Color(0xFFCDD0DC) : const Color(0xFFF5F6FA),
         textSecondary: const Color(0xFF9BA1AE),
-        textTertiary: const Color(0xFF5F6470),
+        // AA-compliant tertiary on black (4.80:1); was #5F6470 (3.54:1).
+        textTertiary: const Color(0xFF737985),
         favorite: AppColors.favorite,
         success: AppColors.success,
         error: AppColors.error,
@@ -210,14 +217,20 @@ class AuraTheme {
       onAccent: onAccent,
       accentContainer: accent.withValues(alpha: 0.14),
       glow: accent.withValues(alpha: 0.28),
-      bg: const Color(0xFF0A0C12),
+      // Near-neutral dark base. Was #0A0C12 (blue-tinted); blue is the most
+      // fatiguing wavelength in dark rooms, so this drops the cool cast.
+      bg: const Color(0xFF0B0B0F),
       surface: const Color(0xFF12141D),
       surfaceContainer: const Color(0xFF171B28),
       surfaceContainerHigh: const Color(0xFF1E2235),
       hairline: Colors.white.withValues(alpha: 0.07),
-      textPrimary: const Color(0xFFEDEFF7),
+      // Dim white point softens peak white for night listening (12.8:1).
+      textPrimary:
+          dimWhitePoint ? const Color(0xFFCDD0DC) : const Color(0xFFEDEFF7),
       textSecondary: const Color(0xFF98A0B3),
-      textTertiary: const Color(0xFF5C6478),
+      // AA-compliant tertiary (5.18:1 on bg, 4.52:1 on cards).
+      // Was #5C6478 (3.30:1 / 2.90:1) which failed WCAG for small text.
+      textTertiary: const Color(0xFF7A8399),
       favorite: AppColors.favorite,
       success: AppColors.success,
       error: AppColors.error,
@@ -230,8 +243,10 @@ class AuraTheme {
     Brightness brightness = Brightness.dark,
     bool isAmoled = false,
     bool isBoldText = false,
+    bool dimWhitePoint = false,
   }) {
-    final p = _palette(accent, brightness, isAmoled);
+    final p = _palette(accent, brightness, isAmoled,
+        dimWhitePoint: dimWhitePoint);
     final isDark = p.isDark;
     const fontFamily = 'Manrope';
     const fontFallbacks = [
@@ -504,8 +519,10 @@ class AuraTheme {
       ),
       sliderTheme: SliderThemeData(
         activeTrackColor: p.accent,
+        // 0.20 (was 0.14) keeps the inactive track visible over bright artwork
+        // in the player, matching iOS/Apple Music track legibility.
         inactiveTrackColor: (p.isDark ? Colors.white : Colors.black)
-            .withValues(alpha: 0.14),
+            .withValues(alpha: 0.20),
         thumbColor: Colors.white,
         overlayColor: p.accent.withValues(alpha: 0.16),
         trackHeight: 6.0,

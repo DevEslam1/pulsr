@@ -55,6 +55,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
   static const String _keyThemeMode = 'setting_theme_mode';
   static const String _keyAutoThemeByTime = 'setting_auto_theme_by_time';
   static const String _keyHighContrast = 'setting_high_contrast';
+  static const String _keyDimWhitePoint = 'setting_dim_white_point';
   static const String _keyLiquidGlassTint = 'setting_liquid_glass_tint';
   static const String _keyLanguageCode = PrefsKeys.languageCode;
   static const String _keyCustomAccent = 'setting_custom_accent';
@@ -476,6 +477,8 @@ class SettingsCubit extends PulsrCubit<SettingsState>
         autoThemeByTime:
             prefs.getBool(_keyAutoThemeByTime) ?? state.autoThemeByTime,
         highContrast: prefs.getBool(_keyHighContrast) ?? state.highContrast,
+        dimWhitePoint:
+            prefs.getBool(_keyDimWhitePoint) ?? state.dimWhitePoint,
         reduceMotion: prefs.getBool('setting_reduce_motion') ?? state.reduceMotion,
         liquidGlassTint:
             prefs.getDouble(_keyLiquidGlassTint) ?? state.liquidGlassTint,
@@ -822,6 +825,12 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     safeEmit(state.copyWith(highContrast: value));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyHighContrast, value);
+  }
+
+  Future<void> setDimWhitePoint(bool value) async {
+    safeEmit(state.copyWith(dimWhitePoint: value));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyDimWhitePoint, value);
   }
 
   Future<void> setLiquidGlassTint(double value) async {
