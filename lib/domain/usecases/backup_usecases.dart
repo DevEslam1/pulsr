@@ -324,10 +324,8 @@ class ImportBackupUseCase {
   Future<ImportResult> execute(String jsonString) async {
     // Cheap length check first (chars) to avoid double alloc for size check — prevents OOM on low RAM
     if (jsonString.length > maxBackupSizeBytes) {
-      if (utf8.encode(jsonString).length > maxBackupSizeBytes) {
-        throw const FormatException(
-            'Backup file exceeds maximum allowed size of 10 MB');
-      }
+      throw const FormatException(
+          'Backup file exceeds maximum allowed size of 10 MB');
     } else if (utf8.encode(jsonString).length > maxBackupSizeBytes) {
       throw const FormatException(
           'Backup file exceeds maximum allowed size of 10 MB');

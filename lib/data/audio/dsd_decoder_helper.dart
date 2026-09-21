@@ -361,8 +361,10 @@ class DsdDecoderHelper {
       final chunkSize = byteData.getUint64(pos + 4, Endian.big);
 
       if (chunkId == 'FS  ') {
-        final sampleRate = byteData.getUint32(pos + 12, Endian.big);
-        dsdRate = sampleRate ~/ 44100;
+        if (chunkSize >= 4 && pos + 16 <= bytes.length) {
+          final sampleRate = byteData.getUint32(pos + 12, Endian.big);
+          dsdRate = sampleRate ~/ 44100;
+        }
       } else if (chunkId == 'DSD ') {
         dataOffset = pos + 12;
         dataSize = chunkSize.clamp(0, bytes.length - dataOffset);

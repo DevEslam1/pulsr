@@ -287,18 +287,21 @@ class DownloadRepositoryImpl implements IDownloadRepository {
           protectedVideoIds: _tasks.keys.toSet());
     } catch (_) {}
 
-    if (task?.filePath != null) {
+    final filePath = task?.filePath;
+    if (filePath != null) {
       try {
-        final f = File(task!.filePath!);
+        final f = File(filePath);
         if (await f.exists()) {
           await f.delete();
         }
       } catch (_) {}
-      // Try .part variant too
-      try {
-        final part = File('${task!.filePath!}.part');
-        if (await part.exists()) await part.delete();
-      } catch (_) {}
+      // Clean up partial chunks and resume stamps if present
+      for (final suffix in const ['.part', '.parts', '.part.stamp']) {
+        try {
+          final part = File('$filePath$suffix');
+          if (await part.exists()) await part.delete();
+        } catch (_) {}
+      }
     }
 
     _cachedStorageStats = null; // Invalidate storage cache

@@ -41,6 +41,7 @@ class DuplicateFinderService {
     }
 
     final List<DuplicateGroup> result = [];
+    final Set<int> capturedSongIds = {};
 
     // Pass 1: Title + Artist matches
     for (final entry in byTitleArtist.entries) {
@@ -50,6 +51,9 @@ class DuplicateFinderService {
           songs: entry.value,
           reason: 'Identical Title & Artist (${entry.value.length} copies)',
         ));
+        for (final song in entry.value) {
+          capturedSongIds.add(song.id);
+        }
       }
     }
 
@@ -60,7 +64,7 @@ class DuplicateFinderService {
     for (final entry in byDurationSize.entries) {
       if (entry.value.length > 1) {
         final remaining = entry.value
-            .where((s) => !result.any((g) => g.songs.contains(s)))
+            .where((s) => !capturedSongIds.contains(s.id))
             .toList();
         if (remaining.length > 1) {
           final clusters = await _verifyWithChecksum(remaining);
@@ -70,6 +74,9 @@ class DuplicateFinderService {
               songs: cluster,
               reason: 'Identical Audio Content (Checksum Verified)',
             ));
+            for (final song in cluster) {
+              capturedSongIds.add(song.id);
+            }
           }
         }
       }

@@ -1,6 +1,6 @@
 import 'package:flutter/services.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../core/bloc/base_cubit.dart';
 import '../../core/constants/channels.dart';
 import '../../core/services/metadata_search_service.dart';
 import '../../core/utils/error_logger.dart';
@@ -9,7 +9,7 @@ import '../../data/db/app_database.dart';
 import '../../data/scanner/media_scanner_service.dart';
 import 'tag_editor_state.dart';
 
-class TagEditorCubit extends Cubit<TagEditorState> {
+class TagEditorCubit extends PulsrCubit<TagEditorState> {
   static const MethodChannel _channel = MethodChannel(PulsrChannels.tagEditor);
   final MediaScannerService _scannerService;
   final MetadataSearchService _metadataSearchService;
@@ -672,9 +672,10 @@ bool _isWriteVerified(dynamic result) {
     // Generation 1: bare bool. Accept as success; log so we know the native
     // side hasn't been updated yet.
     assert(() {
-      // ignore: avoid_print
-      print('[TagEditor] Legacy bare-bool result from writeTags — '
-          'update native bridge to return {verified: true}.');
+      ErrorLogger.log(
+        '[TagEditor] Legacy bare-bool result from writeTags — update native bridge to return {verified: true}.',
+        category: 'tag_editor',
+      );
       return true;
     }());
     return result;
