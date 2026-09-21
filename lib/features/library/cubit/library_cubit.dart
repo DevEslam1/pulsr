@@ -156,9 +156,12 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
             if (isRatingSort) {
               _hasMoreSongs = false;
               _isLoadingMoreSongs = false;
+              final hasHitCap = songs.length >= ratingSortCap;
               safeEmit(state.copyWith(
                   songs: _sortByRating(songs, ascending: state.ascending),
-                  errorMessage: null,
+                  errorMessage: hasHitCap
+                      ? 'Displaying top 5,000 rated songs (maximum limit).'
+                      : null,
                   isLoading: false,
                   isLoadingMore: false));
               return;
@@ -180,13 +183,14 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
   /// Dart-side top-rated sort (ratings live in SharedPreferences).
   List<SongsTableData> _sortByRating(List<SongsTableData> songs,
       {bool ascending = false}) {
+    final store = getIt.isRegistered<SongRatingStore>()
+        ? getIt<SongRatingStore>()
+        : null;
+
     int ratingOf(SongsTableData s) {
+      if (store == null) return 0;
       try {
-        // Ratings are keyed by song id string (see SongRatingStore).
-        final store = getIt.isRegistered<SongRatingStore>()
-            ? getIt<SongRatingStore>()
-            : null;
-        return store?.getRating(s.id.toString()) ?? 0;
+        return store.getRating(s.id.toString());
       } catch (_) {
         return 0;
       }

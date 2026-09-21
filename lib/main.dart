@@ -32,6 +32,7 @@ import 'core/services/scrobbler_service.dart';
 import 'core/services/file_intent_handler.dart';
 import 'core/services/restore_detection_service.dart';
 import 'core/services/ytm_account_service.dart';
+import 'core/services/ytm_client_version_resolver.dart';
 import 'core/services/ytm_service.dart';
 import 'core/services/ytm_url_cache.dart';
 import 'core/utils/error_logger.dart';
@@ -168,6 +169,18 @@ Future<void> main() async {
                 .catchError((e, st) {
               ErrorLogger.log('YtmAccountService init failed or timed out',
                   error: e, stackTrace: st, category: 'Startup');
+            }),
+          if (onlineAllowed &&
+              getIt.isRegistered<YtmClientVersionResolver>())
+            getIt<YtmClientVersionResolver>()
+                .init()
+                .timeout(const Duration(seconds: 8))
+                .catchError((e, st) {
+              ErrorLogger.log(
+                  'YtmClientVersionResolver init failed or timed out',
+                  error: e,
+                  stackTrace: st,
+                  category: 'Startup');
             }),
           // Rehydrate guest stream URLs saved by the previous run so a replay
           // or skip-back after launch resolves instantly.

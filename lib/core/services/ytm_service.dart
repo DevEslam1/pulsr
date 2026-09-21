@@ -555,13 +555,14 @@ class YtmService {
         clientVersion = resolver.clientVersion;
       }
 
+      final localeArgs = _localeArgs();
       final body = jsonEncode({
         'context': {
           'client': {
             'clientName': 'WEB_REMIX',
             'clientVersion': clientVersion,
-            'hl': 'en',
-            'gl': 'EG',
+            'hl': localeArgs['lang'] ?? 'en',
+            'gl': localeArgs['country'] ?? 'US',
           },
         },
         'query': query,
@@ -573,11 +574,18 @@ class YtmService {
         'Origin': 'https://music.youtube.com',
         'Referer': 'https://music.youtube.com/',
         'x-origin': 'https://music.youtube.com',
+        'x-youtube-client-name': '67',
+        'x-youtube-client-version': clientVersion,
         'x-goog-authuser': '0',
+        'X-Goog-Api-Key': apiKey,
       };
 
       if (getIt.isRegistered<YtmAccountService>()) {
         final account = getIt<YtmAccountService>();
+        final visitorData = account.sessionVisitorData;
+        if (visitorData != null && visitorData.isNotEmpty) {
+          headers['X-Goog-Visitor-Id'] = visitorData;
+        }
         if (account.isLoggedIn) {
           final cookies = account.cookies;
           if (cookies != null && cookies.isNotEmpty) {
@@ -638,6 +646,45 @@ class YtmService {
                 }
               }
 
+              if (videoId != null && videoId.length == 11) {
+                tracks.add(YtmTrack(
+                  videoId: videoId,
+                  title: title,
+                  artist: artist,
+                  duration: Duration.zero,
+                ));
+              }
+              return;
+            }
+            if (node.containsKey('musicTwoRowItemRenderer')) {
+              final r = node['musicTwoRowItemRenderer'] as Map<String, dynamic>;
+              final nav = r['navigationEndpoint'] as Map<String, dynamic>?;
+              String? videoId = nav?['watchEndpoint']?['videoId'] as String?;
+              final titleObj = r['title'] as Map<String, dynamic>?;
+              final titleRuns = titleObj?['runs'] as List<dynamic>?;
+              String title = 'Unknown Title';
+              if (titleRuns != null && titleRuns.isNotEmpty) {
+                title = titleRuns[0]['text'] as String? ?? title;
+                videoId ??= (titleRuns[0]['navigationEndpoint']
+                    as Map<String, dynamic>?)?['watchEndpoint']?['videoId'] as String?;
+              }
+              final subObj = r['subtitle'] as Map<String, dynamic>?;
+              final subRuns = subObj?['runs'] as List<dynamic>?;
+              String artist = 'Unknown Artist';
+              if (subRuns != null && subRuns.isNotEmpty) {
+                for (final run in subRuns) {
+                  final text = (run['text'] as String?)?.trim();
+                  if (text != null &&
+                      text.isNotEmpty &&
+                      text != '•' &&
+                      text != '·' &&
+                      text.toLowerCase() != 'song' &&
+                      text.toLowerCase() != 'video') {
+                    artist = text;
+                    break;
+                  }
+                }
+              }
               if (videoId != null && videoId.length == 11) {
                 tracks.add(YtmTrack(
                   videoId: videoId,

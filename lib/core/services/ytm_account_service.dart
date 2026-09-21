@@ -161,6 +161,7 @@ class YtmAccountService {
   /// Raw datasyncId of the authenticated account — null until the first authenticated
   /// Innertube response is harvested. Used externally to gate account-bound poToken minting.
   String? get dataSyncId => _dataSyncId;
+  String? get sessionVisitorData => _sessionVisitorData;
 
   String get _clientVersion => _versionResolver.clientVersion;
   String get _apiKey => _versionResolver.apiKey;

@@ -71,7 +71,7 @@ class YtmBrowseService {
       final newReleases = await getNewReleases();
       final moods = await getMoodsAndGenres();
 
-      final sections = [
+      final rawSections = [
         YtmBrowseSection(
           title: 'Top Charts & Trending',
           subtitle: 'Most played tracks right now',
@@ -88,8 +88,11 @@ class YtmBrowseService {
           items: moods,
         ),
       ];
-      _cachedSections = sections;
-      _lastFetchTime = DateTime.now();
+      final sections = rawSections.where((s) => s.items.isNotEmpty).toList();
+      if (sections.isNotEmpty) {
+        _cachedSections = sections;
+        _lastFetchTime = DateTime.now();
+      }
       _pendingFeed?.complete(sections);
       _pendingFeed = null;
       return sections;
@@ -123,7 +126,8 @@ class YtmBrowseService {
     } catch (_) {}
 
     try {
-      final onlineTracks = await _ytmService.search('Top Global Hits');
+      final onlineTracks =
+          await _ytmService.searchWithFallback('Top Global Hits', limit: 15);
       if (onlineTracks.isNotEmpty) {
         return onlineTracks
             .take(8)
@@ -145,7 +149,8 @@ class YtmBrowseService {
   /// Fetches New Releases.
   Future<List<YtmBrowseItem>> getNewReleases() async {
     try {
-      final onlineTracks = await _ytmService.search('New Music Releases');
+      final onlineTracks =
+          await _ytmService.searchWithFallback('New Music Releases', limit: 15);
       if (onlineTracks.isNotEmpty) {
         return onlineTracks
             .take(8)
@@ -175,6 +180,24 @@ class YtmBrowseService {
       final moods = await _ytmService.getMoods(limit: 15);
       if (moods.isNotEmpty) {
         return moods
+            .take(8)
+            .map((t) => YtmBrowseItem(
+                  id: t.videoId,
+                  title: t.title,
+                  subtitle: t.artist,
+                  artworkUrl: t.artworkUrl,
+                  type: 'song',
+                  duration: t.duration,
+                ))
+            .toList();
+      }
+    } catch (_) {}
+
+    try {
+      final onlineTracks =
+          await _ytmService.searchWithFallback('Popular Hits Playlist', limit: 15);
+      if (onlineTracks.isNotEmpty) {
+        return onlineTracks
             .take(8)
             .map((t) => YtmBrowseItem(
                   id: t.videoId,

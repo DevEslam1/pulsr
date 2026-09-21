@@ -71,6 +71,12 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             // EncryptedSharedPreferences, which is keystore-backed disk I/O and ran
             // during engine attach.
             context?.let { ctx -> plugin.executor.execute { runCatching { PoTokenManager.init(ctx) } } }
+            // Warm up the YouTube player base.js decipher engine at startup.
+            // Without this, every ciphered stream format is discarded until the
+            // first successful /player response delivers an assets.js URL — which
+            // never happens on a flagged IP. Starting the fetch here covers the
+            // entire app launch window before any song tries to resolve.
+            context?.let { plugin.executor.execute { runCatching { PlayerJavaScript.warmUp() } } }
             // 2026-09 gap 2: proxy rotation changes the egress -> re-mint tokens.
             ProxyPool.setOnPathChangeListener { label -> EgressSignals.onEgressChanged?.invoke(label) }
             EgressSignals.onEgressChanged = { id -> PoTokenManager.onEgressChanged(id) }
@@ -260,6 +266,12 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 }
                 runOffMainThread(result) {
                     ClientCapabilityMatrix.init(ctx)
+                    // Proactively fetch the YouTube player base.js and parse decipher
+                    // rules so they are cached before the first song resolution. Without
+                    // this warmUp(), playerUrl stays empty and every ciphered format gets
+                    // discarded ("No cached decipher rules for player hash default"),
+                    // forcing the 9-client chain to time out every session.
+                    executor.execute { runCatching { PlayerJavaScript.warmUp() } }
                     PoTokenManager.preWarm(ctx)
                     true
                 }
@@ -548,22 +560,50 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         // 2. Fallback if empty: General search only if not throttled/blocked
         if (results.isEmpty()) {
             if (primaryError is ReCaptchaException || primaryError is RateLimitedException) {
-                throw primaryError
-            }
-            try {
-                val generalExtractor = ServiceList.YouTube.getSearchExtractor(query)
-                generalExtractor.fetchPage()
-                val items = SearchInfo.getInfo(generalExtractor).relatedItems.asSequence().filterIsInstance<StreamInfoItem>()
-                for (map in streamItemsToMaps(items, limit)) {
-                    val vid = map["videoId"] as? String
-                    if (vid != null && seenVideoIds.add(vid)) {
-                        results.add(map)
+                // Let InnerTube fallback run below before throwing
+            } else {
+                try {
+                    val generalExtractor = ServiceList.YouTube.getSearchExtractor(query)
+                    generalExtractor.fetchPage()
+                    val items = SearchInfo.getInfo(generalExtractor).relatedItems.asSequence().filterIsInstance<StreamInfoItem>()
+                    for (map in streamItemsToMaps(items, limit)) {
+                        val vid = map["videoId"] as? String
+                        if (vid != null && seenVideoIds.add(vid)) {
+                            results.add(map)
+                        }
                     }
+                } catch (e: Exception) {
+                    Log.w(TAG, "General search fallback failed: ${e.message}")
                 }
-            } catch (e: Exception) {
-                Log.w(TAG, "General search fallback failed: ${e.message}")
-                if (primaryError != null && results.isEmpty()) throw primaryError
             }
+        }
+
+        // 3. Fallback if still empty: Native InnerTube search
+        if (results.isEmpty()) {
+            val ctx = context?.applicationContext
+            if (ctx != null) {
+                try {
+                    YtmCookieStore.getInstance(ctx).readFromCookieManager()
+                    val client = InnertubeClient(ctx)
+                    val json = client.requestSearch(query)
+                    val innerTracks = parseInnertubeTracksFromJson(json, limit)
+                    for (map in innerTracks) {
+                        val vid = map["videoId"] as? String
+                        if (vid != null && seenVideoIds.add(vid)) {
+                            results.add(map)
+                        }
+                    }
+                    if (results.isNotEmpty()) {
+                        Log.i(TAG, "InnerTube search fallback returned ${results.size} tracks")
+                    }
+                } catch (e: Throwable) {
+                    Log.w(TAG, "InnerTube search fallback failed: ${e.message}")
+                }
+            }
+        }
+
+        if (results.isEmpty() && primaryError != null && isNetworkFailure(primaryError)) {
+            throw primaryError
         }
 
         return results.take(limit)
@@ -911,11 +951,80 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             )
         }
 
+        fun parseTwoRowRenderer(renderer: org.json.JSONObject) {
+            val videoId = renderer.optJSONObject("navigationEndpoint")
+                ?.optJSONObject("watchEndpoint")
+                ?.optString("videoId")
+                ?.takeIf { it.length == 11 }
+                ?: renderer.optJSONObject("title")
+                    ?.optJSONArray("runs")
+                    ?.optJSONObject(0)
+                    ?.optJSONObject("navigationEndpoint")
+                    ?.optJSONObject("watchEndpoint")
+                    ?.optString("videoId")
+                    ?.takeIf { it.length == 11 }
+                ?: return
+
+            if (!seenVideoIds.add(videoId)) return
+
+            var title = "Unknown Title"
+            val titleRuns = renderer.optJSONObject("title")?.optJSONArray("runs")
+            if (titleRuns != null && titleRuns.length() > 0) {
+                title = titleRuns.optJSONObject(0)?.optString("text") ?: title
+            }
+
+            var artist = "Unknown Artist"
+            val subtitleRuns = renderer.optJSONObject("subtitle")?.optJSONArray("runs")
+            if (subtitleRuns != null && subtitleRuns.length() > 0) {
+                for (i in 0 until subtitleRuns.length()) {
+                    val text = subtitleRuns.optJSONObject(i)?.optString("text")?.trim() ?: continue
+                    if (text.isNotEmpty() && text != "•" && text != "·" &&
+                        text.lowercase() != "song" && text.lowercase() != "video"
+                    ) {
+                        artist = text
+                        break
+                    }
+                }
+            }
+
+            val thumbUrl: String? = renderer
+                .optJSONObject("thumbnailRenderer")
+                ?.optJSONObject("musicThumbnailRenderer")
+                ?.optJSONObject("thumbnail")
+                ?.optJSONArray("thumbnails")
+                ?.let { arr ->
+                    if (arr.length() > 0) arr.optJSONObject(arr.length() - 1)?.optString("url")
+                    else null
+                } ?: renderer
+                .optJSONObject("thumbnail")
+                ?.optJSONObject("musicThumbnailRenderer")
+                ?.optJSONObject("thumbnail")
+                ?.optJSONArray("thumbnails")
+                ?.let { arr ->
+                    if (arr.length() > 0) arr.optJSONObject(arr.length() - 1)?.optString("url")
+                    else null
+                }
+
+            results.add(
+                mapOf(
+                    "videoId" to videoId,
+                    "title" to title,
+                    "uploader" to artist,
+                    "thumbnailUrl" to thumbUrl,
+                    "duration" to 0L,
+                    "viewCount" to -1L,
+                    "isLive" to false,
+                    "shortDescription" to null,
+                    "url" to "https://music.youtube.com/watch?v=$videoId",
+                )
+            )
+        }
+
         fun traverseJson(node: Any?) {
             when (node) {
                 is org.json.JSONObject -> {
                     // Container renderers — recurse into contents
-                    val shelfKeys = listOf("musicPlaylistShelfRenderer", "musicShelfRenderer")
+                    val shelfKeys = listOf("musicPlaylistShelfRenderer", "musicShelfRenderer", "musicCarouselShelfRenderer")
                     for (key in shelfKeys) {
                         if (node.has(key)) {
                             val contents = node.optJSONObject(key)?.optJSONArray("contents")
@@ -931,6 +1040,10 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                     // Leaf renderer
                     if (node.has("musicResponsiveListItemRenderer")) {
                         parseRenderer(node.getJSONObject("musicResponsiveListItemRenderer"))
+                        return
+                    }
+                    if (node.has("musicTwoRowItemRenderer")) {
+                        parseTwoRowRenderer(node.getJSONObject("musicTwoRowItemRenderer"))
                         return
                     }
                     // Generic recursion

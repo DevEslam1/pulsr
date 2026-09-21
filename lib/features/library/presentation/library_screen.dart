@@ -49,6 +49,110 @@ part 'tabs/library_songs_tab.dart';
 part 'tabs/library_collections_tabs.dart';
 part 'tabs/library_favorites_tab.dart';
 
+enum LibraryTabItem {
+  songs,
+  downloaded,
+  albums,
+  artists,
+  favorites,
+  folders,
+  genres,
+  years;
+
+  static const List<LibraryTabItem> defaultTabs = [
+    LibraryTabItem.songs,
+    LibraryTabItem.downloaded,
+    LibraryTabItem.albums,
+    LibraryTabItem.artists,
+    LibraryTabItem.favorites,
+  ];
+
+  String title(BuildContext context) {
+    switch (this) {
+      case LibraryTabItem.songs:
+        return context.l10n.songs;
+      case LibraryTabItem.downloaded:
+        return context.l10n.downloaded;
+      case LibraryTabItem.albums:
+        return context.l10n.albums;
+      case LibraryTabItem.artists:
+        return context.l10n.artists;
+      case LibraryTabItem.favorites:
+        return context.l10n.favorites;
+      case LibraryTabItem.folders:
+        return context.l10n.folders;
+      case LibraryTabItem.genres:
+        return context.l10n.genres;
+      case LibraryTabItem.years:
+        return context.l10n.years;
+    }
+  }
+
+  String subtitle(BuildContext context, LibraryState state) {
+    switch (this) {
+      case LibraryTabItem.songs:
+        return Formatters.formatSongCount(state.songs.length);
+      case LibraryTabItem.downloaded:
+        final count = state.songs.where((s) => s.isDownloaded == true).length;
+        return '$count ${context.l10n.downloaded.toLowerCase()}';
+      case LibraryTabItem.albums:
+        return '${state.albums.length} ${context.l10n.albums.toLowerCase()}';
+      case LibraryTabItem.artists:
+        return '${state.artists.length} ${context.l10n.artists.toLowerCase()}';
+      case LibraryTabItem.favorites:
+        return Formatters.formatSongCount(state.favorites.length);
+      case LibraryTabItem.folders:
+        return '${state.folders.length} ${context.l10n.folders.toLowerCase()}';
+      case LibraryTabItem.genres:
+        return '${state.genres.length} ${context.l10n.genres.toLowerCase()}';
+      case LibraryTabItem.years:
+        return '${state.years.length} ${context.l10n.years.toLowerCase()}';
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case LibraryTabItem.songs:
+        return Icons.music_note_rounded;
+      case LibraryTabItem.downloaded:
+        return Icons.download_done_rounded;
+      case LibraryTabItem.albums:
+        return Icons.album_rounded;
+      case LibraryTabItem.artists:
+        return Icons.person_rounded;
+      case LibraryTabItem.favorites:
+        return Icons.favorite_rounded;
+      case LibraryTabItem.folders:
+        return Icons.folder_rounded;
+      case LibraryTabItem.genres:
+        return Icons.category_rounded;
+      case LibraryTabItem.years:
+        return Icons.calendar_today_rounded;
+    }
+  }
+
+  Color color(PulsrPalette p) {
+    switch (this) {
+      case LibraryTabItem.songs:
+        return p.accent;
+      case LibraryTabItem.downloaded:
+        return const Color(0xFF26A69A);
+      case LibraryTabItem.albums:
+        return const Color(0xFFFF9800);
+      case LibraryTabItem.artists:
+        return const Color(0xFFAB47BC);
+      case LibraryTabItem.favorites:
+        return const Color(0xFFEF5350);
+      case LibraryTabItem.folders:
+        return AppColors.warning;
+      case LibraryTabItem.genres:
+        return const Color(0xFF29B6F6);
+      case LibraryTabItem.years:
+        return const Color(0xFF5C6BC0);
+    }
+  }
+}
+
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
 
@@ -57,7 +161,7 @@ class LibraryScreen extends StatefulWidget {
 }
 
 class _LibraryScreenState extends State<LibraryScreen>
-    with SingleTickerProviderStateMixin, LibrarySongsTab, LibraryCollectionsTabs, LibraryFavoritesTab {
+    with TickerProviderStateMixin, LibrarySongsTab, LibraryCollectionsTabs, LibraryFavoritesTab {
   @override
   late TabController _tabController;
   @override
@@ -69,6 +173,11 @@ class _LibraryScreenState extends State<LibraryScreen>
 
   static const String _genreHierarchyPrefKey = 'library_genre_hierarchy';
   static const String _folderTreePrefKey = 'library_folder_tree';
+  static const String _activeTabsPrefKey = 'library_active_tabs';
+  static const String _tabNamePrefKey = 'library_selected_tab_name';
+  static const String _tabIndexPrefKey = 'library_tab_index';
+
+  List<LibraryTabItem> _activeTabs = List.from(LibraryTabItem.defaultTabs);
 
   @override
   bool _genreHierarchy = false;
@@ -78,48 +187,201 @@ class _LibraryScreenState extends State<LibraryScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: _activeTabs.length, vsync: this);
     _tabController.addListener(_onTabChanged);
     _songsScrollController.addListener(_onSongsScrollNearBottom);
     _loadLayoutPreferences();
   }
 
-  static const String _tabIndexPrefKey = 'library_tab_index';
-
   /// Remember the user's last library surface so reopening Library resumes
   /// where they left off (e.g. Albums) instead of always snapping to Songs.
   void _onTabChanged() => unawaited(_persistSelectedTab());
 
-  Future<void> _persistSelectedTab() async {    if (_tabController.indexIsChanging) return;
+  Future<void> _persistSelectedTab() async {
+    if (_tabController.indexIsChanging) return;
     final index = _tabController.index;
     if (index == _lastPersistedTab) return;
     _lastPersistedTab = index;
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(_tabIndexPrefKey, index);
+      if (index >= 0 && index < _activeTabs.length) {
+        await prefs.setString(_tabNamePrefKey, _activeTabs[index].name);
+      }
     } catch (e, st) {
       ErrorLogger.log('Failed to persist library tab index',
           error: e, stackTrace: st, category: 'Library');
     }
   }
 
+  void _rebuildTabController({int initialIndex = 0}) {
+    final oldController = _tabController;
+    oldController.removeListener(_onTabChanged);
+    final safeIndex = initialIndex.clamp(0, _activeTabs.length - 1);
+    _tabController = TabController(
+      length: _activeTabs.length,
+      vsync: this,
+      initialIndex: safeIndex,
+    );
+    _lastPersistedTab = safeIndex;
+    _tabController.addListener(_onTabChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      oldController.dispose();
+    });
+  }
+
   Future<void> _loadLayoutPreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       if (!mounted) return;
-      final savedTab = prefs.getInt(_tabIndexPrefKey);
-      if (savedTab != null &&
-          savedTab >= 0 &&
-          savedTab < _tabController.length &&
-          savedTab != _tabController.index) {
-        _lastPersistedTab = savedTab;
-        _tabController.animateTo(savedTab);
+
+      final savedTabNames = prefs.getStringList(_activeTabsPrefKey);
+      if (savedTabNames != null && savedTabNames.isNotEmpty) {
+        final loaded = savedTabNames
+            .map((name) {
+              for (final item in LibraryTabItem.values) {
+                if (item.name == name) return item;
+              }
+              return null;
+            })
+            .whereType<LibraryTabItem>()
+            .toList();
+        if (loaded.isNotEmpty) {
+          _activeTabs = loaded;
+        }
       }
+
+      final savedTabName = prefs.getString(_tabNamePrefKey);
+      int targetIndex = 0;
+      if (savedTabName != null) {
+        final found = _activeTabs.indexWhere((t) => t.name == savedTabName);
+        if (found != -1) targetIndex = found;
+      } else {
+        final savedTab = prefs.getInt(_tabIndexPrefKey);
+        if (savedTab != null &&
+            savedTab >= 0 &&
+            savedTab < _activeTabs.length) {
+          targetIndex = savedTab;
+        }
+      }
+
+      if (_tabController.length != _activeTabs.length ||
+          _tabController.index != targetIndex) {
+        _rebuildTabController(initialIndex: targetIndex);
+      }
+
       setState(() {
         _genreHierarchy = prefs.getBool(_genreHierarchyPrefKey) ?? false;
         _folderTree = prefs.getBool(_folderTreePrefKey) ?? false;
       });
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load library preferences',
+          error: e, stackTrace: st, category: 'Library');
+    }
+  }
+
+  void _toggleTab(LibraryTabItem tab) {
+    final currentTabItem = (_tabController.index >= 0 &&
+            _tabController.index < _activeTabs.length)
+        ? _activeTabs[_tabController.index]
+        : null;
+
+    final isPresent = _activeTabs.contains(tab);
+    if (isPresent) {
+      if (_activeTabs.length <= 1) {
+        HapticFeedback.heavyImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                '${context.l10n.navLibrary}: at least one tab is required'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+      HapticFeedback.lightImpact();
+      setState(() {
+        _activeTabs.remove(tab);
+        int newIndex = 0;
+        if (currentTabItem != null) {
+          final found = _activeTabs.indexOf(currentTabItem);
+          if (found != -1) {
+            newIndex = found;
+          } else {
+            newIndex =
+                (_tabController.index - 1).clamp(0, _activeTabs.length - 1);
+          }
+        }
+        _rebuildTabController(initialIndex: newIndex);
+      });
+    } else {
+      HapticFeedback.mediumImpact();
+      setState(() {
+        _activeTabs.add(tab);
+
+        int newIndex = 0;
+        if (currentTabItem != null) {
+          final found = _activeTabs.indexOf(currentTabItem);
+          if (found != -1) newIndex = found;
+        }
+        _rebuildTabController(initialIndex: newIndex);
+      });
+    }
+
+    unawaited(_persistActiveTabs());
+  }
+
+  void _onReorderTabs(int oldIndex, int newIndex) {
+    HapticFeedback.selectionClick();
+    final currentTabItem = (_tabController.index >= 0 &&
+            _tabController.index < _activeTabs.length)
+        ? _activeTabs[_tabController.index]
+        : null;
+
+    setState(() {
+      if (newIndex > oldIndex) {
+        newIndex -= 1;
+      }
+      final item = _activeTabs.removeAt(oldIndex);
+      _activeTabs.insert(newIndex, item);
+
+      int newCurrentIndex = 0;
+      if (currentTabItem != null) {
+        final found = _activeTabs.indexOf(currentTabItem);
+        if (found != -1) newCurrentIndex = found;
+      }
+      _rebuildTabController(initialIndex: newCurrentIndex);
+    });
+
+    unawaited(_persistActiveTabs());
+  }
+
+  Future<void> _persistActiveTabs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(
+        _activeTabsPrefKey,
+        _activeTabs.map((t) => t.name).toList(),
+      );
+      if (_tabController.index >= 0 &&
+          _tabController.index < _activeTabs.length) {
+        await prefs.setString(
+            _tabNamePrefKey, _activeTabs[_tabController.index].name);
+        await prefs.setInt(_tabIndexPrefKey, _tabController.index);
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist active library tabs',
+          error: e, stackTrace: st, category: 'Library');
+    }
+  }
+
+  void _resetDefaultTabs() {
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _activeTabs = List.from(LibraryTabItem.defaultTabs);
+      _rebuildTabController(initialIndex: 0);
+    });
+    unawaited(_persistActiveTabs());
   }
 
   @override
@@ -140,7 +402,10 @@ class _LibraryScreenState extends State<LibraryScreen>
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(key, value);
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist layout preference',
+          error: e, stackTrace: st, category: 'Library');
+    }
   }
 
   @override
@@ -158,7 +423,10 @@ class _LibraryScreenState extends State<LibraryScreen>
     if (pos.pixels >= pos.maxScrollExtent - 800) {
       try {
         context.read<LibraryCubit>().loadMoreSongs();
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Failed to load more songs',
+            error: e, stackTrace: st, category: 'Library');
+      }
     }
   }
 
@@ -267,9 +535,9 @@ class _LibraryScreenState extends State<LibraryScreen>
                   title: Text(context.l10n.navLibrary),
                   actions: [
                     IconButton(
-                      icon: const Icon(Icons.dashboard_customize_rounded),
-                      tooltip: context.l10n.jumpToCategory,
-                      onPressed: () => _showCategoryJumpSheet(context, state),
+                      icon: const Icon(Icons.add_rounded),
+                      tooltip: '${context.l10n.navLibrary} Tabs',
+                      onPressed: () => _showManageTabsSheet(context, state),
                     ),
                     IconButton(
                       icon: Icon(state.viewMode == LibraryViewMode.list
@@ -292,60 +560,28 @@ class _LibraryScreenState extends State<LibraryScreen>
                     ),
                   ],
                   bottom: TabBar(
+                    key: ValueKey(
+                        'library_tab_bar_${_activeTabs.map((t) => t.name).join('_')}'),
                     controller: _tabController,
                     isScrollable: true,
                     tabAlignment: TabAlignment.start,
                     physics: const BouncingScrollPhysics(),
-                    tabs: [
-                      Tab(text: context.l10n.songs),
-                      Tab(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(context.l10n.downloaded),
-                            if (state.songs
-                                .where((s) => s.isDownloaded == true)
-                                .isNotEmpty) ...[
-                              const SizedBox(width: AppSpacing.s6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-
-                                    horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
-                                decoration: BoxDecoration(
-                                  color: p.accent.withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(AppRadii.r10),
-                                ),
-                                child: Text(
-                                  '${state.songs.where((s) => s.isDownloaded == true).length}',
-                                  style: TextStyle(
-                                    fontSize: AppFontSize.caption,
-                                    fontWeight: FontWeight.w700,
-                                    color: p.accent,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      Tab(text: context.l10n.albums),
-                      Tab(text: context.l10n.artists),
-                      Tab(text: context.l10n.favorites),
-                    ],
+                    tabs: _activeTabs
+                        .map((tab) => _buildTabItem(context, tab, state, p))
+                        .toList(),
                   ),
                 ),
           body: Center(
             child: ConstrainedBox(
               constraints: Adaptive.contentConstraints(context),
               child: TabBarView(
+                key: ValueKey(
+                    'library_tab_view_${_activeTabs.map((t) => t.name).join('_')}'),
                 controller: _tabController,
-                children: [
-                  _buildSongsTab(context, state, cubit, playerCubit),
-                  _buildDownloadedTab(context, state, cubit, playerCubit),
-                  _buildAlbumsTab(context, state),
-                  _buildArtistsTab(context, state),
-                  _buildFavoritesTab(context, state, playerCubit),
-                ],
+                children: _activeTabs
+                    .map((tab) => _buildTabView(
+                        context, tab, state, cubit, playerCubit))
+                    .toList(),
               ),
             ),
           ),
@@ -354,151 +590,696 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
   }
 
-  /// Folders / Genres / Years are no longer primary tabs; they open as a large
-  /// bottom sheet so the tab bar stays scannable (Apple/Spotify pattern).
-  void _openSecondaryCategory(BuildContext context, int index) {
-    final state = context.read<LibraryCubit>().state;
-    final Widget body;
-    final String title;
-    switch (index) {
-      case 5:
-        title = context.l10n.folders;
-        body = _buildFoldersTab(context);
+  Widget _buildTabItem(
+    BuildContext context,
+    LibraryTabItem tab,
+    LibraryState state,
+    PulsrPalette p,
+  ) {
+    Widget content;
+    switch (tab) {
+      case LibraryTabItem.songs:
+        content = Text(context.l10n.songs);
         break;
-      case 6:
-        title = context.l10n.genres;
-        body = _buildGenresTab(context, state);
+      case LibraryTabItem.downloaded:
+        final count = state.songs.where((s) => s.isDownloaded == true).length;
+        content = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(context.l10n.downloaded),
+            if (count > 0) ...[
+              const SizedBox(width: AppSpacing.s6),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s6,
+                  vertical: AppSpacing.s2,
+                ),
+                decoration: BoxDecoration(
+                  color: p.accent.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(AppRadii.r10),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: AppFontSize.caption,
+                    fontWeight: FontWeight.w700,
+                    color: p.accent,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        );
         break;
-      default:
-        title = context.l10n.years;
-        body = _buildYearsTab(context, state);
+      case LibraryTabItem.albums:
+        content = Text(context.l10n.albums);
+        break;
+      case LibraryTabItem.artists:
+        content = Text(context.l10n.artists);
+        break;
+      case LibraryTabItem.favorites:
+        content = Text(context.l10n.favorites);
+        break;
+      case LibraryTabItem.folders:
+        content = Text(context.l10n.folders);
+        break;
+      case LibraryTabItem.genres:
+        content = Text(context.l10n.genres);
+        break;
+      case LibraryTabItem.years:
+        content = Text(context.l10n.years);
         break;
     }
-    PulsrSheetHelper.showPulsrSheet<void>(
-      context: context,
-      builder: (sheetContext) => PulsrBottomSheetContainer(
-        title: Text(title),
-        child: SizedBox(
-          height: MediaQuery.sizeOf(sheetContext).height * 0.7,
-          child: body,
+
+    return Tab(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onLongPress: () {
+          HapticFeedback.mediumImpact();
+          _showManageTabsSheet(context, state, initialOrganizeMode: true);
+        },
+        child: Container(
+          color: Colors.transparent,
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+          alignment: Alignment.center,
+          child: content,
         ),
       ),
     );
   }
 
-  void _showCategoryJumpSheet(BuildContext context, LibraryState state) {
-    final p = context.palette;
-    final downloadedCount =
-        state.songs.where((s) => s.isDownloaded == true).length;
+  Widget _buildTabView(
+    BuildContext context,
+    LibraryTabItem tab,
+    LibraryState state,
+    LibraryCubit cubit,
+    PlayerCubit playerCubit,
+  ) {
+    switch (tab) {
+      case LibraryTabItem.songs:
+        return _buildSongsTab(context, state, cubit, playerCubit);
+      case LibraryTabItem.downloaded:
+        return _buildDownloadedTab(context, state, cubit, playerCubit);
+      case LibraryTabItem.albums:
+        return _buildAlbumsTab(context, state);
+      case LibraryTabItem.artists:
+        return _buildArtistsTab(context, state);
+      case LibraryTabItem.favorites:
+        return _buildFavoritesTab(context, state, playerCubit);
+      case LibraryTabItem.folders:
+        return _buildFoldersTab(context);
+      case LibraryTabItem.genres:
+        return _buildGenresTab(context, state);
+      case LibraryTabItem.years:
+        return _buildYearsTab(context, state);
+    }
+  }
 
-    final categories = [
-      (
-        index: 0,
-        title: context.l10n.songs,
-        subtitle: Formatters.formatSongCount(state.songs.length),
-        icon: Icons.music_note_rounded,
-        color: p.accent,
-        secondary: false,
-      ),
-      (
-        index: 1,
-        title: context.l10n.downloaded,
-        subtitle: '$downloadedCount ${context.l10n.downloaded.toLowerCase()}',
-        icon: Icons.download_done_rounded,
-        color: const Color(0xFF26A69A),
-        secondary: false,
-      ),
-      (
-        index: 2,
-        title: context.l10n.albums,
-        subtitle: '${state.albums.length} ${context.l10n.albums.toLowerCase()}',
-        icon: Icons.album_rounded,
-        color: const Color(0xFFFF9800),
-        secondary: false,
-      ),
-      (
-        index: 3,
-        title: context.l10n.artists,
-        subtitle: '${state.artists.length} ${context.l10n.artists.toLowerCase()}',
-        icon: Icons.person_rounded,
-        color: const Color(0xFFAB47BC),
-        secondary: false,
-      ),
-      (
-        index: 4,
-        title: context.l10n.favorites,
-        subtitle: Formatters.formatSongCount(state.favorites.length),
-        icon: Icons.favorite_rounded,
-        color: const Color(0xFFEF5350),
-        secondary: false,
-      ),
-      (
-        index: 5,
-        title: context.l10n.folders,
-        subtitle: '${state.folders.length} ${context.l10n.folders.toLowerCase()}',
-        icon: Icons.folder_rounded,
-        color: AppColors.warning,
-        secondary: true,
-      ),
-      (
-        index: 6,
-        title: context.l10n.genres,
-        subtitle: '${state.genres.length} ${context.l10n.genres.toLowerCase()}',
-        icon: Icons.category_rounded,
-        color: const Color(0xFF29B6F6),
-        secondary: true,
-      ),
-      (
-        index: 7,
-        title: context.l10n.years,
-        subtitle: '${state.years.length} ${context.l10n.years.toLowerCase()}',
-        icon: Icons.calendar_today_rounded,
-        color: const Color(0xFF5C6BC0),
-        secondary: true,
-      ),
-    ];
+  void _showManageTabsSheet(
+    BuildContext context,
+    LibraryState state, {
+    bool initialOrganizeMode = false,
+  }) {
+    bool isOrganizeMode = initialOrganizeMode;
 
     PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
+      wrapWithContainer: false,
       builder: (sheetContext) {
-        return PulsrBottomSheetContainer(
-          title: Text(context.l10n.navLibrary),
-          child: Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.lg),
-            child: GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: sheetContext.isTablet ? 3 : 2,
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                mainAxisExtent: 68,
+        return StatefulBuilder(
+          builder: (modalContext, setSheetState) {
+            final p = modalContext.palette;
+            final inactiveTabs = LibraryTabItem.values
+                .where((t) => !_activeTabs.contains(t))
+                .toList();
+
+            return PulsrBottomSheetContainer(
+              title: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${modalContext.l10n.navLibrary} Tabs',
+                          style: TextStyle(
+                            fontSize: AppFontSize.title,
+                            fontWeight: FontWeight.w800,
+                            color: p.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.s2),
+                        Text(
+                          isOrganizeMode
+                              ? '${_activeTabs.length} / ${LibraryTabItem.values.length} tabs • Drag to reorder'
+                              : '${_activeTabs.length} / ${LibraryTabItem.values.length} tabs • Long-press to organize',
+                          style: TextStyle(
+                            fontSize: AppFontSize.caption,
+                            color: p.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () {
+                      HapticFeedback.selectionClick();
+                      setSheetState(() {
+                        isOrganizeMode = !isOrganizeMode;
+                      });
+                    },
+                    icon: Icon(
+                      isOrganizeMode
+                          ? Icons.check_rounded
+                          : Icons.swap_vert_rounded,
+                      size: 16,
+                    ),
+                    label: Text(
+                      isOrganizeMode
+                          ? modalContext.l10n.done
+                          : modalContext.l10n.edit,
+                      style: TextStyle(
+                        fontSize: AppFontSize.label,
+                        fontWeight:
+                            isOrganizeMode ? FontWeight.w700 : FontWeight.w500,
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      foregroundColor: p.accent,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xs,
+                      ),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () {
+                      _resetDefaultTabs();
+                      setSheetState(() {});
+                    },
+                    icon: const Icon(Icons.restore_rounded, size: 16),
+                    label: Text(
+                      modalContext.l10n.reset,
+                      style: const TextStyle(fontSize: AppFontSize.label),
+                    ),
+                    style: TextButton.styleFrom(
+                      foregroundColor: p.textSecondary,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xs,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              itemCount: categories.length,
-              itemBuilder: (_, i) {
-                final cat = categories[i];
-                final isSelected = _tabController.index == cat.index;
-                return CategoryCard(
-                  icon: cat.icon,
-                  title: cat.title,
-                  subtitle: cat.subtitle,
-                  color: cat.color,
-                  isSelected: isSelected,
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    Navigator.of(sheetContext).pop();
-                    if (cat.secondary) {
-                      _openSecondaryCategory(context, cat.index);
-                    } else {
-                      _tabController.animateTo(cat.index);
-                    }
-                  },
-                );
-              },
-            ),
-          ),
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onLongPress: () {
+                  HapticFeedback.mediumImpact();
+                  setSheetState(() {
+                    isOrganizeMode = !isOrganizeMode;
+                  });
+                },
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(
+                    AppSpacing.md,
+                    AppSpacing.xs,
+                    AppSpacing.md,
+                    AppSpacing.lg,
+                  ),
+                  child: AnimatedSwitcher(
+                    duration: modalContext.motionMs(220),
+                    child: isOrganizeMode
+                        ? _buildOrganizeList(
+                            modalContext,
+                            sheetContext,
+                            state,
+                            p,
+                            inactiveTabs,
+                            setSheetState,
+                            onToggleMode: () {
+                              setSheetState(() {
+                                isOrganizeMode = false;
+                              });
+                            },
+                          )
+                        : _buildTabsGrid(
+                            modalContext,
+                            sheetContext,
+                            state,
+                            setSheetState,
+                            onEnterOrganize: () {
+                              setSheetState(() {
+                                isOrganizeMode = true;
+                              });
+                            },
+                          ),
+                  ),
+                ),
+              ),
+            );
+          },
         );
       },
+    );
+  }
+
+  Widget _buildTabsGrid(
+    BuildContext modalContext,
+    BuildContext sheetContext,
+    LibraryState state,
+    StateSetter setSheetState, {
+    required VoidCallback onEnterOrganize,
+  }) {
+    return GridView.builder(
+      key: ValueKey('tabs_grid_${_activeTabs.map((t) => t.name).join('_')}'),
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: sheetContext.isTablet ? 3 : 2,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        mainAxisExtent: 74,
+      ),
+      itemCount: LibraryTabItem.values.length,
+      itemBuilder: (_, i) {
+        final item = LibraryTabItem.values[i];
+        final isActive = _activeTabs.contains(item);
+        return _buildTabSelectionCard(
+          modalContext,
+          key: ValueKey('tab_card_${item.name}_$isActive'),
+          item: item,
+          state: state,
+          isActive: isActive,
+          onToggle: () {
+            _toggleTab(item);
+            setSheetState(() {});
+          },
+          onLongPress: () {
+            HapticFeedback.mediumImpact();
+            onEnterOrganize();
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildOrganizeList(
+    BuildContext modalContext,
+    BuildContext sheetContext,
+    LibraryState state,
+    PulsrPalette p,
+    List<LibraryTabItem> inactiveTabs,
+    StateSetter setSheetState, {
+    required VoidCallback onToggleMode,
+  }) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(sheetContext).size.height * 0.58,
+      ),
+      child: ReorderableListView.builder(
+        key: ValueKey(
+            'reorder_list_${_activeTabs.map((t) => t.name).join('_')}'),
+        shrinkWrap: true,
+        physics: const BouncingScrollPhysics(),
+        buildDefaultDragHandles: false,
+        proxyDecorator: (child, index, animation) {
+          return AnimatedBuilder(
+            animation: animation,
+            builder: (context, child) {
+              return Material(
+                color: Colors.transparent,
+                elevation: 6,
+                shadowColor: Colors.black45,
+                borderRadius: BorderRadius.circular(AppRadii.r18),
+                child: child,
+              );
+            },
+            child: child,
+          );
+        },
+        itemCount: _activeTabs.length,
+        itemBuilder: (context, i) {
+          final item = _activeTabs[i];
+          return _buildReorderTabRow(
+            modalContext,
+            key: ValueKey('reorder_item_${item.name}'),
+            item: item,
+            state: state,
+            index: i,
+            p: p,
+            onRemove: () {
+              _toggleTab(item);
+              setSheetState(() {});
+            },
+            onLongPress: () {
+              HapticFeedback.mediumImpact();
+              onToggleMode();
+            },
+          );
+        },
+        footer: inactiveTabs.isEmpty
+            ? null
+            : Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.s6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xxs,
+                        vertical: AppSpacing.xs,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.add_rounded,
+                              size: 16, color: p.textSecondary),
+                          const SizedBox(width: AppSpacing.xs),
+                          Text(
+                            '${modalContext.l10n.navLibrary} • Inactive (${inactiveTabs.length})',
+                            style: TextStyle(
+                              color: p.textSecondary,
+                              fontSize: AppFontSize.caption,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: AppTracking.label,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    ...inactiveTabs.map(
+                      (item) => _buildInactiveTabRow(
+                        modalContext,
+                        key: ValueKey('inactive_${item.name}'),
+                        item: item,
+                        state: state,
+                        p: p,
+                        onAdd: () {
+                          _toggleTab(item);
+                          setSheetState(() {});
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+        // ignore: deprecated_member_use
+        onReorder: (oldIndex, newIndex) {
+          _onReorderTabs(oldIndex, newIndex);
+          setSheetState(() {});
+        },
+      ),
+    );
+  }
+
+  Widget _buildReorderTabRow(
+    BuildContext context, {
+    required Key key,
+    required LibraryTabItem item,
+    required LibraryState state,
+    required int index,
+    required PulsrPalette p,
+    required VoidCallback onRemove,
+    required VoidCallback onLongPress,
+  }) {
+    final itemColor = item.color(p);
+    return Container(
+      key: key,
+      margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer,
+        borderRadius: BorderRadius.circular(AppRadii.r18),
+        border: Border.all(
+          color: p.hairline,
+          width: 1.0,
+        ),
+      ),
+      child: InkWell(
+        onLongPress: onLongPress,
+        borderRadius: BorderRadius.circular(AppRadii.r18),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.xs,
+          ),
+          child: Row(
+            children: [
+              ReorderableDragStartListener(
+                index: index,
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.only(
+                    start: AppSpacing.xs,
+                    end: AppSpacing.s10,
+                  ),
+                  child: Icon(
+                    Icons.drag_indicator_rounded,
+                    color: p.textSecondary,
+                    size: 22,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: itemColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                ),
+                child: Icon(item.icon, color: itemColor, size: 20),
+              ),
+              const SizedBox(width: AppSpacing.s10),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title(context),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: p.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: AppFontSize.body,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.s2),
+                    Text(
+                      item.subtitle(context, state),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: AppFontSize.label,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_activeTabs.length > 1)
+                IconButton(
+                  icon:
+                      const Icon(Icons.remove_circle_outline_rounded, size: 20),
+                  color: AppColors.error.withValues(alpha: 0.8),
+                  splashRadius: 20,
+                  onPressed: onRemove,
+                )
+              else
+                const SizedBox(width: 40),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInactiveTabRow(
+    BuildContext context, {
+    required Key key,
+    required LibraryTabItem item,
+    required LibraryState state,
+    required PulsrPalette p,
+    required VoidCallback onAdd,
+  }) {
+    final itemColor = item.color(p);
+    return Container(
+      key: key,
+      margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(AppRadii.r18),
+        border: Border.all(
+          color: p.hairline.withValues(alpha: 0.5),
+          width: 1.0,
+        ),
+      ),
+      child: InkWell(
+        onTap: onAdd,
+        borderRadius: BorderRadius.circular(AppRadii.r18),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.xs,
+          ),
+          child: Row(
+            children: [
+              Padding(
+                padding: const EdgeInsetsDirectional.only(
+                  start: AppSpacing.xs,
+                  end: AppSpacing.s10,
+                ),
+                child: Icon(
+                  Icons.add_rounded,
+                  color: p.textSecondary.withValues(alpha: 0.5),
+                  size: 22,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: itemColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                ),
+                child: Icon(item.icon,
+                    color: itemColor.withValues(alpha: 0.7), size: 20),
+              ),
+              const SizedBox(width: AppSpacing.s10),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title(context),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: p.textSecondary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: AppFontSize.body,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.s2),
+                    Text(
+                      item.subtitle(context, state),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: AppFontSize.label,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.add_circle_outline_rounded, size: 20),
+                color: p.accent,
+                splashRadius: 20,
+                onPressed: onAdd,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabSelectionCard(
+    BuildContext context, {
+    Key? key,
+    required LibraryTabItem item,
+    required LibraryState state,
+    required bool isActive,
+    required VoidCallback onToggle,
+    required VoidCallback onLongPress,
+  }) {
+    final p = context.palette;
+    final itemColor = item.color(p);
+    final title = item.title(context);
+    final subtitle = item.subtitle(context, state);
+
+    return Material(
+      key: key,
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onToggle,
+        onLongPress: onLongPress,
+        borderRadius: BorderRadius.circular(AppRadii.r18),
+        child: AnimatedContainer(
+          duration: context.motionMs(180),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+          decoration: BoxDecoration(
+            color: isActive
+                ? itemColor.withValues(alpha: 0.12)
+                : p.surfaceContainer,
+            borderRadius: BorderRadius.circular(AppRadii.r18),
+            border: Border.all(
+              color: isActive ? itemColor.withValues(alpha: 0.65) : p.hairline,
+              width: isActive ? 1.5 : 1.0,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: itemColor.withValues(alpha: isActive ? 0.25 : 0.12),
+                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                ),
+                child: Icon(item.icon, color: itemColor, size: 20),
+              ),
+              const SizedBox(width: AppSpacing.s10),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: isActive ? itemColor : p.textPrimary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: AppFontSize.body,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.s2),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: AppFontSize.label,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              AnimatedContainer(
+                duration: context.motionMs(180),
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isActive ? itemColor : p.surfaceContainerHigh,
+                  border: Border.all(
+                    color: isActive ? itemColor : p.hairline,
+                    width: 1.5,
+                  ),
+                ),
+                child: Icon(
+                  isActive ? Icons.check_rounded : Icons.add_rounded,
+                  size: 16,
+                  color: isActive ? p.onAccent : p.textTertiary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

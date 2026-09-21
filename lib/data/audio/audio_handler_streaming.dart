@@ -176,13 +176,9 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     // stale higher-quality URL (previously only _streamCache was cleared).
     _streamCache.clear();
     _inFlightResolves.clear();
+    _prefetching.clear();
     _preloadScheduler.clear();
-    // Cancel in-flight prefetches (bumps the prefetch generation) and fence any
-    // in-flight foreground resolve at the old quality so it can't write a
-    // stale-rendition URL back into the freshly-cleared cache.
-    cancelPrefetches();
     _resolveEpoch++;
-    _streamResolutionPipeline.clearNetworkCaches();
     try {
       if (getIt.isRegistered<YtmUrlCache>()) {
         final urlCache = getIt<YtmUrlCache>();
@@ -191,7 +187,10 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
           urlCache.invalidate(song!.remoteId!);
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to invalidate URL cache on quality change',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
   }
 
   UriAudioSource _createAudioSource(SongsTableData song, MediaItem tag) {
@@ -254,18 +253,10 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
       return;
     }
     if (info.recoveryAction == YtmRecoveryAction.skipToNextTrack) {
-      // Count this failure before deciding. The previous code only read the
-      // counter, which the following gapless advance reset, so a queue full of
-      // blocked/unavailable tracks skipped forever without ever tripping.
-      _consecutiveFailures++;
-      if (PulsrAudioHandler.shouldHaltFailureCascade(
-        consecutiveFailures: _consecutiveFailures,
-        rapidGaplessChanges: _rapidGaplessChangeCount,
-        queueLength: _songs.length,
-      )) {
+      // Already 2 rapid gaps means 3rd song in your loop → pause instead of skip
+      if (_consecutiveFailures >= 2 || _rapidGaplessChangeCount >= 1) {
         _consecutiveFailures = 0;
         _rapidGaplessChangeCount = 0;
-        _errorSubject.add('Playback stopped: multiple tracks could not be played.');
         _activePlayer.pause().ignore();
         _broadcastState(_activePlayer.playbackEvent);
         return;
@@ -581,15 +572,11 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   /// Call on VPN/network-path change: googlevideo URLs carry an IP-bound
   /// `expire`/`ip` signature and return 403 when the egress IP changes.
   void clearNetworkCaches() {
+    _resolveEpoch++;
     _streamCache.clear();
     _inFlightResolves.clear();
     _prefetching.clear();
     cancelPrefetches();
-    // Fence any in-flight resolve started before the path change so its result
-    // (bound to the old egress IP) can't repopulate the cache with a URL that
-    // will 403 on the new path.
-    _resolveEpoch++;
-    _streamResolutionPipeline.clearNetworkCaches();
   }
 
   // --- SkipSilence + Normalization (InnerTune parity) ---
@@ -794,18 +781,10 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     }
     _lastSmartPrefetchMs = nowMs;
     _lastSmartPrefetchKey = key;
-    // Forward the player's shuffle order so the scheduler warms the tracks that
-    // actually play next in shuffle, instead of uniformly-random picks. Only
-    // pass it when it lines up with our queue; otherwise the scheduler falls
-    // back to random on its own.
-    final shuffleOrder = _activePlayer.shuffleIndices;
-    final shuffleIndices =
-        shuffleOrder.length == _songs.length ? shuffleOrder : null;
     _preloadScheduler.schedulePreloads(
       queue: _songs,
       currentIndex: _currentIndex,
       isShuffle: _activePlayer.shuffleModeEnabled,
-      shuffleIndices: shuffleIndices,
       position: _activePlayer.position,
       duration: _activePlayer.duration ?? Duration.zero,
       preloadCount: _preloadCountForCurrentBucket,
@@ -1204,11 +1183,6 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   set _prefetchGeneration(int value);
 
   // Requires: provided by the composing class (same library).
-  // Bumped on network-path/quality changes to fence stale in-flight resolves.
-  int get _resolveEpoch;
-  set _resolveEpoch(int value);
-
-  // Requires: provided by the composing class (same library).
   AudioPlayer get _prefetchPlayer;
 
   // Requires: provided by the composing class (same library).
@@ -1228,6 +1202,10 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   IMusicRepository get _repository;
 
   // Requires: provided by the composing class (same library).
+  int get _resolveEpoch;
+  set _resolveEpoch(int value);
+
+  // Requires: provided by the composing class (same library).
   Future<({String url, String? userAgent, String? cookies, String quality})> _resolveStreamUrl(SongsTableData song, {bool forceRefresh = false});
 
   // Requires: provided by the composing class (same library).
@@ -1238,9 +1216,6 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
 
   // Requires: provided by the composing class (same library).
   StreamPreResolver get _streamPreResolver;
-
-  // Requires: provided by the composing class (same library).
-  StreamResolutionPipeline get _streamResolutionPipeline;
 
   // Requires: provided by the composing class (same library).
   YtmService get _ytmService;

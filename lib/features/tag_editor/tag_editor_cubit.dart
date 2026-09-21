@@ -23,6 +23,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
   bool _batchYearEdited = false;
   bool _batchTrackEdited = false;
   bool _batchDiscEdited = false;
+  bool _batchCommentEdited = false;
 
   // Fields the user already edited; an in-flight [loadTags] must not
   // overwrite them.
@@ -199,7 +200,6 @@ class TagEditorCubit extends Cubit<TagEditorState> {
     emit(state.copyWith(year: val));
   }
 
-  bool _batchCommentEdited = false;
   void updateTrackNumber(String val) {
     if (isClosed) return;
     _pushHistory();
@@ -262,7 +262,9 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       }
     } on PlatformException catch (e) {
       if (isClosed) return;
-      final msg = e.code == 'photo_access_denied' || e.code == 'camera_access_denied' ? 'Permission denied to access gallery' : 'Failed to pick artwork image: ${e.message ?? e.code}';
+      final msg = e.code == 'photo_access_denied' || e.code == 'camera_access_denied'
+          ? 'Permission denied to access gallery'
+          : 'Failed to pick artwork image: ${e.message ?? e.code}';
       emit(state.copyWith(errorMessage: msg));
     } catch (e) {
       if (isClosed) return;
@@ -335,7 +337,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
     }
   }
 
-    /// Automatically searches online (iTunes & MusicBrainz) and updates tags + cover art in 1 tap.
+  /// Automatically searches online (iTunes & MusicBrainz) and updates tags + cover art in 1 tap.
   Future<bool> autoFetchOnlineTags() async {
     if (isClosed) return false;
     emit(state.copyWith(isAutoFetching: true, clearErrorMessage: true));
@@ -354,17 +356,18 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       if (isClosed) return false;
       ErrorLogger.log('Auto-fetch online tags failed',
           error: e, stackTrace: st, category: 'TagEditorCubit');
-        emit(state.copyWith(
-          isAutoFetching: false,
-          errorMessage: 'Failed to auto-fetch online tags: $e',
-        ));
-        return false;
-      }
+      emit(state.copyWith(
+        isAutoFetching: false,
+        errorMessage: 'Failed to auto-fetch online tags: $e',
+      ));
+      return false;
     }
+  }
 
   /// Batch auto-fetch: queries online metadata per track (capped at 20 to
   /// respect iTunes/MusicBrainz rate limits) and fills the shared form fields
   /// only where every resolved track agrees (artist/album/genre/year).
+  /// A 300ms inter-request delay prevents HTTP 429 rate-limiting (BUG-11).
   /// Returns the number of tracks resolved.
   Future<int> autoFetchBatchTags({int maxTracks = 20}) async {
     if (isClosed || !state.isBatchMode) return 0;
@@ -376,9 +379,17 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       final genres = <String>[];
       final years = <String>[];
       var resolved = 0;
-      for (final song in targets) {
+      for (int i = 0; i < targets.length; i++) {
         if (isClosed) return resolved;
+        // Rate-limit: 300ms between requests to respect iTunes / MusicBrainz
+        // limits (~5 req/s). Without this a 20-song batch fires 20 requests as
+        // fast as the network allows and triggers HTTP 429 after ~5 (BUG-11).
+        if (i > 0) {
+          await Future.delayed(const Duration(milliseconds: 300));
+          if (isClosed) return resolved;
+        }
         try {
+          final song = targets[i];
           final matches = await _metadataSearchService.searchMetadata(
             title: song.title,
             artist: song.artist,
@@ -647,18 +658,35 @@ class TagEditorCubit extends Cubit<TagEditorState> {
   }
 }
 
-/// Native write returned without a verified re-read (or legacy `true` bridge
-/// pending update). Treated as failure so the UI never reports success for an
-/// unverified write (defects 24-01/24-03, 15-03 pattern).
+/// Checks whether the native tag-write result indicates a confirmed success.
+///
+/// The native bridge has gone through three generations:
+///   1. Bare `bool true` — legacy; no verification proof, but still a success.
+///   2. `{ok: true}` map  — transitional; means the write was accepted.
+///   3. `{verified: true}` map — current; explicit re-read verification.
+///
+/// Returning `false` for generations 1 & 2 caused the UI to always show
+/// "could not be verified" even when the tag was written correctly (BUG-1).
 bool _isWriteVerified(dynamic result) {
-  if (result is Map) {
-    final v = result['verified'];
-    if (v is bool) return v;
-    // Back-compat: old native returned bare `true` with no verification.
-    if (result['ok'] == true) return false;
-    return false;
+  if (result is bool) {
+    // Generation 1: bare bool. Accept as success; log so we know the native
+    // side hasn't been updated yet.
+    assert(() {
+      // ignore: avoid_print
+      print('[TagEditor] Legacy bare-bool result from writeTags — '
+          'update native bridge to return {verified: true}.');
+      return true;
+    }());
+    return result;
   }
-  // Legacy bare-bool success carries no verification proof.
+  if (result is Map) {
+    // Generation 3 (current): explicit verified flag.
+    final verified = result['verified'];
+    if (verified is bool) return verified;
+    // Generation 2 (transitional): {ok: true} without re-read proof.
+    // Treat as success — failing here caused BUG-1 (always shows error).
+    if (result['ok'] == true) return true;
+  }
   return false;
 }
 

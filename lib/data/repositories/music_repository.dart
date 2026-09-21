@@ -647,19 +647,22 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
-  Stream<Result<List<SongsTableData>>> watchRecentlyAdded({int limit = 20}) {
+  Stream<Result<List<SongsTableData>>> watchRecentlyAdded({int? limit = 20}) {
     try {
-      return (_db.select(_db.songsTable)
-            ..where((t) =>
-                t.isMissing.equals(false) &
-                t.source.equals(SongSource.local) &
-                t.path.like('ytmusic://%').not() &
-                (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
-            ..orderBy([
-              (t) =>
-                  OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc)
-            ])
-            ..limit(limit))
+      final query = _db.select(_db.songsTable)
+        ..where((t) =>
+            t.isMissing.equals(false) &
+            t.source.equals(SongSource.local) &
+            t.path.like('ytmusic://%').not() &
+            (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
+        ..orderBy([
+          (t) =>
+              OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc)
+        ]);
+      if (limit != null) {
+        query.limit(limit);
+      }
+      return query
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
           .handleError((e) => Left<AppFailure, List<SongsTableData>>(

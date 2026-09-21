@@ -137,7 +137,14 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   @override
   Future<void> skipToQueueItem(int index) async {
     if (index < 0 || index >= _songs.length) return;
-    await loadQueue(_songs, initialIndex: index, autoPlay: _activePlayer.playing);
+    // A track that naturally reached its end reports playing == false with
+    // processingState == completed. The user was listening to it, so selecting
+    // or swiping to another queue item must auto-play rather than load paused.
+    // Mirrors the same guard in skipToNext/skipToPrevious; without it the
+    // mini-player carousel swipe after a track ends parks the new song paused.
+    final wasPlaying = _activePlayer.playing ||
+        _activePlayer.processingState == ProcessingState.completed;
+    await loadQueue(_songs, initialIndex: index, autoPlay: wasPlaying);
   }
 
   @override
@@ -150,7 +157,11 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     // A headset/double-press storm must never queue overlapping skips: each
     // skip bumps the generation so a slow YouTube resolve from the previous
     // skip bails instead of clobbering the new track.
-    final wasPlaying = _activePlayer.playing;
+    // A track that naturally completed has playing == false and
+    // processingState == completed. The user was listening to it, so the
+    // next track must auto-play instead of loading paused.
+    final wasPlaying = _activePlayer.playing ||
+        _activePlayer.processingState == ProcessingState.completed;
 
     try {
       if (_crossfadeManager.isCrossfading) {
@@ -190,7 +201,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
             // stopForegroundOnPause the notification) while the user
             // explicitly asked to keep listening.
             await _activePlayer.seek(Duration.zero);
-            if (wasPlaying) {
+            if (wasPlaying && _activePlayer.loopMode != LoopMode.off) {
               await _activePlayer.play();
             }
             _broadcastState(_activePlayer.playbackEvent);
@@ -209,7 +220,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
       } else {
         // True end-of-queue: same no-dismiss policy as the gapless path.
         await _activePlayer.seek(Duration.zero);
-        if (wasPlaying) {
+        if (wasPlaying && _activePlayer.loopMode != LoopMode.off) {
           await _activePlayer.play();
         }
         _broadcastState(_activePlayer.playbackEvent);
