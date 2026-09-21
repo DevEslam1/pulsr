@@ -49,7 +49,7 @@ class MusicRepository implements IMusicRepository {
 
       if (searchQuery != null && searchQuery.trim().isNotEmpty) {
         final ftsQuery = _toFtsQuery(searchQuery);
-        if (ftsQuery != null) {
+        if (ftsQuery != null && !AppDatabase.ftsRebuildFailed) {
           // 10/10 path: FTS5 index instead of full-table LIKE scan.
           return _watchSongsFts(
             ftsQuery: ftsQuery,
@@ -234,6 +234,7 @@ class MusicRepository implements IMusicRepository {
             // index): attempt a bounded repair, then report. The next watch
             // re-subscribes onto the rebuilt index. repairFtsIndex caps its
             // own attempts per session, so this cannot loop.
+            AppDatabase.ftsRebuildFailed = true;
             unawaited(_db.repairFtsIndex());
             return Left<AppFailure, List<SongsTableData>>(
                 DatabaseFailure('Failed to watch songs (FTS)', e));

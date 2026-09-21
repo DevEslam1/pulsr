@@ -389,10 +389,6 @@ class YtmResolvingSource extends StreamAudioSource {
     late final Completer<void> ownedCompleter;
     while (true) {
       final completer = Completer<void>();
-      if (_pathCreationLocks.length >= _maxPathCreationLocks &&
-          !_pathCreationLocks.containsKey(pathKey)) {
-        _pathCreationLocks.remove(_pathCreationLocks.keys.first);
-      }
       final previous =
           _pathCreationLocks.putIfAbsent(pathKey, () => completer.future);
 
@@ -480,7 +476,6 @@ class YtmResolvingSource extends StreamAudioSource {
     }
   }
 
-  static const int _maxPathCreationLocks = 32;
   static final LinkedHashMap<String, Future<void>> _pathCreationLocks =
       LinkedHashMap<String, Future<void>>();
 

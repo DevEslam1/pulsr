@@ -59,6 +59,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
         restoreVolume: _preCrossfadeVolume ?? _volume);
     _saveCurrentPosition();
+    unawaited(saveCurrentPositionImmediate());
     // If an online source is still being fetched/loaded (the track is not
     // playable yet), invalidate the in-flight load cycle so a late resolve — or
     // the play() at the end of playSongAt — cannot start playback after the
@@ -683,7 +684,18 @@ mixin PulsrAudioTransport on BaseAudioHandler {
         // Pre-set so the shift emit from currentIndexStream is a no-op.
         _lastGaplessIndex = _currentIndex;
         if (wasGaplessLoaded && index < _activePlayer.audioSources.length) {
-          await _activePlayer.removeAudioSourceAt(index);
+          try {
+            await _activePlayer.removeAudioSourceAt(index);
+          } catch (e, st) {
+            ErrorLogger.log(
+                'Failed to remove audio source at index $index; resyncing gapless queue',
+                error: e,
+                stackTrace: st,
+                category: 'AudioHandler');
+            if (wasGaplessLoaded && _activePlayer.audioSources.isNotEmpty) {
+              await _loadGaplessQueue(preload: wasPlaying);
+            }
+          }
         }
       }
     } else {
@@ -1111,6 +1123,9 @@ mixin PulsrAudioTransport on BaseAudioHandler {
 
   // Requires: provided by the composing class (same library).
   void _saveCurrentPosition();
+
+  // Requires: provided by the composing class (same library).
+  Future<void> saveCurrentPositionImmediate();
 
   // Requires: provided by the composing class (same library).
   void _scheduleFadeInConvergenceGuard(AudioPlayer player, int generation);

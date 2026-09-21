@@ -742,11 +742,22 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
       AudioMemoryManager.calculateHeadSize(bitrateKbps: song.bitrateKbps ?? 256),
     );
     final currentGen = _prefetchGeneration;
-    _resolveStreamUrl(song).whenComplete(() {
-      if (_prefetchGeneration == currentGen) {
-        _prefetching.remove(prefetchKey);
+    unawaited(() async {
+      try {
+        await _resolveStreamUrl(song);
+      } catch (e, st) {
+        ErrorLogger.log(
+          'Background stream prefetch failed for ${song.title}',
+          error: e,
+          stackTrace: st,
+          category: 'AudioHandler',
+        );
+      } finally {
+        if (_prefetchGeneration == currentGen) {
+          _prefetching.remove(prefetchKey);
+        }
       }
-    }).ignore();
+    }());
   }
 
   bool _isConsecutiveAlbumPlayback() {

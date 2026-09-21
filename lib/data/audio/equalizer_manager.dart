@@ -1113,11 +1113,27 @@ class EqualizerManager {
       preset.gains,
       targetFrequencies: targetFreqs,
     );
+    final previousPreset = currentPreset;
+    final previousSlotPreset = comparisonSlots[activeComparisonSlot];
     currentPreset = preset.copyWith(gains: gains);
     comparisonSlots[activeComparisonSlot] = currentPreset;
-    await applyCurrentPreset();
-    await setBassBoost(preset.bassBoost);
-    _debouncedSavePreferences();
+    try {
+      await applyCurrentPreset();
+      await setBassBoost(preset.bassBoost);
+      _debouncedSavePreferences();
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to apply EQ preset ${preset.name}; rolling back in-memory state',
+        error: e,
+        stackTrace: st,
+        category: 'EqualizerManager',
+      );
+      currentPreset = previousPreset;
+      if (previousSlotPreset != null) {
+        comparisonSlots[activeComparisonSlot] = previousSlotPreset;
+      }
+      rethrow;
+    }
   }
 
   Future<void> setBandGain(int index, double gain) async {

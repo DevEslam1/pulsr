@@ -528,8 +528,12 @@ class PulsrAudioHandler extends BaseAudioHandler
   Future<void> _refreshBluetoothRoute() async {
     try {
       if (!getIt.isRegistered<HiResAudioService>()) return;
+      final wasBluetooth = _equalizerManager.isBluetoothRoute;
       final info = await getIt<HiResAudioService>().getAudioOutputInfo();
       _equalizerManager.isBluetoothRoute = info.isBluetooth;
+      if (wasBluetooth != info.isBluetooth) {
+        await _equalizerManager.resyncActiveEffects();
+      }
     } catch (_) {}
   }
 
@@ -1018,6 +1022,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     await _equalizerManager.onAppPaused();
   }
 
+  @override
   Future<void> saveCurrentPositionImmediate() async {
     final hasPosition = _songs.isNotEmpty &&
         _currentIndex >= 0 &&
@@ -1201,6 +1206,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       getInactivePlayer: () => _inactivePlayer,
     );
     _volumeControllerReady = true;
+    _volumeController.setDopActive(AudioQualityInfo.dsdDopActive);
     _streamResolutionPipeline = StreamResolutionPipeline(
       ytmService: _ytmService,
       getLatencyTracker: () => _latencyTracker,
@@ -1748,6 +1754,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       await restoreLastPlaybackSession().timeout(
         const Duration(seconds: 10),
         onTimeout: () {
+          _playGeneration++;
           ErrorLogger.log('restoreLastPlaybackSession timed out after 10s',
               category: 'AudioHandler');
         },
