@@ -986,6 +986,13 @@ class _SettingsScreenState extends State<SettingsScreen>
                 context.l10n.settingsAboutVersionSubtitle(AppConfig.appVersion),
                 onTap: () => showAboutSheet(context),
               ),
+              _navTile(
+                context,
+                Icons.person_outline_rounded,
+                'Developer',
+                'Eslam Mahmoud',
+                onTap: () => showAboutSheet(context),
+              ),
             ],
             key: _catById('about').key,
           ),

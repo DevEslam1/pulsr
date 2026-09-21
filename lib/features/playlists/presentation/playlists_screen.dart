@@ -63,12 +63,12 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
 
   /// Suggestion service output is optional and non-intrusive: it stays hidden
   /// until real library songs produce at least one suggestion.
-  Future<void> _loadSuggestions() async {
+  Future<void> _loadSuggestions({bool forceRefresh = false}) async {
     try {
       final result = await getIt<GetSongsUseCase>().getAllSongs();
       final allSongs = result.fold((_) => <SongsTableData>[], (songs) => songs);
-      final suggestions =
-          getIt<PlaylistSuggestionsService>().generateSuggestions(allSongs);
+      final suggestions = getIt<PlaylistSuggestionsService>()
+          .generateSuggestions(allSongs, forceRefresh: forceRefresh);
       if (!mounted) return;
       setState(() => _suggestions = suggestions);
     } catch (_) {
@@ -97,6 +97,14 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       if (songIds.isNotEmpty) {
         await useCases.addSongsToPlaylist(playlistId, songIds);
       }
+      if (mounted) {
+        setState(() {
+          _suggestions =
+              _suggestions.where((s) => s.title != suggestion.title).toList();
+        });
+      }
+      getIt<PlaylistSuggestionsService>().invalidateCache();
+      unawaited(_loadSuggestions(forceRefresh: true));
       messenger.showSnackBar(
         SnackBar(
           content:

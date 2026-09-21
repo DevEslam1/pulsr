@@ -52,8 +52,12 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
     // the visible window always matches the samples being painted.
     if (!identical(oldWidget.samples, widget.samples) ||
         oldWidget.duration != widget.duration) {
-      _zoomScale = 1.0;
-      _dragValue = null;
+      if (_dragValue == null) {
+        _zoomScale = 1.0;
+      } else if (widget.duration.inMilliseconds > 0) {
+        _dragValue =
+            _dragValue!.clamp(0.0, widget.duration.inMilliseconds.toDouble());
+      }
     }
   }
 

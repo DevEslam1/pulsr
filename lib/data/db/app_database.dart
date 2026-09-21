@@ -29,16 +29,24 @@ class AppDatabase extends _$AppDatabase {
   static bool ftsRebuildFailed = false;
 
   /// Repair attempts made this session. Bounded so a persistently broken index
-  /// cannot loop forever; a manual `force` rebuild resets the budget.
+  /// cannot loop forever; a manual `force` rebuild or a 5-minute cooldown resets the budget.
   static int _ftsRepairAttempts = 0;
   static const int _ftsRepairMaxAttempts = 3;
+  static DateTime? _lastFtsRepairTime;
+  static const Duration _ftsRepairCooldown = Duration(minutes: 5);
 
   /// Best-effort FTS repair: recreates the index tables/triggers and rebuilds.
   /// Retries up to [_ftsRepairMaxAttempts] times with backoff, so a transient
   /// failure no longer leaves the index dead for the whole session. Returns
   /// true on success. Pass [force] for the manual Settings action.
   Future<bool> repairFtsIndex({bool force = false}) async {
-    if (force) _ftsRepairAttempts = 0;
+    final now = DateTime.now();
+    if (force ||
+        (_lastFtsRepairTime != null &&
+            now.difference(_lastFtsRepairTime!) > _ftsRepairCooldown)) {
+      _ftsRepairAttempts = 0;
+    }
+    _lastFtsRepairTime = now;
     if (_ftsRepairAttempts >= _ftsRepairMaxAttempts) {
       return !ftsRebuildFailed;
     }
@@ -51,6 +59,7 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
             "INSERT INTO songs_fts(songs_fts) VALUES('rebuild');");
         ftsRebuildFailed = false;
+        _ftsRepairAttempts = 0;
         return true;
       } catch (e, st) {
         ErrorLogger.log(

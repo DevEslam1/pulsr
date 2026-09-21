@@ -450,6 +450,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   static const _throttleMs = 100;
 
   void _updateTask(DownloadTask task) {
+    if (_streamController.isClosed) return;
     _tasks[task.videoId] = task;
 
     final videoId = task.videoId;

@@ -161,11 +161,13 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
   }
 
   Future<void> _startCrossfade(int nextIndex) async {
+    if (nextIndex < 0 || nextIndex >= _songs.length) return;
     if (_crossfadeManager.isCrossfading) return;
     if (!await _tripleBufferPipeline.claimInactive(PlayerClaim.crossfade)) return;
     try {
       return await _crossfadeManager.protect(() async {
         if (_crossfadeManager.isCrossfading) return;
+        if (nextIndex < 0 || nextIndex >= _songs.length) return;
         _crossfadeManager.beginCrossfade(nextIndex);
       final currentFadeId = _crossfadeManager.nextFadeId();
 
@@ -401,15 +403,17 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
         if (_crossfadeManager.currentFadeId == currentFadeId) {
           await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
               restoreVolume: _volume);
-          try {
-            await playSongAt(nextIndex);
-          } catch (fallbackError, fallbackSt) {
-            ErrorLogger.log('Crossfade fallback also failed',
-                error: fallbackError,
-                stackTrace: fallbackSt,
-                category: 'AudioHandler');
-            _errorSubject.add('Playback failed. Please try again.');
-            await _failCurrentPlayback(fatal: true);
+          if (nextIndex >= 0 && nextIndex < _songs.length) {
+            try {
+              await playSongAt(nextIndex);
+            } catch (fallbackError, fallbackSt) {
+              ErrorLogger.log('Crossfade fallback also failed',
+                  error: fallbackError,
+                  stackTrace: fallbackSt,
+                  category: 'AudioHandler');
+              _errorSubject.add('Playback failed. Please try again.');
+              await _failCurrentPlayback(fatal: true);
+            }
           }
         }
       } finally {

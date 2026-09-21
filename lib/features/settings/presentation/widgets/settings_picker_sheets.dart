@@ -314,6 +314,22 @@ void showAboutSheet(BuildContext context) {
               '${context.l10n.version} ${AppConfig.appVersion}',
               style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
             ),
+            const SizedBox(height: AppSpacing.xs),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.code_rounded, size: 14, color: p.accent),
+                const SizedBox(width: AppSpacing.xs),
+                Text(
+                  'Developer: ${'Eslam Mahmoud'}',
+                  style: TextStyle(
+                    color: p.accent,
+                    fontWeight: FontWeight.w600,
+                    fontSize: AppFontSize.bodySmall,
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: AppSpacing.md),
             Text(context.l10n.aboutBlurb,
               textAlign: TextAlign.center,
