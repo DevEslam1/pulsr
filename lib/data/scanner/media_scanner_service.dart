@@ -522,9 +522,9 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
     }
 
     // Skip if within a user-excluded folder (case-insensitive, normalized)
+    final normPath = path.toLowerCase();
+    final sep = input.pathSeparator;
     if (input.excludedFolders.any((folder) {
-      final sep = input.pathSeparator;
-      final normPath = path.toLowerCase();
       final normFolder = folder.toLowerCase();
       final prefix =
           normFolder.endsWith(sep) ? normFolder : '$normFolder$sep';

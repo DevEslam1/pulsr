@@ -71,6 +71,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
           ? getIt<RoomCorrectionService>()
           : RoomCorrectionService();
   AudioPlayer? _player;
+  Timer? _progressTimer;
   _RcPhase _phase = _RcPhase.idle;
   double _progress = 0.0;
   List<double>? _responseDb;
@@ -80,6 +81,8 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
 
   @override
   void dispose() {
+    _progressTimer?.cancel();
+    _progressTimer = null;
     _player?.stop();
     _player?.dispose();
     if (_service.isCapturing) {
@@ -125,7 +128,8 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
 
       // Progress: playback position vs sweep duration.
       final durationMs = (tones.length * 350).clamp(1000, 60000);
-      Timer.periodic(const Duration(milliseconds: 100), (t) {
+      _progressTimer?.cancel();
+      _progressTimer = Timer.periodic(const Duration(milliseconds: 100), (t) {
         if (!mounted || _phase != _RcPhase.measuring) {
           t.cancel();
           return;
@@ -136,6 +140,8 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
 
       await player.playerStateStream
           .firstWhere((s) => s.processingState == ProcessingState.completed);
+      _progressTimer?.cancel();
+      _progressTimer = null;
       await player.stop();
 
       // Tail margin so the last tone's window is fully captured.
@@ -156,6 +162,8 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
         _phase = _RcPhase.result;
       });
     } catch (e) {
+      _progressTimer?.cancel();
+      _progressTimer = null;
       if (!mounted) return;
       setState(() {
         _phase = _RcPhase.idle;

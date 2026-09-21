@@ -498,6 +498,24 @@ class ScrobblerService {
     required int durationSec,
     required DateTime timestamp,
     String? artworkUrl,
+  }) {
+    return _submitMutex.run(() => _submitScrobbleLocked(
+          artist: artist,
+          track: track,
+          album: album,
+          durationSec: durationSec,
+          timestamp: timestamp,
+          artworkUrl: artworkUrl,
+        ));
+  }
+
+  Future<void> _submitScrobbleLocked({
+    required String artist,
+    required String track,
+    required String album,
+    required int durationSec,
+    required DateTime timestamp,
+    String? artworkUrl,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     // Offline-only mode (and Pure builds, which have no network): queue

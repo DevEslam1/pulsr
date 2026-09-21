@@ -1256,20 +1256,8 @@ class YtDownloadService {
         } catch (_) {}
       }
     }
-  } on _RangeIgnored { // FIX-A02: Catch _RangeIgnored OUTSIDE the try/finally
-    // FIX-A02: Clean parts inside the catch, then call sequential
-    for (final part in tempParts) {
-      try {
-        if (await part.exists()) {
-          await part.delete();
-        }
-      } catch (_) {}
-    }
-    try {
-      if (await stamp.exists()) {
-        await stamp.delete();
-      }
-    } catch (_) {}
+  } on _RangeIgnored {
+    // Inner finally already cleaned up tempParts and stamp since keepParts is false.
     debugPrint(
         '[YtDownloadService] Server ignored Range mid-transfer; retrying as a single request');
     await _downloadSequential(uri, dest, task, onProgress,

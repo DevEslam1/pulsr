@@ -289,11 +289,11 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
       final prefs = await SharedPreferences.getInstance();
       final seeded = prefs.getBool('smart_playlists_seeded') ?? false;
       if (!seeded) {
-        await prefs.setBool('smart_playlists_seeded', true);
         final hasSmart = playlists.any((p) => p.isSmart);
         if (!hasSmart) {
           await _playlistUseCases.seedDefaultSmartPlaylists();
         }
+        await prefs.setBool('smart_playlists_seeded', true);
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to check or seed default smart playlists',

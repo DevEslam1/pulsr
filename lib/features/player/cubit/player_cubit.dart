@@ -154,6 +154,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       );
   int _mediaItemResolutionGen = 0;
   int _localMatchSwapGen = 0;
+  int _perTrackSyncGen = 0;
+  int _followSampleRateGen = 0;
   List<SponsorBlockSegment> _currentSponsorSegments = const [];
   String? _sponsorSegmentsVideoId;
   @override
@@ -465,6 +467,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     final service = _hiResAudioService;
     final settings = _settingsCubit?.state;
     if (service == null || settings == null) return;
+    final gen = ++_followSampleRateGen;
     final rate = HiResAudioService.followTrackRateToApply(
       trackSampleRate: song.sampleRate,
       lastRequestedSampleRate: _lastFollowedSampleRate,
@@ -473,13 +476,20 @@ class PlayerCubit extends PulsrCubit<PlayerState>
           settings.followTrackSampleRate || settings.strictBitPerfect,
     );
     if (rate == null) return;
-    _lastFollowedSampleRate = rate;
     try {
       final depth = song.bitDepth ?? 0;
       await service.setTargetOutputFormat(sampleRate: rate, bitDepth: depth);
-      if (isClosed) return;
+      if (isClosed ||
+          gen != _followSampleRateGen ||
+          !_isSameTrack(state.currentSong, song)) {
+        return;
+      }
+      _lastFollowedSampleRate = rate;
       await _settingsCubit?.refreshOutputDevice();
     } catch (e, st) {
+      if (_lastFollowedSampleRate == rate) {
+        _lastFollowedSampleRate = null;
+      }
       ErrorLogger.log('Follow-track sample rate failed ($rate)',
           error: e, stackTrace: st, category: 'PlayerCubit');
     }
@@ -500,11 +510,11 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   Future<void> persistQueueSlotsNow() {
     _persistQueueDebounce?.cancel();
     _persistQueueDebounce = null;
-    return _persistQueueSlots();
+    return _persistQueueSlots(force: true);
   }
 
-  Future<void> _persistQueueSlots() async {
-    if (isClosed) return;
+  Future<void> _persistQueueSlots({bool force = false}) async {
+    if (!force && isClosed) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       // JSON mapping lives in QueueSlotCodec (god-object split); only the
@@ -1064,8 +1074,11 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       positionUpdates.throttleTime(const Duration(milliseconds: 200),
           trailing: true),
       (pos) {
-        _checkSponsorBlockSkip(pos);
-        safeEmit(state.copyWith(position: pos));
+        final skipped = _checkSponsorBlockSkip(pos);
+        final effectivePos = skipped ? state.position : pos;
+        if (!skipped) {
+          safeEmit(state.copyWith(position: pos));
+        }
         if (state.isPlaying) {
           _updateWidgetProgressThrottled();
           // Keep the active slot's restore position near-live. It used to be
@@ -1074,7 +1087,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
           _queueSlots[state.activeQueueSlot] = _QueueSlotData(
             songs: state.queue,
             currentIndex: state.currentIndex,
-            position: pos,
+            position: effectivePos,
             speed: state.playbackSpeed,
           );
           final slotNow = DateTime.now();
@@ -1173,15 +1186,15 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     }
   }
 
-  void _checkSponsorBlockSkip(Duration pos) {
-    if (_currentSponsorSegments.isEmpty || !state.isPlaying) return;
+  bool _checkSponsorBlockSkip(Duration pos) {
+    if (_currentSponsorSegments.isEmpty || !state.isPlaying) return false;
     // F-67: gate auto-skip on the persisted enable flag and enabled categories.
     final service = _sponsorBlock;
-    if (!service.isEnabled) return;
+    if (!service.isEnabled) return false;
     final now = DateTime.now();
     if (_lastSponsorSkipTime != null &&
         now.difference(_lastSponsorSkipTime!).inMilliseconds < 1500) {
-      return;
+      return false;
     }
     // Pure decision lives in the service (god-object split); only guards and
     // side effects remain here.
@@ -1190,13 +1203,15 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       enabledCategories: service.enabledCategories,
       position: pos,
     );
-    if (seekTarget == null) return;
-    final target = seekTarget - const Duration(milliseconds: 50);
+    if (seekTarget == null) return false;
+    final target = seekTarget <= const Duration(milliseconds: 50)
+        ? Duration.zero
+        : seekTarget - const Duration(milliseconds: 50);
     if (_lastSkippedSegmentEnd != null &&
         (_lastSkippedSegmentEnd == target ||
             (pos - _lastSkippedSegmentEnd!).abs() <
                 const Duration(seconds: 2))) {
-      return;
+      return false;
     }
     _lastSkippedSegmentEnd = target;
     _lastSponsorSkipTime = now;
@@ -1205,6 +1220,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     // Optimistic position update: the throttled position stream would
     // otherwise keep reporting in-segment positions for up to 200ms.
     safeEmit(state.copyWith(position: seekTarget));
+    return true;
   }
 
   /// Reads real audio-header fields for a local song the first time it plays
@@ -1230,7 +1246,13 @@ class PlayerCubit extends PulsrCubit<PlayerState>
           !isClosed &&
           gen == _mediaItemResolutionGen &&
           _isSameTrack(state.currentSong, updated)) {
-        safeEmit(state.copyWith(currentSong: updated));
+        final updatedQueue = state.queue
+            .map((s) => _isSameTrack(s, updated) ? updated : s)
+            .toList();
+        safeEmit(state.copyWith(
+          currentSong: updated,
+          queue: updatedQueue,
+        ));
       }
     } catch (_) {}
   }
@@ -1242,7 +1264,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
 
   @override
   Future<void> _loadLyricsForSong(SongsTableData song) async {
-    if (isClosed) return;
+    if (isClosed || !_isSameTrack(state.currentSong, song)) return;
 
     // Check central in-memory cache first, including a valid negative entry
     // (a recently-proven miss) so a local track with no lyrics does not re-run
@@ -1251,8 +1273,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     if (LrcParser.hasCachedLyrics(songId: song.id, path: song.path)) {
       final cached =
           LrcParser.getCachedLyrics(songId: song.id, path: song.path);
-      ++_lyricsLoadGen;
       if (_isSameTrack(state.currentSong, song)) {
+        ++_lyricsLoadGen;
         safeEmit(state.copyWith(
           isLoadingLyrics: false,
           lyrics: cached?.lines ?? const [],
@@ -1605,10 +1627,12 @@ class PlayerCubit extends PulsrCubit<PlayerState>
                     ? Duration(milliseconds: local.durationMs)
                     : state.duration,
               ));
+              final currentPos =
+                  state.position > startPos ? state.position : startPos;
               _queueSlots[state.activeQueueSlot] = _QueueSlotData(
                 songs: List.from(swappedQueue),
                 currentIndex: effectiveIndex,
-                position: startPos,
+                position: currentPos,
                 speed: state.playbackSpeed,
               );
               _debouncedPersistQueueSlots();
@@ -1659,6 +1683,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       // local-match swap re-checks the gen and must not re-apply the failed
       // queue after the rollback below.
       _mediaItemResolutionGen++;
+      _localMatchSwapGen++;
       // Roll back the optimistic mutations: the unplayable queue must not
       // present itself as active, and the pending 2s persist must not write
       // the broken slot over the previously saved session. Re-scheduling the
@@ -1681,7 +1706,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         isLoadingLyrics: false,
         errorMessage: 'Failed to play ${song.title}',
       ));
-      rethrow;
+      return;
     }
     if (isClosed || _mediaItemResolutionGen != capturedGen) return;
     unawaited(_loadLyricsForSong(song));
@@ -1764,16 +1789,30 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     if (sameId && withinDedupeWindow) return;
     _lastPerTrackSyncSongId = song.id;
     _lastPerTrackSyncAt = now;
+    final gen = ++_perTrackSyncGen;
 
     // The stores load their SharedPreferences map asynchronously; reading
     // before `ready` completes returns defaults (0/null) and silently drops
     // the saved per-song overrides.
-    await Future.wait<void>([
-      _songRatingStore.ready,
-      _perSongEqStore.ready,
-      _perSongVolumeStore.ready,
-    ]);
-    if (isClosed) return;
+    try {
+      await Future.wait<void>([
+        _songRatingStore.ready,
+        _perSongEqStore.ready,
+        _perSongVolumeStore.ready,
+      ]).timeout(
+        const Duration(seconds: 2),
+        onTimeout: () {
+          ErrorLogger.log('Store ready timeout in _syncPerTrackState',
+              category: 'PlayerCubit');
+          return const [];
+        },
+      );
+    } catch (_) {}
+    if (isClosed ||
+        gen != _perTrackSyncGen ||
+        !_isSameTrack(state.currentSong, song)) {
+      return;
+    }
 
     final trackKey = song.id.toString();
     final songRating = _songRatingStore.getRating(trackKey);
@@ -1831,15 +1870,17 @@ class PlayerCubit extends PulsrCubit<PlayerState>
           }
         } catch (_) {}
       }
-    } else if (_perSongOverrideActive && _globalEqBackup != null) {
-      final restore = _globalEqBackup!;
+    } else if (_perSongOverrideActive) {
+      final restore = _globalEqBackup;
       final profileRestore = _globalHeadphoneProfileBackup;
       _globalEqBackup = null;
       _globalHeadphoneProfileBackup = null;
       _perSongOverrideActive = false;
-      unawaited(profileRestore != null
-          ? applyHeadphoneProfile(profileRestore, isPerSongRestore: true)
-          : applyPreset(restore, isPerSongRestore: true));
+      if (profileRestore != null) {
+        unawaited(applyHeadphoneProfile(profileRestore, isPerSongRestore: true));
+      } else if (restore != null) {
+        unawaited(applyPreset(restore, isPerSongRestore: true));
+      }
     }
     // Push per-song volume so the emitted override is actually audible.
     // setVolume combines master + ReplayGain + per-song gain in the handler.
@@ -2210,7 +2251,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     // recent slot state (e.g. the near-live position written by the position
     // listener). Awaited so the write lands before the cubit is gone.
     try {
-      await _persistQueueSlots();
+      await _persistQueueSlots(force: true);
     } catch (_) {}
     return super.close();
   }

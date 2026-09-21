@@ -39,16 +39,21 @@ class FileIntentHandler {
 
   void _initChannel() {
     _channel.setMethodCallHandler((call) async {
-      if (call.method == 'onAudioFileOpened') {
-        final uri = call.arguments as String?;
-        if (uri != null) {
-          await handleAudioUri(uri);
+      try {
+        if (call.method == 'onAudioFileOpened') {
+          final uri = call.arguments as String?;
+          if (uri != null) {
+            await handleAudioUri(uri);
+          }
+        } else if (call.method == 'onVoiceSearch') {
+          final query = call.arguments as String?;
+          if (query != null) {
+            await handleVoiceSearch(query);
+          }
         }
-      } else if (call.method == 'onVoiceSearch') {
-        final query = call.arguments as String?;
-        if (query != null) {
-          await handleVoiceSearch(query);
-        }
+      } catch (e, st) {
+        ErrorLogger.log('Error handling method call: ${call.method}',
+            error: e, stackTrace: st, category: 'FileIntentHandler');
       }
     });
   }

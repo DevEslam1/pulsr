@@ -1494,7 +1494,7 @@ class _RecentlyAddedSectionState extends State<_RecentlyAddedSection> {
                               : Icon(Icons.expand_more_rounded,
                                   size: 18, color: p.accent),
                           label: Text(
-                            'Load more (+50)',
+                            '${context.l10n.loadMore} (+50)',
                             style: TextStyle(
                               color: p.accent,
                               fontSize: AppFontSize.label,

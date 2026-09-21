@@ -412,13 +412,12 @@ class CloudSyncService {
 
       final allLocalSongs = await _db.select(_db.songsTable).get();
       final localByRemoteId = <String, SongsTableData>{};
-      final localByTitleArtist = <String, SongsTableData>{};
+      final localByTitleArtist = <(String, String), SongsTableData>{};
       for (final s in allLocalSongs) {
         if (s.remoteId != null && s.remoteId!.isNotEmpty) {
           localByRemoteId[s.remoteId!] = s;
         }
-        localByTitleArtist[
-            '${s.title.toLowerCase()}|||${s.artist.toLowerCase()}'] = s;
+        localByTitleArtist[(s.title.toLowerCase(), s.artist.toLowerCase())] = s;
       }
 
       await _db.transaction(() async {
@@ -435,8 +434,7 @@ class CloudSyncService {
           if (remoteId != null && remoteId.isNotEmpty) {
             match = localByRemoteId[remoteId];
           }
-          match ??= localByTitleArtist[
-              '${title.toLowerCase()}|||${artist.toLowerCase()}'];
+          match ??= localByTitleArtist[(title.toLowerCase(), artist.toLowerCase())];
 
           if (match != null) {
             if (!match.isFavorite) {
