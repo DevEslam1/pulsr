@@ -9,6 +9,7 @@ import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../domain/models/radio_station.dart';
 import '../../player/cubit/player_cubit.dart';
+import '../../player/cubit/player_state.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -23,18 +24,63 @@ class RadioScreen extends StatefulWidget {
 
 class _RadioScreenState extends State<RadioScreen> {
   final RadioStationStore _store = RadioStationStore();
+  final TextEditingController _searchController = TextEditingController();
   List<RadioStation> _stations = const [];
+  String _searchQuery = '';
+  String _selectedGenre = 'All';
 
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(() {
+      final text = _searchController.text.trim();
+      if (text != _searchQuery) {
+        setState(() => _searchQuery = text);
+      }
+    });
     _store.ready.then((_) {
       if (mounted) setState(() => _stations = _store.list);
     });
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   void _refresh() {
     if (mounted) setState(() => _stations = _store.list);
+  }
+
+  List<String> get _availableGenres {
+    final set = <String>{};
+    for (final s in _stations) {
+      final g = s.genre?.trim();
+      if (g != null && g.isNotEmpty) {
+        set.add(g);
+      }
+    }
+    final list = set.toList()..sort();
+    return ['All', ...list];
+  }
+
+  List<RadioStation> get _filteredStations {
+    return _stations.where((s) {
+      if (_selectedGenre != 'All') {
+        if (s.genre?.toLowerCase() != _selectedGenre.toLowerCase()) {
+          return false;
+        }
+      }
+      if (_searchQuery.isNotEmpty) {
+        final query = _searchQuery.toLowerCase();
+        final matchesName = s.name.toLowerCase().contains(query);
+        final matchesGenre = s.genre?.toLowerCase().contains(query) ?? false;
+        final matchesUrl = s.url.toLowerCase().contains(query);
+        if (!matchesName && !matchesGenre && !matchesUrl) return false;
+      }
+      return true;
+    }).toList();
   }
 
   String _nameForUrl(String url) {
@@ -146,6 +192,8 @@ class _RadioScreenState extends State<RadioScreen> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final playerCubit = context.read<PlayerCubit>();
+    final availableGenres = _availableGenres;
+    final filtered = _filteredStations;
 
     return Scaffold(
       backgroundColor: p.bg,
@@ -241,7 +289,6 @@ class _RadioScreenState extends State<RadioScreen> {
                         side: BorderSide(
                             color: p.accent.withValues(alpha: 0.5)),
                         padding: const EdgeInsets.symmetric(
-
                             horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(AppRadii.r14),
@@ -252,71 +299,233 @@ class _RadioScreenState extends State<RadioScreen> {
                 ),
               ),
             )
-          : ListView.separated(
-              padding: const EdgeInsets.only(top: AppSpacing.xs, bottom: AppSpacing.scrollBottom),
-              itemCount: _stations.length,
-              separatorBuilder: (_, __) => Divider(
-                height: 1,
-                indent: 72,
-                endIndent: 16,
-                color: p.hairline,
-              ),
-              itemBuilder: (context, index) {
-                final station = _stations[index];
-                return StaggeredReveal(
-                  index: index,
-                  groupKey: _stations.length,
-                  child: ListTile(
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
-                  leading: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: p.accentContainer.withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(AppRadii.r12),
-                    ),
-                    alignment: Alignment.center,
-                    child: Icon(Icons.radio_rounded,
-                        color: p.accent, size: 22),
-                  ),
-                  title: Text(
-                    station.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: p.textPrimary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: AppFontSize.callout,
-                    ),
-                  ),
-                  subtitle: Text(
-                    station.url,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        tooltip: context.l10n.radioEdit,
-                        icon: Icon(Icons.edit_rounded, color: p.textSecondary, size: 24),
-                        onPressed: () => _showAddDialog(initial: station),
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
+                  child: TextField(
+                    controller: _searchController,
+                    style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.bodySmall),
+                    decoration: InputDecoration(
+                      hintText: 'Search station, genre, or URL…',
+                      hintStyle: TextStyle(color: p.textTertiary, fontSize: AppFontSize.bodySmall),
+                      prefixIcon: Icon(Icons.search_rounded, color: p.textSecondary, size: 20),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: Icon(Icons.close_rounded, color: p.textSecondary, size: 18),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _searchQuery = '');
+                              },
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadii.r12),
+                        borderSide: BorderSide(color: p.hairline),
                       ),
-                      IconButton(
-                        tooltip: context.l10n.radioPlay,
-                        icon: Icon(Icons.play_circle_fill_rounded,
-                            color: p.accent, size: 30),
-                        onPressed: () => playerCubit.playRadioStation(station),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadii.r12),
+                        borderSide: BorderSide(color: p.hairline),
                       ),
-                    ],
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadii.r12),
+                        borderSide: BorderSide(color: p.accent, width: 1.5),
+                      ),
+                    ),
                   ),
-                  onTap: () => playerCubit.playRadioStation(station),
-                  onLongPress: () => _showStationActions(station),
                 ),
-                );
-              },
+                if (availableGenres.length > 2)
+                  SizedBox(
+                    height: 38,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                      itemCount: availableGenres.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs),
+                      itemBuilder: (context, idx) {
+                        final g = availableGenres[idx];
+                        final isSelected = _selectedGenre == g;
+                        return FilterChip(
+                          label: Text(g),
+                          selected: isSelected,
+                          selectedColor: p.accent.withValues(alpha: 0.2),
+                          checkmarkColor: p.accent,
+                          labelStyle: TextStyle(
+                            color: isSelected ? p.accent : p.textSecondary,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            fontSize: AppFontSize.caption,
+                          ),
+                          side: BorderSide(
+                            color: isSelected ? p.accent.withValues(alpha: 0.4) : p.hairline,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadii.r12),
+                          ),
+                          onSelected: (_) {
+                            setState(() => _selectedGenre = g);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                const SizedBox(height: AppSpacing.xs),
+                Expanded(
+                  child: filtered.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppSpacing.xl),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.search_off_rounded, size: 48, color: p.textTertiary),
+                                const SizedBox(height: AppSpacing.sm),
+                                Text(
+                                  'No stations match "$_searchQuery"',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: p.textSecondary,
+                                    fontSize: AppFontSize.body,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.only(top: AppSpacing.xs, bottom: AppSpacing.scrollBottom),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, __) => Divider(
+                            height: 1,
+                            indent: 72,
+                            endIndent: 16,
+                            color: p.hairline,
+                          ),
+                          itemBuilder: (context, index) {
+                            final station = filtered[index];
+                            return StaggeredReveal(
+                              index: index,
+                              groupKey: filtered.length,
+                              child: BlocBuilder<PlayerCubit, PlayerState>(
+                                buildWhen: (prev, curr) =>
+                                    prev.currentSong?.path != curr.currentSong?.path ||
+                                    prev.isPlaying != curr.isPlaying,
+                                builder: (context, playerState) {
+                                  final isCurrent = playerState.currentSong?.path == station.url;
+                                  final isPlaying = isCurrent && playerState.isPlaying;
+
+                                  return ListTile(
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
+                                    leading: Container(
+                                      width: 44,
+                                      height: 44,
+                                      decoration: BoxDecoration(
+                                        color: isPlaying
+                                            ? p.accent.withValues(alpha: 0.2)
+                                            : p.accentContainer.withValues(alpha: 0.35),
+                                        borderRadius: BorderRadius.circular(AppRadii.r12),
+                                        border: isPlaying
+                                            ? Border.all(color: p.accent, width: 1.5)
+                                            : null,
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Icon(
+                                        isPlaying ? Icons.graphic_eq_rounded : Icons.radio_rounded,
+                                        color: p.accent,
+                                        size: 22,
+                                      ),
+                                    ),
+                                    title: Text(
+                                      station.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: isCurrent ? p.accent : p.textPrimary,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: AppFontSize.callout,
+                                      ),
+                                    ),
+                                    subtitle: Row(
+                                      children: [
+                                        if (station.genre != null && station.genre!.isNotEmpty) ...[
+                                          Container(
+                                            margin: const EdgeInsetsDirectional.only(end: 6),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 6, vertical: 1.5),
+                                            decoration: BoxDecoration(
+                                              color: p.accentContainer.withValues(alpha: 0.35),
+                                              borderRadius: BorderRadius.circular(AppRadii.r6),
+                                            ),
+                                            child: Text(
+                                              station.genre!,
+                                              style: TextStyle(
+                                                color: p.accent,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                        Expanded(
+                                          child: Text(
+                                            station.url,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                                color: p.textSecondary,
+                                                fontSize: AppFontSize.label),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          tooltip: context.l10n.radioEdit,
+                                          icon: Icon(Icons.edit_rounded,
+                                              color: p.textSecondary, size: 22),
+                                          onPressed: () => _showAddDialog(initial: station),
+                                        ),
+                                        IconButton(
+                                          tooltip: isPlaying ? 'Pause' : context.l10n.radioPlay,
+                                          icon: Icon(
+                                            isPlaying
+                                                ? Icons.pause_circle_filled_rounded
+                                                : Icons.play_circle_fill_rounded,
+                                            color: p.accent,
+                                            size: 32,
+                                          ),
+                                          onPressed: () {
+                                            if (isCurrent) {
+                                              playerCubit.togglePlayPause();
+                                            } else {
+                                              playerCubit.playRadioStation(station);
+                                            }
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                    onTap: () {
+                                      if (isCurrent) {
+                                        playerCubit.togglePlayPause();
+                                      } else {
+                                        playerCubit.playRadioStation(station);
+                                      }
+                                    },
+                                    onLongPress: () => _showStationActions(station),
+                                  );
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
             ),
     );
   }
@@ -335,6 +544,7 @@ class _AddStationDialog extends StatefulWidget {
 class _AddStationDialogState extends State<_AddStationDialog> {
   late final TextEditingController _nameController;
   late final TextEditingController _urlController;
+  late final TextEditingController _genreController;
   String? _urlError;
 
   bool get _isEditing => widget.initial != null;
@@ -344,12 +554,14 @@ class _AddStationDialogState extends State<_AddStationDialog> {
     super.initState();
     _nameController = TextEditingController(text: widget.initial?.name ?? '');
     _urlController = TextEditingController(text: widget.initial?.url ?? '');
+    _genreController = TextEditingController(text: widget.initial?.genre ?? '');
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _urlController.dispose();
+    _genreController.dispose();
     super.dispose();
   }
 
@@ -373,11 +585,12 @@ class _AddStationDialogState extends State<_AddStationDialog> {
       return;
     }
     final name = _nameController.text.trim();
+    final genre = _genreController.text.trim();
     Navigator.of(context, rootNavigator: true).pop(
       RadioStation.create(
         name: name,
         url: url,
-        genre: widget.initial?.genre,
+        genre: genre.isNotEmpty ? genre : null,
         artworkUrl: widget.initial?.artworkUrl,
         lastPlayed: widget.initial?.lastPlayed,
       ),
@@ -405,6 +618,32 @@ class _AddStationDialogState extends State<_AddStationDialog> {
                 labelText: context.l10n.radioStationName,
                 labelStyle: TextStyle(color: p.textSecondary),
                 hintText: context.l10n.browseRadioNameHint,
+                hintStyle: TextStyle(color: p.textTertiary),
+                filled: true,
+                fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderSide: BorderSide(color: p.hairline),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderSide: BorderSide(color: p.hairline),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderSide: BorderSide(color: p.accent, width: 1.5),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.s14),
+            TextField(
+              controller: _genreController,
+              textInputAction: TextInputAction.next,
+              style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
+              decoration: InputDecoration(
+                labelText: 'Genre / Category (Optional)',
+                labelStyle: TextStyle(color: p.textSecondary),
+                hintText: 'e.g. Chill, Classical, Jazz, Quran...',
                 hintStyle: TextStyle(color: p.textTertiary),
                 filled: true,
                 fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),

@@ -6,8 +6,8 @@
         <domain includeSubdomains="false">localhost</domain>
     </domain-config>
 
-    <!-- Enforce HTTPS for all other outgoing network traffic -->
-    <base-config cleartextTrafficPermitted="false">
+    <!-- Allow cleartext traffic for audio playback (e.g. Icecast/Shoutcast internet radio streams) -->
+    <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>

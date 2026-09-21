@@ -66,7 +66,7 @@ class DuplicateFinderService {
           final clusters = await _verifyWithChecksum(remaining);
           for (final cluster in clusters) {
             result.add(DuplicateGroup(
-              key: entry.key,
+              key: '${entry.key}-${cluster.first.id}',
               songs: cluster,
               reason: 'Identical Audio Content (Checksum Verified)',
             ));

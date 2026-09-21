@@ -251,5 +251,52 @@ class SmartCriteria {
       sortAscending: false,
       limit: 50,
     ),
+    'Top Starred': SmartCriteria(
+      rules: [
+        SmartRule(
+            field: SmartRuleField.isFavorite,
+            operator: SmartOperator.equals,
+            value: 'true'),
+      ],
+      sortBy: 'playCount',
+      sortAscending: false,
+      limit: 100,
+    ),
+    'Forgotten Favorites': SmartCriteria(
+      rules: [
+        SmartRule(
+            field: SmartRuleField.playCount,
+            operator: SmartOperator.greaterThanOrEqual,
+            value: '3'),
+      ],
+      sortBy: 'lastPlayed',
+      sortAscending: true,
+      limit: 50,
+    ),
+    'Audiophile Hi-Res': SmartCriteria(
+      rules: [
+        SmartRule(
+            field: SmartRuleField.isLossless,
+            operator: SmartOperator.equals,
+            value: 'true'),
+        SmartRule(
+            field: SmartRuleField.bitrate,
+            operator: SmartOperator.greaterThanOrEqual,
+            value: '900'),
+      ],
+      sortBy: 'title',
+      sortAscending: true,
+    ),
+    'Epic Tracks (> 5m)': SmartCriteria(
+      rules: [
+        SmartRule(
+            field: SmartRuleField.durationMs,
+            operator: SmartOperator.greaterThan,
+            value: '300000'),
+      ],
+      sortBy: 'durationMs',
+      sortAscending: false,
+      limit: 50,
+    ),
   };
 }

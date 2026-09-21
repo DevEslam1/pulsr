@@ -5,6 +5,7 @@ import '../../core/theme/aura_theme.dart';
 import '../../core/utils/l10n_extensions.dart';
 import '../player/cubit/player_cubit.dart';
 import '../player/cubit/player_state.dart';
+import '../../data/audio/sleep_timer_manager.dart';
 
 import '../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../core/widgets/pulsr_pressable.dart';
@@ -35,6 +36,7 @@ class SleepTimerSheet extends StatelessWidget {
         final cubit = context.read<PlayerCubit>();
         final remainingTracks = cubit.sleepTimerRemainingTracks;
         final isQueueMode = cubit.isEndOfQueueSleepTimer;
+        final timerMode = cubit.sleepTimerMode;
         final isActive = state.sleepTimerRemaining != null ||
             remainingTracks != null ||
             isQueueMode;
@@ -127,7 +129,10 @@ class SleepTimerSheet extends StatelessWidget {
                                       Text(context.l10n.endOfTrack),
                                     ],
                                   ),
-                                  selected: false,
+                                  // FIX BUG-5: Show as selected when end-of-track
+                                  // timer is active so the user has visual feedback.
+                                  selected: timerMode == SleepTimerMode.endOfTrack &&
+                                      state.sleepTimerRemaining != null,
                                   onSelected: (_) {
                                     cubit.startEndOfTrackTimer();
                                     Navigator.pop(context);
@@ -142,7 +147,9 @@ class SleepTimerSheet extends StatelessWidget {
                                       Text(context.l10n.endOfQueue),
                                     ],
                                   ),
-                                  selected: false,
+                                  // FIX BUG-6: Show as selected when end-of-queue
+                                  // timer is active.
+                                  selected: isQueueMode,
                                   onSelected: (_) {
                                     cubit.startEndOfQueueTimer();
                                     Navigator.pop(context);
@@ -150,7 +157,10 @@ class SleepTimerSheet extends StatelessWidget {
                                 ),
                                 ChoiceChip(
                                   label: Text(context.l10n.songsCount(2)),
-                                  selected: false,
+                                  // FIX BUG-5: Show as selected when N-tracks timer
+                                  // is active with exactly 2 tracks remaining.
+                                  selected: timerMode == SleepTimerMode.afterNTracks &&
+                                      remainingTracks == 2,
                                   onSelected: (_) {
                                     cubit.startAfterNTracksTimer(2);
                                     Navigator.pop(context);
@@ -158,7 +168,8 @@ class SleepTimerSheet extends StatelessWidget {
                                 ),
                                 ChoiceChip(
                                   label: Text(context.l10n.songsCount(3)),
-                                  selected: false,
+                                  selected: timerMode == SleepTimerMode.afterNTracks &&
+                                      remainingTracks == 3,
                                   onSelected: (_) {
                                     cubit.startAfterNTracksTimer(3);
                                     Navigator.pop(context);
@@ -166,7 +177,8 @@ class SleepTimerSheet extends StatelessWidget {
                                 ),
                                 ChoiceChip(
                                   label: Text(context.l10n.songsCount(5)),
-                                  selected: false,
+                                  selected: timerMode == SleepTimerMode.afterNTracks &&
+                                      remainingTracks == 5,
                                   onSelected: (_) {
                                     cubit.startAfterNTracksTimer(5);
                                     Navigator.pop(context);
@@ -174,7 +186,8 @@ class SleepTimerSheet extends StatelessWidget {
                                 ),
                                 ChoiceChip(
                                   label: Text(context.l10n.songsCount(10)),
-                                  selected: false,
+                                  selected: timerMode == SleepTimerMode.afterNTracks &&
+                                      remainingTracks == 10,
                                   onSelected: (_) {
                                     cubit.startAfterNTracksTimer(10);
                                     Navigator.pop(context);

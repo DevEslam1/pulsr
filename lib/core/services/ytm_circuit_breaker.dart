@@ -58,6 +58,14 @@ class YtmCircuitBreaker {
   /// Record a classified failure; opens the breaker past the threshold.
   void recordFailure(YtmBlockSignal signal) {
     _totalFailures.update(signal, (v) => v + 1, ifAbsent: () => 1);
+    // Transient network failures (SocketException, YTM_OFFLINE/TIMEOUT) should
+    // NOT trip the circuit breaker. They are caused by brief connectivity
+    // interruptions, not by YouTube blocking this IP/client. Opening the breaker
+    // on network blips silenced the native resolve tiers for 10 seconds per blip
+    // — enough to cover the start of the next song and produce the symptom of
+    // "no connection after ~2 songs" even though the internet was working fine.
+    // Total-failure accounting still increments above for diagnostics.
+    if (signal == YtmBlockSignal.networkUnavailable) return;
     final n = (_consecutiveFailures[signal] ?? 0) + 1;
     _consecutiveFailures[signal] = n;
     if (n >= maxConsecutiveFailures) {

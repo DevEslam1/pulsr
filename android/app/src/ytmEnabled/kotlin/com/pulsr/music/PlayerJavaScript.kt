@@ -2,6 +2,7 @@ package com.pulsr.music
 
 import android.util.Log
 import org.schabi.newpipe.extractor.services.youtube.YoutubeJavaScriptPlayerManager
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Player-JS deciphering (signatureCipher `s` + throttling `n`) backed by
@@ -34,6 +35,7 @@ internal object PlayerJavaScript {
     private var playerUrl: String = ""
 
     private val lock = Any()
+    private val warmUpInProgress = AtomicBoolean(false)
 
     /** Best-effort record of the player URL from a `/player` response `assets.js`. */
     fun rememberPlayerUrlFromAssets(assetsJs: String?) {
@@ -49,8 +51,115 @@ internal object PlayerJavaScript {
         }
     }
 
+    /**
+     * Proactively fetches the YouTube player base.js URL from the iframe_api
+     * endpoint and warms up NewPipe's decipher engine.
+     *
+     * Without this, [playerUrl] is empty until the first successful `/player`
+     * response returns an `assets.js` field — which only happens on a playable
+     * response. On a flagged IP all clients return bot/login errors first, so
+     * every ciphered format is discarded ("No cached decipher rules for player
+     * hash default") and the entire 9-client chain times out with YTM_TIMEOUT.
+     *
+     * Called once from [YtmExtractorPlugin] during `preWarm` so decipher rules
+     * are ready before the first song needs them.
+     */
+    fun warmUp() {
+        if (!warmUpInProgress.compareAndSet(false, true)) return // already running
+        try {
+            val fetchedUrl = fetchPlayerUrlFromIframeApi()
+            if (!fetchedUrl.isNullOrEmpty()) {
+                rememberPlayerUrlFromAssets(fetchedUrl)
+                // Trigger NewPipe to parse the JS now so the first decipher call
+                // (which may come in under 1s from resolvePlayerStream) is instant.
+                synchronized(lock) {
+                    try {
+                        YoutubeJavaScriptPlayerManager.getSignatureTimestamp(playerUrl)
+                        Log.i(TAG, "Player JS warmed up successfully from $playerUrl")
+                    } catch (t: Throwable) {
+                        Log.w(TAG, "Player JS warm-up parse failed (non-fatal): ${t.message}")
+                    }
+                }
+            } else {
+                Log.w(TAG, "Player JS warm-up: could not fetch player URL from iframe_api")
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "Player JS warm-up failed (non-fatal): ${t.message}")
+        } finally {
+            warmUpInProgress.set(false)
+        }
+    }
+
+    /**
+     * Fetches the YouTube player base.js URL by parsing the iframe_api response.
+     * YouTube embeds the player script tag with the base.js path in the iframe_api
+     * page; we extract it with a simple regex rather than a full HTML parse.
+     */
+    private fun fetchPlayerUrlFromIframeApi(): String? {
+        return try {
+            val conn = java.net.URL("https://www.youtube.com/iframe_api").openConnection()
+            conn.connectTimeout = 8000
+            conn.readTimeout = 8000
+            val iframeHtml = conn.getInputStream().bufferedReader().use { it.readText() }
+            // The iframe_api JS contains: src="/s/player/<hash>/player_ias.vflset/en_US/base.js"
+            // or it redirects to www.youtube.com/s/player/... directly.
+            val srcRegex = Regex("""src=[\"'](/s/player/[^\"']+/base\.js)[\"']""")  
+            val match = srcRegex.find(iframeHtml)
+            if (match != null) {
+                val path = match.groupValues[1]
+                Log.d(TAG, "Player JS path from iframe_api: $path")
+                "https://www.youtube.com$path"
+            } else {
+                fetchPlayerUrlFromWatchPage()
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "fetchPlayerUrlFromIframeApi failed: ${t.message}")
+            fetchPlayerUrlFromWatchPage()
+        }
+    }
+
+    /**
+     * Secondary approach: fetch a known-public YouTube watch page and extract
+     * the player base.js URL from it. Used when iframe_api does not embed the path.
+     */
+    private fun fetchPlayerUrlFromWatchPage(): String? {
+        return try {
+            val conn = java.net.URL("https://www.youtube.com/watch?v=dQw4w9WgXcQ").openConnection()
+            conn.connectTimeout = 8000
+            conn.readTimeout = 8000
+            val html = conn.getInputStream().bufferedReader().use { it.readText() }
+            val patterns = listOf(
+                Regex("""\"jsUrl\":\"(/s/player/[^\"]+/base\.js)\""""),
+                Regex("""src=[\"'](/s/player/[^\"']+/base\.js)[\"']"""),
+                Regex("""(/s/player/[a-f0-9]+/player_ias\.vflset/[^/]+/base\.js)""")
+            )
+            for (regex in patterns) {
+                val m = regex.find(html)
+                if (m != null) {
+                    val path = m.groupValues[1]
+                    Log.d(TAG, "Player JS path from watch page: $path")
+                    return "https://www.youtube.com$path"
+                }
+            }
+            null
+        } catch (t: Throwable) {
+            Log.w(TAG, "fetchPlayerUrlFromWatchPage failed: ${t.message}")
+            null
+        }
+    }
+
     /** Deobfuscates a `signatureCipher` `s` value. Null when it cannot be done. */
     fun decipherSignature(signature: String): String? = synchronized(lock) {
+        // If playerUrl is still empty (warm-up hasn't completed yet or failed),
+        // try to fetch it synchronously now. This is a last-resort inline fetch;
+        // the warmUp() path is preferred so this never runs on the happy path.
+        if (playerUrl.isEmpty()) {
+            val fetched = try { fetchPlayerUrlFromIframeApi() } catch (_: Throwable) { null }
+            if (!fetched.isNullOrEmpty()) {
+                playerUrl = fetched
+                Log.i(TAG, "Player JS URL lazily fetched during decipherSignature: $playerUrl")
+            }
+        }
         try {
             val deciphered: String? =
                 YoutubeJavaScriptPlayerManager.deobfuscateSignature(playerUrl, signature)

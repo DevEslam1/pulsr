@@ -29,14 +29,24 @@ class YtmClientVersionResolver {
     } catch (_) {}
   }
 
+  static String get defaultDynamicVersion {
+    final now = DateTime.now().toUtc();
+    final yyyy = now.year.toString().padLeft(4, '0');
+    final mm = now.month.toString().padLeft(2, '0');
+    final dd = now.day.toString().padLeft(2, '0');
+    return '1.$yyyy$mm$dd.01.00';
+  }
+
   /// Build-time fallbacks. Both are overridable via `--dart-define` so release
   /// pipelines can inject their own values from CI secrets rather than relying
   /// on the public defaults baked into source (I18). The live scraped values
   /// still take precedence once [init] refreshes them.
-  static const String fallbackClientVersion = String.fromEnvironment(
-    'YTM_CLIENT_VERSION',
-    defaultValue: '1.20250820.01.00',
-  );
+  static String get fallbackClientVersion {
+    const fromEnv = String.fromEnvironment('YTM_CLIENT_VERSION');
+    if (fromEnv.isNotEmpty) return fromEnv;
+    return defaultDynamicVersion;
+  }
+
   static const String fallbackApiKey = String.fromEnvironment(
     'YTM_API_KEY',
     defaultValue: 'AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30',
@@ -44,7 +54,7 @@ class YtmClientVersionResolver {
   static const Duration _cacheTtl = Duration(hours: 24);
   static const Duration _maxStaleTtl = Duration(days: 30);
 
-  String _clientVersion = fallbackClientVersion;
+  late String _clientVersion = fallbackClientVersion;
   String _apiKey = fallbackApiKey;
   bool _isInitialized = false;
 
@@ -64,6 +74,9 @@ class YtmClientVersionResolver {
       if (!isStale && savedVersion != null && savedVersion.isNotEmpty) {
         _clientVersion = savedVersion;
         unawaited(_pushToNative(savedVersion));
+      } else {
+        _clientVersion = fallbackClientVersion;
+        unawaited(_pushToNative(_clientVersion));
       }
       if (!isStale && savedKey != null && savedKey.isNotEmpty) {
         _apiKey = savedKey;

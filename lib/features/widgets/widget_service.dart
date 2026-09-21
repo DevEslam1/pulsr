@@ -312,7 +312,10 @@ class WidgetService {
             } finally {
               try {
                 client?.close(force: true);
-              } catch (_) {}
+              } catch (e, st) {
+                ErrorLogger.log('Failed to close widget HTTP client',
+                    error: e, stackTrace: st, category: 'WidgetService');
+              }
             }
           }
         }
@@ -425,7 +428,9 @@ class WidgetService {
             try {
               final stat = await f.stat();
               return (file: f, modified: stat.modified);
-            } catch (_) {
+            } catch (e, st) {
+              ErrorLogger.log('Failed to stat widget artwork file',
+                  error: e, stackTrace: st, category: 'WidgetService');
               return (file: f, modified: null);
             }
           }),

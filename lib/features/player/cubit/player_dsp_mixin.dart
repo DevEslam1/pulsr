@@ -93,6 +93,7 @@ mixin PlayerDspControls on PulsrCubit<PlayerState> {
     return const [];
   }
 
+  // ignore: unused_element
   Future<HeadphoneProfile?> _headphoneProfileByName(String name) async {
     try {
       final lower = name.toLowerCase();
@@ -309,6 +310,9 @@ mixin PlayerDspControls on PulsrCubit<PlayerState> {
           isLoudnessContourEnabled: false,
           isSubCrossoverEnabled: false,
           isDynamicEqEnabled: false,
+          isViperDdcEnabled: false,
+          isArbitraryEqEnabled: false,
+          isLiveProgEnabled: false,
           isDynamicBassEnabled: false,
           volumeBoost: 0.0,
         ));
@@ -324,6 +328,9 @@ mixin PlayerDspControls on PulsrCubit<PlayerState> {
         await _audioHandler.setLoudnessContour(false);
         await _audioHandler.setSubCrossover(false);
         await _audioHandler.setDynamicEq(false);
+        await _audioHandler.setViperDdc(false);
+        await _audioHandler.setArbitraryEq(false);
+        await _audioHandler.setLiveProg(false);
         await _audioHandler.setDynamicBass(enabled: false);
         await _audioHandler.setVolumeBoost(0.0);
       } else {
@@ -358,6 +365,12 @@ mixin PlayerDspControls on PulsrCubit<PlayerState> {
             subCrossoverGain: snap.subCrossoverGain,
             isDynamicEqEnabled: snap.isDynamicEqEnabled,
             dynamicEqBands: snap.dynamicEqBands,
+            isViperDdcEnabled: snap.isViperDdcEnabled,
+            viperDdcProfileName: snap.viperDdcProfileName,
+            isArbitraryEqEnabled: snap.isArbitraryEqEnabled,
+            arbitraryEqString: snap.arbitraryEqString,
+            isLiveProgEnabled: snap.isLiveProgEnabled,
+            liveProgCode: snap.liveProgCode,
             isDynamicBassEnabled: snap.isDynamicBassEnabled,
             dynamicBassStrength: snap.dynamicBassStrength,
             dynamicBassPreset: snap.dynamicBassPreset,
@@ -410,6 +423,17 @@ mixin PlayerDspControls on PulsrCubit<PlayerState> {
           }
           if (snap.isDynamicEqEnabled) {
             await _audioHandler.setDynamicEq(true);
+          }
+          if (snap.isViperDdcEnabled) {
+            await _audioHandler.setViperDdc(true,
+                profileName: snap.viperDdcProfileName);
+          }
+          if (snap.isArbitraryEqEnabled) {
+            await _audioHandler.setArbitraryEq(true,
+                eqString: snap.arbitraryEqString);
+          }
+          if (snap.isLiveProgEnabled) {
+            await _audioHandler.setLiveProg(true, code: snap.liveProgCode);
           }
           if (snap.isDynamicBassEnabled) {
             await _audioHandler.setDynamicBass(

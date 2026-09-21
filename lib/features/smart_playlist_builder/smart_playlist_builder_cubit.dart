@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
+import '../../core/utils/error_logger.dart';
 import '../../data/db/app_database.dart';
 import '../../domain/models/smart_playlist_criteria.dart';
 import '../../domain/repositories/smart_playlist_engine_interface.dart';
@@ -144,7 +145,9 @@ class SmartPlaylistBuilderCubit extends Cubit<SmartPlaylistBuilderState> {
         smartCriteria: state.criteria.toJsonString(),
       );
       return _finishSave(res.isRight(), res.getLeft().toNullable()?.message);
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Failed to save smart playlist',
+          error: e, stackTrace: st, category: 'SmartPlaylist');
       return _finishSave(false, 'Could not save the playlist. Please try again.');
     }
   }

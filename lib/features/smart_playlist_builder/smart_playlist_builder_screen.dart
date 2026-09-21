@@ -157,6 +157,10 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                               cubit.applyTemplate(entry.value);
                               _limitController.text =
                                   entry.value.limit?.toString() ?? '';
+                              if (_nameController.text.trim().isEmpty) {
+                                _nameController.text = entry.key;
+                                cubit.updateName(entry.key);
+                              }
                             },
                           );
                         },

@@ -93,16 +93,25 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
         .where((s) => !state.queue.any((q) => _isSameTrack(q, s)))
         .take(room)
         .toList();
+    // Track only the rows the handler actually accepted: on a mid-loop failure
+    // the cubit queue must mirror the engine, otherwise the UI lists tracks
+    // that will never play.
+    final added = <SongsTableData>[];
     for (final s in toAdd) {
       try {
         await _audioHandler.addToQueueEnd(s);
+        added.add(s);
       } catch (e, st) {
         ErrorLogger.log('Failed to batch-add to queue',
             error: e, stackTrace: st, category: 'PlayerCubit');
+        if (!isClosed) {
+          safeEmit(state.copyWith(errorMessage: 'Failed to add ${s.title}'));
+        }
         break;
       }
     }
-    final updatedQueue = List<SongsTableData>.from(state.queue)..addAll(toAdd);
+    if (added.isEmpty) return;
+    final updatedQueue = List<SongsTableData>.from(state.queue)..addAll(added);
     _queueSlots[state.activeQueueSlot] = _QueueSlotData(
       songs: updatedQueue,
       currentIndex: state.currentIndex,
@@ -177,20 +186,38 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
   }
 
   /// Restores a previously cleared queue (Undo for destructive clear, gap 10-03).
-  /// Cubit slots are the source of truth (10-01); the handler re-syncs on the
-  /// next play/seek via the existing persist path.
+  ///
+  /// The handler is the actual playback queue, so restoring only the cubit's
+  /// state/slots would leave the engine holding the single track `clearQueue`
+  /// left behind — Next/Previous would then no-op. Re-load the full queue into
+  /// the handler at the same index/position and resume only if it was playing.
   Future<void> restoreQueue(List<SongsTableData> songs, int index) async {
     if (songs.isEmpty || isClosed) return;
     final safeIndex = index.clamp(0, songs.length - 1);
+    final wasPlaying = state.isPlaying;
     _queueSlots[state.activeQueueSlot] = _QueueSlotData(
       songs: List.of(songs),
       currentIndex: safeIndex,
-      position: Duration.zero,
+      position: state.position,
       speed: state.playbackSpeed,
     );
     _debouncedPersistQueueSlots();
     _queueVersion++;
     safeEmit(state.copyWith(queue: List.of(songs), currentIndex: safeIndex));
+    try {
+      await _audioHandler.loadQueue(
+        List.of(songs),
+        initialIndex: safeIndex,
+        initialPosition: state.position,
+        autoPlay: wasPlaying,
+      );
+    } catch (e, st) {
+      ErrorLogger.log('Failed to restore queue',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+      if (!isClosed) {
+        safeEmit(state.copyWith(errorMessage: 'Failed to restore queue'));
+      }
+    }
   }
 
   Future<void> reorderQueue(int oldIndex, int newIndex) async {
@@ -327,7 +354,15 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
     }
     _isSwitchingSlot = true;
     try {
-      final wasPlaying = state.isPlaying;
+      // A naturally completed track reports isPlaying == false (the cubit
+      // derives it from `playing && !completed`), but the user was listening.
+      // Treat a finished-but-uninterrupted session as playing so switching
+      // slots auto-plays instead of loading the target paused — mirrors the
+      // handler's skipToNext/skipToQueueItem guard. A deliberate pause leaves
+      // processingState == ready, so it still restores paused.
+      final wasPlaying = state.isPlaying ||
+          _audioHandler.playbackState.value.processingState ==
+              AudioProcessingState.completed;
       _queueSlots[state.activeQueueSlot] = _QueueSlotData(
         songs: List.from(state.queue),
         currentIndex: state.currentIndex,
@@ -433,67 +468,6 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
       _audioHandler.swapReconciledSong(oldId, newSong);
     } catch (_) {}
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   // Requires: provided by the composing class (same library).
   PulsrAudioHandler get _audioHandler;

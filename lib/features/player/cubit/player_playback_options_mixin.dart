@@ -144,36 +144,58 @@ mixin PlayerPlaybackOptions on PulsrCubit<PlayerState> {
   Future<void> setSongEqOverride(int songId, String? presetName) async {
     await _perSongEqStore.setPresetForTrack(songId.toString(), presetName);
     if (state.currentSong?.id != songId) return;
-    safeEmit(state.copyWith(currentSongEqOverride: presetName));
 
-    if (presetName != null) {
-      final match = EqPreset.defaultPresets
-          .where((p) => p.name.toLowerCase() == presetName.toLowerCase())
-          .firstOrNull;
-      if (match == null) return;
-      // Assigning an override mid-song must mark it active and snapshot the
-      // pre-override preset, otherwise clearing it (or the next song without an
-      // override) has nothing to restore and the per-song curve leaks into the
-      // rest of the queue.
-      if (!_perSongOverrideActive) {
-        _globalEqBackup = state.eqPreset;
-        _globalHeadphoneProfileBackup = state.selectedHeadphoneProfile;
-        _perSongOverrideActive = true;
+    if (presetName == null) {
+      safeEmit(state.copyWith(currentSongEqOverride: null));
+      if (_perSongOverrideActive && _globalEqBackup != null) {
+        final restore = _globalEqBackup!;
+        final profileRestore = _globalHeadphoneProfileBackup;
+        _globalEqBackup = null;
+        _globalHeadphoneProfileBackup = null;
+        _perSongOverrideActive = false;
+        // Re-apply the AutoEQ profile as a profile (not a plain preset), so the
+        // global headphone selection is not silently deselected in the UI.
+        if (profileRestore != null) {
+          await applyHeadphoneProfile(profileRestore, isPerSongRestore: true);
+        } else {
+          await applyPreset(restore, isPerSongRestore: true);
+        }
       }
+      return;
+    }
+
+    // Resolve BEFORE reporting: emitting currentSongEqOverride for a name that
+    // matches nothing would show a phantom override with no audible effect.
+    final lower = presetName.toLowerCase();
+    final match = EqPreset.defaultPresets
+        .where((p) => p.name.toLowerCase() == lower)
+        .firstOrNull;
+    final HeadphoneProfile? profile =
+        match == null ? await _headphoneProfileByName(presetName) : null;
+    if (match == null && profile == null) {
+      if (!isClosed) {
+        safeEmit(state.copyWith(
+          currentSongEqOverride: null,
+          errorMessage: 'Unknown EQ preset: $presetName',
+        ));
+      }
+      return;
+    }
+
+    safeEmit(state.copyWith(currentSongEqOverride: presetName));
+    // Assigning an override mid-song must mark it active and snapshot the
+    // pre-override preset, otherwise clearing it (or the next song without an
+    // override) has nothing to restore and the per-song curve leaks into the
+    // rest of the queue.
+    if (!_perSongOverrideActive) {
+      _globalEqBackup = state.eqPreset;
+      _globalHeadphoneProfileBackup = state.selectedHeadphoneProfile;
+      _perSongOverrideActive = true;
+    }
+    if (match != null) {
       await applyPreset(match, isPerSongRestore: true);
-    } else if (_perSongOverrideActive && _globalEqBackup != null) {
-      final restore = _globalEqBackup!;
-      final profileRestore = _globalHeadphoneProfileBackup;
-      _globalEqBackup = null;
-      _globalHeadphoneProfileBackup = null;
-      _perSongOverrideActive = false;
-      // Re-apply the AutoEQ profile as a profile (not a plain preset), so the
-      // global headphone selection is not silently deselected in the UI.
-      if (profileRestore != null) {
-        await applyHeadphoneProfile(profileRestore, isPerSongRestore: true);
-      } else {
-        await applyPreset(restore, isPerSongRestore: true);
-      }
+    } else {
+      await applyHeadphoneProfile(profile, isPerSongRestore: true);
     }
   }
 
@@ -250,91 +272,6 @@ mixin PlayerPlaybackOptions on PulsrCubit<PlayerState> {
     }
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   // Requires: provided by the composing class (same library).
   PulsrAudioHandler get _audioHandler;
 
@@ -380,6 +317,9 @@ mixin PlayerPlaybackOptions on PulsrCubit<PlayerState> {
 
   // Requires: provided by the composing class (same library).
   Future<void> applyHeadphoneProfile(HeadphoneProfile? profile, {bool isPerSongRestore = false});
+
+  // Requires: provided by the composing class (same library).
+  Future<HeadphoneProfile?> _headphoneProfileByName(String name);
 
   // Requires: provided by the composing class (same library).
   Future<void> applyPreset(EqPreset preset, {bool isPerSongRestore = false});

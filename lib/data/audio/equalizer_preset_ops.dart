@@ -162,4 +162,97 @@ extension EqualizerPresetOps on EqualizerManager {
     custom64Frequencies = List.from(frequencies);
     await _savePreferences();
   }
+
+  Future<void> setArbitraryEq(
+    bool enabled, {
+    String? eqString,
+    bool? linearPhase,
+  }) async {
+    isArbitraryEqEnabled = enabled;
+    if (eqString != null) arbitraryEqString = eqString;
+    if (linearPhase != null) arbitraryEqLinearPhase = linearPhase;
+    if (PlatformCapabilities.isAndroid) {
+      if ((eqString != null && eqString.isNotEmpty) ||
+          (linearPhase != null && arbitraryEqString.isNotEmpty)) {
+        await _effectsChannel.loadArbitraryEq(
+          eqString: arbitraryEqString,
+          linearPhase: arbitraryEqLinearPhase,
+        );
+      }
+      await _effectsChannel.setArbitraryEqEnabled(enabled);
+    }
+    _debouncedSavePreferences();
+    _syncPipeline();
+  }
+
+  Future<void> setLiveProg(
+    bool enabled, {
+    String? code,
+  }) async {
+    isLiveProgEnabled = enabled;
+    if (code != null) liveProgCode = code;
+    if (PlatformCapabilities.isAndroid) {
+      if (code != null && code.isNotEmpty) {
+        await _effectsChannel.loadLiveProgCode(code);
+      }
+      await _effectsChannel.setLiveProgEnabled(enabled);
+    }
+    _debouncedSavePreferences();
+    _syncPipeline();
+  }
+
+  Future<void> setLiveProgSlider(int sliderIndex, double value) async {
+    if (!isValidLiveProgSlider(sliderIndex, value)) return;
+    liveProgSliders[sliderIndex] = value;
+    if (PlatformCapabilities.isAndroid) {
+      await _effectsChannel.setLiveProgSlider(sliderIndex, value);
+    }
+    _debouncedSavePreferences();
+  }
+
+  Future<void> setStereoWidth(
+    bool enabled, {
+    double? width,
+    bool? multiband,
+    double? lowWidth,
+    double? midWidth,
+    double? highWidth,
+    double? lowCrossoverHz,
+    double? highCrossoverHz,
+  }) async {
+    isStereoWidthEnabled = enabled;
+    if (width != null) stereoWidth = width.clamp(0.0, 2.0);
+    if (multiband != null) stereoWidthMultiband = multiband;
+    if (lowWidth != null) stereoWidthLow = lowWidth.clamp(0.0, 2.0);
+    if (midWidth != null) stereoWidthMid = midWidth.clamp(0.0, 2.0);
+    if (highWidth != null) stereoWidthHigh = highWidth.clamp(0.0, 2.0);
+    if (lowCrossoverHz != null) {
+      stereoWidthLowCrossoverHz = lowCrossoverHz.clamp(40.0, 1000.0);
+    }
+    if (highCrossoverHz != null) {
+      stereoWidthHighCrossoverHz = highCrossoverHz.clamp(1000.0, 10000.0);
+    }
+    if (stereoWidthLowCrossoverHz >= stereoWidthHighCrossoverHz) {
+      stereoWidthHighCrossoverHz =
+          (stereoWidthLowCrossoverHz + 200.0).clamp(1000.0, 10000.0);
+      if (stereoWidthHighCrossoverHz <= stereoWidthLowCrossoverHz) {
+        stereoWidthLowCrossoverHz =
+            (stereoWidthHighCrossoverHz - 200.0).clamp(40.0, 1000.0);
+      }
+    }
+    if (PlatformCapabilities.isAndroid) {
+      await _effectsChannel.setStereoWidthParams(
+        stereoWidth,
+        multiband: stereoWidthMultiband,
+        lowWidth: stereoWidthLow,
+        midWidth: stereoWidthMid,
+        highWidth: stereoWidthHigh,
+        lowCrossoverHz: stereoWidthLowCrossoverHz,
+        highCrossoverHz: stereoWidthHighCrossoverHz,
+      );
+      await _effectsChannel.setStereoWidthEnabled(enabled);
+    }
+    _debouncedSavePreferences();
+    _syncPipeline();
+  }
 }

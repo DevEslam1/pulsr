@@ -516,70 +516,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
         const SizedBox(height: AppSpacing.md),
 
-        // ---------- Recently added ----------
-        StreamBuilder<Result<List<SongsTableData>>>(
-          stream: getSongsUseCase.watchRecentlyAdded(),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return _SectionError(onRetry: () => setState(() {}));
-            }
-            final songs =
-                snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
-            if (songs.isEmpty) return const _EmptyLibrary();
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SectionHeader(
-                  title: context.l10n.recentlyAdded,
-                  actionLabel: context.l10n.browseSeeAll,
-                  onAction: () => context.push('/library'),
-                ),
-                if (context.trackGridColumns > 1)
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: EdgeInsets.symmetric(
-                        horizontal: Adaptive.pagePadding(context)),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: context.trackGridColumns,
-                      mainAxisExtent: 72,
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 4,
-                    ),
-                    itemCount: songs.take(12).length,
-                    itemBuilder: (context, index) => StaggeredReveal(
-                      index: index,
-                      groupKey: songs.isEmpty
-                          ? ''
-                          : '${songs.first.id}-${songs.length}',
-                      child: SongTile(
-                        song: songs[index],
-                        onTap: () =>
-                            playerCubit.playSong(songs[index], queue: songs),
-                        onMorePressed: () =>
-                            SongInfoSheet.show(context, song: songs[index]),
-                      ),
-                    ),
-                  )
-                else
-                  for (final entry in songs.take(10).toList().asMap().entries)
-                    StaggeredReveal(
-                      index: entry.key,
-                      groupKey: songs.isEmpty
-                          ? ''
-                          : '${songs.first.id}-${songs.length}',
-                      child: SongTile(
-                        song: entry.value,
-                        onTap: () =>
-                            playerCubit.playSong(entry.value, queue: songs),
-                        onMorePressed: () =>
-                            SongInfoSheet.show(context, song: entry.value),
-                      ),
-                    ),
-              ],
-            );
-          },
+        // ---------- Recently added (lazy loaded in 50-song batches) ----------
+        RepaintBoundary(
+          child: _RecentlyAddedSection(
+            getSongsUseCase: getSongsUseCase,
+          ),
         ),
       ],
     );
@@ -1375,6 +1316,212 @@ class _RecentlyPlayedSectionState extends State<_RecentlyPlayedSection> {
                 },
               ),
             ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _RecentlyAddedSection extends StatefulWidget {
+  final GetSongsUseCase getSongsUseCase;
+
+  const _RecentlyAddedSection({
+    required this.getSongsUseCase,
+  });
+
+  @override
+  State<_RecentlyAddedSection> createState() => _RecentlyAddedSectionState();
+}
+
+class _RecentlyAddedSectionState extends State<_RecentlyAddedSection> {
+  static const int _pageSize = 50;
+  int _currentLimit = _pageSize;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+
+  void _loadMore() {
+    if (_isLoadingMore || !_hasMore) return;
+    setState(() {
+      _isLoadingMore = true;
+      _currentLimit += _pageSize;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final playerCubit = context.read<PlayerCubit>();
+    final columns = context.trackGridColumns;
+
+    return StreamBuilder<Result<List<SongsTableData>>>(
+      stream: widget.getSongsUseCase.watchRecentlyAdded(limit: _currentLimit),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _SectionError(onRetry: () => setState(() {}));
+        }
+        final songs =
+            snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
+
+        // Determine if more songs are available
+        if (snapshot.hasData && snapshot.data != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            if (songs.length < _currentLimit) {
+              if (_hasMore || _isLoadingMore) {
+                setState(() {
+                  _hasMore = false;
+                  _isLoadingMore = false;
+                });
+              }
+            } else {
+              if (_isLoadingMore) {
+                setState(() {
+                  _isLoadingMore = false;
+                });
+              }
+            }
+          });
+        }
+
+        if (songs.isEmpty) return const _EmptyLibrary();
+
+        final totalItemCount = songs.length + (_hasMore ? 1 : 0);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SectionHeader(
+              title: context.l10n.recentlyAdded,
+              actionLabel: context.l10n.browseSeeAll,
+              onAction: () => context.push('/library'),
+            ),
+            if (columns > 1)
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: EdgeInsets.symmetric(
+                    horizontal: Adaptive.pagePadding(context)),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  mainAxisExtent: 72,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 4,
+                ),
+                itemCount: totalItemCount,
+                itemBuilder: (context, index) {
+                  if (index >= songs.length) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppSpacing.sm),
+                        child: OutlinedButton.icon(
+                          onPressed: _isLoadingMore ? null : _loadMore,
+                          icon: _isLoadingMore
+                              ? SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor:
+                                        AlwaysStoppedAnimation<Color>(p.accent),
+                                  ),
+                                )
+                              : const Icon(Icons.expand_more_rounded, size: 18),
+                          label: Text(
+                            context.l10n.browseSeeAll,
+                            style: TextStyle(
+                              color: p.accent,
+                              fontSize: AppFontSize.label,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+
+                  final song = songs[index];
+                  return StaggeredReveal(
+                    index: index,
+                    groupKey: songs.isEmpty
+                        ? ''
+                        : '${songs.first.id}-${songs.length}',
+                    child: SongTile(
+                      song: song,
+                      onTap: () =>
+                          playerCubit.playSong(song, queue: songs),
+                      onMorePressed: () =>
+                          SongInfoSheet.show(context, song: song),
+                    ),
+                  );
+                },
+              )
+            else
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: totalItemCount,
+                itemBuilder: (context, index) {
+                  if (index >= songs.length) {
+                    return Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: Adaptive.pagePadding(context),
+                        vertical: AppSpacing.sm,
+                      ),
+                      child: Center(
+                        child: OutlinedButton.icon(
+                          onPressed: _isLoadingMore ? null : _loadMore,
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: p.accent.withValues(alpha: 0.3)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppRadii.r20),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                              vertical: AppSpacing.s10,
+                            ),
+                          ),
+                          icon: _isLoadingMore
+                              ? SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor:
+                                        AlwaysStoppedAnimation<Color>(p.accent),
+                                  ),
+                                )
+                              : Icon(Icons.expand_more_rounded,
+                                  size: 18, color: p.accent),
+                          label: Text(
+                            'Load more (+50)',
+                            style: TextStyle(
+                              color: p.accent,
+                              fontSize: AppFontSize.label,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+
+                  final song = songs[index];
+                  return StaggeredReveal(
+                    index: index,
+                    groupKey: songs.isEmpty
+                        ? ''
+                        : '${songs.first.id}-${songs.length}',
+                    child: SongTile(
+                      song: song,
+                      onTap: () =>
+                          playerCubit.playSong(song, queue: songs),
+                      onMorePressed: () =>
+                          SongInfoSheet.show(context, song: song),
+                    ),
+                  );
+                },
+              ),
           ],
         );
       },
