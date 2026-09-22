@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/di/injection.dart';
@@ -50,7 +52,7 @@ double _scaledCarouselHeight(BuildContext context, bool isTablet) {
   return (isTablet ? 232.0 : 212.0) + delta;
 }
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends StatelessWidget {
   final YtmService? ytmService;
   final YtmAccountService? ytmAccountService;
   final GetSongsUseCase? getSongsUseCase;
@@ -63,10 +65,39 @@ class HomeScreen extends StatefulWidget {
   });
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  Widget build(BuildContext context) {
+    final accountService = ytmAccountService ?? getIt<YtmAccountService>();
+    final ytm = ytmService ?? getIt<YtmService>();
+    return BlocProvider<HomeCubit>(
+      create: (context) => HomeCubit(
+        ytmService: ytm,
+        accountService: accountService,
+      ),
+      child: _HomeScreenContent(
+        ytmService: ytmService,
+        ytmAccountService: ytmAccountService,
+        getSongsUseCase: getSongsUseCase,
+      ),
+    );
+  }
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenContent extends StatefulWidget {
+  final YtmService? ytmService;
+  final YtmAccountService? ytmAccountService;
+  final GetSongsUseCase? getSongsUseCase;
+
+  const _HomeScreenContent({
+    this.ytmService,
+    this.ytmAccountService,
+    this.getSongsUseCase,
+  });
+
+  @override
+  State<_HomeScreenContent> createState() => _HomeScreenContentState();
+}
+
+class _HomeScreenContentState extends State<_HomeScreenContent> {
   int _selectedTab = 0; // 0: Local, 1: Online
   String _selectedOnlineCategory = 'Recommended For You';
 
@@ -77,25 +108,52 @@ class _HomeScreenState extends State<HomeScreen> {
 
   late final HomeCubit _homeCubit;
 
+  // FIX-M12: Use monotonic Stopwatch for 60-second TTL cache for 200 songs shared by Daily Drive and Focus Flow
+  List<SongsTableData>? _cachedSongs200;
+  Stopwatch? _cachedSongs200Stopwatch;
+
+  Future<List<SongsTableData>> _getQuickActionSongs(GetSongsUseCase useCase) async {
+    if (_cachedSongs200 != null &&
+        _cachedSongs200Stopwatch != null &&
+        _cachedSongs200Stopwatch!.isRunning &&
+        _cachedSongs200Stopwatch!.elapsed < const Duration(seconds: 60)) {
+      return _cachedSongs200!;
+    }
+    final res = await useCase.getAllSongs(limit: 200);
+    final list = res.fold((_) => <SongsTableData>[], (r) => r);
+    _cachedSongs200 = list;
+    _cachedSongs200Stopwatch = Stopwatch()..start();
+    return list;
+  }
+
   List<String> get _onlineCategories => _homeCubit.onlineCategories;
+  bool _notificationDenied = false;
 
   @override
   void initState() {
     super.initState();
-    _homeCubit = HomeCubit(
-      ytmService: widget.ytmService ?? getIt<YtmService>(),
-      accountService: _ytmAccountService,
-    );
+    _homeCubit = context.read<HomeCubit>();
     final isLoggedIn = _ytmAccountService.isLoggedIn;
     _selectedOnlineCategory =
         isLoggedIn ? 'Recommended For You' : 'Trending Egypt';
     _ytmAccountService.loginState.addListener(_onLoginStateChanged);
+    _checkNotificationDenied();
+  }
+
+  Future<void> _checkNotificationDenied() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final denied = prefs.getBool('notification_permission_denied') ?? false;
+      if (denied && mounted) {
+        setState(() => _notificationDenied = true);
+      }
+    } catch (_) {}
   }
 
   void _onLoginStateChanged() {
     if (!mounted) return;
     setState(() {
-      _homeCubit.clearCache();
+      context.read<HomeCubit>().clearCache();
       final isLoggedIn = _ytmAccountService.isLoggedIn;
       _selectedOnlineCategory =
           isLoggedIn ? 'Recommended For You' : 'Trending Egypt';
@@ -105,7 +163,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _ytmAccountService.loginState.removeListener(_onLoginStateChanged);
-    _homeCubit.close();
     super.dispose();
   }
 
@@ -150,11 +207,11 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final isTablet = context.isTablet;
     final getSongsUseCase = _getSongsUseCase;
     final playerCubit = context.read<PlayerCubit>();
-    final isTablet = Adaptive.isTablet(context);
-    final offlineOnly =
-        context.watch<SettingsCubit?>()?.state.offlineOnlyMode ?? false;
+    final offlineOnly = context.select<SettingsCubit, bool>(
+        (c) => c.state.offlineOnlyMode);
     final showOnlineTab = AppConfig.ytmEnabled && !offlineOnly;
 
     // Reset to local tab if offline only is enabled
@@ -167,6 +224,8 @@ class _HomeScreenState extends State<HomeScreen> {
           child: ConstrainedBox(
             constraints: Adaptive.contentConstraints(context),
             child: RefreshIndicator(
+              color: p.accent,
+              backgroundColor: p.surfaceContainer,
               onRefresh: () async {
                 if (currentTab == 0) {
                   final count =
@@ -182,7 +241,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   }
                 } else {
                   setState(() {
-                    _homeCubit.clearCache();
+                    context.read<HomeCubit>().clearCache();
                   });
                 }
               },
@@ -242,6 +301,61 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                   ),
+
+                  // ---------- Notification Permission Denied Banner (B-37) ----------
+                  if (_notificationDenied)
+                    Padding(
+                      padding: EdgeInsetsDirectional.fromSTEB(
+                        Adaptive.pagePadding(context),
+                        AppSpacing.sm,
+                        Adaptive.pagePadding(context),
+                        0,
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.sm,
+                        ),
+                        decoration: BoxDecoration(
+                          color: p.surfaceContainer,
+                          borderRadius: BorderRadius.circular(AppRadii.card),
+                          border: Border.all(color: p.accent.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.notifications_off_outlined,
+                                color: p.accent, size: 20),
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: Text(
+                                context.l10n.playbackStopsScreenOff,
+                                style: TextStyle(
+                                  color: p.textSecondary,
+                                  fontSize: AppFontSize.caption,
+                                ),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () async {
+                                await openAppSettings();
+                                final prefs = await SharedPreferences.getInstance();
+                                await prefs.setBool('notification_permission_denied', false);
+                                if (mounted) setState(() => _notificationDenied = false);
+                              },
+                              child: Text(context.l10n.openSettings),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close, size: 16),
+                              onPressed: () async {
+                                final prefs = await SharedPreferences.getInstance();
+                                await prefs.setBool('notification_permission_denied', false);
+                                if (mounted) setState(() => _notificationDenied = false);
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
 
                   // ---------- Segmented Tab Selector (Local vs Online) ----------
                   if (showOnlineTab) ...[
@@ -470,14 +584,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icons.directions_car_rounded,
                 color: p.accent,
                 onTap: () async {
-                  final songs = await getSongsUseCase.getAllSongs();
-                  songs.fold((l) => null, (list) {
-                    if (list.isNotEmpty) {
-                      final shuffled = List<SongsTableData>.from(list)
-                        ..shuffle();
-                      playerCubit.playSong(shuffled.first, queue: shuffled);
-                    }
-                  });
+                  final list = await _getQuickActionSongs(getSongsUseCase);
+                  if (list.isNotEmpty) {
+                    final shuffled = List<SongsTableData>.from(list)..shuffle();
+                    playerCubit.playSong(shuffled.first, queue: shuffled);
+                  }
                 },
               ),
               const SizedBox(width: AppSpacing.s10),
@@ -486,16 +597,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 subtitle: context.l10n.topPlayedTracks,
                 icon: Icons.headphones_rounded,
                 color: AppColors.mint,
-                  onTap: () async {
-                    final songs = await getSongsUseCase.getAllSongs();
-                    songs.fold((l) => null, (list) {
-                      final top = list.where((s) => s.playCount > 0).toList()
-                        ..sort((a, b) => b.playCount.compareTo(a.playCount));
-                      if (top.isNotEmpty) {
-                        playerCubit.playSong(top.first, queue: top);
-                      }
-                    });
-                  },
+                onTap: () async {
+                  final list = await _getQuickActionSongs(getSongsUseCase);
+                  final top = list.where((s) => s.playCount > 0).toList()
+                    ..sort((a, b) => b.playCount.compareTo(a.playCount));
+                  if (top.isNotEmpty) {
+                    playerCubit.playSong(top.first, queue: top);
+                  }
+                },
               ),
             ],
           ),
@@ -707,10 +816,10 @@ class _HomeScreenState extends State<HomeScreen> {
               : (_selectedOnlineCategory == 'Trending Egypt'
                   ? context.l10n.browseTrendingInEgypt
                   : '${context.l10n.browsePopular}: ${_categoryLabel(context, _selectedOnlineCategory)}'),
-          future: _homeCubit.categoryFuture(_selectedOnlineCategory),
+          future: context.read<HomeCubit>().categoryFuture(_selectedOnlineCategory),
           playerCubit: playerCubit,
           onRetry: () {
-            _homeCubit.retryCategory(_selectedOnlineCategory);
+            context.read<HomeCubit>().retryCategory(_selectedOnlineCategory);
             setState(() {});
           },
         ),
@@ -752,6 +861,8 @@ class _OnlineCategorySection extends StatelessWidget {
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   physics: const NeverScrollableScrollPhysics(),
+                  addAutomaticKeepAlives: false,
+                  addRepaintBoundaries: true,
                   padding: EdgeInsets.symmetric(
                       horizontal: Adaptive.pagePadding(context)),
                   itemCount: 4,
@@ -804,16 +915,19 @@ class _OnlineCategorySection extends StatelessWidget {
 
         final tracks = snapshot.data!;
         final songs = [for (final track in tracks) track.toSongData()];
-        return BlocProvider<YtmDownloadCubit>.value(
-          value: getIt<YtmDownloadCubit>(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SectionHeader(title: title),
+        final ytmCubit = getIt.isRegistered<YtmDownloadCubit>()
+            ? getIt<YtmDownloadCubit>()
+            : null;
+        final content = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SectionHeader(title: title),
               SizedBox(
                 height: _scaledCarouselHeight(context, isTablet),
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
+                  addAutomaticKeepAlives: false,
+                  addRepaintBoundaries: true,
                   padding: EdgeInsets.symmetric(
                       horizontal: Adaptive.pagePadding(context)),
                   itemCount: songs.length,
@@ -841,6 +955,8 @@ class _OnlineCategorySection extends StatelessWidget {
                 GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
+                  addAutomaticKeepAlives: false,
+                  addRepaintBoundaries: true,
                   padding: EdgeInsets.symmetric(
                       horizontal: Adaptive.pagePadding(context)),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -882,8 +998,14 @@ class _OnlineCategorySection extends StatelessWidget {
                     ),
                   ),
             ],
-          ),
-        );
+          );
+        if (ytmCubit != null) {
+          return BlocProvider<YtmDownloadCubit>.value(
+            value: ytmCubit,
+            child: content,
+          );
+        }
+        return content;
       },
     );
   }
@@ -1116,8 +1238,6 @@ class _RecentlyPlayedSection extends StatefulWidget {
 class _RecentlyPlayedSectionState extends State<_RecentlyPlayedSection> {
   static const int _pageSize = 50;
   int _currentLimit = _pageSize;
-  bool _isLoadingMore = false;
-  bool _hasMore = true;
   final ScrollController _scrollController = ScrollController();
 
   @override
@@ -1134,7 +1254,7 @@ class _RecentlyPlayedSectionState extends State<_RecentlyPlayedSection> {
   }
 
   void _onScroll() {
-    if (!_scrollController.hasClients || _isLoadingMore || !_hasMore) return;
+    if (!_scrollController.hasClients) return;
 
     final maxScroll = _scrollController.position.maxScrollExtent;
     final currentScroll = _scrollController.position.pixels;
@@ -1145,11 +1265,16 @@ class _RecentlyPlayedSectionState extends State<_RecentlyPlayedSection> {
     }
   }
 
+  bool _isLoadingMore = false;
+
   void _loadMore() {
-    if (_isLoadingMore || !_hasMore) return;
+    if (_isLoadingMore) return;
+    _isLoadingMore = true;
     setState(() {
-      _isLoadingMore = true;
       _currentLimit += _pageSize;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _isLoadingMore = false;
     });
   }
 
@@ -1159,7 +1284,7 @@ class _RecentlyPlayedSectionState extends State<_RecentlyPlayedSection> {
     final playerCubit = context.read<PlayerCubit>();
 
     return StreamBuilder<Result<List<SongsTableData>>>(
-      stream: widget.getSongsUseCase.watchRecentlyPlayed(limit: _currentLimit),
+      stream: widget.getSongsUseCase.watchRecentlyPlayed(limit: _currentLimit).distinct(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return _SectionError(onRetry: () => setState(() {}));
@@ -1167,31 +1292,11 @@ class _RecentlyPlayedSectionState extends State<_RecentlyPlayedSection> {
         final songs =
             snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
 
-        // Determine if more songs are available
-        if (snapshot.hasData && snapshot.data != null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted) return;
-            if (songs.length < _currentLimit) {
-              if (_hasMore || _isLoadingMore) {
-                setState(() {
-                  _hasMore = false;
-                  _isLoadingMore = false;
-                });
-              }
-            } else {
-              if (_isLoadingMore) {
-                setState(() {
-                  _isLoadingMore = false;
-                });
-              }
-            }
-          });
-        }
-
         if (songs.isEmpty) return const SizedBox.shrink();
 
+        final hasMore = songs.length >= _currentLimit;
         final size = widget.isTablet ? 158.0 : 138.0;
-        final totalItemCount = songs.length + (_hasMore ? 1 : 0);
+        final totalItemCount = songs.length + (hasMore ? 1 : 0);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1207,6 +1312,8 @@ class _RecentlyPlayedSectionState extends State<_RecentlyPlayedSection> {
                 controller: _scrollController,
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
+                addAutomaticKeepAlives: false,
+                addRepaintBoundaries: true,
                 padding: EdgeInsets.symmetric(
                     horizontal: Adaptive.pagePadding(context)),
                 itemCount: totalItemCount,
@@ -1338,10 +1445,9 @@ class _RecentlyAddedSectionState extends State<_RecentlyAddedSection> {
   static const int _pageSize = 50;
   int _currentLimit = _pageSize;
   bool _isLoadingMore = false;
-  bool _hasMore = true;
 
   void _loadMore() {
-    if (_isLoadingMore || !_hasMore) return;
+    if (_isLoadingMore) return;
     setState(() {
       _isLoadingMore = true;
       _currentLimit += _pageSize;
@@ -1355,7 +1461,7 @@ class _RecentlyAddedSectionState extends State<_RecentlyAddedSection> {
     final columns = context.trackGridColumns;
 
     return StreamBuilder<Result<List<SongsTableData>>>(
-      stream: widget.getSongsUseCase.watchRecentlyAdded(limit: _currentLimit),
+      stream: widget.getSongsUseCase.watchRecentlyAdded(limit: _currentLimit).distinct(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return _SectionError(onRetry: () => setState(() {}));
@@ -1363,30 +1469,11 @@ class _RecentlyAddedSectionState extends State<_RecentlyAddedSection> {
         final songs =
             snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
 
-        // Determine if more songs are available
-        if (snapshot.hasData && snapshot.data != null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted) return;
-            if (songs.length < _currentLimit) {
-              if (_hasMore || _isLoadingMore) {
-                setState(() {
-                  _hasMore = false;
-                  _isLoadingMore = false;
-                });
-              }
-            } else {
-              if (_isLoadingMore) {
-                setState(() {
-                  _isLoadingMore = false;
-                });
-              }
-            }
-          });
-        }
-
         if (songs.isEmpty) return const _EmptyLibrary();
 
-        final totalItemCount = songs.length + (_hasMore ? 1 : 0);
+        final hasMore = songs.length >= _currentLimit;
+        final loading = _isLoadingMore && songs.length < _currentLimit;
+        final totalItemCount = songs.length + (hasMore ? 1 : 0);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1400,6 +1487,8 @@ class _RecentlyAddedSectionState extends State<_RecentlyAddedSection> {
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
+                addAutomaticKeepAlives: false,
+                addRepaintBoundaries: true,
                 padding: EdgeInsets.symmetric(
                     horizontal: Adaptive.pagePadding(context)),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -1415,8 +1504,8 @@ class _RecentlyAddedSectionState extends State<_RecentlyAddedSection> {
                       child: Padding(
                         padding: const EdgeInsets.all(AppSpacing.sm),
                         child: OutlinedButton.icon(
-                          onPressed: _isLoadingMore ? null : _loadMore,
-                          icon: _isLoadingMore
+                          onPressed: loading ? null : _loadMore,
+                          icon: loading
                               ? SizedBox(
                                   width: 16,
                                   height: 16,
@@ -1460,6 +1549,8 @@ class _RecentlyAddedSectionState extends State<_RecentlyAddedSection> {
               ListView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
+                addAutomaticKeepAlives: false,
+                addRepaintBoundaries: true,
                 itemCount: totalItemCount,
                 itemBuilder: (context, index) {
                   if (index >= songs.length) {
@@ -1591,9 +1682,23 @@ class _EmptyLibraryState extends State<_EmptyLibrary> {
     super.dispose();
   }
 
+  MediaScannerService? _getScanner() {
+    try {
+      return context.read<MediaScannerService>();
+    } catch (_) {
+      try {
+        if (getIt.isRegistered<MediaScannerService>()) {
+          return getIt<MediaScannerService>();
+        }
+      } catch (_) {}
+      return null;
+    }
+  }
+
   Future<void> _checkPermission() async {
     try {
-      final scanner = context.read<MediaScannerService>();
+      final scanner = _getScanner();
+      if (scanner == null) return;
       final granted = await scanner.checkPermission();
       if (mounted) setState(() => _hasPermission = granted);
     } catch (_) {}
@@ -1601,7 +1706,8 @@ class _EmptyLibraryState extends State<_EmptyLibrary> {
 
   Future<void> _requestPermission() async {
     try {
-      final scanner = context.read<MediaScannerService>();
+      final scanner = _getScanner();
+      if (scanner == null) return;
       final granted = await scanner.requestPermission();
       if (mounted) {
         setState(() => _hasPermission = granted);
@@ -1613,12 +1719,14 @@ class _EmptyLibraryState extends State<_EmptyLibrary> {
   }
 
   Future<void> _scan() async {
+    final scanner = _getScanner();
+    if (scanner == null) return;
+
     setState(() {
       _isScanning = true;
       _scanProgress = 0.0;
     });
 
-    final scanner = context.read<MediaScannerService>();
     _progressSub?.cancel();
     _progressSub = scanner.scanProgress.listen((p) {
       if (mounted) setState(() => _scanProgress = p);

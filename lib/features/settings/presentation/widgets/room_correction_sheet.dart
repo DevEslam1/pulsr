@@ -13,6 +13,7 @@ import '../../../../core/di/injection.dart';
 import '../../../../core/services/room_correction_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
+import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
@@ -83,12 +84,34 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
   void dispose() {
     _progressTimer?.cancel();
     _progressTimer = null;
-    _player?.stop();
-    _player?.dispose();
+    try {
+      _player?.stop();
+      _player?.dispose();
+    } catch (_) {}
+    _player = null;
     if (_service.isCapturing) {
       _service.stopCapture();
     }
     super.dispose();
+  }
+
+  Future<void> _cancelSweep() async {
+    _progressTimer?.cancel();
+    _progressTimer = null;
+    try {
+      await _player?.stop();
+      await _player?.dispose();
+    } catch (_) {}
+    _player = null;
+    try {
+      await _service.stopCapture();
+    } catch (_) {}
+    if (mounted) {
+      setState(() {
+        _phase = _RcPhase.idle;
+        _progress = 0.0;
+      });
+    }
   }
 
   Future<void> _start() async {
@@ -112,14 +135,31 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
       final tones = RoomCorrectionService.tonePlan();
       final wav = RoomCorrectionService.synthSweepWav(tones);
 
-      final started = await _service.startCapture();
-      if (!started || !mounted) {
-        setState(() {
-          _phase = _RcPhase.idle;
-          _error = context.l10n.rcMicNeeded;
-        });
+      bool started = false;
+      try {
+        started = await _service.startCapture();
+      } catch (err) {
+        if (mounted) {
+          setState(() {
+            _phase = _RcPhase.idle;
+            _error = '${context.l10n.rcMicNeeded} ($err)';
+          });
+        }
         return;
       }
+      if (!started || !mounted) {
+        if (mounted) {
+          setState(() {
+            _phase = _RcPhase.idle;
+            _error = context.l10n.rcMicNeeded;
+          });
+        }
+        return;
+      }
+
+      await _player?.stop();
+      await _player?.dispose();
+      _player = null;
 
       final player = AudioPlayer();
       _player = player;
@@ -135,17 +175,27 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
           return;
         }
         final posMs = player.position.inMilliseconds;
-        setState(() => _progress = (posMs / durationMs).clamp(0.0, 1.0));
+        if (posMs >= durationMs) {
+          t.cancel();
+          return;
+        }
+        if (mounted) {
+          setState(() => _progress = (posMs / durationMs).clamp(0.0, 1.0));
+        }
       });
 
-      await player.playerStateStream
-          .firstWhere((s) => s.processingState == ProcessingState.completed);
+      // Wait until playback finishes or user cancels.
+      await player.playerStateStream.firstWhere(
+        (s) =>
+            s.processingState == ProcessingState.completed ||
+            _phase != _RcPhase.measuring,
+      );
       _progressTimer?.cancel();
       _progressTimer = null;
-      await player.stop();
 
       // Tail margin so the last tone's window is fully captured.
       await Future<void>.delayed(const Duration(milliseconds: 250));
+      if (!mounted) return;
 
       setState(() => _phase = _RcPhase.analyzing);
       final pcm = await _service.stopCapture();
@@ -161,9 +211,15 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
         _gains = gains;
         _phase = _RcPhase.result;
       });
-    } catch (e) {
+    } catch (e, st) {
+      ErrorLogger.log('Room correction failed', error: e, stackTrace: st, category: 'RoomCorrection');
       _progressTimer?.cancel();
       _progressTimer = null;
+      try {
+        await _player?.stop();
+        await _player?.dispose();
+      } catch (_) {}
+      _player = null;
       if (!mounted) return;
       setState(() {
         _phase = _RcPhase.idle;
@@ -188,7 +244,9 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
       SnackBar(content: Text(context.l10n.rcApplied)),
     );
-    Navigator.of(context).pop();
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
   }
 
   @override
@@ -392,6 +450,12 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                               ),
                             ),
                             const SizedBox(height: AppSpacing.s18),
+                            OutlinedButton.icon(
+                              onPressed: _cancelSweep,
+                              icon: const Icon(Icons.close_rounded, size: 18),
+                              label: Text(context.l10n.cancel),
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
                           ],
                         ),
                       ),

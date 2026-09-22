@@ -38,127 +38,145 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _handleGrantAccess() async {
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() => _isLoading = true);
     try {
       final granted = await widget.scannerService.requestPermission();
-      if (granted) {
-        if (Platform.isAndroid && mounted) {
-          // Prime before the OS prompt: explain why notifications matter so the
-          // user can make an informed choice instead of denying reflexively.
-          final allow = await PulsrDialogHelper.showCustomDialog<bool>(
-            context,
-            builder: (ctx) => PulsrDialog(
-              title: context.l10n.notificationPermissionTitle,
-              icon: Icons.notifications_active_rounded,
-              content: Text(context.l10n.notificationPermissionRationale),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: Text(context.l10n.notificationPermissionNotNow),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  child: Text(context.l10n.notificationPermissionAllow),
-                ),
-              ],
-            ),
-          );
-          if (allow == true) {
-            try {
-              final status = await Permission.notification.request();
-              if (mounted &&
-                  (status.isDenied || status.isPermanentlyDenied)) {
-                ScaffoldMessenger.of(context)
-                  ..clearSnackBars()
-                  ..showSnackBar(
-                    SnackBar(
-                        content: Text('${context.l10n.onboardingNotificationDenied} Notifications are needed for playback controls.'),
-                        behavior: SnackBarBehavior.floating,
-                        action: SnackBarAction(label: 'OK', onPressed: () {}),
-                    ),
-                  );
-              }
-            } catch (e, st) {
-              ErrorLogger.log('Notification permission request failed',
-                  error: e, stackTrace: st, category: 'Onboarding');
-              if (mounted) {
-                ScaffoldMessenger.of(context)
-                  ..clearSnackBars()
-                  ..showSnackBar(
-                    SnackBar(
-                        content: Text(context.l10n.onboardingNotificationDenied),
-                        behavior: SnackBarBehavior.floating,
-                        action: SnackBarAction(label: 'OK', onPressed: () {}),
-                    ),
-                  );
-              }
-            }
-          }
-        }
-        try {
-          await widget.scannerService.scanDeviceLibrary();
-        } catch (e, st) {
-          ErrorLogger.log('Library scan failed during onboarding',
-              error: e, stackTrace: st, category: 'Onboarding');
-          if (mounted) {
-            ScaffoldMessenger.of(context)
-              ..clearSnackBars()
-              ..showSnackBar(
-                SnackBar(content: Text(context.l10n.onboardingScanFailed)),
-              );
-          }
-        }
-      } else {
-        if (mounted) {
-          // No dead end (defect 02-01): explain + offer Settings AND a
-          // continue-with-limited-access path that completes onboarding.
-          final action = await PulsrDialogHelper.showCustomDialog<String>(
-            context,
-            builder: (ctx) => PulsrDialog(
-              title: context.l10n.audioAccessRequired,
-              icon: Icons.folder_shared_rounded,
-              content: Text(context.l10n.onboardingPermissionRationale),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, 'limited'),
-                  child: Text(context.l10n.continueLimitedAccess),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.pop(ctx, 'settings'),
-                  child: Text(context.l10n.openSettings),
-                ),
-              ],
-            ),
-          );
-          if (action == 'settings') {
-            await openAppSettings();
-            return;
-          }
-          // 'limited' (or dismiss): complete onboarding with an empty library
-          // so the user is never stuck; they can grant later from Settings.
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool('onboarding_completed', true);
-          if (mounted) context.go('/');
-          return;
-        }
+      if (!granted) {
+        if (mounted) await _handleDeniedStorageAccess();
         return;
       }
 
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('onboarding_completed', true);
-
-      if (mounted) {
-        context.go('/');
+      if (Platform.isAndroid && mounted) {
+        await _requestNotificationPermission();
       }
+
+      await _scanLibrary();
+      await _completeOnboarding();
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
+    }
+  }
+
+  Future<void> _requestNotificationPermission() async {
+    final allow = await PulsrDialogHelper.showCustomDialog<bool>(
+      context,
+      builder: (ctx) => PulsrDialog(
+        title: context.l10n.notificationPermissionTitle,
+        icon: Icons.notifications_active_rounded,
+        content: Text(context.l10n.notificationPermissionRationale),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(context.l10n.notificationPermissionNotNow),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(context.l10n.notificationPermissionAllow),
+          ),
+        ],
+      ),
+    );
+
+    if (allow == true && mounted) {
+      try {
+        final status = await Permission.notification.request();
+        if (status.isDenied || status.isPermanentlyDenied) {
+          final messenger = mounted ? ScaffoldMessenger.of(context) : null;
+          final msg = mounted ? context.l10n.onboardingNotificationDenied : '';
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('notification_permission_denied', true);
+          if (mounted && messenger != null) {
+            messenger
+              ..clearSnackBars()
+              ..showSnackBar(
+                SnackBar(
+                  content: Text(
+                      '$msg Notifications are needed for playback controls.'),
+                  behavior: SnackBarBehavior.floating,
+                  action: SnackBarAction(label: 'OK', onPressed: () {}),
+                ),
+              );
+          }
+        } else if (status.isGranted) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('notification_permission_denied', false);
+        }
+      } catch (e, st) {
+        final messenger = mounted ? ScaffoldMessenger.of(context) : null;
+        final msg = mounted ? context.l10n.onboardingNotificationDenied : '';
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('notification_permission_denied', true);
+        ErrorLogger.log('Notification permission request failed',
+            error: e, stackTrace: st, category: 'Onboarding');
+        if (mounted && messenger != null) {
+          messenger
+            ..clearSnackBars()
+            ..showSnackBar(
+              SnackBar(
+                content: Text(msg),
+                behavior: SnackBarBehavior.floating,
+                action: SnackBarAction(label: 'OK', onPressed: () {}),
+              ),
+            );
+        }
+      }
+    } else if (allow == false) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('notification_permission_denied', true);
+    }
+  }
+
+  Future<void> _scanLibrary() async {
+    try {
+      await widget.scannerService.scanDeviceLibrary();
+    } catch (e, st) {
+      ErrorLogger.log('Library scan failed during onboarding',
+          error: e, stackTrace: st, category: 'Onboarding');
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..clearSnackBars()
+          ..showSnackBar(
+            SnackBar(content: Text(context.l10n.onboardingScanFailed)),
+          );
+      }
+    }
+  }
+
+  Future<void> _handleDeniedStorageAccess() async {
+    final action = await PulsrDialogHelper.showCustomDialog<String>(
+      context,
+      builder: (ctx) => PulsrDialog(
+        title: context.l10n.audioAccessRequired,
+        icon: Icons.folder_shared_rounded,
+        content: Text(context.l10n.onboardingPermissionRationale),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'limited'),
+            child: Text(context.l10n.continueLimitedAccess),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, 'settings'),
+            child: Text(context.l10n.openSettings),
+          ),
+        ],
+      ),
+    );
+
+    if (action == 'settings') {
+      await openAppSettings();
+      return;
+    }
+
+    await _completeOnboarding();
+  }
+
+  Future<void> _completeOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('onboarding_completed', true);
+    if (mounted) {
+      context.go('/');
     }
   }
 
@@ -266,8 +284,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     width: double.infinity,
                     height: 52,
                     child: _currentPage == 2
-                        ? ElevatedButton(
-                            style: ElevatedButton.styleFrom(
+                        ? FilledButton(
+                            style: FilledButton.styleFrom(
                               backgroundColor: p.accent,
                               foregroundColor: p.onAccent,
                               shape: RoundedRectangleBorder(
@@ -300,9 +318,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                     ],
                                   ),
                           )
-                        : ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: p.surfaceContainer,
+                        : OutlinedButton(
+                            style: OutlinedButton.styleFrom(
                               foregroundColor: p.textPrimary,
                               side: BorderSide(color: p.hairline, width: 1.5),
                               shape: RoundedRectangleBorder(

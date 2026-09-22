@@ -255,13 +255,13 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                             ),
                           ),
                           const SizedBox(width: AppSpacing.xs),
-                          ElevatedButton.icon(
+                          FilledButton.icon(
                             onPressed: () => _apply(context),
                             icon: const Icon(Icons.check_rounded, size: 16),
                             label: Text(context.l10n.applyCurve),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: p.primary,
-                              foregroundColor: Colors.white,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: p.accent,
+                              foregroundColor: p.onAccent,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(AppRadii.r10),
                               ),

@@ -50,6 +50,11 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
           }
         }
 
+        // Reset stale folder if it was removed
+        if (_currentPath != null && !folders.contains(_currentPath)) {
+          _currentPath = null;
+        }
+
         // Initialize root to the shortest (top-most) folder, not an
         // arbitrary set order.
         if (_currentPath == null && folders.isNotEmpty) {
@@ -59,13 +64,17 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
         }
 
         final currentDir = (_currentPath ?? '').replaceAll('\\', '/');
+        final dirPrefix = currentDir.endsWith('/') ? currentDir : '$currentDir/';
         final childSongs = songs.where((s) {
           final dir =
               p_path.posix.dirname(s.path.replaceAll('\\', '/'));
           return dir == currentDir;
         }).toList();
         final childFolders = folders
-            .where((f) => f != currentDir && f.startsWith(currentDir))
+            .where((f) {
+              final normF = f.replaceAll('\\', '/');
+              return normF != currentDir && normF.startsWith(dirPrefix);
+            })
             .toList()
           ..sort();
 

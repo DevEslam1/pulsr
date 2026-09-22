@@ -18,6 +18,7 @@ import '../../cubit/player_state.dart';
 import 'karaoke_mode_screen.dart';
 import 'lyrics_editor_sheet.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../../../core/utils/error_logger.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
@@ -91,7 +92,10 @@ class _LyricsViewState extends State<LyricsView> {
       } else {
         try {
           context.read<PlayerCubit>().seek(position);
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Lyrics tap seek failed',
+              error: e, stackTrace: st, category: 'Lyrics');
+        }
       }
     });
   }
@@ -131,12 +135,9 @@ class _LyricsViewState extends State<LyricsView> {
   }
 
   void _updateProgress(Duration position) {
-    final effectivePos = position -
-        _audibleOffset -
-        Duration(milliseconds: _manualOffsetMs);
-    _lyricController.setProgress(
-      effectivePos < Duration.zero ? Duration.zero : effectivePos,
-    );
+    final manualOffset = Duration(milliseconds: _manualOffsetMs);
+    final effective = (position - _audibleOffset - manualOffset);
+    _lyricController.setProgress(effective.isNegative ? Duration.zero : effective);
   }
 
   /// Loads the persisted per-file offset when the current song changes.
@@ -147,10 +148,14 @@ class _LyricsViewState extends State<LyricsView> {
       _applyManualOffset(0);
       return;
     }
-    unawaited(_offsetStore.getOffsetMs(path).then((ms) {
+    _offsetStore.getOffsetMs(path).catchError((e, st) {
+      ErrorLogger.log('Failed to load lyrics manual offset for $path',
+          error: e, stackTrace: st, category: 'Lyrics');
+      return 0;
+    }).then((ms) {
       if (!mounted || _offsetSongPath != path) return;
       _applyManualOffset(ms);
-    }));
+    });
   }
 
   void _applyManualOffset(int ms) {
@@ -162,9 +167,12 @@ class _LyricsViewState extends State<LyricsView> {
       if (pos == null) {
         try {
           pos = context.read<PlayerCubit>().state.position;
-        } catch (_) {
-          // PlayerCubit unavailable (e.g. during teardown); the offset is
-          // still applied on the next position tick.
+        } catch (e, st) {
+          ErrorLogger.log(
+              'PlayerCubit unavailable for manual offset position',
+              error: e,
+              stackTrace: st,
+              category: 'Lyrics');
         }
       }
       if (pos != null) _updateProgress(pos);
@@ -266,8 +274,11 @@ class _LyricsViewState extends State<LyricsView> {
 
     // Only reload the controller when the lyrics content or source actually changed,
     // avoiding re-parsing and animation resets caused by Freezed state emissions.
-    if (!listEquals(widget.lyrics, oldWidget.lyrics) ||
-        widget.source != oldWidget.source) {
+    final lyricsChanged = widget.source != oldWidget.source ||
+        (!identical(widget.lyrics, oldWidget.lyrics) &&
+            (widget.lyrics.length != oldWidget.lyrics.length ||
+                !listEquals(widget.lyrics, oldWidget.lyrics)));
+    if (lyricsChanged) {
       _syncLyricsToController();
     }
 
@@ -402,8 +413,10 @@ class _LyricsViewState extends State<LyricsView> {
     );
   }
 
-  Widget _buildPlainTextList() {
+  Widget _buildPlainTextList(PulsrPalette p) {
     return ListView.builder(
+      addAutomaticKeepAlives: false,
+      addRepaintBoundaries: true,
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg, horizontal: AppSpacing.s20),
       itemCount: widget.lyrics.length,
       // FIX-F02: Use fixed itemExtent for lists > 100 lines to prevent layout thrash and scroll jank
@@ -418,7 +431,7 @@ class _LyricsViewState extends State<LyricsView> {
             style: TextStyle(
               fontSize: AppFontSize.bodyLarge,
               fontWeight: FontWeight.w500,
-              color: Colors.white.withValues(alpha: 0.85),
+              color: p.textPrimary,
               height: 1.4,
             ),
           ),
@@ -427,27 +440,29 @@ class _LyricsViewState extends State<LyricsView> {
     );
   }
 
-  Widget _buildSyncedLyricView() {
+  Widget _buildSyncedLyricView(PulsrPalette p) {
+    final activeCol =
+        widget.activeColor == Colors.white ? p.accent : widget.activeColor;
     final style = LyricStyles.default1.copyWith(
       textStyle: TextStyle(
         fontSize: AppFontSize.bodyLarge,
         fontWeight: FontWeight.w500,
-        color: Colors.white.withValues(alpha: 0.45),
+        color: p.textSecondary.withValues(alpha: 0.7),
         height: 1.4,
       ),
       activeStyle: TextStyle(
         fontSize: AppFontSize.titleLarge,
         fontWeight: FontWeight.w800,
-        color: widget.activeColor,
+        color: activeCol,
         height: 1.3,
         shadows: [
           Shadow(
-            color: widget.activeColor.withValues(alpha: 0.4),
+            color: activeCol.withValues(alpha: 0.4),
             blurRadius: 16,
           ),
         ],
       ),
-      activeHighlightColor: widget.activeColor,
+      activeHighlightColor: activeCol,
       textAlign: TextAlign.center,
       lineGap: 20,
       anchorPosition: 0.42,
@@ -459,17 +474,19 @@ class _LyricsViewState extends State<LyricsView> {
       enableSwitchAnimation: true,
     );
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SizedBox(
-          width: constraints.maxWidth,
-          height: constraints.maxHeight,
-          child: LyricView(
-            controller: _lyricController,
-            style: style,
-          ),
-        );
-      },
+    return RepaintBoundary(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SizedBox(
+            width: constraints.maxWidth,
+            height: constraints.maxHeight,
+            child: LyricView(
+              controller: _lyricController,
+              style: style,
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -480,16 +497,15 @@ class _LyricsViewState extends State<LyricsView> {
 
     return Container(
       decoration: BoxDecoration(
-        // Lyrics are rendered in white over the artwork, so the scrim must be
-        // strong enough in light mode to keep the text legible.
-        color: Colors.black.withValues(alpha: p.isDark ? 0.40 : 0.72),
+        // Lyrics scrim uses palette background token to support AMOLED and light mode cleanly.
+        color: p.bg.withValues(alpha: p.isDark ? 0.40 : 0.72),
         borderRadius: AppRadii.cardRadius,
       ),
       child: Stack(
         children: [
           Padding(
             padding: const EdgeInsets.only(top: AppSpacing.xxl),
-            child: isSynced ? _buildSyncedLyricView() : _buildPlainTextList(),
+            child: isSynced ? _buildSyncedLyricView(p) : _buildPlainTextList(p),
           ),
           PositionedDirectional(
             top: 4,

@@ -2416,6 +2416,9 @@ class AppLocalizationsEs extends AppLocalizations {
       'Vaciar la cola? (Se conservara la cancion en reproduccion)';
 
   @override
+  String get queueCleared => 'Cola borrada';
+
+  @override
   String get queueSaved => 'Lista guardada';
 
   @override
@@ -3720,7 +3723,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get last7DaysActivity => 'Actividad de 7 dias';
 
   @override
-  String get topScrobbledArtists => 'Artistas mas escuchados';
+  String get topScrobbledArtists => 'Artistas más reproducidos';
 
   @override
   String get themeModeLabel => 'MODO DE TEMA';
@@ -6636,4 +6639,16 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get nowPlayingSwipeHint =>
       'Desliza hacia abajo para cerrar - Desliza la carátula para saltar';
+
+  @override
+  String get vinylDirectDrive => 'ESTUDIO • TRACCIÓN DIRECTA';
+
+  @override
+  String get cassetteSideA => 'LADO A • TIPO II (CrO2)';
+
+  @override
+  String get cassettePulsrTape => 'CINTA PULSR';
+
+  @override
+  String get vinylSpeedRpm => '33⅓ RPM';
 }

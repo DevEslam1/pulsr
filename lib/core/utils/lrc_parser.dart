@@ -263,6 +263,13 @@ class LrcParser {
     return restored;
   }
 
+  /// FIX-H02: Returns the timestamp when negative cache entry was recorded.
+  static DateTime? getCacheTimestamp({int? songId, String? path}) {
+    final cacheKey = songId != null ? 'song_$songId' : path;
+    if (cacheKey == null) return null;
+    return _negativeCacheTimes[cacheKey];
+  }
+
   static Directory? _diskCacheDir;
 
   static String _diskCacheKey(String key) {

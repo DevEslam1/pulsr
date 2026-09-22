@@ -1,10 +1,12 @@
 // lib/features/downloads/presentation/downloads_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/errors/error_message_resolver.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/error_logger.dart';
+import '../../../../core/widgets/empty_state_widget.dart';
 import '../../../../core/widgets/pulsr_back_button.dart';
 import '../../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
@@ -24,7 +26,9 @@ import 'package:pulsr/core/constants/app_typography.dart';
 enum DownloadFilter { all, downloading, completed, failed }
 
 class DownloadsScreen extends StatefulWidget {
-  const DownloadsScreen({super.key});
+  final AppDatabase? db;
+
+  const DownloadsScreen({super.key, this.db});
 
   @override
   State<DownloadsScreen> createState() => _DownloadsScreenState();
@@ -32,13 +36,23 @@ class DownloadsScreen extends StatefulWidget {
 
 class _DownloadsScreenState extends State<DownloadsScreen> {
   DownloadFilter _filter = DownloadFilter.all;
+  late final AppDatabase? _db;
 
-  String _emptyMessageForFilter(DownloadFilter filter) {
+  @override
+  void initState() {
+    super.initState();
+    _db = widget.db ??
+        (getIt.isRegistered<AppDatabase>() ? getIt<AppDatabase>() : null);
+  }
+
+  String _emptyMessageForFilter(AppLocalizations l10n, DownloadFilter filter) {
     return switch (filter) {
-      DownloadFilter.all => 'No downloads yet',
-      DownloadFilter.downloading => 'No active downloads in progress',
-      DownloadFilter.completed => 'No completed downloads yet',
-      DownloadFilter.failed => 'No failed downloads',
+      DownloadFilter.all => l10n.noDownloadsTitle,
+      DownloadFilter.downloading =>
+        '${l10n.noDownloadsTitle} (${l10n.statusDownloading})',
+      DownloadFilter.completed =>
+        '${l10n.noDownloadsTitle} (${l10n.statusCompleted})',
+      DownloadFilter.failed => '${l10n.noDownloadsTitle} (${l10n.statusFailed})',
     };
   }
 
@@ -88,12 +102,11 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             ),
           ),
           actions: [
-            BlocBuilder<DownloadsCubit, DownloadsState>(
-              buildWhen: (a, b) => a.taskList != b.taskList,
-              builder: (context, state) {
-                final failedCount = state.taskList
-                    .where((t) => t.status == DownloadStatus.failed)
-                    .length;
+            BlocSelector<DownloadsCubit, DownloadsState, int>(
+              selector: (state) => state.taskList
+                  .where((t) => t.status == DownloadStatus.failed)
+                  .length,
+              builder: (context, failedCount) {
                 if (failedCount == 0) return const SizedBox.shrink();
                 return TextButton.icon(
                   onPressed: () =>
@@ -160,38 +173,13 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                         children: [
                           if (state.storageStats.totalBytes > 0)
                             StorageStatsHeader(stats: state.storageStats),
-                          Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(AppSpacing.xl),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.download_done_rounded,
-                                    size: 64,
-                                    color: p.textTertiary,
-                                  ),
-                                  const SizedBox(height: AppSpacing.md),
-                                  Text(
-                                    l10n.noDownloadsTitle,
-                                    style: TextStyle(
-                                      color: p.textPrimary,
-                                      fontSize: AppFontSize.title,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.xs),
-                                  Text(
-                                    l10n.noDownloadsSubtitle,
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: p.textSecondary,
-                                      fontSize: AppFontSize.body,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                          EmptyStateWidget(
+                            icon: Icons.download_done_rounded,
+                            title: l10n.noDownloadsTitle,
+                            subtitle: l10n.noDownloadsSubtitle,
+                            primaryActionLabel: l10n.searchOnline,
+                            primaryActionIcon: Icons.explore_rounded,
+                            onPrimaryAction: () => context.go('/browse'),
                           ),
                         ],
                       ),
@@ -201,6 +189,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
               } else {
                 content = ListView.builder(
                   physics: const AlwaysScrollableScrollPhysics(),
+                  addAutomaticKeepAlives: false,
+                  addRepaintBoundaries: true,
                   padding: const EdgeInsets.only(bottom: AppSpacing.lg),
                   itemCount: filteredTasks.isEmpty
                       ? 3
@@ -223,16 +213,16 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                           scrollDirection: Axis.horizontal,
                           child: Row(
                             children: [
-                              _buildFilterChip('All', allTasks.length,
+                              _buildFilterChip(l10n.all, allTasks.length,
                                   DownloadFilter.all, p),
                               const SizedBox(width: AppSpacing.xs),
-                              _buildFilterChip('Downloading', activeTasks.length,
+                              _buildFilterChip(l10n.statusDownloading, activeTasks.length,
                                   DownloadFilter.downloading, p),
                               const SizedBox(width: AppSpacing.xs),
-                              _buildFilterChip('Completed', completedTasks.length,
+                              _buildFilterChip(l10n.statusCompleted, completedTasks.length,
                                   DownloadFilter.completed, p),
                               const SizedBox(width: AppSpacing.xs),
-                              _buildFilterChip('Failed', failedTasks.length,
+                              _buildFilterChip(l10n.statusFailed, failedTasks.length,
                                   DownloadFilter.failed, p),
                             ],
                           ),
@@ -241,32 +231,28 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                     }
 
                     if (filteredTasks.isEmpty) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: AppSpacing.xl, horizontal: AppSpacing.lg),
-                        child: Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                _filter == DownloadFilter.failed
-                                    ? Icons.check_circle_outline_rounded
-                                    : Icons.downloading_rounded,
-                                size: 48,
-                                color: p.textTertiary,
-                              ),
-                              const SizedBox(height: AppSpacing.sm),
-                              Text(
-                                _emptyMessageForFilter(_filter),
-                                style: TextStyle(
-                                  color: p.textSecondary,
-                                  fontSize: AppFontSize.body,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                      return EmptyStateWidget(
+                        icon: _filter == DownloadFilter.failed
+                            ? Icons.error_outline_rounded
+                            : Icons.downloading_rounded,
+                        iconColor: _filter == DownloadFilter.failed
+                            ? p.error
+                            : p.accent,
+                        title: l10n.downloadsTitle,
+                        subtitle: _emptyMessageForFilter(l10n, _filter),
+                        primaryActionLabel: _filter == DownloadFilter.failed
+                            ? l10n.retry
+                            : l10n.searchOnline,
+                        primaryActionIcon: _filter == DownloadFilter.failed
+                            ? Icons.refresh_rounded
+                            : Icons.explore_rounded,
+                        onPrimaryAction: () {
+                          if (_filter == DownloadFilter.failed) {
+                            context.read<DownloadsCubit>().retryAllFailed();
+                          } else {
+                            context.go('/browse');
+                          }
+                        },
                       );
                     }
 
@@ -292,6 +278,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
 
               return RefreshIndicator(
                 color: p.accent,
+                backgroundColor: p.surfaceContainer,
                 onRefresh: () async {
                   final cubit = context.read<DownloadsCubit>();
                   await Future.wait([
@@ -311,29 +298,40 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   Future<void> _playCompleted(BuildContext context, DownloadTask task) async {
     final localId = task.localSongId;
     if (localId == null) return;
+    final downloadsCubit = context.read<DownloadsCubit>();
+    final playerCubit = context.read<PlayerCubit>();
+    final l10n = AppLocalizations.of(context)!;
     try {
-      final db = getIt<AppDatabase>();
+      final db = _db;
+      if (db == null) return;
       final song = await (db.select(db.songsTable)
             ..where((t) => t.id.equals(localId)))
           .getSingleOrNull();
+      if (!context.mounted) return;
       if (song == null) {
-        if (context.mounted) {
-          PulsrToast.show(context,
-              message: AppLocalizations.of(context)!.songNotFound,
-              icon: Icons.music_off_rounded,
-              isError: true);
-        }
+        PulsrToast.show(
+          context,
+          message: l10n.songNotFound,
+          icon: Icons.music_off_rounded,
+          isError: true,
+          actionLabel: l10n.delete,
+          onActionPressed: () {
+            downloadsCubit.deleteDownload(task.videoId);
+          },
+        );
         return;
       }
-      if (context.mounted) context.read<PlayerCubit>().playSong(song);
+      playerCubit.playSong(song);
     } catch (e, st) {
       ErrorLogger.log('Failed to play downloaded song',
           error: e, stackTrace: st, category: 'Downloads');
       if (context.mounted) {
-        PulsrToast.show(context,
-            message: AppLocalizations.of(context)!.songNotFound,
-            icon: Icons.music_off_rounded,
-            isError: true);
+        PulsrToast.show(
+          context,
+          message: l10n.songNotFound,
+          icon: Icons.music_off_rounded,
+          isError: true,
+        );
       }
     }
   }

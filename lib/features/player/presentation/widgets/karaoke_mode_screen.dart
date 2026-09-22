@@ -31,8 +31,9 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen> {
 
   @override
   void dispose() {
-    // Restore the app's edge-to-edge chrome on the way out.
+    // Restore the app's edge-to-edge chrome and ensure overlays are fully re-enabled.
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
     super.dispose();
   }
 
@@ -93,20 +94,20 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen> {
 
         return PulsrPagePopScope(
           child: Scaffold(
-            backgroundColor: const Color(0xFF08090E),
-          appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
+            backgroundColor: p.bg,
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
               leading: IconButton(
-                icon: const Icon(Icons.close_rounded, color: Colors.white),
+                icon: Icon(Icons.close_rounded, color: p.textPrimary),
                 tooltip: context.l10n.close,
                 onPressed: () => Navigator.pop(context),
               ),
-            title: Text(
-              song?.title ?? context.l10n.dspKaraokeMode,
-              style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.w700),
-            ),
+              title: Text(
+                song?.title ?? context.l10n.dspKaraokeMode,
+                style: TextStyle(
+                    color: p.textPrimary, fontWeight: FontWeight.w700),
+              ),
             actions: [
               Container(
                 margin: const EdgeInsetsDirectional.only(end: AppSpacing.md),
@@ -147,7 +148,7 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen> {
                     style: TextStyle(
                       fontSize: AppFontSize.bodyLarge,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white.withValues(alpha: 0.55),
+                      color: p.textSecondary,
                     ),
                   ),
                 ),
@@ -206,7 +207,7 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen> {
                         style: TextStyle(
                           fontSize: AppFontSize.title,
                           fontWeight: FontWeight.w600,
-                          color: Colors.white.withValues(alpha: 0.45),
+                          color: p.textTertiary,
                         ),
                       ),
                     ),
@@ -235,13 +236,13 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen> {
                     Text(
                       Formatters.formatDuration(pos),
                       style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.7),
+                          color: p.textSecondary,
                           fontSize: AppFontSize.bodySmall),
                     ),
                     Text(
                       Formatters.formatDuration(state.duration),
                       style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.7),
+                          color: p.textSecondary,
                           fontSize: AppFontSize.bodySmall),
                     ),
                   ],

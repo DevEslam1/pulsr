@@ -237,6 +237,8 @@ void showThemePickerSheet(
               child: ListView.builder(
                 shrinkWrap: true,
                 physics: const BouncingScrollPhysics(),
+                addAutomaticKeepAlives: false,
+                addRepaintBoundaries: true,
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                 itemCount: themes.length,
                 itemBuilder: (context, index) {

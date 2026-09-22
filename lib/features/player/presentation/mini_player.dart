@@ -14,11 +14,15 @@ import '../../../core/utils/formatters.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/utils/list_content_diff.dart';
 import '../../../core/widgets/cached_artwork.dart';
+import '../../../core/widgets/gesture_hint_overlay.dart';
 import '../../../core/widgets/spinning_vinyl_disc.dart';
+import '../../../core/widgets/waveform_logo.dart';
+import '../../../data/db/app_database.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../settings/cubit/settings_state.dart';
 import '../cubit/player_cubit.dart';
 import '../cubit/player_state.dart';
+import '../../../core/utils/error_logger.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
@@ -89,6 +93,17 @@ class _MiniPlayerState extends State<MiniPlayer> {
     // Created eagerly so the PageView is always driven by this controller and
     // synchronisation never has to run inside build (A-9).
     _pageController = PageController();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final playerCubit = context.read<PlayerCubit>();
+      final state = playerCubit.state;
+      final queue = state.queue.isNotEmpty
+          ? state.queue
+          : (state.currentSong != null ? [state.currentSong!] : const <SongsTableData>[]);
+      final currentIndex =
+          state.currentIndex.clamp(0, math.max(0, queue.length - 1)).toInt();
+      _syncPageController(currentIndex, queue.length);
+    });
   }
 
   @override
@@ -101,13 +116,21 @@ class _MiniPlayerState extends State<MiniPlayer> {
     final controller = _pageController;
     if (queueLength == 0 || controller == null) return;
     final safeIndex = targetIndex.clamp(0, queueLength - 1);
-    // Never fight an in-progress user gesture; the page-change handler releases
+    // Never fight an in-progress user gesture or in-flight skip; the page-change handler releases
     // the latch once the skip it triggered has completed.
-    if (_isUserDragging) return;
+    if (_isUserDragging || _swipeInFlight) return;
     if (_lastKnownIndex != safeIndex) {
       _lastKnownIndex = safeIndex;
-      if (controller.hasClients && controller.page?.round() != safeIndex) {
-        controller.jumpToPage(safeIndex);
+      if (controller.hasClients &&
+          controller.position.hasContentDimensions &&
+          controller.page?.round() != safeIndex) {
+        try {
+          // FIX-C10: Guard jumpToPage against unexpected RangeError during rapid queue shrinkage
+          controller.jumpToPage(safeIndex);
+        } catch (e, st) {
+          ErrorLogger.log('MiniPlayer PageController jumpToPage failed',
+              error: e, stackTrace: st, category: 'MiniPlayer');
+        }
       }
     }
   }
@@ -117,10 +140,12 @@ class _MiniPlayerState extends State<MiniPlayer> {
   /// (e.g. ScrollEnd before the state update) can no longer snap the carousel
   /// back to the old track.
   Future<void> _completeSwipe(int page, PlayerCubit cubit) async {
+    _swipeInFlight = true;
     try {
       await cubit.skipToQueueItem(page);
-    } catch (_) {
-      // Failure is already surfaced by PlayerCubit; just release the latch.
+    } catch (e, st) {
+      ErrorLogger.log('MiniPlayer swipe failed',
+          error: e, stackTrace: st, category: 'MiniPlayer');
     }
     if (!mounted) return;
     setState(() {
@@ -146,7 +171,18 @@ class _MiniPlayerState extends State<MiniPlayer> {
         swipeRightAction == MiniPlayerSwipeAction.prev;
     final p = context.palette;
 
-    return BlocBuilder<PlayerCubit, PlayerState>(
+    return BlocConsumer<PlayerCubit, PlayerState>(
+      listenWhen: (a, b) =>
+          a.currentIndex != b.currentIndex ||
+          listContentDiffers(a.queue, b.queue),
+      listener: (context, state) {
+        final queue = state.queue.isNotEmpty
+            ? state.queue
+            : (state.currentSong != null ? [state.currentSong!] : const <SongsTableData>[]);
+        final currentIndex =
+            state.currentIndex.clamp(0, math.max(0, queue.length - 1)).toInt();
+        _syncPageController(currentIndex, queue.length);
+      },
       buildWhen: (a, b) =>
           a.currentSong?.id != b.currentSong?.id ||
           a.currentSong?.title != b.currentSong?.title ||
@@ -165,12 +201,6 @@ class _MiniPlayerState extends State<MiniPlayer> {
         final queue = state.queue.isNotEmpty ? state.queue : [song];
         final currentIndex = state.currentIndex.clamp(0, queue.length - 1);
 
-        // Page synchronisation must not run during build: defer the jump to the
-        // end of the frame, after the PageView has laid out (A-9).
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _syncPageController(currentIndex, queue.length);
-        });
-
         final isTablet = Adaptive.isTablet(context);
         final playerRadius = BorderRadius.circular(isTablet ? 28 : 24);
 
@@ -184,11 +214,15 @@ class _MiniPlayerState extends State<MiniPlayer> {
                 widget.onSwipeDown!,
         };
 
-        return Semantics(
-          label: context.l10n.nowPlayingSemantics(song.title, song.artist),
-          button: true,
-          customSemanticsActions: customSemanticsActions,
-          child: GestureDetector(
+        return Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.topCenter,
+          children: [
+            Semantics(
+              label: context.l10n.nowPlayingSemantics(song.title, song.artist),
+              button: true,
+              customSemanticsActions: customSemanticsActions,
+              child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onVerticalDragStart: (_) {
               _verticalDragDy = 0.0;
@@ -289,13 +323,14 @@ class _MiniPlayerState extends State<MiniPlayer> {
                       ),
                       child: ClipRRect(
                         borderRadius: playerRadius,
-                        child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Directionality(
-                          textDirection: TextDirection.ltr,
-                          child: Padding(
-                            padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s10, AppSpacing.xs, AppSpacing.xs, 0),
+                        child: Stack(
+                          alignment: Alignment.topCenter,
+                          children: [
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s10, AppSpacing.xs, AppSpacing.xs, 0),
                             child: Row(
                               children: [
                                 // Interactive Swipeable Track Info Carousel
@@ -310,8 +345,11 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                           _isUserDragging = true;
                                           _swipeInFlight = false;
                                         } else if (notification is UserScrollNotification) {
-                                          _isUserDragging =
-                                              notification.direction != ScrollDirection.idle;
+                                          if (notification.direction != ScrollDirection.idle) {
+                                            _isUserDragging = true;
+                                          } else if (!_swipeInFlight) {
+                                            _isUserDragging = false;
+                                          }
                                         } else if (notification is ScrollEndNotification) {
                                           // Only release immediately when no skip is
                                           // pending; otherwise the page-change handler
@@ -346,31 +384,53 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                           child: Row(
                                             children: [
                                               // Artwork or Vinyl Disc
-                                              if (playerThemeMode ==
-                                                  PlayerThemeMode.vinyl)
-                                                SpinningVinylDisc(
-                                                  id: item.id,
-                                                  remoteArtworkUrl:
-                                                      item.remoteArtworkUrl,
-                                                  size: 46,
-                                                  isPlaying: state.isPlaying &&
-                                                      isCurrent,
-                                                )
-                                              else
-                                                Hero(
-                                                  tag: isCurrent
-                                                      ? _fullArtworkHeroTag(
-                                                          playerThemeMode)
-                                                      : 'queue_art_${item.id}_$index',
-                                                  child: CachedArtwork(
-                                                    id: item.id,
-                                                    remoteUrl:
-                                                        item.remoteArtworkUrl,
-                                                    type: ArtworkType.AUDIO,
-                                                    size: 46,
-                                                    borderRadius: 12,
-                                                  ),
-                                                ),
+                                              Stack(
+                                                alignment: Alignment.center,
+                                                children: [
+                                                  if (playerThemeMode ==
+                                                      PlayerThemeMode.vinyl)
+                                                    SpinningVinylDisc(
+                                                      id: item.id,
+                                                      remoteArtworkUrl:
+                                                          item.remoteArtworkUrl,
+                                                      size: 46,
+                                                      isPlaying: state.isPlaying &&
+                                                          isCurrent,
+                                                    )
+                                                  else
+                                                    Hero(
+                                                      tag: isCurrent
+                                                          ? _fullArtworkHeroTag(
+                                                              playerThemeMode)
+                                                          : 'queue_art_${item.id}_$index',
+                                                      child: CachedArtwork(
+                                                        id: item.id,
+                                                        remoteUrl:
+                                                            item.remoteArtworkUrl,
+                                                        type: ArtworkType.AUDIO,
+                                                        size: 46,
+                                                        borderRadius: 12,
+                                                      ),
+                                                    ),
+                                                  if (isCurrent && state.isPlaying && playerThemeMode != PlayerThemeMode.vinyl)
+                                                    PositionedDirectional(
+                                                      bottom: 2,
+                                                      end: 2,
+                                                      child: Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.black.withValues(alpha: 0.65),
+                                                          borderRadius: BorderRadius.circular(4),
+                                                        ),
+                                                        child: WaveformLogo(
+                                                          size: 11,
+                                                          color: p.accent,
+                                                          animate: true,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
                                               const SizedBox(width: AppSpacing.sm),
                                               // Track title & artist.
                                               // Dense fixed-height chrome: clamp
@@ -461,24 +521,52 @@ class _MiniPlayerState extends State<MiniPlayer> {
                               ],
                             ),
                           ),
-                        ),
-                        _MiniPlayerProgressBar(
-                          duration: state.duration,
-                          activeAccent: activeAccent,
-                          hairlineColor: p.hairline,
-                          isPlaying: state.isPlaying,
-                          onSeek: (pos) => cubit.seek(pos),
+                        RepaintBoundary(
+                          child: _MiniPlayerProgressBar(
+                            duration: state.duration,
+                            activeAccent: activeAccent,
+                            hairlineColor: p.hairline,
+                            isPlaying: state.isPlaying,
+                            onSeek: (pos) => cubit.seek(pos),
+                          ),
                         ),
                       ],
                     ),
+                    Positioned(
+                      top: 2.5,
+                      child: IgnorePointer(
+                        child: Container(
+                          width: 28,
+                          height: 2.5,
+                          decoration: BoxDecoration(
+                            color: (p.isDark ? Colors.white : Colors.black)
+                                .withValues(alpha: 0.22),
+                            borderRadius: BorderRadius.circular(1.5),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                   ),
                 ),
               ),
             ),
           ),
         ),
-        ),
-        );
+      ),
+    ),
+  const Positioned(
+    top: -46,
+    child: GestureHintOverlay(
+      hintKey: 'mini_player_swipe',
+      message: 'Swipe left/right to skip',
+      padding: EdgeInsets.zero,
+      icon: Icons.swipe_rounded,
+    ),
+  ),
+],
+);
       },
     );
   }
@@ -535,11 +623,12 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
 
   void _syncWave() {
     // Never tick a decorative animation while the app is backgrounded or
-    // paused; this was draining battery while music played in the background.
+    final isTest = const bool.fromEnvironment('FLUTTER_TEST') ||
+        WidgetsBinding.instance.runtimeType.toString().contains('Test');
     final shouldAnimate = _isAppActive &&
         widget.isPlaying &&
         context.motionEnabled &&
-        !WidgetsBinding.instance.runtimeType.toString().contains('Test');
+        !isTest;
     if (shouldAnimate) {
       if (!_waveController.isAnimating) _waveController.repeat();
     } else if (_waveController.isAnimating) {
@@ -562,115 +651,118 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.ltr,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final trackWidth = constraints.maxWidth;
-          return BlocSelector<PlayerCubit, PlayerState, Duration>(
-            selector: (s) => s.position,
-            builder: (context, position) {
-              final progress = _dragProgress ??
-                  (widget.duration.inMilliseconds > 0
-                      ? (position.inMilliseconds / widget.duration.inMilliseconds)
-                          .clamp(0.0, 1.0)
-                      : 0.0);
-              final currentDuration = _dragProgress != null
-                  ? Duration(
-                      milliseconds: (widget.duration.inMilliseconds *
-                              _dragProgress!)
-                          .round())
-                  : position;
-              final valueLabel =
-                  '${Formatters.formatDuration(currentDuration)} / ${Formatters.formatDuration(widget.duration)}';
+    return RepaintBoundary(
+      child: Directionality(
+        textDirection: Directionality.of(context),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final trackWidth = constraints.maxWidth;
+            return BlocSelector<PlayerCubit, PlayerState, Duration>(
+              selector: (s) => s.position,
+              builder: (context, position) {
+                final progress = _dragProgress ??
+                    (widget.duration.inMilliseconds > 0
+                        ? (position.inMilliseconds / widget.duration.inMilliseconds)
+                            .clamp(0.0, 1.0)
+                        : 0.0);
+                final currentDuration = _dragProgress != null
+                    ? Duration(
+                        milliseconds: (widget.duration.inMilliseconds *
+                                _dragProgress!)
+                            .round())
+                    : position;
+                final valueLabel =
+                    '${Formatters.formatDuration(currentDuration)} / ${Formatters.formatDuration(widget.duration)}';
 
-              Duration clampDuration(Duration d) {
-                if (d < Duration.zero) return Duration.zero;
-                if (d > widget.duration) return widget.duration;
-                return d;
-              }
+                Duration clampDuration(Duration d) {
+                  if (d < Duration.zero) return Duration.zero;
+                  if (d > widget.duration) return widget.duration;
+                  return d;
+                }
 
-              String labelFor(Duration d) =>
-                  '${Formatters.formatDuration(d)} / ${Formatters.formatDuration(widget.duration)}';
-              final increasedLabel = labelFor(
-                  clampDuration(currentDuration + const Duration(seconds: 10)));
-              final decreasedLabel = labelFor(
-                  clampDuration(currentDuration - const Duration(seconds: 10)));
+                String labelFor(Duration d) =>
+                    '${Formatters.formatDuration(d)} / ${Formatters.formatDuration(widget.duration)}';
+                final increasedLabel = labelFor(
+                    clampDuration(currentDuration + const Duration(seconds: 10)));
+                final decreasedLabel = labelFor(
+                    clampDuration(currentDuration - const Duration(seconds: 10)));
 
-              return Semantics(
-                slider: true,
-                label: context.l10n.seekLabel,
-                value: valueLabel,
-                increasedValue: increasedLabel,
-                decreasedValue: decreasedLabel,
-                onIncrease: () => widget.onSeek(
-                    clampDuration(currentDuration + const Duration(seconds: 10))),
-                onDecrease: () => widget.onSeek(
-                    clampDuration(currentDuration - const Duration(seconds: 10))),
-                child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTapDown: (details) {
-                  if (trackWidth > 0 && widget.duration.inMilliseconds > 0) {
-                    HapticFeedback.selectionClick();
-                    final ratio =
-                        (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                return Semantics(
+                  slider: true,
+                  label: context.l10n.seekLabel,
+                  value: valueLabel,
+                  increasedValue: increasedLabel,
+                  decreasedValue: decreasedLabel,
+                  onIncrease: () => widget.onSeek(
+                      clampDuration(currentDuration + const Duration(seconds: 10))),
+                  onDecrease: () => widget.onSeek(
+                      clampDuration(currentDuration - const Duration(seconds: 10))),
+                  child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTapDown: (details) {
+                    if (trackWidth > 0 && widget.duration.inMilliseconds > 0) {
+                      HapticFeedback.selectionClick();
+                      final ratio =
+                          (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                      setState(() => _dragProgress = null);
+                      final seekMs =
+                          (widget.duration.inMilliseconds * ratio).round();
+                      widget.onSeek(Duration(milliseconds: seekMs));
+                    }
+                  },
+                  onHorizontalDragStart: (details) {
+                    if (trackWidth > 0 && widget.duration.inMilliseconds > 0) {
+                      HapticFeedback.selectionClick();
+                      final ratio =
+                          (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                      setState(() => _dragProgress = ratio);
+                    }
+                  },
+                  onHorizontalDragUpdate: (details) {
+                    if (trackWidth > 0 && widget.duration.inMilliseconds > 0) {
+                      final ratio =
+                          (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                      setState(() => _dragProgress = ratio);
+                    }
+                  },
+                  onHorizontalDragEnd: (_) {
+                    if (_dragProgress != null &&
+                        widget.duration.inMilliseconds > 0) {
+                      final seekMs =
+                          (widget.duration.inMilliseconds * _dragProgress!)
+                              .round();
+                      widget.onSeek(Duration(milliseconds: seekMs));
+                      setState(() => _dragProgress = null);
+                    }
+                  },
+                  onHorizontalDragCancel: () {
                     setState(() => _dragProgress = null);
-                    final seekMs =
-                        (widget.duration.inMilliseconds * ratio).round();
-                    widget.onSeek(Duration(milliseconds: seekMs));
-                  }
-                },
-                onHorizontalDragStart: (details) {
-                  if (trackWidth > 0 && widget.duration.inMilliseconds > 0) {
-                    HapticFeedback.selectionClick();
-                    final ratio =
-                        (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
-                    setState(() => _dragProgress = ratio);
-                  }
-                },
-                onHorizontalDragUpdate: (details) {
-                  if (trackWidth > 0 && widget.duration.inMilliseconds > 0) {
-                    final ratio =
-                        (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
-                    setState(() => _dragProgress = ratio);
-                  }
-                },
-                onHorizontalDragEnd: (_) {
-                  if (_dragProgress != null &&
-                      widget.duration.inMilliseconds > 0) {
-                    final seekMs =
-                        (widget.duration.inMilliseconds * _dragProgress!)
-                            .round();
-                    widget.onSeek(Duration(milliseconds: seekMs));
-                    setState(() => _dragProgress = null);
-                  }
-                },
-                onHorizontalDragCancel: () {
-                  setState(() => _dragProgress = null);
-                },
-                // Generous hit area so the thin wavy bar is easy to grab; the
-                // wave amplitude stays small so the card never grows.
-                child: SizedBox(
-                  height: AppSpacing.lg,
-                  width: double.infinity,
-                  child: AnimatedBuilder(
-                    animation: _waveController,
-                    builder: (context, _) => Stack(
-                      clipBehavior: Clip.none,
-                      alignment: AlignmentDirectional.centerStart,
-                      children: [
-                        Positioned.fill(
-                          child: CustomPaint(
-                            painter: _MiniProgressWavePainter(
-                              progress: progress,
-                              phase: _waveController.value * 2 * math.pi,
-                              activeColor: widget.activeAccent,
-                              inactiveColor: widget.hairlineColor
-                                  .withValues(alpha: 0.35),
-                              isPlaying: widget.isPlaying,
+                  },
+                  // Generous hit area so the thin wavy bar is easy to grab; the
+                  // wave amplitude stays small so the card never grows.
+                  child: SizedBox(
+                    height: AppSpacing.lg,
+                    width: double.infinity,
+                    child: AnimatedBuilder(
+                      animation: _waveController,
+                      builder: (context, _) => Stack(
+                        clipBehavior: Clip.none,
+                        alignment: AlignmentDirectional.centerStart,
+                        children: [
+                          Positioned.fill(
+                            child: RepaintBoundary(
+                              child: CustomPaint(
+                                painter: _MiniProgressWavePainter(
+                                  progress: progress,
+                                  phase: _waveController.value * 2 * math.pi,
+                                  activeColor: widget.activeAccent,
+                                  inactiveColor: widget.hairlineColor
+                                      .withValues(alpha: 0.35),
+                                  isPlaying: widget.isPlaying,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
                         // Scrub thumb, shown while dragging.
                         if (_dragProgress != null)
                           Align(
@@ -702,8 +794,9 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
           );
         },
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 

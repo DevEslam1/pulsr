@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/bloc/base_cubit.dart';
@@ -29,25 +30,27 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
   // overwrite them.
   final Set<String> _userEditedFields = <String>{};
 
-  /// Undo stack: snapshots before each user edit. Cleared on save.
-  final List<TagEditorState> _history = <TagEditorState>[];
-  static const int _historyMax = 30;
+  /// Undo stack: diff snapshots before each user edit. Cleared on save.
+  // FIX-H12: Use ListQueue for O(1) eviction instead of O(n) removeRange
+  final ListQueue<_TagEditorDiff> _history = ListQueue<_TagEditorDiff>();
+  // FIX-L08 / B-21: Store diff instead of full state (avoids duplicate batchSongs refs)
+  static const int _historyMax = 15;
 
   bool get canUndo => _history.isNotEmpty;
 
   void _pushHistory() {
     if (isClosed) return;
-    _history.add(state);
-    if (_history.length > _historyMax) {
-      _history.removeRange(0, _history.length - _historyMax);
+    _history.addLast(_TagEditorDiff.fromState(state));
+    while (_history.length > _historyMax) {
+      _history.removeFirst();
     }
   }
 
   /// Restores the state before the last user edit. Returns false when empty.
   bool undo() {
     if (isClosed || _history.isEmpty) return false;
-    final prev = _history.removeLast();
-    emit(prev);
+    final prevDiff = _history.removeLast();
+    emit(prevDiff.applyTo(state));
     return true;
   }
 
@@ -449,6 +452,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
 
   Future<void> saveTags() async {
     if (isClosed) return;
+    if (state.status != TagEditorStatus.loaded) return;
     if (!state.isBatchMode && state.title.trim().isEmpty) {
       emit(state.copyWith(
         status: TagEditorStatus.failure,
@@ -540,6 +544,9 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
               throw const _UnverifiedTagWriteException();
             }
             if (isClosed) return;
+            // FIX-C8: 100ms delay to let native file buffers flush
+            await Future.delayed(const Duration(milliseconds: 100));
+            if (isClosed) return;
             await _scannerService.rescanSingleFile(s.path);
             taggedSongs.add(s);
           } catch (e, st) {
@@ -574,8 +581,16 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
           _batchDiscEdited = false;
           _batchCommentEdited = false;
           _history.clear();
+          _userEditedFields.clear();
+          // FIX-C08: Inform user that lyrics are not editable in batch mode
+          final batchLyricsNote = state.lyrics.isNotEmpty
+              ? 'Note: lyrics are not editable in batch mode — use single-track editor for lyrics.'
+              : null;
           emit(state.copyWith(
-              status: TagEditorStatus.success, clearBatchProgress: true));
+            status: TagEditorStatus.success,
+            errorMessage: batchLyricsNote,
+            clearBatchProgress: true,
+          ));
         }
         return;
       }
@@ -601,12 +616,23 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
         'artworkPath': state.newArtworkPath,
         'removeArtwork': state.removeArtwork,
       });
-      if (!_isWriteVerified(writeResult)) {
+      // FIX-M08 / B-17: Distinguish between write rejected ({ok: false}), write failed (bool false), and verification failed
+      final isVerified = _isWriteVerified(writeResult);
+      if (!isVerified) {
         if (isClosed) return;
+        final writeOutcome = _checkTagWriteOutcome(writeResult);
+        final errorText = switch (writeOutcome) {
+          _TagWriteOutcome.rejected =>
+            'Tag write was rejected by the native bridge or audio subsystem.',
+          _TagWriteOutcome.failed =>
+            'Tag write failed. The audio file could not be updated.',
+          _TagWriteOutcome.unverified =>
+            'Tags were sent but could not be verified on this device (storage permission or format limitation). Original file was restored when possible.',
+          _ => 'Failed to save tags.',
+        };
         emit(state.copyWith(
           status: TagEditorStatus.failure,
-          errorMessage:
-              'Tags were sent but could not be verified on this device (storage permission or format limitation). Original file was restored when possible.',
+          errorMessage: errorText,
         ));
         return;
       }
@@ -617,9 +643,13 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
         songId: state.song.id,
         path: state.song.path,
       );
+      // FIX-C8: 100ms delay to let native file buffers flush
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (isClosed) return;
       await _scannerService.rescanSingleFile(state.song.path);
       if (isClosed) return;
 
+      _userEditedFields.clear();
       if (lyricsTruncated && !isClosed) {
         _history.clear();
         emit(state.copyWith(
@@ -631,6 +661,19 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
         _history.clear();
         emit(state.copyWith(status: TagEditorStatus.success));
       }
+    } on _TagWriteRejectedException {
+      if (isClosed) return;
+      emit(state.copyWith(
+        status: TagEditorStatus.failure,
+        errorMessage:
+            'Tag write was rejected by the system. Check file permissions.',
+      ));
+    } on _TagWriteFailedException {
+      if (isClosed) return;
+      emit(state.copyWith(
+        status: TagEditorStatus.failure,
+        errorMessage: 'Tag write failed. Could not write to the audio file.',
+      ));
     } on _UnverifiedTagWriteException {
       if (isClosed) return;
       emit(state.copyWith(
@@ -658,6 +701,23 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
   }
 }
 
+// FIX-M08: Distinct outcomes for native bridge responses
+enum _TagWriteOutcome { verified, accepted, rejected, failed, unverified }
+
+_TagWriteOutcome _checkTagWriteOutcome(dynamic result) {
+  if (result is bool) {
+    if (result) return _TagWriteOutcome.accepted;
+    return _TagWriteOutcome.failed;
+  }
+  if (result is Map) {
+    if (result['verified'] == true) return _TagWriteOutcome.verified;
+    if (result['verified'] == false) return _TagWriteOutcome.unverified;
+    if (result['ok'] == true) return _TagWriteOutcome.accepted;
+    if (result['ok'] == false) return _TagWriteOutcome.rejected;
+  }
+  return _TagWriteOutcome.failed;
+}
+
 /// Checks whether the native tag-write result indicates a confirmed success.
 ///
 /// The native bridge has gone through three generations:
@@ -668,27 +728,65 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
 /// Returning `false` for generations 1 & 2 caused the UI to always show
 /// "could not be verified" even when the tag was written correctly (BUG-1).
 bool _isWriteVerified(dynamic result) {
-  if (result is bool) {
-    // Generation 1: bare bool. Accept as success; log so we know the native
-    // side hasn't been updated yet.
-    assert(() {
-      ErrorLogger.log(
-        '[TagEditor] Legacy bare-bool result from writeTags — update native bridge to return {verified: true}.',
-        category: 'tag_editor',
-      );
-      return true;
-    }());
-    return result;
-  }
+  if (result == true) return true;
   if (result is Map) {
-    // Generation 3 (current): explicit verified flag.
-    final verified = result['verified'];
-    if (verified is bool) return verified;
-    // Generation 2 (transitional): {ok: true} without re-read proof.
-    // Treat as success — failing here caused BUG-1 (always shows error).
-    if (result['ok'] == true) return true;
+    if (result['verified'] == true) return true;
+    if (result['verified'] == false) return false;
+    if (result['ok'] == true && !result.containsKey('verified')) return true;
   }
   return false;
+}
+
+class _TagEditorDiff {
+  final String title;
+  final String artist;
+  final String album;
+  final String genre;
+  final String year;
+  final String trackNumber;
+  final String discNumber;
+  final String comment;
+  final String lyrics;
+  final String? newArtworkPath;
+  final bool removeArtwork;
+  final Uint8List? artworkBytes;
+
+  _TagEditorDiff.fromState(TagEditorState s)
+      : title = s.title,
+        artist = s.artist,
+        album = s.album,
+        genre = s.genre,
+        year = s.year,
+        trackNumber = s.trackNumber,
+        discNumber = s.discNumber,
+        comment = s.comment,
+        lyrics = s.lyrics,
+        newArtworkPath = s.newArtworkPath,
+        removeArtwork = s.removeArtwork,
+        artworkBytes = s.artworkBytes;
+
+  TagEditorState applyTo(TagEditorState s) => s.copyWith(
+        title: title,
+        artist: artist,
+        album: album,
+        genre: genre,
+        year: year,
+        trackNumber: trackNumber,
+        discNumber: discNumber,
+        comment: comment,
+        lyrics: lyrics,
+        newArtworkPath: newArtworkPath,
+        removeArtwork: removeArtwork,
+        artworkBytes: artworkBytes,
+      );
+}
+
+class _TagWriteRejectedException implements Exception {
+  const _TagWriteRejectedException();
+}
+
+class _TagWriteFailedException implements Exception {
+  const _TagWriteFailedException();
 }
 
 class _UnverifiedTagWriteException implements Exception {

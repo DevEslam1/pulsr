@@ -865,6 +865,10 @@
   "@clearQueueConfirm": {
     "description": "max-rate l10n tranche 3"
   },
+  "queueCleared": "Cola borrada",
+  "@queueCleared": {
+    "description": "queue cleared snackbar message"
+  },
   "queueSaved": "Lista guardada",
   "@queueSaved": {
     "description": "max-rate l10n tranche 3"
@@ -2566,7 +2570,7 @@
   "@last7DaysActivity": {
     "description": "tranche8 l10n"
   },
-  "topScrobbledArtists": "Artistas mas escuchados",
+  "topScrobbledArtists": "Artistas más reproducidos",
   "@topScrobbledArtists": {
     "description": "tranche8 l10n"
   },
@@ -3903,5 +3907,9 @@
   "eqUnlockStudioDesc": "Accede a bandas paramétricas 10/32/64, corrección de sala, limitador y espacializador",
   "queueConfirmDelete": "Confirmar eliminación",
   "headsetRestartNotice": "Tiene efecto tras reiniciar la app.",
-  "nowPlayingSwipeHint": "Desliza hacia abajo para cerrar - Desliza la carátula para saltar"
+  "nowPlayingSwipeHint": "Desliza hacia abajo para cerrar - Desliza la carátula para saltar",
+  "vinylDirectDrive": "ESTUDIO • TRACCIÓN DIRECTA",
+  "cassetteSideA": "LADO A • TIPO II (CrO2)",
+  "cassettePulsrTape": "CINTA PULSR",
+  "vinylSpeedRpm": "33⅓ RPM"
 }

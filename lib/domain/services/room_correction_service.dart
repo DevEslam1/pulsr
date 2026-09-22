@@ -1,8 +1,9 @@
-﻿// lib/core/services/room_correction_service.dart
+// lib/core/services/room_correction_service.dart
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:injectable/injectable.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -247,6 +248,35 @@ class RoomCorrectionService {
   /// log-interpolated [gains] at [centers]; linear phase; Hamming-windowed
   /// inverse DFT. Returns mono taps of length [taps] (odd, default 127).
   /// Magnitude-only correction — phase of the room is left untouched.
+  /// Offloads the 512-point FFT & inverse DFT computation to a background isolate via [compute].
+  static Future<Float32List> exportCorrectionImpulseResponseAsync(
+    List<double> gains, {
+    List<double> centers = EqPreset.centerFrequencies,
+    int sampleRate = captureSampleRate,
+    int taps = 127,
+  }) {
+    return compute(_computeCorrectionTask, (
+      gains: gains,
+      centers: centers,
+      sampleRate: sampleRate,
+      taps: taps,
+    ));
+  }
+
+  static Float32List _computeCorrectionTask(({
+    List<double> gains,
+    List<double> centers,
+    int sampleRate,
+    int taps,
+  }) p) {
+    return exportCorrectionImpulseResponse(
+      p.gains,
+      centers: p.centers,
+      sampleRate: p.sampleRate,
+      taps: p.taps,
+    );
+  }
+
   static Float32List exportCorrectionImpulseResponse(
     List<double> gains, {
     List<double> centers = EqPreset.centerFrequencies,

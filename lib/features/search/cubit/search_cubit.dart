@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/bloc/base_cubit.dart';
@@ -47,7 +48,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
   void onQueryChanged(String query) {
     safeEmit(state.copyWith(query: query));
     _debounceTimer?.cancel();
-    _debounceTimer = autoTimer(Timer(const Duration(milliseconds: 250), () {
+    _debounceTimer = autoTimer(Timer(const Duration(milliseconds: 300), () {
       _executeSearch(query);
     }));
   }
@@ -55,7 +56,10 @@ class SearchCubit extends PulsrCubit<SearchState> {
   int _generation = 0;
   List<String>? _cachedExcludedFolders;
   DateTime? _lastExcludedFetch;
-  static const int _historyMax = 10;
+
+  // FIX-L07: Expose historyMax for testing
+  @visibleForTesting
+  static const int historyMax = 10;
 
   /// Single bound applied to the query at every stage of the pipeline.
   /// The FTS query and the fuzzy post-filter MUST use the same length: if the
@@ -76,7 +80,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final existing = prefs.getStringList(_historyKey) ?? List.from(state.history);
-      final updated = [q, ...existing.where((h) => h.toLowerCase() != q.toLowerCase())].take(_historyMax).toList();
+      final updated = [q, ...existing.where((h) => h.toLowerCase() != q.toLowerCase())].take(historyMax).toList();
       await prefs.setStringList(_historyKey, updated);
       if (!isClosed) safeEmit(state.copyWith(history: updated));
     } catch (_) {}
@@ -139,34 +143,46 @@ class SearchCubit extends PulsrCubit<SearchState> {
 
       final excluded = _cachedExcludedFolders ?? const <String>[];
 
+      // FIX-H4: Explicit limit 500 to prevent unbounded query load
       _searchSub = autoSub(
-        _searchUseCase.searchSongs(boundedQuery, excludedFolders: excluded),
+        _searchUseCase.searchSongs(boundedQuery, excludedFolders: excluded, limit: 500),
         (result) async {
           if (generation != _generation || isClosed) return;
           await result.fold(
             (failure) async => safeEmit(state.copyWith(
                 isLoading: false, errorMessage: failure.message)),
             (allResults) async {
-              final q = normalize(query);
+              // B-15: Ensure fuzzy post-filter uses normalize(boundedQuery) to match FTS bounded query
+              final q = normalize(boundedQuery);
               final filter = filterOverride ?? state.selectedFilter;
               var filtered = _filterWithFuzzy(allResults, q, filter);
 
               if (filtered.isEmpty && boundedQuery.length >= 2) {
-                // If strict SQL yielded 0 results (e.g. typos, Arabic normalized variants, or accents),
-                // fallback to evaluating across a bounded subset so fuzzy/Levenshtein can match safely.
+                // FIX-M03: Query by 2-character prefix instead of querying the entire database,
+                // and cap candidate results at 500 to avoid UI/memory starvation.
                 try {
-                  final allSongsRes = await _searchUseCase
-                      .searchSongs('', excludedFolders: excluded)
+                  final prefixRes = await _searchUseCase
+                      .searchSongs(boundedQuery.substring(0, 2), excludedFolders: excluded, limit: 500)
                       .first;
                   if (generation != _generation || isClosed) return;
-                  final allSongs =
-                      allSongsRes.fold((l) => <SongsTableData>[], (r) => r);
-                  // Scan the entire library: fuzzy matching must not miss
-                  // valid typo/variant matches beyond an arbitrary window.
-                  // Levenshtein early-exits on length mismatch, keeping this
-                  // fast even for 10k-row libraries.
-                  filtered = _filterWithFuzzy(allSongs, q, filter);
-                } catch (_) {}
+                  var candidates =
+                      prefixRes.fold((l) => <SongsTableData>[], (r) => r);
+                  if (candidates.length > 500) {
+                    ErrorLogger.log(
+                      'Fuzzy fallback candidate pool capped at 500 (was ${candidates.length})',
+                      category: 'SearchCubit',
+                    );
+                    candidates = candidates.take(500).toList();
+                  }
+                  filtered = _filterWithFuzzy(candidates, q, filter);
+                } catch (e, st) {
+                  ErrorLogger.log(
+                    'Fuzzy fallback search failed',
+                    error: e,
+                    stackTrace: st,
+                    category: 'SearchCubit',
+                  );
+                }
               }
 
               safeEmit(state.copyWith(

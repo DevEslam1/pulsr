@@ -179,12 +179,18 @@ class _DelaySheetState extends State<_DelaySheet> {
                 TextButton(
                   onPressed: () {
                     widget.cubit.setTrackDelayMs(0);
-                    Navigator.of(context).pop();
+                    if (Navigator.of(context).canPop()) {
+                      Navigator.of(context).pop();
+                    }
                   },
                   child: Text(l10n.reset),
                 ),
                 FilledButton(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () {
+                    if (Navigator.of(context).canPop()) {
+                      Navigator.of(context).pop();
+                    }
+                  },
                   child: Text(l10n.done),
                 ),
               ],

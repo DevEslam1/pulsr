@@ -12,7 +12,6 @@ import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
-import '../../../core/widgets/pulsr_dismissible.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/playlist_suggestions_service.dart';
@@ -38,15 +37,14 @@ class QueueScreen extends StatelessWidget {
           leading: const PulsrBackButton(),
           title: Text(context.l10n.queue),
         actions: [
-          BlocBuilder<PlayerCubit, PlayerState>(
-            buildWhen: (prev, curr) =>
-                prev.queue.isEmpty != curr.queue.isEmpty ||
-                prev.queue != curr.queue,
-            builder: (context, state) {
-            if (state.queue.isEmpty) return const SizedBox.shrink();
+          BlocSelector<PlayerCubit, PlayerState, bool>(
+            selector: (state) => state.queue.isEmpty,
+            builder: (context, queueIsEmpty) {
+            if (queueIsEmpty) return const SizedBox.shrink();
             return PopupMenuButton<String>(
               onSelected: (v) async {
                 final cubit = context.read<PlayerCubit>();
+                final playerState = cubit.state;
                 switch (v) {
                   case 'clear':
                     final confirm = await PulsrDialogHelper.showConfirmDialog(
@@ -59,14 +57,14 @@ class QueueScreen extends StatelessWidget {
                     );
                     if (confirm == true && context.mounted) {
                       HapticFeedback.mediumImpact();
-                      final removed = List.of(state.queue);
-                      final removedIndex = state.currentIndex;
+                      final removed = List.of(playerState.queue);
+                      final removedIndex = playerState.currentIndex;
                       await cubit.clearQueue();
                       if (context.mounted) {
                         // Undo for destructive clear (gap 10-03).
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(context.l10n.clearQueueConfirm),
+                            content: Text(context.l10n.queueCleared),
                             action: SnackBarAction(
                               label: context.l10n.undo,
                               onPressed: () {
@@ -87,14 +85,14 @@ class QueueScreen extends StatelessWidget {
                     break;
                   case 'shuffle':
                     HapticFeedback.selectionClick();
-                    final shuffled = List.of(state.queue)..shuffle();
+                    final shuffled = List.of(playerState.queue)..shuffle();
                     // Rebuild queue with shuffled order centered on current
-                    final current = state.currentSong;
+                    final current = playerState.currentSong;
                     if (current != null) await cubit.playSong(current, queue: shuffled);
                     break;
                   case 'autodj':
                     // Auto-DJ: append tracks similar to the current song.
-                    final seed = state.currentSong;
+                    final seed = playerState.currentSong;
                     if (seed == null) break;
                     final songsRes =
                         await getIt<GetSongsUseCase>().getAllSongs();
@@ -108,7 +106,7 @@ class QueueScreen extends StatelessWidget {
                       break;
                     }
                     final exclude =
-                        state.queue.map((s) => s.id).toSet();
+                        playerState.queue.map((s) => s.id).toSet();
                     final dj = getIt<PlaylistSuggestionsService>()
                         .buildAutoDjQueue(seed, all,
                             limit: 10, excludeIds: exclude);
@@ -140,7 +138,7 @@ class QueueScreen extends StatelessWidget {
                       cancelLabel: context.l10n.cancel,
                     );
                     if (name != null && name.isNotEmpty && context.mounted) {
-                      final songIds = state.queue.map((s) => s.id).toList();
+                      final songIds = playerState.queue.map((s) => s.id).toList();
                       final result = await getIt<PlaylistUseCases>().createPlaylist(name);
                       result.fold(
                         (failure) {
@@ -209,65 +207,42 @@ class QueueScreen extends StatelessWidget {
                 ).copyWith(bottom: AppSpacing.scrollBottom),
                 itemCount: queue.length,
                 // ignore: deprecated_member_use — onReorderItem is 3.41+; keep onReorder for stable channel compat
-                onReorder: (oldIdx, newIdx) => context.read<PlayerCubit>().reorderQueue(oldIdx, newIdx),
+                onReorder: (oldIdx, newIdx) {
+                  if (newIdx > oldIdx) newIdx -= 1;
+                  context.read<PlayerCubit>().reorderQueue(oldIdx, newIdx);
+                },
                 itemBuilder: (context, index) {
                   final song = queue[index];
                   final isCurrent = song.id == currentSong?.id;
 
-                  return PulsrDismissible(
+                  return Container(
                     key: ValueKey('${song.id}-$index'),
-                    dismissDirection: DismissDirection.endToStart,
-                    endToStartLabel: context.l10n.delete,
-                    secondaryBackgroundBuilder: (context, isConfirming) => Container(
-                      alignment: AlignmentDirectional.centerEnd,
-                      padding: const EdgeInsetsDirectional.only(end: AppSpacing.s20),
-                      margin: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
-                      decoration: BoxDecoration(
-                        color: p.error.withValues(alpha: isConfirming ? 0.35 : 0.15),
-                        borderRadius: AppRadii.cardRadius,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (isConfirming) ...[
-                            Text(
-                              context.l10n.queueConfirmDelete,
-                              style: TextStyle(
-                                color: p.error,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.xs),
-                          ],
-                          Icon(
-                            isConfirming
-                                ? Icons.delete_forever_rounded
-                                : Icons.delete_rounded,
-                            color: p.error,
-                          ),
-                        ],
-                      ),
-                    ),
-                    onConfirm: (direction) {
-                      context.read<PlayerCubit>().removeQueueItem(index);
-                      return true;
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
-                      child: Material(
-                        color: isCurrent ? p.accentContainer : p.surfaceContainer,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: AppRadii.cardRadius,
-                          side: BorderSide(
-                            color: isCurrent ? p.accent : p.hairline,
-                            width: 1,
-                          ),
+                    margin: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
+                    decoration: BoxDecoration(
+                      borderRadius: AppRadii.cardRadius,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: p.isDark ? 0.12 : 0.04),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
                         ),
-                        child: Semantics(
-                          button: true,
-                          label: '${song.title} by ${song.artist}',
-                          child: ListTile(
-                            leading: CachedArtwork(
+                      ],
+                    ),
+                    child: Material(
+                      clipBehavior: Clip.antiAlias,
+                      color: isCurrent ? p.accentContainer : p.surfaceContainer,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: AppRadii.cardRadius,
+                        side: BorderSide(
+                          color: isCurrent ? p.accent : p.hairline,
+                          width: 1,
+                        ),
+                      ),
+                      child: Semantics(
+                        button: true,
+                        label: '${song.title} by ${song.artist}',
+                        child: ListTile(
+                          leading: CachedArtwork(
                             id: song.id,
                             remoteUrl: song.remoteArtworkUrl,
                             type: ArtworkType.AUDIO,
@@ -292,25 +267,36 @@ class QueueScreen extends StatelessWidget {
                             style:
                                 TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
                           ),
-                          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                            Icon(
-                              isCurrent
-                                  ? Icons.graphic_eq_rounded
-                                  : Icons.music_note_rounded,
-                              color: isCurrent ? p.accent : p.textTertiary,
-                            ),
-                            const SizedBox(width: AppSpacing.xxs),
-                            Semantics(
-                              label: 'Reorder ${song.title}',
-                              child: Icon(Icons.drag_handle_rounded, color: p.textTertiary.withValues(alpha: 0.5), size: 18),
-                            ),
-                          ]),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isCurrent) ...[
+                                Icon(
+                                  Icons.graphic_eq_rounded,
+                                  color: p.accent,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: AppSpacing.xxs),
+                              ],
+                              IconButton(
+                                icon: Icon(Icons.close_rounded, color: p.textTertiary, size: 20),
+                                tooltip: context.l10n.delete,
+                                onPressed: () {
+                                  HapticFeedback.heavyImpact();
+                                  context.read<PlayerCubit>().removeQueueItem(index);
+                                },
+                              ),
+                              Semantics(
+                                label: 'Reorder ${song.title}',
+                                child: Icon(Icons.drag_handle_rounded, color: p.textTertiary.withValues(alpha: 0.5), size: 20),
+                              ),
+                            ],
+                          ),
                           onTap: () {
                             context
                                 .read<PlayerCubit>()
                                 .playSong(song, queue: queue);
                           },
-                          ),
                         ),
                       ),
                     ),

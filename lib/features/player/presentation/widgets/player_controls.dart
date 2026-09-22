@@ -105,7 +105,7 @@ class PlayerControls extends StatelessWidget {
                     Icons.skip_previous_rounded,
                     color: hasPrevious
                         ? p.textPrimary
-                        : p.textSecondary.withValues(alpha: 0.35),
+                        : p.textTertiary.withValues(alpha: 0.3),
                     size: 38,
                   ),
                 ),

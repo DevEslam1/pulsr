@@ -7,6 +7,8 @@ import '../../../../core/services/ytm_cache_manager.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../../../core/widgets/pulsr_dialog.dart';
+import '../../../../core/widgets/pulsr_toast.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -112,12 +114,21 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
             icon: const Icon(Icons.delete_outline_rounded, size: 18),
             label: Text(context.l10n.clear),
             onPressed: () async {
+              final confirmed = await PulsrDialogHelper.showConfirmDialog(
+                context,
+                title: context.l10n.clear,
+                message: context.l10n.confirm,
+                confirmLabel: context.l10n.clear,
+                isDestructive: true,
+              );
+              if (confirmed != true) return;
               await manager.clearAllCache();
               await _refreshCacheSize();
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text(context.l10n.artworkCacheCleared)),
+                PulsrToast.show(
+                  context,
+                  message: context.l10n.artworkCacheCleared,
+                  isSuccess: true,
                 );
               }
             },
@@ -157,14 +168,23 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
               icon: const Icon(Icons.delete_outline_rounded, size: 18),
               label: Text(context.l10n.clear),
               onPressed: () async {
+                final confirmed = await PulsrDialogHelper.showConfirmDialog(
+                  context,
+                  title: context.l10n.clear,
+                  message: context.l10n.confirm,
+                  confirmLabel: context.l10n.clear,
+                  isDestructive: true,
+                );
+                if (confirmed != true) return;
                 final cacheManager = _ytmCacheManager;
                 if (cacheManager == null) return;
                 await cacheManager.clearCache();
                 await _refreshCacheSize();
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        content: Text(context.l10n.streamCacheCleared)),
+                  PulsrToast.show(
+                    context,
+                    message: context.l10n.streamCacheCleared,
+                    isSuccess: true,
                   );
                 }
               },

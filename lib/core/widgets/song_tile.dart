@@ -7,6 +7,8 @@ import '../../data/db/app_database.dart';
 import '../../core/utils/formatters.dart';
 import '../theme/aura_theme.dart';
 import 'cached_artwork.dart';
+import 'gesture_hint_overlay.dart';
+import 'pulsr_pressable.dart';
 import '../../features/player/cubit/player_cubit.dart';
 import '../../features/player/cubit/player_state.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -58,30 +60,36 @@ class SongTile extends StatelessWidget {
                 song.remoteId != null &&
                 song.remoteId!.isNotEmpty));
 
-    return BlocBuilder<PlayerCubit, PlayerState>(
-      buildWhen: (a, b) =>
-          a.currentSong?.id != b.currentSong?.id || a.isPlaying != b.isPlaying,
-      builder: (context, playerState) {
-        final isActive = playerState.currentSong?.id == song.id;
-        final isPlaying = isActive && playerState.isPlaying;
+    return BlocSelector<PlayerCubit, PlayerState, ({bool isActive, bool isPlaying})>(
+      selector: (state) {
+        final isActive = state.currentSong?.id == song.id;
+        return (isActive: isActive, isPlaying: isActive && state.isPlaying);
+      },
+      builder: (context, playback) {
+        final isActive = playback.isActive;
+        final isPlaying = playback.isPlaying;
 
-        return Semantics(
+        final tile = Semantics(
           label: '${song.title} by ${song.artist}',
           button: true,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
-            child: Material(
-              color: backgroundColor ??
-                  (selected
-                      ? p.accentContainer
-                      : (isActive ? p.surfaceContainer : p.surface)),
-              borderRadius: BorderRadius.circular(AppRadii.r16),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
+            child: PulsrPressable(
+              pressedScale: 0.98,
+              onTap: onTap,
+              onLongPress: onLongPress,
+              child: Material(
+                color: backgroundColor ??
+                    (selected
+                        ? p.accentContainer
+                        : (isActive ? p.surfaceContainer : p.surface)),
                 borderRadius: BorderRadius.circular(AppRadii.r16),
-                onTap: onTap,
-                onLongPress: onLongPress,
-                child: Container(
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(AppRadii.r16),
+                  onTap: onTap,
+                  onLongPress: onLongPress,
+                  child: Container(
                   constraints: const BoxConstraints(minHeight: 56),
                   padding:
                       const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
@@ -203,15 +211,17 @@ class SongTile extends StatelessWidget {
                         ),
                       ],
                       if (trailing != null)
-                        trailing!
+                        RepaintBoundary(child: trailing!)
                       else if (onMorePressed != null)
-                          IconButton(
+                        RepaintBoundary(
+                          child: IconButton(
                             icon: Icon(Icons.more_vert_rounded,
                                 size: 20, color: p.textTertiary),
                             tooltip:
                                 MaterialLocalizations.of(context).moreButtonTooltip,
                             onPressed: onMorePressed,
-                          visualDensity: VisualDensity.compact,
+                            visualDensity: VisualDensity.compact,
+                          ),
                         ),
                     ],
                   ),
@@ -219,7 +229,25 @@ class SongTile extends StatelessWidget {
               ),
             ),
           ),
+        ),
         );
+
+        if (index == 0) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const GestureHintOverlay(
+                hintKey: 'song_tile_swipe',
+                message: 'Swipe to play next / favorite',
+                padding: EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
+                icon: Icons.swipe_rounded,
+              ),
+              tile,
+            ],
+          );
+        }
+
+        return tile;
       },
     );
   }

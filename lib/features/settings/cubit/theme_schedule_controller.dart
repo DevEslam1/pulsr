@@ -81,7 +81,10 @@ class ThemeScheduleController {
       ErrorLogger.log('Failed to persist theme schedule hours',
           error: err, stackTrace: st, category: 'ThemeScheduleController');
     }
-    if (_isAutoEnabled()) this.start();
+    if (_isAutoEnabled()) {
+      _scheduler.refresh();
+      this.start();
+    }
   }
 
   /// Loads the persisted dark-hours window into the scheduler singleton so a

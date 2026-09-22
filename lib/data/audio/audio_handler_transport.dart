@@ -339,7 +339,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
 
   @override
   Future<void> setRepeatMode(AudioServiceRepeatMode repeatMode) async {
-    LoopMode loopMode = switch (repeatMode) {
+    final LoopMode loopMode = switch (repeatMode) {
       AudioServiceRepeatMode.none => LoopMode.off,
       AudioServiceRepeatMode.one => LoopMode.one,
       AudioServiceRepeatMode.all ||
@@ -603,7 +603,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
       if (existingIdx == _songs.length - 1) {
         return;
       }
-      await reorderQueue(existingIdx, _songs.length);
+      await reorderQueue(existingIdx, _songs.length - 1);
       return;
     }
 
@@ -726,10 +726,9 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     if (oldIndex < 0 ||
         oldIndex >= _songs.length ||
         newIndex < 0 ||
-        newIndex > _songs.length) {
+        newIndex >= _songs.length) {
       return;
     }
-    if (oldIndex < newIndex) newIndex -= 1;
     if (oldIndex == newIndex) return;
 
     final song = _songs.removeAt(oldIndex);

@@ -29,15 +29,14 @@ class SleepTimerSheet extends StatelessWidget {
     final presets = [15, 30, 45, 60, 90];
     final screenHeight = MediaQuery.sizeOf(context).height;
 
-    return BlocBuilder<PlayerCubit, PlayerState>(
-      buildWhen: (prev, curr) =>
-          prev.sleepTimerRemaining != curr.sleepTimerRemaining,
-      builder: (context, state) {
+    return BlocSelector<PlayerCubit, PlayerState, Duration?>(
+      selector: (state) => state.sleepTimerRemaining,
+      builder: (context, sleepTimerRemaining) {
         final cubit = context.read<PlayerCubit>();
         final remainingTracks = cubit.sleepTimerRemainingTracks;
         final isQueueMode = cubit.isEndOfQueueSleepTimer;
         final timerMode = cubit.sleepTimerMode;
-        final isActive = state.sleepTimerRemaining != null ||
+        final isActive = sleepTimerRemaining != null ||
             remainingTracks != null ||
             isQueueMode;
 
@@ -74,8 +73,13 @@ class SleepTimerSheet extends StatelessWidget {
           child: ConstrainedBox(
             constraints: BoxConstraints(maxHeight: screenHeight * 0.70),
             child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.s10, AppSpacing.s20, AppSpacing.lg),
+              // FIX-M5: Add viewInsets.bottom padding to prevent keyboard obscuring sheet content
+              padding: EdgeInsetsDirectional.fromSTEB(
+                AppSpacing.s20,
+                AppSpacing.s10,
+                AppSpacing.s20,
+                AppSpacing.lg + MediaQuery.viewInsetsOf(context).bottom,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -95,11 +99,8 @@ class SleepTimerSheet extends StatelessWidget {
                                                   .musicWillStopAfterSongs(
                                                       remainingTracks))
                                           : context.l10n.musicWillStopIn(
-                                              state.sleepTimerRemaining!
-                                                  .inMinutes,
-                                              state.sleepTimerRemaining!
-                                                      .inSeconds %
-                                                  60),
+                                              (sleepTimerRemaining?.inMinutes ?? 0),
+                                              (sleepTimerRemaining?.inSeconds ?? 0) % 60),
                                   style: TextStyle(
                                     color: p.accent,
                                     fontWeight: FontWeight.w600,
@@ -132,7 +133,7 @@ class SleepTimerSheet extends StatelessWidget {
                                   // FIX BUG-5: Show as selected when end-of-track
                                   // timer is active so the user has visual feedback.
                                   selected: timerMode == SleepTimerMode.endOfTrack &&
-                                      state.sleepTimerRemaining != null,
+                                      sleepTimerRemaining != null,
                                   onSelected: (_) {
                                     cubit.startEndOfTrackTimer();
                                     Navigator.pop(context);

@@ -55,12 +55,26 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
       );
       if (result != null && result.path != null) {
         final file = File(result.path!);
+        if (!await file.exists()) {
+          throw 'File does not exist';
+        }
+        final length = await file.length();
+        if (length == 0 || length > 2 * 1024 * 1024) {
+          throw 'Invalid file size (must be > 0 and < 2MB)';
+        }
         final bytes = await file.readAsBytes();
+        if (bytes.length < 4) {
+          throw 'File is too short for a valid VDC profile';
+        }
         // Unpack 32-bit floats from binary VDC
         final byteData = ByteData.sublistView(bytes);
         final coeffs = <double>[];
         for (int i = 0; i <= bytes.length - 4; i += 4) {
-          coeffs.add(byteData.getFloat32(i, Endian.little));
+          final val = byteData.getFloat32(i, Endian.little);
+          if (!val.isFinite || val < -10000.0 || val > 10000.0) {
+            throw 'Corrupt DSP coefficients detected';
+          }
+          coeffs.add(val);
         }
 
         if (coeffs.isNotEmpty && context.mounted) {
@@ -207,13 +221,13 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                           ],
                         ),
                       ),
-                      ElevatedButton.icon(
+                      FilledButton.icon(
                         onPressed: () => _pickVdcFile(context),
                         icon: const Icon(Icons.file_open_rounded, size: 16),
                         label: Text(context.l10n.openVdc),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: p.primary,
-                          foregroundColor: Colors.white,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: p.accent,
+                          foregroundColor: p.onAccent,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(AppRadii.r12),
                           ),

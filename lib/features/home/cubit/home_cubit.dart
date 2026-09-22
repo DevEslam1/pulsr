@@ -1,10 +1,10 @@
 // lib/features/home/cubit/home_cubit.dart
 import 'dart:async';
 
-import 'package:flutter_bloc/flutter_bloc.dart';
-
+import '../../../core/bloc/base_cubit.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/services/ytm_service.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../domain/models/ytm_track.dart';
 
 /// Minimal state: [loginEpoch] bumps whenever the account login state flips so
@@ -24,7 +24,7 @@ class HomeState {
 
 /// Owns the Home online-category data fetching and its TTL cache so the UI no
 /// longer calls YTM services directly or manages future maps (I2).
-class HomeCubit extends Cubit<HomeState> {
+class HomeCubit extends PulsrCubit<HomeState> {
   HomeCubit({
     required YtmService ytmService,
     required YtmAccountService accountService,
@@ -40,52 +40,38 @@ class HomeCubit extends Cubit<HomeState> {
   /// Resolved once and reused across rebuilds with a 10-minute TTL.
   static const Duration categoryTtl = Duration(minutes: 10);
 
-  static const Map<String, String> categoryQueries = {
-    'Recommended For You': 'recommended music',
-    'Trending Egypt': 'أغاني مصرية جديدة تريند',
-    'Mahraganat': 'مهرجانات مصرية جديدة',
-    'Arabic Pop': 'أغاني عربي عمرو دياب تامر حسني حماقي',
-    'Global Top Hits': 'global top hits songs',
-    'New Releases': 'new music releases',
-    'Chill & Lo-Fi': 'chill lofi beats',
-    'Pop Mix': 'pop hits playlist',
-    'Hip-Hop': 'arabic hip hop rap ويجز',
-    'Workout Energy': 'workout gym motivation music',
-    'Rock & Metal': 'rock metal playlist',
-    'Acoustic': 'acoustic guitar relax',
+  // FIX-L03: Single source of truth for categories, queries, and login requirements
+  static const List<(String name, String query, bool requiresLogin)> _allCategories = [
+    ('Recommended For You', 'recommended music', true),
+    ('Trending Egypt', 'أغاني مصرية جديدة تريند', false),
+    ('Mahraganat', 'مهرجانات مصرية جديدة', false),
+    ('Arabic Pop', 'أغاني عربي عمرو دياب تامر حسني حماقي', false),
+    ('Global Top Hits', 'global top hits songs', false),
+    ('New Releases', 'new music releases', false),
+    ('Chill & Lo-Fi', 'chill lofi beats', false),
+    ('Pop Mix', 'pop hits playlist', false),
+    ('Hip-Hop', 'arabic hip hop rap ويجز', false),
+    ('Workout Energy', 'workout gym motivation music', false),
+    ('Rock & Metal', 'rock metal playlist', false),
+    ('Acoustic', 'acoustic guitar relax', false),
+  ];
+
+  static final Map<String, String> categoryQueries = {
+    for (final c in _allCategories) c.$1: c.$2,
   };
 
-  static const List<String> _loggedInCategories = [
-    'Recommended For You',
-    'Trending Egypt',
-    'Mahraganat',
-    'Arabic Pop',
-    'Global Top Hits',
-    'New Releases',
-    'Chill & Lo-Fi',
-    'Pop Mix',
-    'Hip-Hop',
-    'Workout Energy',
-    'Rock & Metal',
-    'Acoustic',
-  ];
+  static final List<String> _loggedInCategories =
+      _allCategories.map((c) => c.$1).toList();
 
-  static const List<String> _anonymousCategories = [
-    'Trending Egypt',
-    'Mahraganat',
-    'Arabic Pop',
-    'Global Top Hits',
-    'New Releases',
-    'Chill & Lo-Fi',
-    'Pop Mix',
-    'Hip-Hop',
-    'Workout Energy',
-    'Rock & Metal',
-    'Acoustic',
-  ];
+  static final List<String> _anonymousCategories =
+      _allCategories.where((c) => !c.$3).map((c) => c.$1).toList();
 
   final Map<String, Future<List<YtmTrack>>> _categoryFutures = {};
-  final Map<String, DateTime> _categoryFetchTimestamps = {};
+  // FIX-G3: Monotonic clock for cache TTL calculations
+  static final Stopwatch _monotonicClock = Stopwatch()..start();
+  final Map<String, int> _categoryFetchTimestamps = {};
+  // FIX-H6: Track in-flight categories to prevent TTL eviction while request is pending
+  final Set<String> _inFlightCategories = {};
 
   bool get isLoggedIn => _account.isLoggedIn;
 
@@ -95,7 +81,7 @@ class HomeCubit extends Cubit<HomeState> {
   void _onLoginChanged() {
     clearCache();
     if (isClosed) return;
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
       loginEpoch: state.loginEpoch + 1,
       isLoggedIn: isLoggedIn,
     ));
@@ -103,9 +89,12 @@ class HomeCubit extends Cubit<HomeState> {
 
   /// Returns the cached future for [category], refetching once its TTL lapses.
   Future<List<YtmTrack>> categoryFuture(String category) {
-    final now = DateTime.now();
-    final lastFetch = _categoryFetchTimestamps[category];
-    if (lastFetch != null && now.difference(lastFetch) > categoryTtl) {
+    final nowMs = _monotonicClock.elapsedMilliseconds;
+    final lastFetchMs = _categoryFetchTimestamps[category];
+    // FIX-H6 / FIX-G3: If TTL expired but fetch is still in flight, do not evict to avoid race conditions
+    if (lastFetchMs != null &&
+        (nowMs - lastFetchMs > categoryTtl.inMilliseconds) &&
+        !_inFlightCategories.contains(category)) {
       _categoryFutures.remove(category);
       _categoryFetchTimestamps.remove(category);
     }
@@ -113,7 +102,8 @@ class HomeCubit extends Cubit<HomeState> {
     return _categoryFutures.putIfAbsent(
       category,
       () async {
-        _categoryFetchTimestamps[category] = DateTime.now();
+        _inFlightCategories.add(category);
+        _categoryFetchTimestamps[category] = _monotonicClock.elapsedMilliseconds;
         try {
           if (category == 'Recommended For You') {
             if (_account.isLoggedIn) {
@@ -142,21 +132,28 @@ class HomeCubit extends Cubit<HomeState> {
           }
           final query = categoryQueries[category] ?? '$category songs';
           return await _ytm.searchWithFallback(query, limit: 25);
-        } catch (e) {
+        } catch (e, st) {
           _categoryFutures.remove(category);
           _categoryFetchTimestamps.remove(category);
-          rethrow;
+          // FIX-H05: Return empty list and log error instead of unhandled rethrow in widget FutureBuilder
+          ErrorLogger.log('Failed to fetch home category $category',
+              error: e, stackTrace: st, category: 'HomeCubit');
+          return <YtmTrack>[];
+        } finally {
+          _inFlightCategories.remove(category);
         }
       },
     );
   }
 
   void retryCategory(String category) {
+    _inFlightCategories.remove(category);
     _categoryFutures.remove(category);
     _categoryFetchTimestamps.remove(category);
   }
 
   void clearCache() {
+    _inFlightCategories.clear();
     _categoryFutures.clear();
     _categoryFetchTimestamps.clear();
   }

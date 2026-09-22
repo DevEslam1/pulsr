@@ -147,17 +147,15 @@ class EmptyStateWidget extends StatelessWidget {
             if (primaryActionLabel != null && onPrimaryAction != null) ...[
               const SizedBox(height: AppSpacing.s28),
               SizedBox(
-                height: 46,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: p.accent,
+                height: 48,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: effectiveIconColor == p.error ? p.error : p.accent,
                     foregroundColor: p.onAccent,
                     padding: const EdgeInsets.symmetric(
-
                         horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
                     shape: RoundedRectangleBorder(
                         borderRadius: AppRadii.cardRadius),
-                    elevation: 2,
                   ),
                   onPressed: isPrimaryLoading ? null : onPrimaryAction,
                   child: isPrimaryLoading

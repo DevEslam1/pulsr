@@ -63,13 +63,14 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
     };
     final jsonStr = const JsonEncoder.withIndent('  ').convert(themeData);
     try {
-      await SharePlus.instance.share(
+      final result = await SharePlus.instance.share(
         ShareParams(
           text: jsonStr,
           subject: 'Pulsr Custom Theme',
         ),
       );
       if (!mounted) return;
+      if (result.status == ShareResultStatus.dismissed) return;
       PulsrToast.show(context,
           message: l10n.themeExported, icon: Icons.check_circle_rounded);
     } catch (_) {
@@ -124,8 +125,8 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
             onPressed: () => Navigator.pop(ctx),
             child: Text(context.l10n.cancel, style: TextStyle(color: p.textSecondary)),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
+          FilledButton(
+            style: FilledButton.styleFrom(
               backgroundColor: p.accent,
               foregroundColor: p.onAccent,
               shape: RoundedRectangleBorder(
@@ -139,8 +140,10 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
       ),
     );
 
-    // The dialog's controller is local to this call and must not leak.
-    controller.dispose();
+    // The dialog's controller is local to this call and must not leak; dispose post-frame to ensure modal exit animation finishes.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.dispose();
+    });
 
     if (result != null && result.trim().isNotEmpty && mounted) {
       try {

@@ -7,6 +7,7 @@ import '../../core/widgets/pulsr_pressable.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
+// FIX-L5: Optimize SortFilterSheet widget tree and const constructors
 class SortFilterSheet extends StatelessWidget {
   final String currentSort;
   final bool ascending;

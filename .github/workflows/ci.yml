@@ -46,8 +46,8 @@ jobs:
       - name: Format Check
         run: dart format --output=none --set-exit-if-changed .
 
-      - name: Analyze Code
-        run: flutter analyze
+      - name: Analyze Code (Fatal Infos & Warnings)
+        run: flutter analyze --fatal-infos --fatal-warnings
 
       - name: Flavor Isolation Guard Check
         run: |
@@ -56,6 +56,20 @@ jobs:
 
       - name: Run Audio DSP & Bluetooth Suites
         run: bash scripts/run_audio_suites.sh
+
+      - name: Run Hardening Test Suites
+        run: |
+          flutter test test/concurrency/concurrency_hardening_test.dart
+          flutter test test/architecture/player_controller_decomposition_test.dart
+          flutter test test/property/state_property_test.dart
+          flutter test test/fuzz/parser_fuzz_test.dart
+          flutter test test/perf/rebuild_audit_test.dart
+          flutter test test/errors/app_error_taxonomy_test.dart
+          flutter test test/perf/frame_budget_test.dart
+          flutter test test/lifecycle/disposal_audit_test.dart
+          flutter test test/security/security_hardening_test.dart
+          flutter test test/a11y/accessibility_compliance_test.dart
+          flutter test test/code_hygiene_test.dart
 
       - name: Run Tests with Coverage
         run: flutter test --coverage

@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rxdart/rxdart.dart';
 
 import '../utils/error_logger.dart';
+import '../utils/leak_detector.dart';
 
 /// Transient one-off UI event (toast, banner, haptic, navigation command).
 ///
@@ -31,7 +32,9 @@ class HapticEffect extends UiEffect {
 /// Base cubit that prevents emit-after-close errors and guarantees
 /// automatic disposal of stream subscriptions and timers on close.
 abstract class PulsrCubit<S> extends Cubit<S> {
-  PulsrCubit(super.initialState);
+  PulsrCubit(super.initialState) {
+    LeakDetector.track(this);
+  }
 
   final CompositeSubscription _subs = CompositeSubscription();
   final List<Timer> _timers = [];
@@ -82,8 +85,9 @@ abstract class PulsrCubit<S> extends Cubit<S> {
     void Function()? onDone,
     bool? cancelOnError,
   }) {
+    // FIX-L1: Return safe no-op StreamSubscription if cubit is already closed when autoSub is called
     if (_closed) {
-      return Stream<T>.empty().listen((_) {});
+      return Stream<T>.empty().listen(null);
     }
     final sub = stream.listen(
       (data) {
@@ -169,6 +173,7 @@ abstract class PulsrCubit<S> extends Cubit<S> {
     // the test times out (observed: 10-minute TimeoutException in
     // downloads_tile_test). Closing must never block on the UI tree.
     _closed = true;
+    LeakDetector.untrack(this);
     for (final timer in _timers) {
       timer.cancel();
     }

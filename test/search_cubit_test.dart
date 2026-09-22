@@ -14,7 +14,7 @@ class MockSearchMusicUseCase implements SearchMusicUseCase {
 
   @override
   Stream<Result<List<SongsTableData>>> searchSongs(String query,
-      {List<String> excludedFolders = const []}) {
+      {List<String> excludedFolders = const [], int limit = 50}) {
     return Stream.value(Right(mockSongs));
   }
 }

@@ -227,7 +227,7 @@ class SettingsSwitchTile extends StatelessWidget {
           ),
           trailing: PulsrSwitch(
             value: value,
-            onChanged: isDisabled ? null : onChanged,
+            onChanged: disabledReason != null ? null : onChanged,
           ),
         ),
       ),
@@ -318,3 +318,58 @@ void showAudioFeatureInfoDialog(
     ],
   );
 }
+
+/// A standard card container for settings sections with an optional title header.
+class SettingsSectionCard extends StatelessWidget {
+  final String? title;
+  final Widget child;
+  final EdgeInsetsGeometry? margin;
+  final EdgeInsetsGeometry? padding;
+
+  const SettingsSectionCard({
+    super.key,
+    this.title,
+    required this.child,
+    this.margin,
+    this.padding,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final content = Material(
+      color: p.surfaceContainer,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.r20),
+        side: BorderSide(color: p.hairline),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: padding != null ? Padding(padding: padding!, child: child) : child,
+    );
+
+    if (title == null || title!.isEmpty) {
+      return margin != null ? Padding(padding: margin!, child: content) : content;
+    }
+
+    final column = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s6, 0, 0, AppSpacing.xs),
+          child: Text(
+            title!,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: p.textTertiary,
+                  letterSpacing: AppTracking.medium,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ),
+        content,
+      ],
+    );
+
+    return margin != null ? Padding(padding: margin!, child: column) : column;
+  }
+}
+

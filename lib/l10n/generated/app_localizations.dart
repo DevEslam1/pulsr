@@ -4343,6 +4343,12 @@ abstract class AppLocalizations {
   /// **'Clear queue? (Playing track will be kept)'**
   String get clearQueueConfirm;
 
+  /// queue cleared snackbar message
+  ///
+  /// In en, this message translates to:
+  /// **'Queue cleared'**
+  String get queueCleared;
+
   /// max-rate l10n tranche 3
   ///
   /// In en, this message translates to:
@@ -6740,7 +6746,7 @@ abstract class AppLocalizations {
   /// tranche8 l10n
   ///
   /// In en, this message translates to:
-  /// **'Top Scrobbled Artists'**
+  /// **'Most Played Artists'**
   String get topScrobbledArtists;
 
   /// tranche8 l10n
@@ -11908,6 +11914,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Pull down to close - Swipe art to skip'**
   String get nowPlayingSwipeHint;
+
+  /// No description provided for @vinylDirectDrive.
+  ///
+  /// In en, this message translates to:
+  /// **'STUDIO • DIRECT DRIVE'**
+  String get vinylDirectDrive;
+
+  /// No description provided for @cassetteSideA.
+  ///
+  /// In en, this message translates to:
+  /// **'SIDE A • TYPE II (CrO2)'**
+  String get cassetteSideA;
+
+  /// No description provided for @cassettePulsrTape.
+  ///
+  /// In en, this message translates to:
+  /// **'PULSR TAPE'**
+  String get cassettePulsrTape;
+
+  /// No description provided for @vinylSpeedRpm.
+  ///
+  /// In en, this message translates to:
+  /// **'33⅓ RPM'**
+  String get vinylSpeedRpm;
 }
 
 class _AppLocalizationsDelegate

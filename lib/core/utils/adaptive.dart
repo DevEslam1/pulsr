@@ -1,3 +1,4 @@
+import 'dart:ui' show DisplayFeature, DisplayFeatureType;
 import 'package:flutter/material.dart';
 
 enum WindowClass { compact, medium, expanded }
@@ -34,6 +35,19 @@ abstract class Adaptive {
     final h = heightOf(context);
     return isLandscape(context) || (w >= tabletBreakpoint && w > h);
   }
+
+  /// Returns the display feature corresponding to a foldable hinge / fold if present (D13).
+  static DisplayFeature? hinge(BuildContext context) {
+    for (final feature in MediaQuery.displayFeaturesOf(context)) {
+      if (feature.type == DisplayFeatureType.hinge ||
+          feature.type == DisplayFeatureType.fold) {
+        return feature;
+      }
+    }
+    return null;
+  }
+
+  static bool hasHinge(BuildContext context) => hinge(context) != null;
 
   static bool isTabletPortrait(BuildContext context) =>
       isTablet(context) && !isLandscape(context);
@@ -96,6 +110,10 @@ extension AdaptiveContextX on BuildContext {
   bool get isTabletLandscape => Adaptive.isTabletLandscape(this);
   bool get isLargeTablet => Adaptive.isLargeTablet(this);
   bool get isTwoPane => Adaptive.isTwoPane(this);
+  bool get isTwoPanePlaylist =>
+      Adaptive.widthOf(this) > 840 || Adaptive.isTabletLandscape(this);
+  DisplayFeature? get hinge => Adaptive.hinge(this);
+  bool get hasHinge => Adaptive.hasHinge(this);
   int get trackGridColumns => Adaptive.trackGridColumns(this);
   double get pagePadding => Adaptive.pagePadding(this);
   WindowClass get windowClass => Adaptive.windowOf(this);

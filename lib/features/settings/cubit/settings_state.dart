@@ -189,7 +189,11 @@ abstract class SettingsState with _$SettingsState {
     @Default(false) bool bpmSyncCrossfadeEnabled,
   }) = _SettingsState;
 
-  Color get customAccentColor => Color(customAccentColorValue);
+  // FIX-L3: Cache Color object for customAccentColorValue to avoid re-instantiating on every getter call
+  static final Map<int, Color> _colorCache = {};
+
+  Color get customAccentColor =>
+      _colorCache.putIfAbsent(customAccentColorValue, () => Color(customAccentColorValue));
 
   /// True when the full professional control surface should be shown.
   bool get isProfessional => experienceMode == ExperienceMode.professional;
@@ -209,14 +213,4 @@ abstract class SettingsState with _$SettingsState {
   Duration get audibleLatencyOffset => currentOutputDevice?.isBluetooth == true
       ? Duration(milliseconds: bluetoothLatencyOffsetMs)
       : Duration.zero;
-
-  ProxyConfig get proxyConfig => ProxyConfig(
-        enabled: proxyEnabled,
-        type: proxyType,
-        host: proxyHost,
-        port: proxyPort,
-        username: proxyUsername,
-        password: '',
-        bypassHosts: proxyBypassHosts,
-      );
 }

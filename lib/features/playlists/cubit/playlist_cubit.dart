@@ -214,10 +214,32 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
                 [])
             .map((p) => YtmAccountPlaylist.fromJson(p as Map<String, dynamic>))
             .toList();
-        final customPlaylists = (data['customPlaylists'] as List<dynamic>? ??
-                [])
+        var rawCustomList = (data['customPlaylists'] as List<dynamic>? ?? [])
             .map((p) => OnlinePlaylistEntry.fromJson(p as Map<String, dynamic>))
             .toList();
+        // B-19: Validate loaded custom playlists count <= 10 and tracks per playlist <= 50
+        if (rawCustomList.length > 10) {
+          ErrorLogger.log(
+            'Loaded custom playlists exceeded cap of 10 (${rawCustomList.length}), truncating',
+            category: 'PlaylistCubit',
+          );
+          rawCustomList = rawCustomList.take(10).toList();
+        }
+        final customPlaylists = rawCustomList.map((entry) {
+          if (entry.tracks.length > 50) {
+            ErrorLogger.log(
+              'Playlist "${entry.title}" tracks exceeded cap of 50 (${entry.tracks.length}), truncating',
+              category: 'PlaylistCubit',
+            );
+            return OnlinePlaylistEntry(
+              id: entry.id,
+              title: entry.title,
+              uploader: entry.uploader,
+              tracks: entry.tracks.take(50).toList(),
+            );
+          }
+          return entry;
+        }).toList();
 
         ytmOnline.value = ytmOnline.value.copyWith(
           likedTracks: likedTracks,
@@ -666,6 +688,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
             .removeListener(_onYtmLoginStateChanged);
       } catch (_) {}
     }
+    // FIX-M04: Reset ytmOnline to default before disposal so listeners don't retain stale state
+    ytmOnline.value = const YtmOnlineState();
     ytmOnline.dispose();
     _playlistsSub?.cancel();
     _playlistSongsSub?.cancel();

@@ -101,7 +101,16 @@ class PulsrDialogHelper {
         ),
         FilledButton(
           onPressed: () {
-            HapticFeedback.lightImpact();
+            if (isDestructive) {
+              if (confirmLabel.toLowerCase().contains('delete') ||
+                  title.toLowerCase().contains('delete')) {
+                HapticFeedback.heavyImpact();
+              } else {
+                HapticFeedback.mediumImpact();
+              }
+            } else {
+              HapticFeedback.selectionClick();
+            }
             Navigator.of(context, rootNavigator: true).pop(true);
           },
           style: FilledButton.styleFrom(

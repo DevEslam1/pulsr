@@ -6,6 +6,7 @@ import '../../../core/errors/error_message_resolver.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
+import '../../../core/widgets/pulsr_modal_tracker.dart';
 import '../../../core/widgets/pulsr_toast.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../player/cubit/player_state.dart';
@@ -26,12 +27,17 @@ class _AppShellState extends State<AppShell> {
   bool _isSideInspectorOpen = false;
   bool? _isSidebarExtended;
   DockStackMode _dockMode = DockStackMode.defaultLayout;
+  // FIX-H9: Cap tab history at 50 entries to prevent memory leak
+  static const int _maxTabHistory = 50;
   final List<int> _tabHistory = [0];
   DateTime? _lastBackPressTime;
 
   void _onTapNav(int index) {
     if (_tabHistory.isEmpty || _tabHistory.last != index) {
       _tabHistory.add(index);
+      if (_tabHistory.length > _maxTabHistory) {
+        _tabHistory.removeRange(0, _tabHistory.length - _maxTabHistory);
+      }
     }
     widget.navigationShell.goBranch(
       index,
@@ -80,6 +86,10 @@ class _AppShellState extends State<AppShell> {
 
           // 1. If any dialog, bottom sheet, or modal route is open on the root navigator, pop it first:
           final rootNav = rootNavigatorKey.currentState;
+          if (PulsrModalTracker.isModalOpen.value && rootNav != null && rootNav.canPop()) {
+            rootNav.pop();
+            return;
+          }
           if (rootNav != null && rootNav.canPop()) {
             rootNav.pop();
             return;
@@ -113,7 +123,7 @@ class _AppShellState extends State<AppShell> {
           final now = DateTime.now();
           if (_lastBackPressTime == null ||
               now.difference(_lastBackPressTime!) >
-                  const Duration(seconds: 2)) {
+                  const Duration(seconds: 3)) {
             _lastBackPressTime = now;
             PulsrToast.show(
               context,

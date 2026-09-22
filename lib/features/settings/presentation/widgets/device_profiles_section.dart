@@ -9,6 +9,7 @@ import '../../../../l10n/generated/app_localizations.dart';
 import '../../../../core/services/hires_audio_service.dart';
 import '../../../../core/services/settings_profiles_service.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
+import '../../../../core/widgets/shimmer_skeleton.dart';
 import '../../../player/cubit/player_cubit.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 
@@ -158,7 +159,7 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
     if (_loading) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
-        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        child: SkeletonList(itemCount: 3),
       );
     }
     return Column(

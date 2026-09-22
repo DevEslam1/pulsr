@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart'
     show
         AlertDialog,
@@ -14,6 +15,7 @@ import 'package:flutter/material.dart'
         WidgetsBinding,
         showDialog;
 import 'package:injectable/injectable.dart';
+import 'package:mutex/mutex.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -65,9 +67,12 @@ import '../../../domain/models/audio_output_info.dart';
 import '../../../domain/models/quran_mode_profile.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../widgets/widget_service.dart';
+import 'player_dependencies.dart';
 import 'player_state.dart';
 import 'player_scrobble_coordinator.dart';
 import 'player_widget_coordinator.dart';
+import 'controllers/player_controllers.dart';
+import 'managers/player_managers.dart';
 import 'quran_restore_snapshot.dart';
 import 'queue_slot_codec.dart';
 part 'player_queue_mixin.dart';
@@ -75,18 +80,16 @@ part 'player_transport_mixin.dart';
 part 'player_dsp_mixin.dart';
 part 'player_playback_options_mixin.dart';
 
-class _QueueSlotData {
-  final List<SongsTableData> songs;
-  final int currentIndex;
-  final Duration position;
-  final double speed;
+typedef _QueueSlotData = QueueSlotData;
 
-  const _QueueSlotData({
-    required this.songs,
-    required this.currentIndex,
-    required this.position,
-    this.speed = 1.0,
-  });
+String _encodeQueueSlotsSync(Map<String, dynamic> data) {
+  final activeSlot = data['activeSlot'] as int;
+  final slots = data['slots'] as Map<dynamic, dynamic>;
+  final doc = <String, dynamic>{
+    'activeSlot': activeSlot,
+    for (final e in slots.entries) e.key.toString(): e.value,
+  };
+  return jsonEncode(doc);
 }
 
 @singleton
@@ -139,6 +142,13 @@ class PlayerCubit extends PulsrCubit<PlayerState>
 
   SponsorBlockService get _sponsorBlock => _sponsorBlockService;
 
+  // FIX-A1: Composed controllers decomposing PlayerCubit
+  late final PlayerTransportController transportController;
+  late final PlayerQueueController queueController;
+  late final PlayerDspController dspController;
+  late final PlayerMetadataController metadataController;
+  late final PlayerWidgetBridge widgetBridge;
+
   StreamSubscription<void>? _widgetClickSub;
   DateTime? _lastSlotPersistAt;
   PlayerWidgetCoordinator? _widgetCoordinator;
@@ -152,7 +162,12 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         isClosed: () => isClosed,
         interval: _scrobbleInterval,
       );
+  // FIX-C02: Separate generation counters for onTrackChanged and mediaItem listeners
+  int _trackChangedGen = 0;
+  int _mediaItemGen = 0;
   int _mediaItemResolutionGen = 0;
+  // FIX-C09: Completer to serialize per-track sync operations
+  Completer<void>? _perTrackSyncCompleter;
   int _localMatchSwapGen = 0;
   int _perTrackSyncGen = 0;
   int _followSampleRateGen = 0;
@@ -195,6 +210,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   /// the window and re-runs the reset.
   int? _lastPerTrackSyncSongId;
   DateTime? _lastPerTrackSyncAt;
+  // FIX-M09: Track position at last per-track sync to detect backward jumps/restarts
+  Duration? _lastPerTrackSyncPosition;
 
   /// Guards playbackState echoes against optimistic UI:
   /// - a transient loading/buffering `playing:false` must not regress an
@@ -221,20 +238,55 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   int _queueVersion = 0;
 
   @override
+  final Map<int, SongsTableData> _slotLookupCache = {};
+
+  // FIX-G2: Single-writer mutex for queue slots and slot lookup cache
+  @override
+  final Mutex _queueMutex = Mutex();
+
+  @override
   final Map<int, _QueueSlotData> _queueSlots = {
     0: const _QueueSlotData(
-        songs: [], currentIndex: 0, position: Duration.zero, speed: 1.0),
+        songIds: [], currentIndex: 0, position: Duration.zero, speed: 1.0),
     1: const _QueueSlotData(
-        songs: [], currentIndex: 0, position: Duration.zero, speed: 1.0),
+        songIds: [], currentIndex: 0, position: Duration.zero, speed: 1.0),
     2: const _QueueSlotData(
-        songs: [], currentIndex: 0, position: Duration.zero, speed: 1.0),
+        songIds: [], currentIndex: 0, position: Duration.zero, speed: 1.0),
   };
   bool _queueRestorationDone = false;
 
+  @override
+  void _setQueueSlot(
+    int slot, {
+    required List<SongsTableData> songs,
+    required int currentIndex,
+    required Duration position,
+    required double speed,
+  }) {
+    for (final s in songs) {
+      _slotLookupCache[s.id] = s;
+    }
+    if (_slotLookupCache.length > 1500) {
+      final activeIds = <int>{
+        for (final slotData in _queueSlots.values) ...slotData.songIds,
+        for (final s in state.queue) s.id,
+      };
+      _slotLookupCache.removeWhere((id, _) => !activeIds.contains(id));
+    }
+    _queueSlots[slot] = _QueueSlotData(
+      songIds: songs.map((s) => s.id).toList(),
+      currentIndex: currentIndex,
+      position: position,
+      speed: speed,
+    );
+  }
+
+  // FIX-A03: PlayerDependencies bundles optional auxiliary services for PlayerCubit
   PlayerCubit({
     required PulsrAudioHandler audioHandler,
     required IMusicRepository repository,
     required ToggleFavoriteUseCase toggleFavoriteUseCase,
+    PlayerDependencies? dependencies,
     SettingsCubit? settingsCubit,
     WidgetService? widgetService,
     ScrobblerService? scrobblerService,
@@ -255,62 +307,76 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   })  : _audioHandler = audioHandler,
         _repository = repository,
         _toggleFavoriteUseCase = toggleFavoriteUseCase,
-        _settingsCubit = settingsCubit,
-        _widgetService = widgetService,
-        _scrobblerService = scrobblerService,
-        _settingsProfilesService = settingsProfilesService ??
+        _settingsCubit = dependencies?.settingsCubit ?? settingsCubit,
+        _widgetService = dependencies?.widgetService ?? widgetService,
+        _scrobblerService = dependencies?.scrobblerService ?? scrobblerService,
+        _settingsProfilesService = dependencies?.settingsProfilesService ??
+            settingsProfilesService ??
             (getIt.isRegistered<SettingsProfilesService>()
                 ? getIt<SettingsProfilesService>()
                 : null),
-        _deviceProfileService = deviceProfileService ??
+        _deviceProfileService = dependencies?.deviceProfileService ??
+            deviceProfileService ??
             (getIt.isRegistered<DeviceProfileService>()
                 ? getIt<DeviceProfileService>()
                 : null),
-        _hiResAudioService = hiResAudioService ??
+        _hiResAudioService = dependencies?.hiResAudioService ??
+            hiResAudioService ??
             (getIt.isRegistered<HiResAudioService>()
                 ? getIt<HiResAudioService>()
                 : null),
-        _smartAudioService = smartAudioService ??
+        _smartAudioService = dependencies?.smartAudioService ??
+            smartAudioService ??
             (getIt.isRegistered<SmartAudioService>()
                 ? getIt<SmartAudioService>()
                 : SmartAudioService()),
-        _latencyTracker = latencyTracker ??
+        _latencyTracker = dependencies?.latencyTracker ??
+            latencyTracker ??
             (getIt.isRegistered<PlaybackLatencyTracker>()
                 ? getIt<PlaybackLatencyTracker>()
                 : null),
-        _perSongEqStore = perSongEqStore ??
+        _perSongEqStore = dependencies?.perSongEqStore ??
+            perSongEqStore ??
             (getIt.isRegistered<PerSongEqStore>()
                 ? getIt<PerSongEqStore>()
                 : PerSongEqStore()),
-        _perSongVolumeStore = perSongVolumeStore ??
+        _perSongVolumeStore = dependencies?.perSongVolumeStore ??
+            perSongVolumeStore ??
             (getIt.isRegistered<PerSongVolumeStore>()
                 ? getIt<PerSongVolumeStore>()
                 : PerSongVolumeStore()),
-        _songRatingStore = songRatingStore ??
+        _songRatingStore = dependencies?.songRatingStore ??
+            songRatingStore ??
             (getIt.isRegistered<SongRatingStore>()
                 ? getIt<SongRatingStore>()
                 : SongRatingStore()),
-        _sponsorBlockService = sponsorBlockService ??
+        _sponsorBlockService = dependencies?.sponsorBlockService ??
+            sponsorBlockService ??
             (getIt.isRegistered<SponsorBlockService>()
                 ? getIt<SponsorBlockService>()
                 : SponsorBlockService.instance),
-        _quranModeService = quranModeService ??
+        _quranModeService = dependencies?.quranModeService ??
+            quranModeService ??
             (getIt.isRegistered<QuranModeService>()
                 ? getIt<QuranModeService>()
                 : null),
-        _earbudOptimizationService = earbudOptimizationService ??
+        _earbudOptimizationService = dependencies?.earbudOptimizationService ??
+            earbudOptimizationService ??
             (getIt.isRegistered<EarbudOptimizationService>()
                 ? getIt<EarbudOptimizationService>()
                 : null),
-        _lrclibService = lrclibService ??
+        _lrclibService = dependencies?.lrclibService ??
+            lrclibService ??
             (getIt.isRegistered<LrclibService>()
                 ? getIt<LrclibService>()
                 : null),
-        _ytmAccountService = ytmAccountService ??
+        _ytmAccountService = dependencies?.ytmAccountService ??
+            ytmAccountService ??
             (getIt.isRegistered<YtmAccountService>()
                 ? getIt<YtmAccountService>()
                 : null),
-        _mediaScannerService = mediaScannerService ??
+        _mediaScannerService = dependencies?.mediaScannerService ??
+            mediaScannerService ??
             (getIt.isRegistered<MediaScannerService>()
                 ? getIt<MediaScannerService>()
                 : null),
@@ -362,6 +428,55 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     _restoreQueueSlots();
     _startDeviceProfileWatcher();
     _updateWidgetThrottled(force: true);
+
+    // FIX-A1: Initialize decomposed controllers
+    transportController = PlayerTransportController(
+      audioHandler: _audioHandler,
+      getState: () => state,
+      emit: safeEmit,
+      isClosed: () => isClosed,
+    );
+    queueController = PlayerQueueController(
+      audioHandler: _audioHandler,
+      getState: () => state,
+      emit: safeEmit,
+      isClosed: () => isClosed,
+      queueMutex: _queueMutex,
+      slotLookupCache: _slotLookupCache,
+      queueSlots: _queueSlots,
+      updateWidgetThrottled: ({bool force = false}) => _updateWidgetThrottled(force: force),
+      loadLyrics: (song) => unawaited(_loadLyricsForSong(song)),
+      debouncedPersistQueueSlots: _debouncedPersistQueueSlots,
+      bumpQueueVersion: () => _queueVersion++,
+      isSameTrack: (a, b) => _isSameTrack(a, b),
+    );
+    dspController = PlayerDspController(
+      audioHandler: _audioHandler,
+      settingsCubit: _settingsCubit,
+      getState: () => state,
+      emit: safeEmit,
+    );
+    metadataController = PlayerMetadataController(
+      lyricsManager: PlayerLyricsManager(
+        lrclibService: _lrclibService,
+        ytmAccountService: _ytmAccountService,
+      ),
+      sponsorBlockManager: PlayerSponsorBlockManager(
+        service: _sponsorBlockService,
+      ),
+      repository: _repository,
+      getState: () => state,
+      emit: safeEmit,
+      isClosed: () => isClosed,
+      isSameTrack: (a, b) => _isSameTrack(a, b),
+    );
+    widgetBridge = PlayerWidgetBridge(
+      widgetService: _widgetService,
+      scrobblerService: () => _scrobblerService,
+      latencyTracker: _latencyTracker,
+      isQuranMode: () => state.isQuranModeEnabled,
+      isClosed: () => isClosed,
+    );
   }
 
   @override
@@ -487,9 +602,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       _lastFollowedSampleRate = rate;
       await _settingsCubit?.refreshOutputDevice();
     } catch (e, st) {
-      if (_lastFollowedSampleRate == rate) {
-        _lastFollowedSampleRate = null;
-      }
+      // FIX-M01: Unconditionally reset followed sample rate on failure so next track retries cleanly
+      _lastFollowedSampleRate = null;
       ErrorLogger.log('Follow-track sample rate failed ($rate)',
           error: e, stackTrace: st, category: 'PlayerCubit');
     }
@@ -517,21 +631,37 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     if (!force && isClosed) return;
     try {
       final prefs = await SharedPreferences.getInstance();
-      // JSON mapping lives in QueueSlotCodec (god-object split); only the
-      // prefs write and error surfacing remain here.
-      final data = QueueSlotCodec.encodeDocument(
-        {
-          for (final entry in _queueSlots.entries)
-            entry.key: (
-              songs: entry.value.songs,
-              currentIndex: entry.value.currentIndex,
-              position: entry.value.position,
-              speed: entry.value.speed,
-            ),
-        },
-        state.activeQueueSlot,
-      );
-      final encoded = await compute(jsonEncode, data);
+      // B-29: Build map and json-encode in background isolate via compute
+      final rawSlotPayload = {
+        for (final entry in _queueSlots.entries)
+          entry.key.toString(): {
+            'songIds': entry.value.songIds,
+            'currentIndex': entry.value.currentIndex,
+            'positionMs': entry.value.position.inMilliseconds,
+            'speed': entry.value.speed,
+            'onlineSongs': entry.value.songIds
+                .map((id) => _slotLookupCache[id])
+                .whereType<SongsTableData>()
+                .where((s) => s.source == SongSource.youtube || s.id < 0)
+                .map((s) => {
+                      'id': s.id,
+                      'title': s.title,
+                      'artist': s.artist,
+                      'album': s.album,
+                      'durationMs': s.durationMs,
+                      'path': s.path,
+                      'source': s.source,
+                      'remoteId': s.remoteId,
+                      'remoteArtworkUrl': s.remoteArtworkUrl,
+                      'isFavorite': s.isFavorite,
+                    })
+                .toList(),
+          },
+      };
+      final encoded = await compute(_encodeQueueSlotsSync, {
+        'slots': rawSlotPayload,
+        'activeSlot': state.activeQueueSlot,
+      });
       await prefs.setString(PrefsKeys.queueSlots, encoded);
     } catch (e, st) {
       ErrorLogger.log('Failed to persist queue slots',
@@ -569,11 +699,13 @@ class PlayerCubit extends PulsrCubit<PlayerState>
               in songsResult.fold((_) => <SongsTableData>[], (r) => r))
             s.id: s
         };
+        _slotLookupCache.addAll(songsMap);
+        _slotLookupCache.addAll(decoded.onlineSongsById);
         final songs = QueueSlotCodec.mergeInPersistedOrder(
             decoded.songIds, songsMap, decoded.onlineSongsById);
         if (songs.isEmpty) continue;
         _queueSlots[slotIndex] = _QueueSlotData(
-          songs: songs,
+          songIds: songs.map((s) => s.id).toList(),
           currentIndex: QueueSlotCodec.clampCurrentIndex(
               decoded.currentIndex, songs.length),
           position: QueueSlotCodec.clampPosition(decoded.positionMs),
@@ -763,7 +895,9 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   void _listenToAudioService() {
     autoSub(_audioHandler.onTrackChanged, (song) {
       if (isClosed) return;
-      final gen = ++_mediaItemResolutionGen;
+      // FIX-C02: Use dedicated _trackChangedGen for track-change listener
+      final trackGen = ++_trackChangedGen;
+      final mediaGen = _mediaItemGen;
       final songQueueIndex =
           state.queue.indexWhere((s) => _isSameTrack(s, song));
       final effectiveIndex =
@@ -788,24 +922,36 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       );
 
       if (!isSameSong) {
-        unawaited(_loadLyricsForSong(song));
-        unawaited(_enrichAudioQuality(song, gen));
-        // Gapless advances fire onTrackChanged without a fresh mediaItem;
-        // without this the previous track's SponsorBlock segments stay armed.
-        unawaited(_loadSponsorBlockSegments(song, gen));
-        unawaited(_loadCueChapters(song));
-        unawaited(_maybeFollowTrackSampleRate(song));
+        // FIX-G1: Wrap background enrichment tasks in Future.wait for unified execution & atomic cancellation
+        unawaited(
+          Future.wait([
+            _loadLyricsForSong(song, trackGen: trackGen, mediaGen: mediaGen),
+            _enrichAudioQuality(song, trackGen: trackGen, mediaGen: mediaGen),
+            _loadSponsorBlockSegments(song, trackGen: trackGen, mediaGen: mediaGen),
+            _loadCueChapters(song),
+          ]),
+          // reason: Background track metadata enrichment runs concurrently with playback
+        );
+        unawaited(
+          _maybeFollowTrackSampleRate(song),
+          // reason: Hardware audio output sample rate adjustment
+        );
       }
       _updateWidgetThrottled(force: true);
       _debouncedScrobble(song, state.position, state.isPlaying);
       if (!isSameSong) {
-        unawaited(_syncPerTrackState(song));
+        unawaited(
+          _syncPerTrackState(song),
+          // reason: Restore per-track audio effects and bookmarks
+        );
       }
     });
 
     autoSub(_audioHandler.mediaItem, (item) async {
       if (item != null) {
-        final gen = ++_mediaItemResolutionGen;
+        // FIX-C02: Use dedicated _mediaItemGen for mediaItem listener
+        final mediaGen = ++_mediaItemGen;
+        final trackGen = _trackChangedGen;
         final id = int.tryParse(item.id);
         if (id != null) {
           SongsTableData? resolvedSong;
@@ -815,10 +961,10 @@ class PlayerCubit extends PulsrCubit<PlayerState>
               : state.queue.where((s) => s.id == id).firstOrNull;
           if (resolvedSong == null) {
             final songResult = await _repository.getSongById(id);
-            if (gen != _mediaItemResolutionGen || isClosed) return;
+            if (mediaGen != _mediaItemGen || isClosed) return;
             songResult.fold((_) => null, (song) => resolvedSong = song);
           }
-          if (gen != _mediaItemResolutionGen || isClosed) return;
+          if (mediaGen != _mediaItemGen || isClosed) return;
 
           // Final fallback — construct from MediaItem extras
           if (resolvedSong == null && item.id.isNotEmpty) {
@@ -842,7 +988,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
           }
 
           if (resolvedSong != null) {
-            if (gen != _mediaItemResolutionGen || isClosed) return;
+            if (mediaGen != _mediaItemGen || isClosed) return;
             final isSameSong = _isSameTrack(state.currentSong, resolvedSong);
             final duration =
                 (item.duration != null && item.duration! > Duration.zero)
@@ -869,17 +1015,29 @@ class PlayerCubit extends PulsrCubit<PlayerState>
               ),
             );
 
-            if (gen != _mediaItemResolutionGen || isClosed) return;
+            if (mediaGen != _mediaItemGen || isClosed) return;
 
             if (!isSameSong) {
-              unawaited(_loadLyricsForSong(resolvedSong!));
-              unawaited(_enrichAudioQuality(resolvedSong!, gen));
-              unawaited(_loadSponsorBlockSegments(resolvedSong!, gen));
-              unawaited(_loadCueChapters(resolvedSong!));
-              unawaited(_maybeFollowTrackSampleRate(resolvedSong!));
-              unawaited(_syncPerTrackState(resolvedSong!));
+              // FIX-G1: Wrap background enrichment tasks in Future.wait for atomic execution
+              unawaited(
+                Future.wait([
+                  _loadLyricsForSong(resolvedSong!, trackGen: trackGen, mediaGen: mediaGen),
+                  _enrichAudioQuality(resolvedSong!, trackGen: trackGen, mediaGen: mediaGen),
+                  _loadSponsorBlockSegments(resolvedSong!, trackGen: trackGen, mediaGen: mediaGen),
+                  _loadCueChapters(resolvedSong!),
+                ]),
+                // reason: MediaItem-driven metadata enrichment runs concurrently with playback
+              );
+              unawaited(
+                _maybeFollowTrackSampleRate(resolvedSong!),
+                // reason: Hardware audio output sample rate adjustment
+              );
+              unawaited(
+                _syncPerTrackState(resolvedSong!),
+                // reason: Per-track state sync for resolved song
+              );
             }
-            if (gen != _mediaItemResolutionGen || isClosed) return;
+            if (mediaGen != _mediaItemGen || isClosed) return;
             _updateWidgetThrottled(force: true);
             _debouncedScrobble(resolvedSong!, state.position, state.isPlaying);
           }
@@ -1084,7 +1242,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
           // Keep the active slot's restore position near-live. It used to be
           // written only at queue-mutation time, so an app kill mid-song
           // resumed from the last mutation's position (often 0:00).
-          _queueSlots[state.activeQueueSlot] = _QueueSlotData(
+          _setQueueSlot(
+            state.activeQueueSlot,
             songs: state.queue,
             currentIndex: state.currentIndex,
             position: effectivePos,
@@ -1114,9 +1273,20 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     });
   }
 
-  Future<void> _loadSponsorBlockSegments(SongsTableData song, int gen) async {
-    // F-67: respect the persisted enable flag; the service loads it lazily.
-    await _sponsorBlock.loadPreferences();
+  Future<void> _loadSponsorBlockSegments(
+    SongsTableData song, {
+    int? gen,
+    int? trackGen,
+    int? mediaGen,
+  }) async {
+    // FIX-C04: Respect persisted enable flag after loadPreferences succeeds, without wiping existing segments on throw
+    try {
+      await _sponsorBlock.loadPreferences();
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load SponsorBlock preferences',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+      return;
+    }
     if (!_sponsorBlock.isEnabled) {
       _currentSponsorSegments = const [];
       _sponsorSegmentsVideoId = null;
@@ -1145,11 +1315,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         _currentSponsorSegments.isNotEmpty) {
       return;
     }
-    // Clear synchronously BEFORE any await. The mediaItem and onTrackChanged
-    // listeners share _mediaItemResolutionGen, so whichever fires last on a
-    // track change invalidates this fetch; without this clear, the aborted
-    // fetch left the previous song's segments armed and the skip checker
-    // seeked the new song to positions meaningless for it.
+    // Clear synchronously BEFORE any await.
     _currentSponsorSegments = const [];
     _sponsorSegmentsVideoId = null;
     _lastSkippedSegmentEnd = null;
@@ -1157,11 +1323,20 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     try {
       final service = _sponsorBlock;
       final segments = await service.getSegments(videoId);
-      if (isClosed || gen != _mediaItemResolutionGen) return;
+      // FIX-C02: Verify both listener generations
+      if (isClosed) return;
+      if (trackGen != null && trackGen != _trackChangedGen) return;
+      if (mediaGen != null && mediaGen != _mediaItemGen) return;
+      if (gen != null && gen != _mediaItemResolutionGen) return;
+
       _currentSponsorSegments = segments;
       _sponsorSegmentsVideoId = videoId;
       _lastSkippedSegmentEnd = null;
-    } catch (_) {}
+    } catch (e, st) {
+      // FIX-A05: Log SponsorBlock segment fetch failure
+      ErrorLogger.log('Failed to fetch SponsorBlock segments for $videoId',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+    }
   }
 
   /// Loads the chapter list for a song expanded from a CUE sheet, so the
@@ -1216,17 +1391,30 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     _lastSkippedSegmentEnd = target;
     _lastSponsorSkipTime = now;
     debugPrint('[SPONSORBLOCK] Auto-skipping segment: $pos -> $seekTarget');
-    _audioHandler.seek(seekTarget);
-    // Optimistic position update: the throttled position stream would
-    // otherwise keep reporting in-segment positions for up to 200ms.
-    safeEmit(state.copyWith(position: seekTarget));
+    // FIX-C03: Handle seek failure to prevent UI/audio desync
+    _audioHandler.seek(seekTarget).then((_) {
+      if (!isClosed) {
+        safeEmit(state.copyWith(position: seekTarget));
+      }
+    }).catchError((e, st) {
+      if (!isClosed) {
+        safeEmit(state.copyWith(position: pos));
+      }
+      ErrorLogger.log('SponsorBlock seek failed',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+    });
     return true;
   }
 
   /// Reads real audio-header fields for a local song the first time it plays
   /// and caches them, so the quality badge shows actual metadata. Cheap: runs
   /// once per file (skips songs already enriched) and only for local files.
-  Future<void> _enrichAudioQuality(SongsTableData song, int gen) async {
+  Future<void> _enrichAudioQuality(
+    SongsTableData song, {
+    int? gen,
+    int? trackGen,
+    int? mediaGen,
+  }) async {
     if (song.source != SongSource.local) return;
     if (song.codec != null) return;
     final path = song.path;
@@ -1239,12 +1427,19 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     if (scanner == null) return;
     try {
       await scanner.enrichAudioQuality(song.id, path);
-      if (isClosed || gen != _mediaItemResolutionGen) return;
+      // FIX-C02: Check both listener generation counters
+      if (isClosed) return;
+      if (trackGen != null && trackGen != _trackChangedGen) return;
+      if (mediaGen != null && mediaGen != _mediaItemGen) return;
+      if (gen != null && gen != _mediaItemResolutionGen) return;
+
       final refreshed = await _repository.getSongById(song.id);
       final updated = refreshed.fold((_) => null, (s) => s);
       if (updated != null &&
           !isClosed &&
-          gen == _mediaItemResolutionGen &&
+          (trackGen == null || trackGen == _trackChangedGen) &&
+          (mediaGen == null || mediaGen == _mediaItemGen) &&
+          (gen == null || gen == _mediaItemResolutionGen) &&
           _isSameTrack(state.currentSong, updated)) {
         final updatedQueue = state.queue
             .map((s) => _isSameTrack(s, updated) ? updated : s)
@@ -1254,7 +1449,11 @@ class PlayerCubit extends PulsrCubit<PlayerState>
           queue: updatedQueue,
         ));
       }
-    } catch (_) {}
+    } catch (e, st) {
+      // FIX-A05: Log audio quality enrichment failure
+      ErrorLogger.log('Failed to enrich audio quality for song ${song.id}',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+    }
   }
 
   /// Monotonic loader generation: only the most recently started lyrics load
@@ -1263,25 +1462,36 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   int _lyricsLoadGen = 0;
 
   @override
-  Future<void> _loadLyricsForSong(SongsTableData song) async {
+  Future<void> _loadLyricsForSong(
+    SongsTableData song, {
+    int? trackGen,
+    int? mediaGen,
+  }) async {
     if (isClosed || !_isSameTrack(state.currentSong, song)) return;
+    // FIX-C02: Generation check for caller
+    if (trackGen != null && trackGen != _trackChangedGen) return;
+    if (mediaGen != null && mediaGen != _mediaItemGen) return;
 
     // Check central in-memory cache first, including a valid negative entry
-    // (a recently-proven miss) so a local track with no lyrics does not re-run
-    // embedded reads plus a 5s LRCLIB round-trip on every play. `refreshLyrics`
-    // invalidates explicitly; the negative-cache TTL bounds the rest.
     if (LrcParser.hasCachedLyrics(songId: song.id, path: song.path)) {
       final cached =
           LrcParser.getCachedLyrics(songId: song.id, path: song.path);
-      if (_isSameTrack(state.currentSong, song)) {
-        ++_lyricsLoadGen;
-        safeEmit(state.copyWith(
-          isLoadingLyrics: false,
-          lyrics: cached?.lines ?? const [],
-          lyricsSource: cached?.source ?? LyricsSource.none,
-        ));
+      // FIX-H02: Negative cache TTL verification (10 minutes)
+      final cacheTs = LrcParser.getCacheTimestamp(songId: song.id, path: song.path);
+      final isNegative = cached == null;
+      final isFresh = cacheTs == null ||
+          DateTime.now().difference(cacheTs) <= const Duration(minutes: 10);
+      if (!isNegative || isFresh) {
+        if (_isSameTrack(state.currentSong, song)) {
+          ++_lyricsLoadGen;
+          safeEmit(state.copyWith(
+            isLoadingLyrics: false,
+            lyrics: cached?.lines ?? const [],
+            lyricsSource: cached?.source ?? LyricsSource.none,
+          ));
+        }
+        return;
       }
-      return;
     }
 
     final gen = ++_lyricsLoadGen;
@@ -1312,6 +1522,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
 
       if (isClosed ||
           gen != _lyricsLoadGen ||
+          (trackGen != null && trackGen != _trackChangedGen) ||
+          (mediaGen != null && mediaGen != _mediaItemGen) ||
           !_isSameTrack(state.currentSong, song)) {
         return;
       }
@@ -1354,6 +1566,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
 
       if (isClosed ||
           gen != _lyricsLoadGen ||
+          (trackGen != null && trackGen != _trackChangedGen) ||
+          (mediaGen != null && mediaGen != _mediaItemGen) ||
           !_isSameTrack(state.currentSong, song)) {
         return;
       }
@@ -1511,6 +1725,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     } catch (_) {}
     ++_mediaItemResolutionGen;
     final capturedGen = _mediaItemResolutionGen;
+    // Dedicated token for mediaItem stream listener to discard stale DB lookups
+    ++_mediaItemGen;
     // Dedicated token for the async downloaded-twin swap. It must NOT share
     // _mediaItemResolutionGen: the handler's own onTrackChanged bump for the
     // navigation that started this playSong would otherwise cancel every swap.
@@ -1518,7 +1734,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     final capturedSwapGen = _localMatchSwapGen;
     // Mark restoration as done: any in-flight _restoreQueueSlots must abort
     _queueRestorationDone = true;
-    var rawQueue = queue != null ? List<SongsTableData>.from(queue) : [song];
+    final rawQueue = queue != null ? List<SongsTableData>.from(queue) : [song];
 
     var targetIndex = rawQueue.indexWhere((s) => _isSameTrack(s, song));
     if (targetIndex == -1) {
@@ -1557,7 +1773,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     final prevDuration = state.duration;
     final prevLyrics = state.lyrics;
     final prevLyricsSource = state.lyricsSource;
-    _queueSlots[state.activeQueueSlot] = _QueueSlotData(
+    _setQueueSlot(
+      state.activeQueueSlot,
       songs: List.from(effectiveQueue),
       currentIndex: effectiveIndex,
       position: startPos,
@@ -1629,7 +1846,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
               ));
               final currentPos =
                   state.position > startPos ? state.position : startPos;
-              _queueSlots[state.activeQueueSlot] = _QueueSlotData(
+              _setQueueSlot(
+                state.activeQueueSlot,
                 songs: List.from(swappedQueue),
                 currentIndex: effectiveIndex,
                 position: currentPos,
@@ -1682,6 +1900,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       // Invalidate everything captured against this request: the parallel
       // local-match swap re-checks the gen and must not re-apply the failed
       // queue after the rollback below.
+      // FIX-H06: Invalidate lyrics loader generation so in-flight fetch doesn't overwrite rollback lyrics
+      _lyricsLoadGen++;
       _mediaItemResolutionGen++;
       _localMatchSwapGen++;
       // Roll back the optimistic mutations: the unplayable queue must not
@@ -1691,7 +1911,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       // already be persisted, and persisting the restored slot heals that.
       _queueSlots[state.activeQueueSlot] = prevSlot ??
           const _QueueSlotData(
-              songs: [], currentIndex: 0, position: Duration.zero);
+              songIds: [], currentIndex: 0, position: Duration.zero);
       _debouncedPersistQueueSlots();
       _queueVersion++;
       safeEmit(state.copyWith(
@@ -1706,11 +1926,17 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         isLoadingLyrics: false,
         errorMessage: 'Failed to play ${song.title}',
       ));
+      // FIX-C3: Invalidate widget coordinator on rollback
+      _updateWidgetThrottled(force: true);
       return;
     }
-    if (isClosed || _mediaItemResolutionGen != capturedGen) return;
-    unawaited(_loadLyricsForSong(song));
-    unawaited(_loadSponsorBlockSegments(song, capturedGen));
+    unawaited(
+      Future.wait([
+        _loadLyricsForSong(song, mediaGen: capturedGen),
+        _loadSponsorBlockSegments(song, mediaGen: capturedGen),
+      ]),
+      // reason: Background lyrics and sponsorblock loading once track playback has initiated
+    );
     _updateWidgetThrottled(force: true);
   }
 
@@ -1782,37 +2008,60 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   /// of the same song id (repeat-one / duplicate queue entry) still re-runs.
   Future<void> _syncPerTrackState(SongsTableData song) async {
     final now = DateTime.now();
+    final pos = state.position;
     final sameId = _lastPerTrackSyncSongId == song.id;
+    // FIX-C9: 800ms dedupe window
     final withinDedupeWindow = _lastPerTrackSyncAt != null &&
         now.difference(_lastPerTrackSyncAt!) <
-            const Duration(milliseconds: 400);
-    if (sameId && withinDedupeWindow) return;
+            const Duration(milliseconds: 800);
+    // FIX-M09: Allow sync if position jumped backwards by > 1s (e.g. track restart)
+    final jumpedBackwards = _lastPerTrackSyncPosition != null &&
+        (_lastPerTrackSyncPosition! - pos) > const Duration(seconds: 1);
+    final restartedAtZero = pos == Duration.zero &&
+        _lastPerTrackSyncPosition != null &&
+        _lastPerTrackSyncPosition! > Duration.zero;
+    // FIX-C9: Secondary guard: if same song and exact same position, skip redundant sync
+    final samePosition = _lastPerTrackSyncPosition != null &&
+        _lastPerTrackSyncPosition == pos;
+    if (sameId && ((withinDedupeWindow && !jumpedBackwards && !restartedAtZero) || samePosition)) return;
     _lastPerTrackSyncSongId = song.id;
     _lastPerTrackSyncAt = now;
+    _lastPerTrackSyncPosition = pos;
     final gen = ++_perTrackSyncGen;
 
-    // The stores load their SharedPreferences map asynchronously; reading
-    // before `ready` completes returns defaults (0/null) and silently drops
-    // the saved per-song overrides.
-    try {
-      await Future.wait<void>([
-        _songRatingStore.ready,
-        _perSongEqStore.ready,
-        _perSongVolumeStore.ready,
-      ]).timeout(
-        const Duration(seconds: 2),
-        onTimeout: () {
-          ErrorLogger.log('Store ready timeout in _syncPerTrackState',
-              category: 'PlayerCubit');
-          return const [];
-        },
-      );
-    } catch (_) {}
-    if (isClosed ||
-        gen != _perTrackSyncGen ||
-        !_isSameTrack(state.currentSong, song)) {
-      return;
+    // FIX-C9: Serialize in-flight per-track store reads
+    final prevCompleter = _perTrackSyncCompleter;
+    final completer = Completer<void>();
+    _perTrackSyncCompleter = completer;
+    if (prevCompleter != null && !prevCompleter.isCompleted) {
+      try {
+        await prevCompleter.future;
+      } catch (_) {}
     }
+
+    try {
+      // The stores load their SharedPreferences map asynchronously; reading
+      // before `ready` completes returns defaults (0/null) and silently drops
+      // the saved per-song overrides.
+      try {
+        await Future.wait<void>([
+          _songRatingStore.ready,
+          _perSongEqStore.ready,
+          _perSongVolumeStore.ready,
+        ]).timeout(
+          const Duration(seconds: 2),
+          onTimeout: () {
+            ErrorLogger.log('Store ready timeout in _syncPerTrackState',
+                category: 'PlayerCubit');
+            return const [];
+          },
+        );
+      } catch (_) {}
+      if (isClosed ||
+          gen != _perTrackSyncGen ||
+          !_isSameTrack(state.currentSong, song)) {
+        return;
+      }
 
     final trackKey = song.id.toString();
     final songRating = _songRatingStore.getRating(trackKey);
@@ -1890,7 +2139,10 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       ErrorLogger.log('Per-song volume push failed',
           error: e, stackTrace: st, category: 'PlayerCubit');
     }
+  } finally {
+    if (!completer.isCompleted) completer.complete();
   }
+}
 
   /// Syncs AB-loop UI with the (possibly restored) handler state after a
   /// track change. Guarded for handler test doubles without F1 members.
@@ -1973,7 +2225,10 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       await _audioHandler.persistBookmarks();
       safeEmit(state.copyWith(bookmarkPosition: Duration(milliseconds: posMs)));
       return true;
-    } catch (_) {
+    } catch (e, st) {
+      // FIX-A05: Log bookmark persistence failure
+      ErrorLogger.log('Failed to save bookmark for song ${song.id}',
+          error: e, stackTrace: st, category: 'PlayerCubit');
       return false;
     }
   }
@@ -2238,6 +2493,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
 
   @override
   Future<void> close() async {
+    transportController.dispose();
+    widgetBridge.dispose();
     _persistQueueDebounce?.cancel();
     _scrobbleCoordinator?.dispose();
     _seekThrottleTimer?.cancel();
@@ -2252,7 +2509,11 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     // listener). Awaited so the write lands before the cubit is gone.
     try {
       await _persistQueueSlots(force: true);
-    } catch (_) {}
+    } catch (e, st) {
+      // FIX-A05: Log failure during final queue persistence on close
+      ErrorLogger.log('Failed to persist queue slots on close',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+    }
     return super.close();
   }
 }

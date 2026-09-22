@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -217,6 +218,7 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
                             labels: _dayLabels,
                             barColor: p.primary,
                             labelColor: p.textSecondary,
+                            textDirection: Directionality.of(context),
                           ),
                         ),
                       ),
@@ -303,12 +305,16 @@ class _ScrobbleBarChartPainter extends CustomPainter {
   final List<String> labels;
   final Color barColor;
   final Color labelColor;
+  final TextDirection textDirection;
+
+  static final TextPainter _cachedPainter = TextPainter();
 
   const _ScrobbleBarChartPainter({
     required this.data,
     required this.labels,
     required this.barColor,
     required this.labelColor,
+    this.textDirection = TextDirection.ltr,
   });
 
   @override
@@ -335,22 +341,28 @@ class _ScrobbleBarChartPainter extends CustomPainter {
       );
       canvas.drawRRect(rRect, paint);
 
-      final textSpan = TextSpan(
-        text: i < labels.length ? labels[i] : '',
-        style: TextStyle(
-            color: labelColor, fontSize: AppFontSize.caption, fontWeight: FontWeight.w600),
-      );
-      final textPainter = TextPainter(
-        text: textSpan,
-        textDirection: TextDirection.ltr,
-      )..layout();
-      textPainter.paint(
-        canvas,
-        Offset(x + (barWidth - textPainter.width) / 2, size.height - 18),
-      );
+      if (i < labels.length && labels[i].isNotEmpty) {
+        _cachedPainter.text = TextSpan(
+          text: labels[i],
+          style: TextStyle(
+              color: labelColor, fontSize: AppFontSize.caption, fontWeight: FontWeight.w600),
+        );
+        _cachedPainter.textDirection = textDirection;
+        _cachedPainter.layout();
+        _cachedPainter.paint(
+          canvas,
+          Offset(x + (barWidth - _cachedPainter.width) / 2, size.height - 18),
+        );
+      }
     }
   }
 
   @override
-  bool shouldRepaint(covariant _ScrobbleBarChartPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _ScrobbleBarChartPainter oldDelegate) {
+    return oldDelegate.barColor != barColor ||
+        oldDelegate.labelColor != labelColor ||
+        oldDelegate.textDirection != textDirection ||
+        !listEquals(oldDelegate.data, data) ||
+        !listEquals(oldDelegate.labels, labels);
+  }
 }

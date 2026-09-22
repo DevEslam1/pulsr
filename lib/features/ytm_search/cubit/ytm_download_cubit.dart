@@ -1,9 +1,10 @@
 // lib/features/ytm_search/cubit/ytm_download_cubit.dart
 import 'dart:async';
+import 'dart:collection';
 import 'package:drift/drift.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 
+import '../../../core/bloc/base_cubit.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/yt_download_service.dart';
 import '../../../data/db/app_database.dart';
@@ -66,7 +67,7 @@ class YtmDownloadState {
 /// persistence, and foreground-service integration) and only maps that state
 /// back into the per-row [YtDownloadItem] the buttons render.
 @singleton
-class YtmDownloadCubit extends Cubit<YtmDownloadState> {
+class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
   final YtDownloadService _service;
   final PlayerCubit _playerCubit;
   final DownloadsCubit? _injectedDownloadsCubit;
@@ -74,7 +75,10 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
 
   /// Video ids whose completed task has already been folded back into the
   /// queue/DB, so the completion side effects run exactly once.
-  final Set<String> _reconciledVideoIds = {};
+  final LinkedHashSet<String> _reconciledVideoIds = LinkedHashSet<String>();
+  // FIX-C12: Shield recently completed tasks with a 10-second TTL
+  final Map<String, int> _recentlyCompleted = {};
+  static const int _recentlyCompletedTtlMs = 10000;
 
   YtmDownloadCubit(
     this._service,
@@ -90,15 +94,30 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
 
   void _subscribe() {
     _sub?.cancel();
-    _sub = _downloads.stream.listen(_onDownloadsState);
+    // FIX-A01: autoSub management
+    _sub = autoSub(_downloads.stream, _onDownloadsState);
   }
 
   void _onDownloadsState(DownloadsState downloads) {
     if (isClosed) return;
 
+    final now = DateTime.now().millisecondsSinceEpoch;
+    // FIX-C12: Prune recently completed tasks past TTL
+    _recentlyCompleted.removeWhere((_, completedAt) => now - completedAt >= _recentlyCompletedTtlMs);
+
+    // FIX-C12: Prune only IDs that are not in tasks AND are not in _recentlyCompleted
+    _reconciledVideoIds.removeWhere((id) {
+      if (downloads.tasks.containsKey(id)) return false;
+      if (_recentlyCompleted.containsKey(id)) return false;
+      return true;
+    });
+
     final mapped = <String, YtDownloadItem>{};
     for (final task in downloads.tasks.values) {
       mapped[task.videoId] = _mapTask(task);
+      if (task.status == DownloadStatus.complete) {
+        _recentlyCompleted[task.videoId] = now;
+      }
     }
     // Canceled lives only here: the repository deletes the task on cancel, so a
     // canceled row keeps its state until the song is downloaded again.
@@ -108,12 +127,17 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
       }
     }
 
-    emit(YtmDownloadState(items: mapped));
+    safeEmit(YtmDownloadState(items: mapped));
 
     for (final task in downloads.tasks.values) {
       if (task.status == DownloadStatus.complete &&
           !_reconciledVideoIds.contains(task.videoId)) {
         _reconciledVideoIds.add(task.videoId);
+        _recentlyCompleted[task.videoId] = now;
+        // FIX-H04 / B-06: Cap reconciled IDs at 500, evicting oldest (insertion order)
+        while (_reconciledVideoIds.length > 250) {
+          _reconciledVideoIds.remove(_reconciledVideoIds.first);
+        }
         unawaited(_onDownloadComplete(task));
       }
     }
@@ -314,7 +338,7 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
     }
 
     _lastEmitTimeByVideoId[videoId] = now;
-    emit(YtmDownloadState(items: {...state.items, videoId: item}));
+    safeEmit(YtmDownloadState(items: {...state.items, videoId: item}));
   }
 
   @override

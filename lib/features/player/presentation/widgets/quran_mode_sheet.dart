@@ -168,7 +168,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
 
             // Tuning sliders
             _QuranSliderTile(
-              icon: Icons.church_rounded,
+              icon: Icons.mosque_rounded,
               title: context.l10n.dspMosqueAmbience,
               subtitle: context.l10n.dspMosqueAmbienceDesc,
               value: state.reverbWetDry.clamp(0.0, 0.6),

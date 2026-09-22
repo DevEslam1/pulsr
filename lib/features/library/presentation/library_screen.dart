@@ -185,6 +185,9 @@ class _LibraryScreenState extends State<LibraryScreen>
   bool _folderTree = false;
 
   @override
+  final TextEditingController _importYtmController = TextEditingController();
+
+  @override
   void initState() {
     super.initState();
     _tabController = TabController(length: _activeTabs.length, vsync: this);
@@ -225,9 +228,17 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
     _lastPersistedTab = safeIndex;
     _tabController.addListener(_onTabChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      oldController.dispose();
-    });
+    oldController.dispose();
+  }
+
+  @override
+  void dispose() {
+    _tabController.removeListener(_onTabChanged);
+    _tabController.dispose();
+    _songsScrollController.removeListener(_onSongsScrollNearBottom);
+    _songsScrollController.dispose();
+    _importYtmController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadLayoutPreferences() async {
@@ -265,15 +276,23 @@ class _LibraryScreenState extends State<LibraryScreen>
         }
       }
 
+      if (!mounted) return;
+
       if (_tabController.length != _activeTabs.length ||
           _tabController.index != targetIndex) {
-        _rebuildTabController(initialIndex: targetIndex);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _rebuildTabController(initialIndex: targetIndex);
+          }
+        });
       }
 
-      setState(() {
-        _genreHierarchy = prefs.getBool(_genreHierarchyPrefKey) ?? false;
-        _folderTree = prefs.getBool(_folderTreePrefKey) ?? false;
-      });
+      if (mounted) {
+        setState(() {
+          _genreHierarchy = prefs.getBool(_genreHierarchyPrefKey) ?? false;
+          _folderTree = prefs.getBool(_folderTreePrefKey) ?? false;
+        });
+      }
     } catch (e, st) {
       ErrorLogger.log('Failed to load library preferences',
           error: e, stackTrace: st, category: 'Library');
@@ -406,15 +425,6 @@ class _LibraryScreenState extends State<LibraryScreen>
       ErrorLogger.log('Failed to persist layout preference',
           error: e, stackTrace: st, category: 'Library');
     }
-  }
-
-  @override
-  void dispose() {
-    _songsScrollController.removeListener(_onSongsScrollNearBottom);
-    _tabController.removeListener(_onTabChanged);
-    _tabController.dispose();
-    _songsScrollController.dispose();
-    super.dispose();
   }
 
   void _onSongsScrollNearBottom() {
@@ -853,6 +863,8 @@ class _LibraryScreenState extends State<LibraryScreen>
       key: ValueKey('tabs_grid_${_activeTabs.map((t) => t.name).join('_')}'),
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
+      addAutomaticKeepAlives: false,
+      addRepaintBoundaries: true,
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: sheetContext.isTablet ? 3 : 2,
         mainAxisSpacing: 10,
@@ -1310,7 +1322,10 @@ class _LibraryScreenState extends State<LibraryScreen>
     IconData? actionIcon,
     VoidCallback? onAction,
   }) {
+    final p = context.palette;
     return RefreshIndicator(
+      color: p.accent,
+      backgroundColor: p.surfaceContainer,
       onRefresh: () => _handleRefresh(context),
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),

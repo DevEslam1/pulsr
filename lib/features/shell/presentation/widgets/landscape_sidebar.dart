@@ -521,10 +521,10 @@ class _SidebarBottomSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // FIX-L7: Streamline buildWhen to compare currentSong identity and playback state
     return BlocBuilder<PlayerCubit, PlayerState>(
       buildWhen: (prev, curr) =>
-          prev.currentSong?.id != curr.currentSong?.id ||
-          prev.currentSong?.title != curr.currentSong?.title ||
+          prev.currentSong != curr.currentSong ||
           prev.isPlaying != curr.isPlaying,
       builder: (context, state) {
         final song = state.currentSong;

@@ -20,8 +20,8 @@ void main() {
     });
 
     test('EC-2: Repeat-One / self-loop skips crossfade into same track index', () {
-      int currentIndex = 3;
-      int nextIndex = 3; // In LoopMode.one, getNextIndex returns currentIndex
+      final int currentIndex = 3;
+      final int nextIndex = 3; // In LoopMode.one, getNextIndex returns currentIndex
 
       bool crossfadeStarted = false;
       if (nextIndex != currentIndex) {

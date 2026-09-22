@@ -456,8 +456,8 @@ class AudioQualitySheet extends StatelessWidget {  final SongsTableData song;
 
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
                         backgroundColor: activeColor,
                         foregroundColor: activeColor.computeLuminance() > 0.5
                             ? Colors.black

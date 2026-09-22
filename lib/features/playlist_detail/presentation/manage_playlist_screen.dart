@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/constants/app_radii.dart';
+import 'package:fpdart/fpdart.dart' hide State;
 import '../../../core/di/injection.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/theme/aura_theme.dart';
@@ -48,7 +49,7 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
     super.initState();
     _playlistUseCases = getIt<PlaylistUseCases>();
     _getSongsUseCase = getIt<GetSongsUseCase>();
-    _songsStream = _getSongsUseCase.watchSongs().asBroadcastStream();
+    _songsStream = _getSongsUseCase.watchSongs().distinct().asBroadcastStream();
     _loadInitialPlaylistSongs();
   }
 
@@ -61,7 +62,20 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
 
   Future<void> _loadInitialPlaylistSongs() async {
     final stream = _playlistUseCases.watchPlaylistSongs(widget.playlist.id);
-    final firstBatch = await stream.first;
+    Result<List<SongsTableData>> firstBatch;
+    try {
+      firstBatch = await stream.first.timeout(
+        const Duration(seconds: 4),
+        onTimeout: () => const Right(<SongsTableData>[]),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _loadError = e.toString();
+      });
+      return;
+    }
     if (!mounted) return;
     firstBatch.fold(
       (failure) {
@@ -212,8 +226,9 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
                                 ),
                               )
                             : ListView.builder(
+                                addAutomaticKeepAlives: false,
+                                addRepaintBoundaries: true,
                                 padding: const EdgeInsetsDirectional.only(
-
                                     top: AppSpacing.xs, bottom: 100, start: AppSpacing.sm, end: AppSpacing.sm),
                                 itemCount: visibleSongs.length,
                                 itemBuilder: (context, index) {
@@ -353,7 +368,7 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
                 controller: _searchController,
                 onChanged: (val) {
                   _searchDebounce?.cancel();
-                  _searchDebounce = Timer(const Duration(milliseconds: 250), () {
+                  _searchDebounce = Timer(const Duration(milliseconds: 300), () {
                     if (mounted) setState(() => _searchQuery = val);
                   });
                 },
@@ -442,11 +457,12 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
       ),
       child: SafeArea(
         top: false,
-        child: ElevatedButton.icon(
+        child: FilledButton.icon(
           onPressed: hasChanges && !_isSaving ? _applyChanges : null,
           icon: _isSaving
-              ? SizedBox(width: AppSpacing.s18,
-                  height: 18,
+              ? SizedBox(
+                  width: AppSpacing.s18,
+                  height: AppSpacing.s18,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
                     valueColor: AlwaysStoppedAnimation<Color>(p.onAccent),
@@ -459,7 +475,7 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
                 : context.l10n.browseNoChangesToSave,
             style: const TextStyle(fontWeight: FontWeight.w700, fontSize: AppFontSize.body),
           ),
-          style: ElevatedButton.styleFrom(
+          style: FilledButton.styleFrom(
             backgroundColor: hasChanges ? p.accent : p.surfaceContainerHigh,
             foregroundColor: hasChanges ? p.onAccent : p.textTertiary,
             elevation: hasChanges ? 3 : 0,

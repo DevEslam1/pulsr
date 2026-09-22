@@ -18,12 +18,14 @@ class EqCurveVisualizer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      size: Size(double.infinity, height),
-      painter: _EqCurvePainter(
-        gains: gains,
-        color: activeColor,
-        spectrumData: spectrumData,
+    return RepaintBoundary(
+      child: CustomPaint(
+        size: Size(double.infinity, height),
+        painter: _EqCurvePainter(
+          gains: gains,
+          color: activeColor,
+          spectrumData: spectrumData,
+        ),
       ),
     );
   }

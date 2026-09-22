@@ -1,11 +1,10 @@
 // lib/features/player/presentation/now_playing_screen.dart
-import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/widgets/gesture_hint_overlay.dart';
 import '../../../core/motion/pulsr_motion.dart';
-import '../../../core/theme/aura_theme.dart';
 import '../../../core/theme/dynamic_theme_cubit.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
@@ -13,18 +12,8 @@ import '../../settings/cubit/settings_cubit.dart';
 import '../../settings/cubit/settings_state.dart';
 import '../cubit/player_cubit.dart';
 import '../cubit/player_state.dart';
-import 'themes/card_player_theme.dart';
-import 'themes/cassette_player_theme.dart';
-import 'themes/circle_player_theme.dart';
-import 'themes/classic_player_theme.dart';
-import 'themes/lyrics_player_theme.dart';
-import 'themes/minimal_player_theme.dart';
 import 'themes/player_theme.dart';
-import 'themes/vinyl_player_theme.dart';
-import 'themes/waveform_player_theme.dart';
-import 'package:pulsr/core/constants/app_spacing.dart';
-import 'package:pulsr/core/constants/app_radii.dart';
-import 'package:pulsr/core/constants/app_typography.dart';
+import 'themes/theme_registry.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
 class NowPlayingScreen extends StatefulWidget {
@@ -99,49 +88,30 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
           bgColor: bgColor,
         );
 
-        Widget themeWidget;
-        switch (settingsConfig.playerThemeMode) {
-          case PlayerThemeMode.classic:
-            themeWidget = ClassicPlayerTheme(props: props);
-            break;
-          case PlayerThemeMode.card:
-            themeWidget = CardPlayerTheme(props: props);
-            break;
-          case PlayerThemeMode.circle:
-            themeWidget = CirclePlayerTheme(props: props);
-            break;
-          case PlayerThemeMode.minimal:
-            themeWidget = MinimalPlayerTheme(props: props);
-            break;
-          case PlayerThemeMode.vinyl:
-            themeWidget = VinylPlayerTheme(props: props);
-            break;
-          case PlayerThemeMode.cassette:
-            themeWidget = CassettePlayerTheme(props: props);
-            break;
-          case PlayerThemeMode.waveform:
-            themeWidget = WaveformPlayerTheme(props: props);
-            break;
-          case PlayerThemeMode.lyricsFocus:
-            themeWidget = LyricsPlayerTheme(props: props);
-            break;
-        }
+        final themeWidget = ThemeRegistry.build(settingsConfig.playerThemeMode, props);
 
         return PopScope(
           canPop: false,
           onPopInvokedWithResult: (didPop, result) {
             if (didPop) return;
-            if (context.canPop()) {
-              context.pop();
+            final router = GoRouter.of(context);
+            if (router.canPop()) {
+              router.pop();
             } else {
-              context.go('/');
+              router.go('/');
             }
           },
           child: Scaffold(
             backgroundColor: bgColor,
             body: _SwipeDownToDismiss(
-              onDismiss: () =>
-                  context.canPop() ? context.pop() : context.go('/'),
+              onDismiss: () {
+                final router = GoRouter.of(context);
+                if (router.canPop()) {
+                  router.pop();
+                } else {
+                  router.go('/');
+                }
+              },
               child: Center(
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
@@ -151,7 +121,15 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                   ),
                   child: Stack(
                     children: [
-                      themeWidget,
+                      AnimatedSwitcher(
+                        duration: context.motionMs(250),
+                        switchInCurve: context.motionCurve(Curves.easeInOut),
+                        switchOutCurve: context.motionCurve(Curves.easeInOut),
+                        child: KeyedSubtree(
+                          key: ValueKey(settingsConfig.playerThemeMode),
+                          child: themeWidget,
+                        ),
+                      ),
                       const _NowPlayingGestureHintOverlay(),
                     ],
                   ),
@@ -199,10 +177,13 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
       curve: Curves.easeOutCubic,
     );
     _anim = Tween<double>(begin: 0.0, end: 0.0).animate(_curvedAnimation);
-    _animController.addListener(() {
-      setState(() {
-        _dragOffset = _anim.value;
-      });
+    _animController.addListener(_onAnimTick);
+  }
+
+  void _onAnimTick() {
+    if (!mounted) return;
+    setState(() {
+      _dragOffset = _anim.value;
     });
   }
 
@@ -214,6 +195,9 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
 
   @override
   void dispose() {
+    // FIX-H7: Stop controller and remove listener before disposal
+    _animController.stop();
+    _animController.removeListener(_onAnimTick);
     _curvedAnimation.dispose();
     _animController.dispose();
     super.dispose();
@@ -265,182 +249,59 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
     // is actually in progress: at rest the subtree paints exactly as before.
     // The RepaintBoundary lets the compositor reuse the cached subtree layer
     // across drag frames instead of re-rasterising it per frame (A-16).
+    final boundChild = RepaintBoundary(child: widget.child);
     final child = progress > 0.0
         ? Opacity(
             opacity: (1.0 - progress * 0.4).clamp(0.0, 1.0),
-            child: RepaintBoundary(child: widget.child),
+            child: boundChild,
           )
-        : widget.child;
+        : boundChild;
 
-    return Listener(
-      onPointerDown: (_) => _activePointers++,
-      onPointerUp: (_) => _activePointers = (_activePointers - 1).clamp(0, 10),
-      onPointerCancel: (_) =>
-          _activePointers = (_activePointers - 1).clamp(0, 10),
-      child: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onVerticalDragStart: _onVerticalDragStart,
-        onVerticalDragUpdate: _onVerticalDragUpdate,
-        onVerticalDragEnd: _onVerticalDragEnd,
-        child: Transform.translate(
-          offset: Offset(0, _dragOffset),
-          child: child,
+    final dismissAction = CustomSemanticsAction(
+      label: context.l10n.dismissPlayer,
+    );
+
+    return Semantics(
+      customSemanticsActions: {
+        dismissAction: widget.onDismiss,
+      },
+      child: Listener(
+        onPointerDown: (_) => _activePointers++,
+        onPointerUp: (_) {
+          if (_activePointers > 0) _activePointers--;
+        },
+        onPointerCancel: (_) {
+          if (_activePointers > 0) _activePointers--;
+        },
+        child: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onVerticalDragStart: _onVerticalDragStart,
+          onVerticalDragUpdate: _onVerticalDragUpdate,
+          onVerticalDragEnd: _onVerticalDragEnd,
+          child: Transform.translate(
+            offset: Offset(0, _dragOffset),
+            child: child,
+          ),
         ),
       ),
     );
   }
 }
 
-class _NowPlayingGestureHintOverlay extends StatefulWidget {
+class _NowPlayingGestureHintOverlay extends StatelessWidget {
   const _NowPlayingGestureHintOverlay();
 
   @override
-  State<_NowPlayingGestureHintOverlay> createState() =>
-      _NowPlayingGestureHintOverlayState();
-}
-
-class _NowPlayingGestureHintOverlayState
-    extends State<_NowPlayingGestureHintOverlay> {
-  static const String _prefKey = 'pulsr_gesture_hints_dismissed';
-  bool _dismissed = true;
-  bool _visible = false;
-  Timer? _autoHideTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkStatus();
-  }
-
-  @override
-  void dispose() {
-    _autoHideTimer?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _checkStatus() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final seen = prefs.getBool(_prefKey) ?? false;
-      if (!seen && mounted) {
-        setState(() {
-          _dismissed = false;
-        });
-        await Future.delayed(const Duration(milliseconds: 600));
-        if (mounted && !_dismissed) {
-          setState(() => _visible = true);
-          _autoHideTimer = Timer(const Duration(seconds: 7), _dismiss);
-        }
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _dismiss() async {
-    if (!mounted || _dismissed) return;
-    setState(() => _visible = false);
-    await Future.delayed(const Duration(milliseconds: 300));
-    if (mounted) setState(() => _dismissed = true);
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_prefKey, true);
-    } catch (_) {}
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (_dismissed) return const SizedBox.shrink();
-
-    final p = context.palette;
     final isTablet = context.isTablet;
-
     return PositionedDirectional(
       start: isTablet ? 32 : 16,
       end: isTablet ? 32 : 16,
       bottom: isTablet ? 120 : 76,
-      child: IgnorePointer(
-        ignoring: !_visible,
-        child: AnimatedOpacity(
-          opacity: _visible ? 1.0 : 0.0,
-          duration: context.motionMs(300),
-          curve: context.motionCurve(Curves.easeInOut),
-          child: Center(
-            child: GestureDetector(
-              onTap: _dismiss,
-              child: Material(
-              color: Colors.transparent,
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 480),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: AppSpacing.s14, vertical: AppSpacing.xs),
-                decoration: BoxDecoration(
-                  color: (p.isDark ? const Color(0xFF161824) : Colors.white)
-                      .withValues(alpha: 0.92),
-                  borderRadius: BorderRadius.circular(AppRadii.r20),
-                  border: Border.all(
-                    color: p.accent.withValues(alpha: 0.35),
-                    width: 1.2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color:
-                          Colors.black.withValues(alpha: p.isDark ? 0.45 : 0.15),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    ),
-                    BoxShadow(
-                      color: p.accent.withValues(alpha: 0.15),
-                      blurRadius: 10,
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(AppSpacing.xxs),
-                      decoration: BoxDecoration(
-                        color: p.accent.withValues(alpha: 0.18),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.touch_app_rounded,
-                        color: p.accent,
-                        size: 16,
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                    Flexible(
-                      child: Text(
-                        context.l10n.nowPlayingSwipeHint,
-                        style: TextStyle(
-                          fontSize: AppFontSize.label,
-                          fontWeight: FontWeight.w700,
-                          color: p.textPrimary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.s6),
-                    IconButton(
-                      tooltip: context.l10n.close,
-                      onPressed: _dismiss,
-                      visualDensity: VisualDensity.compact,
-                      constraints: const BoxConstraints(
-                          minWidth: 44, minHeight: 44),
-                      icon: Icon(
-                        Icons.close_rounded,
-                        size: 16,
-                        color: p.textTertiary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            ),
-          ),
-        ),
+      child: GestureHintOverlay(
+        hintKey: 'now_playing_screen',
+        message: context.l10n.nowPlayingSwipeHint,
+        padding: EdgeInsets.zero,
       ),
     );
   }

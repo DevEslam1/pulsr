@@ -6,6 +6,7 @@ import '../../../../core/di/injection.dart';
 import '../../../../core/services/ytm_browse_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
+import '../../../../core/widgets/empty_state_widget.dart';
 import '../../../../core/widgets/pulsr_back_button.dart';
 import '../../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../../core/widgets/shimmer_skeleton.dart';
@@ -38,13 +39,11 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
   String? _error;
   bool _loadFailed = false;
   Future<void> _loadFeed() async {
-    if (_sections.isEmpty) {
-      setState(() {
-        _isLoading = true;
-        _error = null;
-        _loadFailed = false;
-      });
-    }
+    setState(() {
+      _isLoading = true;
+      _error = null;
+      _loadFailed = false;
+    });
     try {
       final sections = await _browseService.getHomeFeed();
       if (mounted) {
@@ -90,58 +89,45 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
             IconButton(
               icon: Icon(Icons.refresh_rounded, color: p.textPrimary),
               tooltip: context.l10n.refresh,
-              onPressed: _loadFeed,
+              onPressed: _isLoading ? null : _loadFeed,
             ),
         ],
+        bottom: _isLoading
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(2.0),
+                child: LinearProgressIndicator(
+                  color: p.accent,
+                  backgroundColor: Colors.transparent,
+                  minHeight: 2.0,
+                ),
+              )
+            : null,
       ),
-        body: _isLoading
+        body: (_isLoading && _sections.isEmpty)
             ? const SkeletonList(padding: EdgeInsets.only(top: AppSpacing.xs))
             : (_error != null && _loadFailed)
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.lg),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.cloud_off_rounded,
-                            color: p.textSecondary, size: 40),
-                        const SizedBox(height: AppSpacing.sm),
-                        Text(_error!,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: p.textSecondary)),
-                        const SizedBox(height: AppSpacing.sm),
-                        FilledButton(
-                            onPressed: _loadFeed,
-                            child: Text(context.l10n.retry)),
-                      ],
-                    ),
-                  ),
+              ? EmptyStateWidget(
+                  icon: Icons.cloud_off_rounded,
+                  iconColor: p.error,
+                  title: context.l10n.browseFailedLoadFeed,
+                  subtitle: _error!,
+                  primaryActionLabel: context.l10n.retry,
+                  primaryActionIcon: Icons.refresh_rounded,
+                  onPrimaryAction: _loadFeed,
                 )
               : _sections.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.lg),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.explore_off_rounded,
-                                color: p.textSecondary, size: 40),
-                            const SizedBox(height: AppSpacing.sm),
-                            Text(context.l10n.browseNoRecommendations,
-                                textAlign: TextAlign.center,
-                                style:
-                                    TextStyle(color: p.textSecondary)),
-                            const SizedBox(height: AppSpacing.sm),
-                            FilledButton(
-                                onPressed: _loadFeed,
-                                child: Text(context.l10n.retry)),
-                          ],
-                        ),
-                      ),
+                  ? EmptyStateWidget(
+                      icon: Icons.explore_off_rounded,
+                      title: context.l10n.browseNoRecommendations,
+                      subtitle: context.l10n.browseSearchSongsHint,
+                      primaryActionLabel: context.l10n.retry,
+                      primaryActionIcon: Icons.refresh_rounded,
+                      onPrimaryAction: _loadFeed,
                     )
               : RefreshIndicator(
               onRefresh: _loadFeed,
-              color: p.primary,
+              color: p.accent,
+              backgroundColor: p.surfaceContainer,
               child: Align(
                 alignment: Alignment.topCenter,
                 child: ConstrainedBox(
@@ -238,6 +224,25 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                         width: 140,
                         height: 130,
                         fit: BoxFit.cover,
+                        cacheWidth: 280,
+                        cacheHeight: 260,
+                        loadingBuilder: (context, child, progress) => progress == null
+                            ? child
+                            : Container(
+                                width: 140,
+                                height: 130,
+                                color: p.surfaceContainer,
+                                child: Center(
+                                  child: SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: p.accent,
+                                    ),
+                                  ),
+                                ),
+                              ),
                         errorBuilder: (_, __, ___) => Container(
                           width: 140,
                           height: 130,

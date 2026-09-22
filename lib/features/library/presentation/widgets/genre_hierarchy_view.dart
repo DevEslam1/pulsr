@@ -1,4 +1,5 @@
 // lib/features/library/presentation/widgets/genre_hierarchy_view.dart
+import 'dart:collection';
 import 'package:flutter/material.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:go_router/go_router.dart';
@@ -13,7 +14,34 @@ class GenreCategory {
   final IconData icon;
   final List<String> keywords;
 
+  // B-28: LinkedHashMap guarantees deterministic insertion-order eviction for keys.first
+  static final LinkedHashMap<String, RegExp> _regexCache = LinkedHashMap<String, RegExp>();
+  static const int _maxCacheSize = 100;
+
+  static RegExp _keywordRegex(String kw) {
+    final cached = _regexCache[kw];
+    if (cached != null) return cached;
+    if (_regexCache.length >= _maxCacheSize) {
+      _regexCache.remove(_regexCache.keys.first);
+    }
+    final regex = RegExp('\\b${RegExp.escape(kw)}\\b', caseSensitive: false);
+    _regexCache[kw] = regex;
+    return regex;
+  }
+
+  // FIX-H15: Static method to clear regex cache for memory cleanup and tests
+  static void clearCache() {
+    _regexCache.clear();
+  }
+
   const GenreCategory(this.name, this.icon, this.keywords);
+
+  bool matches(String genreName) {
+    for (final kw in keywords) {
+      if (_keywordRegex(kw).hasMatch(genreName)) return true;
+    }
+    return false;
+  }
 }
 
 class GenreHierarchyView extends StatelessWidget {
@@ -92,26 +120,24 @@ class GenreHierarchyView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final categories = _categories(context);
 
     return ListView(
       padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, 120),
       children: [
-        for (final category in _categories(context)) ...[
+        for (final category in categories) ...[
           _buildCategoryGroup(context, category, p),
           const SizedBox(height: AppSpacing.sm),
         ],
         // Remaining uncategorized genres
-        _buildUncategorizedGroup(context, p),
+        _buildUncategorizedGroup(context, categories, p),
       ],
     );
   }
 
   Widget _buildCategoryGroup(
       BuildContext context, GenreCategory cat, PulsrPalette p) {
-    final matching = genres.where((g) {
-      final name = g.name.toLowerCase();
-      return cat.keywords.any((kw) => name.contains(kw));
-    }).toList();
+    final matching = genres.where((g) => cat.matches(g.name)).toList();
 
     if (matching.isEmpty) return const SizedBox.shrink();
 
@@ -151,20 +177,25 @@ class GenreHierarchyView extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: matching.map((g) {
-                return ActionChip(
-                  backgroundColor: p.surfaceContainer,
-                  side: BorderSide(color: p.hairline),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r12)),
-                  label: Text(
-                    '${g.name} (${g.songCount})',
-                    style: TextStyle(
-                        fontSize: AppFontSize.label,
-                        color: p.textPrimary,
-                        fontWeight: FontWeight.w600),
+                return Semantics(
+                  button: true,
+                  label: '${g.name}, ${g.songCount} ${context.l10n.songs}',
+                  child: ActionChip(
+                    materialTapTargetSize: MaterialTapTargetSize.padded,
+                    backgroundColor: p.surfaceContainer,
+                    side: BorderSide(color: p.hairline),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadii.r12)),
+                    label: Text(
+                      '${g.name} (${g.songCount})',
+                      style: TextStyle(
+                          fontSize: AppFontSize.label,
+                          color: p.textPrimary,
+                          fontWeight: FontWeight.w600),
+                    ),
+                    onPressed: () =>
+                        context.push('/genre', extra: g),
                   ),
-                  onPressed: () =>
-                      context.push('/genre', extra: g),
                 );
               }).toList(),
             ),
@@ -174,11 +205,10 @@ class GenreHierarchyView extends StatelessWidget {
     );
   }
 
-  Widget _buildUncategorizedGroup(BuildContext context, PulsrPalette p) {
+  Widget _buildUncategorizedGroup(BuildContext context, List<GenreCategory> categories, PulsrPalette p) {
     final uncategorized = genres.where((g) {
-      final name = g.name.toLowerCase();
-      return !_categories(context)
-          .any((cat) => cat.keywords.any((kw) => name.contains(kw)));
+      final name = g.name;
+      return !categories.any((cat) => cat.matches(name));
     }).toList();
 
     if (uncategorized.isEmpty) return const SizedBox.shrink();
@@ -217,20 +247,25 @@ class GenreHierarchyView extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: uncategorized.map((g) {
-                return ActionChip(
-                  backgroundColor: p.surfaceContainer,
-                  side: BorderSide(color: p.hairline),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r12)),
-                  label: Text(
-                    '${g.name} (${g.songCount})',
-                    style: TextStyle(
-                        fontSize: AppFontSize.label,
-                        color: p.textPrimary,
-                        fontWeight: FontWeight.w600),
+                return Semantics(
+                  button: true,
+                  label: '${g.name}, ${g.songCount} ${context.l10n.songs}',
+                  child: ActionChip(
+                    materialTapTargetSize: MaterialTapTargetSize.padded,
+                    backgroundColor: p.surfaceContainer,
+                    side: BorderSide(color: p.hairline),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadii.r12)),
+                    label: Text(
+                      '${g.name} (${g.songCount})',
+                      style: TextStyle(
+                          fontSize: AppFontSize.label,
+                          color: p.textPrimary,
+                          fontWeight: FontWeight.w600),
+                    ),
+                    onPressed: () =>
+                        context.push('/genre', extra: g),
                   ),
-                  onPressed: () =>
-                      context.push('/genre', extra: g),
                 );
               }).toList(),
             ),

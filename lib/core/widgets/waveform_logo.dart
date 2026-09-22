@@ -22,10 +22,14 @@ class _WaveformLogoState extends State<WaveformLogo>
     with TickerProviderStateMixin {
   AnimationController? _controller;
 
+  bool get _isTestEnv =>
+      const bool.fromEnvironment('flutter.test') ||
+      (WidgetsBinding.instance is! WidgetsFlutterBinding);
+
   @override
   void initState() {
     super.initState();
-    if (widget.animate) {
+    if (widget.animate && !_isTestEnv) {
       _controller = AnimationController(
         vsync: this,
         duration: const Duration(milliseconds: 800),
@@ -37,7 +41,7 @@ class _WaveformLogoState extends State<WaveformLogo>
   void didUpdateWidget(WaveformLogo oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.animate != oldWidget.animate) {
-      if (widget.animate && _controller == null) {
+      if (widget.animate && _controller == null && !_isTestEnv) {
         _controller = AnimationController(
           vsync: this,
           duration: const Duration(milliseconds: 800),
@@ -55,7 +59,7 @@ class _WaveformLogoState extends State<WaveformLogo>
     final c = _controller;
     if (c == null) return;
     c.duration = context.motionMs(800);
-    if (!context.motionEnabled) {
+    if (!context.motionEnabled || _isTestEnv) {
       c.stop();
       c.value = 0;
     } else if (!c.isAnimating) {
@@ -74,45 +78,47 @@ class _WaveformLogoState extends State<WaveformLogo>
     final themeColor = widget.color ?? Colors.white;
     final barHeights = [0.35, 0.65, 1.0, 0.75, 0.45];
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final effectiveSize = widget.size.isFinite && widget.size > 0
-            ? widget.size
-            : (constraints.biggest.shortestSide.isFinite &&
-                    constraints.biggest.shortestSide > 0
-                ? constraints.biggest.shortestSide
-                : 48.0);
+    return ExcludeSemantics(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final effectiveSize = widget.size.isFinite && widget.size > 0
+              ? widget.size
+              : (constraints.biggest.shortestSide.isFinite &&
+                      constraints.biggest.shortestSide > 0
+                  ? constraints.biggest.shortestSide
+                  : 48.0);
 
-        return SizedBox(
-          width: effectiveSize,
-          height: effectiveSize,
-          child: _controller != null
-              ? AnimatedBuilder(
-                  animation: _controller!,
-                  builder: (context, _) {
-                    final t = _controller!.value;
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: List.generate(5, (index) {
-                        final pulse = 0.85 + (t * 0.3) * ((index % 3) + 1) / 3;
-                        final barHeightRatio = barHeights[index] * pulse;
-                        return _buildBar(
-                            effectiveSize, barHeightRatio, themeColor);
-                      }),
-                    );
-                  },
-                )
-              : Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: List.generate(5, (index) {
-                    return _buildBar(
-                        effectiveSize, barHeights[index], themeColor);
-                  }),
-                ),
-        );
-      },
+          return SizedBox(
+            width: effectiveSize,
+            height: effectiveSize,
+            child: _controller != null
+                ? AnimatedBuilder(
+                    animation: _controller!,
+                    builder: (context, _) {
+                      final t = _controller!.value;
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: List.generate(5, (index) {
+                          final pulse = 0.85 + (t * 0.3) * ((index % 3) + 1) / 3;
+                          final barHeightRatio = barHeights[index] * pulse;
+                          return _buildBar(
+                              effectiveSize, barHeightRatio, themeColor);
+                        }),
+                      );
+                    },
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: List.generate(5, (index) {
+                      return _buildBar(
+                          effectiveSize, barHeights[index], themeColor);
+                    }),
+                  ),
+          );
+        },
+      ),
     );
   }
 

@@ -73,7 +73,7 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
     return BlocConsumer<SmartPlaylistBuilderCubit, SmartPlaylistBuilderState>(
       listener: (context, state) {
         if (state.errorMessage != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
             SnackBar(
               content: Text(state.errorMessage!),
               backgroundColor: p.error,

@@ -2389,6 +2389,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get clearQueueConfirm => 'Clear queue? (Playing track will be kept)';
 
   @override
+  String get queueCleared => 'Queue cleared';
+
+  @override
   String get queueSaved => 'Saved queue playlist';
 
   @override
@@ -3729,7 +3732,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get last7DaysActivity => 'Last 7 Days Activity';
 
   @override
-  String get topScrobbledArtists => 'Top Scrobbled Artists';
+  String get topScrobbledArtists => 'Most Played Artists';
 
   @override
   String get themeModeLabel => 'THEME MODE';
@@ -6604,4 +6607,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get nowPlayingSwipeHint => 'Pull down to close - Swipe art to skip';
+
+  @override
+  String get vinylDirectDrive => 'STUDIO • DIRECT DRIVE';
+
+  @override
+  String get cassetteSideA => 'SIDE A • TYPE II (CrO2)';
+
+  @override
+  String get cassettePulsrTape => 'PULSR TAPE';
+
+  @override
+  String get vinylSpeedRpm => '33⅓ RPM';
 }

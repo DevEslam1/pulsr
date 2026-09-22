@@ -351,7 +351,8 @@ class _SponsorBlockSettingTileState extends State<_SponsorBlockSettingTile> {
   };
 
   bool _enabled = true;
-  Set<String> _categories = Set.of(SponsorBlockService.supportedCategories);
+  Set<String> _categories = {};
+  bool _loadingCategories = true;
 
   SponsorBlockService get _service =>
       getIt.isRegistered<SponsorBlockService>()
@@ -371,6 +372,7 @@ class _SponsorBlockSettingTileState extends State<_SponsorBlockSettingTile> {
     setState(() {
       _enabled = service.isEnabled;
       _categories = service.enabledCategories.toSet();
+      _loadingCategories = false;
     });
   }
 
@@ -384,7 +386,7 @@ class _SponsorBlockSettingTileState extends State<_SponsorBlockSettingTile> {
     final result = await PulsrSheetHelper.showPulsrSheet<Set<String>>(
       context: context,
       builder: (sheetContext) {
-        var selected = Set<String>.from(_categories);
+        final selected = Set<String>.from(_categories);
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) => SafeArea(
             child: Padding(
@@ -461,10 +463,12 @@ class _SponsorBlockSettingTileState extends State<_SponsorBlockSettingTile> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final categorySummary = SponsorBlockService.supportedCategories
-        .where(_categories.contains)
-        .map((c) => _labels(context)[c] ?? c)
-        .join(', ');
+    final categorySummary = _loadingCategories
+        ? '…'
+        : SponsorBlockService.supportedCategories
+            .where(_categories.contains)
+            .map((c) => _labels(context)[c] ?? c)
+            .join(', ');
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [

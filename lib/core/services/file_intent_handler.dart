@@ -71,29 +71,38 @@ class FileIntentHandler {
     }
   }
 
+  static final RegExp _rawIdRegex = RegExp(r'^[a-zA-Z0-9_-]{11}$');
+  static final RegExp _shortRegex =
+      RegExp(r'(?:https?:\/\/)?(?:www\.)?youtu\.be\/([a-zA-Z0-9_-]{11})');
+  static final RegExp _longRegex = RegExp(
+      r'(?:https?:\/\/)?(?:(?:[a-zA-Z0-9-]+\.)*youtube\.com|youtube-nocookie\.com)\/(?:(?:watch\?.*?v=)|(?:v|embed|shorts)\/)([a-zA-Z0-9_-]{11})');
+  static final RegExp _fallbackRegex = RegExp(r'[?&]v=([a-zA-Z0-9_-]{11})');
+
   static String? extractYouTubeVideoId(String input) {
     final trimmed = input.trim();
+    // Security / ReDoS guard: valid YouTube URLs and video IDs never exceed 2048 characters.
+    // Early-rejecting unbounded inputs eliminates catastrophic backtracking vectors.
+    if (trimmed.isEmpty || trimmed.length > 2048) {
+      return null;
+    }
+
     // Reject anything that looks like a file path when checking raw 11-char ID
     if (!trimmed.contains('/') &&
         !trimmed.contains('\\') &&
         !trimmed.contains('.') &&
-        RegExp(r'^[a-zA-Z0-9_-]{11}$').hasMatch(trimmed)) {
+        _rawIdRegex.hasMatch(trimmed)) {
       return trimmed;
     }
 
-    final youTubeShort =
-        RegExp(r'(?:https?:\/\/)?(?:www\.)?youtu\.be\/([a-zA-Z0-9_-]{11})')
-            .firstMatch(trimmed);
+    final youTubeShort = _shortRegex.firstMatch(trimmed);
     if (youTubeShort != null) return youTubeShort.group(1);
 
-    final youTubeLong = RegExp(
-            r'(?:https?:\/\/)?(?:(?:[a-zA-Z0-9-]+\.)*youtube\.com|youtube-nocookie\.com)\/(?:(?:watch\?.*?v=)|(?:v|embed|shorts)\/)([a-zA-Z0-9_-]{11})')
-        .firstMatch(trimmed);
+    final youTubeLong = _longRegex.firstMatch(trimmed);
     if (youTubeLong != null) return youTubeLong.group(1);
 
     // Fallback: only if it contains youtube.com or youtu.be
     if (trimmed.contains('youtube.com') || trimmed.contains('youtu.be')) {
-      final fallback = RegExp(r'[?&]v=([a-zA-Z0-9_-]{11})').firstMatch(trimmed);
+      final fallback = _fallbackRegex.firstMatch(trimmed);
       if (fallback != null) return fallback.group(1);
     }
 

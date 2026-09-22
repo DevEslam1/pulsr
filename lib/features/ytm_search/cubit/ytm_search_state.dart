@@ -4,6 +4,16 @@ import '../../../domain/models/ytm_track.dart';
 
 part 'ytm_search_state.freezed.dart';
 
+enum SearchPhase {
+  idle,
+  debouncing,
+  fetching,
+  displaying,
+  error;
+
+  bool get isTerminal => this == displaying || this == error;
+}
+
 @freezed
 abstract class YtmSearchState with _$YtmSearchState {
   const YtmSearchState._();
@@ -16,4 +26,12 @@ abstract class YtmSearchState with _$YtmSearchState {
   }) = _YtmSearchState;
 
   bool get hasSearched => query.trim().isNotEmpty;
+
+  SearchPhase get phase {
+    if (errorMessage != null && errorMessage!.isNotEmpty) return SearchPhase.error;
+    if (isLoading) return SearchPhase.fetching;
+    if (results.isNotEmpty) return SearchPhase.displaying;
+    if (query.trim().isNotEmpty) return SearchPhase.debouncing;
+    return SearchPhase.idle;
+  }
 }

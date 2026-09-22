@@ -66,12 +66,13 @@ class _SpinningVinylDiscState extends State<SpinningVinylDisc>
     final labelSize = discSize * 0.44;
     final spindleSize = discSize * 0.08;
 
-    return GestureDetector(
-      onTap: widget.onTap,
-      child: SizedBox(
-        width: discSize,
-        height: discSize,
-        child: AnimatedBuilder(
+    final content = RepaintBoundary(
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: SizedBox(
+          width: discSize,
+          height: discSize,
+          child: AnimatedBuilder(
           animation: _controller,
           builder: (context, child) {
             return Transform.rotate(
@@ -174,6 +175,16 @@ class _SpinningVinylDiscState extends State<SpinningVinylDisc>
           ),
         ),
       ),
+    ),
+    );
+
+    if (widget.onTap == null) {
+      return ExcludeSemantics(child: content);
+    }
+    return Semantics(
+      button: true,
+      label: 'Vinyl disc',
+      child: content,
     );
   }
 }

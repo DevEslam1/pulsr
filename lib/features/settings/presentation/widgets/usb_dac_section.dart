@@ -79,8 +79,11 @@ class _UsbDacSectionState extends State<UsbDacSection> {
     }
   }
 
+  // FIX-M11: Check hardware volume is enabled and supported before setting volume
   Future<void> _commitVolume(double db) async {
-    await widget.cubit.setUsbHardwareVolumeEnabled(true);
+    if (!widget.state.usbHardwareVolumeEnabled || !_status.hasVolumeControl) {
+      return;
+    }
     await _service.setHardwareVolume(db);
     await _refresh();
   }
@@ -97,9 +100,12 @@ class _UsbDacSectionState extends State<UsbDacSection> {
         final ok = await _service.startStreaming(sampleRate: 48000);
         if (!mounted) return;
         if (!ok) {
-          ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
-            content: Text(context.l10n.usbBpFailed),
-          ));
+          await _refresh();
+          if (mounted) {
+            ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+              content: Text(context.l10n.usbBpFailed),
+            ));
+          }
         }
       } else {
         await _service.stopStreaming();
@@ -155,11 +161,15 @@ class _UsbDacSectionState extends State<UsbDacSection> {
                   value: currentDb,
                   min: minDb,
                   max: maxDb,
-                  onChanged: (v) => setState(() => _pendingDb = v),
-                  onChangeEnd: (v) {
-                    _pendingDb = null;
-                    unawaited(_commitVolume(v));
-                  },
+                  onChanged: (enabled && hasHwVolume)
+                      ? (v) => setState(() => _pendingDb = v)
+                      : null,
+                  onChangeEnd: (enabled && hasHwVolume)
+                      ? (v) {
+                          _pendingDb = null;
+                          unawaited(_commitVolume(v));
+                        }
+                      : null,
                 ),
               ],
             ),

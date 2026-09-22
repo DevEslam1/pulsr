@@ -17,21 +17,39 @@ class ArtworkLruCache {
 
   final int maxCapacity;
   static const int maxBytes = 50 * 1024 * 1024; // 50MB cap
+  static const int largePayloadThreshold = 512 * 1024; // 512 KB
   final Map<String, Uint8List> _cache = {};
+  final Map<String, WeakReference<Uint8List>> _weakLargeCache = {};
   int _currentBytes = 0;
 
-  int get length => _cache.length;
+  int get length => _cache.length + _weakLargeCache.length;
   int get currentBytes => _currentBytes;
 
-  bool containsKey(String key) => _cache.containsKey(key);
+  bool containsKey(String key) {
+    if (_cache.containsKey(key)) return true;
+    final weak = _weakLargeCache[key];
+    if (weak != null && weak.target != null) return true;
+    return false;
+  }
 
   Uint8List? get(String key) {
-    if (!_cache.containsKey(key)) return null;
-    final value = _cache.remove(key);
-    if (value != null) {
-      _cache[key] = value;
+    if (_cache.containsKey(key)) {
+      final value = _cache.remove(key);
+      if (value != null) {
+        _cache[key] = value;
+      }
+      return value;
     }
-    return value;
+    final weak = _weakLargeCache[key];
+    if (weak != null) {
+      final target = weak.target;
+      if (target == null) {
+        _weakLargeCache.remove(key);
+        return null;
+      }
+      return target;
+    }
+    return null;
   }
 
   void put(String key, Uint8List? bytes, {bool persistToDisk = true}) {
@@ -43,6 +61,15 @@ class ArtworkLruCache {
     // after the eviction loop would leave the cache permanently over cap.
     if (bytes.length > maxBytes) {
       remove(key);
+      return;
+    }
+
+    // FIX-F2: Large payloads (>512KB) are held via WeakReference so memory pressure can reclaim them
+    if (bytes.length > largePayloadThreshold) {
+      _weakLargeCache[key] = WeakReference(bytes);
+      if (persistToDisk) {
+        ArtworkCacheManager().put(key, bytes);
+      }
       return;
     }
 
@@ -70,6 +97,7 @@ class ArtworkLruCache {
   }
 
   void remove(String key) {
+    _weakLargeCache.remove(key);
     final removed = _cache.remove(key);
     if (removed != null) {
       _currentBytes -= removed.length;
@@ -78,11 +106,13 @@ class ArtworkLruCache {
 
   void clear() {
     _cache.clear();
+    _weakLargeCache.clear();
     _currentBytes = 0;
     ArtworkCacheManager().clearAllCache();
   }
 
   void trimForMemoryPressure() {
+    _weakLargeCache.clear();
     // Evict half of cache on memory pressure (LOG-14 GC 14MB/59MB)
     while (_cache.length > maxCapacity ~/ 2 && _cache.isNotEmpty) {
       final oldest = _cache.keys.first;
@@ -109,8 +139,10 @@ class CachedArtwork extends StatefulWidget {
   /// that has not been downloaded yet. Takes precedence over [id].
   final String? remoteUrl;
 
-  /// Whether to fetch and render uncompressed/high-resolution artwork (e.g. for player screen).
   final bool highQuality;
+  /// Explicit decode dimensions. Defaults to [decodeDim] computed from widget.size.
+  final int? cacheWidth;
+  final int? cacheHeight;
 
   const CachedArtwork({
     super.key,
@@ -122,6 +154,8 @@ class CachedArtwork extends StatefulWidget {
     this.customCache,
     this.remoteUrl,
     this.highQuality = false,
+    this.cacheWidth,
+    this.cacheHeight,
   });
 
   static String upgradeToHighResArtwork(String url) {
@@ -193,7 +227,7 @@ class _CachedArtworkState extends State<CachedArtwork> {
                 width: 220, height: 220)
             : url);
 
-    var uri = Uri.tryParse(targetUrl);
+    final uri = Uri.tryParse(targetUrl);
     if (uri == null || !uri.isScheme('https')) return null;
     HttpClientRequest? request;
     try {
@@ -385,8 +419,8 @@ class _CachedArtworkState extends State<CachedArtwork> {
                 _cachedBytes!,
                 width: isBounded ? effectiveSize : null,
                 height: isBounded ? effectiveSize : null,
-                cacheWidth: decodeDim,
-                cacheHeight: decodeDim,
+                cacheWidth: widget.cacheWidth ?? decodeDim,
+                cacheHeight: widget.cacheHeight ?? decodeDim,
                 fit: BoxFit.cover,
                 filterQuality:
                     isHq ? FilterQuality.high : FilterQuality.medium,

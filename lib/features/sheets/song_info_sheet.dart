@@ -18,6 +18,7 @@ import '../../core/widgets/pulsr_dialog.dart';
 import '../../core/widgets/pulsr_slider.dart';
 import '../../data/audio/bpm_override_store.dart';
 import '../../data/audio/headphone_profiles_repository.dart';
+import '../../domain/models/headphone_profile.dart';
 import '../../data/audio/per_song_eq_store.dart';
 import '../../data/audio/per_song_volume_store.dart';
 import '../../data/audio/song_rating_store.dart';
@@ -298,7 +299,8 @@ class SongInfoSheet extends StatelessWidget {
                         context.l10n.fileSize,
                         '${(song.fileSize! / (1024 * 1024)).toStringAsFixed(2)} MB',
                         p),
-                  _buildAudioOverridesSection(context, p),
+                  // FIX-M6: Use _AudioOverridesSection with cached stores
+                  _AudioOverridesSection(song: song),
                   _buildPlaybackToolsSection(context, p),
                   const SizedBox(height: AppSpacing.sm),
                   Row(
@@ -352,8 +354,8 @@ class SongInfoSheet extends StatelessWidget {
                   if (PlatformCapabilities.hasTagEditor)
                     SizedBox(
                       width: double.infinity,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
                           backgroundColor: p.accent,
                           foregroundColor: p.onAccent,
                           padding: const EdgeInsets.symmetric(vertical: AppSpacing.s14),
@@ -380,240 +382,7 @@ class SongInfoSheet extends StatelessWidget {
         );
       }
 
-  Widget _buildAudioOverridesSection(BuildContext context, PulsrPalette p) {
-    final trackKey = song.id.toString();
-    PlayerCubit? playerCubit;
-    try {
-      playerCubit = context.read<PlayerCubit>();
-    } catch (_) {}
-    final ratingStore = getIt.isRegistered<SongRatingStore>()
-        ? getIt<SongRatingStore>()
-        : SongRatingStore();
-    final eqStore = getIt.isRegistered<PerSongEqStore>()
-        ? getIt<PerSongEqStore>()
-        : PerSongEqStore();
-    final volStore = getIt.isRegistered<PerSongVolumeStore>()
-        ? getIt<PerSongVolumeStore>()
-        : PerSongVolumeStore();
-    // BPM store has no DI registration (avoids graph regen); a local
-    // instance shares the same SharedPreferences backing.
-    final bpmStore = BpmOverrideStore();
 
-    double currentSliderVol = volStore.getGainDbForTrack(trackKey);
-
-    return StatefulBuilder(
-      builder: (context, setLocalState) {
-        final currentRating = ratingStore.getRating(trackKey);
-        final currentEq = eqStore.getPresetForTrack(trackKey);
-        final currentBpm = bpmStore.getBpmForTrack(trackKey);
-
-        return Container(
-          margin: const EdgeInsets.symmetric(vertical: AppSpacing.s10),
-          padding: const EdgeInsets.all(AppSpacing.s14),
-          decoration: BoxDecoration(
-            color: p.surfaceContainer,
-            borderRadius: BorderRadius.circular(AppRadii.r16),
-            border: Border.all(color: p.hairline),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Rating Bar
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(context.l10n.trackRating,
-                    style: TextStyle(
-                      fontSize: AppFontSize.label,
-                      fontWeight: FontWeight.w700,
-                      color: p.textSecondary,
-                    ),
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: List.generate(5, (index) {
-                      final starNum = index + 1;
-                      final isFilled = starNum <= currentRating;
-                      return GestureDetector(
-                        onTap: () async {
-                          final newRating =
-                              currentRating == starNum ? 0 : starNum;
-                          await ratingStore.setRating(trackKey, newRating);
-                          playerCubit?.setSongRating(song.id, newRating);
-                          setLocalState(() {});
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s2),
-                          child: Icon(
-                            isFilled
-                                ? Icons.star_rounded
-                                : Icons.star_outline_rounded,
-                            size: 22,
-                            color: isFilled ? p.warning : p.textTertiary,
-                          ),
-                        ),
-                      );
-                    }),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.s10),
-              Divider(color: p.hairline, height: 1),
-              const SizedBox(height: AppSpacing.xs),
-
-              // Per-Track EQ Preset Override
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(context.l10n.trackEqOverride,
-                    style: TextStyle(
-                      fontSize: AppFontSize.label,
-                      fontWeight: FontWeight.w700,
-                      color: p.textSecondary,
-                    ),
-                  ),
-                  DropdownButton<String?>(
-                    value: _eqDropdownValue(currentEq),
-                    underline: const SizedBox(),
-                    dropdownColor: p.surfaceContainer,
-                    icon: Icon(Icons.arrow_drop_down, color: p.accent),
-                    style: TextStyle(
-                      color: currentEq != null ? p.accent : p.textPrimary,
-                      fontSize: AppFontSize.label,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    items: [
-                      DropdownMenuItem<String?>(
-                        value: null,
-                        child: Text(context.l10n.defaultGlobalEq),
-                      ),
-                      ...EqPreset.defaultPresets.map(
-                        (preset) => DropdownMenuItem<String?>(
-                          value: preset.name,
-                          child: Text(preset.name),
-                        ),
-                      ),
-                      // Custom + AutoEQ headphone profiles (resolved by name
-                      // on auto-apply, same as built-in presets).
-                      ...HeadphoneProfilesRepository()
-                          .profiles
-                          .where((hp) => EqPreset.defaultPresets.every(
-                              (d) =>
-                                  d.name.toLowerCase() !=
-                                  hp.name.toLowerCase()))
-                          .map(
-                            (hp) => DropdownMenuItem<String?>(
-                              value: hp.name,
-                              child: Text('${hp.name} • AutoEQ'),
-                            ),
-                          ),
-                    ],
-                    onChanged: (newPreset) async {
-                      await eqStore.setPresetForTrack(trackKey, newPreset);
-                      playerCubit?.setSongEqOverride(song.id, newPreset);
-                      setLocalState(() {});
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Divider(color: p.hairline, height: 1),
-              const SizedBox(height: AppSpacing.xs),
-
-              // Per-Track Volume Offset
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(context.l10n.trackVolumeOffset,
-                    style: TextStyle(
-                      fontSize: AppFontSize.label,
-                      fontWeight: FontWeight.w700,
-                      color: p.textSecondary,
-                    ),
-                  ),
-                  Text(
-                    currentSliderVol.abs() < 0.1
-                        ? '0.0 dB'
-                        : '${currentSliderVol > 0 ? '+' : ''}${currentSliderVol.toStringAsFixed(1)} dB',
-                    style: TextStyle(
-                      fontSize: AppFontSize.label,
-                      fontWeight: FontWeight.w700,
-                      color: currentSliderVol.abs() < 0.1 ? p.textSecondary : p.accent,
-                    ),
-                  ),
-                ],
-              ),
-              PulsrSlider(
-                value: currentSliderVol.clamp(-12.0, 6.0),
-                min: -12.0,
-                max: 6.0,
-                divisions: 36,
-                semanticLabel: context.l10n.trackVolumeOffset,
-                onChanged: (val) {
-                  currentSliderVol = val;
-                  setLocalState(() {});
-                },
-                onChangeEnd: (val) async {
-                  final clamped = val.abs() < 0.2 ? 0.0 : val;
-                  currentSliderVol = clamped;
-                  await volStore.setGainDbForTrack(trackKey, clamped);
-                  playerCubit?.setSongVolumeOverride(song.id, clamped);
-                  setLocalState(() {});
-                },
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Divider(color: p.hairline, height: 1),
-              const SizedBox(height: AppSpacing.xs),
-
-              // Per-Track BPM (feeds BPM-synced crossfade)
-              InkWell(
-                onTap: () => _showBpmDialog(
-                    context, bpmStore, playerCubit, currentBpm,
-                    onSaved: setLocalState),
-                borderRadius: BorderRadius.circular(AppRadii.r8),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        context.l10n.trackBpm,
-                        style: TextStyle(
-                          fontSize: AppFontSize.label,
-                          fontWeight: FontWeight.w700,
-                          color: p.textSecondary,
-                        ),
-                      ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            currentBpm == null
-                                ? context.l10n.browseNotSet
-                                : '${currentBpm.toStringAsFixed(0)} BPM',
-                            style: TextStyle(
-                              fontSize: AppFontSize.label,
-                              fontWeight: FontWeight.w700,
-                              color: currentBpm == null
-                                  ? p.textSecondary
-                                  : p.accent,
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.xxs),
-                          Icon(Icons.edit_rounded,
-                              size: 14, color: p.textTertiary),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
 
   /// F-28 (save DSP snapshot) + F-57 (per-track bookmark controls).
   Widget _buildPlaybackToolsSection(BuildContext context, PulsrPalette p) {
@@ -783,70 +552,7 @@ class SongInfoSheet extends StatelessWidget {
     );
   }
 
-  Future<void> _showBpmDialog(
-    BuildContext context,
-    BpmOverrideStore bpmStore,
-    PlayerCubit? playerCubit,
-    double? currentBpm, {
-    required void Function(VoidCallback) onSaved,
-  }) async {
-    // null = cancel, '' = clear override, otherwise the BPM text to save.
-    final result = await PulsrDialogHelper.showCustomDialog<String?>(
-      context,
-      builder: (_) => _BpmOverrideDialog(currentBpm: currentBpm),
-    );
-    if (result == null || !context.mounted) return;
-    // Clear, or save the validated text returned by the dialog.
-    await _persistBpmChoice(
-        context, bpmStore, playerCubit, result.isEmpty ? null : result);
-    onSaved(() {});
-  }
 
-  Future<void> _persistBpmChoice(
-    BuildContext context,
-    BpmOverrideStore bpmStore,
-    PlayerCubit? playerCubit,
-    String? raw,
-  ) async {
-    double? bpm;
-    if (raw != null) {
-      bpm = double.tryParse(raw);
-      if (bpm == null ||
-          !bpm.isFinite ||
-          bpm < BpmOverrideStore.minBpm ||
-          bpm > BpmOverrideStore.maxBpm) {
-        return;
-      }
-    }
-    await bpmStore.setBpmForTrack(song.id.toString(), bpm);
-    await playerCubit?.setTrackBpm(song, bpm);
-    if (context.mounted && bpm == null) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.bpmCleared)),
-      );
-    }
-  }
-
-  /// Resolves the stored override to a dropdown value. Returns null
-  /// ("Default") when the named preset no longer exists, since
-  /// DropdownButton throws on unmatched values.
-  String? _eqDropdownValue(String? stored) {
-    if (stored == null || stored.isEmpty) return null;
-    final lower = stored.toLowerCase();
-    if (EqPreset.defaultPresets
-        .any((d) => d.name.toLowerCase() == lower)) {
-      return stored;
-    }
-    try {
-      if (HeadphoneProfilesRepository()
-          .profiles
-          .any((hp) => hp.name.toLowerCase() == lower)) {
-        return stored;
-      }
-    } catch (_) {}
-    return null;
-  }
 
   Widget _buildInfoRow(String label, String value, PulsrPalette p) {
     return Padding(
@@ -1002,6 +708,321 @@ class _BpmOverrideDialogState extends State<_BpmOverrideDialog> {
           child: Text(context.l10n.save),
         ),
       ],
+    );
+  }
+}
+
+// FIX-M6: Extract audio overrides section into a StatefulWidget caching stores in initState
+class _AudioOverridesSection extends StatefulWidget {
+  final SongsTableData song;
+
+  const _AudioOverridesSection({required this.song});
+
+  @override
+  State<_AudioOverridesSection> createState() => _AudioOverridesSectionState();
+}
+
+class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
+  late final SongRatingStore _ratingStore;
+  late final PerSongEqStore _eqStore;
+  late final PerSongVolumeStore _volStore;
+  late final BpmOverrideStore _bpmStore;
+  late final List<HeadphoneProfile> _headphoneProfiles;
+  late double _currentSliderVol;
+
+  @override
+  void initState() {
+    super.initState();
+    _ratingStore = getIt.isRegistered<SongRatingStore>()
+        ? getIt<SongRatingStore>()
+        : SongRatingStore();
+    _eqStore = getIt.isRegistered<PerSongEqStore>()
+        ? getIt<PerSongEqStore>()
+        : PerSongEqStore();
+    _volStore = getIt.isRegistered<PerSongVolumeStore>()
+        ? getIt<PerSongVolumeStore>()
+        : PerSongVolumeStore();
+    _bpmStore = BpmOverrideStore();
+    try {
+      _headphoneProfiles = HeadphoneProfilesRepository().profiles;
+    } catch (_) {
+      _headphoneProfiles = const [];
+    }
+    _currentSliderVol = _volStore.getGainDbForTrack(widget.song.id.toString());
+  }
+
+  String? _eqDropdownValue(String? stored) {
+    if (stored == null || stored.isEmpty) return null;
+    final lower = stored.toLowerCase();
+    if (EqPreset.defaultPresets.any((d) => d.name.toLowerCase() == lower)) {
+      return stored;
+    }
+    if (_headphoneProfiles.any((hp) => hp.name.toLowerCase() == lower)) {
+      return stored;
+    }
+    return null;
+  }
+
+  Future<void> _showBpmDialog(
+    BuildContext context,
+    PlayerCubit? playerCubit,
+    double? currentBpm,
+  ) async {
+    final result = await PulsrDialogHelper.showCustomDialog<String?>(
+      context,
+      builder: (_) => _BpmOverrideDialog(currentBpm: currentBpm),
+    );
+    if (result == null || !context.mounted) return;
+    await _persistBpmChoice(
+        context, playerCubit, result.isEmpty ? null : result);
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _persistBpmChoice(
+    BuildContext context,
+    PlayerCubit? playerCubit,
+    String? raw,
+  ) async {
+    double? bpm;
+    if (raw != null) {
+      bpm = double.tryParse(raw);
+      if (bpm == null ||
+          !bpm.isFinite ||
+          bpm < BpmOverrideStore.minBpm ||
+          bpm > BpmOverrideStore.maxBpm) {
+        return;
+      }
+    }
+    await _bpmStore.setBpmForTrack(widget.song.id.toString(), bpm);
+    await playerCubit?.setTrackBpm(widget.song, bpm);
+    if (context.mounted && bpm == null) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.bpmCleared)),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final trackKey = widget.song.id.toString();
+    PlayerCubit? playerCubit;
+    try {
+      playerCubit = context.read<PlayerCubit>();
+    } catch (_) {}
+
+    final currentRating = _ratingStore.getRating(trackKey);
+    final currentEq = _eqStore.getPresetForTrack(trackKey);
+    final currentBpm = _bpmStore.getBpmForTrack(trackKey);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: AppSpacing.s10),
+      padding: const EdgeInsets.all(AppSpacing.s14),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer,
+        borderRadius: BorderRadius.circular(AppRadii.r16),
+        border: Border.all(color: p.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Rating Bar
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                context.l10n.trackRating,
+                style: TextStyle(
+                  fontSize: AppFontSize.label,
+                  fontWeight: FontWeight.w700,
+                  color: p.textSecondary,
+                ),
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(5, (index) {
+                  final starNum = index + 1;
+                  final isFilled = starNum <= currentRating;
+                  return GestureDetector(
+                    onTap: () async {
+                      final newRating =
+                          currentRating == starNum ? 0 : starNum;
+                      await _ratingStore.setRating(trackKey, newRating);
+                      playerCubit?.setSongRating(widget.song.id, newRating);
+                      if (mounted) setState(() {});
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s2),
+                      child: Icon(
+                        isFilled
+                            ? Icons.star_rounded
+                            : Icons.star_outline_rounded,
+                        size: 22,
+                        color: isFilled ? p.warning : p.textTertiary,
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s10),
+          Divider(color: p.hairline, height: 1),
+          const SizedBox(height: AppSpacing.xs),
+
+          // Per-Track EQ Preset Override
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                context.l10n.trackEqOverride,
+                style: TextStyle(
+                  fontSize: AppFontSize.label,
+                  fontWeight: FontWeight.w700,
+                  color: p.textSecondary,
+                ),
+              ),
+              DropdownButton<String?>(
+                value: _eqDropdownValue(currentEq),
+                underline: const SizedBox(),
+                dropdownColor: p.surfaceContainer,
+                icon: Icon(Icons.arrow_drop_down, color: p.accent),
+                style: TextStyle(
+                  color: currentEq != null ? p.accent : p.textPrimary,
+                  fontSize: AppFontSize.label,
+                  fontWeight: FontWeight.w600,
+                ),
+                items: [
+                  DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text(context.l10n.defaultGlobalEq),
+                  ),
+                  ...EqPreset.defaultPresets.map(
+                    (preset) => DropdownMenuItem<String?>(
+                      value: preset.name,
+                      child: Text(preset.name),
+                    ),
+                  ),
+                  // Custom + AutoEQ headphone profiles
+                  ..._headphoneProfiles
+                      .where((hp) => EqPreset.defaultPresets.every(
+                          (d) =>
+                              d.name.toLowerCase() !=
+                              hp.name.toLowerCase()))
+                      .map(
+                        (hp) => DropdownMenuItem<String?>(
+                          value: hp.name,
+                          child: Text('${hp.name} • AutoEQ'),
+                        ),
+                      ),
+                ],
+                onChanged: (newPreset) async {
+                  await _eqStore.setPresetForTrack(trackKey, newPreset);
+                  playerCubit?.setSongEqOverride(widget.song.id, newPreset);
+                  if (mounted) setState(() {});
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Divider(color: p.hairline, height: 1),
+          const SizedBox(height: AppSpacing.xs),
+
+          // Per-Track Volume Offset
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                context.l10n.trackVolumeOffset,
+                style: TextStyle(
+                  fontSize: AppFontSize.label,
+                  fontWeight: FontWeight.w700,
+                  color: p.textSecondary,
+                ),
+              ),
+              Text(
+                _currentSliderVol.abs() < 0.1
+                    ? '0.0 dB'
+                    : '${_currentSliderVol > 0 ? '+' : ''}${_currentSliderVol.toStringAsFixed(1)} dB',
+                style: TextStyle(
+                  fontSize: AppFontSize.label,
+                  fontWeight: FontWeight.w700,
+                  color: _currentSliderVol.abs() < 0.1 ? p.textSecondary : p.accent,
+                ),
+              ),
+            ],
+          ),
+          PulsrSlider(
+            value: _currentSliderVol.clamp(-12.0, 6.0),
+            min: -12.0,
+            max: 6.0,
+            divisions: 36,
+            semanticLabel: context.l10n.trackVolumeOffset,
+            onChanged: (val) {
+              setState(() {
+                _currentSliderVol = val;
+              });
+            },
+            onChangeEnd: (val) async {
+              final clamped = val.abs() < 0.2 ? 0.0 : val;
+              setState(() {
+                _currentSliderVol = clamped;
+              });
+              await _volStore.setGainDbForTrack(trackKey, clamped);
+              playerCubit?.setSongVolumeOverride(widget.song.id, clamped);
+            },
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Divider(color: p.hairline, height: 1),
+          const SizedBox(height: AppSpacing.xs),
+
+          // Per-Track BPM (feeds BPM-synced crossfade)
+          InkWell(
+            onTap: () => _showBpmDialog(
+                context, playerCubit, currentBpm),
+            borderRadius: BorderRadius.circular(AppRadii.r8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    context.l10n.trackBpm,
+                    style: TextStyle(
+                      fontSize: AppFontSize.label,
+                      fontWeight: FontWeight.w700,
+                      color: p.textSecondary,
+                    ),
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        currentBpm == null
+                            ? context.l10n.browseNotSet
+                            : '${currentBpm.toStringAsFixed(0)} BPM',
+                        style: TextStyle(
+                          fontSize: AppFontSize.label,
+                          fontWeight: FontWeight.w700,
+                          color: currentBpm == null
+                              ? p.textSecondary
+                              : p.accent,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.xxs),
+                      Icon(Icons.edit_rounded,
+                          size: 14, color: p.textTertiary),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

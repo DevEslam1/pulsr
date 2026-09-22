@@ -33,6 +33,11 @@ class ThemeSchedulerService {
     _timer = null;
   }
 
+  /// Forces an immediate evaluation and broadcast of the night state.
+  void refresh([void Function(bool isNight)? onThemeChange]) {
+    _checkSchedule(onThemeChange ?? (_) {});
+  }
+
   void _checkSchedule(void Function(bool isNight) onThemeChange) {
     final now = DateTime.now();
     final bool isNight;

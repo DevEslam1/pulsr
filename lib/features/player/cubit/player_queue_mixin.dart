@@ -67,7 +67,8 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
     } else {
       updatedQueue.insert(targetSlot, song);
     }
-    _queueSlots[state.activeQueueSlot] = _QueueSlotData(
+    _setQueueSlot(
+      state.activeQueueSlot,
       songs: updatedQueue,
       currentIndex: state.currentIndex,
       position: state.position,
@@ -112,7 +113,8 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
     }
     if (added.isEmpty) return;
     final updatedQueue = List<SongsTableData>.from(state.queue)..addAll(added);
-    _queueSlots[state.activeQueueSlot] = _QueueSlotData(
+    _setQueueSlot(
+      state.activeQueueSlot,
       songs: updatedQueue,
       currentIndex: state.currentIndex,
       position: state.position,
@@ -150,7 +152,8 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
     } else {
       updatedQueue.add(song);
     }
-    _queueSlots[state.activeQueueSlot] = _QueueSlotData(
+    _setQueueSlot(
+      state.activeQueueSlot,
       songs: updatedQueue,
       currentIndex: state.currentIndex,
       position: state.position,
@@ -174,7 +177,8 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
     }
     final current = state.currentSong;
     final updatedQueue = current != null ? [current] : <SongsTableData>[];
-    _queueSlots[state.activeQueueSlot] = _QueueSlotData(
+    _setQueueSlot(
+      state.activeQueueSlot,
       songs: updatedQueue,
       currentIndex: 0,
       position: state.position,
@@ -195,7 +199,8 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
     if (songs.isEmpty || isClosed) return;
     final safeIndex = index.clamp(0, songs.length - 1);
     final wasPlaying = state.isPlaying;
-    _queueSlots[state.activeQueueSlot] = _QueueSlotData(
+    _setQueueSlot(
+      state.activeQueueSlot,
       songs: List.of(songs),
       currentIndex: safeIndex,
       position: state.position,
@@ -224,9 +229,10 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
     if (oldIndex < 0 ||
         oldIndex >= state.queue.length ||
         newIndex < 0 ||
-        newIndex > state.queue.length) {
+        newIndex >= state.queue.length) {
       return;
     }
+    if (oldIndex == newIndex) return;
     try {
       await _audioHandler.reorderQueue(oldIndex, newIndex);
     } catch (e, st) {
@@ -238,7 +244,6 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
       return;
     }
     final updatedQueue = List<SongsTableData>.from(state.queue);
-    if (oldIndex < newIndex) newIndex -= 1;
     final song = updatedQueue.removeAt(oldIndex);
     updatedQueue.insert(newIndex, song);
     var updatedIndex = state.currentIndex;
@@ -249,7 +254,8 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
     } else if (oldIndex > updatedIndex && newIndex <= updatedIndex) {
       updatedIndex++;
     }
-    _queueSlots[state.activeQueueSlot] = _QueueSlotData(
+    _setQueueSlot(
+      state.activeQueueSlot,
       songs: updatedQueue,
       currentIndex: updatedIndex,
       position: state.position,
@@ -291,11 +297,13 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
       _queueVersion++;
       if (updatedQueue.isEmpty) {
         // The handler stops and emits a null mediaItem for this case.
-        _queueSlots[state.activeQueueSlot] = _QueueSlotData(
-            songs: const [],
-            currentIndex: 0,
-            position: Duration.zero,
-            speed: state.playbackSpeed);
+        _setQueueSlot(
+          state.activeQueueSlot,
+          songs: const [],
+          currentIndex: 0,
+          position: Duration.zero,
+          speed: state.playbackSpeed,
+        );
         _debouncedPersistQueueSlots();
         safeEmit(state.copyWith(
           queue: const [],
@@ -311,7 +319,8 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
       final newCurrent = updatedQueue[updatedIndex];
       final sameTrack = _isSameTrack(state.currentSong, newCurrent);
       _queueVersion++;
-      _queueSlots[state.activeQueueSlot] = _QueueSlotData(
+      _setQueueSlot(
+        state.activeQueueSlot,
         songs: updatedQueue,
         currentIndex: updatedIndex,
         position: Duration.zero,
@@ -334,7 +343,8 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
       _updateWidgetThrottled(force: true);
       return;
     }
-    _queueSlots[state.activeQueueSlot] = _QueueSlotData(
+    _setQueueSlot(
+      state.activeQueueSlot,
       songs: updatedQueue,
       currentIndex: updatedIndex,
       position: state.position,
@@ -363,7 +373,8 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
       final wasPlaying = state.isPlaying ||
           _audioHandler.playbackState.value.processingState ==
               AudioProcessingState.completed;
-      _queueSlots[state.activeQueueSlot] = _QueueSlotData(
+      _setQueueSlot(
+        state.activeQueueSlot,
         songs: List.from(state.queue),
         currentIndex: state.currentIndex,
         position: state.position,
@@ -371,12 +382,13 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
       );
       final targetSlot = _queueSlots[slot] ??
           const _QueueSlotData(
-              songs: [], currentIndex: 0, position: Duration.zero, speed: 1.0);
+              songIds: [], currentIndex: 0, position: Duration.zero, speed: 1.0);
+      final targetSongs = targetSlot.songsFrom(_slotLookupCache);
       final targetOriginalSong = (targetSlot.currentIndex >= 0 &&
-              targetSlot.currentIndex < targetSlot.songs.length)
-          ? targetSlot.songs[targetSlot.currentIndex]
+              targetSlot.currentIndex < targetSongs.length)
+          ? targetSongs[targetSlot.currentIndex]
           : null;
-      final validSongs = targetSlot.songs.where((s) => !s.isMissing).toList();
+      final validSongs = targetSongs.where((s) => !s.isMissing).toList();
 
       _debouncedPersistQueueSlots();
 
@@ -443,14 +455,18 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
     final newSong = result.fold((_) => null, (s) => s);
     if (newSong == null || isClosed) return;
 
-    _queueSlots.updateAll((slot, data) {
-      if (!data.songs.any((s) => s.id == oldId)) return data;
-      return _QueueSlotData(
-        songs: data.songs.map((s) => s.id == oldId ? newSong : s).toList(),
-        currentIndex: data.currentIndex,
-        position: data.position,
-        speed: data.speed,
-      );
+    _slotLookupCache[newSong.id] = newSong;
+    _slotLookupCache.remove(oldId);
+    _queueMutex.protect(() async {
+      _queueSlots.updateAll((slot, data) {
+        if (!data.songIds.contains(oldId)) return data;
+        return _QueueSlotData(
+          songIds: data.songIds.map((id) => id == oldId ? newId : id).toList(),
+          currentIndex: data.currentIndex,
+          position: data.position,
+          speed: data.speed,
+        );
+      });
     });
     _debouncedPersistQueueSlots();
 
@@ -487,6 +503,21 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
 
   // Requires: provided by the composing class (same library).
   Map<int, _QueueSlotData> get _queueSlots;
+
+  // Requires: provided by the composing class (same library).
+  Mutex get _queueMutex;
+
+  // Requires: provided by the composing class (same library).
+  Map<int, SongsTableData> get _slotLookupCache;
+
+  // Requires: provided by the composing class (same library).
+  void _setQueueSlot(
+    int slot, {
+    required List<SongsTableData> songs,
+    required int currentIndex,
+    required Duration position,
+    required double speed,
+  });
 
   // Requires: provided by the composing class (same library).
   int get _queueVersion;

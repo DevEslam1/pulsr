@@ -1,4 +1,5 @@
 // lib/core/services/playlist_suggestions_service.dart
+import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';
 import '../../data/db/app_database.dart';
 
@@ -28,6 +29,36 @@ class PlaylistSuggestionsService {
     _lastSongCount = null;
   }
 
+  /// Asynchronously generates smart suggested mixes using [compute] for large libraries (> 500 tracks).
+  Future<List<PlaylistSuggestion>> generateSuggestionsAsync(
+    List<SongsTableData> allSongs, {
+    bool forceRefresh = false,
+  }) async {
+    if (allSongs.isEmpty) return [];
+
+    final now = DateTime.now();
+    if (!forceRefresh &&
+        _cachedSuggestions != null &&
+        _lastGeneratedTime != null &&
+        _lastSongCount == allSongs.length &&
+        now.difference(_lastGeneratedTime!) < _cacheTtl) {
+      return _cachedSuggestions!;
+    }
+
+    List<PlaylistSuggestion> suggestions;
+    if (allSongs.length > 500) {
+      suggestions = await compute(generateSuggestionsRaw, allSongs);
+    } else {
+      suggestions = generateSuggestionsRaw(allSongs);
+    }
+
+    _cachedSuggestions = suggestions;
+    _lastGeneratedTime = now;
+    _lastSongCount = allSongs.length;
+
+    return suggestions;
+  }
+
   /// Generates smart suggested mixes based on library tracks and playback history.
   /// Uses a single-pass traversal over [allSongs] and caches results for 30 minutes.
   List<PlaylistSuggestion> generateSuggestions(List<SongsTableData> allSongs, {bool forceRefresh = false}) {
@@ -42,12 +73,23 @@ class PlaylistSuggestionsService {
       return _cachedSuggestions!;
     }
 
+    final suggestions = generateSuggestionsRaw(allSongs);
+    _cachedSuggestions = suggestions;
+    _lastGeneratedTime = now;
+    _lastSongCount = allSongs.length;
+
+    return suggestions;
+  }
+
+  static List<PlaylistSuggestion> generateSuggestionsRaw(List<SongsTableData> allSongs) {
+    if (allSongs.isEmpty) return [];
+
     final heavyRotationCandidates = <SongsTableData>[];
     final forgotten = <SongsTableData>[];
     final audiophile = <SongsTableData>[];
     final upbeat = <SongsTableData>[];
 
-    // P0-3: Single pass through allSongs, avoiding multiple 50k object allocations
+    // Single pass through allSongs
     for (final song in allSongs) {
       if (song.playCount > 0) {
         heavyRotationCandidates.add(song);
@@ -72,7 +114,7 @@ class PlaylistSuggestionsService {
     heavyRotationCandidates.sort((a, b) => b.playCount.compareTo(a.playCount));
     final heavyRotation = heavyRotationCandidates.take(25).toList();
 
-    final suggestions = <PlaylistSuggestion>[
+    return <PlaylistSuggestion>[
       if (heavyRotation.isNotEmpty)
         PlaylistSuggestion(
           title: 'Heavy Rotation Mix',
@@ -98,12 +140,6 @@ class PlaylistSuggestionsService {
           songs: upbeat,
         ),
     ];
-
-    _cachedSuggestions = suggestions;
-    _lastGeneratedTime = now;
-    _lastSongCount = allSongs.length;
-
-    return suggestions;
   }
 
   /// Seed-based similarity for Auto-DJ / Up Next.

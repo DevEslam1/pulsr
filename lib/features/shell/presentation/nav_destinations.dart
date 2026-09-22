@@ -26,38 +26,50 @@ class PulsrDestination {
 /// Settings is a primary destination again so it is always reachable from the
 /// phone dock and the tablet rail; it is also still available from the Home
 /// header gear.
-List<PulsrDestination> pulsrDestinations(BuildContext context) => [
-      PulsrDestination(
-        index: 0,
-        icon: Icons.home_outlined,
-        activeIcon: Icons.home_rounded,
-        label: context.l10n.navHome,
-      ),
-      PulsrDestination(
-        index: 1,
-        icon: Icons.library_music_outlined,
-        activeIcon: Icons.library_music_rounded,
-        label: context.l10n.navLibrary,
-      ),
-      PulsrDestination(
-        index: 2,
-        icon: Icons.search_rounded,
-        activeIcon: Icons.search_rounded,
-        label: context.l10n.navSearch,
-      ),
-      PulsrDestination(
-        index: 3,
-        icon: Icons.queue_music_outlined,
-        activeIcon: Icons.queue_music_rounded,
-        label: context.l10n.navPlaylists,
-      ),
-      PulsrDestination(
-        index: 4,
-        icon: Icons.settings_outlined,
-        activeIcon: Icons.settings_rounded,
-        label: context.l10n.navSettings,
-      ),
-    ];
+// FIX-L6: Cache navigation destinations by Locale to avoid rebuilding on every frame
+final Map<Locale, List<PulsrDestination>> _destinationsCache = {};
+
+List<PulsrDestination> pulsrDestinations(BuildContext context) {
+  final locale = Localizations.localeOf(context);
+  final cached = _destinationsCache[locale];
+  if (cached != null) return cached;
+
+  final destinations = List<PulsrDestination>.unmodifiable([
+    PulsrDestination(
+      index: 0,
+      icon: Icons.home_outlined,
+      activeIcon: Icons.home_rounded,
+      label: context.l10n.navHome,
+    ),
+    PulsrDestination(
+      index: 1,
+      icon: Icons.library_music_outlined,
+      activeIcon: Icons.library_music_rounded,
+      label: context.l10n.navLibrary,
+    ),
+    PulsrDestination(
+      index: 2,
+      icon: Icons.search_rounded,
+      activeIcon: Icons.search_rounded,
+      label: context.l10n.navSearch,
+    ),
+    PulsrDestination(
+      index: 3,
+      icon: Icons.queue_music_outlined,
+      activeIcon: Icons.queue_music_rounded,
+      label: context.l10n.navPlaylists,
+    ),
+    PulsrDestination(
+      index: 4,
+      icon: Icons.settings_outlined,
+      activeIcon: Icons.settings_rounded,
+      label: context.l10n.navSettings,
+    ),
+  ]);
+
+  _destinationsCache[locale] = destinations;
+  return destinations;
+}
 
 /// Settings' fixed shell branch index.
 const int settingsDestinationIndex = 4;

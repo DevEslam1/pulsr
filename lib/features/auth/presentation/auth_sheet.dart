@@ -198,11 +198,12 @@ class _AuthSheetState extends State<AuthSheet> {
                             : () =>
                                 context.read<AuthCubit>().signInWithGoogle(),
                         style: FilledButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black87,
+                          backgroundColor: p.surface,
+                          foregroundColor: p.textPrimary,
                           padding: const EdgeInsets.symmetric(vertical: AppSpacing.s14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(AppRadii.r14),
+                            side: BorderSide(color: p.hairline),
                           ),
                         ),
                         child: Row(
@@ -214,8 +215,8 @@ class _AuthSheetState extends State<AuthSheet> {
                               height: 20,
                               width: 20,
                               alignment: Alignment.center,
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
+                              decoration: BoxDecoration(
+                                color: p.surface,
                                 shape: BoxShape.circle,
                               ),
                               child: const Text(

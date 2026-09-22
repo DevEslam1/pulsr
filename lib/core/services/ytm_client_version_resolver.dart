@@ -139,7 +139,7 @@ class YtmClientVersionResolver {
           if (resolvedKey.isNotEmpty) {
             _apiKey = resolvedKey;
             await prefs.setString(_prefKeyApiKey, resolvedKey);
-            debugPrint('[YTM_VERSION] Resolved Innertube apiKey: $_apiKey');
+            debugPrint('[YTM_VERSION] Successfully resolved Innertube apiKey');
           }
         }
 

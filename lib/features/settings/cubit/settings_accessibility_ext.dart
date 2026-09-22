@@ -12,6 +12,8 @@ extension SettingsAccessibilityX on SettingsCubit {
   static const String _keyReduceMotion = 'setting_reduce_motion';
 
   Future<void> setReduceMotion(bool value) async {
+    // FIX-H07: Track dirty field during async load
+    markDirty('reduceMotion');
     safeEmit(state.copyWith(reduceMotion: value));
     // Reduced motion also opts out of expensive blur/shader passes.
     GpuBudget.setEnabled(value);

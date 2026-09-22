@@ -77,6 +77,8 @@ mixin SettingsProxyActions on PulsrCubit<SettingsState> {
 
     final pass = password ?? '';
     _proxyPassword = pass;
+    // FIX-C6: Reset / set _proxyPasswordLoaded whenever user sets proxy credentials
+    _proxyPasswordLoaded = true;
     final newConfig = ProxyConfig(
       enabled: enabled,
       type: type,
@@ -367,6 +369,11 @@ mixin SettingsProxyActions on PulsrCubit<SettingsState> {
   // ignore: unused_element
   String get _proxyPassword;
   set _proxyPassword(String value);
+
+  // Requires: provided by the composing class (same library).
+  // ignore: unused_element
+  bool get _proxyPasswordLoaded;
+  set _proxyPasswordLoaded(bool value);
 
   // Requires: provided by the composing class (same library).
   ProxyConfig get activeProxyConfig;

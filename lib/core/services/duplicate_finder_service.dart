@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';
 import '../../data/db/app_database.dart';
 
@@ -16,12 +17,24 @@ class DuplicateGroup {
   });
 }
 
+Future<List<DuplicateGroup>> _findDuplicatesWorker(List<SongsTableData> allSongs) async {
+  return DuplicateFinderService.findDuplicatesInternal(allSongs);
+}
+
 @singleton
 class DuplicateFinderService {
   /// Scans songs and finds verified duplicate sets.
   /// Pass 1: Identical normalized title + artist metadata.
   /// Pass 2: Duration + size pre-filtering verified via fast audio content checksums.
+  /// Offloads execution to a background isolate via [compute] for larger collections.
   Future<List<DuplicateGroup>> findDuplicates(List<SongsTableData> allSongs) async {
+    if (allSongs.length < 20) {
+      return findDuplicatesInternal(allSongs);
+    }
+    return compute(_findDuplicatesWorker, allSongs);
+  }
+
+  static Future<List<DuplicateGroup>> findDuplicatesInternal(List<SongsTableData> allSongs) async {
     final Map<String, List<SongsTableData>> byTitleArtist = {};
     final Map<String, List<SongsTableData>> byDurationSize = {};
 
@@ -58,9 +71,6 @@ class DuplicateFinderService {
     }
 
     // Pass 2: Duration + Size matches verified with audio file content checksum.
-    // Songs already captured by Pass 1 are dropped from the bucket, and every
-    // checksum cluster in the bucket is emitted (an earlier version returned on
-    // the first cluster and skipped whole buckets, silently losing duplicates).
     for (final entry in byDurationSize.entries) {
       if (entry.value.length > 1) {
         final remaining = entry.value
@@ -85,7 +95,7 @@ class DuplicateFinderService {
     return result;
   }
 
-  Future<List<List<SongsTableData>>> _verifyWithChecksum(
+  static Future<List<List<SongsTableData>>> _verifyWithChecksum(
       List<SongsTableData> candidates) async {
     final Map<String, List<SongsTableData>> byHash = {};
     for (final song in candidates) {
@@ -118,7 +128,7 @@ class DuplicateFinderService {
     }
   }
 
-  String _normalizeString(String str) {
+  static String _normalizeString(String str) {
     var s = str
         .toLowerCase()
         .replaceAll(RegExp(r'\([^)]*\)'),

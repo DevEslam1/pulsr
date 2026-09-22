@@ -2406,6 +2406,9 @@ class AppLocalizationsAr extends AppLocalizations {
       'مسح قائمة الانتظار؟ (سيتم الاحتفاظ بالمسار الحالي)';
 
   @override
+  String get queueCleared => 'تم مسح قائمة الانتظار';
+
+  @override
   String get queueSaved => 'تم حفظ القائمة';
 
   @override
@@ -3699,7 +3702,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get last7DaysActivity => 'نشاط 7 ايام';
 
   @override
-  String get topScrobbledArtists => 'اكثر الفنانين سكرابلنغ';
+  String get topScrobbledArtists => 'الفنانون الأكثر استماعاً';
 
   @override
   String get themeModeLabel => 'وضع السمة';
@@ -6547,4 +6550,16 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get nowPlayingSwipeHint => 'اسحب للأسفل للإغلاق - اسحب الغلاف للتخطي';
+
+  @override
+  String get vinylDirectDrive => 'استوديو • محرك مباشر';
+
+  @override
+  String get cassetteSideA => 'الوجه أ • النوع الثاني (CrO2)';
+
+  @override
+  String get cassettePulsrTape => 'شريط بولسر';
+
+  @override
+  String get vinylSpeedRpm => '33⅓ دورة/د';
 }

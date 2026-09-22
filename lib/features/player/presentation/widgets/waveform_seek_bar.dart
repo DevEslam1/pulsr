@@ -61,18 +61,17 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
     }
   }
 
-  /// The slice of samples currently rendered, centered on the committed
-  /// playback position. Gesture hit-testing and the painter MUST agree on this
-  /// window, otherwise a zoomed seek lands on the wrong timestamp.
+  // FIX-M8: Guard against totalCount <= 1 to prevent division by zero in calculations
   ({int startIndex, int visibleCount}) _visibleWindow(int totalCount) {
-    if (totalCount < 2) return (startIndex: 0, visibleCount: totalCount);
+    if (totalCount <= 1) return (startIndex: 0, visibleCount: totalCount);
     final int visibleCount = (totalCount / _zoomScale.clamp(1.0, 8.0))
         .round()
         .clamp(2, totalCount);
+    final effectiveMs = _dragValue ?? widget.position.inMilliseconds.toDouble();
     final double centerRatio = widget.duration.inMilliseconds > 0
-        ? widget.position.inMilliseconds / widget.duration.inMilliseconds
+        ? effectiveMs / widget.duration.inMilliseconds
         : 0.0;
-    final int centerIndex = (centerRatio * totalCount).round();
+    final int centerIndex = (centerRatio.clamp(0.0, 1.0) * totalCount).round();
     final int halfVisible = visibleCount ~/ 2;
     final int startIndex =
         (centerIndex - halfVisible).clamp(0, totalCount - visibleCount);
@@ -82,8 +81,10 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
   /// Maps a local X coordinate to a global 0..1 ratio through the visible
   /// window, so zoomed scrubbing is accurate.
   double _ratioForDx(double dx, double trackWidth, int totalCount) {
-    if (trackWidth <= 0 || totalCount <= 0) return 0.0;
+    // FIX-M8: Guard totalCount <= 1
+    if (trackWidth <= 0 || totalCount <= 1) return 0.0;
     final window = _visibleWindow(totalCount);
+    if (window.visibleCount <= 0) return 0.0;
     final double ratioInWindow = (dx / trackWidth).clamp(0.0, 1.0);
     final double globalRatio =
         (window.startIndex + ratioInWindow * window.visibleCount) / totalCount;
@@ -126,7 +127,8 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
     final decreasedLabel = labelFor(
         clampDuration(currentDuration - const Duration(seconds: 10)));
 
-    return Semantics(
+    return RepaintBoundary(
+      child: Semantics(
       slider: true,
       label: widget.semanticLabel ?? context.l10n.seekLabel,
       value: valueLabel,
@@ -137,7 +139,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
       onDecrease: () => widget.onSeek(
           clampDuration(currentDuration - const Duration(seconds: 10))),
       child: Directionality(
-      textDirection: TextDirection.ltr,
+      textDirection: Directionality.of(context),
       child: RepaintBoundary(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
@@ -209,19 +211,21 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                         clipBehavior: Clip.none,
                         children: [
                           Positioned.fill(
-                            child: CustomPaint(
-                              painter: _WaveformPainter(
-                                samples: widget.samples,
-                                progress: progressPercent,
-                                activeColor: widget.activeColor,
-                                inactiveColor: inactiveColor,
-                                chapterMarkers: widget.chapterMarkers,
-                                duration: widget.duration,
-                                loopPointA: widget.loopPointA,
-                                loopPointB: widget.loopPointB,
-                                zoomScale: _zoomScale,
-                                visibleStart: window.startIndex,
-                                visibleCount: window.visibleCount,
+                            child: RepaintBoundary(
+                              child: CustomPaint(
+                                painter: _WaveformPainter(
+                                  samples: widget.samples,
+                                  progress: progressPercent,
+                                  activeColor: widget.activeColor,
+                                  inactiveColor: inactiveColor,
+                                  chapterMarkers: widget.chapterMarkers,
+                                  duration: widget.duration,
+                                  loopPointA: widget.loopPointA,
+                                  loopPointB: widget.loopPointB,
+                                  zoomScale: _zoomScale,
+                                  visibleStart: window.startIndex,
+                                  visibleCount: window.visibleCount,
+                                ),
                               ),
                             ),
                           ),
@@ -298,6 +302,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
         ),
         ),
       ),
+    ),
     );
   }
 }
@@ -351,6 +356,8 @@ class _WaveformPainter extends CustomPainter {
     final visibleSamples = samples.sublist(startIndex, endIndex);
 
     final int count = visibleSamples.length;
+    // FIX-M8: Guard visible < 2 and count < 2 to prevent division by zero
+    if (count < 2 || visible < 2) return;
     const double spacing = 2.5;
     final double totalSpacing = spacing * (count - 1);
     final double barWidth =

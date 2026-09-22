@@ -10,11 +10,13 @@ class SearchMusicUseCase {
 
   SearchMusicUseCase(this._repository);
 
+  // FIX-H4: Add limit parameter defaulting to 500 to prevent unbounded query load
   Stream<Result<List<SongsTableData>>> searchSongs(String query,
-      {List<String> excludedFolders = const []}) {
+      {List<String> excludedFolders = const [], int limit = 500}) {
     return _repository.watchAllSongs(
       searchQuery: query,
       excludedFolders: excludedFolders,
+      limit: limit,
     );
   }
 }

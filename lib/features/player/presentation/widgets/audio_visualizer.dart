@@ -16,6 +16,7 @@ import '../../../../data/visualizer/milkdrop_preset_store.dart';
 import '../../../../data/visualizer/visualizer_preset_store.dart';
 import '../../../../domain/models/milkdrop_preset.dart';
 import '../../../../domain/models/visualizer_preset.dart';
+import '../../../../core/widgets/pulsr_toast.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -44,6 +45,7 @@ class AudioVisualizer extends StatefulWidget {
   final String? trackPath;
   final MilkdropPreset? milkdropPreset;
   final VisualizerPreset? customPreset;
+  final VoidCallback? onPermissionDenied;
 
   const AudioVisualizer({
     super.key,
@@ -58,6 +60,7 @@ class AudioVisualizer extends StatefulWidget {
     this.trackPath,
     this.milkdropPreset,
     this.customPreset,
+    this.onPermissionDenied,
   });
 
   /// Deterministic per-track seed (defect 16-05): prefers explicit trackSeed,
@@ -95,6 +98,9 @@ class _AudioVisualizerState extends State<AudioVisualizer>
 
   StreamSubscription? _subscription;
   late AnimationController _animController;
+  bool _isAppActive = true;
+  bool _permissionAsked = false;
+  bool _permissionDenied = false;
 
   static const int _numBands = 32;
   final List<double> _currentData = List.filled(_numBands, 0.0);
@@ -209,12 +215,14 @@ class _AudioVisualizerState extends State<AudioVisualizer>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      _isAppActive = true;
       if (widget.isPlaying && widget.style != VisualizerStyle.off) {
         _startAnimation();
         _restartNativeStream();
       }
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
+      _isAppActive = false;
       _stopAnimation();
       _stopNativeStream();
     }
@@ -261,12 +269,34 @@ class _AudioVisualizerState extends State<AudioVisualizer>
 
     try {
       var status = await Permission.microphone.status;
-      if (status.isDenied) {
+      if (status.isDenied && !_permissionAsked) {
+        _permissionAsked = true;
         status = await Permission.microphone.request();
       }
       if (!mounted) return;
       if (status.isGranted) {
+        if (_permissionDenied && mounted) {
+          setState(() => _permissionDenied = false);
+        }
         _subscribeToStream();
+      } else {
+        if (!_permissionDenied) {
+          widget.onPermissionDenied?.call();
+        }
+        if (mounted) setState(() => _permissionDenied = true);
+        if (status.isPermanentlyDenied) {
+          ErrorLogger.log(
+              'Microphone permission permanently denied for visualizer',
+              category: 'Visualizer');
+          if (mounted) {
+            PulsrToast.show(
+              context,
+              message: context.l10n.rcMicNeeded,
+              actionLabel: 'Settings',
+              onActionPressed: () => openAppSettings(),
+            );
+          }
+        }
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to init visualizer',
@@ -317,6 +347,8 @@ class _AudioVisualizerState extends State<AudioVisualizer>
   }
 
   void _onTick() {
+    if (!mounted || !_isAppActive || !widget.isPlaying) return;
+
     final now = DateTime.now();
     final isStale = now.difference(_lastNativeDataTime).inMilliseconds > 250;
 
@@ -402,40 +434,42 @@ class _AudioVisualizerState extends State<AudioVisualizer>
               child: ValueListenableBuilder<List<double>>(
           valueListenable: _dataNotifier,
           builder: (context, data, _) {
-            return CustomPaint(
-              size: Size(widget.width, widget.height),
-              painter: switch (effectiveStyle) {
-                VisualizerStyle.bar =>
-                  _BarVisualizerPainter(data: data, color: activeColor),
-                VisualizerStyle.wave =>
-                  _WaveVisualizerPainter(data: data, color: activeColor),
-                VisualizerStyle.circular =>
-                  _CircularVisualizerPainter(data: data, color: activeColor),
-                VisualizerStyle.particles =>
-                  _ParticlesVisualizerPainter(data: data, color: activeColor),
-                VisualizerStyle.terrain3D =>
-                  _Terrain3DVisualizerPainter(data: data, color: activeColor),
-                VisualizerStyle.albumArtReactive =>
-                  _AlbumArtReactivePainter(data: data, color: activeColor),
-                VisualizerStyle.custom => _CustomJsonVisualizerPainter(
-                    data: data,
-                    color: activeColor,
-                    preset: widget.customPreset ?? _customPreset,
-                  ),
-                VisualizerStyle.milkdrop => (_milkShader != null)
-                    ? _MilkdropGpuPainter(
-                        shader: _milkShader!,
-                        data: data,
-                        color: activeColor,
-                        preset: widget.milkdropPreset ?? _milkPreset,
-                      )
-                    : _MilkdropPainter(
-                        data: data,
-                        color: activeColor,
-                        preset: widget.milkdropPreset ?? _milkPreset,
-                      ),
-                VisualizerStyle.off => null,
-              },
+            return RepaintBoundary(
+              child: CustomPaint(
+                size: Size(widget.width, widget.height),
+                painter: switch (effectiveStyle) {
+                  VisualizerStyle.bar =>
+                    _BarVisualizerPainter(data: data, color: activeColor),
+                  VisualizerStyle.wave =>
+                    _WaveVisualizerPainter(data: data, color: activeColor),
+                  VisualizerStyle.circular =>
+                    _CircularVisualizerPainter(data: data, color: activeColor),
+                  VisualizerStyle.particles =>
+                    _ParticlesVisualizerPainter(data: data, color: activeColor),
+                  VisualizerStyle.terrain3D =>
+                    _Terrain3DVisualizerPainter(data: data, color: activeColor),
+                  VisualizerStyle.albumArtReactive =>
+                    _AlbumArtReactivePainter(data: data, color: activeColor),
+                  VisualizerStyle.custom => _CustomJsonVisualizerPainter(
+                      data: data,
+                      color: activeColor,
+                      preset: widget.customPreset ?? _customPreset,
+                    ),
+                  VisualizerStyle.milkdrop => (_milkShader != null)
+                      ? _MilkdropGpuPainter(
+                          shader: _milkShader!,
+                          data: data,
+                          color: activeColor,
+                          preset: widget.milkdropPreset ?? _milkPreset,
+                        )
+                      : _MilkdropPainter(
+                          data: data,
+                          color: activeColor,
+                          preset: widget.milkdropPreset ?? _milkPreset,
+                        ),
+                  VisualizerStyle.off => null,
+                },
+              ),
             );
           },
         ),
@@ -465,6 +499,21 @@ class _AudioVisualizerState extends State<AudioVisualizer>
                     ),
                   ),
                 ),
+              ),
+            ),
+          if (_permissionDenied && Platform.isAndroid)
+            Center(
+              child: ActionChip(
+                avatar: const Icon(Icons.mic_none_rounded, size: 16),
+                label: Text(context.l10n.rcMicNeeded),
+                onPressed: () async {
+                  final status = await Permission.microphone.request();
+                  if (status.isGranted) {
+                    _initVisualizer();
+                  } else {
+                    await openAppSettings();
+                  }
+                },
               ),
             ),
         ],

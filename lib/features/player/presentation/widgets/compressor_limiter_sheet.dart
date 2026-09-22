@@ -1,11 +1,15 @@
 // lib/features/player/presentation/widgets/compressor_limiter_sheet.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../data/audio/equalizer_manager.dart';
 import '../../../../domain/models/audio_effects_config.dart';
+import '../../cubit/player_cubit.dart';
+import '../../cubit/player_state.dart';
 
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../../../core/widgets/pulsr_toast.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -16,10 +20,14 @@ class CompressorLimiterSheet extends StatefulWidget {
   const CompressorLimiterSheet({super.key, required this.equalizerManager});
 
   static Future<void> show(BuildContext context, {required EqualizerManager equalizerManager}) {
+    final cubit = context.read<PlayerCubit>();
     return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
       wrapWithContainer: false,
-      builder: (_) => CompressorLimiterSheet(equalizerManager: equalizerManager),
+      builder: (_) => BlocProvider.value(
+        value: cubit,
+        child: CompressorLimiterSheet(equalizerManager: equalizerManager),
+      ),
     );
   }
 
@@ -49,6 +57,20 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
   @override
   void initState() {
     super.initState();
+    _syncFromManager();
+    _advancedSupported =
+        widget.equalizerManager.isCompressorAdvancedParamsSupported;
+  }
+
+  @override
+  void didUpdateWidget(covariant CompressorLimiterSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.equalizerManager != widget.equalizerManager) {
+      _syncFromManager();
+    }
+  }
+
+  void _syncFromManager() {
     _limiterEnabled = widget.equalizerManager.isLimiterEnabled;
     _thresholdDb = widget.equalizerManager.limiterThresholdDb;
     _ratio = widget.equalizerManager.compressorRatio;
@@ -60,11 +82,18 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
     _mbcF1 = widget.equalizerManager.multibandCompressorF1;
     _mbcF2 = widget.equalizerManager.multibandCompressorF2;
     _mbcBands = List.of(widget.equalizerManager.multibandCompressorBands);
-    _advancedSupported =
-        widget.equalizerManager.isCompressorAdvancedParamsSupported;
   }
 
   Future<void> _applyMbc() async {
+    if (!widget.equalizerManager.isCompressorAdvancedParamsSupported) {
+      if (mounted) {
+        PulsrToast.show(
+          context,
+          message: context.l10n.compressorLimitDesc,
+        );
+      }
+      return;
+    }
     await widget.equalizerManager.setMultibandCompressor(
       _mbcEnabled,
       f0: _mbcF0,
@@ -93,7 +122,19 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
   Widget build(BuildContext context) {
     final p = context.palette;
 
-    return Container(
+    return BlocListener<PlayerCubit, PlayerState>(
+      listenWhen: (prev, curr) =>
+          prev.dynamicsPreset != curr.dynamicsPreset ||
+          prev.isLimiterEnabled != curr.isLimiterEnabled ||
+          prev.limiterThresholdDb != curr.limiterThresholdDb ||
+          prev.limiterReleaseMs != curr.limiterReleaseMs ||
+          prev.eqPreset != curr.eqPreset,
+      listener: (context, state) {
+        if (mounted) {
+          setState(() => _syncFromManager());
+        }
+      },
+      child: Container(
       padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, AppSpacing.xl),
       decoration: BoxDecoration(
         color: p.surface,
@@ -470,8 +511,9 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildParamRow({
     required String title,

@@ -20,6 +20,7 @@ import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/cubit/ytm_search_cubit.dart';
 import '../../ytm_search/cubit/ytm_search_state.dart';
 import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
+import '../../../data/db/app_database.dart';
 import '../cubit/search_cubit.dart';
 import '../cubit/search_state.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -39,9 +40,8 @@ class _SearchScreenState extends State<SearchScreen> {
   int _selectedTab = 0;
   StreamSubscription? _settingsSub;
 
-  // Memoised derived headers. The results list object is stable within a single
-  // emission, so this avoids recomputing the artist/album sets for every row.
-  List<Object?>? _derivedCacheFor;
+  // Memoised derived headers using content hash
+  int? _derivedCacheHash;
   List<String> _derivedArtistsCache = const [];
   List<String> _derivedAlbumsCache = const [];
 
@@ -61,7 +61,6 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void initState() {
     super.initState();
-    _searchController.addListener(_onControllerChanged);
 
     // Reset to local tab if offline-only mode gets enabled
     _settingsSub = context.read<SettingsCubit?>()?.stream.listen((settings) {
@@ -71,15 +70,14 @@ class _SearchScreenState extends State<SearchScreen> {
     });
   }
 
-  void _onControllerChanged() {
-    if (mounted) setState(() {});
-  }
-
   bool _initialQueryApplied = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (!AppConfig.ytmEnabled && _selectedTab != 0) {
+      _selectedTab = 0;
+    }
     if (_initialQueryApplied) return;
     _initialQueryApplied = true;
     // Assistant / deep-link entry: prefill and run the search when the route
@@ -88,19 +86,18 @@ class _SearchScreenState extends State<SearchScreen> {
     if (q == null || q.trim().isEmpty) return;
     _searchController.text = q;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _onQueryChanged(context, q);
+      if (mounted) _onQueryChanged(context, q, immediate: true);
     });
   }
 
   @override
   void dispose() {
     _settingsSub?.cancel();
-    _searchController.removeListener(_onControllerChanged);
     _searchController.dispose();
     super.dispose();
   }
 
-  void _onQueryChanged(BuildContext context, String value) {
+  void _onQueryChanged(BuildContext context, String value, {bool immediate = false}) {
     if (_isOnlineTab) {
       context.read<YtmSearchCubit>().onQueryChanged(value);
     } else {
@@ -213,14 +210,18 @@ class _SearchScreenState extends State<SearchScreen> {
                               : context.l10n.searchPlaceholder,
                           prefixIcon:
                               Icon(Icons.search_rounded, color: p.textTertiary),
-                          suffixIcon: _searchController.text.isNotEmpty
-                                ? IconButton(
-                                    icon: Icon(Icons.clear_rounded,
-                                        color: p.textTertiary),
-                                    tooltip: context.l10n.clear,
-                                    onPressed: () => _clear(context),
-                                  )
-                              : null,
+                          suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                            valueListenable: _searchController,
+                            builder: (context, val, _) {
+                              if (val.text.isEmpty) return const SizedBox.shrink();
+                              return IconButton(
+                                icon: Icon(Icons.clear_rounded,
+                                    color: p.textTertiary),
+                                tooltip: context.l10n.clear,
+                                onPressed: () => _clear(context),
+                              );
+                            },
+                          ),
                         ),
                       ),
                     ),
@@ -438,8 +439,19 @@ class _SearchScreenState extends State<SearchScreen> {
         ? _derivedAlbums(state).take(3).toList()
         : const <String>[];
     final headerCount = derivedArtists.length + derivedAlbums.length;
-    return ListView.builder(
-        padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom, top: AppSpacing.xxs),
+    return RefreshIndicator(
+      color: p.accent,
+      backgroundColor: p.surfaceContainer,
+      onRefresh: () async {
+        context.read<SearchCubit>().onQueryChanged(state.query);
+      },
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics()),
+        addAutomaticKeepAlives: false,
+        addRepaintBoundaries: true,
+        padding: const EdgeInsets.only(
+            bottom: AppSpacing.scrollBottom, top: AppSpacing.xxs),
         itemCount: state.results.length + headerCount,
         itemBuilder: (context, index) {
           if (index < headerCount) {
@@ -454,12 +466,24 @@ class _SearchScreenState extends State<SearchScreen> {
             onMorePressed: () => SongInfoSheet.show(context, song: song),
           );
         },
+      ),
+    );
+  }
+
+    int _computeResultsHash(List<SongsTableData> results) {
+      if (results.isEmpty) return 0;
+      return Object.hash(
+        results.length,
+        results.first.id,
+        results.last.id,
+        results[results.length ~/ 2].id,
       );
     }
 
     void _ensureDerivedCache(SearchState state) {
-      if (identical(_derivedCacheFor, state.results)) return;
-      _derivedCacheFor = state.results;
+      final hash = _computeResultsHash(state.results);
+      if (_derivedCacheHash == hash) return;
+      _derivedCacheHash = hash;
       final artists = <String>[];
       final albums = <String>[];
       final seenA = <String>{};
@@ -484,10 +508,10 @@ class _SearchScreenState extends State<SearchScreen> {
       return _derivedAlbumsCache;
     }
 
-    Widget? _buildDerivedHeader(BuildContext context, int index,
+    Widget _buildDerivedHeader(BuildContext context, int index,
         List<String> artists, List<String> albums, PulsrPalette p) {
       final total = artists.length + albums.length;
-      if (index >= total) return null;
+      if (index >= total) return const SizedBox.shrink();
       if (index < artists.length) {
         final name = artists[index];
         return ListTile(
@@ -659,18 +683,32 @@ class _OnlineResults extends StatelessWidget {
         }
 
         final songs = [for (final track in state.results) track.toSongData()];
-        return ListView.builder(
-          padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom, top: AppSpacing.xxs),
-          itemCount: songs.length,
-          itemBuilder: (context, index) {
-            final song = songs[index];
-            return SongTile(
-              song: song,
-              subtitleOverride: state.results[index].artist,
-              onTap: () => playerCubit.playSong(song, queue: songs),
-              trailing: YtmDownloadButton(song: song),
-            );
+        return RefreshIndicator(
+          color: p.accent,
+          backgroundColor: p.surfaceContainer,
+          onRefresh: () async {
+            if (state.query.isNotEmpty) {
+              context.read<YtmSearchCubit>().onQueryChanged(state.query);
+            }
           },
+          child: ListView.builder(
+            physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics()),
+            addAutomaticKeepAlives: false,
+            addRepaintBoundaries: true,
+            padding: const EdgeInsets.only(
+                bottom: AppSpacing.scrollBottom, top: AppSpacing.xxs),
+            itemCount: songs.length,
+            itemBuilder: (context, index) {
+              final song = songs[index];
+              return SongTile(
+                song: song,
+                subtitleOverride: state.results[index].artist,
+                onTap: () => playerCubit.playSong(song, queue: songs),
+                trailing: YtmDownloadButton(song: song),
+              );
+            },
+          ),
         );
       },
     );

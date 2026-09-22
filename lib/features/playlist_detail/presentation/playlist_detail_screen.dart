@@ -188,18 +188,31 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     final p = context.palette;
     final playlistUseCases = _useCases;
 
-    final Stream<_PlaylistSongsResult> songsStream =
-        playlist.isSmart && playlist.smartCriteria != null
-            ? playlistUseCases
-                .watchSmartPlaylistSongs(
-                    SmartCriteria.fromJsonString(playlist.smartCriteria!))
-                .map((songs) => _PlaylistSongsResult(songs: songs))
-            : playlistUseCases.watchPlaylistSongs(playlist.id).map(
-                  (res) => res.fold(
-                    (failure) => _PlaylistSongsResult(error: failure.message),
-                    (songs) => _PlaylistSongsResult(songs: songs),
-                  ),
-                );
+    final Stream<_PlaylistSongsResult> songsStream;
+    if (playlist.isSmart && playlist.smartCriteria != null) {
+      SmartCriteria? criteria;
+      try {
+        criteria = SmartCriteria.fromJsonString(playlist.smartCriteria!);
+      } catch (_) {
+        criteria = null;
+      }
+      if (criteria != null) {
+        songsStream = playlistUseCases
+            .watchSmartPlaylistSongs(criteria)
+            .map((songs) => _PlaylistSongsResult(songs: songs));
+      } else {
+        songsStream = Stream.value(
+          const _PlaylistSongsResult(songs: <SongsTableData>[]),
+        );
+      }
+    } else {
+      songsStream = playlistUseCases.watchPlaylistSongs(playlist.id).map(
+            (res) => res.fold(
+              (failure) => _PlaylistSongsResult(error: failure.message),
+              (songs) => _PlaylistSongsResult(songs: songs),
+            ),
+          );
+    }
 
     return StreamBuilder<_PlaylistSongsResult>(
       stream: songsStream,
@@ -253,8 +266,36 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                       await _sharePlaylist(context, songs);
                       break;
                     case 'delete':
+                      final messenger = ScaffoldMessenger.of(context);
+                      final undoLabel = context.l10n.undo;
+                      final plName = playlist.name;
+                      final isSmart = playlist.isSmart;
+                      final smartCriteria = playlist.smartCriteria;
+                      final songIds = songs.map((s) => s.id).toList();
                       await playlistUseCases.deletePlaylist(playlist.id);
                       if (context.mounted) Navigator.pop(context);
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text('$plName - $undoLabel?'),
+                          action: SnackBarAction(
+                            label: undoLabel,
+                            onPressed: () async {
+                              final res = await playlistUseCases.createPlaylist(
+                                plName,
+                                isSmart: isSmart,
+                                smartCriteria: smartCriteria,
+                              );
+                              if (!isSmart && songIds.isNotEmpty) {
+                                final newId = res.getOrElse((_) => -1);
+                                if (newId > 0) {
+                                  await playlistUseCases.addSongsToPlaylist(
+                                      newId, songIds);
+                                }
+                              }
+                            },
+                          ),
+                        ),
+                      );
                       break;
                   }
                 },
@@ -345,6 +386,8 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                               : context.l10n.emptyPlaylist,
                         )
                       : ListView.builder(
+                          addAutomaticKeepAlives: false,
+                          addRepaintBoundaries: true,
                           padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom),
                           itemCount: songs.length + 1,
                           itemBuilder: (context, index) {
@@ -352,11 +395,15 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                               return Padding(
                                 padding: EdgeInsets.symmetric(
                                     horizontal: Adaptive.pagePadding(context),
-                                    vertical: 12),
+                                    vertical: AppSpacing.sm),
                                 child: Row(
                                   children: [
                                     Expanded(
-                                      child: ElevatedButton.icon(
+                                      child: FilledButton.icon(
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: p.accent,
+                                          foregroundColor: p.onAccent,
+                                        ),
                                         onPressed: () {
                                           context.read<PlayerCubit>().playSong(
                                               songs.first,

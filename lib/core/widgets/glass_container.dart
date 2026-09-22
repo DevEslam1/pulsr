@@ -115,7 +115,7 @@ class GlassContainer extends StatelessWidget {
             boxShadow: effectiveShadow,
           );
 
-    Widget decoratedContent = Container(
+    final Widget decoratedContent = Container(
       decoration: decoration,
       child: Stack(
         children: [

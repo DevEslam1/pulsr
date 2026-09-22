@@ -241,9 +241,10 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
     }).toList();
 
     if (results.isEmpty) {
+      final suggestions = ['Equalizer', 'Theme', 'Downloads', 'Smart Audio', 'Volume', 'Timer'];
       return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.lg),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -274,6 +275,22 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
               ),
+              const SizedBox(height: AppSpacing.md),
+              Wrap(
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xs,
+                alignment: WrapAlignment.center,
+                children: suggestions.map((s) {
+                  return ActionChip(
+                    label: Text(s, style: TextStyle(fontSize: AppFontSize.tiny, color: p.textPrimary)),
+                    backgroundColor: p.surfaceContainer,
+                    side: BorderSide(color: p.hairline),
+                    onPressed: () {
+                      _searchController.text = s;
+                    },
+                  );
+                }).toList(),
+              ),
             ],
           ),
         ),
@@ -281,15 +298,31 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
     }
 
     return ListView.builder(
+      addAutomaticKeepAlives: false,
+      addRepaintBoundaries: true,
       padding: EdgeInsetsDirectional.only(
         bottom: AppSpacing.scrollBottom,
         top: 8,
         start: Adaptive.pagePadding(context),
         end: Adaptive.pagePadding(context),
       ),
-      itemCount: results.length,
+      itemCount: results.length + 1,
       itemBuilder: (context, i) {
-        final r = results[i];
+        if (i == 0) {
+          return Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.xs, 0, AppSpacing.xs, AppSpacing.sm),
+            child: Text(
+              '${results.length} ${results.length == 1 ? "setting" : "settings"} found',
+              style: TextStyle(
+                color: p.textTertiary,
+                fontSize: AppFontSize.caption,
+                fontWeight: FontWeight.w700,
+                letterSpacing: AppTracking.label,
+              ),
+            ),
+          );
+        }
+        final r = results[i - 1];
         return Padding(
           padding: const EdgeInsets.only(bottom: AppSpacing.xs),
           child: Material(
@@ -301,19 +334,12 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
             clipBehavior: Clip.antiAlias,
             child: ListTile(
               leading: _iconBox(context, r.icon),
-              title: Row(
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: Text(
-                      r.title,
-                      style: TextStyle(
-                        color: p.textPrimary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: AppFontSize.body,
-                      ),
-                    ),
-                  ),
                   Container(
+                    margin: const EdgeInsets.only(bottom: AppSpacing.xxs),
                     padding:
                         const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
                     decoration: BoxDecoration(
@@ -330,11 +356,31 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
                       ),
                     ),
                   ),
+                  _buildHighlightedText(
+                    r.title,
+                    query,
+                    baseStyle: TextStyle(
+                      color: p.textPrimary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: AppFontSize.body,
+                    ),
+                    matchStyle: TextStyle(
+                      color: p.accent,
+                      fontWeight: FontWeight.w900,
+                      fontSize: AppFontSize.body,
+                    ),
+                  ),
                 ],
               ),
-              subtitle: Text(
+              subtitle: _buildHighlightedText(
                 r.subtitle,
-                style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
+                query,
+                baseStyle: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
+                matchStyle: TextStyle(
+                  color: p.accent,
+                  fontWeight: FontWeight.w800,
+                  fontSize: AppFontSize.label,
+                ),
               ),
               trailing: r.trailing ??
                   Icon(Icons.chevron_right_rounded,
@@ -711,4 +757,29 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
 
   // Requires: provided by the composing class (same library).
   Widget _switchTile( BuildContext context, IconData icon, String title, String subtitle, { required bool value, required ValueChanged<bool> onChanged, });
+
+  Widget _buildHighlightedText(
+    String text,
+    String query, {
+    required TextStyle baseStyle,
+    required TextStyle matchStyle,
+  }) {
+    if (query.isEmpty) return Text(text, style: baseStyle);
+    final spans = <TextSpan>[];
+    int start = 0;
+    final lower = text.toLowerCase();
+    while (true) {
+      final index = lower.indexOf(query, start);
+      if (index == -1) {
+        spans.add(TextSpan(text: text.substring(start), style: baseStyle));
+        break;
+      }
+      if (index > start) {
+        spans.add(TextSpan(text: text.substring(start, index), style: baseStyle));
+      }
+      spans.add(TextSpan(text: text.substring(index, index + query.length), style: matchStyle));
+      start = index + query.length;
+    }
+    return Text.rich(TextSpan(children: spans));
+  }
 }

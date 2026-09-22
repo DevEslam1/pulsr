@@ -46,7 +46,8 @@ class _TagEditorView extends StatelessWidget {
     final p = context.palette;
     return BlocConsumer<TagEditorCubit, TagEditorState>(
       listener: (context, state) {
-        final messenger = ScaffoldMessenger.of(context);
+        final messenger = ScaffoldMessenger.maybeOf(context);
+        if (messenger == null) return;
         if (state.status == TagEditorStatus.success) {
           messenger
             ..clearSnackBars()
@@ -288,7 +289,7 @@ class _AutoFetchButton extends StatelessWidget {
 
   Future<void> _run(BuildContext context) async {
     final p = context.palette;
-    final messenger = ScaffoldMessenger.of(context);
+    final messenger = ScaffoldMessenger.maybeOf(context);
     if (state.isBatchMode) {
       final resolved = await cubit.autoFetchBatchTags();
       if (!context.mounted) return;
@@ -296,8 +297,8 @@ class _AutoFetchButton extends StatelessWidget {
           ? 'Online metadata filled for $resolved track${resolved == 1 ? '' : 's'} (shared fields only)'
           : context.l10n.noOnlineMetadata;
       messenger
-        ..clearSnackBars()
-        ..showSnackBar(
+        ?.clearSnackBars();
+      messenger?.showSnackBar(
           SnackBar(
             content: Text(message),
             backgroundColor: resolved > 0 ? p.accent : null,
@@ -310,8 +311,8 @@ class _AutoFetchButton extends StatelessWidget {
     if (!context.mounted) return;
     if (matches.isEmpty) {
       messenger
-        ..clearSnackBars()
-        ..showSnackBar(SnackBar(content: Text(context.l10n.noOnlineMetadata)));
+        ?.clearSnackBars();
+      messenger?.showSnackBar(SnackBar(content: Text(context.l10n.noOnlineMetadata)));
       return;
     }
 
@@ -319,8 +320,8 @@ class _AutoFetchButton extends StatelessWidget {
       final ok = await cubit.applyMetadataResult(matches.first);
       if (ok && context.mounted) {
         messenger
-          ..clearSnackBars()
-          ..showSnackBar(SnackBar(
+          ?.clearSnackBars();
+        messenger?.showSnackBar(SnackBar(
             content: Text(context.l10n.onlineMetadataApplied),
             backgroundColor: p.accent,
           ));
@@ -338,8 +339,8 @@ class _AutoFetchButton extends StatelessWidget {
       final ok = await cubit.applyMetadataResult(selected);
       if (ok && context.mounted) {
         messenger
-          ..clearSnackBars()
-          ..showSnackBar(SnackBar(
+          ?.clearSnackBars();
+        messenger?.showSnackBar(SnackBar(
             content: Text(context.l10n.onlineMetadataApplied),
             backgroundColor: p.accent,
           ));
@@ -422,6 +423,23 @@ class _MetadataMatchSheet extends StatelessWidget {
                             width: 44,
                             height: 44,
                             fit: BoxFit.cover,
+                            cacheWidth: 88,
+                            cacheHeight: 88,
+                            loadingBuilder: (context, child, progress) => progress == null
+                                ? child
+                                : Container(
+                                    width: 44,
+                                    height: 44,
+                                    color: p.surfaceContainer,
+                                    child: Center(
+                                      child: SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2, color: p.accent),
+                                      ),
+                                    ),
+                                  ),
                             errorBuilder: (_, __, ___) => Icon(
                                 Icons.music_note_rounded,
                                 color: p.accent),

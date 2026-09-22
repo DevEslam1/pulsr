@@ -1,4 +1,5 @@
 // lib/features/library/presentation/favorites_screen.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/config/app_config.dart';
@@ -34,11 +35,20 @@ class FavoritesScreen extends StatefulWidget {
 class _FavoritesScreenState extends State<FavoritesScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  Timer? _searchDebounce;
   bool _isSearchOpen = false;
   int _favTabFilter = 0; // 0: Local, 1: Online
 
   @override
+  void deactivate() {
+    // FIX-M2: Cancel debounce timer in deactivate to prevent setState while inactive
+    _searchDebounce?.cancel();
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -94,7 +104,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                     hintStyle: TextStyle(color: p.textTertiary),
                     border: InputBorder.none,
                   ),
-                  onChanged: (v) => setState(() => _searchQuery = v.trim()),
+                  onChanged: (v) {
+                    _searchDebounce?.cancel();
+                    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+                      if (mounted) setState(() => _searchQuery = v.trim());
+                    });
+                  },
                 )
               : Text(
                   l10n.favorites,
@@ -108,6 +123,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 ),
                 tooltip: _isSearchOpen ? context.l10n.close : context.l10n.search,
               onPressed: () {
+                _searchDebounce?.cancel();
                 setState(() {
                   if (_isSearchOpen) {
                     _searchController.clear();

@@ -120,8 +120,8 @@ void main() {
   test('resume must verify 206 not 200 append corruption', () {
     // Simulate server reply 200 to Range request → must discard existing part, not append
     int existingBytes = 500000;
-    int serverStatus = 200; // ignored Range
-    bool shouldAppend = serverStatus == 206;
+    final int serverStatus = 200; // ignored Range
+    final bool shouldAppend = serverStatus == 206;
     int finalSize;
     if (shouldAppend) {
       finalSize = existingBytes + 1000000;

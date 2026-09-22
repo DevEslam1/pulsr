@@ -17,7 +17,9 @@ class BatteryOptimizationCard extends StatefulWidget {
       _BatteryOptimizationCardState();
 }
 
-class _BatteryOptimizationCardState extends State<BatteryOptimizationCard> {
+// FIX-M10: Add WidgetsBindingObserver to refresh battery status on app resume
+class _BatteryOptimizationCardState extends State<BatteryOptimizationCard>
+    with WidgetsBindingObserver {
   bool _isDismissed = false;
   bool _isIgnoring = true;
   String _manufacturer = '';
@@ -25,7 +27,21 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _checkStatus();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkStatus();
+    }
   }
 
   Future<void> _checkStatus() async {
@@ -77,11 +93,11 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard> {
                   ),
                 ),
               ),
-                IconButton(
-                  icon:
-                      Icon(Icons.close_rounded, size: 18, color: p.textTertiary),
-                  tooltip: context.l10n.close,
-                  onPressed: () async {
+              IconButton(
+                icon:
+                    Icon(Icons.close_rounded, size: 18, color: p.textTertiary),
+                tooltip: context.l10n.close,
+                onPressed: () async {
                   await BatteryOptimizationService.dismissCard();
                   setState(() => _isDismissed = true);
                 },

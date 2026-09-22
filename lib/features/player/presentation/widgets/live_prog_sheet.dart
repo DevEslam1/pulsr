@@ -1,9 +1,12 @@
 // lib/features/player/presentation/widgets/live_prog_sheet.dart
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/audio_feature_info.dart';
+import '../../../../core/constants/prefs_keys.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../data/audio/live_prog_slider_persistence.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -97,6 +100,20 @@ spl1 = spl1 + lp1 * amount;''',
     _codeController = TextEditingController(
       text: current.isNotEmpty ? current : _scriptPresets.values.first,
     );
+    _restoreSliders();
+  }
+
+  Future<void> _restoreSliders() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(PrefsKeys.liveProgSliders);
+      final saved = decodeLiveProgSliders(raw);
+      if (saved.isNotEmpty && mounted) {
+        setState(() {
+          _sliderValues.addAll(saved);
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -251,13 +268,13 @@ spl1 = spl1 + lp1 * amount;''',
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          ElevatedButton.icon(
+                          FilledButton.icon(
                             onPressed: () => _compileAndRun(context),
                             icon: const Icon(Icons.play_arrow_rounded, size: 16),
                             label: Text(context.l10n.compileRun),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: p.primary,
-                              foregroundColor: Colors.white,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: p.accent,
+                              foregroundColor: p.onAccent,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(AppRadii.r10),
                               ),

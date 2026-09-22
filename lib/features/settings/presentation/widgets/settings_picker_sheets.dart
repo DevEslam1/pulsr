@@ -320,8 +320,9 @@ void showAboutSheet(BuildContext context) {
               children: [
                 Icon(Icons.code_rounded, size: 14, color: p.accent),
                 const SizedBox(width: AppSpacing.xs),
+                // FIX-L8: Extract developer name constant to AppConfig.developerName
                 Text(
-                  'Developer: ${'Eslam Mahmoud'}',
+                  'Developer: ${AppConfig.developerName}',
                   style: TextStyle(
                     color: p.accent,
                     fontWeight: FontWeight.w600,

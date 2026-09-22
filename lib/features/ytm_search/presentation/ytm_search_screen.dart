@@ -43,7 +43,8 @@ class _YtmSearchView extends StatefulWidget {
 
 class _YtmSearchViewState extends State<_YtmSearchView> {
   final TextEditingController _searchController = TextEditingController();
-  Future<List<String>>? _historyFuture;
+  List<String> _history = const [];
+  bool _historyLoaded = false;
 
   @override
   void initState() {
@@ -51,11 +52,22 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
     _refreshHistory();
   }
 
-  void _refreshHistory() {
+  Future<void> _refreshHistory() async {
     try {
-      _historyFuture = context.read<YtmSearchCubit>().getSearchHistory();
+      final items = await context.read<YtmSearchCubit>().getSearchHistory();
+      if (mounted) {
+        setState(() {
+          _history = items;
+          _historyLoaded = true;
+        });
+      }
     } catch (_) {
-      _historyFuture = Future.value(const <String>[]);
+      if (mounted) {
+        setState(() {
+          _history = const [];
+          _historyLoaded = true;
+        });
+      }
     }
   }
 
@@ -86,7 +98,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
             child: BlocListener<YtmSearchCubit, YtmSearchState>(
               listenWhen: (prev, curr) =>
                   prev.results != curr.results && curr.results.isNotEmpty,
-              listener: (_, __) => setState(_refreshHistory),
+              listener: (_, __) => _refreshHistory(),
               child: BlocBuilder<YtmSearchCubit, YtmSearchState>(
               builder: (context, state) {
                 return Column(
@@ -138,66 +150,63 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
 
   Widget _buildHistory(BuildContext context, PulsrPalette p) {
     final cubit = context.read<YtmSearchCubit>();
-    return FutureBuilder<List<String>>(
-      future: _historyFuture,
-      builder: (context, snapshot) {
-        final history = snapshot.data ?? const <String>[];
-        if (history.isEmpty) {
-          return EmptyStateWidget(
-            icon: Icons.travel_explore_rounded,
-            title: context.l10n.searchYtm,
-            subtitle: context.l10n.browseYtmSearchScreenDesc,
-          );
-        }
-        return ListView(
-          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xxs, AppSpacing.md, 160),
+    if (!_historyLoaded) {
+      return const SizedBox.shrink();
+    }
+    if (_history.isEmpty) {
+      return EmptyStateWidget(
+        icon: Icons.travel_explore_rounded,
+        title: context.l10n.searchYtm,
+        subtitle: context.l10n.browseYtmSearchScreenDesc,
+      );
+    }
+    return ListView(
+      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xxs, AppSpacing.md, 160),
+      children: [
+        Row(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    context.l10n.history,
-                    style: TextStyle(
-                      color: p.textSecondary,
-                      fontSize: AppFontSize.label,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+            Expanded(
+              child: Text(
+                context.l10n.history,
+                style: TextStyle(
+                  color: p.textSecondary,
+                  fontSize: AppFontSize.label,
+                  fontWeight: FontWeight.w700,
                 ),
-                TextButton(
-                  onPressed: () async {
-                    await cubit.clearHistory();
-                    if (mounted) setState(_refreshHistory);
-                  },
-                  child: Text(context.l10n.browseClearHistory),
-                ),
-              ],
+              ),
             ),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final h in history)
-                  ActionChip(
-                    label: Text(h,
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
-                    avatar: Icon(Icons.history_rounded,
-                        size: 16, color: p.textTertiary),
-                    onPressed: () {
-                      _searchController.text = h;
-                      cubit.onQueryChanged(h);
-                    },
-                  ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              context.l10n.browseYtmSearchScreenDesc,
-              style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label),
+            TextButton(
+              onPressed: () async {
+                await cubit.clearHistory();
+                if (mounted) _refreshHistory();
+              },
+              child: Text(context.l10n.browseClearHistory),
             ),
           ],
-        );
-      },
+        ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final h in _history)
+              ActionChip(
+                label: Text(h,
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                avatar: Icon(Icons.history_rounded,
+                    size: 16, color: p.textTertiary),
+                onPressed: () {
+                  _searchController.text = h;
+                  cubit.onQueryChanged(h);
+                },
+              ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Text(
+          context.l10n.browseYtmSearchScreenDesc,
+          style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label),
+        ),
+      ],
     );
   }
 
@@ -262,12 +271,16 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
         ),
         Expanded(
           child: RefreshIndicator(
+            color: p.accent,
+            backgroundColor: p.surfaceContainer,
             onRefresh: () async {
               cubit.retry();
               await Future.delayed(const Duration(milliseconds: 300));
             },
             child: ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
+              addAutomaticKeepAlives: false,
+              addRepaintBoundaries: true,
               padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom, top: AppSpacing.xxs),
               itemCount: songs.length,
               itemBuilder: (context, index) {

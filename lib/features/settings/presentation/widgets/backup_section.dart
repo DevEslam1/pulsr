@@ -1,6 +1,5 @@
 // lib/features/settings/presentation/widgets/backup_section.dart
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -103,30 +102,12 @@ class _BackupSectionState extends State<BackupSection> {
     if (result == null) return;
     const maxBackupBytes = 10 * 1024 * 1024;
 
-    String? jsonContent;
-    final webBytes = (result as dynamic).bytes as Uint8List?;
-    if (webBytes != null && webBytes.isNotEmpty) {
-      // Web / in-memory pick path.
-      if (webBytes.length > maxBackupBytes) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(context.l10n.backupTooLarge),
-              backgroundColor: context.palette.error,
-            ),
-          );
-        }
-        return;
-      }
-      jsonContent = utf8.decode(webBytes);
-    } else {
-      if (result.path == null) return;
-      final filePath = result.path!;
-      final file = File(filePath);
-
-    if (!await file.exists()) {
+    final length = await result.length();
+    if (length > maxBackupBytes) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.backupMissing),
+          SnackBar(
+            content: Text(context.l10n.backupTooLarge),
             backgroundColor: context.palette.error,
           ),
         );
@@ -134,19 +115,8 @@ class _BackupSectionState extends State<BackupSection> {
       return;
     }
 
-    jsonContent ??= await file.readAsString();
-    } // end file-path branch
-    final resolvedContent = jsonContent;
-    if (resolvedContent.length > maxBackupBytes) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.backupTooLarge),
-            backgroundColor: context.palette.error,
-          ),
-        );
-      }
-      return;
-    }
+    final bytes = await result.readAsBytes();
+    final resolvedContent = utf8.decode(bytes);
     Map<String, dynamic> data;
     try {
       data = jsonDecode(resolvedContent) as Map<String, dynamic>;
@@ -205,11 +175,11 @@ class _BackupSectionState extends State<BackupSection> {
           child: Text(context.l10n.cancel,
               style: TextStyle(color: context.palette.textSecondary)),
         ),
-        ElevatedButton(
+        FilledButton(
           onPressed: () => Navigator.pop(context, true),
-          style: ElevatedButton.styleFrom(
+          style: FilledButton.styleFrom(
             backgroundColor: context.palette.accent,
-            foregroundColor: Colors.white,
+            foregroundColor: context.palette.onAccent,
           ),
           child: Text(context.l10n.confirmRestore),
         ),

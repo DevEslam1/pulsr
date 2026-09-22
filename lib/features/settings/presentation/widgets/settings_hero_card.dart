@@ -115,15 +115,27 @@ class SettingsHeroCard extends StatelessWidget {
                                   ),
                                   child: user?.photoURL != null
                                       ? ClipOval(
-                                          child: Image.network(
-                                            user!.photoURL!,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (_, __, ___) => Icon(
-                                              Icons.person_rounded,
-                                              color: p.accent,
-                                              size: 26,
-                                            ),
-                                          ),
+                                           child: Image.network(
+                                             user!.photoURL!,
+                                             fit: BoxFit.cover,
+                                             cacheWidth: 104,
+                                             cacheHeight: 104,
+                                             loadingBuilder: (context, child, progress) => progress == null
+                                                 ? child
+                                                 : Center(
+                                                     child: SizedBox(
+                                                       width: 16,
+                                                       height: 16,
+                                                       child: CircularProgressIndicator(
+                                                           strokeWidth: 2, color: p.accent),
+                                                     ),
+                                                   ),
+                                             errorBuilder: (_, __, ___) => Icon(
+                                               Icons.person_rounded,
+                                               color: p.accent,
+                                               size: 26,
+                                             ),
+                                           ),
                                         )
                                       : Icon(
                                           user != null
@@ -330,6 +342,9 @@ class SettingsHeroCard extends StatelessWidget {
   }
 
   Widget _buildYtmRow(BuildContext context, PulsrPalette p) {
+    if (!getIt.isRegistered<YtmAccountService>()) {
+      return const SizedBox.shrink();
+    }
     final ytmAccount = getIt<YtmAccountService>();
     return ValueListenableBuilder<bool>(
       valueListenable: ytmAccount.loginState,

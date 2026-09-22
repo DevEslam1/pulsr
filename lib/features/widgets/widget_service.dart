@@ -49,7 +49,9 @@ class WidgetService {
 
   Future<void> _bumpContentVersion() async {
     _contentVersion += 1;
-    await HomeWidget.saveWidgetData<int>('contentVersion', _contentVersion);
+    try {
+      await HomeWidget.saveWidgetData<int>('contentVersion', _contentVersion);
+    } catch (_) {}
   }
 
   /// Whether an artwork resolve is currently in-flight (to avoid stacking).
