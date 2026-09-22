@@ -1,7 +1,9 @@
-// lib/features/downloads/cubit/downloads_cubit.dart
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
+
+import 'package:mutex/mutex.dart';
 
 import '../../../core/bloc/base_cubit.dart';
 import '../../../core/errors/failures.dart';
@@ -29,6 +31,9 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
   final IDownloadRepository? _downloadRepository; // FIX-I02
 
   StreamSubscription<DownloadTask>? _downloadSub;
+  // FIX-A06: Monotonic clock for download event throttling and deletion tracking
+  final Stopwatch _throttleStopwatch = Stopwatch()..start();
+  int get _nowMs => _throttleStopwatch.elapsedMilliseconds;
   final Map<String, int> _lastEmitTimeByVideoId = {};
   Timer? _storageStatsDebounceTimer; // FIX-A14: debounce storage stats refresh
 
@@ -38,6 +43,8 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
   /// (the repository has already dropped it, so no further events ever come).
   static const int _deletedIgnoreWindowMs = 5000;
   final Map<String, int> _deletedAtMsByVideoId = {};
+  // FIX-G2: Single-writer mutex for tombstone mutations
+  final Mutex _deleteMutex = Mutex();
 
   /// Storage-stat refreshes are fired unawaited from the task listener and
   /// from delete paths; concurrent runs could complete out of order and let a
@@ -52,6 +59,11 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
   /// `downloading` forever would otherwise leak an entry each.
   static const int _maxThrottleEntries = 128;
 
+  // FIX-C4: Track boot timestamp for monotonic comparison across re-initialization
+  int _bootTimestamp = DateTime.now().millisecondsSinceEpoch;
+  @visibleForTesting
+  int get bootTimestamp => _bootTimestamp;
+
   DownloadsCubit(
     this._queueDownloadUseCase,
     this._pauseDownloadUseCase,
@@ -65,7 +77,21 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     _init();
   }
 
+  Future<void> _pruneDeletedTombstones() async {
+    await _deleteMutex.protect(() async {
+      final now = _nowMs;
+      _deletedAtMsByVideoId.removeWhere(
+          (_, deletedAt) => now - deletedAt >= _deletedIgnoreWindowMs);
+    });
+  }
+
   Future<void> _init() async {
+    // FIX-C4: Reset tombstones and update boot timestamp at start of init
+    await _deleteMutex.protect(() async {
+      _deletedAtMsByVideoId.clear();
+    });
+    _bootTimestamp = DateTime.now().millisecondsSinceEpoch;
+    await _pruneDeletedTombstones();
     safeEmit(state.copyWith(isLoading: true));
     try {
       // FIX-I02: Reconcile on boot from cubit init rather than repository constructor
@@ -79,6 +105,11 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
       _subscribeToDownloadUpdates();
       await loadInitialTasks();
       await refreshStorageStats();
+      // B-11 / FIX-C4: Periodic prune of deleted tombstones older than ignore window
+      autoTimer(Timer.periodic(const Duration(seconds: 30), (_) {
+        if (isClosed) return;
+        _pruneDeletedTombstones();
+      }));
     } catch (e, st) {
       // _init runs from the constructor: an unexpected throw (a use case
       // throwing instead of returning Left) would otherwise escape as an
@@ -150,7 +181,7 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     // Events are flowing again: reset the resubscribe backoff.
     _resubscribeAttempts = 0;
 
-    final now = DateTime.now().millisecondsSinceEpoch;
+    final now = _nowMs;
     _deletedAtMsByVideoId
         .removeWhere((_, deletedAt) => now - deletedAt >= _deletedIgnoreWindowMs);
     if (_deletedAtMsByVideoId.containsKey(task.videoId)) {
@@ -195,13 +226,26 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
             t.status.isTerminal ||
             t.status == DownloadStatus.paused;
       });
+      // B-12: Replace fallback clear() with targeted eviction of non-active/terminal tasks and oldest entries
       if (_lastEmitTimeByVideoId.length > _maxThrottleEntries) {
-        // Pathological growth: reset rather than grow unbounded.
-        _lastEmitTimeByVideoId.clear();
+        _lastEmitTimeByVideoId.removeWhere((videoId, _) {
+          final t = updatedTasks[videoId];
+          return t == null || t.status.isTerminal;
+        });
+        if (_lastEmitTimeByVideoId.length > _maxThrottleEntries) {
+          final entries = _lastEmitTimeByVideoId.entries.toList()
+            ..sort((a, b) => a.value.compareTo(b.value));
+          final toRemove = entries.take(_lastEmitTimeByVideoId.length - _maxThrottleEntries);
+          for (final e in toRemove) {
+            _lastEmitTimeByVideoId.remove(e.key);
+          }
+        }
       }
     }
 
-    if (task.status == DownloadStatus.complete ||
+    // FIX-H03: Clean up throttle entry for all terminal states
+    if (task.status.isTerminal ||
+        task.status == DownloadStatus.complete ||
         task.status == DownloadStatus.failed) {
       _lastEmitTimeByVideoId.remove(task.videoId);
       _scheduleDebouncedStorageStats(); // FIX-A14: debounce rapid updates
@@ -283,6 +327,8 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
       }
       if (isClosed) break;
       final result = await _retryDownloadUseCase(failed[i].videoId);
+      // FIX-M07: Check isClosed immediately after async retry use-case
+      if (isClosed) break;
       if (result.isRight()) queued++;
     }
     if (!isClosed && failed.isNotEmpty && queued == 0) {
@@ -303,9 +349,11 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     if (isClosed) return;
     result.fold(
       (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
-      (_) {
+      (_) async {
         _lastEmitTimeByVideoId.remove(videoId);
-        _deletedAtMsByVideoId[videoId] = DateTime.now().millisecondsSinceEpoch;
+        await _deleteMutex.protect(() async {
+          _deletedAtMsByVideoId[videoId] = _nowMs;
+        });
         final remaining = Map<String, DownloadTask>.from(state.tasks)
           ..remove(videoId);
         safeEmit(state.copyWith(
@@ -331,7 +379,9 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     _storageStatsDebounceTimer?.cancel(); // FIX-A14
     _resubscribeTimer?.cancel();
     _lastEmitTimeByVideoId.clear();
-    _deletedAtMsByVideoId.clear();
+    _deleteMutex.protect(() async {
+      _deletedAtMsByVideoId.clear();
+    });
     return super.close();
   }
 }

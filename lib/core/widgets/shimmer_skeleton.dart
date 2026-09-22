@@ -283,6 +283,8 @@ class SkeletonList extends StatelessWidget {
     final list = ListView.builder(
       padding: padding,
       physics: const NeverScrollableScrollPhysics(),
+      addAutomaticKeepAlives: false,
+      addRepaintBoundaries: true,
       itemCount: itemCount,
       itemBuilder: (context, i) =>
           _cascade(i, SkeletonSongRow(artworkSize: artworkSize), enabled),
@@ -311,6 +313,8 @@ class SkeletonGrid extends StatelessWidget {
     final grid = GridView.builder(
       padding: padding,
       physics: const NeverScrollableScrollPhysics(),
+      addAutomaticKeepAlives: false,
+      addRepaintBoundaries: true,
       itemCount: itemCount,
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: columns,

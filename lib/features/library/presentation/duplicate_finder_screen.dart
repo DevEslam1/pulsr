@@ -225,8 +225,8 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
           ],
         ),
         body: RefreshIndicator(
-          color: p.primary,
-          backgroundColor: p.surfaceCard,
+          color: p.accent,
+          backgroundColor: p.surfaceContainer,
           onRefresh: _scan,
           child: _buildBody(p),
         ),

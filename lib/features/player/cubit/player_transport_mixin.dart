@@ -1,7 +1,11 @@
 part of 'player_cubit.dart';
 
 mixin PlayerTransportControls on PulsrCubit<PlayerState> {
+  // FIX-A06: Monotonic Stopwatch for seek throttling
+  static final Stopwatch _seekStopwatch = Stopwatch()..start();
+
   Future<void> togglePlayPause() async {
+    HapticFeedback.lightImpact();
     try {
       // Decide from what the user actually sees (the transport mirrors
       // state.isPlaying), not the engine's playWhenReady alone: while an online
@@ -51,7 +55,8 @@ mixin PlayerTransportControls on PulsrCubit<PlayerState> {
     // Throttle tap-spam: at most one native seek per 100ms. Drag-end seeks
     // are discrete user intents — the 100ms window is short enough that the
     // final position still lands promptly while floods are coalesced.
-    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    // FIX-A06: Use monotonic clock to prevent time skew from breaking seek throttling
+    final nowMs = _seekStopwatch.elapsedMilliseconds;
     if (nowMs - _lastSeekMs < 100) {
       // Coalesce: schedule the latest position at the window edge.
       _pendingSeek = target;
@@ -66,7 +71,7 @@ mixin PlayerTransportControls on PulsrCubit<PlayerState> {
           final pending = _pendingSeek;
           _pendingSeek = null;
           if (pending != null) {
-            _lastSeekMs = DateTime.now().millisecondsSinceEpoch;
+            _lastSeekMs = _seekStopwatch.elapsedMilliseconds;
             _lastSkippedSegmentEnd = null;
             _lastSponsorSkipTime = null;
             _audioHandler.seek(pending).catchError((Object e, StackTrace st) {
@@ -179,16 +184,13 @@ mixin PlayerTransportControls on PulsrCubit<PlayerState> {
         final updatedQueue = state.queue
             .map((s) => s.id == songId ? s.copyWith(isFavorite: isFav) : s)
             .toList();
-        // Also update slots
-        _queueSlots.updateAll((k, v) => _QueueSlotData(
-              songs: v.songs
-                  .map(
-                      (s) => s.id == songId ? s.copyWith(isFavorite: isFav) : s)
-                  .toList(),
-              currentIndex: v.currentIndex,
-              position: v.position,
-              speed: v.speed,
-            ));
+        // Also update lookup cache
+        final cached = _slotLookupCache[songId];
+        if (cached != null) {
+          _slotLookupCache[songId] = cached.copyWith(isFavorite: isFav);
+        }
+        // FIX-M05: Debounced persistence for updated queue slots
+        _debouncedPersistQueueSlots();
         if (state.currentSong != null && state.currentSong!.id == songId) {
           safeEmit(
             state.copyWith(
@@ -227,7 +229,7 @@ mixin PlayerTransportControls on PulsrCubit<PlayerState> {
   set _pendingSeek(Duration? value);
 
   // Requires: provided by the composing class (same library).
-  Map<int, _QueueSlotData> get _queueSlots;
+  Map<int, SongsTableData> get _slotLookupCache;
 
   // Requires: provided by the composing class (same library).
   Timer? get _seekThrottleTimer;
@@ -243,4 +245,7 @@ mixin PlayerTransportControls on PulsrCubit<PlayerState> {
   // ignore: unused_element
   bool get _userPausedIntentionally;
   set _userPausedIntentionally(bool value);
+
+  // Requires: provided by the composing class (same library).
+  void _debouncedPersistQueueSlots();
 }

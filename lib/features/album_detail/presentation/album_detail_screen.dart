@@ -16,6 +16,7 @@ import '../../../domain/usecases/get_albums_usecase.dart';
 import '../../../core/errors/failures.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../sheets/song_info_sheet.dart';
+import '../../../core/utils/error_logger.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
@@ -56,8 +57,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       if (matches.isNotEmpty && mounted) {
         setState(() => _sort = matches.first);
       }
-    } catch (_) {
-      // Preference load is best-effort; keep the default sort on failure.
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load saved album sort',
+          error: e, stackTrace: st, category: 'AlbumDetail');
     }
   }
 
@@ -65,12 +67,22 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_sortPrefsKey(widget.album.id), sort.name);
-    } catch (_) {
-      // Persisting the preference is best-effort.
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist album sort',
+          error: e, stackTrace: st, category: 'AlbumDetail');
     }
   }
 
+  int? _cachedSongsHash;
+  _AlbumSort? _cachedSort;
+  List<SongsTableData> _cachedSortedSongs = const [];
+
   List<SongsTableData> _sorted(List<SongsTableData> songs) {
+    // FIX-M1: Hash-based check so new list instances with identical songs reuse cached sorted list
+    final songsHash = Object.hash(songs.length, songs.firstOrNull?.id, songs.lastOrNull?.id);
+    if (_cachedSongsHash == songsHash && _cachedSort == _sort) {
+      return _cachedSortedSongs;
+    }
     final out = List<SongsTableData>.of(songs);
     switch (_sort) {
       case _AlbumSort.title:
@@ -84,6 +96,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           return (a.trackNumber ?? 0).compareTo(b.trackNumber ?? 0);
         });
     }
+    _cachedSongsHash = songsHash;
+    _cachedSort = _sort;
+    _cachedSortedSongs = out;
     return out;
   }
 
@@ -100,7 +115,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     return PulsrPagePopScope(
       child: Scaffold(
         body: StreamBuilder<Result<List<SongsTableData>>>(
-          stream: _useCase.watchAlbumSongs(album.id),
+          stream: _useCase.watchAlbumSongs(album.id).distinct(),
           builder: (context, snapshot) {
             final loadFailed = snapshot.hasError ||
                 (snapshot.data?.fold((l) => true, (_) => false) ?? false);
@@ -168,7 +183,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                       child: Row(
                         children: [
                           Expanded(
-                            child: ElevatedButton.icon(
+                            child: FilledButton.icon(
                               onPressed: songs.isEmpty
                                   ? null
                                   : () => context
@@ -286,6 +301,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                   SliverPadding(
                     padding: const EdgeInsets.only(top: AppSpacing.xs, bottom: AppSpacing.scrollBottom),
                     sliver: SliverList.builder(
+                      addAutomaticKeepAlives: false,
+                      addRepaintBoundaries: true,
                       itemCount: songs.length,
                       itemBuilder: (context, index) {
                         // Disc grouping (gap 07-02): data is already ordered by
@@ -389,7 +406,7 @@ class _AlbumErrorView extends StatelessWidget {
                 style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
               ),
               const SizedBox(height: AppSpacing.s20),
-              ElevatedButton.icon(
+              FilledButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh_rounded),
                 label: Text(context.l10n.retry),

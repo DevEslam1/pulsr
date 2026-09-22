@@ -40,7 +40,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
   // Resolved once per artist so widget rebuilds (scroll, theme, selection)
   // never re-fire the Deezer/Wikipedia lookups (the service's cache is
   // instance-level, so a per-build `ArtistBioService()` defeated it).
-  late final Future<ArtistInfo?> _bioFuture;
+  late Future<ArtistInfo?> _bioFuture;
 
   @override
   void initState() {
@@ -50,6 +50,16 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
         ? getIt<ArtistBioService>()
         : ArtistBioService();
     _bioFuture = _bioService.getArtistInfo(widget.artist.name);
+  }
+
+  @override
+  void didUpdateWidget(ArtistDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.artist.id != oldWidget.artist.id) {
+      setState(() {
+        _bioFuture = _bioService.getArtistInfo(widget.artist.name);
+      });
+    }
   }
 
   @override
@@ -167,7 +177,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
 
                 // Discography (Albums)
                 StreamBuilder<Result<List<AlbumsTableData>>>(
-                  stream: _useCase.watchArtistAlbums(artist.id),
+                  stream: _useCase.watchArtistAlbums(artist.id).distinct(),
                   builder: (context, snapshot) {
                     final loadFailed = snapshot.hasError ||
                         (snapshot.data?.fold((l) => true, (_) => false) ??
@@ -192,6 +202,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                           height: 175,
                           child: ListView.builder(
                             scrollDirection: Axis.horizontal,
+                            addAutomaticKeepAlives: false,
+                            addRepaintBoundaries: true,
                             padding: EdgeInsets.symmetric(
                                 horizontal: Adaptive.pagePadding(context)),
                             itemCount: albums.length,
@@ -242,7 +254,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
 
                 // Top Tracks
                 StreamBuilder<Result<List<SongsTableData>>>(
-                  stream: _useCase.watchArtistSongs(artist.id),
+                  stream: _useCase.watchArtistSongs(artist.id).distinct(),
                   builder: (context, snapshot) {
                     final loadFailed = snapshot.hasError ||
                         (snapshot.data?.fold((l) => true, (_) => false) ??

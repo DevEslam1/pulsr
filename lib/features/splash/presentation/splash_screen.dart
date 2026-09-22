@@ -18,6 +18,8 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  bool _timedOut = false;
+
   @override
   void initState() {
     super.initState();
@@ -28,11 +30,25 @@ class _SplashScreenState extends State<SplashScreen> {
     // Hold the intro for its full choreography, but never route before the DI
     // graph is actually ready. The timeout is a safety net so a stuck
     // initializer can never trap the user on the splash (I25).
-    await Future.wait<void>([
-      Future<void>.delayed(const Duration(milliseconds: 800)),
-      initializationReady.timeout(const Duration(seconds: 5), onTimeout: () {}),
-    ]);
+    bool timedOut = false;
+    try {
+      await Future.wait<void>([
+        Future<void>.delayed(const Duration(milliseconds: 800)),
+        initializationReady.timeout(
+          const Duration(seconds: 8),
+          onTimeout: () {
+            timedOut = true;
+          },
+        ),
+      ]);
+    } catch (_) {
+      timedOut = true;
+    }
     if (!mounted) return;
+    if (timedOut && !getIt.allReadySync()) {
+      setState(() => _timedOut = true);
+      return;
+    }
     final prefs = await SharedPreferences.getInstance();
     final onboardingDone = prefs.getBool('onboarding_completed') ?? false;
 
@@ -106,6 +122,24 @@ class _SplashScreenState extends State<SplashScreen> {
             ).animate().fadeIn(
                 delay: context.motionMs(500),
                 duration: context.motionMs(600)),
+            if (_timedOut) ...[
+              const SizedBox(height: AppSpacing.lg),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: p.accent,
+                  foregroundColor: p.onAccent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadii.r14),
+                  ),
+                ),
+                onPressed: () {
+                  setState(() => _timedOut = false);
+                  _checkNextScreen();
+                },
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: Text(context.l10n.retry),
+              ),
+            ],
           ],
         ),
       ),

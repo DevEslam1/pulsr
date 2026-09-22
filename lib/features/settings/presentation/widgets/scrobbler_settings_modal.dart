@@ -280,17 +280,18 @@ class _ScrobblerConfigSheetState extends State<ScrobblerConfigSheet> {
             const SizedBox(height: AppSpacing.lg),
             SizedBox(
               width: double.infinity,
-              height: 46,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
+              height: 48,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
                   backgroundColor: p.accent,
+                  foregroundColor: p.onAccent,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppRadii.r14)),
                 ),
                 onPressed: _saveScrobblerPrefs,
                 child: Text(context.l10n.saveSettings,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700, color: Colors.black)),
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700, color: p.onAccent)),
               ),
             ),
           ],

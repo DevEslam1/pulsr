@@ -39,16 +39,60 @@ class TabletPlayerBar extends StatefulWidget {
 }
 
 class _TabletPlayerBarState extends State<TabletPlayerBar> {
-  /// Local drag override while the user is scrubbing the volume slider. When
-  /// null, the authoritative volume is read from [PulsrAudioHandler] (the
-  /// single volume owner used across the app). Mirrors [_dragSeekValue].
-  double? _dragVolume;
+  final ValueNotifier<double?> _dragVolumeNotifier = ValueNotifier<double?>(null);
   double _preMuteVolume = 1.0;
-  double? _dragSeekValue;
+  final ValueNotifier<double?> _dragSeekNotifier = ValueNotifier<double?>(null);
+  double? _lastDockHeight;
+  bool? _lastMiniPlayer;
+
+  @override
+  void initState() {
+    super.initState();
+    PulsrModalTracker.isModalOpen.addListener(_onModalChanged);
+  }
+
+  void _onModalChanged() {
+    _syncDock();
+  }
+
+  void _syncDock() {
+    if (!mounted) return;
+    if (PulsrModalTracker.isModalOpen.value) {
+      _maybeUpdateDock(0.0, false);
+      return;
+    }
+    final playerState = context.read<PlayerCubit>().state;
+    if (playerState.currentSong == null) {
+      _maybeUpdateDock(0.0, false);
+      return;
+    }
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    _maybeUpdateDock(90.0 + bottomInset, true);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncDock();
+  }
+
+  void _maybeUpdateDock(double height, bool miniPlayer) {
+    if (_lastDockHeight == height && _lastMiniPlayer == miniPlayer) return;
+    _lastDockHeight = height;
+    _lastMiniPlayer = miniPlayer;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        PulsrDockTracker.updateDock(height: height, miniPlayer: miniPlayer);
+      }
+    });
+  }
 
   @override
   void dispose() {
-    PulsrDockTracker.updateDock(height: 0.0, miniPlayer: false);
+    PulsrModalTracker.isModalOpen.removeListener(_onModalChanged);
+    _dragVolumeNotifier.dispose();
+    _dragSeekNotifier.dispose();
+    _maybeUpdateDock(0.0, false);
     super.dispose();
   }
 
@@ -56,61 +100,49 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final settingsState = context.watch<SettingsCubit>().state;
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final barHeight = 90.0 + bottomInset;
 
-    return ValueListenableBuilder<bool>(
-      valueListenable: PulsrModalTracker.isModalOpen,
-      builder: (context, modalOpen, _) {
-        if (modalOpen) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              PulsrDockTracker.updateDock(height: 0.0, miniPlayer: false);
-            }
-          });
-          return const SizedBox.shrink();
-        }
-        return BlocBuilder<PlayerCubit, PlayerState>(
-          buildWhen: (prev, curr) =>
-              prev.currentSong?.id != curr.currentSong?.id ||
-              prev.currentSong?.title != curr.currentSong?.title ||
-              prev.currentSong?.artist != curr.currentSong?.artist ||
-              prev.currentSong?.isFavorite != curr.currentSong?.isFavorite ||
-              prev.isPlaying != curr.isPlaying ||
-              prev.duration != curr.duration ||
-              prev.isShuffle != curr.isShuffle ||
-              prev.repeatMode != curr.repeatMode ||
-              prev.isLyricsVisible != curr.isLyricsVisible ||
-              prev.isQueueVisible != curr.isQueueVisible ||
-              prev.isEqEnabled != curr.isEqEnabled,
-          builder: (context, state) {
-            final song = state.currentSong;
-            if (song == null) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) {
-                  PulsrDockTracker.updateDock(height: 0.0, miniPlayer: false);
-                }
-              });
-              return const SizedBox.shrink();
-            }
-
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                PulsrDockTracker.updateDock(height: 90.0, miniPlayer: true);
+    return BlocListener<PlayerCubit, PlayerState>(
+      listenWhen: (prev, curr) => (prev.currentSong != null) != (curr.currentSong != null),
+      listener: (context, state) => _syncDock(),
+      child: ValueListenableBuilder<bool>(
+        valueListenable: PulsrModalTracker.isModalOpen,
+        builder: (context, modalOpen, _) {
+          if (modalOpen) {
+            return const SizedBox.shrink();
+          }
+          return BlocBuilder<PlayerCubit, PlayerState>(
+            buildWhen: (prev, curr) =>
+                prev.currentSong?.id != curr.currentSong?.id ||
+                prev.currentSong?.title != curr.currentSong?.title ||
+                prev.currentSong?.artist != curr.currentSong?.artist ||
+                prev.currentSong?.isFavorite != curr.currentSong?.isFavorite ||
+                prev.isPlaying != curr.isPlaying ||
+                prev.duration != curr.duration ||
+                prev.isShuffle != curr.isShuffle ||
+                prev.repeatMode != curr.repeatMode ||
+                prev.isLyricsVisible != curr.isLyricsVisible ||
+                prev.isQueueVisible != curr.isQueueVisible ||
+                prev.isEqEnabled != curr.isEqEnabled,
+            builder: (context, state) {
+              final song = state.currentSong;
+              if (song == null) {
+                return const SizedBox.shrink();
               }
-            });
 
-            final cubit = context.read<PlayerCubit>();
-            final activeColor = p.accent;
+              final cubit = context.read<PlayerCubit>();
+              final activeColor = p.accent;
             // A-3: the handler owns the master volume (no PlayerState.volume by
             // design). Read it as the single source of truth, keeping the local
             // drag override only while the user is scrubbing.
             final handlerVolume =
                 context.read<PulsrAudioHandler>().volume.clamp(0.0, 1.0);
-            final effectiveVolume = (_dragVolume ?? handlerVolume).clamp(0.0, 1.0);
-            final isMuted = effectiveVolume <= 0.0;
             final l10n = context.l10n;
 
             return Container(
-          height: 90,
+              height: barHeight,
+              padding: EdgeInsets.only(bottom: bottomInset),
           decoration: BoxDecoration(
             color: p.surface,
             border: Border(
@@ -351,87 +383,77 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                             ],
                           ),
                         ),
-
+                        const SizedBox(height: AppSpacing.xxs),
                         // Seekbar Row
                         BlocSelector<PlayerCubit, PlayerState, Duration>(
                           selector: (s) => s.position,
                           builder: (context, position) {
-                            final currentDuration = _dragSeekValue != null
-                                ? Duration(
-                                    milliseconds: _dragSeekValue!.toInt())
-                                : position;
-                            final valueLabel =
-                                '${Formatters.formatDuration(currentDuration)} / ${Formatters.formatDuration(state.duration)}';
-                            return Row(
-                              children: [
-                                Text(
-                                  Formatters.formatDuration(
-                                    _dragSeekValue != null
-                                        ? Duration(
-                                            milliseconds:
-                                                _dragSeekValue!.toInt())
-                                        : position,
-                                  ),
-                                  style: TextStyle(
-                                    color: p.textSecondary,
-                                    fontSize: AppFontSize.caption,
-                                    fontFeatures: const [
-                                      FontFeature.tabularFigures()
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: AppSpacing.xs),
-                                Expanded(
-                                  child: Semantics(
-                                    value: valueLabel,
-                                    child: PulsrSlider(
-                                      min: 0.0,
-                                      max: state.duration.inMilliseconds
-                                                  .toDouble() >
-                                              0
-                                          ? state.duration.inMilliseconds
-                                              .toDouble()
-                                          : 1.0,
-                                      value: (_dragSeekValue ??
-                                              position.inMilliseconds
-                                                  .toDouble())
-                                          .clamp(
-                                        0.0,
-                                        state.duration.inMilliseconds
-                                                    .toDouble() >
-                                                0
-                                            ? state.duration.inMilliseconds
-                                                .toDouble()
-                                            : 1.0,
+                            return ValueListenableBuilder<double?>(
+                              valueListenable: _dragSeekNotifier,
+                              builder: (context, dragSeekValue, _) {
+                                final currentDuration = dragSeekValue != null
+                                    ? Duration(milliseconds: dragSeekValue.toInt())
+                                    : position;
+                                final valueLabel =
+                                    '${Formatters.formatDuration(currentDuration)} / ${Formatters.formatDuration(state.duration)}';
+                                return Row(
+                                  children: [
+                                    Text(
+                                      Formatters.formatDuration(currentDuration),
+                                      style: TextStyle(
+                                        color: p.textSecondary,
+                                        fontSize: AppFontSize.caption,
+                                        fontFeatures: const [
+                                          FontFeature.tabularFigures()
+                                        ],
                                       ),
-                                      semanticLabel: context.l10n.seekLabel,
-                                      activeColor: activeColor,
-                                      onChangeStart: (val) {
-                                        setState(() => _dragSeekValue = val);
-                                      },
-                                      onChanged: (val) {
-                                        setState(() => _dragSeekValue = val);
-                                      },
-                                      onChangeEnd: (val) {
-                                        cubit.seek(
-                                            Duration(milliseconds: val.toInt()));
-                                        setState(() => _dragSeekValue = null);
-                                      },
                                     ),
-                                  ),
-                                ),
-                                const SizedBox(width: AppSpacing.xs),
-                                Text(
-                                  Formatters.formatDuration(state.duration),
-                                  style: TextStyle(
-                                    color: p.textSecondary,
-                                    fontSize: AppFontSize.caption,
-                                    fontFeatures: const [
-                                      FontFeature.tabularFigures()
-                                    ],
-                                  ),
-                                ),
-                              ],
+                                    const SizedBox(width: AppSpacing.xs),
+                                    Expanded(
+                                      child: Semantics(
+                                        value: valueLabel,
+                                        child: PulsrSlider(
+                                          min: 0.0,
+                                          max: state.duration.inMilliseconds.toDouble() > 0
+                                              ? state.duration.inMilliseconds.toDouble()
+                                              : 1.0,
+                                          value: (dragSeekValue ?? position.inMilliseconds.toDouble())
+                                              .clamp(
+                                            0.0,
+                                            state.duration.inMilliseconds.toDouble() > 0
+                                                ? state.duration.inMilliseconds.toDouble()
+                                                : 1.0,
+                                          ),
+                                          semanticLabel: context.l10n.seekLabel,
+                                          activeColor: activeColor,
+                                          onChangeStart: (val) {
+                                            _dragSeekNotifier.value = val;
+                                          },
+                                          onChanged: (val) {
+                                            _dragSeekNotifier.value = val;
+                                          },
+                                          onChangeEnd: (val) {
+                                            cubit.seek(
+                                                Duration(milliseconds: val.toInt()));
+                                            _dragSeekNotifier.value = null;
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: AppSpacing.xs),
+                                    Text(
+                                      Formatters.formatDuration(state.duration),
+                                      style: TextStyle(
+                                        color: p.textSecondary,
+                                        fontSize: AppFontSize.caption,
+                                        fontFeatures: const [
+                                          FontFeature.tabularFigures()
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
                             );
                           },
                         ),
@@ -453,61 +475,70 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         // Volume Mute / Slider
-                        IconButton(
-                          visualDensity: VisualDensity.compact,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                              minWidth: 48, minHeight: 48),
-                          icon: Icon(
-                            isMuted
-                                ? Icons.volume_off_rounded
-                                : (effectiveVolume < 0.5
-                                    ? Icons.volume_down_rounded
-                                    : Icons.volume_up_rounded),
-                            color: p.textSecondary,
-                            size: 19,
-                          ),
-                          tooltip: isMuted ? l10n.unmute : l10n.mute,
-                          onPressed: () {
-                            if (isMuted) {
-                              final restore =
-                                  _preMuteVolume <= 0.0 ? 1.0 : _preMuteVolume;
-                              setState(() {
-                                _preMuteVolume = restore;
-                                _dragVolume = null;
-                              });
-                              cubit.setVolume(restore);
-                            } else {
-                              setState(() {
-                                _preMuteVolume = effectiveVolume;
-                                _dragVolume = null;
-                              });
-                              cubit.setVolume(0.0);
-                            }
+                        ValueListenableBuilder<double?>(
+                          valueListenable: _dragVolumeNotifier,
+                          builder: (context, dragVolume, _) {
+                            final effectiveVolume =
+                                (dragVolume ?? handlerVolume).clamp(0.0, 1.0);
+                            final isMuted = effectiveVolume <= 0.0;
+                            return Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  visualDensity: VisualDensity.compact,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(
+                                      minWidth: 48, minHeight: 48),
+                                  icon: Icon(
+                                    isMuted
+                                        ? Icons.volume_off_rounded
+                                        : (effectiveVolume < 0.5
+                                            ? Icons.volume_down_rounded
+                                            : Icons.volume_up_rounded),
+                                    color: p.textSecondary,
+                                    size: 19,
+                                  ),
+                                  tooltip: isMuted ? l10n.unmute : l10n.mute,
+                                  onPressed: () {
+                                    if (isMuted) {
+                                      final restore =
+                                          _preMuteVolume <= 0.0 ? 1.0 : _preMuteVolume;
+                                      _preMuteVolume = restore;
+                                      _dragVolumeNotifier.value = null;
+                                      cubit.setVolume(restore);
+                                    } else {
+                                      _preMuteVolume = effectiveVolume;
+                                      _dragVolumeNotifier.value = null;
+                                      cubit.setVolume(0.0);
+                                    }
+                                  },
+                                ),
+                                SizedBox(
+                                  width: 80,
+                                  child: Semantics(
+                                    label: l10n.volume,
+                                    child: PulsrSlider(
+                                      min: 0.0,
+                                      max: 1.0,
+                                      value: effectiveVolume,
+                                      activeColor: p.textPrimary,
+                                      onChangeStart: (v) =>
+                                          _dragVolumeNotifier.value = v,
+                                      onChanged: (v) {
+                                        _dragVolumeNotifier.value = v;
+                                        cubit.setVolume(v);
+                                      },
+                                      onChangeEnd: (v) {
+                                        _dragVolumeNotifier.value = null;
+                                        cubit.setVolume(v);
+                                        if (v > 0.0) _preMuteVolume = v;
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
                           },
-                        ),
-                        SizedBox(
-                          width: 80,
-                          child: Semantics(
-                            label: l10n.volume,
-                            child: PulsrSlider(
-                              min: 0.0,
-                              max: 1.0,
-                              value: effectiveVolume,
-                              activeColor: p.textPrimary,
-                              onChangeStart: (v) =>
-                                  setState(() => _dragVolume = v),
-                              onChanged: (v) {
-                                setState(() => _dragVolume = v);
-                                cubit.setVolume(v);
-                              },
-                              onChangeEnd: (v) {
-                                setState(() => _dragVolume = null);
-                                cubit.setVolume(v);
-                                if (v > 0.0) _preMuteVolume = v;
-                              },
-                            ),
-                          ),
                         ),
                         const SizedBox(width: AppSpacing.s2),
 
@@ -587,10 +618,11 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                ],
              ),
            ),
-         );
+            );
           },
         );
       },
-    );
-  }
+    ),
+  );
+}
 }

@@ -5,6 +5,7 @@ import '../../../../core/di/injection.dart';
 import '../../../../core/services/hires_audio_service.dart';
 import '../../../../core/services/smart_audio_service.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../domain/services/smart_audio_plan.dart';
@@ -27,13 +28,14 @@ class SmartAudioSection extends StatefulWidget {
 }
 
 class _SmartAudioSectionState extends State<SmartAudioSection> {
-  SmartAudioService get _service => getIt.isRegistered<SmartAudioService>()
+  late final SmartAudioService _service = getIt.isRegistered<SmartAudioService>()
       ? getIt<SmartAudioService>()
       : SmartAudioService();
 
   SmartAudioMode _mode = SmartAudioMode.auto;
   String? _deviceName;
   String? _matchedProfileName;
+  String? _deviceDetectionError;
 
   @override
   void initState() {
@@ -46,6 +48,7 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
       final mode = await _service.getMode();
       String? deviceName;
       String? matchedName;
+      String? detectionError;
       try {
         final info = getIt.isRegistered<HiResAudioService>()
             ? getIt<HiResAudioService>().currentOutputInfo
@@ -60,14 +63,22 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
             matchedName = repo.getProfileById(link.profileId)?.name;
           }
         }
-      } catch (_) {}
+      } catch (e, st) {
+        detectionError = e.toString();
+        ErrorLogger.log('Error matching device profile in SmartAudioSection',
+            error: e, stackTrace: st, category: 'SmartAudio');
+      }
       if (!mounted) return;
       setState(() {
         _mode = mode;
         _deviceName = deviceName;
         _matchedProfileName = matchedName;
+        _deviceDetectionError = detectionError;
       });
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Error reloading SmartAudioSection',
+          error: e, stackTrace: st, category: 'SmartAudio');
+    }
   }
 
   Future<void> _setMode(SmartAudioMode mode) async {
@@ -138,6 +149,34 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
             ),
           ),
         ),
+        if (_deviceDetectionError != null) ...[
+          const SizedBox(height: AppSpacing.xs),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+            decoration: BoxDecoration(
+              color: p.error.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(AppRadii.r10),
+              border: Border.all(color: p.error.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, size: 16, color: p.error),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    _deviceDetectionError!,
+                    style: TextStyle(
+                      fontSize: AppFontSize.label,
+                      color: p.error,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         if (_deviceName != null) ...[
           const SizedBox(height: AppSpacing.xs),
           Container(

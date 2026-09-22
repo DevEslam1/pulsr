@@ -12,8 +12,11 @@ import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
+import '../../../core/widgets/pulsr_toast.dart';
+import '../../../core/widgets/shimmer_skeleton.dart';
 import '../cubit/settings_cubit.dart';
 import '../cubit/settings_state.dart';
+import '../../../core/utils/input_sanitizer.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -48,10 +51,23 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
   late TextEditingController _bypassController;
 
   @override
+  final FocusNode _hostFocusNode = FocusNode();
+  @override
+  final FocusNode _portFocusNode = FocusNode();
+  @override
+  final FocusNode _usernameFocusNode = FocusNode();
+  @override
+  final FocusNode _passwordFocusNode = FocusNode();
+  @override
+  final FocusNode _bypassFocusNode = FocusNode();
+
+  @override
   bool _obscurePassword = true;
   bool _isTesting = false;
   @override
   ({bool success, int latencyMs, String? error})? _testResult;
+
+  bool _loaded = false;
 
   @override
   void initState() {
@@ -66,11 +82,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
     _passwordController = TextEditingController();
     _bypassController = TextEditingController(text: state.proxyBypassHosts);
 
-    cubit.getProxyPassword().then((pw) {
-      if (mounted && _passwordController.text.isEmpty && pw.isNotEmpty) {
-        _passwordController.text = pw;
-      }
-    });
+    _load();
 
     if (widget.initialImportText != null &&
         widget.initialImportText!.isNotEmpty) {
@@ -82,8 +94,27 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
     }
   }
 
+  Future<void> _load() async {
+    if (_loaded) return;
+    _loaded = true;
+    final cubit = context.read<SettingsCubit>();
+    try {
+      final pw = await cubit.getProxyPassword();
+      if (mounted && _passwordController.text.isEmpty && pw.isNotEmpty) {
+        _passwordController.text = pw;
+      }
+    } catch (_) {
+      // Ignore secure storage errors during initial load
+    }
+  }
+
   @override
   void dispose() {
+    _hostFocusNode.dispose();
+    _portFocusNode.dispose();
+    _usernameFocusNode.dispose();
+    _passwordFocusNode.dispose();
+    _bypassFocusNode.dispose();
     _hostController.dispose();
     _portController.dispose();
     _usernameController.dispose();
@@ -93,25 +124,27 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
   }
 
   void _syncControllersWithState(SettingsState state) {
-    if (_hostController.text != state.proxyHost) {
+    if (!_hostFocusNode.hasFocus && _hostController.text != state.proxyHost) {
       _hostController.text = state.proxyHost;
     }
-    if (_portController.text != state.proxyPort.toString()) {
+    if (!_portFocusNode.hasFocus && _portController.text != state.proxyPort.toString()) {
       _portController.text = state.proxyPort.toString();
     }
-    if (_usernameController.text != state.proxyUsername) {
+    if (!_usernameFocusNode.hasFocus && _usernameController.text != state.proxyUsername) {
       _usernameController.text = state.proxyUsername;
     }
-    if (_bypassController.text != state.proxyBypassHosts) {
+    if (!_bypassFocusNode.hasFocus && _bypassController.text != state.proxyBypassHosts) {
       _bypassController.text = state.proxyBypassHosts;
     }
     // Password lives in secure storage (not in SettingsState) — rehydrate it
     // so switching pool entries never leaves a stale password behind.
-    context.read<SettingsCubit>().getProxyPassword().then((pw) {
-      if (mounted && _passwordController.text != pw) {
-        _passwordController.text = pw;
-      }
-    });
+    if (!_passwordFocusNode.hasFocus) {
+      context.read<SettingsCubit>().getProxyPassword().then((pw) {
+        if (mounted && !_passwordFocusNode.hasFocus && _passwordController.text != pw) {
+          _passwordController.text = pw;
+        }
+      });
+    }
     _enabled = state.proxyEnabled;
     _type = state.proxyType;
   }
@@ -458,6 +491,13 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
     final horizontalPad = Adaptive.pagePadding(context);
 
     return BlocConsumer<SettingsCubit, SettingsState>(
+      listenWhen: (prev, curr) =>
+          prev.proxyHost != curr.proxyHost ||
+          prev.proxyPort != curr.proxyPort ||
+          prev.proxyUsername != curr.proxyUsername ||
+          prev.proxyBypassHosts != curr.proxyBypassHosts ||
+          prev.proxyEnabled != curr.proxyEnabled ||
+          prev.proxyType != curr.proxyType,
       listener: (context, state) {
         _syncControllersWithState(state);
       },

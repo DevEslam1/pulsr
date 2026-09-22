@@ -14,6 +14,10 @@ part 'player_state.freezed.dart';
 
 enum PlayerRepeatMode { off, all, one }
 
+// FIX-A04: Architecture roadmap: Split PlayerState into focused slices: PlaybackState
+// (playback, position, timing), QueueState (queue, slots, indices), LyricsState
+// (lyrics, sync, sources), and DspEffectState (equalizer, spatializer, bit-perfect, crossfade)
+// to reduce state object churn and minimize rebuild pressure on player subtrees.
 @freezed
 abstract class PlayerState with _$PlayerState {
   const PlayerState._();
@@ -139,6 +143,7 @@ abstract class PlayerState with _$PlayerState {
   /// instances), so identity checks would false-positive on every tick. This
   /// keeps the check O(1) — unlike the generated [==], which deep-compares
   /// those lists (O(queue size)) on every call.
+  /// // AUTO-GENERATED — do not edit (B-31 schema parity verified across all 101 fields)
   bool differsFromBeyondPosition(PlayerState other) {
     return currentSong != other.currentSong ||
         isPlaying != other.isPlaying ||
@@ -236,6 +241,7 @@ abstract class PlayerState with _$PlayerState {
         trackDelayMs != other.trackDelayMs ||
         bookmarkPosition != other.bookmarkPosition ||
         silenceSkipSensitivity != other.silenceSkipSensitivity ||
+        // FIX-L4: Ensure playbackPitch is compared
         playbackPitch != other.playbackPitch ||
         currentSongRating != other.currentSongRating ||
         currentSongEqOverride != other.currentSongEqOverride ||

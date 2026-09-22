@@ -36,7 +36,8 @@ class DecodedSlot {
 class QueueSlotCodec {
   static const int maxSlotIndex = 2;
   static const int maxDocumentKeys = 4; // three slots + activeSlot
-  static const int maxPositionMs = 24 * 3600 * 1000;
+  // FIX-L06: 7 days to support audiobooks and long podcasts
+  static const int maxPositionMs = 7 * 24 * 3600 * 1000;
   static const double minSpeed = 0.1;
   static const double maxSpeed = 8.0;
 
@@ -59,6 +60,8 @@ class QueueSlotCodec {
                   'source': s.source,
                   'remoteId': s.remoteId,
                   'remoteArtworkUrl': s.remoteArtworkUrl,
+                  // FIX-C05: Preserve favorite state across queue restore
+                  'isFavorite': s.isFavorite,
                 })
             .toList(),
         'currentIndex': entry.value.currentIndex,
@@ -76,9 +79,9 @@ class QueueSlotCodec {
   /// Validates the top-level document. Returns null when corrupt/oversized
   /// (DoS guard: three slots + activeSlot key).
   static Map<String, dynamic>? decodeDocument(Object? decoded) {
-    if (decoded is! Map<String, dynamic>) return null;
+    if (decoded is! Map) return null;
     if (decoded.length > maxDocumentKeys) return null;
-    return decoded;
+    return Map<String, dynamic>.from(decoded);
   }
 
   /// Parses a restorable slot key ('0'..'2'); null for anything else.
@@ -92,17 +95,34 @@ class QueueSlotCodec {
   /// otherwise unusable — one corrupt slot must not abort the others.
   static DecodedSlot? decodeSlot(
       Map<String, dynamic> slotData, int maxQueueSize) {
-    final rawIds = (slotData['songIds'] as List<dynamic>?) ?? [];
+    final rawIds = slotData['songIds'];
+    if (rawIds is! List) return null;
     if (rawIds.length > maxQueueSize) return null;
     final songIds = rawIds.whereType<int>().toList();
     if (songIds.isEmpty) return null;
+
+    final rawOnline = slotData['onlineSongs'];
+    final onlineSongsById = rawOnline is List
+        ? decodeOnlineSongs(rawOnline)
+        : const <int, SongsTableData>{};
+
+    final rawIndex = slotData['currentIndex'];
+    final currentIndex = rawIndex is int ? rawIndex : 0;
+
+    final rawPos = slotData['positionMs'];
+    final positionMs =
+        (rawPos is num) ? rawPos.toInt().clamp(0, maxPositionMs) : 0;
+
+    final rawSpeed = slotData['speed'];
+    final speed =
+        (rawSpeed is num) ? rawSpeed.toDouble().clamp(minSpeed, maxSpeed) : 1.0;
+
     return DecodedSlot(
       songIds: songIds,
-      onlineSongsById:
-          decodeOnlineSongs((slotData['onlineSongs'] as List<dynamic>?) ?? []),
-      currentIndex: (slotData['currentIndex'] as int?) ?? 0,
-      positionMs: (slotData['positionMs'] as num?)?.toInt() ?? 0,
-      speed: (slotData['speed'] as num?)?.toDouble() ?? 1.0,
+      onlineSongsById: onlineSongsById,
+      currentIndex: currentIndex,
+      positionMs: positionMs,
+      speed: speed,
     );
   }
 
@@ -110,20 +130,21 @@ class QueueSlotCodec {
     final map = <int, SongsTableData>{};
     for (final item in raw) {
       if (item is Map) {
-        final m = Map<String, dynamic>.from(item);
-        final id = m['id'] as int?;
-        if (id != null) {
+        final id = item['id'];
+        if (id is int) {
           map[id] = SongsTableData(
             id: id,
-            title: m['title'] as String? ?? 'Unknown',
-            artist: m['artist'] as String? ?? 'Unknown Artist',
-            album: m['album'] as String? ?? '',
-            durationMs: (m['durationMs'] as num?)?.toInt() ?? 0,
-            path: m['path'] as String? ?? '',
-            source: m['source'] as String? ?? SongSource.youtube,
-            remoteId: m['remoteId'] as String?,
-            remoteArtworkUrl: m['remoteArtworkUrl'] as String?,
-            isFavorite: false,
+            title: item['title']?.toString() ?? 'Unknown',
+            artist: item['artist']?.toString() ?? 'Unknown Artist',
+            album: item['album']?.toString() ?? '',
+            durationMs: (item['durationMs'] is num)
+                ? (item['durationMs'] as num).toInt()
+                : 0,
+            path: item['path']?.toString() ?? '',
+            source: item['source']?.toString() ?? SongSource.youtube,
+            remoteId: item['remoteId']?.toString(),
+            remoteArtworkUrl: item['remoteArtworkUrl']?.toString(),
+            isFavorite: item['isFavorite'] == true,
             isMissing: false,
             isDownloaded: false,
             playCount: 0,

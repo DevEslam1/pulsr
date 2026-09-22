@@ -8,6 +8,8 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/lyrics_line.dart';
 import '../../cubit/player_cubit.dart';
+import '../../../../core/di/injection.dart';
+import '../../../../core/utils/error_logger.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -37,6 +39,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
   // frozen at open time while playback kept running underneath.
   final ValueNotifier<Duration> _livePosition = ValueNotifier(Duration.zero);
   StreamSubscription<Duration>? _positionSub;
+  Timer? _fallbackTimer;
 
   @override
   void initState() {
@@ -50,32 +53,58 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
       ];
     }
     try {
-      _positionSub =
-          context.read<PlayerCubit>().rawPositionStream.listen((pos) {
+      final cubit = context.read<PlayerCubit>();
+      _positionSub = cubit.rawPositionStream.listen((pos) {
         _livePosition.value = pos;
       });
-    } catch (_) {}
+    } catch (_) {
+      try {
+        if (getIt.isRegistered<PlayerCubit>()) {
+          final cubit = getIt<PlayerCubit>();
+          _positionSub = cubit.rawPositionStream.listen((pos) {
+            _livePosition.value = pos;
+          });
+        }
+      } catch (e, st) {
+        ErrorLogger.log('PlayerCubit unavailable for lyrics editor position stream',
+            error: e, stackTrace: st, category: 'LyricsEditor');
+      }
+    }
+    if (_positionSub == null) {
+      _fallbackTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
+        _livePosition.value = _livePosition.value + const Duration(milliseconds: 250);
+      });
+    }
   }
 
   @override
   void dispose() {
     _positionSub?.cancel();
+    _fallbackTimer?.cancel();
     _livePosition.dispose();
     super.dispose();
   }
 
   void _stampCurrentPosition(int index) {
+    if (index < 0 || index >= _lines.length) return;
+    final stamp = _livePosition.value;
     setState(() {
       final old = _lines[index];
       _lines[index] =
-          LyricsLine(timestamp: _livePosition.value, text: old.text);
+          LyricsLine(timestamp: stamp, text: old.text);
     });
   }
 
   void _adjustOffset(int index, int deltaMs) {
+    if (index < 0 || index >= _lines.length) return;
     setState(() {
       final old = _lines[index];
-      final newMs = (old.timestamp.inMilliseconds + deltaMs).clamp(0, 3600000);
+      final newMs =
+          (old.timestamp.inMilliseconds + deltaMs).clamp(0, 3600000);
       _lines[index] =
           LyricsLine(timestamp: Duration(milliseconds: newMs), text: old.text);
     });
@@ -183,7 +212,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                     },
                     child: Text(context.l10n.save,
                         style: TextStyle(
-                            color: Colors.black, fontWeight: FontWeight.w700)),
+                            color: p.onAccent, fontWeight: FontWeight.w700)),
                   ),
                 ],
               ),
@@ -205,6 +234,23 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                   ),
                   child: Row(
                     children: [
+                      // Tap-to-play preview button
+                      IconButton(
+                        icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                        color: p.primary,
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                        onPressed: () {
+                          try {
+                            final cubit = context.read<PlayerCubit>();
+                            cubit.seek(line.timestamp);
+                          } catch (_) {
+                            getIt<PlayerCubit>().seek(line.timestamp);
+                          }
+                        },
+                      ),
+                      const SizedBox(width: AppSpacing.s2),
                       // Timestamp stamp button
                       InkWell(
                         onTap: () => _stampCurrentPosition(index),

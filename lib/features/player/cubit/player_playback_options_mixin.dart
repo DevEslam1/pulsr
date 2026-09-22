@@ -93,7 +93,8 @@ mixin PlayerPlaybackOptions on PulsrCubit<PlayerState> {
     safeEmit(state.copyWith(playbackSpeed: clamped));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(PrefsKeys.playbackSpeed, clamped);
-    _queueSlots[state.activeQueueSlot] = _QueueSlotData(
+    _setQueueSlot(
+      state.activeQueueSlot,
       songs: state.queue,
       currentIndex: state.currentIndex,
       position: state.position,
@@ -307,7 +308,13 @@ mixin PlayerPlaybackOptions on PulsrCubit<PlayerState> {
   PerSongVolumeStore get _perSongVolumeStore;
 
   // Requires: provided by the composing class (same library).
-  Map<int, _QueueSlotData> get _queueSlots;
+  void _setQueueSlot(
+    int slot, {
+    required List<SongsTableData> songs,
+    required int currentIndex,
+    required Duration position,
+    required double speed,
+  });
 
   // Requires: provided by the composing class (same library).
   SongRatingStore get _songRatingStore;

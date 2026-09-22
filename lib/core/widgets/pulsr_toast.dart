@@ -64,7 +64,7 @@ class PulsrToast {
     // root Navigator's own context, whose Overlay is a *child* of that
     // context, not an ancestor. Prefer a nullable lookup and fall back to
     // the root navigator's overlay state.
-    OverlayState? overlayState = Overlay.maybeOf(context, rootOverlay: true);
+    final OverlayState? overlayState = Overlay.maybeOf(context, rootOverlay: true);
     if (overlayState == null) return;
     final p = context.palette;
 

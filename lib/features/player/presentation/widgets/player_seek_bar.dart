@@ -9,7 +9,6 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/services/waveform_service.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../cubit/player_cubit.dart';
-import '../../cubit/player_state.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
 import 'waveform_seek_bar.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -56,6 +55,8 @@ class PlayerSeekBar extends StatefulWidget {
 
 class _PlayerSeekBarState extends State<PlayerSeekBar> {
   double? _dragValue;
+  bool _tapSeekPending = false;
+  double? _tapSeekRatio;
   int? _lastSongId;
   String? _lastFilePath;
   Future<List<double>>? _cachedWaveformFuture;
@@ -64,6 +65,26 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
     100,
     (i) => 0.2 + 0.15 * math.sin(i * 0.15),
   );
+
+  @override
+  void didUpdateWidget(PlayerSeekBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.songId != widget.songId || oldWidget.filePath != widget.filePath) {
+      _dragValue = null;
+      _tapSeekPending = false;
+      _tapSeekRatio = null;
+    } else if (_dragValue != null && widget.position != null && oldWidget.position != null) {
+      // FIX-H13: Reset _dragValue if position jumped by more than 1s externally
+      final delta = (widget.position! - oldWidget.position!).abs();
+      if (delta > const Duration(seconds: 1)) {
+        setState(() {
+          _dragValue = null;
+          _tapSeekPending = false;
+          _tapSeekRatio = null;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -203,10 +224,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
   Widget _withPosition(Widget Function(Duration position) build) {
     final provided = widget.position;
     if (provided != null) return build(provided);
-    return BlocSelector<PlayerCubit, PlayerState, Duration>(
-      selector: (s) => s.position,
-      builder: (context, position) => build(position),
-    );
+    return _PlayerPositionScope(builder: build);
   }
 
   Widget _buildStandardSeekBar(BuildContext context) {
@@ -237,49 +255,59 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
           clampDuration(currentDuration - const Duration(seconds: 10)));
 
       return Directionality(
-        textDirection: TextDirection.ltr,
-        child: RepaintBoundary(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Modern wavy gesture-driven scrubber
-                Semantics(
-                  value: valueLabel,
-                  increasedValue: increasedLabel,
-                  decreasedValue: decreasedLabel,
-                  onIncrease: () => widget.onSeek(
-                      clampDuration(currentDuration + const Duration(seconds: 10))),
-                  onDecrease: () => widget.onSeek(
-                      clampDuration(currentDuration - const Duration(seconds: 10))),
-                  child: PulsrSlider(
-                    value: effectiveValue,
-                    min: 0.0,
-                    max: maxDuration > 0 ? maxDuration : 1.0,
-                    height: 32,
-                    semanticLabel: semanticLabel,
-                    activeColor: widget.activeColor,
-                    inactiveColor: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white.withValues(alpha: 0.14)
-                        : context.palette.hairline.withValues(alpha: 0.8),
-                    isWavy: true,
-                    animateWave: isPlaying,
-                    onChangeStart: (val) {
-                      setState(() => _dragValue = val);
-                    },
-                    onChanged: (val) {
-                      setState(() => _dragValue = val);
-                    },
-                    onChangeEnd: (val) {
-                      widget.onSeek(Duration(milliseconds: val.round()));
-                      setState(() => _dragValue = null);
-                    },
-                  ),
+        textDirection: Directionality.of(context),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Modern wavy gesture-driven scrubber
+              Semantics(
+                value: valueLabel,
+                increasedValue: increasedLabel,
+                decreasedValue: decreasedLabel,
+                onIncrease: () => widget.onSeek(
+                    clampDuration(currentDuration + const Duration(seconds: 10))),
+                onDecrease: () => widget.onSeek(
+                    clampDuration(currentDuration - const Duration(seconds: 10))),
+                child: PulsrSlider(
+                  value: effectiveValue,
+                  min: 0.0,
+                  max: maxDuration > 0 ? maxDuration : 1.0,
+                  height: 32,
+                  semanticLabel: semanticLabel,
+                  activeColor: widget.activeColor,
+                  inactiveColor: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white.withValues(alpha: 0.14)
+                      : context.palette.hairline.withValues(alpha: 0.8),
+                  isWavy: true,
+                  animateWave: isPlaying,
+                  onChangeStart: (val) {
+                    _tapSeekPending = true;
+                    _tapSeekRatio = val;
+                    setState(() => _dragValue = val);
+                  },
+                  onChanged: (val) {
+                    if (_tapSeekRatio != null && (val - _tapSeekRatio!).abs() > 200) {
+                      _tapSeekPending = false;
+                    }
+                    setState(() => _dragValue = val);
+                  },
+                  onChangeEnd: (val) {
+                    final target = (_tapSeekPending && _tapSeekRatio != null) ? _tapSeekRatio! : val;
+                    widget.onSeek(Duration(milliseconds: target.round()));
+                    setState(() {
+                      _dragValue = null;
+                      _tapSeekPending = false;
+                      _tapSeekRatio = null;
+                    });
+                  },
                 ),
-                const SizedBox(height: AppSpacing.s2),
-                // Timestamps
-                Row(
+              ),
+              const SizedBox(height: AppSpacing.s2),
+              // Timestamps
+              RepaintBoundary(
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
@@ -308,11 +336,23 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       );
     });
+  }
+}
+
+class _PlayerPositionScope extends StatelessWidget {
+  final Widget Function(Duration position) builder;
+  const _PlayerPositionScope({required this.builder});
+
+  @override
+  Widget build(BuildContext context) {
+    final position =
+        context.select<PlayerCubit, Duration>((c) => c.state.position);
+    return builder(position);
   }
 }

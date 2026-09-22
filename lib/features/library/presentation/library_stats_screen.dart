@@ -21,13 +21,18 @@ import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
 class LibraryStatsScreen extends StatefulWidget {
-  const LibraryStatsScreen({super.key});
+  final IMusicRepository? musicRepository;
+
+  const LibraryStatsScreen({super.key, this.musicRepository});
 
   @override
   State<LibraryStatsScreen> createState() => _LibraryStatsScreenState();
 }
 
-class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
+class _LibraryStatsScreenState extends State<LibraryStatsScreen>
+    with WidgetsBindingObserver {
+  late final IMusicRepository? _musicRepository;
+
   /// Full-library snapshot for accurate totals. The live `LibraryCubit.songs`
   /// list is a paginated window, so deriving stats from it under-counts large
   /// libraries. Falls back to the window until the query completes.
@@ -36,12 +41,31 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _musicRepository = widget.musicRepository ??
+        (getIt.isRegistered<IMusicRepository>()
+            ? getIt<IMusicRepository>()
+            : null);
     _loadAllSongs();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadAllSongs();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
   Future<void> _loadAllSongs() async {
-    if (!getIt.isRegistered<IMusicRepository>()) return;
-    final res = await getIt<IMusicRepository>().getAllSongs();
+    final repo = _musicRepository;
+    if (repo == null) return;
+    final res = await repo.getAllSongs();
     if (!mounted) return;
     res.fold((_) {}, (songs) {
       if (mounted) setState(() => _allSongs = songs);
@@ -59,8 +83,8 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
     );
 
     if (confirmed == true && context.mounted) {
-      if (getIt.isRegistered<IMusicRepository>()) {
-        final repo = getIt<IMusicRepository>();
+      final repo = _musicRepository;
+      if (repo != null) {
         final res = await repo.clearRecentlyPlayed();
         if (context.mounted) {
           res.fold(
@@ -96,6 +120,11 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen> {
             style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700),
           ),
           actions: [
+            IconButton(
+              icon: Icon(Icons.refresh_rounded, color: p.textSecondary),
+              tooltip: context.l10n.refresh,
+              onPressed: _loadAllSongs,
+            ),
             IconButton(
               icon: Icon(Icons.delete_sweep_rounded, color: p.textSecondary),
               tooltip: context.l10n.browseClearPlayHistory,

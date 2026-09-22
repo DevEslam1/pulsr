@@ -865,6 +865,10 @@
   "@clearQueueConfirm": {
     "description": "max-rate l10n tranche 3"
   },
+  "queueCleared": "تم مسح قائمة الانتظار",
+  "@queueCleared": {
+    "description": "queue cleared snackbar message"
+  },
   "queueSaved": "تم حفظ القائمة",
   "@queueSaved": {
     "description": "max-rate l10n tranche 3"
@@ -2566,7 +2570,7 @@
   "@last7DaysActivity": {
     "description": "tranche8 l10n"
   },
-  "topScrobbledArtists": "اكثر الفنانين سكرابلنغ",
+  "topScrobbledArtists": "الفنانون الأكثر استماعاً",
   "@topScrobbledArtists": {
     "description": "tranche8 l10n"
   },
@@ -3903,5 +3907,9 @@
   "eqUnlockStudioDesc": "الوصول إلى نطاقات بارامترية 10/32/64 وتصحيح الغرفة والمحدد والموسع الصوتي",
   "queueConfirmDelete": "تأكيد الحذف",
   "headsetRestartNotice": "يسري بعد إعادة تشغيل التطبيق.",
-  "nowPlayingSwipeHint": "اسحب للأسفل للإغلاق - اسحب الغلاف للتخطي"
+  "nowPlayingSwipeHint": "اسحب للأسفل للإغلاق - اسحب الغلاف للتخطي",
+  "vinylDirectDrive": "استوديو • محرك مباشر",
+  "cassetteSideA": "الوجه أ • النوع الثاني (CrO2)",
+  "cassettePulsrTape": "شريط بولسر",
+  "vinylSpeedRpm": "33⅓ دورة/د"
 }

@@ -129,7 +129,7 @@ void main() {
     });
 
     test('multiple error scenarios in succession maintain stability', () async {
-      var sessionChanges = <int>[];
+      final sessionChanges = <int>[];
 
       final router = AudioSessionIdRouter(
         onSessionChanged: (id) => sessionChanges.add(id),

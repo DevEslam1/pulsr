@@ -23,9 +23,13 @@ mixin LibrarySongsTab on State<LibraryScreen> {
 
     if (isGrid) {
       return RefreshIndicator(
+        color: p.accent,
+        backgroundColor: p.surfaceContainer,
         onRefresh: () => _handleRefresh(context),
         child: GridView.builder(
           physics: const AlwaysScrollableScrollPhysics(),
+          addAutomaticKeepAlives: false,
+          addRepaintBoundaries: true,
           padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context), 16,
               Adaptive.pagePadding(context), 160),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -188,6 +192,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
     }
 
     return RefreshIndicator(
+      color: p.accent,
+      backgroundColor: p.surfaceContainer,
       onRefresh: () => _handleRefresh(context),
       child: Stack(
         children: [
@@ -302,6 +308,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
     }
 
     return RefreshIndicator(
+      color: p.accent,
+      backgroundColor: p.surfaceContainer,
       onRefresh: () => _handleRefresh(context),
       child: Column(
         children: [
@@ -392,8 +400,9 @@ mixin LibrarySongsTab on State<LibraryScreen> {
             child: trackCols > 1
                 ? GridView.builder(
                     physics: const AlwaysScrollableScrollPhysics(),
+                    addAutomaticKeepAlives: false,
+                    addRepaintBoundaries: true,
                     padding: const EdgeInsetsDirectional.only(
-
                         bottom: AppSpacing.scrollBottom, top: AppSpacing.xxs, start: AppSpacing.s6, end: AppSpacing.s6),
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: trackCols,
@@ -452,6 +461,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                   )
                 : ListView.builder(
                     physics: const AlwaysScrollableScrollPhysics(),
+                    addAutomaticKeepAlives: false,
+                    addRepaintBoundaries: true,
                     padding:
                         const EdgeInsetsDirectional.only(bottom: AppSpacing.scrollBottom, top: AppSpacing.xxs, start: AppSpacing.xxs, end: AppSpacing.xxs),
                     itemCount: downloaded.length,

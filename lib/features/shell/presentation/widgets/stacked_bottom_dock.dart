@@ -41,7 +41,9 @@ class _ModalGate extends StatelessWidget {
           duration: context.motionMs(220),
           curve: context.motionCurve(Curves.easeOut),
           opacity: modalOpen ? 0.0 : 1.0,
-          child: IgnorePointer(ignoring: modalOpen, child: child),
+          child: RepaintBoundary(
+            child: IgnorePointer(ignoring: modalOpen, child: child),
+          ),
         ),
       ),
     );
@@ -73,9 +75,81 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
   static const Curve _animCurve = Curves.easeOutCubic;
   static const double _peekOffset = 14.0;
   static const double _miniPlayerHeight = 84.0;
+  double _behindDragDy = 0;
+  double _dockDragDy = 0;
+
+  double? _lastReportedHeight;
+  bool? _lastReportedMiniPlayer;
+  // B-27: Deduplicate addPostFrameCallback so updateDock is called at most once per frame
+  double? _pendingDockHeight;
+  bool? _pendingMiniPlayer;
+  bool _postFrameCallbackScheduled = false;
+
+  void _maybeUpdateDock({required double height, required bool miniPlayer}) {
+    if (_lastReportedHeight == height && _lastReportedMiniPlayer == miniPlayer) return;
+    _pendingDockHeight = height;
+    _pendingMiniPlayer = miniPlayer;
+    if (_postFrameCallbackScheduled) return;
+    _postFrameCallbackScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _postFrameCallbackScheduled = false;
+      if (mounted && _pendingDockHeight != null && _pendingMiniPlayer != null) {
+        final h = _pendingDockHeight!;
+        final mp = _pendingMiniPlayer!;
+        _lastReportedHeight = h;
+        _lastReportedMiniPlayer = mp;
+        PulsrDockTracker.updateDock(height: h, miniPlayer: mp);
+      }
+    });
+  }
+
+  void _syncDock({required bool hasSong}) {
+    if (!mounted) return;
+    final isTablet = Adaptive.isTablet(context);
+    final double barHeight = isTablet ? 68.0 : 64.0;
+    final double navBarPaddingVertical = isTablet ? 14.0 : 10.0;
+    final double navBarTotalHeight = barHeight + navBarPaddingVertical;
+
+    if (!hasSong) {
+      _maybeUpdateDock(height: navBarTotalHeight, miniPlayer: false);
+      return;
+    }
+
+    final mode = widget.mode;
+    final isStacked = mode != DockStackMode.defaultLayout;
+    final isNavBarOnTop = mode == DockStackMode.navBarOnTop;
+
+    final double dockHeight = !isStacked
+        ? (navBarTotalHeight + _miniPlayerHeight)
+        : (isNavBarOnTop
+            ? (_peekOffset + _miniPlayerHeight)
+            : (navBarTotalHeight + _peekOffset));
+
+    _maybeUpdateDock(height: dockHeight, miniPlayer: true);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final hasSong = context.read<PlayerCubit>().state.currentSong != null;
+    _syncDock(hasSong: hasSong);
+  }
+
+  @override
+  void didUpdateWidget(covariant StackedBottomDock oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.mode != widget.mode) {
+      final hasSong = context.read<PlayerCubit>().state.currentSong != null;
+      _syncDock(hasSong: hasSong);
+    }
+  }
 
   @override
   void dispose() {
+    // FIX-H14: Clear pending dock state and update dock tracker immediately
+    _postFrameCallbackScheduled = false;
+    _pendingDockHeight = null;
+    _pendingMiniPlayer = null;
     PulsrDockTracker.updateDock(height: 0.0, miniPlayer: false);
     super.dispose();
   }
@@ -120,51 +194,35 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
     final double navBarTotalHeight = barHeight + navBarPaddingVertical;
 
     return _ModalGate(
-      child: BlocBuilder<PlayerCubit, PlayerState>(
-        buildWhen: (prev, curr) =>
-            (prev.currentSong != null) != (curr.currentSong != null),
-        builder: (context, state) {
-        final hasSong = state.currentSong != null;
+      child: BlocListener<PlayerCubit, PlayerState>(
+        listenWhen: (prev, curr) => (prev.currentSong != null) != (curr.currentSong != null),
+        listener: (context, state) => _syncDock(hasSong: state.currentSong != null),
+        child: BlocSelector<PlayerCubit, PlayerState, bool>(
+          selector: (state) => state.currentSong != null,
+          builder: (context, hasSong) {
 
-        // If no song is active, render only the standalone navigation bar
-        if (!hasSong) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              PulsrDockTracker.updateDock(
-                height: navBarTotalHeight,
-                miniPlayer: false,
-              );
-            }
-          });
-          return PulsrBottomNavBar(
-            currentIndex: widget.currentIndex,
-            onTap: widget.onTapNav,
-            includeSafeArea: true,
-          );
-        }
-
-        final mode = widget.mode;
-        final isStacked = mode != DockStackMode.defaultLayout;
-        final isNavBarOnTop = mode == DockStackMode.navBarOnTop;
-
-        // Size the stack to whichever card sits highest. In navBarOnTop the
-        // mini player peeks above the nav bar, so its top is
-        // _peekOffset + _miniPlayerHeight (not navBarTotalHeight + _peekOffset,
-        // which clipped it).
-        final double dockHeight = !isStacked
-            ? (navBarTotalHeight + _miniPlayerHeight)
-            : (isNavBarOnTop
-                ? (_peekOffset + _miniPlayerHeight)
-                : (navBarTotalHeight + _peekOffset));
-
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            PulsrDockTracker.updateDock(
-              height: dockHeight,
-              miniPlayer: true,
+          // If no song is active, render only the standalone navigation bar
+          if (!hasSong) {
+            return PulsrBottomNavBar(
+              currentIndex: widget.currentIndex,
+              onTap: widget.onTapNav,
+              includeSafeArea: true,
             );
           }
-        });
+
+          final mode = widget.mode;
+          final isStacked = mode != DockStackMode.defaultLayout;
+          final isNavBarOnTop = mode == DockStackMode.navBarOnTop;
+
+          // Size the stack to whichever card sits highest. In navBarOnTop the
+          // mini player peeks above the nav bar, so its top is
+          // _peekOffset + _miniPlayerHeight (not navBarTotalHeight + _peekOffset,
+          // which clipped it).
+          final double dockHeight = !isStacked
+              ? (navBarTotalHeight + _miniPlayerHeight)
+              : (isNavBarOnTop
+                  ? (_peekOffset + _miniPlayerHeight)
+                  : (navBarTotalHeight + _peekOffset));
 
         // Calculate card bottom offsets, scales, and opacities
         final double miniPlayerBottom;
@@ -236,22 +294,21 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
         }
 
         Widget wrapBehindCard(Widget child, DockStackMode targetMode) {
-          double behindDragDy = 0;
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () => _setMode(targetMode),
-            onVerticalDragStart: (_) => behindDragDy = 0,
-            onVerticalDragUpdate: (d) => behindDragDy += d.delta.dy,
+            onVerticalDragStart: (_) => _behindDragDy = 0,
+            onVerticalDragUpdate: (d) => _behindDragDy += d.delta.dy,
             onVerticalDragEnd: (d) {
               final v = d.primaryVelocity ?? 0;
-              if (behindDragDy > 20 || v > 80) {
+              if (_behindDragDy > 40 || v > 120) {
                 _handleSwipeDown();
-              } else if (behindDragDy < -20 || v < -80) {
+              } else if (_behindDragDy < -40 || v < -120) {
                 _handleSwipeUp();
               }
-              behindDragDy = 0;
+              _behindDragDy = 0;
             },
-            onVerticalDragCancel: () => behindDragDy = 0,
+            onVerticalDragCancel: () => _behindDragDy = 0,
             child: AbsorbPointer(child: child),
           );
         }
@@ -347,7 +404,6 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
             ? [miniPlayerCard, navBarCard]
             : [navBarCard, miniPlayerCard];
 
-        double dockDragDy = 0;
         return SafeArea(
           top: false,
           left: false,
@@ -355,18 +411,18 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
           bottom: true,
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
-            onVerticalDragStart: (_) => dockDragDy = 0,
-            onVerticalDragUpdate: (d) => dockDragDy += d.delta.dy,
+            onVerticalDragStart: (_) => _dockDragDy = 0,
+            onVerticalDragUpdate: (d) => _dockDragDy += d.delta.dy,
             onVerticalDragEnd: (d) {
               final v = d.primaryVelocity ?? 0;
-              if (dockDragDy > 20 || v > 80) {
+              if (_dockDragDy > 40 || v > 120) {
                 _handleSwipeDown();
-              } else if (dockDragDy < -20 || v < -80) {
+              } else if (_dockDragDy < -40 || v < -120) {
                 _handleSwipeUp();
               }
-              dockDragDy = 0;
+              _dockDragDy = 0;
             },
-            onVerticalDragCancel: () => dockDragDy = 0,
+            onVerticalDragCancel: () => _dockDragDy = 0,
             child: AnimatedContainer(
               duration: animDuration,
               curve: animCurve,
@@ -379,8 +435,9 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
             ),
           ),
         );
-        },
-      ),
-    );
+      },
+    ),
+  ),
+);
   }
 }

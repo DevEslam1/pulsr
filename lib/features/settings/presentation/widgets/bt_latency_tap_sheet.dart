@@ -1,16 +1,39 @@
 // lib/features/settings/presentation/widgets/bt_latency_tap_sheet.dart
+// ignore_for_file: experimental_member_use
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:just_audio/just_audio.dart';
+import '../../../../domain/services/room_correction_service.dart';
 import '../../../../core/services/bluetooth_latency_calibrator.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../cubit/settings_cubit.dart';
+import '../../../../core/utils/error_logger.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+
+class _BeepSource extends StreamAudioSource {
+  final Uint8List bytes;
+  _BeepSource(this.bytes);
+
+  @override
+  Future<StreamAudioResponse> request([int? start, int? end]) async {
+    final from = start ?? 0;
+    final to = end ?? bytes.length;
+    return StreamAudioResponse(
+      rangeRequestsSupported: false,
+      sourceLength: bytes.length,
+      contentLength: to - from,
+      offset: from,
+      contentType: 'audio/wav',
+      stream: Stream.value(bytes.sublist(from, to)),
+    );
+  }
+}
 
 /// Interactive BT latency tap test: plays 6 beeps 2s apart, user taps the pad
 /// the moment each beep is HEARD. Mean(tap-beep) minus reaction baseline
@@ -37,10 +60,36 @@ class _BtLatencyTapSheetState extends State<BtLatencyTapSheet> {
   final List<int> _deltas = [];
   bool _running = false;
   int? _resultMs;
+  late final AudioPlayer _player;
+  late final Uint8List _beepWav;
+
+  @override
+  void initState() {
+    super.initState();
+    _player = AudioPlayer();
+    _beepWav = RoomCorrectionService.synthSweepWav([880.0], toneMs: 60, fadeMs: 4, amp: 0.5);
+    try {
+      _player.setAudioSource(_BeepSource(_beepWav)).catchError((e, st) {
+        ErrorLogger.log('Failed to set audio source for BT latency test',
+            error: e, stackTrace: st, category: 'BtLatency');
+        return null;
+      });
+    } catch (e, st) {
+      ErrorLogger.log('Failed to initialize AudioPlayer in BT latency test',
+          error: e, stackTrace: st, category: 'BtLatency');
+    }
+  }
 
   @override
   void dispose() {
     _timer?.cancel();
+    try {
+      _player.stop();
+      _player.dispose();
+    } catch (e, st) {
+      ErrorLogger.log('Failed to dispose player in BT latency test',
+          error: e, stackTrace: st, category: 'BtLatency');
+    }
     super.dispose();
   }
 
@@ -54,6 +103,10 @@ class _BtLatencyTapSheetState extends State<BtLatencyTapSheet> {
     });
     _emitBeep();
     _timer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (!mounted) {
+        _timer?.cancel();
+        return;
+      }
       if (_beepsEmitted >= kTrials) {
         _finish();
         return;
@@ -65,7 +118,15 @@ class _BtLatencyTapSheetState extends State<BtLatencyTapSheet> {
   void _emitBeep() {
     _lastBeepAt = DateTime.now();
     _beepsEmitted++;
-    unawaited(SystemSound.play(SystemSoundType.click));
+    try {
+      unawaited(_player.seek(Duration.zero).then((_) => _player.play()).catchError((e, st) {
+        ErrorLogger.log('Failed to play beep in BT latency test',
+            error: e, stackTrace: st, category: 'BtLatency');
+      }));
+    } catch (e, st) {
+      ErrorLogger.log('Failed to trigger beep playback in BT latency test',
+          error: e, stackTrace: st, category: 'BtLatency');
+    }
     if (mounted) setState(() {});
   }
 
@@ -78,12 +139,13 @@ class _BtLatencyTapSheetState extends State<BtLatencyTapSheet> {
     if (_deltas.length >= kTrials) {
       _finish();
     } else {
-      setState(() {});
+      if (mounted) setState(() {});
     }
   }
 
   void _finish() {
     _timer?.cancel();
+    if (!mounted) return;
     final offset = BluetoothLatencyCalibrator()
         .offsetFromTapDeltas(List.of(_deltas));
     setState(() {
@@ -95,7 +157,7 @@ class _BtLatencyTapSheetState extends State<BtLatencyTapSheet> {
   Future<void> _apply() async {
     if (_resultMs == null) return;
     await context.read<SettingsCubit>().setBluetoothLatencyOffsetMs(_resultMs!);
-    if (mounted) Navigator.of(context).pop();
+    if (mounted && Navigator.of(context).canPop()) Navigator.of(context).pop();
   }
 
   @override

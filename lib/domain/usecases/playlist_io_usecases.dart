@@ -231,8 +231,17 @@ class PlaylistImportUseCase {
         return Left(DatabaseFailure('File not found: $filePath'));
       }
 
-      String content;
+      final length = await file.length();
+      if (length > 10 * 1024 * 1024) {
+        return Left(DatabaseFailure('Playlist file too large (> 10MB)'));
+      }
+
       final bytes = await file.readAsBytes();
+      if (bytes.contains(0)) {
+        return Left(DatabaseFailure('Binary or malformed playlist file'));
+      }
+
+      String content;
       try {
         content = utf8.decode(bytes);
       } catch (_) {
@@ -242,6 +251,27 @@ class PlaylistImportUseCase {
       // Strip UTF-8 BOM if present
       if (content.startsWith('\uFEFF')) {
         content = content.substring(1);
+      }
+
+      final dotIndex = filePath.lastIndexOf('.');
+      final ext = dotIndex >= 0 && dotIndex < filePath.length - 1
+          ? filePath.substring(dotIndex + 1).toLowerCase()
+          : '';
+      const knownExts = {'m3u', 'm3u8', 'pls', 'wpl', 'json'};
+
+      final lower = content.toLowerCase();
+      final hasPlaylistHeader = lower.contains('[playlist]');
+      final hasSmilOrMedia = lower.contains('<smil') ||
+          lower.contains('<media') ||
+          lower.contains('<?wpl');
+      final hasM3uHeader =
+          lower.contains('#extm3u') || lower.contains('#extinf');
+
+      if (!knownExts.contains(ext) &&
+          !hasPlaylistHeader &&
+          !hasSmilOrMedia &&
+          !hasM3uHeader) {
+        return Left(DatabaseFailure('Unsupported playlist format: .$ext'));
       }
 
       final rawPaths = _parseByContent(content, filePath);

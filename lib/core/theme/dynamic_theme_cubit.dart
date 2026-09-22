@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:palette_generator/palette_generator.dart';
 import '../../data/db/app_database.dart';
+import '../bloc/base_cubit.dart';
 import '../constants/app_colors.dart';
 import '../utils/error_logger.dart';
 import '../widgets/cached_artwork.dart';
@@ -56,13 +56,22 @@ class _CachedPalette {
   final Color secondaryColor;
   final Color backgroundColor;
   final Color surfaceColor;
+  // FIX-G3: Monotonic clock for TTL calculations and cache ordering
+  static final Stopwatch _monotonicClock = Stopwatch()..start();
+  final int cachedAtElapsedMs;
+  // FIX-L04: Track caching timestamp for backward compatibility & debugging
+  final DateTime cachedAt;
 
-  const _CachedPalette({
+  _CachedPalette({
     required this.primaryColor,
     required this.secondaryColor,
     required this.backgroundColor,
     required this.surfaceColor,
-  });
+    DateTime? cachedAt,
+    int? cachedAtElapsedMs,
+  })  : cachedAt = cachedAt ?? DateTime.now(),
+        cachedAtElapsedMs =
+            cachedAtElapsedMs ?? _monotonicClock.elapsedMilliseconds;
 
   DynamicThemeState applyTo(DynamicThemeState current) => current.copyWith(
         primaryColor: primaryColor,
@@ -74,13 +83,17 @@ class _CachedPalette {
 }
 
 @singleton
-class DynamicThemeCubit extends Cubit<DynamicThemeState> {
+class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
   final OnAudioQuery _audioQuery = OnAudioQuery();
   static const int _maxCacheSize = 50;
   final LinkedHashMap<String, _CachedPalette> _cachedPalettes =
       LinkedHashMap();
   Timer? _debounceTimer;
   int _currentRequestToken = 0;
+  // FIX-C01: Guard against overlapping extractions
+  bool _pendingExtraction = false;
+  // FIX-H01: Ultimate fallback if palette extraction fails
+  _CachedPalette? _lastEmittedPalette;
 
   DynamicThemeCubit() : super(const DynamicThemeState());
 
@@ -105,36 +118,52 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
         ? remoteArtworkUrl
         : 'AUDIO_$songId';
 
-    // Invalidate any in-flight extraction for the previous song: without this a
-    // slow palette landing later would overwrite the colour emitted below.
-    _currentRequestToken++;
+    // FIX-C01: Invalidate any in-flight extraction timer BEFORE incrementing token
+    _debounceTimer?.cancel();
+    final token = ++_currentRequestToken;
 
+    _CachedPalette? expiredPalette;
     if (_cachedPalettes.containsKey(cacheKey)) {
-      _debounceTimer?.cancel();
-      final cached = _cachedPalettes.remove(cacheKey)!;
-      _cachedPalettes[cacheKey] = cached; // Refresh LRU position
-      // Guarded like every other emit: this path fires during teardown when
-      // the player screen disposes while artwork updates are still landing.
-      if (!isClosed) {
-        emit(cached.applyTo(state));
+      final cached = _cachedPalettes[cacheKey]!;
+      // FIX-G3 / FIX-L04 / FIX-H01: Monotonic 30-minute TTL check
+      final isExpired = (_CachedPalette._monotonicClock.elapsedMilliseconds -
+              cached.cachedAtElapsedMs) >
+          (30 * 60 * 1000);
+      if (isExpired) {
+        expiredPalette = cached;
+        _cachedPalettes.remove(cacheKey);
+      } else {
+        _cachedPalettes.remove(cacheKey);
+        _cachedPalettes[cacheKey] = cached; // Refresh LRU position
+        _lastEmittedPalette = cached;
+        // Guarded like every other emit: this path fires during teardown when
+        // the player screen disposes while artwork updates are still landing.
+        safeEmit(cached.applyTo(state));
+        return;
       }
-      return;
     }
 
-    _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+    // FIX-C01: Check token inside callback before calling extraction
+    _debounceTimer = autoTimer(Timer(const Duration(milliseconds: 500), () {
+      if (token != _currentRequestToken || isClosed) return;
       _extractPalette(
           songId: songId,
           remoteArtworkUrl: remoteArtworkUrl,
-          cacheKey: cacheKey);
-    });
+          cacheKey: cacheKey,
+          token: token,
+          expiredFallback: expiredPalette);
+    }));
   }
 
   Future<void> _extractPalette(
       {required int songId,
       String? remoteArtworkUrl,
-      required String cacheKey}) async {
-    final token = ++_currentRequestToken;
+      required String cacheKey,
+      required int token,
+      _CachedPalette? expiredFallback}) async {
+    // FIX-C01: Prevent overlapping extractions
+    if (_pendingExtraction) return;
+    _pendingExtraction = true;
 
     try {
       ImageProvider? imageProvider;
@@ -226,12 +255,23 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
           _cachedPalettes.remove(_cachedPalettes.keys.first);
         }
         _cachedPalettes[cacheKey] = newPalette;
+        _lastEmittedPalette = newPalette;
         if (!isClosed && token == _currentRequestToken) {
-          emit(newPalette.applyTo(state));
+          safeEmit(newPalette.applyTo(state));
         }
         return;
       }
     } catch (e, st) {
+      // FIX-H01: If re-extraction fails, emit expired palette as fallback instead of leaving state stale
+      if (expiredFallback != null && !isClosed && token == _currentRequestToken) {
+        _lastEmittedPalette = expiredFallback;
+        safeEmit(expiredFallback.applyTo(state));
+        return;
+      }
+      if (_lastEmittedPalette != null && !isClosed && token == _currentRequestToken) {
+        safeEmit(_lastEmittedPalette!.applyTo(state));
+        return;
+      }
       // Do not reset to default on single artwork 404/timeout — keep existing palette
       if (e is TimeoutException || e.toString().contains('404') || e.toString().contains('Failed host lookup')) {
         ErrorLogger.log('Palette fetch transient failure for $cacheKey (keeping existing)',
@@ -241,10 +281,12 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
       ErrorLogger.log('Failed to generate dynamic theme palette for $cacheKey',
           error: e, stackTrace: st, category: 'DynamicTheme');
       return;
+    } finally {
+      _pendingExtraction = false;
     }
 
     if (token == _currentRequestToken && !isClosed) {
-      emit(DynamicThemeState(isDark: state.isDark));
+      safeEmit(DynamicThemeState(isDark: state.isDark));
     }
   }
 
@@ -254,12 +296,12 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
     _currentRequestToken++;
     // Preserve the current light/dark selection; a bare DynamicThemeState()
     // hard-codes isDark: true and silently reverted the user's mode.
-    emit(DynamicThemeState(isDark: state.isDark));
+    safeEmit(DynamicThemeState(isDark: state.isDark));
   }
 
   @override
   Future<void> close() {
-    _debounceTimer?.cancel();
+    // FIX-C07: PulsrCubit handles autoTimer cancellation automatically
     _cachedPalettes.clear();
     return super.close();
   }

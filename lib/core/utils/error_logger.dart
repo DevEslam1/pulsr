@@ -34,6 +34,7 @@ class ErrorLogger {
     dynamic error,
     StackTrace? stackTrace,
     String category = 'App',
+    Map<String, dynamic>? meta,
   }) {
     final sanitizedMessage = redactPii(message);
     if (kDebugMode) {
@@ -42,6 +43,17 @@ class ErrorLogger {
         name: 'Pulsr.$category',
         error: error,
         stackTrace: stackTrace,
+      );
+    }
+    if (Sentry.isEnabled) {
+      Sentry.addBreadcrumb(
+        Breadcrumb(
+          message: sanitizedMessage,
+          category: category,
+          data: meta,
+          level: error != null ? SentryLevel.error : SentryLevel.info,
+          timestamp: DateTime.now(),
+        ),
       );
     }
     if (error != null) {
@@ -53,6 +65,9 @@ class ErrorLogger {
           withScope: (scope) {
             scope.setTag('category', category);
             scope.setContexts('message', {'value': sanitizedMessage});
+            if (meta != null) {
+              scope.setContexts('meta', meta);
+            }
           },
         );
       }

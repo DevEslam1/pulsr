@@ -14,6 +14,7 @@ import '../../domain/models/genre_item.dart';
 import '../../domain/models/year_item.dart';
 import '../../domain/models/ytm_track.dart';
 import '../../domain/repositories/music_repository_interface.dart';
+import '../../core/utils/input_sanitizer.dart';
 import '../db/app_database.dart';
 
 @Singleton(as: IMusicRepository)
@@ -974,9 +975,10 @@ class MusicRepository implements IMusicRepository {
   Future<Result<int>> createPlaylist(String name,
       {bool isSmart = false, String? smartCriteria}) async {
     try {
+      final safeName = InputSanitizer.sanitizePlaylistName(name);
       final id = await _db.into(_db.playlistsTable).insert(
             PlaylistsTableCompanion.insert(
-              name: name,
+              name: safeName,
               isSmart: Value(isSmart),
               smartCriteria: Value(smartCriteria),
             ),
@@ -990,11 +992,12 @@ class MusicRepository implements IMusicRepository {
   @override
   Future<Result<void>> renamePlaylist(int playlistId, String newName) async {
     try {
+      final safeName = InputSanitizer.sanitizePlaylistName(newName);
       await (_db.update(_db.playlistsTable)
             ..where((t) => t.id.equals(playlistId)))
           .write(
         PlaylistsTableCompanion(
-          name: Value(newName),
+          name: Value(safeName),
           updatedAt: Value(DateTime.now()),
         ),
       );
@@ -1008,11 +1011,12 @@ class MusicRepository implements IMusicRepository {
   Future<Result<void>> updateSmartPlaylist(
       int playlistId, String name, String smartCriteria) async {
     try {
+      final safeName = InputSanitizer.sanitizePlaylistName(name);
       await (_db.update(_db.playlistsTable)
             ..where((t) => t.id.equals(playlistId)))
           .write(
         PlaylistsTableCompanion(
-          name: Value(name),
+          name: Value(safeName),
           smartCriteria: Value(smartCriteria),
           updatedAt: Value(DateTime.now()),
         ),

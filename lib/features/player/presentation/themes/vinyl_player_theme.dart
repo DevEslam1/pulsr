@@ -149,23 +149,25 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
         );
         final double pillBarHeight = isTablet ? 50.0 : 44.0;
 
-        final viewSwitcher = _buildViewSwitcher(
-          context: context,
+        final viewSwitcher = PlayerViewSwitcher(
           state: state,
           cubit: cubit,
           activeColor: activeColor,
           isTablet: isTablet,
           barWidth: pillBarWidth,
           barHeight: pillBarHeight,
+          trackIcon: Icons.album_rounded,
+          surfaceFillAlpha: 0.06,
+          borderAlpha: 0.12,
         );
 
-        final bottomDock = _buildBottomActionDock(
-          context: context,
+        final bottomDock = PlayerBottomActionDock(
           props: widget.props,
           settingsState: settingsState,
           isTablet: isTablet,
           barWidth: pillBarWidth,
           barHeight: pillBarHeight,
+          dockIconStyle: PlayerDockIconStyle.common,
         );
 
         final turntableDeck = Center(
@@ -276,9 +278,9 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                                   ),
                                 ),
                                 const SizedBox(width: AppSpacing.s6),
-                                const Text(
-                                  'STUDIO • DIRECT DRIVE',
-                                  style: TextStyle(
+                                Text(
+                                  context.l10n.vinylDirectDrive,
+                                  style: const TextStyle(
                                     fontSize: AppFontSize.micro,
                                     fontWeight: FontWeight.w800,
                                     letterSpacing: AppTracking.wide,
@@ -452,7 +454,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                                       const SizedBox(width: AppSpacing.xxs),
                                       Text(
                                         state.isPlaying
-                                            ? '33⅓ RPM'
+                                            ? context.l10n.vinylSpeedRpm
                                             : context.l10n.dspStandby,
                                         style: TextStyle(
                                           fontSize: AppFontSize.micro,
@@ -907,50 +909,6 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // View Switcher Pill Bar (Track / Lyrics / Queue) - Twin Capsule to EQ Dock
-  // ---------------------------------------------------------------------------
-  Widget _buildViewSwitcher({
-    required BuildContext context,
-    required PlayerState state,
-    required PlayerCubit cubit,
-    required Color activeColor,
-    required bool isTablet,
-    required double barWidth,
-    required double barHeight,
-  }) {
-    // Extracted to player_theme_chrome.dart (A-13); only the tokens this theme
-    // actually differed on are passed through.
-    return PlayerViewSwitcher(
-      state: state,
-      cubit: cubit,
-      activeColor: activeColor,
-      isTablet: isTablet,
-      barWidth: barWidth,
-      barHeight: barHeight,
-      trackIcon: Icons.album_rounded,
-      surfaceFillAlpha: 0.06,
-      borderAlpha: 0.12,
-    );
-  }
-  Widget _buildBottomActionDock({
-    required BuildContext context,
-    required PlayerThemeProps props,
-    required SettingsState settingsState,
-    required bool isTablet,
-    required double barWidth,
-    required double barHeight,
-  }) {
-    // Extracted to player_theme_chrome.dart (A-13).
-    return PlayerBottomActionDock(
-      props: props,
-      settingsState: settingsState,
-      isTablet: isTablet,
-      barWidth: barWidth,
-      barHeight: barHeight,
-      dockIconStyle: PlayerDockIconStyle.common,
-    );
-  }
 }
 
 // -----------------------------------------------------------------------------

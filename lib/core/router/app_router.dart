@@ -215,7 +215,7 @@ GoRouter createRouter(MediaScannerService scannerService) {
                 context.l10n.pageNotFoundMessage(state.uri.toString()),
                 style: const TextStyle(fontSize: AppFontSize.bodyLarge)),
             const SizedBox(height: AppSpacing.md),
-            ElevatedButton(
+            FilledButton(
               onPressed: () => context.go('/'),
               child: Text(context.l10n.goHome),
             ),

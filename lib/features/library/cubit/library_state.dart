@@ -26,6 +26,7 @@ abstract class LibraryState with _$LibraryState {
     @Default(false) bool isLoading,
     @Default(false) bool isLoadingMore,
     String? errorMessage,
+    String? infoMessage,
     @Default({}) Set<int> selectedSongIds,
     @Default(false) bool isMultiSelectMode,
     @Default(LibraryViewMode.list) LibraryViewMode viewMode,

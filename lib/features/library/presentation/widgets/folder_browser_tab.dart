@@ -39,6 +39,8 @@ class FolderBrowserTab extends StatelessWidget {
 
         if (folders.isEmpty) {
           return RefreshIndicator(
+            color: p.accent,
+            backgroundColor: p.surfaceContainer,
             onRefresh: onRefresh,
             child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -63,9 +65,13 @@ class FolderBrowserTab extends StatelessWidget {
           child: ConstrainedBox(
             constraints: Adaptive.contentConstraints(context),
             child: RefreshIndicator(
+              color: p.accent,
+              backgroundColor: p.surfaceContainer,
               onRefresh: onRefresh,
               child: ListView.builder(
                 physics: const AlwaysScrollableScrollPhysics(),
+                addAutomaticKeepAlives: false,
+                addRepaintBoundaries: true,
                 padding: EdgeInsetsDirectional.only(
                   bottom: AppSpacing.scrollBottom,
                   top: 8,
@@ -118,7 +124,7 @@ class FolderBrowserTab extends StatelessWidget {
                                     ? Icons.download_done_rounded
                                     : Icons.folder_rounded,
                             color: folder.isExcluded ? p.error : p.accent,
-                            size: 22,
+                            size: 20,
                           ),
                         ),
                         title: Row(
@@ -177,7 +183,7 @@ class FolderBrowserTab extends StatelessWidget {
                                 : Icons.visibility_rounded,
                             color:
                                 folder.isExcluded ? p.error : p.textSecondary,
-                            size: 22,
+                            size: 20,
                           ),
                           tooltip: folder.isExcluded
                               ? context.l10n.browseIncludeInScan

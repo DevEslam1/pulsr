@@ -10,6 +10,7 @@ import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
+import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/usecases/folder_usecases.dart';
@@ -34,7 +35,7 @@ class FolderDetailScreen extends StatefulWidget {
 }
 
 class _FolderDetailScreenState extends State<FolderDetailScreen> {
-  late FolderUseCases _useCase;
+  late final FolderUseCases _useCase;
   late bool _isExcluded;
 
   @override
@@ -70,8 +71,10 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
               setState(() => _isExcluded = newExcluded);
               await _useCase.toggleExcludeFolder(folder.path);
               if (context.mounted) {
+                LibraryCubit? libraryCubit;
                 try {
-                  context.read<LibraryCubit>().loadFolders();
+                  libraryCubit = context.read<LibraryCubit>();
+                  libraryCubit.loadFolders();
                 } catch (_) {}
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -79,6 +82,16 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                       newExcluded
                           ? context.l10n.folderExcluded
                           : context.l10n.folderIncluded,
+                    ),
+                    action: SnackBarAction(
+                      label: context.l10n.undo,
+                      onPressed: () async {
+                        if (mounted) setState(() => _isExcluded = !newExcluded);
+                        await _useCase.toggleExcludeFolder(folder.path);
+                        try {
+                          libraryCubit?.loadFolders();
+                        } catch (_) {}
+                      },
                     ),
                   ),
                 );
@@ -88,42 +101,24 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
         ],
       ),
       body: StreamBuilder<Result<List<SongsTableData>>>(
-        stream: _useCase.watchFolderSongs(folder.path),
+        stream: _useCase.watchFolderSongs(folder.path).distinct(),
         builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              !snapshot.hasData) {
+            return const SkeletonList(
+                padding: EdgeInsets.only(top: AppSpacing.xs));
+          }
           final loadFailed = snapshot.hasError ||
               (snapshot.data?.fold((l) => true, (_) => false) ?? false);
           if (loadFailed) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.xl),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.error_outline_rounded, color: p.error, size: 48),
-                    const SizedBox(height: AppSpacing.md),
-                    Text(
-                      context.l10n.couldNotLoadFolderSongs,
-                      style: TextStyle(
-                        color: p.textPrimary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: AppFontSize.bodyLarge,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      context.l10n.libraryReadError,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
-                    ),
-                    const SizedBox(height: AppSpacing.s20),
-                    ElevatedButton.icon(
-                      onPressed: () => setState(() {}),
-                      icon: const Icon(Icons.refresh_rounded),
-                      label: Text(context.l10n.retry),
-                    ),
-                  ],
-                ),
-              ),
+            return EmptyStateWidget(
+              icon: Icons.error_outline_rounded,
+              iconColor: p.error,
+              title: context.l10n.couldNotLoadFolderSongs,
+              subtitle: context.l10n.libraryReadError,
+              primaryActionLabel: context.l10n.retry,
+              primaryActionIcon: Icons.refresh_rounded,
+              onPrimaryAction: () => setState(() {}),
             );
           }
 
@@ -210,7 +205,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                     child: Row(
                       children: [
                         Expanded(
-                          child: ElevatedButton.icon(
+                          child: FilledButton.icon(
                             onPressed: songs.isNotEmpty
                                 ? () => context
                                     .read<PlayerCubit>()

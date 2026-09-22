@@ -60,6 +60,77 @@ class YtmWebLoginSheet extends StatefulWidget {
     );
   }
 
+  /// Generates hardened [InAppWebViewSettings] ensuring strict sandboxing:
+  /// no local file access, no universal access from file URLs, no content provider access,
+  /// no mixed content, and suppressed X-Requested-With package headers.
+  static InAppWebViewSettings buildDefaultSettings({String? userAgent}) {
+    return InAppWebViewSettings(
+      userAgent: userAgent ?? EmbeddedBrowserUa.mobile,
+      preferredContentMode: UserPreferredContentMode.MOBILE,
+      useHybridComposition: true,
+      javaScriptEnabled: true,
+      javaScriptCanOpenWindowsAutomatically: false,
+      supportMultipleWindows: true,
+      mediaPlaybackRequiresUserGesture: false,
+      isInspectable: kDebugMode,
+      transparentBackground: false,
+      mixedContentMode: MixedContentMode.MIXED_CONTENT_NEVER_ALLOW,
+      cacheEnabled: true,
+      databaseEnabled: true,
+      domStorageEnabled: true,
+      thirdPartyCookiesEnabled: true,
+      sharedCookiesEnabled: true,
+      allowFileAccess: false,
+      allowContentAccess: false,
+      allowFileAccessFromFileURLs: false,
+      allowUniversalAccessFromFileURLs: false,
+      geolocationEnabled: false,
+      useWideViewPort: true,
+      loadWithOverviewMode: true,
+      supportZoom: true,
+      builtInZoomControls: false,
+      displayZoomControls: false,
+      allowsInlineMediaPlayback: true,
+      useShouldOverrideUrlLoading: true,
+      requestedWithHeaderOriginAllowList: <String>{},
+      disableDefaultErrorPage: false,
+    );
+  }
+
+  /// Evaluates whether a navigation action to [uri] is permitted under Pulsr's webview sandbox.
+  /// Blocks non-HTTPS schemes (especially javascript:, file:, data:, market:, intent:) and untrusted domains.
+  static NavigationActionPolicy evaluateNavigation(Uri? uri) {
+    if (uri == null) return NavigationActionPolicy.ALLOW;
+    final urlStr = uri.toString().toLowerCase();
+
+    // Block all script execution or local file access schemes
+    if (urlStr.startsWith('javascript:') ||
+        urlStr.startsWith('file:') ||
+        urlStr.startsWith('data:') ||
+        urlStr.startsWith('blob:') ||
+        uri.scheme == 'javascript' ||
+        uri.scheme == 'file' ||
+        uri.scheme == 'data' ||
+        uri.scheme == 'blob') {
+      return NavigationActionPolicy.CANCEL;
+    }
+
+    // Block app market and intent schemes
+    if (urlStr.startsWith('market://') ||
+        urlStr.startsWith('intent://') ||
+        urlStr.contains('play.google.com') ||
+        (urlStr.contains('google.com/url') && urlStr.contains('play.google.com'))) {
+      return NavigationActionPolicy.CANCEL;
+    }
+
+    // Enforce trusted Google/YouTube endpoints
+    if (!_YtmWebLoginSheetState._isTrustedGoogleNavigation(uri)) {
+      return NavigationActionPolicy.CANCEL;
+    }
+
+    return NavigationActionPolicy.ALLOW;
+  }
+
   @override
   State<YtmWebLoginSheet> createState() => _YtmWebLoginSheetState();
 }
@@ -89,14 +160,14 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   /// loop stop and lets `onWebViewCreated` restart it against the new instance.
   bool _webViewGone = false;
 
+  bool _disposed = false;
+
   /// Whether [error] means the native WebView is gone rather than that the call
   /// itself failed. Nothing is recoverable from it, and it is not worth a crash
   /// report — it is the expected shape of "you are holding a dead handle".
   bool _isWebViewGoneError(Object error) =>
       error is MissingPluginException ||
-      (error is PlatformException &&
-          (error.code == 'invalid_instance_id' ||
-              (error.message ?? '').toLowerCase().contains('not found')));
+      (error is PlatformException && error.code == 'invalid_instance_id');
 
   /// Funnels a caught WebView error: drops the dead-handle case (recording it so
   /// callers stop retrying) and crash-reports everything else as before.
@@ -326,8 +397,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   /// the embedded WebView even after the UA string has been spoofed.
   /// Also injects browse guard & viewport scripts to ensure the full YouTube
   /// Music web player renders instead of Google Play redirects.
-  static UnmodifiableListView<UserScript> get _antiFingerPrintScripts =>
-      UnmodifiableListView([
+  static final UnmodifiableListView<UserScript> _antiFingerPrintScripts =
+      UnmodifiableListView<UserScript>([
         UserScript(
           source: EmbeddedBrowserUa.antiFingerprint,
           injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
@@ -358,17 +429,16 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   bool _blockExhausted = false;
 
   /// Identity override chosen by the ladder or the recovery card. Null =
-  /// use the default isYtm URL-based selection.
+  /// follow the automatic ladder.
   BrowserIdentity? _uaIdentityOverride;
 
-  /// Throttle for the block-page JS text scan (once per 2.5 s per page).
-  DateTime _lastBlockScanAt = DateTime.fromMillisecondsSinceEpoch(0);
+  final Stopwatch _lastBlockScanStopwatch = Stopwatch()..start();
 
   /// Suppresses block re-detection for 8 s after each recovery step so the
   /// new page has time to fully load before we scan again. Without this,
   /// the poll fires while the reloaded page is still the block page and
   /// triggers another recovery step immediately, looping forever.
-  DateTime _blockCooldownUntil = DateTime.fromMillisecondsSinceEpoch(0);
+  final Stopwatch _blockCooldownStopwatch = Stopwatch();
 
   String _uaFor(BrowserIdentity identity) {
     switch (identity) {
@@ -495,41 +565,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         ? _uaFor(_uaIdentityOverride!)
         : _resolvedUserAgent;
 
-    _settings = InAppWebViewSettings(
-      userAgent: initialUa,
-      preferredContentMode: UserPreferredContentMode.MOBILE,
-      useHybridComposition: true,
-      javaScriptEnabled: true,
-      javaScriptCanOpenWindowsAutomatically: false,
-      supportMultipleWindows: true,
-      mediaPlaybackRequiresUserGesture: false,
-      isInspectable: kDebugMode,
-      transparentBackground: false,
-      mixedContentMode: MixedContentMode.MIXED_CONTENT_NEVER_ALLOW,
-      cacheEnabled: true,
-      databaseEnabled: true,
-      domStorageEnabled: true,
-      thirdPartyCookiesEnabled: true,
-      sharedCookiesEnabled: true,
-      allowFileAccess: false,
-      allowContentAccess: false,
-      allowFileAccessFromFileURLs: false,
-      allowUniversalAccessFromFileURLs: false,
-      geolocationEnabled: false,
-      useWideViewPort: true,
-      loadWithOverviewMode: true,
-      supportZoom: true,
-      builtInZoomControls: false,
-      displayZoomControls: false,
-      allowsInlineMediaPlayback: true,
-      useShouldOverrideUrlLoading: true,
-      // Empty set suppresses the X-Requested-With header that Android WebView
-      // normally injects with the app's package name (com.pulsr.music).
-      // Google uses this header to detect embedded WebViews and block sign-in.
-      requestedWithHeaderOriginAllowList: <String>{},
-      // Disable hardware acceleration override to avoid rendering fingerprint differences
-      disableDefaultErrorPage: false,
-    );
+    _settings = YtmWebLoginSheet.buildDefaultSettings(userAgent: initialUa);
 
     _hintTimer = Timer(const Duration(seconds: 30), () {
       if (mounted && !_isLoggedIn && !widget.isBrowseMode) {
@@ -568,30 +604,43 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   }
 
   int _pollIntervalSeconds = 2;
+  int _authPollAttempts = 0;
+  static const int _maxPollAttempts = 120;
+  // FIX-H10: Generation counter to discard stale poll executions
+  int _pollGeneration = 0;
 
   void _scheduleNextAuthPoll() {
     _authPollTimer?.cancel();
-    if (!mounted || _isLoggedIn) return;
+    if (_disposed || !mounted || _isLoggedIn || _webViewGone) return;
+    if (_authPollAttempts >= _maxPollAttempts) {
+      debugPrint('[YtmWebLogin] Max poll attempts reached, stopping.');
+      return;
+    }
+    _authPollAttempts++;
+    final generation = ++_pollGeneration;
     // Nothing to poll: every call would throw MissingPluginException on the dead
     // handle. `onWebViewCreated` restarts the loop when a live one arrives.
-    if (_webViewGone) return;
 
     _authPollTimer = Timer(Duration(seconds: _pollIntervalSeconds), () async {
-      if (!mounted || _isLoggedIn || _webViewGone) return;
+      // FIX-H10: Early _disposed and generation check
+      if (_disposed || !mounted || _isLoggedIn || _webViewGone || generation != _pollGeneration) return;
       if (_webViewController != null && !_isLoading) {
         final loggedIn = await _checkIfLoggedIn();
+        if (_disposed || !mounted || generation != _pollGeneration) return;
         if (loggedIn) return;
         // _checkIfLoggedIn may have discovered the handle is dead.
-        if (_webViewGone || _webViewController == null) return;
+        if (_disposed || _webViewGone || _webViewController == null || generation != _pollGeneration) return;
 
         // Check for Google block during polling (detects SPA client-side rejections after tapping Next)
         if (!widget.isBrowseMode && !_blockExhausted && _blockStatus == null) {
           // Skip block scan during post-recovery cooldown to prevent re-detection
           // of the same block page before the new page has finished loading.
-          final inCooldown = DateTime.now().isBefore(_blockCooldownUntil);
+          final inCooldown = _blockCooldownStopwatch.isRunning &&
+              _blockCooldownStopwatch.elapsed < const Duration(seconds: 8);
           final isBlocked = (!inCooldown && _shouldScanForBlockPage())
               ? await _scanPageForBlockText(_webViewController!)
               : false;
+          if (_disposed || !mounted || generation != _pollGeneration) return;
           if (isBlocked) {
             _handleGoogleBlock();
             return;
@@ -613,20 +662,25 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
   @override
   void dispose() {
+    _disposed = true;
+    _webViewGone = true;
+    _blockCooldownStopwatch.stop();
+    _lastBlockScanStopwatch.stop();
     _hintTimer?.cancel();
     _authPollTimer?.cancel();
     _cookieMismatchDebounce?.cancel();
     _progressNotifier.dispose();
+    _webViewController = null;
     super.dispose();
   }
 
   Future<void> _updateNavState() async {
-    if (_webViewController == null) return;
+    if (_disposed || _webViewController == null) return;
     try {
       final back = await _webViewController!.canGoBack();
       final forward = await _webViewController!.canGoForward();
       final url = await _webViewController!.getUrl();
-      if (mounted) {
+      if (mounted && !_disposed) {
         setState(() {
           _canGoBack = back;
           _canGoForward = forward;
@@ -731,13 +785,14 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   }
 
   bool _shouldScanForBlockPage() {
-    final now = DateTime.now();
-    if (now.isBefore(_blockCooldownUntil)) return false;
-    if (now.difference(_lastBlockScanAt) <
-        const Duration(milliseconds: 2500)) {
+    if (_blockCooldownStopwatch.isRunning &&
+        _blockCooldownStopwatch.elapsed < const Duration(seconds: 8)) {
       return false;
     }
-    _lastBlockScanAt = now;
+    if (_lastBlockScanStopwatch.elapsed < const Duration(milliseconds: 2500)) {
+      return false;
+    }
+    _lastBlockScanStopwatch.reset();
     return true;
   }
 
@@ -756,6 +811,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   /// Lightweight throttled JS evaluation: looks for Google's block-page
   /// phrases in the document title/body text (first 4 KB, lowercased).
   Future<bool> _scanPageForBlockText(InAppWebViewController controller) async {
+    if (_disposed) return false;
     try {
       final currentUrl =
           (await controller.getUrl())?.toString().toLowerCase() ?? '';
@@ -847,14 +903,14 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     required String userAgent,
     UserPreferredContentMode? contentMode,
   }) async {
-    if (controller == null) return;
-    final base = _settings?.copy() ?? InAppWebViewSettings();
+    final base = _settings?.copy() ??
+        YtmWebLoginSheet.buildDefaultSettings(userAgent: userAgent);
     base.userAgent = userAgent;
     if (contentMode != null) base.preferredContentMode = contentMode;
     // Keep the field in step with the WebView, so the next call copies from what
     // is actually installed rather than from the initial value.
     _settings = base;
-    await controller.setSettings(settings: base);
+    await controller?.setSettings(settings: base);
   }
 
 
@@ -877,10 +933,12 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       userAgent: mobileUserAgent,
       contentMode: UserPreferredContentMode.MOBILE,
     );
-    _blockCooldownUntil = DateTime.now().add(const Duration(seconds: 8));
+    _blockCooldownStopwatch
+      ..reset()
+      ..start();
     await _navigateTo(
         widget.isBrowseMode ? 'https://music.youtube.com' : googleSignInUrl);
-    if (mounted) setState(() => _blockStatus = null);
+    if (mounted && !_disposed) setState(() => _blockStatus = null);
   }
 
   /// Recovery card identity toggle: switch UA mode and reload in place.
@@ -888,7 +946,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     _uaIdentityOverride = identity;
     final isDesktop = identity == BrowserIdentity.desktop ||
         identity == BrowserIdentity.chromeDesktop;
-    if (mounted) {
+    if (mounted && !_disposed) {
       setState(() {
         _blockExhausted = false;
         _blockStatus =
@@ -903,15 +961,18 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           ? UserPreferredContentMode.DESKTOP
           : UserPreferredContentMode.MOBILE,
     );
-    _blockCooldownUntil = DateTime.now().add(const Duration(seconds: 8));
+    _blockCooldownStopwatch
+      ..reset()
+      ..start();
     await _navigateTo(
         widget.isBrowseMode ? 'https://music.youtube.com' : googleSignInUrl);
-    if (mounted) setState(() => _blockStatus = null);
+    if (mounted && !_disposed) setState(() => _blockStatus = null);
   }
 
   Future<void> _navigateTo(String url) async {
     final effectiveUrl = _withGeoParams(url);
     _pollIntervalSeconds = 2;
+    _authPollAttempts = 0;
     _scheduleNextAuthPoll();
     final targetUa = _uaIdentityOverride != null
         ? _uaFor(_uaIdentityOverride!)
@@ -941,13 +1002,19 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   }
 
   Future<bool> _checkIfLoggedIn([String? url]) {
-    if (_isLoggedIn) return Future<bool>.value(true);
-    return _loginCheckInFlight ??=
-        _detectLoginState(url).whenComplete(() => _loginCheckInFlight = null);
+    if (_disposed || _isLoggedIn) return Future<bool>.value(true);
+    return _loginCheckInFlight ??= () async {
+      try {
+        if (_disposed) return false;
+        return await _detectLoginState(url);
+      } finally {
+        _loginCheckInFlight = null;
+      }
+    }();
   }
 
   Future<bool> _detectLoginState([String? url]) async {
-    if (_isLoggedIn) return true;
+    if (_disposed || _isLoggedIn) return true;
 
     String? currentUrl = url;
     try {
@@ -1002,7 +1069,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           _isLoggedIn = true;
           _detectedCookies = combinedCookies;
           await accountService.saveSession(combinedCookies);
-          if (mounted) {
+          if (mounted && !_disposed) {
             setState(() {});
             // Navigate to music.youtube.com to complete the OAuth redirect
             // and ensure music.youtube.com domain cookies are also set.
@@ -1028,7 +1095,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         _isLoggedIn = true;
         _detectedCookies = cookies;
         await accountService.saveSession(cookies);
-        if (mounted) {
+        if (mounted && !_disposed) {
           setState(() {});
           unawaited(_navigateTo('https://music.youtube.com'));
         }
@@ -1057,7 +1124,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
             _isLoggedIn = true;
             _detectedCookies = cookieStr;
             await accountService.saveSession(cookieStr);
-            if (mounted) {
+            if (mounted && !_disposed) {
               setState(() {});
               unawaited(_navigateTo('https://music.youtube.com'));
             }
@@ -1783,11 +1850,13 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                         },
                         onWebViewCreated: (controller) {
                           _webViewController = controller;
+                          final wasGone = _webViewGone;
+                          _webViewGone = false;
                           // A fresh native instance: the previous handle may have
                           // died and paused the auth poll, so bring it back.
-                          if (_webViewGone) {
-                            _webViewGone = false;
+                          if (wasGone) {
                             _pollIntervalSeconds = 2;
+                            _authPollAttempts = 0;
                             _scheduleNextAuthPoll();
                           }
                         },
@@ -1808,25 +1877,20 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                         shouldOverrideUrlLoading:
                             (controller, navigationAction) async {
                           final uri = navigationAction.request.url;
-                          if (uri == null) return NavigationActionPolicy.ALLOW;
-                          final urlStr = uri.toString();
-                          final urlLower = urlStr.toLowerCase();
-
-                          // Prevent Google Play Store / market / intent deep links from opening
-                          if (urlLower.startsWith('market://') ||
-                              urlLower.startsWith('intent://') ||
-                              urlLower.contains('play.google.com') ||
-                              (urlLower.contains('google.com/url') &&
-                                  urlLower.contains('play.google.com'))) {
-                            if (!widget.isBrowseMode && !urlLower.contains('music')) {
-                              unawaited(_navigateTo(googleSignInUrl));
-                            } else {
-                              unawaited(_navigateTo('https://music.youtube.com'));
+                          final policy = YtmWebLoginSheet.evaluateNavigation(uri);
+                          if (policy == NavigationActionPolicy.CANCEL) {
+                            if (uri != null) {
+                              final urlLower = uri.toString().toLowerCase();
+                              if (urlLower.startsWith('market://') ||
+                                  urlLower.startsWith('intent://') ||
+                                  urlLower.contains('play.google.com')) {
+                                if (!widget.isBrowseMode && !urlLower.contains('music')) {
+                                  unawaited(_navigateTo(googleSignInUrl));
+                                } else {
+                                  unawaited(_navigateTo('https://music.youtube.com'));
+                                }
+                              }
                             }
-                            return NavigationActionPolicy.CANCEL;
-                          }
-
-                          if (!_isTrustedGoogleNavigation(uri)) {
                             return NavigationActionPolicy.CANCEL;
                           }
                           return NavigationActionPolicy.ALLOW;
@@ -1851,6 +1915,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                           }
                         },
                         onProgressChanged: (controller, progress) {
+                          if (_disposed) return;
                           // F-17: no setState — progress ticks only rebuild
                           // the ValueListenableBuilder bar above.
                           _progressNotifier.value = progress / 100;

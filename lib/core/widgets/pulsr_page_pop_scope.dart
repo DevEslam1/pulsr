@@ -24,10 +24,11 @@ class PulsrPagePopScope extends StatelessWidget {
           onPop!();
           return;
         }
-        if (context.canPop()) {
-          context.pop();
+        final router = GoRouter.of(context);
+        if (router.canPop()) {
+          router.pop();
         } else {
-          context.go('/');
+          router.go('/');
         }
       },
       child: child,

@@ -106,7 +106,9 @@ class NowPlayingQueueView extends StatelessWidget {
                     : ReorderableListView.builder(
                         padding: const EdgeInsets.only(bottom: AppSpacing.lg, top: AppSpacing.xxs),
                         itemCount: queue.length,
-                        onReorderItem: (oldIndex, newIndex) {
+                        // ignore: deprecated_member_use
+                        onReorder: (oldIndex, newIndex) {
+                          if (newIndex > oldIndex) newIndex -= 1;
                           cubit.reorderQueue(oldIndex, newIndex);
                         },
                         itemBuilder: (context, index) {

@@ -2,6 +2,7 @@ part of 'settings_cubit.dart';
 
 mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   Future<void> setReplayGainMode(ReplayGainMode mode) async {
+    markDirty('replayGainMode');
     if (mode != ReplayGainMode.off) {
       final blocked = AudioConflicts.replayGainBlockedByBitPerfect(
         bitPerfectOutput: state.bitPerfectOutput,
@@ -23,6 +24,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   }
 
   Future<void> setReplayGainPreampWithRg(double db) async {
+    markDirty('replayGainPreampWithRg');
     final clamped = db.clamp(-15.0, 15.0);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(SettingsCubit._keyReplayGainPreampWithRg, clamped);
@@ -30,6 +32,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   }
 
   Future<void> setReplayGainPreampWithoutRg(double db) async {
+    markDirty('replayGainPreampWithoutRg');
     final clamped = db.clamp(-15.0, 15.0);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(SettingsCubit._keyReplayGainPreampWithoutRg, clamped);
@@ -37,24 +40,28 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   }
 
   Future<void> setStreamingQuality(YtmAudioQuality quality) async {
+    markDirty('streamingQuality');
     safeEmit(state.copyWith(streamingQuality: quality));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(SettingsCubit._keyStreamingQuality, quality.name);
   }
 
   Future<void> setDownloadQuality(YtmAudioQuality quality) async {
+    markDirty('downloadQuality');
     safeEmit(state.copyWith(downloadQuality: quality));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(SettingsCubit._keyDownloadQuality, quality.name);
   }
 
   Future<void> setWifiOnlyMode(bool enabled) async {
+    markDirty('wifiOnlyMode');
     safeEmit(state.copyWith(wifiOnlyMode: enabled));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(SettingsCubit._keyWifiOnlyMode, enabled);
   }
 
   Future<void> setOfflineOnlyMode(bool enabled) async {
+    markDirty('offlineOnlyMode');
     safeEmit(state.copyWith(offlineOnlyMode: enabled));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(SettingsCubit._keyOfflineOnlyMode, enabled);
@@ -111,7 +118,24 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       return;
     }
     if (enabled) {
-      await _forceCrossfadeOffForBitPerfect();
+      try {
+        await _forceCrossfadeOffForBitPerfect();
+      } catch (e, st) {
+        // FIX-H11: Wrap in try-catch and revert bit-perfect state on error
+        ErrorLogger.log('Failed to force crossfade off for bit-perfect',
+            error: e, stackTrace: st, category: 'SettingsAudioActions');
+        try {
+          await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
+          await _hiResAudioService.setBitPerfectMode(false);
+        } catch (_) {}
+        if (!isClosed) {
+          safeEmit(state.copyWith(
+            bitPerfectOutput: false,
+            errorMessage: 'Failed to configure bit-perfect mode.',
+          ));
+        }
+        return;
+      }
     }
     // Wire bypass: when bit-perfect enabled and user wants bypass, force DSP off via native
     if (enabled && state.bypassDspOnBitPerfect) {
@@ -216,6 +240,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// the DSP bypass and follow-track, then surfaces the conflict reason rather
   /// than silently muting stages. Disabled when the path cannot do bit-perfect.
   Future<void> setStrictBitPerfect(bool enabled) async {
+    // FIX-C01: Capture pre-call follow-track rate for rollback
+    final prevFollowRate = state.followTrackSampleRate;
     if (enabled) {
       final block = AudioConflicts.strictBitPerfectBlockedReason(
           state.currentOutputDevice);
@@ -244,14 +270,22 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     if (!applied) {
       // Strict bit-perfect is impossible on this device; revert rather than
       // persist a configuration the hardware cannot honour.
+      // FIX-C01: Revert all four fields in prefs and state atomically
       try {
         await prefs.setBool(PrefsKeys.strictBitPerfect, false);
         await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
-      } catch (_) {}
+        await prefs.setBool(PrefsKeys.bypassDspOnBitPerfect, false);
+        await prefs.setBool(PrefsKeys.followTrackSampleRate, prevFollowRate);
+      } catch (e, st) {
+        ErrorLogger.log('Failed to persist strict bit-perfect revert',
+            error: e, stackTrace: st, category: 'Settings');
+      }
       if (!isClosed) {
         safeEmit(state.copyWith(
           strictBitPerfect: false,
           bitPerfectOutput: false,
+          bypassDspOnBitPerfect: false,
+          followTrackSampleRate: prevFollowRate,
           errorMessage:
               'Strict Bit-Perfect is not supported by the current output device.',
         ));
@@ -425,40 +459,47 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   }
 
   Future<void> refreshOutputDevice() async {
-    final info = await _hiResAudioService.getAudioOutputInfo();
-    final caps = await DsdDecoderHelper.probeDopCapabilities();
-    final previous = state.currentOutputDevice;
-    // Drop stale DAC targets when the route changes (e.g. USB -> speaker/BT);
-    // otherwise a 192k DAC request is re-sent to the phone speaker.
-    final routeChanged = previous != null &&
-        (previous.deviceName != info.deviceName ||
-            previous.activeDeviceType != info.activeDeviceType ||
-            previous.isBluetooth != info.isBluetooth ||
-            previous.isUsbDac != info.isUsbDac);
-    final savedSampleRate = (!routeChanged &&
-            previous?.targetSampleRate != null &&
-            previous!.targetSampleRate > 0)
-        ? previous.targetSampleRate
-        : 0;
-    final savedBitDepth = (!routeChanged &&
-            previous?.targetBitDepth != null &&
-            previous!.targetBitDepth > 0)
-        ? previous.targetBitDepth
-        : 0;
+    // FIX-C02: Guard against native crash or unhandled exception during device/DOP refresh
+    try {
+      final info = await _hiResAudioService.getAudioOutputInfo();
+      final caps = await DsdDecoderHelper.probeDopCapabilities();
+      final previous = state.currentOutputDevice;
+      // Drop stale DAC targets when the route changes (e.g. USB -> speaker/BT);
+      // otherwise a 192k DAC request is re-sent to the phone speaker.
+      final routeChanged = previous != null &&
+          (previous.deviceName != info.deviceName ||
+              previous.activeDeviceType != info.activeDeviceType ||
+              previous.isBluetooth != info.isBluetooth ||
+              previous.isUsbDac != info.isUsbDac);
+      final savedSampleRate = (!routeChanged &&
+              previous?.targetSampleRate != null &&
+              previous!.targetSampleRate > 0)
+          ? previous.targetSampleRate
+          : 0;
+      final savedBitDepth = (!routeChanged &&
+              previous?.targetBitDepth != null &&
+              previous!.targetBitDepth > 0)
+          ? previous.targetBitDepth
+          : 0;
 
-    if (isClosed) return;
-    safeEmit(
-      state.copyWith(
-        currentOutputDevice: info.copyWith(
-          targetSampleRate: info.targetSampleRate != 0
-              ? info.targetSampleRate
-              : savedSampleRate,
-          targetBitDepth:
-              info.targetBitDepth != 0 ? info.targetBitDepth : savedBitDepth,
+      if (isClosed) return;
+      safeEmit(
+        state.copyWith(
+          currentOutputDevice: info.copyWith(
+            targetSampleRate: info.targetSampleRate != 0
+                ? info.targetSampleRate
+                : savedSampleRate,
+            targetBitDepth:
+                info.targetBitDepth != 0 ? info.targetBitDepth : savedBitDepth,
+          ),
+          dsdDopSupported: caps.canUseDop,
         ),
-        dsdDopSupported: caps.canUseDop,
-      ),
-    );
+      );
+    } catch (e, st) {
+      ErrorLogger.log('Failed to refresh output device or probe DoP',
+          error: e, stackTrace: st, category: 'Settings');
+      return;
+    }
   }
 
   Future<void> setDspPreference(String preference) async {
@@ -608,12 +649,14 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     }
   }
 
-  /// Opt-in USB DAC hardware volume control. Persisted only; the USB settings
-  /// widget applies it to the attached DAC when the toggle changes.
-  Future<void> setUsbHardwareVolumeEnabled(bool enabled) async {
-    safeEmit(state.copyWith(usbHardwareVolumeEnabled: enabled));
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(PrefsKeys.usbHardwareVolumeEnabled, enabled);
+  Future<bool> setUsbHardwareVolumeEnabled(bool enabled) async {
+    try {
+      safeEmit(state.copyWith(usbHardwareVolumeEnabled: enabled));
+      final prefs = await SharedPreferences.getInstance();
+      return await prefs.setBool(PrefsKeys.usbHardwareVolumeEnabled, enabled);
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Resampler quality (0=Fast/linear, 1=Standard, 2=High, 3=Ultra).
@@ -772,8 +815,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     if (parsed != MultiOutputMode.systemDefault && !applied) {
       // Android cannot route media to two outputs simultaneously. Revert the
       // selection instead of persisting an option that never takes effect.
-      await prefs.setString(
-          PrefsKeys.multiOutputMode, MultiOutputMode.systemDefault.name);
+      // FIX-M06: Emit systemDefault before prefs write to ensure UI updates immediately even if disk write hangs
       if (!isClosed) {
         safeEmit(state.copyWith(
           multiOutputMode: MultiOutputMode.systemDefault.name,
@@ -781,6 +823,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
               'This device cannot play to two outputs at once. Output stays on System default.',
         ));
       }
+      await prefs.setString(
+          PrefsKeys.multiOutputMode, MultiOutputMode.systemDefault.name);
       return;
     }
     await prefs.setString(PrefsKeys.multiOutputMode, parsed.name);
@@ -902,4 +946,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
 
   // Requires: provided by the composing class (same library).
   Future<void> setGapless(bool value);
+
+  // Requires: provided by the composing class (same library).
+  void markDirty(String field);
 }

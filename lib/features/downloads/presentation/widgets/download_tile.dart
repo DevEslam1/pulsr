@@ -57,13 +57,8 @@ class DownloadTile extends StatelessWidget {
         ),
     };
 
-    // a11y: semantic label for screen readers per 10/10 checklist
-    return Semantics(
-      label:
-          '${task.title} ${task.artist} $statusLabel ${task.progress > 0 ? '${(task.progress * 100).round()}%' : ''}',
-      button: false,
-      child: Container(
-        decoration: BoxDecoration(
+    return Container(
+      decoration: BoxDecoration(
           color: p.surfaceContainer,
           borderRadius: BorderRadius.circular(AppRadii.r16),
           border: Border.all(color: p.hairline),
@@ -272,7 +267,6 @@ class DownloadTile extends StatelessWidget {
             ],
           ],
         ),
-      ),
-    );
+      );
   }
 }

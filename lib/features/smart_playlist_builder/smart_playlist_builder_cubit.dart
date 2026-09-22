@@ -1,7 +1,7 @@
 // lib/features/smart_playlist_builder/smart_playlist_builder_cubit.dart
 import 'dart:async';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
+import '../../core/bloc/base_cubit.dart';
 import '../../core/utils/error_logger.dart';
 import '../../data/db/app_database.dart';
 import '../../domain/models/smart_playlist_criteria.dart';
@@ -9,11 +9,14 @@ import '../../domain/repositories/smart_playlist_engine_interface.dart';
 import '../../domain/usecases/playlist_usecases.dart';
 import 'smart_playlist_builder_state.dart';
 
+// FIX-A01: Migrate to PulsrCubit
 @injectable
-class SmartPlaylistBuilderCubit extends Cubit<SmartPlaylistBuilderState> {
+class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
   final ISmartPlaylistEngine _engine;
   final PlaylistUseCases _playlistUseCases;
   StreamSubscription? _previewSub;
+  // FIX-H3: Generation counter to discard stale preview results
+  int _previewGen = 0;
 
   /// The live preview is capped so a rule set that matches the entire library
   /// cannot materialize every row into memory (OOM risk on large libraries).
@@ -33,7 +36,7 @@ class SmartPlaylistBuilderCubit extends Cubit<SmartPlaylistBuilderState> {
     final criteria = playlist.smartCriteria != null
         ? SmartCriteria.fromJsonString(playlist.smartCriteria!)
         : const SmartCriteria();
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
       name: playlist.name,
       criteria: criteria,
       isEditing: true,
@@ -43,24 +46,24 @@ class SmartPlaylistBuilderCubit extends Cubit<SmartPlaylistBuilderState> {
   }
 
   void updateName(String name) {
-    emit(state.copyWith(name: name));
+    safeEmit(state.copyWith(name: name));
   }
 
   /// Replaces the current rule set with a preset template.
   void applyTemplate(SmartCriteria template) {
-    emit(state.copyWith(criteria: template));
+    safeEmit(state.copyWith(criteria: template));
     _updatePreview();
   }
 
   void toggleMatchAll(bool matchAll) {
     final newCriteria = state.criteria.copyWith(matchAll: matchAll);
-    emit(state.copyWith(criteria: newCriteria));
+    safeEmit(state.copyWith(criteria: newCriteria));
     _updatePreview();
   }
 
   void setLimit(int? limit) {
     final newCriteria = state.criteria.copyWith(limit: limit);
-    emit(state.copyWith(criteria: newCriteria));
+    safeEmit(state.copyWith(criteria: newCriteria));
     _updatePreview();
   }
 
@@ -69,13 +72,13 @@ class SmartPlaylistBuilderCubit extends Cubit<SmartPlaylistBuilderState> {
       sortBy: sortBy,
       sortAscending: sortAscending ?? state.criteria.sortAscending,
     );
-    emit(state.copyWith(criteria: newCriteria));
+    safeEmit(state.copyWith(criteria: newCriteria));
     _updatePreview();
   }
 
   void addRule(SmartRule rule) {
     final rules = List<SmartRule>.from(state.criteria.rules)..add(rule);
-    emit(state.copyWith(criteria: state.criteria.copyWith(rules: rules)));
+    safeEmit(state.copyWith(criteria: state.criteria.copyWith(rules: rules)));
     _updatePreview();
   }
 
@@ -83,19 +86,26 @@ class SmartPlaylistBuilderCubit extends Cubit<SmartPlaylistBuilderState> {
     if (index < 0 || index >= state.criteria.rules.length) return;
     final rules = List<SmartRule>.from(state.criteria.rules);
     rules[index] = rule;
-    emit(state.copyWith(criteria: state.criteria.copyWith(rules: rules)));
+    safeEmit(state.copyWith(criteria: state.criteria.copyWith(rules: rules)));
     _updatePreview();
   }
 
   void removeRule(int index) {
     if (index < 0 || index >= state.criteria.rules.length) return;
     final rules = List<SmartRule>.from(state.criteria.rules)..removeAt(index);
-    emit(state.copyWith(criteria: state.criteria.copyWith(rules: rules)));
+    safeEmit(state.copyWith(criteria: state.criteria.copyWith(rules: rules)));
     _updatePreview();
   }
 
   void _updatePreview() {
-    _previewSub?.cancel();
+    final oldSub = _previewSub;
+    _previewSub = null;
+    if (oldSub != null) {
+      removeFromComposite(oldSub);
+      // FIX-H3: Cancel previous subscription to avoid competing streams
+      unawaited(oldSub.cancel());
+    }
+    final gen = ++_previewGen;
 
     final queryLimit = (state.criteria.limit == null || state.criteria.limit! > previewCap)
         ? previewCap + 1
@@ -103,20 +113,25 @@ class SmartPlaylistBuilderCubit extends Cubit<SmartPlaylistBuilderState> {
     
     final previewCriteria = state.criteria.copyWith(limit: queryLimit);
 
-    _previewSub = _engine.watchCriteria(previewCriteria).listen(
+    _previewSub = autoSub(
+      _engine.watchCriteria(previewCriteria),
       (songs) {
-        if (isClosed) return;
-        final truncated = songs.length > previewCap;
-        final visible =
-            truncated ? songs.take(previewCap).toList() : songs;
-        emit(state.copyWith(
+        // FIX-H3: Guard against superseded generation
+        if (isClosed || gen != _previewGen) return;
+        // FIX-M7: Truncation check comparing against previewCap and queryLimit
+        final truncated = songs.length > previewCap ||
+            (queryLimit != null && queryLimit > previewCap && songs.length >= queryLimit);
+        final visible = songs.take(previewCap).toList();
+        safeEmit(state.copyWith(
           previewSongs: visible,
           previewTruncated: truncated,
         ));
       },
-      onError: (_) {
-        if (isClosed) return;
-        emit(state.copyWith(previewSongs: [], previewTruncated: false));
+      onError: (e, st) {
+        if (isClosed || gen != _previewGen) return;
+        ErrorLogger.log('Smart playlist preview query failed',
+            error: e, stackTrace: st, category: 'SmartPlaylist');
+        safeEmit(state.copyWith(previewSongs: [], previewTruncated: false));
       },
     );
   }
@@ -124,11 +139,11 @@ class SmartPlaylistBuilderCubit extends Cubit<SmartPlaylistBuilderState> {
   Future<bool> savePlaylist() async {
     final name = state.name.trim();
     if (name.isEmpty) {
-      emit(state.copyWith(errorMessage: 'Please enter a playlist name'));
+      safeEmit(state.copyWith(errorMessage: 'Please enter a playlist name'));
       return false;
     }
 
-    emit(state.copyWith(isSubmitting: true, errorMessage: null));
+    safeEmit(state.copyWith(isSubmitting: true, errorMessage: null));
 
     try {
       if (state.isEditing && state.editingPlaylistId != null) {
@@ -154,17 +169,11 @@ class SmartPlaylistBuilderCubit extends Cubit<SmartPlaylistBuilderState> {
 
   bool _finishSave(bool succeeded, String? failureMessage) {
     if (!isClosed) {
-      emit(state.copyWith(
+      safeEmit(state.copyWith(
         isSubmitting: false,
         errorMessage: succeeded ? null : failureMessage,
       ));
     }
     return succeeded;
-  }
-
-  @override
-  Future<void> close() {
-    _previewSub?.cancel();
-    return super.close();
   }
 }

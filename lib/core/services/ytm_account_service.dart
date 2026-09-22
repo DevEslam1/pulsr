@@ -20,6 +20,7 @@ import '../../domain/models/ytm_track.dart';
 import '../constants/channels.dart';
 import '../constants/embedded_browser_ua.dart';
 import '../utils/error_logger.dart';
+import '../utils/input_sanitizer.dart';
 import '../utils/lrc_parser.dart';
 import '../utils/ytm_rate_limiter.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart'
@@ -88,7 +89,7 @@ class YtmAccountService {
   /// Session cookies are full Google auth credentials — stored in
   /// Keystore/Keychain-backed secure storage, never as plaintext prefs. (BUG-023)
   static const String _cookieSecureKey = 'ytm_session_cookies_secure';
-  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage(
+  static FlutterSecureStorage _secureStorage = const FlutterSecureStorage(
     aOptions: AndroidOptions(
       resetOnError: true,
     ),
@@ -96,6 +97,11 @@ class YtmAccountService {
       accessibility: KeychainAccessibility.first_unlock,
     ),
   );
+
+  @visibleForTesting
+  static void setSecureStorageForTesting(FlutterSecureStorage storage) {
+    _secureStorage = storage;
+  }
   static const String _accountNamePrefKey = 'ytm_account_name';
   static const String _accountAvatarPrefKey = 'ytm_account_avatar';
   static const String _dataSyncIdPrefKey = 'ytm_data_sync_id';
@@ -319,6 +325,15 @@ class YtmAccountService {
     try {
       final secure = await _secureStorage.read(key: _cookieSecureKey);
       if (secure != null && secure.isNotEmpty) return secure;
+
+      // Migration: check legacy plaintext pref key, migrate to secure storage, and remove from prefs
+      final prefs = await SharedPreferences.getInstance();
+      final legacy = prefs.getString('ytm_session_cookies');
+      if (legacy != null && legacy.isNotEmpty) {
+        await _secureStorage.write(key: _cookieSecureKey, value: legacy);
+        await prefs.remove('ytm_session_cookies');
+        return legacy;
+      }
     } catch (e, st) {
       ErrorLogger.log('Failed to read cookies from secure storage',
           error: e, stackTrace: st, category: 'YTM_ACCOUNT');
@@ -328,8 +343,15 @@ class YtmAccountService {
 
   /// Persists session cookies exclusively to secure storage. (BUG-023)
   Future<void> _persistCookies(String rawCookies) async {
+    if (!InputSanitizer.isValidCookie(rawCookies)) {
+      debugPrint('[YTM_ACCOUNT] Refusing to persist malformed cookie string');
+      return;
+    }
     try {
       await _secureStorage.write(key: _cookieSecureKey, value: rawCookies);
+      // Ensure plaintext legacy store is purged
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('ytm_session_cookies');
     } catch (e, st) {
       ErrorLogger.log('Failed to persist cookies to secure storage',
           error: e, stackTrace: st, category: 'YTM_ACCOUNT');
@@ -340,6 +362,8 @@ class YtmAccountService {
   Future<void> _deleteStoredCookies() async {
     try {
       await _secureStorage.delete(key: _cookieSecureKey);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('ytm_session_cookies');
     } catch (_) {}
   }
 

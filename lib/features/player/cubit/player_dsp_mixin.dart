@@ -49,6 +49,11 @@ mixin PlayerDspControls on PulsrCubit<PlayerState> {
     await _audioHandler.applyPreset(preset);
   }
 
+  Future<void> resetEqualizer() async {
+    final flat = EqPreset.defaultPresets.first;
+    await applyPreset(flat);
+  }
+
   Future<void> applyHeadphoneProfile(HeadphoneProfile? profile,
       {bool isPerSongRestore = false}) async {
     if (profile != null && !_guardDsp('AutoEQ')) return;
@@ -813,7 +818,7 @@ mixin PlayerDspControls on PulsrCubit<PlayerState> {
   }
 
   Future<void> setDynamicEqBand(int index, DynamicEqBandConfig band) async {
-    var bands = List<DynamicEqBandConfig>.from(state.dynamicEqBands);
+    final bands = List<DynamicEqBandConfig>.from(state.dynamicEqBands);
     // Seed with neutral defaults if the state list has not been synced yet
     while (bands.length <= index) {
       bands.add(const DynamicEqBandConfig());
@@ -831,7 +836,7 @@ mixin PlayerDspControls on PulsrCubit<PlayerState> {
 
   Future<void> addDynamicEqBand() async {
     if (state.dynamicEqBands.length >= 8) return;
-    var bands = List<DynamicEqBandConfig>.from(state.dynamicEqBands);
+    final bands = List<DynamicEqBandConfig>.from(state.dynamicEqBands);
     bands.add(const DynamicEqBandConfig());
     safeEmit(state.copyWith(dynamicEqBands: bands));
     try {
@@ -845,7 +850,7 @@ mixin PlayerDspControls on PulsrCubit<PlayerState> {
 
   Future<void> removeDynamicEqBand(int index) async {
     if (index < 0 || index >= state.dynamicEqBands.length) return;
-    var bands = List<DynamicEqBandConfig>.from(state.dynamicEqBands);
+    final bands = List<DynamicEqBandConfig>.from(state.dynamicEqBands);
     bands.removeAt(index);
     safeEmit(state.copyWith(dynamicEqBands: bands));
     try {

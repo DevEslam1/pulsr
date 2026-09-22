@@ -17,10 +17,14 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
     final isGrid = state.viewMode == LibraryViewMode.grid;
 
     return RefreshIndicator(
+      color: p.accent,
+      backgroundColor: p.surfaceContainer,
       onRefresh: () => _handleRefresh(context),
       child: isGrid
           ? GridView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
+              addAutomaticKeepAlives: false,
+              addRepaintBoundaries: true,
               padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context), 16,
                   Adaptive.pagePadding(context), 160),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -74,6 +78,8 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
             )
           : ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
+              addAutomaticKeepAlives: false,
+              addRepaintBoundaries: true,
               padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom, top: AppSpacing.xs),
               itemCount: albums.length,
               itemBuilder: (context, index) {
@@ -130,10 +136,14 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
     final isGrid = state.viewMode == LibraryViewMode.grid;
 
     return RefreshIndicator(
+      color: p.accent,
+      backgroundColor: p.surfaceContainer,
       onRefresh: () => _handleRefresh(context),
       child: isGrid
           ? GridView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
+              addAutomaticKeepAlives: false,
+              addRepaintBoundaries: true,
               padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context), 16,
                   Adaptive.pagePadding(context), 160),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -181,6 +191,8 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
             )
           : ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
+              addAutomaticKeepAlives: false,
+              addRepaintBoundaries: true,
               padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom, top: AppSpacing.xs),
               itemCount: artists.length,
               itemBuilder: (context, index) {
@@ -352,10 +364,15 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
   Widget _chipCategoryGrid(BuildContext context,
       {required int count,
       required Widget Function(BuildContext, int) builder}) {
+    final p = context.palette;
     return RefreshIndicator(
+      color: p.accent,
+      backgroundColor: p.surfaceContainer,
       onRefresh: () => _handleRefresh(context),
       child: GridView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
+        addAutomaticKeepAlives: false,
+        addRepaintBoundaries: true,
         padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context), 16,
             Adaptive.pagePadding(context), 160),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(

@@ -405,7 +405,7 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
         .where((r) => _isDartRule(r.field))
         .toList();
     if (dartRules.isEmpty) {
-      var list = await _buildQuery(criteria).get();
+      final list = await _buildQuery(criteria).get();
       return _postProcess(list, criteria, const []);
     }
     if (criteria.matchAll) {

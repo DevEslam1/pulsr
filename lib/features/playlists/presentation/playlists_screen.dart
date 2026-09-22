@@ -20,6 +20,7 @@ import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../../core/widgets/pulsr_toast.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../domain/models/smart_playlist_criteria.dart';
 import '../../../domain/models/ytm_track.dart';
@@ -64,11 +65,15 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
   /// Suggestion service output is optional and non-intrusive: it stays hidden
   /// until real library songs produce at least one suggestion.
   Future<void> _loadSuggestions({bool forceRefresh = false}) async {
+    if (!getIt.isRegistered<GetSongsUseCase>() ||
+        !getIt.isRegistered<PlaylistSuggestionsService>()) {
+      return;
+    }
     try {
       final result = await getIt<GetSongsUseCase>().getAllSongs();
       final allSongs = result.fold((_) => <SongsTableData>[], (songs) => songs);
-      final suggestions = getIt<PlaylistSuggestionsService>()
-          .generateSuggestions(allSongs, forceRefresh: forceRefresh);
+      final suggestions = await getIt<PlaylistSuggestionsService>()
+          .generateSuggestionsAsync(allSongs, forceRefresh: forceRefresh);
       if (!mounted) return;
       setState(() => _suggestions = suggestions);
     } catch (_) {
@@ -78,7 +83,6 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
 
   Future<void> _createPlaylistFromSuggestion(
       PlaylistSuggestion suggestion) async {
-    final messenger = ScaffoldMessenger.of(context);
     // Capture localized strings before async gaps (no context-across-gap).
     final createFailedText = context.l10n.suggestCreateFailed;
     final loc = context.l10n;
@@ -87,9 +91,9 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       final created = await useCases.createPlaylist(suggestion.title);
       final playlistId = created.fold<int?>((_) => null, (id) => id);
       if (playlistId == null) {
-        messenger.showSnackBar(
-          SnackBar(content: Text(createFailedText)),
-        );
+        if (mounted) {
+          PulsrToast.show(context, message: createFailedText, isError: true);
+        }
         return;
       }
       // Suggestions already carry resolved songs; persist them by id.
@@ -105,21 +109,22 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       }
       getIt<PlaylistSuggestionsService>().invalidateCache();
       unawaited(_loadSuggestions(forceRefresh: true));
-      messenger.showSnackBar(
-        SnackBar(
-          content:
-              Text(loc.suggestedCreated(suggestion.title, songIds.length)),
-        ),
-      );
+      if (mounted) {
+        PulsrToast.show(
+          context,
+          message: loc.suggestedCreated(suggestion.title, songIds.length),
+          isSuccess: true,
+        );
+      }
     } catch (_) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(createFailedText)),
-      );
+      if (mounted) {
+        PulsrToast.show(context, message: createFailedText, isError: true);
+      }
     }
   }
 
   void _onSelectPlaylist(PlaylistsTableData pl) {
-    if (context.isTabletLandscape) {
+    if (context.isTwoPanePlaylist) {
       setState(() => _selectedPlaylist = pl);
     } else {
       context.push('/playlist', extra: pl);
@@ -179,9 +184,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       }
       if (!context.mounted) return;
       if (songs.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.cannotExportEmpty)),
-        );
+        PulsrToast.show(context, message: context.l10n.cannotExportEmpty);
         return;
       }
       final file =
@@ -209,16 +212,18 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
           } catch (_) {}
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(
-                  '$exportedSuccess (${songs.length} $tracksLabel).')),
+        PulsrToast.show(
+          context,
+          message: '$exportedSuccess (${songs.length} $tracksLabel).',
+          isSuccess: true,
         );
       }
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.exportFailedRetry)),
+        PulsrToast.show(
+          context,
+          message: context.l10n.exportFailedRetry,
+          isError: true,
         );
       }
     }
@@ -297,16 +302,37 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
 
   void _confirmDelete(
       BuildContext context, PlaylistCubit cubit, PlaylistsTableData pl) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final undoLabel = context.l10n.undo;
+    final deleteTitle = '${context.l10n.delete} "${pl.name}"?';
+    final deleteMessage = context.l10n.browseCannotBeUndone;
+    final deleteLabel = context.l10n.delete;
     final confirmed = await PulsrDialogHelper.showConfirmDialog(
       context,
-      title: '${context.l10n.delete} "${pl.name}"?',
-      message: context.l10n.browseCannotBeUndone,
+      title: deleteTitle,
+      message: deleteMessage,
       icon: Icons.delete_outline_rounded,
-      confirmLabel: context.l10n.delete,
+      confirmLabel: deleteLabel,
       isDestructive: true,
     );
     if (confirmed == true) {
+      final plName = pl.name;
+      final isSmart = pl.isSmart;
+      final smartCriteria = pl.smartCriteria;
       await cubit.deletePlaylist(pl.id);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('$plName - $undoLabel?'),
+          action: SnackBarAction(
+            label: undoLabel,
+            onPressed: () => cubit.createPlaylist(
+              plName,
+              isSmart: isSmart,
+              criteria: smartCriteria,
+            ),
+          ),
+        ),
+      );
     }
   }
 
@@ -391,9 +417,9 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
         final smartPlaylists = state.playlists.where((x) => x.isSmart).toList();
         final userPlaylists = state.playlists.where((x) => !x.isSmart).toList();
         final columns = Adaptive.gridColumns(context, minItemWidth: 170);
-        final isTabletLandscape = context.isTabletLandscape;
+        final isTwoPane = context.isTwoPanePlaylist;
 
-        if (isTabletLandscape && _selectedPlaylist == null) {
+        if (isTwoPane && _selectedPlaylist == null) {
           if (userPlaylists.isNotEmpty) {
             _selectedPlaylist = userPlaylists.first;
           } else if (smartPlaylists.isNotEmpty) {
@@ -411,7 +437,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
           smartPlaylists: smartPlaylists,
           userPlaylists: userPlaylists,
           columns: columns,
-          isTabletLandscape: isTabletLandscape,
+          isTabletLandscape: isTwoPane,
         );
 
         return Scaffold(
@@ -443,14 +469,17 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               ],
             ],
           ),
-          body: isTabletLandscape
+          body: isTwoPane
               ? Row(
                   children: [
                     SizedBox(
                       width: 380,
                       child: playlistListWidget,
                     ),
-                    VerticalDivider(width: 1, thickness: 1, color: p.hairline),
+                    if (context.hasHinge)
+                      SizedBox(width: context.hinge!.bounds.width)
+                    else
+                      VerticalDivider(width: 1, thickness: 1, color: p.hairline),
                     Expanded(
                       child: _selectedPlaylist != null
                           ? PlaylistDetailScreen(
@@ -502,6 +531,8 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     required bool isTabletLandscape,
   }) {
     return RefreshIndicator(
+      color: p.accent,
+      backgroundColor: p.surfaceContainer,
       onRefresh: () async {
         if (_selectedTab == _PlaylistTabMode.online) {
           await cubit.autoFetchOnlineLibrary(force: true);
@@ -509,11 +540,9 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
           final count =
               await context.read<SettingsCubit>().rescanLibrary();
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(context.l10n.scanResult(count)),
-                duration: const Duration(seconds: 2),
-              ),
+            PulsrToast.show(
+              context,
+              message: context.l10n.scanResult(count),
             );
           }
         }
@@ -626,6 +655,8 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               child: GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
+                addAutomaticKeepAlives: false,
+                addRepaintBoundaries: true,
                 gridDelegate:
                     SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: isTabletLandscape ? 2 : columns,
@@ -769,6 +800,8 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                 child: GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
+                  addAutomaticKeepAlives: false,
+                  addRepaintBoundaries: true,
                   gridDelegate:
                       SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: isTabletLandscape ? 2 : columns,
@@ -852,17 +885,16 @@ class _OnlinePlaylistsContent extends StatelessWidget {
     BuildContext context,
     YtmAccountPlaylist playlist,
   ) async {
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     // Capture localized strings before async gaps (avoid context-across-gap).
     final l10n = context.l10n;
     final loadFailedText = l10n.playlistLoadFailed;
-    scaffoldMessenger.showSnackBar(
-      SnackBar(
-        content: Text(
-            '${l10n.browseFetching} "${playlist.title}" ${l10n.browseForDownload}…'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    if (context.mounted) {
+      PulsrToast.show(
+        context,
+        message:
+            '${l10n.browseFetching} "${playlist.title}" ${l10n.browseForDownload}…',
+      );
+    }
 
     try {
       final ytmService = getIt<YtmService>();
@@ -873,26 +905,24 @@ class _OnlinePlaylistsContent extends StatelessWidget {
         final songs = tracks.map((t) => t.toSongData()).toList();
         final downloadCubit = getIt<YtmDownloadCubit>();
         final queuedCount = downloadCubit.downloadAll(songs);
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              queuedCount > 0
-                  ? '${l10n.browseQueued} $queuedCount ${l10n.browseTracksFrom} "${playlist.title}" ${l10n.browseForDownload} ${l10n.browseActiveDownloadsSuffix}'
-                  : '${l10n.browseAllTracksFrom} "${playlist.title}" ${l10n.browseAlreadyDownloadedOffline}',
-            ),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        if (context.mounted) {
+          PulsrToast.show(
+            context,
+            message: queuedCount > 0
+                ? '${l10n.browseQueued} $queuedCount ${l10n.browseTracksFrom} "${playlist.title}" ${l10n.browseForDownload} ${l10n.browseActiveDownloadsSuffix}'
+                : '${l10n.browseAllTracksFrom} "${playlist.title}" ${l10n.browseAlreadyDownloadedOffline}',
+            isSuccess: queuedCount > 0,
+          );
+        }
       } else {
-        final emptyText = loadFailedText;
-        scaffoldMessenger.showSnackBar(
-          SnackBar(content: Text(emptyText)),
-        );
+        if (context.mounted) {
+          PulsrToast.show(context, message: loadFailedText, isError: true);
+        }
       }
     } catch (_) {
-      scaffoldMessenger.showSnackBar(
-        SnackBar(content: Text(loadFailedText)),
-      );
+      if (context.mounted) {
+        PulsrToast.show(context, message: loadFailedText, isError: true);
+      }
     }
   }
 
@@ -901,24 +931,19 @@ class _OnlinePlaylistsContent extends StatelessWidget {
     OnlinePlaylistEntry entry,
   ) {
     if (entry.tracks.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.emptyPlaylist)),
-      );
+      PulsrToast.show(context, message: context.l10n.emptyPlaylist);
       return;
     }
     final songs = entry.tracks.map((t) => t.toSongData()).toList();
     final downloadCubit =
         context.read<YtmDownloadCubit?>() ?? getIt<YtmDownloadCubit>();
     final queuedCount = downloadCubit.downloadAll(songs);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          queuedCount > 0
-              ? '${context.l10n.browseQueued} $queuedCount ${context.l10n.browseTracksFrom} "${entry.title}" ${context.l10n.browseForDownload} ${context.l10n.browseActiveDownloadsSuffix}'
-              : '${context.l10n.browseAllTracksFrom} "${entry.title}" ${context.l10n.browseAlreadyDownloadedOffline}',
-        ),
-        behavior: SnackBarBehavior.floating,
-      ),
+    PulsrToast.show(
+      context,
+      message: queuedCount > 0
+          ? '${context.l10n.browseQueued} $queuedCount ${context.l10n.browseTracksFrom} "${entry.title}" ${context.l10n.browseForDownload} ${context.l10n.browseActiveDownloadsSuffix}'
+          : '${context.l10n.browseAllTracksFrom} "${entry.title}" ${context.l10n.browseAlreadyDownloadedOffline}',
+      isSuccess: queuedCount > 0,
     );
   }
 
@@ -927,31 +952,30 @@ class _OnlinePlaylistsContent extends StatelessWidget {
     List<YtmTrack> likedTracks,
   ) {
     if (likedTracks.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.noLikedToDownload)),
-      );
+      PulsrToast.show(context, message: context.l10n.noLikedToDownload);
       return;
     }
     final songs = likedTracks.map((t) => t.toSongData()).toList();
     final downloadCubit =
         context.read<YtmDownloadCubit?>() ?? getIt<YtmDownloadCubit>();
     final queuedCount = downloadCubit.downloadAll(songs);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          queuedCount > 0
-              ? '${context.l10n.browseQueued} $queuedCount ${context.l10n.browseLikedSongsForDownload} ${context.l10n.browseActiveDownloadsSuffix}'
-              : context.l10n.browseAllLikedSongsDownloadedOffline,
-        ),
-        behavior: SnackBarBehavior.floating,
-      ),
+    PulsrToast.show(
+      context,
+      message: queuedCount > 0
+          ? '${context.l10n.browseQueued} $queuedCount ${context.l10n.browseLikedSongsForDownload} ${context.l10n.browseActiveDownloadsSuffix}'
+          : context.l10n.browseAllLikedSongsDownloadedOffline,
+      isSuccess: queuedCount > 0,
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final ytmAccount = getIt<YtmAccountService>();
+    final ytmAccount = getIt.isRegistered<YtmAccountService>()
+        ? getIt<YtmAccountService>()
+        : null;
+
+    if (ytmAccount == null) return const SizedBox.shrink();
 
     return ValueListenableBuilder<bool>(
       valueListenable: ytmAccount.loginState,
@@ -1093,21 +1117,9 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                   if (online.accountStatus == YtmFetchStatus.loading &&
                       online.accountPlaylists.isEmpty)
                     Padding(
-                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
-                      child: Center(
-                        child: Column(
-                          children: [
-                            SizedBox(width: AppSpacing.lg,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2.5, color: p.accent)),
-                            const SizedBox(height: AppSpacing.sm),
-                            Text(context.l10n.fetchingAccount,
-                                style: TextStyle(
-                                    color: p.textSecondary, fontSize: AppFontSize.bodySmall)),
-                          ],
-                        ),
-                      ),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: Adaptive.pagePadding(context)),
+                      child: const SkeletonList(itemCount: 4),
                     )
                   else if (online.accountStatus == YtmFetchStatus.error &&
                       online.accountPlaylists.isEmpty)
@@ -1176,6 +1188,8 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                       child: GridView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
+                        addAutomaticKeepAlives: false,
+                        addRepaintBoundaries: true,
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: columns,
                           crossAxisSpacing: 14,
@@ -1215,6 +1229,8 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                     child: GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
+                      addAutomaticKeepAlives: false,
+                      addRepaintBoundaries: true,
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: columns,
                         crossAxisSpacing: 14,
@@ -1293,10 +1309,13 @@ class _AccountPlaylistCard extends StatelessWidget {
     final p = context.palette;
     const gradientColors = [AppColors.netflixRed, AppColors.ytRedDeep];
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppRadii.r20),
-      child: Container(
+    return Semantics(
+      button: true,
+      label: playlist.title,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadii.r20),
+        child: Container(
         decoration: BoxDecoration(
           color: p.surfaceContainer,
           borderRadius: BorderRadius.circular(AppRadii.r20),
@@ -1316,6 +1335,27 @@ class _AccountPlaylistCard extends StatelessWidget {
                         ? Image.network(
                             playlist.artworkUrl!,
                             fit: BoxFit.cover,
+                            cacheWidth: 360,
+                            cacheHeight: 360,
+                            loadingBuilder: (context, child, progress) => progress == null
+                                ? child
+                                : Container(
+                                    decoration: const BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: gradientColors,
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                    ),
+                                    child: const Center(
+                                      child: SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2, color: Colors.white),
+                                      ),
+                                    ),
+                                  ),
                             errorBuilder: (_, __, ___) => Container(
                               decoration: const BoxDecoration(
                                 gradient: LinearGradient(
@@ -1392,8 +1432,9 @@ class _AccountPlaylistCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1580,12 +1621,14 @@ class _OnlinePlaylistCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    const ytRed = AppColors.ytRed;
-    return InkWell(
-      onTap: onTap,
-      onLongPress: onRemove,
-      borderRadius: BorderRadius.circular(AppRadii.r20),
-      child: Container(
+    return Semantics(
+      button: true,
+      label: entry.title,
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: onRemove,
+        borderRadius: BorderRadius.circular(AppRadii.r20),
+        child: Container(
         decoration: BoxDecoration(
           color: p.surfaceContainer,
           borderRadius: BorderRadius.circular(AppRadii.r20),
@@ -1599,8 +1642,8 @@ class _OnlinePlaylistCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      ytRed.withValues(alpha: 0.8),
-                      ytRed.withValues(alpha: 0.35)
+                      AppColors.ytRed.withValues(alpha: 0.8),
+                      AppColors.ytRed.withValues(alpha: 0.35)
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -1673,8 +1716,9 @@ class _OnlinePlaylistCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1772,51 +1816,55 @@ class _SuggestionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppRadii.r16),
-      child: Container(
-        width: 230,
-        padding: const EdgeInsets.all(AppSpacing.s14),
-        decoration: BoxDecoration(
-          color: p.surfaceContainer,
-          borderRadius: BorderRadius.circular(AppRadii.r16),
-          border: Border.all(color: p.hairline),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.auto_awesome_rounded, color: p.accent, size: 18),
-                const SizedBox(width: AppSpacing.xs),
-                Expanded(
-                  child: Text(
-                    suggestion.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: p.textPrimary,
-                      fontWeight: FontWeight.w800,
-                      fontSize: AppFontSize.bodySmall,
+    return Semantics(
+      button: true,
+      label: suggestion.title,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadii.r16),
+        child: Container(
+          width: 230,
+          padding: const EdgeInsets.all(AppSpacing.s14),
+          decoration: BoxDecoration(
+            color: p.surfaceContainer,
+            borderRadius: BorderRadius.circular(AppRadii.r16),
+            border: Border.all(color: p.hairline),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.auto_awesome_rounded, color: p.accent, size: 18),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      suggestion.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: p.textPrimary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: AppFontSize.bodySmall,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              suggestion.description,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
-            ),
-            const Spacer(),
-            Text(
-              context.l10n.tapToCreate(suggestion.songs.length),
-              style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.caption),
-            ),
-          ],
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                suggestion.description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
+              ),
+              const Spacer(),
+              Text(
+                context.l10n.tapToCreate(suggestion.songs.length),
+                style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.caption),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1870,10 +1918,13 @@ class _PlaylistCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final card = InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppRadii.r20),
-      child: Container(
+    final card = Semantics(
+      button: true,
+      label: name,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadii.r20),
+        child: Container(
         decoration: BoxDecoration(
           color: p.surfaceContainer,
           borderRadius: BorderRadius.circular(AppRadii.r20),
@@ -1948,6 +1999,7 @@ class _PlaylistCard extends StatelessWidget {
           ],
         ),
       ),
+    ),
     );
     if (menuItems != null) {
       return GestureDetector(

@@ -20,6 +20,8 @@ import '../../sheets/add_to_playlist_sheet.dart';
 import '../../sheets/song_info_sheet.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_pressable.dart';
+import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/shimmer_skeleton.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
@@ -34,7 +36,9 @@ class _RecentsScreenState extends State<RecentsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   Timer? _searchDebounce;
-  int _historyLimit = 100;
+  // FIX-M3: Static default history limit
+  static const int _persistedHistoryLimit = 100;
+  int _historyLimit = _persistedHistoryLimit;
   late final GetSongsUseCase _getSongsUseCase;
 
   @override
@@ -71,6 +75,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
 
     if (confirmed == true && mounted) {
       final res = await _getSongsUseCase.clearRecentlyPlayed();
+      if (!mounted) return;
       res.fold(
         (err) => PulsrToast.show(context,
             message:
@@ -109,27 +114,29 @@ class _RecentsScreenState extends State<RecentsScreen> {
       body: StreamBuilder(
         stream: _getSongsUseCase.watchRecentlyPlayed(limit: _historyLimit),
         builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+            return const SkeletonList();
+          }
+
           final allRecents =
               snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
 
           if (allRecents.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+            return RefreshIndicator(
+              color: p.accent,
+              backgroundColor: p.surfaceContainer,
+              onRefresh: () async {
+                if (mounted) setState(() {});
+              },
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics()),
                 children: [
-                  Icon(Icons.history_toggle_off_rounded,
-                      size: 64, color: p.textTertiary),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(context.l10n.noRecentSongs,
-                    style: TextStyle(
-                      color: p.textPrimary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: AppFontSize.bodyLarge,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(context.l10n.recentEmptyHint,
-                    style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
+                  const SizedBox(height: AppSpacing.xxl),
+                  EmptyStateWidget(
+                    icon: Icons.history_toggle_off_rounded,
+                    title: context.l10n.noRecentSongs,
+                    subtitle: context.l10n.recentEmptyHint,
                   ),
                 ],
               ),
@@ -138,9 +145,16 @@ class _RecentsScreenState extends State<RecentsScreen> {
 
           final filtered = _filterSongs(allRecents);
 
-          return CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
+          return RefreshIndicator(
+            color: p.accent,
+            backgroundColor: p.surfaceContainer,
+            onRefresh: () async {
+              if (mounted) setState(() {});
+            },
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics()),
+              slivers: [
               // Search & Header Stats
               SliverToBoxAdapter(
                 child: Padding(
@@ -165,7 +179,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                                 controller: _searchController,
                                 onChanged: (val) {
                                   _searchDebounce?.cancel();
-                                  _searchDebounce = Timer(const Duration(milliseconds: 250), () {
+                                  _searchDebounce = Timer(const Duration(milliseconds: 300), () {
                                     if (mounted) setState(() => _searchQuery = val);
                                   });
                                 },
@@ -202,7 +216,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                       Row(
                         children: [
                           Expanded(
-                            child: ElevatedButton.icon(
+                            child: FilledButton.icon(
                               onPressed: () {
                                 if (filtered.isNotEmpty) {
                                   playerCubit.playSong(filtered.first,
@@ -212,7 +226,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                               icon: const Icon(Icons.play_arrow_rounded,
                                   size: 20),
                               label: Text(context.l10n.playAllCount(filtered.length)),
-                              style: ElevatedButton.styleFrom(
+                              style: FilledButton.styleFrom(
                                 backgroundColor: p.accent,
                                 foregroundColor: p.onAccent,
                                 padding:
@@ -224,7 +238,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                             ),
                           ),
                           const SizedBox(width: AppSpacing.sm),
-                          ElevatedButton.icon(
+                          OutlinedButton.icon(
                             onPressed: () {
                               if (filtered.isNotEmpty) {
                                 final shuffled = List<SongsTableData>.from(
@@ -235,11 +249,10 @@ class _RecentsScreenState extends State<RecentsScreen> {
                             },
                             icon: const Icon(Icons.shuffle_rounded, size: 20),
                             label: Text(context.l10n.shuffle),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: p.surfaceContainerHigh,
+                            style: OutlinedButton.styleFrom(
                               foregroundColor: p.textPrimary,
+                              side: BorderSide(color: p.hairline),
                               padding: const EdgeInsets.symmetric(
-
                                   vertical: AppSpacing.sm, horizontal: AppSpacing.md),
                               shape: RoundedRectangleBorder(
                                 borderRadius: AppRadii.buttonRadius,
@@ -257,11 +270,10 @@ class _RecentsScreenState extends State<RecentsScreen> {
               if (filtered.isEmpty)
                 SliverFillRemaining(
                   hasScrollBody: false,
-                  child: Center(
-                    child: Text(
-                      context.l10n.noResultsFor(_searchQuery),
-                      style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.body),
-                    ),
+                  child: EmptyStateWidget(
+                    icon: Icons.search_off_rounded,
+                    title: context.l10n.noSongsFound,
+                    subtitle: context.l10n.noResultsFor(_searchQuery),
                   ),
                 )
               else
@@ -270,6 +282,8 @@ class _RecentsScreenState extends State<RecentsScreen> {
                       const EdgeInsetsDirectional.only(top: AppSpacing.xs, bottom: 100, start: AppSpacing.md, end: AppSpacing.md),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
+                      addAutomaticKeepAlives: false,
+                      addRepaintBoundaries: true,
                       (context, index) {
                         final song = filtered[index];
                         return StaggeredListItem(
@@ -369,7 +383,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                     ),
                   ),
                 ),
-              if (allRecents.length >= _historyLimit && _searchQuery.isEmpty)
+              if (allRecents.length >= _historyLimit && _searchQuery.isEmpty && _historyLimit < 500)
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
@@ -379,7 +393,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                         label: Text(context.l10n.loadMoreHistory),
                         onPressed: () {
                           setState(() {
-                            _historyLimit += 100;
+                            _historyLimit = (_historyLimit + 100).clamp(100, 500);
                           });
                         },
                       ),
@@ -387,12 +401,13 @@ class _RecentsScreenState extends State<RecentsScreen> {
                   ),
                 ),
             ],
+            ),
           );
         },
       ),
-      ),
-    );
-  }
+    ),
+  );
+}
 
   void _showSongOptions(BuildContext context, SongsTableData song) {
     PulsrSheetHelper.showPulsrSheet<void>(

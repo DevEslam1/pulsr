@@ -17,6 +17,8 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
     final isGrid = state.viewMode == LibraryViewMode.grid;
 
     return RefreshIndicator(
+      color: p.accent,
+      backgroundColor: p.surfaceContainer,
       onRefresh: () => _favTabFilter == 1 && AppConfig.ytmEnabled
           ? _syncYtmLikes(context)
           : _handleRefresh(context),
@@ -95,7 +97,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                     IconButton.filledTonal(
                       onPressed: () =>
                           _downloadFavorites(context, currentFavorites),
-                      icon: const Icon(Icons.download_rounded, size: 19),
+                      icon: const Icon(Icons.download_rounded, size: 20),
                       style: IconButton.styleFrom(
                         visualDensity: VisualDensity.compact,
                         backgroundColor: p.accent.withValues(alpha: 0.15),
@@ -108,7 +110,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                     const SizedBox(width: AppSpacing.xs),
                     IconButton.filledTonal(
                       onPressed: () => _syncYtmLikes(context),
-                      icon: const Icon(Icons.sync_rounded, size: 19),
+                      icon: const Icon(Icons.sync_rounded, size: 20),
                       style: IconButton.styleFrom(
                         visualDensity: VisualDensity.compact,
                         backgroundColor: p.accent.withValues(alpha: 0.15),
@@ -148,6 +150,8 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                 : (isGrid
                     ? GridView.builder(
                         physics: const AlwaysScrollableScrollPhysics(),
+                        addAutomaticKeepAlives: false,
+                        addRepaintBoundaries: true,
                         padding: EdgeInsetsDirectional.fromSTEB(
                           Adaptive.pagePadding(context),
                           8,
@@ -176,8 +180,9 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                       )
                     : ListView.builder(
                         physics: const AlwaysScrollableScrollPhysics(),
+                        addAutomaticKeepAlives: false,
+                        addRepaintBoundaries: true,
                         padding: const EdgeInsetsDirectional.only(
-
                             bottom: AppSpacing.scrollBottom, top: AppSpacing.xxs, start: AppSpacing.xxs, end: AppSpacing.xxs),
                         itemCount: currentFavorites.length,
                         itemBuilder: (context, index) {
@@ -442,7 +447,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
 
   void _showImportYtmFavoritesDialog(BuildContext context) {
     final p = context.palette;
-    final controller = TextEditingController();
+    final controller = _importYtmController..clear();
     bool isLoading = false;
     String? errorText;
 
@@ -764,4 +769,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
 
   // Requires: provided by the composing class (same library).
   TabController get _tabController;
+
+  // Requires: provided by the composing class (same library).
+  TextEditingController get _importYtmController;
 }

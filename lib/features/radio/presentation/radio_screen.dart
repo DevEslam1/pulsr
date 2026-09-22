@@ -7,6 +7,8 @@ import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
+import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/pulsr_toast.dart';
 import '../../../domain/models/radio_station.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../player/cubit/player_state.dart';
@@ -143,9 +145,7 @@ class _RadioScreenState extends State<RadioScreen> {
 
     final urls = RadioStationStore.extractStreamUrls(content);
     if (urls.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.radioNoStreamsFound)),
-      );
+      PulsrToast.show(context, message: context.l10n.radioNoStreamsFound, isError: true);
       return;
     }
     for (final url in urls) {
@@ -154,8 +154,10 @@ class _RadioScreenState extends State<RadioScreen> {
     }
     _refresh();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.radioImportedCount(urls.length))),
+      PulsrToast.show(
+        context,
+        message: context.l10n.radioImportedCount(urls.length),
+        isSuccess: true,
       );
     }
   }
@@ -164,12 +166,12 @@ class _RadioScreenState extends State<RadioScreen> {
     final added = await _store.importCurated();
     _refresh();
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(added > 0
-            ? context.l10n.radioCuratedAdded(added)
-            : context.l10n.radioCuratedUpToDate),
-      ),
+    PulsrToast.show(
+      context,
+      message: added > 0
+          ? context.l10n.radioCuratedAdded(added)
+          : context.l10n.radioCuratedUpToDate,
+      isSuccess: added > 0,
     );
   }
 
@@ -221,81 +223,92 @@ class _RadioScreenState extends State<RadioScreen> {
         ],
       ),
       body: _stations.isEmpty
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.xl),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 76,
-                      height: 76,
-                      decoration: BoxDecoration(
-                        color: p.accentContainer.withValues(alpha: 0.35),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: p.accent.withValues(alpha: 0.25),
-                          width: 1.5,
-                        ),
+          ? RefreshIndicator(
+              onRefresh: () async => _refresh(),
+              color: p.accent,
+              backgroundColor: p.surfaceContainer,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height - kToolbarHeight - 100,
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.xl),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 76,
+                            height: 76,
+                            decoration: BoxDecoration(
+                              color: p.accentContainer.withValues(alpha: 0.35),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: p.accent.withValues(alpha: 0.25),
+                                width: 1.5,
+                              ),
+                            ),
+                            alignment: Alignment.center,
+                            child: Icon(Icons.radio_rounded,
+                                size: 38, color: p.accent),
+                          ),
+                          const SizedBox(height: AppSpacing.s20),
+                          Text(
+                            context.l10n.radioEmptyTitle,
+                            style: TextStyle(
+                              color: p.textPrimary,
+                              fontSize: AppFontSize.title,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            context.l10n.radioEmptySubtitle,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: p.textSecondary,
+                              fontSize: AppFontSize.bodySmall,
+                              height: 1.45,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          FilledButton.icon(
+                            onPressed: _showAddDialog,
+                            icon: const Icon(Icons.add_rounded, size: 20),
+                            label: Text(
+                              context.l10n.radioAddStation,
+                              style: const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: p.accent,
+                              foregroundColor: p.onAccent,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 22, vertical: AppSpacing.sm),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(AppRadii.r14),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.s10),
+                          OutlinedButton.icon(
+                            onPressed: _importCurated,
+                            icon: const Icon(Icons.explore_rounded, size: 18),
+                            label: Text(context.l10n.radioCuratedBrowse),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: p.accent,
+                              side: BorderSide(
+                                  color: p.accent.withValues(alpha: 0.5)),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(AppRadii.r14),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      alignment: Alignment.center,
-                      child: Icon(Icons.radio_rounded,
-                          size: 38, color: p.accent),
                     ),
-                    const SizedBox(height: AppSpacing.s20),
-                    Text(
-                      context.l10n.radioEmptyTitle,
-                      style: TextStyle(
-                        color: p.textPrimary,
-                        fontSize: AppFontSize.title,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      context.l10n.radioEmptySubtitle,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: p.textSecondary,
-                        fontSize: AppFontSize.bodySmall,
-                        height: 1.45,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    FilledButton.icon(
-                      onPressed: _showAddDialog,
-                      icon: const Icon(Icons.add_rounded, size: 20),
-                      label: Text(
-                        context.l10n.radioAddStation,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: p.accent,
-                        foregroundColor: p.onAccent,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 22, vertical: AppSpacing.sm),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadii.r14),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.s10),
-                    OutlinedButton.icon(
-                      onPressed: _importCurated,
-                      icon: const Icon(Icons.explore_rounded, size: 18),
-                      label: Text(context.l10n.radioCuratedBrowse),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: p.accent,
-                        side: BorderSide(
-                            color: p.accent.withValues(alpha: 0.5)),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadii.r14),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             )
@@ -349,7 +362,7 @@ class _RadioScreenState extends State<RadioScreen> {
                         final g = availableGenres[idx];
                         final isSelected = _selectedGenre == g;
                         return FilterChip(
-                          label: Text(g),
+                          label: Text(g == 'All' ? context.l10n.all : g),
                           selected: isSelected,
                           selectedColor: p.accent.withValues(alpha: 0.2),
                           checkmarkColor: p.accent,
@@ -374,36 +387,35 @@ class _RadioScreenState extends State<RadioScreen> {
                 const SizedBox(height: AppSpacing.xs),
                 Expanded(
                   child: filtered.isEmpty
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(AppSpacing.xl),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.search_off_rounded, size: 48, color: p.textTertiary),
-                                const SizedBox(height: AppSpacing.sm),
-                                Text(
-                                  'No stations match "$_searchQuery"',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: p.textSecondary,
-                                    fontSize: AppFontSize.body,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
+                      ? RefreshIndicator(
+                          onRefresh: () async => _refresh(),
+                          color: p.accent,
+                          backgroundColor: p.surfaceContainer,
+                          child: SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            child: SizedBox(
+                              height: 350,
+                              child: EmptyStateWidget(
+                                icon: Icons.search_off_rounded,
+                                title: 'No stations match "$_searchQuery"',
+                                subtitle: 'Try searching by a different genre or station URL',
+                              ),
                             ),
                           ),
                         )
-                      : ListView.separated(
-                          padding: const EdgeInsets.only(top: AppSpacing.xs, bottom: AppSpacing.scrollBottom),
-                          itemCount: filtered.length,
-                          separatorBuilder: (_, __) => Divider(
-                            height: 1,
-                            indent: 72,
-                            endIndent: 16,
-                            color: p.hairline,
-                          ),
+                      : RefreshIndicator(
+                          onRefresh: () async => _refresh(),
+                          color: p.accent,
+                          backgroundColor: p.surfaceContainer,
+                          child: ListView.separated(
+                            padding: const EdgeInsets.only(top: AppSpacing.xs, bottom: AppSpacing.scrollBottom),
+                            itemCount: filtered.length,
+                            separatorBuilder: (_, __) => Divider(
+                              height: 1,
+                              indent: 72,
+                              endIndent: 16,
+                              color: p.hairline,
+                            ),
                           itemBuilder: (context, index) {
                             final station = filtered[index];
                             return StaggeredReveal(
@@ -492,7 +504,7 @@ class _RadioScreenState extends State<RadioScreen> {
                                           onPressed: () => _showAddDialog(initial: station),
                                         ),
                                         IconButton(
-                                          tooltip: isPlaying ? 'Pause' : context.l10n.radioPlay,
+                                          tooltip: isPlaying ? context.l10n.pause : context.l10n.radioPlay,
                                           icon: Icon(
                                             isPlaying
                                                 ? Icons.pause_circle_filled_rounded
@@ -524,6 +536,7 @@ class _RadioScreenState extends State<RadioScreen> {
                             );
                           },
                         ),
+                      ),
                 ),
               ],
             ),

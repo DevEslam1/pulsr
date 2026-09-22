@@ -1,22 +1,26 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/bloc/base_cubit.dart';
 import '../../../core/errors/ytm_error_classifier.dart';
 import '../../../core/services/file_intent_handler.dart';
 import '../../../core/services/ytm_service.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../domain/models/ytm_track.dart';
 import 'ytm_search_state.dart';
 
+// FIX-A01: Migrate to PulsrCubit
 @injectable
-class YtmSearchCubit extends Cubit<YtmSearchState> {
+class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
   final YtmService _service;
   Timer? _debounceTimer;
 
   int _generation = 0;
+  // FIX-C7: Latch to prevent concurrent bot-block retries
+  bool _botRetryInFlight = false;
 
   YtmSearchCubit({required YtmService service})
       : _service = service,
@@ -29,7 +33,9 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
     try {
       final prefs = await SharedPreferences.getInstance();
       return prefs.getStringList(_historyKey) ?? [];
-    } catch (_) {
+    } catch (e, st) {
+      // FIX-A05: Log failure to read history
+      ErrorLogger.log('Failed to read search history', error: e, stackTrace: st, category: 'YtmSearchCubit');
       return [];
     }
   }
@@ -44,14 +50,20 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
       list.insert(0, q);
       if (list.length > _maxHistory) list.removeRange(_maxHistory, list.length);
       await prefs.setStringList(_historyKey, list);
-    } catch (_) {}
+    } catch (e, st) {
+      // FIX-A05: Log failure to save history
+      ErrorLogger.log('Failed to save query to search history', error: e, stackTrace: st, category: 'YtmSearchCubit');
+    }
   }
 
   Future<void> clearHistory() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_historyKey);
-    } catch (_) {}
+    } catch (e, st) {
+      // FIX-A05: Log failure to clear history
+      ErrorLogger.log('Failed to clear search history', error: e, stackTrace: st, category: 'YtmSearchCubit');
+    }
   }
 
   /// Persistent YTM health strip for the search screen: bot cooldown, offline
@@ -81,21 +93,21 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
   }
 
   void onQueryChanged(String query) {
-    emit(state.copyWith(query: query));
+    safeEmit(state.copyWith(query: query));
     _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 250), () {
+    _debounceTimer = autoTimer(Timer(const Duration(milliseconds: 300), () {
       _executeSearch(query);
-    });
+    }));
   }
 
   void clearQuery() {
     _debounceTimer?.cancel();
     _generation++;
-    emit(const YtmSearchState());
+    safeEmit(const YtmSearchState());
   }
 
   void clearError() {
-    emit(state.copyWith(errorMessage: null));
+    safeEmit(state.copyWith(errorMessage: null));
   }
 
   Future<void> retry() => _executeSearch(state.query);
@@ -104,21 +116,23 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
     String query, {
     bool isRetryAfterBotBlock = false,
     int retryDepth = 0,
+    int? generation,
   }) async {
-    final generation = ++_generation;
+    // FIX-C7: Parameterize generation and do not increment on recursive retry
+    final effectiveGeneration = generation ?? ++_generation;
 
     if (query.trim().isEmpty) {
-      emit(state.copyWith(results: [], isLoading: false, errorMessage: null));
+      safeEmit(state.copyWith(results: [], isLoading: false, errorMessage: null));
       return;
     }
 
-    emit(state.copyWith(isLoading: true, errorMessage: null));
+    safeEmit(state.copyWith(isLoading: true, errorMessage: null));
     try {
       final videoId = FileIntentHandler.extractYouTubeVideoId(query);
       if (videoId != null) {
         try {
           final stream = await _service.resolveStream(videoId);
-          if (generation != _generation || isClosed) return;
+          if (effectiveGeneration != _generation || isClosed) return;
           final track = YtmTrack(
             videoId: videoId,
             title: stream.title.isNotEmpty ? stream.title : 'YouTube Track',
@@ -126,17 +140,19 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
             duration: stream.duration,
             artworkUrl: stream.artworkUrl,
           );
-          emit(state.copyWith(
+          safeEmit(state.copyWith(
               results: [track], isLoading: false, errorMessage: null));
           return;
-        } catch (_) {
-          // Fall through to regular search if resolving by ID fails
+        } catch (e, st) {
+          // FIX-A05: Log failure before falling back to regular search
+          ErrorLogger.log('Failed to resolve stream by video ID, falling back to text search',
+              error: e, stackTrace: st, category: 'YtmSearchCubit');
         }
       }
 
       final results = await _service.searchWithFallback(query);
-      if (generation != _generation || isClosed) return;
-      emit(state.copyWith(
+      if (effectiveGeneration != _generation || isClosed) return;
+      safeEmit(state.copyWith(
           results: results, isLoading: false, errorMessage: null));
       if (results.isNotEmpty) unawaited(_saveToHistory(query));
       // Speculative warm: the top hit is the most likely tap. Resolving its
@@ -154,39 +170,57 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
                 .then((_) {})
                 .catchError((_) {}));
           }
-        } catch (_) {}
+        } catch (_) {
+          // FIX-A05: Speculative warming failure is intentionally non-fatal
+        }
       }
     } on YtmException catch (e) {
-      if (generation != _generation || isClosed) return;
+      if (effectiveGeneration != _generation || isClosed) return;
 
-      // Auto-recovery: On bot block or recaptcha, invalidate poToken and retry with depth bound
-      if (e.isBotBlocked && !isRetryAfterBotBlock && retryDepth < 2) {
-        var refreshed = false;
+      // FIX-C7: Auto-recovery with _botRetryInFlight latch
+      if (e.isBotBlocked && !isRetryAfterBotBlock && retryDepth < 2 && !_botRetryInFlight) {
+        _botRetryInFlight = true;
         try {
-          await _service.invalidatePoToken();
-          await _service.ensurePoTokenReady();
-          refreshed = true;
-        } catch (_) {
-          // A failing poToken refresh must not escape this handler, or the
-          // spinner below is never cleared and the block is never reported.
-        }
-        if (generation != _generation || isClosed) return;
-        if (refreshed) {
-          return _executeSearch(query,
-              isRetryAfterBotBlock: true, retryDepth: retryDepth + 1);
+          var refreshed = false;
+          try {
+            await _service.invalidatePoToken();
+            await _service.ensurePoTokenReady();
+            refreshed = true;
+          } catch (e2, st2) {
+            // FIX-A05: Log failed token refresh during bot block recovery
+            ErrorLogger.log('Failed poToken refresh in recovery',
+                error: e2, stackTrace: st2, category: 'YtmSearchCubit');
+          }
+          if (effectiveGeneration != _generation || isClosed) return;
+          if (refreshed) {
+            try {
+              await _executeSearch(
+                query,
+                isRetryAfterBotBlock: true,
+                retryDepth: retryDepth + 1,
+                generation: effectiveGeneration,
+              );
+              return;
+            } catch (retryErr, retrySt) {
+              ErrorLogger.log('Bot block retry search failed',
+                  error: retryErr, stackTrace: retrySt, category: 'YtmSearchCubit');
+            }
+          }
+        } finally {
+          _botRetryInFlight = false;
         }
       }
 
       // FIX-C04: Ensure generation guard precedes every emit in catch blocks
-      if (generation != _generation || isClosed) return;
+      if (effectiveGeneration != _generation || isClosed) return;
       final errorInfo = YtmErrorClassifier.classify(e);
-      emit(state.copyWith(
+      safeEmit(state.copyWith(
           isLoading: false, results: [], errorMessage: errorInfo.message));
     } catch (e) {
       // FIX-C04: Ensure generation guard precedes emit
-      if (generation != _generation || isClosed) return;
+      if (effectiveGeneration != _generation || isClosed) return;
       final errorInfo = YtmErrorClassifier.classify(e);
-      emit(state.copyWith(
+      safeEmit(state.copyWith(
           isLoading: false, results: [], errorMessage: errorInfo.message));
     }
   }

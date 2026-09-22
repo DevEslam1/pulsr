@@ -15,7 +15,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('static raw Text literals do not increase (28-01 ratchet)', () {
-    const baseline = 23;
+    const baseline = 20;
     final pattern = RegExp(r"Text\(\s*'([^'$]*)'");
     var count = 0;
     final offenders = <String>[];

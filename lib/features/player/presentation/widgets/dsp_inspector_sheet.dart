@@ -34,7 +34,8 @@ class DspInspectorSheet extends StatefulWidget {
   State<DspInspectorSheet> createState() => _DspInspectorSheetState();
 }
 
-class _DspInspectorSheetState extends State<DspInspectorSheet> {
+class _DspInspectorSheetState extends State<DspInspectorSheet>
+    with WidgetsBindingObserver {
   DspDebugReport? _report;
   bool _isLoading = true;
   Timer? _autoRefreshTimer;
@@ -42,16 +43,39 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _refreshReport();
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _autoRefreshTimer?.cancel();
     // Poll every 1.5 seconds while open to show live updates when toggles change
-    _autoRefreshTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) {
+    _autoRefreshTimer =
+        Timer.periodic(const Duration(milliseconds: 1500), (_) {
       if (mounted) _refreshReport(silent: true);
     });
   }
 
+  void _stopTimer() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = null;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startTimer();
+      _refreshReport(silent: true);
+    } else {
+      _stopTimer();
+    }
+  }
+
   @override
   void dispose() {
-    _autoRefreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _stopTimer();
     super.dispose();
   }
 
@@ -170,12 +194,12 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
                       ),
                       IconButton(
                         tooltip: context.l10n.dspCopyJsonReport,
-                        icon: Icon(Icons.copy_rounded, color: p.accent, size: 19),
+                        icon: Icon(Icons.copy_rounded, color: p.accent, size: 20),
                         onPressed: () => _copyReportToClipboard(context),
                       ),
                       IconButton(
                         tooltip: 'Share DSP report',
-                        icon: Icon(Icons.share_rounded, color: p.accent, size: 19),
+                        icon: Icon(Icons.share_rounded, color: p.accent, size: 20),
                         onPressed: () => _shareReport(context),
                       ),
                       IconButton(

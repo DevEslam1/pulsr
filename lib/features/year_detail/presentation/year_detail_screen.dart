@@ -9,6 +9,7 @@ import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
+import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/models/year_item.dart';
@@ -23,8 +24,11 @@ class YearDetailScreen extends StatefulWidget {
   final YearItem yearItem;
   final GetYearsUseCase? getYearsUseCase;
 
-  const YearDetailScreen(
-      {super.key, required this.yearItem, this.getYearsUseCase});
+  const YearDetailScreen({
+    super.key,
+    required this.yearItem,
+    this.getYearsUseCase,
+  });
 
   @override
   State<YearDetailScreen> createState() => _YearDetailScreenState();
@@ -51,8 +55,13 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
           title: Text('${yearItem.year}'),
         ),
       body: StreamBuilder<Result<List<SongsTableData>>>(
-        stream: _useCase.watchYearSongs(yearItem.year),
+        stream: _useCase.watchYearSongs(yearItem.year).distinct(),
         builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              !snapshot.hasData) {
+            return const SkeletonList(
+                padding: EdgeInsets.only(top: AppSpacing.xs));
+          }
           final loadFailed = snapshot.hasError ||
               (snapshot.data?.fold((l) => true, (_) => false) ?? false);
           if (loadFailed) {
@@ -77,7 +86,7 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
                       style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                     ),
                     const SizedBox(height: AppSpacing.s20),
-                    ElevatedButton.icon(
+                    FilledButton.icon(
                       onPressed: () => setState(() {}),
                       icon: const Icon(Icons.refresh_rounded),
                       label: Text(context.l10n.retry),
@@ -145,7 +154,7 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
                     child: Row(
                       children: [
                         Expanded(
-                          child: ElevatedButton.icon(
+                          child: FilledButton.icon(
                             onPressed: songs.isNotEmpty
                                 ? () => context
                                     .read<PlayerCubit>()

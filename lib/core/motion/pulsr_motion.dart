@@ -22,6 +22,7 @@ abstract class PulsrMotion {
 
   /// 150ms — press states, small fades.
   static const Duration fast = Duration(milliseconds: 150);
+  static const Duration snappy = fast;
 
   /// 250ms — standard transitions (nav indicator, switches).
   static const Duration standard = Duration(milliseconds: 250);
@@ -69,3 +70,6 @@ extension PulsrMotionX on BuildContext {
   /// Reduce-motion-aware easing curve.
   Curve motionCurve(Curve curve) => PulsrMotion.resolveCurve(this, curve);
 }
+
+/// Convenience alias for [PulsrMotion].
+typedef AppMotion = PulsrMotion;

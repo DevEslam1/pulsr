@@ -15,12 +15,13 @@ class _DopContainerSelector extends StatefulWidget {
 class _DopContainerSelectorState extends State<_DopContainerSelector> {
   int _bits = 24;
   bool _loaded = false;
+  bool _disposed = false;
 
   @override
   void initState() {
     super.initState();
     SharedPreferences.getInstance().then((prefs) {
-      if (!mounted) return;
+      if (_disposed || !mounted) return;
       setState(() {
         final stored = prefs.getInt(PrefsKeys.dopContainerBits) ?? 24;
         _bits = stored == 32 ? 32 : 24;
@@ -29,7 +30,14 @@ class _DopContainerSelectorState extends State<_DopContainerSelector> {
     });
   }
 
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
   Future<void> _select(int bits) async {
+    if (_disposed || !mounted) return;
     setState(() => _bits = bits);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(PrefsKeys.dopContainerBits, bits);

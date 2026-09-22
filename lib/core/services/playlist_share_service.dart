@@ -80,10 +80,46 @@ class PlaylistShareService {
     return json.encode(bundle.toJson());
   }
 
+  /// Computes the nesting depth of a JSON object tree.
+  static int computeDepth(Object? object, [int currentDepth = 1]) {
+    if (currentDepth > 5) return currentDepth;
+    if (object is Map) {
+      var maxChild = currentDepth;
+      for (final value in object.values) {
+        final d = computeDepth(value, currentDepth + 1);
+        if (d > maxChild) maxChild = d;
+        if (maxChild > 5) return maxChild;
+      }
+      return maxChild;
+    } else if (object is List) {
+      var maxChild = currentDepth;
+      for (final item in object) {
+        final d = computeDepth(item, currentDepth + 1);
+        if (d > maxChild) maxChild = d;
+        if (maxChild > 5) return maxChild;
+      }
+      return maxChild;
+    }
+    return currentDepth;
+  }
+
   /// Parses a shared playlist bundle from JSON.
   SharedPlaylistBundle? importPlaylist(String jsonString) {
     try {
-      final decoded = json.decode(jsonString) as Map<String, dynamic>;
+      final decoded = json.decode(jsonString);
+      if (decoded is! Map<String, dynamic>) {
+        ErrorLogger.log('Invalid JSON root format in shared playlist',
+            category: 'PlaylistShareService');
+        return null;
+      }
+      final depth = computeDepth(decoded);
+      if (depth > 5) {
+        ErrorLogger.log(
+          'Shared playlist JSON exceeds maximum nesting depth ($depth > 5)',
+          category: 'PlaylistShareService',
+        );
+        return null;
+      }
       return SharedPlaylistBundle.fromJson(decoded);
     } catch (e, st) {
       ErrorLogger.log('Failed to parse shared playlist',

@@ -209,7 +209,15 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                       ],
                     ),
                   )
-                else
+                else ...[
+                  if (isTestingAll)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: AppSpacing.xs),
+                      child: SkeletonBox(
+                        height: 52,
+                        radius: AppRadii.r14,
+                      ),
+                    ),
                   ListView.separated(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -224,6 +232,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                       return _buildProxyItemCard(p, item, isActive);
                     },
                   ),
+                ],
               ],
             ),
           ),
@@ -246,12 +255,10 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
       child: InkWell(
         onTap: () {
           context.read<SettingsCubit>().selectProxyEntry(item);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(context.l10n.proxyActivated(item.displayAddress)),
-              duration: const Duration(seconds: 1),
-              behavior: SnackBarBehavior.floating,
-            ),
+          PulsrToast.show(
+            context,
+            message: context.l10n.proxyActivated(item.displayAddress),
+            icon: Icons.check_circle_outline_rounded,
           );
         },
         child: Padding(
@@ -356,9 +363,22 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                       tooltip: context.l10n.settingsRemoveProxy,
                       icon: Icon(Icons.close_rounded,
                           size: 16, color: p.textTertiary),
-                      onPressed: () => context
-                          .read<SettingsCubit>()
-                          .removeProxyEntry(item.id),
+                      onPressed: () async {
+                        final confirm = await PulsrDialogHelper.showConfirmDialog(
+                          context,
+                          title: context.l10n.settingsRemoveProxy,
+                          message: item.displayAddress,
+                          icon: Icons.delete_outline_rounded,
+                          confirmLabel: context.l10n.delete,
+                          cancelLabel: context.l10n.cancel,
+                          isDestructive: true,
+                        );
+                        if (confirm == true && mounted) {
+                          context
+                              .read<SettingsCubit>()
+                              .removeProxyEntry(item.id);
+                        }
+                      },
                     ),
                   ),
                 ],
@@ -620,6 +640,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
 
                 final hostField = TextFormField(
                   controller: _hostController,
+                  focusNode: _hostFocusNode,
                   style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
                   decoration: InputDecoration(
                     labelText: context.l10n.settingsServerHost,
@@ -647,8 +668,14 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                         horizontal: AppSpacing.s14, vertical: AppSpacing.s14),
                   ),
                   validator: (value) {
-                    if (_enabled && (value == null || value.trim().isEmpty)) {
-                      return context.l10n.settingsEnterProxyHost;
+                    if (_enabled) {
+                      final host = value?.trim() ?? '';
+                      if (host.isEmpty) {
+                        return context.l10n.settingsEnterProxyHost;
+                      }
+                      if (!InputSanitizer.isValidProxyHost(host)) {
+                        return 'Invalid proxy host format';
+                      }
                     }
                     return null;
                   },
@@ -656,6 +683,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
 
                 final portField = TextFormField(
                   controller: _portController,
+                  focusNode: _portFocusNode,
                   style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -808,6 +836,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
 
             final usernameField = TextFormField(
               controller: _usernameController,
+              focusNode: _usernameFocusNode,
               style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
               decoration: InputDecoration(
                 labelText: context.l10n.settingsUsernameLabel,
@@ -837,6 +866,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
 
             final passwordField = TextFormField(
               controller: _passwordController,
+              focusNode: _passwordFocusNode,
               style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
               obscureText: _obscurePassword,
               decoration: InputDecoration(
@@ -912,6 +942,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
           children: [
             TextFormField(
               controller: _bypassController,
+              focusNode: _bypassFocusNode,
               style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
               decoration: InputDecoration(
                 labelText: context.l10n.settingsBypassList,
@@ -1121,4 +1152,10 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
 
   // Requires: provided by the composing class (same library).
   TextEditingController get _usernameController;
+
+  FocusNode get _hostFocusNode;
+  FocusNode get _portFocusNode;
+  FocusNode get _usernameFocusNode;
+  FocusNode get _passwordFocusNode;
+  FocusNode get _bypassFocusNode;
 }

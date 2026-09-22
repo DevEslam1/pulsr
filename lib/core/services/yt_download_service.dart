@@ -481,7 +481,8 @@ class YtDownloadService {
         if (freeBytes != null && freeBytes > 0) {
           // F3: see [requiredPreflightBytes].
           final requiredSpace = requiredPreflightBytes(stream);
-          if (freeBytes < requiredSpace) {
+          const minSafetyBytes = 100 * 1024 * 1024; // 100MB minimum buffer
+          if (freeBytes < minSafetyBytes || freeBytes < requiredSpace) {
             return const Left(
                 DownloadFailure('Insufficient storage space for download'));
           }
@@ -1395,7 +1396,7 @@ class YtDownloadService {
     }
 
     // Determine total expected size for atomic commit verification
-    int total = response.contentLength; // remaining bytes
+    final total = response.contentLength; // remaining bytes
     // If resumed, total via Content-Range: bytes start-end/total
     final contentRange = response.headers.value(HttpHeaders.contentRangeHeader);
     int? expectedFinalSize;
@@ -1670,9 +1671,9 @@ class YtDownloadService {
     if (rawTitle.isEmpty) rawTitle = 'Unknown Title';
 
     // 1. Strip reserved characters and control characters (BUG-015)
-    var cleanedArtist =
+    final cleanedArtist =
         rawArtist.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F]'), '_').trim();
-    var cleanedTitle =
+    final cleanedTitle =
         rawTitle.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F]'), '_').trim();
 
     var base = '$cleanedArtist - $cleanedTitle';

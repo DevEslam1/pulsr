@@ -76,14 +76,12 @@ class SpeedPickerSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return BlocBuilder<PlayerCubit, PlayerState>(
-      buildWhen: (a, b) =>
-          a.playbackSpeed != b.playbackSpeed ||
-          a.playbackPitch != b.playbackPitch,
-      builder: (context, state) {
+    return BlocSelector<PlayerCubit, PlayerState, ({double speed, double pitch})>(
+      selector: (state) => (speed: state.playbackSpeed, pitch: state.playbackPitch),
+      builder: (context, playback) {
         final cubit = context.read<PlayerCubit>();
-        final currentSpeed = state.playbackSpeed;
-        final currentPitch = state.playbackPitch;
+        final currentSpeed = playback.speed;
+        final currentPitch = playback.pitch;
         final options = speedOptionsFor(
             cubit.minPlaybackSpeed, cubit.maxPlaybackSpeed);
         final semitones = currentPitch == 1.0

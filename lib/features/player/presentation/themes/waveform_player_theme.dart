@@ -18,8 +18,6 @@ import '../../../settings/cubit/settings_state.dart';
 import '../../../sheets/add_to_playlist_sheet.dart';
 import '../../../sheets/song_info_sheet.dart';
 import '../../../ytm_search/presentation/widgets/ytm_download_button.dart';
-import '../../cubit/player_cubit.dart';
-import '../../cubit/player_state.dart';
 import '../widgets/audio_quality_badge.dart';
 import '../widgets/lyrics_view.dart';
 import '../widgets/now_playing_queue_view.dart';
@@ -142,23 +140,25 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
             );
             final double pillBarHeight = isTablet ? 50.0 : 44.0;
 
-            final viewSwitcher = _buildViewSwitcher(
-              context: context,
+            final viewSwitcher = PlayerViewSwitcher(
               state: state,
               cubit: cubit,
               activeColor: activeColor,
               isTablet: isTablet,
               barWidth: pillBarWidth,
               barHeight: pillBarHeight,
+              trackIcon: Icons.album_rounded,
+              surfaceFillAlpha: 0.06,
+              borderAlpha: 0.12,
             );
 
-            final bottomDock = _buildBottomActionDock(
-              context: context,
+            final bottomDock = PlayerBottomActionDock(
               props: widget.props,
               settingsState: settingsState,
               isTablet: isTablet,
               barWidth: pillBarWidth,
               barHeight: pillBarHeight,
+              dockIconStyle: PlayerDockIconStyle.common,
             );
 
             final centerDisplay = GestureDetector(
@@ -631,50 +631,6 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // View Switcher Pill Bar (Track / Lyrics / Queue) - Twin Capsule to EQ Dock
-  // ---------------------------------------------------------------------------
-  Widget _buildViewSwitcher({
-    required BuildContext context,
-    required PlayerState state,
-    required PlayerCubit cubit,
-    required Color activeColor,
-    required bool isTablet,
-    required double barWidth,
-    required double barHeight,
-  }) {
-    // Extracted to player_theme_chrome.dart (A-13); only the tokens this theme
-    // actually differed on are passed through.
-    return PlayerViewSwitcher(
-      state: state,
-      cubit: cubit,
-      activeColor: activeColor,
-      isTablet: isTablet,
-      barWidth: barWidth,
-      barHeight: barHeight,
-      trackIcon: Icons.album_rounded,
-      surfaceFillAlpha: 0.06,
-      borderAlpha: 0.12,
-    );
-  }
-  Widget _buildBottomActionDock({
-    required BuildContext context,
-    required PlayerThemeProps props,
-    required SettingsState settingsState,
-    required bool isTablet,
-    required double barWidth,
-    required double barHeight,
-  }) {
-    // Extracted to player_theme_chrome.dart (A-13).
-    return PlayerBottomActionDock(
-      props: props,
-      settingsState: settingsState,
-      isTablet: isTablet,
-      barWidth: barWidth,
-      barHeight: barHeight,
-      dockIconStyle: PlayerDockIconStyle.common,
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -725,12 +681,14 @@ class _WaveformHeroStage extends StatelessWidget {
               child: AnimatedBuilder(
                 animation: waveController,
                 builder: (context, _) {
-                  return CustomPaint(
-                    painter: _SonicRipplesPainter(
-                      color: activeColor,
-                      progress: waveController.value,
-                      isPlaying: isPlaying,
-                      baseRadius: artSize * 0.52,
+                  return RepaintBoundary(
+                    child: CustomPaint(
+                      painter: _SonicRipplesPainter(
+                        color: activeColor,
+                        progress: waveController.value,
+                        isPlaying: isPlaying,
+                        baseRadius: artSize * 0.52,
+                      ),
                     ),
                   );
                 },
@@ -742,12 +700,14 @@ class _WaveformHeroStage extends StatelessWidget {
               child: AnimatedBuilder(
                 animation: waveController,
                 builder: (context, _) {
-                  return CustomPaint(
-                    painter: _FluidAudioWavesPainter(
-                      color: activeColor,
-                      progress: waveController.value,
-                      isPlaying: isPlaying,
-                      baselineY: waveBaselineY,
+                  return RepaintBoundary(
+                    child: CustomPaint(
+                      painter: _FluidAudioWavesPainter(
+                        color: activeColor,
+                        progress: waveController.value,
+                        isPlaying: isPlaying,
+                        baselineY: waveBaselineY,
+                      ),
                     ),
                   );
                 },

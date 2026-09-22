@@ -133,6 +133,9 @@ class _PulsrSliderState extends State<PulsrSlider>
         widget.min;
   }
 
+  bool _tapSeekPending = false;
+  double _tapSeekValue = 0.0;
+
   void _onDragStart(double dx, double width) {
     setState(() => _isDragging = true);
     _expandController.forward();
@@ -143,6 +146,7 @@ class _PulsrSliderState extends State<PulsrSlider>
   }
 
   void _onDragUpdate(double dx, double width) {
+    _tapSeekPending = false;
     final val = _calculateValue(dx, width);
     widget.onChanged(val);
   }
@@ -150,8 +154,15 @@ class _PulsrSliderState extends State<PulsrSlider>
   void _onDragEnd(double dx, double width) {
     setState(() => _isDragging = false);
     _expandController.reverse();
-    final val = _calculateValue(dx, width);
+    final val = _tapSeekPending ? _tapSeekValue : _calculateValue(dx, width);
+    _tapSeekPending = false;
     widget.onChangeEnd?.call(val);
+  }
+
+  void _onTapDown(double dx, double width) {
+    _tapSeekPending = true;
+    _tapSeekValue = _calculateValue(dx, width);
+    _onDragStart(dx, width);
   }
 
   @override
@@ -171,19 +182,23 @@ class _PulsrSliderState extends State<PulsrSlider>
 
             return GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTapDown: (d) => _onDragStart(d.localPosition.dx, width),
+              onTapDown: (d) => _onTapDown(d.localPosition.dx, width),
               onTapUp: (d) => _onDragEnd(d.localPosition.dx, width),
               onTapCancel: () {
+                _tapSeekPending = false;
                 setState(() => _isDragging = false);
                 _expandController.reverse();
               },
-              onHorizontalDragStart: (d) =>
-                  _onDragStart(d.localPosition.dx, width),
+              onHorizontalDragStart: (d) {
+                _tapSeekPending = false;
+                _onDragStart(d.localPosition.dx, width);
+              },
               onHorizontalDragUpdate: (d) =>
                   _onDragUpdate(d.localPosition.dx, width),
               onHorizontalDragEnd: (d) =>
                   _onDragEnd(d.localPosition.dx, width),
               onHorizontalDragCancel: () {
+                _tapSeekPending = false;
                 setState(() => _isDragging = false);
                 _expandController.reverse();
               },

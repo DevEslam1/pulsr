@@ -399,8 +399,8 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                     const SizedBox(height: AppSpacing.sm),
                     SizedBox(
                       width: double.infinity,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
                           backgroundColor: p.accent,
                           foregroundColor: p.onAccent,
                           shape: RoundedRectangleBorder(

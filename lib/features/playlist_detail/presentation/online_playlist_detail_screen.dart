@@ -12,7 +12,9 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
+import '../../../core/widgets/pulsr_toast.dart';
 import '../../../core/widgets/song_tile.dart';
+import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../domain/models/ytm_track.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
 import '../../library/cubit/library_cubit.dart';
@@ -83,13 +85,17 @@ class _OnlinePlaylistDetailScreenState
     }
   }
 
+  bool _disposed = false;
+
   @override
   void dispose() {
+    _disposed = true;
     _searchController.dispose();
     super.dispose();
   }
 
   Future<void> _fetchTracks() async {
+    if (_disposed || !mounted) return;
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -102,6 +108,7 @@ class _OnlinePlaylistDetailScreenState
       // Bound the whole fetch: paginated library playlists can otherwise
       // keep the spinner forever on slow/auth-challenged networks.
       // On timeout we fall through to the error state with retry.
+      bool isTimeout = false;
       YtmPlaylistDetails? details;
       try {
         details = await accountService
@@ -111,9 +118,12 @@ class _OnlinePlaylistDetailScreenState
             )
             .timeout(const Duration(seconds: 45));
       } on TimeoutException {
+        isTimeout = true;
         debugPrint(
             '[ONLINE_PLAYLIST] fetchPlaylistDetails timed out for ${widget.args.playlistId}');
       }
+
+      if (_disposed || !mounted) return;
 
       List<YtmTrack> fetchedTracks = details?.tracks ?? const [];
 
@@ -127,18 +137,21 @@ class _OnlinePlaylistDetailScreenState
               )
               .timeout(const Duration(seconds: 45));
         } on TimeoutException {
+          isTimeout = true;
           debugPrint(
               '[ONLINE_PLAYLIST] getPlaylistTracks timed out for ${widget.args.playlistId}');
           fetchedTracks = const [];
         }
       }
 
-      if (!mounted) return;
+      if (_disposed || !mounted) return;
 
       if (fetchedTracks.isEmpty) {
         setState(() {
           _isLoading = false;
-          _errorMessage = context.l10n.browseCouldNotLoadTracks;
+          _errorMessage = isTimeout
+              ? 'Connection timed out. Check your network and try again.'
+              : context.l10n.browseCouldNotLoadTracks;
         });
         return;
       }
@@ -163,8 +176,14 @@ class _OnlinePlaylistDetailScreenState
           _artworkUrl ??= fetchedTracks.firstOrNull?.artworkUrl;
         }
       });
+    } on TimeoutException {
+      if (_disposed || !mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Connection timed out. Check your network and try again.';
+      });
     } catch (e) {
-      if (!mounted) return;
+      if (_disposed || !mounted) return;
       setState(() {
         _isLoading = false;
         _errorMessage = '${context.l10n.playlistLoadFailed} $e';
@@ -200,18 +219,17 @@ class _OnlinePlaylistDetailScreenState
     if (report.skippedLocal > 0) {
       parts.add('${report.skippedLocal} already on device — skipped.');
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(parts.join(' ')),
-        behavior: SnackBarBehavior.floating,
+    if (mounted) {
+      PulsrToast.show(
+        context,
+        message: parts.join(' '),
         duration: const Duration(seconds: 4),
-      ),
-    );
+      );
+    }
   }
 
   Future<void> _saveToLocalPlaylists() async {
     if (_tracks.isEmpty) return;
-    final messenger = ScaffoldMessenger.of(context);
     // Captured before async gaps (no context-across-gap).
     final saveFailedText = context.l10n.saveFailed;
     final loc = context.l10n;
@@ -226,24 +244,26 @@ class _OnlinePlaylistDetailScreenState
       final playlistRes = await playlistUseCases.createPlaylist(_title);
       final createdId = playlistRes.fold((l) => null, (r) => r);
 
-        if (createdId != null) {
-          // Single batch insert: one transaction instead of N round-trips.
-          await playlistUseCases.addSongsToPlaylist(
-              createdId, [for (final s in songs) s.id]);
-          messenger.showSnackBar(
-          SnackBar(
-            content: Text(loc.savedToLocal(_title, songs.length)),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+      if (createdId != null) {
+        // Single batch insert: one transaction instead of N round-trips.
+        await playlistUseCases.addSongsToPlaylist(
+            createdId, [for (final s in songs) s.id]);
+        if (mounted) {
+          PulsrToast.show(
+            context,
+            message: loc.savedToLocal(_title, songs.length),
+            isSuccess: true,
+          );
+        }
       }
     } catch (_) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(saveFailedText),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      if (mounted) {
+        PulsrToast.show(
+          context,
+          message: saveFailedText,
+          isError: true,
+        );
+      }
     }
   }
 
@@ -264,6 +284,7 @@ class _OnlinePlaylistDetailScreenState
     final content = RefreshIndicator(
       onRefresh: _fetchTracks,
       color: p.accent,
+      backgroundColor: p.surfaceContainer,
       child: ListView(
         padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom),
         physics: const AlwaysScrollableScrollPhysics(),
@@ -272,7 +293,7 @@ class _OnlinePlaylistDetailScreenState
           Padding(
             padding: EdgeInsets.symmetric(
               horizontal: Adaptive.pagePadding(context),
-              vertical: 12,
+              vertical: AppSpacing.sm,
             ),
             child: _buildHeroCard(context, p, totalDurationMs),
           ),
@@ -408,22 +429,9 @@ class _OnlinePlaylistDetailScreenState
 
           // ── CONTENT / TRACKS LIST ───────────────────────────────────
           if (_isLoading && _tracks.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.s64),
-              child: Center(
-                child: Column(
-                  children: [
-                    SizedBox(width: AppSpacing.s28,
-                      height: 28,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2.5, color: p.accent),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    Text(context.l10n.fetchingYtmTracks,
-                        style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall)),
-                  ],
-                ),
-              ),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+              child: SkeletonList(padding: EdgeInsets.symmetric(horizontal: AppSpacing.md)),
             )
           else if (_errorMessage != null && _tracks.isEmpty)
             Padding(
@@ -468,6 +476,8 @@ class _OnlinePlaylistDetailScreenState
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
+              addAutomaticKeepAlives: false,
+              addRepaintBoundaries: true,
               itemCount: filtered.length,
               itemBuilder: (context, index) {
                 final track = filtered[index];
@@ -560,6 +570,10 @@ class _OnlinePlaylistDetailScreenState
                   Image.network(
                     _artworkUrl!,
                     fit: BoxFit.cover,
+                    cacheWidth: 600,
+                    cacheHeight: 360,
+                    loadingBuilder: (context, child, progress) =>
+                        progress == null ? child : _buildFallbackHeroGradient(ytGradient),
                     errorBuilder: (_, __, ___) => _buildFallbackHeroGradient(ytGradient),
                   )
                 else

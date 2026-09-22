@@ -198,7 +198,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                               borderRadius: BorderRadius.circular(AppRadii.r12),
                             ),
                             child: Icon(Icons.mic_off_rounded,
-                                color: p.accent, size: 19),
+                                color: p.accent, size: 20),
                           ),
                           title: Text(context.l10n.autoFilterVoiceNotes,
                             style: TextStyle(
@@ -230,7 +230,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                               BorderRadius.circular(AppRadii.r12),
                                         ),
                                         child: Icon(Icons.timer_outlined,
-                                            color: p.accent, size: 19),
+                                            color: p.accent, size: 20),
                                       ),
                                       const SizedBox(width: AppSpacing.s14),
                                       Column(
@@ -332,7 +332,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                     borderRadius: BorderRadius.circular(AppRadii.r12),
                                   ),
                                   child: Icon(Icons.sd_storage_outlined,
-                                      color: p.accent, size: 19),
+                                      color: p.accent, size: 20),
                                 ),
                                 const SizedBox(width: AppSpacing.s14),
                                 Column(
@@ -573,7 +573,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                             subtitle: Padding(
                               padding: const EdgeInsets.only(top: AppSpacing.s2),
                               child: Text(
-                                '${context.l10n.tracksCountPlural(folder.songCount)} • ${folder.path}',
+                                '${context.l10n.tracksCount(folder.songCount)} • ${folder.path}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(

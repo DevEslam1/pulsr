@@ -20,6 +20,9 @@ class PlayerWidgetCoordinator {
   int? _cachedQueueVersion;
   List<String>? _cachedNextTitles;
 
+  // FIX-L05: Extract nextTitlesCount constant and middle dot separator
+  static const int nextTitlesCount = 3;
+
   @visibleForTesting
   List<String>? nextTitles(PlayerState s, int queueVersion) {
     if (s.queue.isEmpty || s.currentIndex + 1 >= s.queue.length) {
@@ -41,9 +44,9 @@ class PlayerWidgetCoordinator {
     _cachedCurrentSongId = s.currentSong?.id;
     _cachedNextTitles = s.queue
         .skip(s.currentIndex + 1)
-        .take(3)
+        .take(nextTitlesCount)
         .map((item) => item.artist.isNotEmpty && item.artist != 'Unknown Artist'
-            ? '${item.title} • ${item.artist}'
+            ? '${item.title} · ${item.artist}'
             : item.title)
         .toList();
     return _cachedNextTitles;
