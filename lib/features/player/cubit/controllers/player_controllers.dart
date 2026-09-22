@@ -5,6 +5,7 @@ export 'dsp_effects_engine.dart';
 export 'dsp_eq_engine.dart';
 export 'player_dsp_controller.dart';
 export 'player_metadata_controller.dart';
+export 'player_playback_options_controller.dart';
 export 'player_queue_controller.dart';
 export 'player_transport_controller.dart';
 export 'player_widget_bridge.dart';

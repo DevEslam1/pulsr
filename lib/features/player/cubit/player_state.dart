@@ -14,31 +14,106 @@ part 'player_state.freezed.dart';
 
 enum PlayerRepeatMode { off, all, one }
 
-// FIX-A04: Architecture roadmap: Split PlayerState into focused slices: PlaybackState
-// (playback, position, timing), QueueState (queue, slots, indices), LyricsState
-// (lyrics, sync, sources), and DspEffectState (equalizer, spatializer, bit-perfect, crossfade)
-// to reduce state object churn and minimize rebuild pressure on player subtrees.
+/// Focused slice owning playback transport, track identities, positions, and options.
 @freezed
-abstract class PlayerState with _$PlayerState {
-  const PlayerState._();
+abstract class PlaybackSlice with _$PlaybackSlice {
+  const PlaybackSlice._();
 
-  const factory PlayerState({
+  const factory PlaybackSlice({
     SongsTableData? currentSong,
     @Default(false) bool isPlaying,
     @Default(Duration.zero) Duration position,
     @Default(Duration.zero) Duration duration,
     @Default(false) bool isShuffle,
     @Default(PlayerRepeatMode.off) PlayerRepeatMode repeatMode,
-    @Default([]) List<SongsTableData> queue,
-    @Default(0) int currentIndex,
+    @Default(1.0) double playbackSpeed,
+    @Default(1.0) double playbackPitch,
+    int? audioSessionId,
+    String? errorMessage,
     @Default(false) bool isExpanded,
     Color? dominantColor,
     Duration? sleepTimerRemaining,
+    @Default(false) bool abLoopEnabled,
+    Duration? abPointA,
+    Duration? abPointB,
+    @Default(0) int trackDelayMs,
+    Duration? bookmarkPosition,
+    @Default(0) int silenceSkipSensitivity,
+    @Default(0) int currentSongRating,
+    String? currentSongEqOverride,
+    @Default(0.0) double currentSongVolumeOverrideDb,
+  }) = _PlaybackSlice;
+
+  /// True when every field other than [position] is equal to [other]'s.
+  bool differsBeyondPosition(PlaybackSlice other) {
+    return currentSong != other.currentSong ||
+        isPlaying != other.isPlaying ||
+        duration != other.duration ||
+        isShuffle != other.isShuffle ||
+        repeatMode != other.repeatMode ||
+        playbackSpeed != other.playbackSpeed ||
+        playbackPitch != other.playbackPitch ||
+        audioSessionId != other.audioSessionId ||
+        errorMessage != other.errorMessage ||
+        isExpanded != other.isExpanded ||
+        dominantColor != other.dominantColor ||
+        ((sleepTimerRemaining == null) != (other.sleepTimerRemaining == null) ||
+            (sleepTimerRemaining != null &&
+                other.sleepTimerRemaining != null &&
+                sleepTimerRemaining!.inSeconds !=
+                    other.sleepTimerRemaining!.inSeconds)) ||
+        abLoopEnabled != other.abLoopEnabled ||
+        abPointA != other.abPointA ||
+        abPointB != other.abPointB ||
+        trackDelayMs != other.trackDelayMs ||
+        bookmarkPosition != other.bookmarkPosition ||
+        silenceSkipSensitivity != other.silenceSkipSensitivity ||
+        currentSongRating != other.currentSongRating ||
+        currentSongEqOverride != other.currentSongEqOverride ||
+        currentSongVolumeOverrideDb != other.currentSongVolumeOverrideDb;
+  }
+}
+
+/// Focused slice owning active playback queue, slots, and CUE chapters.
+@freezed
+abstract class QueueSlice with _$QueueSlice {
+  const QueueSlice._();
+
+  const factory QueueSlice({
+    @Default([]) List<SongsTableData> queue,
+    @Default(0) int currentIndex,
+    @Default(0) int activeQueueSlot,
+    @Default([]) List<ChapterInfo> cueChapters,
+    @Default(0) int currentCueIndex,
+  }) = _QueueSlice;
+
+  bool differs(QueueSlice other) {
+    return currentIndex != other.currentIndex ||
+        activeQueueSlot != other.activeQueueSlot ||
+        currentCueIndex != other.currentCueIndex ||
+        listContentDiffers(queue, other.queue) ||
+        listContentDiffers(cueChapters, other.cueChapters);
+  }
+}
+
+/// Focused slice owning lyrics lines, sources, and visibility.
+@freezed
+abstract class LyricsSlice with _$LyricsSlice {
+  const factory LyricsSlice({
     @Default([]) List<LyricsLine> lyrics,
     @Default(LyricsSource.none) LyricsSource lyricsSource,
     @Default(false) bool isLoadingLyrics,
     @Default(false) bool isLyricsVisible,
     @Default(false) bool isQueueVisible,
+  }) = _LyricsSlice;
+}
+
+/// Focused slice owning all audio DSP effects, equalizer presets, and audio processing configurations.
+@freezed
+abstract class DspSlice with _$DspSlice {
+  const DspSlice._();
+
+  const factory DspSlice({
     @Default(EqPreset(name: 'Flat', gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]))
     EqPreset eqPreset,
     @Default(false) bool isEqEnabled,
@@ -107,167 +182,9 @@ abstract class PlayerState with _$PlayerState {
     @Default(0) int dynamicBassPreset,
     @Default(false) bool hasOemAudio,
     @Default([]) List<String> detectedOemEngines,
-    @Default(0) int activeQueueSlot,
-    @Default(1.0) double playbackSpeed,
-    @Default(1.0) double playbackPitch,
-    int? audioSessionId,
-    String? errorMessage,
-    // F1: AB loop
-    @Default(false) bool abLoopEnabled,
-    Duration? abPointA,
-    Duration? abPointB,
-    // F2: per-track delay (ms) for current track
-    @Default(0) int trackDelayMs,
-    // F11: bookmark resume offer for current track
-    Duration? bookmarkPosition,
-    // F10: silence-skip sensitivity mirror
-    @Default(0) int silenceSkipSensitivity,
-    // PowerAmp Parity: per-song rating (1-5), EQ override, Volume offset (dB)
-    @Default(0) int currentSongRating,
-    String? currentSongEqOverride,
-    @Default(0.0) double currentSongVolumeOverrideDb,
-    // T10: chapters of the CUE image backing the current song, if any.
-    @Default([]) List<ChapterInfo> cueChapters,
-    @Default(0) int currentCueIndex,
-    // Quran Mode: vocal-optimized recitation profile.
     @Default(false) bool isQuranModeEnabled,
     @Default(QuranReciterStyle.murattal) QuranReciterStyle quranReciterStyle,
-  }) = _PlayerState;
-
-  /// True when every field other than [position] is equal to [other]'s, i.e.
-  /// the two states differ only by the ~200 ms playback position tick.
-  ///
-  /// Collections (`queue`, `lyrics`, `detectedOemEngines`) are compared with
-  /// O(1) [listContentDiffers] (length + first/last): freezed `copyWith` does NOT
-  /// preserve list reference identity (even a no-arg copyWith yields new list
-  /// instances), so identity checks would false-positive on every tick. This
-  /// keeps the check O(1) — unlike the generated [==], which deep-compares
-  /// those lists (O(queue size)) on every call.
-  /// // AUTO-GENERATED — do not edit (B-31 schema parity verified across all 101 fields)
-  bool differsFromBeyondPosition(PlayerState other) {
-    return currentSong != other.currentSong ||
-        isPlaying != other.isPlaying ||
-        duration != other.duration ||
-        isShuffle != other.isShuffle ||
-        repeatMode != other.repeatMode ||
-        listContentDiffers(queue, other.queue) ||
-        currentIndex != other.currentIndex ||
-        isExpanded != other.isExpanded ||
-        dominantColor != other.dominantColor ||
-        ((sleepTimerRemaining == null) != (other.sleepTimerRemaining == null) ||
-            (sleepTimerRemaining != null &&
-                other.sleepTimerRemaining != null &&
-                sleepTimerRemaining!.inSeconds !=
-                    other.sleepTimerRemaining!.inSeconds)) ||
-        listContentDiffers(lyrics, other.lyrics) ||
-        lyricsSource != other.lyricsSource ||
-        isLoadingLyrics != other.isLoadingLyrics ||
-        isLyricsVisible != other.isLyricsVisible ||
-        isQueueVisible != other.isQueueVisible ||
-        eqPreset != other.eqPreset ||
-        isEqEnabled != other.isEqEnabled ||
-        isVirtualizerEnabled != other.isVirtualizerEnabled ||
-        virtualizerStrength != other.virtualizerStrength ||
-        isVirtualizerSupported != other.isVirtualizerSupported ||
-        isDynamicsEnabled != other.isDynamicsEnabled ||
-        isDynamicsSupported != other.isDynamicsSupported ||
-        dynamicsPreset != other.dynamicsPreset ||
-        selectedHeadphoneProfile != other.selectedHeadphoneProfile ||
-        isSpatializerSupported != other.isSpatializerSupported ||
-        isSpatializerEnabled != other.isSpatializerEnabled ||
-        volumeBoost != other.volumeBoost ||
-        isVolumeBoostSupported != other.isVolumeBoostSupported ||
-        isBassBoostSupported != other.isBassBoostSupported ||
-        isCrossfeedEnabled != other.isCrossfeedEnabled ||
-        crossfeedDelayUs != other.crossfeedDelayUs ||
-        crossfeedFeedDb != other.crossfeedFeedDb ||
-        crossfeedMode != other.crossfeedMode ||
-        isLimiterEnabled != other.isLimiterEnabled ||
-        limiterThresholdDb != other.limiterThresholdDb ||
-        limiterReleaseMs != other.limiterReleaseMs ||
-        isReverbEnabled != other.isReverbEnabled ||
-        reverbPreset != other.reverbPreset ||
-        reverbWetDry != other.reverbWetDry ||
-        stereoBalance != other.stereoBalance ||
-        monoMix != other.monoMix ||
-        isSincResamplerEnabled != other.isSincResamplerEnabled ||
-        isDitherEnabled != other.isDitherEnabled ||
-        ditherTargetBitDepth != other.ditherTargetBitDepth ||
-        isSaturationEnabled != other.isSaturationEnabled ||
-        saturationDrive != other.saturationDrive ||
-        saturationMix != other.saturationMix ||
-        saturationTilt != other.saturationTilt ||
-        saturationMultiband != other.saturationMultiband ||
-        isStereoWidthEnabled != other.isStereoWidthEnabled ||
-        stereoWidth != other.stereoWidth ||
-        isLoudnessContourEnabled != other.isLoudnessContourEnabled ||
-        loudnessContourIntensity != other.loudnessContourIntensity ||
-        isSubCrossoverEnabled != other.isSubCrossoverEnabled ||
-        subCrossoverCornerHz != other.subCrossoverCornerHz ||
-        subCrossoverSlopeDbPerOct != other.subCrossoverSlopeDbPerOct ||
-        subCrossoverGain != other.subCrossoverGain ||
-        subCrossoverBassMono != other.subCrossoverBassMono ||
-        subCrossoverAntiPop != other.subCrossoverAntiPop ||
-        stereoWidthMultiband != other.stereoWidthMultiband ||
-        stereoWidthLow != other.stereoWidthLow ||
-        stereoWidthMid != other.stereoWidthMid ||
-        stereoWidthHigh != other.stereoWidthHigh ||
-        stereoWidthLowCrossoverHz != other.stereoWidthLowCrossoverHz ||
-        stereoWidthHighCrossoverHz != other.stereoWidthHighCrossoverHz ||
-        multibandCompressorF0 != other.multibandCompressorF0 ||
-        multibandCompressorF1 != other.multibandCompressorF1 ||
-        multibandCompressorF2 != other.multibandCompressorF2 ||
-        isDynamicEqEnabled != other.isDynamicEqEnabled ||
-        listContentDiffers(dynamicEqBands, other.dynamicEqBands) ||
-        isViperDdcEnabled != other.isViperDdcEnabled ||
-        viperDdcProfileName != other.viperDdcProfileName ||
-        isArbitraryEqEnabled != other.isArbitraryEqEnabled ||
-        arbitraryEqString != other.arbitraryEqString ||
-        isLiveProgEnabled != other.isLiveProgEnabled ||
-        liveProgCode != other.liveProgCode ||
-        liveProgStatus != other.liveProgStatus ||
-        isDynamicBassEnabled != other.isDynamicBassEnabled ||
-        dynamicBassStrength != other.dynamicBassStrength ||
-        dynamicBassPreset != other.dynamicBassPreset ||
-        hasOemAudio != other.hasOemAudio ||
-        listContentDiffers(detectedOemEngines, other.detectedOemEngines) ||
-        activeQueueSlot != other.activeQueueSlot ||
-        playbackSpeed != other.playbackSpeed ||
-        audioSessionId != other.audioSessionId ||
-        errorMessage != other.errorMessage ||
-        abLoopEnabled != other.abLoopEnabled ||
-        abPointA != other.abPointA ||
-        abPointB != other.abPointB ||
-        trackDelayMs != other.trackDelayMs ||
-        bookmarkPosition != other.bookmarkPosition ||
-        silenceSkipSensitivity != other.silenceSkipSensitivity ||
-        // FIX-L4: Ensure playbackPitch is compared
-        playbackPitch != other.playbackPitch ||
-        currentSongRating != other.currentSongRating ||
-        currentSongEqOverride != other.currentSongEqOverride ||
-        currentSongVolumeOverrideDb != other.currentSongVolumeOverrideDb ||
-        listContentDiffers(cueChapters, other.cueChapters) ||
-        currentCueIndex != other.currentCueIndex ||
-        isQuranModeEnabled != other.isQuranModeEnabled ||
-        quranReciterStyle != other.quranReciterStyle;
-  }
-
-  /// Whether a neighbouring queue entry exists to skip to, mirroring the
-  /// handler's notification-control decision (`_hasQueueNeighbour`). A lone
-  /// stream or a single-entry queue has no neighbour in either direction.
-  bool get hasPreviousNeighbour => _hasQueueNeighbour(forward: false);
-
-  /// See [hasPreviousNeighbour].
-  bool get hasNextNeighbour => _hasQueueNeighbour(forward: true);
-
-  bool _hasQueueNeighbour({required bool forward}) {
-    final length =
-        queue.isNotEmpty ? queue.length : (currentSong != null ? 1 : 0);
-    if (length <= 1) return false;
-    if (isShuffle) return true;
-    if (repeatMode == PlayerRepeatMode.all) return true;
-    return forward ? currentIndex + 1 < length : currentIndex > 0;
-  }
+  }) = _DspSlice;
 
   bool get isDspActive =>
       isEqEnabled ||
@@ -289,10 +206,6 @@ abstract class PlayerState with _$PlayerState {
       isDynamicBassEnabled ||
       volumeBoost > 0.01;
 
-  /// True when any non-EQ DSP stage is engaged. Deliberately excludes
-  /// [isEqEnabled] and the AutoEQ headphone profile: the Equalizer master
-  /// switch owns those, while the "DSP & Spatial Effects" master switch in the
-  /// equalizer sheet must toggle independently instead of mirroring EQ.
   bool get isDspEffectsActive =>
       isVirtualizerEnabled ||
       isDynamicsEnabled ||
@@ -334,9 +247,163 @@ abstract class PlayerState with _$PlayerState {
     return count;
   }
 
-  /// Non-EQ DSP stages only, matching [isDspEffectsActive] for the sheet label.
   int get activeDspEffectStagesCount =>
       activeDspStagesCount -
       (isEqEnabled ? 1 : 0) -
       (selectedHeadphoneProfile != null ? 1 : 0);
+}
+
+/// Lightweight composite PlayerState holding the 4 focused state slices.
+@freezed
+abstract class PlayerState with _$PlayerState {
+  const PlayerState._();
+
+  const factory PlayerState({
+    @Default(PlaybackSlice()) PlaybackSlice playback,
+    @Default(QueueSlice()) QueueSlice queueSlice,
+    @Default(DspSlice()) DspSlice dsp,
+    @Default(LyricsSlice()) LyricsSlice lyricsSlice,
+  }) = _PlayerState;
+
+  // ──────────────────────────────────────────────
+  // Forwarded Playback Getters
+  // ──────────────────────────────────────────────
+  SongsTableData? get currentSong => playback.currentSong;
+  bool get isPlaying => playback.isPlaying;
+  Duration get position => playback.position;
+  Duration get duration => playback.duration;
+  bool get isShuffle => playback.isShuffle;
+  PlayerRepeatMode get repeatMode => playback.repeatMode;
+  double get playbackSpeed => playback.playbackSpeed;
+  double get playbackPitch => playback.playbackPitch;
+  int? get audioSessionId => playback.audioSessionId;
+  String? get errorMessage => playback.errorMessage;
+  bool get isExpanded => playback.isExpanded;
+  Color? get dominantColor => playback.dominantColor;
+  Duration? get sleepTimerRemaining => playback.sleepTimerRemaining;
+  bool get abLoopEnabled => playback.abLoopEnabled;
+  Duration? get abPointA => playback.abPointA;
+  Duration? get abPointB => playback.abPointB;
+  int get trackDelayMs => playback.trackDelayMs;
+  Duration? get bookmarkPosition => playback.bookmarkPosition;
+  int get silenceSkipSensitivity => playback.silenceSkipSensitivity;
+  int get currentSongRating => playback.currentSongRating;
+  String? get currentSongEqOverride => playback.currentSongEqOverride;
+  double get currentSongVolumeOverrideDb => playback.currentSongVolumeOverrideDb;
+
+  // ──────────────────────────────────────────────
+  // Forwarded Queue Getters
+  // ──────────────────────────────────────────────
+  List<SongsTableData> get queue => queueSlice.queue;
+  int get currentIndex => queueSlice.currentIndex;
+  int get activeQueueSlot => queueSlice.activeQueueSlot;
+  List<ChapterInfo> get cueChapters => queueSlice.cueChapters;
+  int get currentCueIndex => queueSlice.currentCueIndex;
+
+  // ──────────────────────────────────────────────
+  // Forwarded Lyrics Getters
+  // ──────────────────────────────────────────────
+  List<LyricsLine> get lyrics => lyricsSlice.lyrics;
+  LyricsSource get lyricsSource => lyricsSlice.lyricsSource;
+  bool get isLoadingLyrics => lyricsSlice.isLoadingLyrics;
+  bool get isLyricsVisible => lyricsSlice.isLyricsVisible;
+  bool get isQueueVisible => lyricsSlice.isQueueVisible;
+
+  // ──────────────────────────────────────────────
+  // Forwarded DSP Getters
+  // ──────────────────────────────────────────────
+  EqPreset get eqPreset => dsp.eqPreset;
+  bool get isEqEnabled => dsp.isEqEnabled;
+  bool get isVirtualizerEnabled => dsp.isVirtualizerEnabled;
+  double get virtualizerStrength => dsp.virtualizerStrength;
+  bool get isVirtualizerSupported => dsp.isVirtualizerSupported;
+  bool get isDynamicsEnabled => dsp.isDynamicsEnabled;
+  bool get isDynamicsSupported => dsp.isDynamicsSupported;
+  DynamicsPreset get dynamicsPreset => dsp.dynamicsPreset;
+  HeadphoneProfile? get selectedHeadphoneProfile => dsp.selectedHeadphoneProfile;
+  bool get isSpatializerSupported => dsp.isSpatializerSupported;
+  bool get isSpatializerEnabled => dsp.isSpatializerEnabled;
+  double get volumeBoost => dsp.volumeBoost;
+  bool get isVolumeBoostSupported => dsp.isVolumeBoostSupported;
+  bool get isBassBoostSupported => dsp.isBassBoostSupported;
+  bool get isCrossfeedEnabled => dsp.isCrossfeedEnabled;
+  double get crossfeedDelayUs => dsp.crossfeedDelayUs;
+  double get crossfeedFeedDb => dsp.crossfeedFeedDb;
+  int get crossfeedMode => dsp.crossfeedMode;
+  bool get isLimiterEnabled => dsp.isLimiterEnabled;
+  double get limiterThresholdDb => dsp.limiterThresholdDb;
+  double get limiterReleaseMs => dsp.limiterReleaseMs;
+  bool get isReverbEnabled => dsp.isReverbEnabled;
+  int get reverbPreset => dsp.reverbPreset;
+  double get reverbWetDry => dsp.reverbWetDry;
+  double get stereoBalance => dsp.stereoBalance;
+  bool get monoMix => dsp.monoMix;
+  bool get isSincResamplerEnabled => dsp.isSincResamplerEnabled;
+  bool get isDitherEnabled => dsp.isDitherEnabled;
+  int get ditherTargetBitDepth => dsp.ditherTargetBitDepth;
+  bool get isSaturationEnabled => dsp.isSaturationEnabled;
+  double get saturationDrive => dsp.saturationDrive;
+  double get saturationMix => dsp.saturationMix;
+  double get saturationTilt => dsp.saturationTilt;
+  bool get saturationMultiband => dsp.saturationMultiband;
+  bool get isStereoWidthEnabled => dsp.isStereoWidthEnabled;
+  double get stereoWidth => dsp.stereoWidth;
+  bool get isLoudnessContourEnabled => dsp.isLoudnessContourEnabled;
+  double get loudnessContourIntensity => dsp.loudnessContourIntensity;
+  bool get isSubCrossoverEnabled => dsp.isSubCrossoverEnabled;
+  double get subCrossoverCornerHz => dsp.subCrossoverCornerHz;
+  double get subCrossoverSlopeDbPerOct => dsp.subCrossoverSlopeDbPerOct;
+  double get subCrossoverGain => dsp.subCrossoverGain;
+  bool get subCrossoverBassMono => dsp.subCrossoverBassMono;
+  bool get subCrossoverAntiPop => dsp.subCrossoverAntiPop;
+  bool get stereoWidthMultiband => dsp.stereoWidthMultiband;
+  double get stereoWidthLow => dsp.stereoWidthLow;
+  double get stereoWidthMid => dsp.stereoWidthMid;
+  double get stereoWidthHigh => dsp.stereoWidthHigh;
+  double get stereoWidthLowCrossoverHz => dsp.stereoWidthLowCrossoverHz;
+  double get stereoWidthHighCrossoverHz => dsp.stereoWidthHighCrossoverHz;
+  double get multibandCompressorF0 => dsp.multibandCompressorF0;
+  double get multibandCompressorF1 => dsp.multibandCompressorF1;
+  double get multibandCompressorF2 => dsp.multibandCompressorF2;
+  bool get isDynamicEqEnabled => dsp.isDynamicEqEnabled;
+  List<DynamicEqBandConfig> get dynamicEqBands => dsp.dynamicEqBands;
+  bool get isViperDdcEnabled => dsp.isViperDdcEnabled;
+  String get viperDdcProfileName => dsp.viperDdcProfileName;
+  bool get isArbitraryEqEnabled => dsp.isArbitraryEqEnabled;
+  String get arbitraryEqString => dsp.arbitraryEqString;
+  String get liveProgCode => dsp.liveProgCode;
+  bool get isLiveProgEnabled => dsp.isLiveProgEnabled;
+  String get liveProgStatus => dsp.liveProgStatus;
+  bool get isDynamicBassEnabled => dsp.isDynamicBassEnabled;
+  double get dynamicBassStrength => dsp.dynamicBassStrength;
+  int get dynamicBassPreset => dsp.dynamicBassPreset;
+  bool get hasOemAudio => dsp.hasOemAudio;
+  List<String> get detectedOemEngines => dsp.detectedOemEngines;
+  bool get isQuranModeEnabled => dsp.isQuranModeEnabled;
+  QuranReciterStyle get quranReciterStyle => dsp.quranReciterStyle;
+
+  bool get isDspActive => dsp.isDspActive;
+  bool get isDspEffectsActive => dsp.isDspEffectsActive;
+  int get activeDspStagesCount => dsp.activeDspStagesCount;
+  int get activeDspEffectStagesCount => dsp.activeDspEffectStagesCount;
+
+  /// High-performance diff: skips high-frequency position ticks while reacting
+  /// to playback, queue, and lyrics/overlay view changes.
+  bool differsFromBeyondPosition(PlayerState other) {
+    return playback.differsBeyondPosition(other.playback) ||
+        queueSlice.differs(other.queueSlice) ||
+        lyricsSlice != other.lyricsSlice;
+  }
+
+  bool get hasPreviousNeighbour => _hasQueueNeighbour(forward: false);
+  bool get hasNextNeighbour => _hasQueueNeighbour(forward: true);
+
+  bool _hasQueueNeighbour({required bool forward}) {
+    final length =
+        queue.isNotEmpty ? queue.length : (currentSong != null ? 1 : 0);
+    if (length <= 1) return false;
+    if (isShuffle) return true;
+    if (repeatMode == PlayerRepeatMode.all) return true;
+    return forward ? currentIndex + 1 < length : currentIndex > 0;
+  }
 }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -56,17 +57,16 @@ class WidgetService {
 
   /// Whether an artwork resolve is currently in-flight (to avoid stacking).
   bool _artworkResolveInFlight = false;
-  SongsTableData? _pendingArtworkSong;
+  final Queue<SongsTableData> _pendingArtworkQueue = Queue<SongsTableData>();
 
   void _drainPendingArtwork() {
     if (_artworkResolveInFlight) return;
-    final next = _pendingArtworkSong;
-    if (next == null) return;
+    if (_pendingArtworkQueue.isEmpty) return;
+    final next = _pendingArtworkQueue.removeFirst();
     if (next.id == _lastSavedArtworkSongId && _artworkCache.containsKey(next.id)) {
-      _pendingArtworkSong = null;
+      _drainPendingArtwork();
       return;
     }
-    _pendingArtworkSong = null;
     _artworkResolveInFlight = true;
     unawaited(_resolveArtworkAsync(next).whenComplete(() {
       _artworkResolveInFlight = false;
@@ -128,7 +128,8 @@ class WidgetService {
           _lastSavedArtworkSongId = song.id;
           await HomeWidget.saveWidgetData<String>('artwork', cachedArt);
         } else if (_lastSavedArtworkSongId != song.id) {
-          _pendingArtworkSong = song;
+          _pendingArtworkQueue.removeWhere((s) => s.id == song.id);
+          _pendingArtworkQueue.add(song);
           _drainPendingArtwork();
         }
       } else {
@@ -138,7 +139,7 @@ class WidgetService {
           await HomeWidget.saveWidgetData<String>('nextTrack$i', '');
         }
         await HomeWidget.saveWidgetData<String>('artwork', '');
-        _pendingArtworkSong = null;
+        _pendingArtworkQueue.clear();
         _lastSavedArtworkSongId = null;
       }
 
@@ -168,8 +169,8 @@ class WidgetService {
         },
       );
       if (artPath != null && artPath.isNotEmpty) {
-        // Generation check: skip if another song took over while resolving.
-        if (_pendingArtworkSong != null && _pendingArtworkSong!.id != song.id) {
+        // Generation check: skip updating UI if newer songs are queued.
+        if (_pendingArtworkQueue.isNotEmpty && _pendingArtworkQueue.any((s) => s.id != song.id)) {
           return;
         }
         _lastSavedArtworkSongId = song.id;
@@ -183,7 +184,7 @@ class WidgetService {
         );
       } else {
         // FIX-G03: Push empty string on resolution failure so widget doesn't stay stuck on stale artwork
-        if (_pendingArtworkSong != null && _pendingArtworkSong!.id != song.id) {
+        if (_pendingArtworkQueue.isNotEmpty && _pendingArtworkQueue.any((s) => s.id != song.id)) {
           return;
         }
         _lastSavedArtworkSongId = song.id;

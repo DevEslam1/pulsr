@@ -47,6 +47,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
   int _lastKnownIndex = -1;
   bool _isUserDragging = false;
   bool _swipeInFlight = false;
+  Timer? _verticalSwipeTimer;
   double _verticalDragDy = 0.0;
   double _horizontalDragDx = 0.0;
 
@@ -64,26 +65,36 @@ class _MiniPlayerState extends State<MiniPlayer> {
   /// Honors the user's configured mini-player swipe actions
   /// (next / prev / volume / none) for the directions the carousel does not
   /// already handle natively.
-  void _applySwipeAction(
+  Future<void> _applySwipeAction(
     MiniPlayerSwipeAction action,
     PlayerCubit cubit, {
     required bool swipedLeft,
-  }) {
-    switch (action) {
-      case MiniPlayerSwipeAction.next:
-        HapticFeedback.selectionClick();
-        unawaited(cubit.next());
-        break;
-      case MiniPlayerSwipeAction.prev:
-        HapticFeedback.selectionClick();
-        unawaited(cubit.previous());
-        break;
-      case MiniPlayerSwipeAction.volume:
-        HapticFeedback.selectionClick();
-        unawaited(cubit.adjustVolume(swipedLeft ? 0.05 : -0.05));
-        break;
-      case MiniPlayerSwipeAction.none:
-        break;
+  }) async {
+    if (_swipeInFlight) return;
+    _swipeInFlight = true;
+    try {
+      switch (action) {
+        case MiniPlayerSwipeAction.next:
+          HapticFeedback.selectionClick();
+          await cubit.next();
+          break;
+        case MiniPlayerSwipeAction.prev:
+          HapticFeedback.selectionClick();
+          await cubit.previous();
+          break;
+        case MiniPlayerSwipeAction.volume:
+          HapticFeedback.selectionClick();
+          await cubit.adjustVolume(swipedLeft ? 0.05 : -0.05);
+          break;
+        case MiniPlayerSwipeAction.none:
+          break;
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _swipeInFlight = false;
+        });
+      }
     }
   }
 
@@ -108,6 +119,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
 
   @override
   void dispose() {
+    _verticalSwipeTimer?.cancel();
     _pageController?.dispose();
     super.dispose();
   }
@@ -125,8 +137,12 @@ class _MiniPlayerState extends State<MiniPlayer> {
           controller.position.hasContentDimensions &&
           controller.page?.round() != safeIndex) {
         try {
-          // FIX-C10: Guard jumpToPage against unexpected RangeError during rapid queue shrinkage
-          controller.jumpToPage(safeIndex);
+          final maxPage = controller.position.viewportDimension > 0
+              ? (controller.position.maxScrollExtent / controller.position.viewportDimension).round()
+              : queueLength - 1;
+          if (safeIndex <= maxPage) {
+            controller.jumpToPage(safeIndex);
+          }
         } catch (e, st) {
           ErrorLogger.log('MiniPlayer PageController jumpToPage failed',
               error: e, stackTrace: st, category: 'MiniPlayer');
@@ -225,48 +241,64 @@ class _MiniPlayerState extends State<MiniPlayer> {
               child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onVerticalDragStart: (_) {
+              if (_swipeInFlight) return;
               _verticalDragDy = 0.0;
             },
             onVerticalDragUpdate: (d) {
+              if (_swipeInFlight) return;
               _verticalDragDy += d.delta.dy;
             },
             onVerticalDragEnd: (d) {
+              if (_swipeInFlight) return;
               final vy = d.velocity.pixelsPerSecond.dy;
               if (_verticalDragDy > 25 || vy > 120) {
+                _swipeInFlight = true;
                 HapticFeedback.selectionClick();
                 widget.onSwipeDown?.call();
+                _verticalSwipeTimer?.cancel();
+                _verticalSwipeTimer = Timer(const Duration(milliseconds: 500), () {
+                  if (mounted) setState(() => _swipeInFlight = false);
+                });
               } else if (_verticalDragDy < -25 || vy < -120) {
+                _swipeInFlight = true;
                 HapticFeedback.selectionClick();
                 if (widget.onSwipeUp != null) {
                   widget.onSwipeUp!();
                 } else {
                   widget.onTap();
                 }
+                _verticalSwipeTimer?.cancel();
+                _verticalSwipeTimer = Timer(const Duration(milliseconds: 500), () {
+                  if (mounted) setState(() => _swipeInFlight = false);
+                });
               }
               _verticalDragDy = 0.0;
             },
             onHorizontalDragStart: carouselEnabled
                 ? null
                 : (_) {
+                    if (_swipeInFlight) return;
                     _horizontalDragDx = 0.0;
                   },
             onHorizontalDragUpdate: carouselEnabled
                 ? null
                 : (d) {
+                    if (_swipeInFlight) return;
                     _horizontalDragDx += d.delta.dx;
                   },
             onHorizontalDragEnd: carouselEnabled
                 ? null
                 : (d) {
+                    if (_swipeInFlight) return;
                     final dx = _horizontalDragDx + d.velocity.pixelsPerSecond.dx * 0.05;
                     _horizontalDragDx = 0.0;
                     if (dx.abs() < 24) return;
                     final swipedLeft = dx < 0;
-                    _applySwipeAction(
+                    unawaited(_applySwipeAction(
                       swipedLeft ? swipeLeftAction : swipeRightAction,
                       cubit,
                       swipedLeft: swipedLeft,
-                    );
+                    ));
                   },
             child: Padding(
               padding: EdgeInsetsDirectional.fromSTEB(
@@ -367,7 +399,8 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                             : const NeverScrollableScrollPhysics(),
                                         itemCount: queue.length,
                                         onPageChanged: (page) {
-                                          if (_isUserDragging &&
+                                          if (!_swipeInFlight &&
+                                              _isUserDragging &&
                                               page != currentIndex) {
                                             _lastKnownIndex = page;
                                             _swipeInFlight = true;
@@ -608,10 +641,13 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    final active = state == AppLifecycleState.resumed;
-    if (_isAppActive == active) return;
-    _isAppActive = active;
-    _syncWave();
+    if (state != AppLifecycleState.resumed) {
+      _isAppActive = false;
+      _waveController.stop();
+    } else {
+      _isAppActive = true;
+      _syncWave();
+    }
   }
 
   @override

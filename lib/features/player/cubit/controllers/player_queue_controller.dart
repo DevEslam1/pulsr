@@ -1,21 +1,32 @@
 // lib/features/player/cubit/controllers/player_queue_controller.dart
 // FIX-A1: Focused PlayerQueueController extracted from PlayerCubit
 import 'dart:async';
-import 'package:audio_service/audio_service.dart';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:mutex/mutex.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/constants/prefs_keys.dart';
+import '../../../../core/services/radio_station_store.dart';
+import '../../../../core/telemetry/playback_latency_tracker.dart';
+import '../../../../core/utils/async_guard.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../data/audio/audio_handler.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/lyrics_line.dart';
+import '../../../../domain/models/radio_station.dart';
+import '../../../../domain/repositories/music_repository_interface.dart';
 import '../player_state.dart';
-
+import '../queue_slot_codec.dart';
 import 'queue_slot_data.dart';
+
+part 'player_queue_slots.dart';
 
 /// Controls playback queue management, slot switching, and reordering.
 class PlayerQueueController {
   static const int maxQueueSize = 500;
 
   final PulsrAudioHandler _audioHandler;
+  final IMusicRepository _repository;
   final PlayerState Function() _getState;
   final void Function(PlayerState state) _emit;
   final bool Function() _isClosed;
@@ -27,11 +38,26 @@ class PlayerQueueController {
   final void Function() _debouncedPersistQueueSlots;
   final void Function() _bumpQueueVersion;
   final bool Function(SongsTableData? a, SongsTableData? b) _isSameTrack;
+  final PlaybackLatencyTracker? _latencyTracker;
+
+  Timer? _persistQueueDebounce;
+
+  // Async guards for coordination
+  final AsyncGuard _mediaItemResolutionGuard = AsyncGuard();
+  final AsyncGuard _localMatchSwapGuard = AsyncGuard();
+  final AsyncGuard _mediaItemGuard = AsyncGuard();
+  final AsyncGuard _lyricsGuard = AsyncGuard();
+
+  AsyncGuard get mediaItemResolutionGuard => _mediaItemResolutionGuard;
+  AsyncGuard get localMatchSwapGuard => _localMatchSwapGuard;
+  AsyncGuard get mediaItemGuard => _mediaItemGuard;
+  AsyncGuard get lyricsGuard => _lyricsGuard;
 
   bool _isSwitchingSlot = false;
 
   PlayerQueueController({
     required PulsrAudioHandler audioHandler,
+    required IMusicRepository repository,
     required PlayerState Function() getState,
     required void Function(PlayerState state) emit,
     required bool Function() isClosed,
@@ -40,10 +66,12 @@ class PlayerQueueController {
     required Map<int, QueueSlotData> queueSlots,
     required void Function({bool force}) updateWidgetThrottled,
     required void Function(SongsTableData song) loadLyrics,
-    required void Function() debouncedPersistQueueSlots,
+    void Function()? debouncedPersistQueueSlots,
     required void Function() bumpQueueVersion,
     required bool Function(SongsTableData? a, SongsTableData? b) isSameTrack,
+    PlaybackLatencyTracker? latencyTracker,
   })  : _audioHandler = audioHandler,
+        _repository = repository,
         _getState = getState,
         _emit = emit,
         _isClosed = isClosed,
@@ -52,9 +80,11 @@ class PlayerQueueController {
         _queueSlots = queueSlots,
         _updateWidgetThrottled = updateWidgetThrottled,
         _loadLyrics = loadLyrics,
-        _debouncedPersistQueueSlots = debouncedPersistQueueSlots,
+        _debouncedPersistQueueSlots =
+            debouncedPersistQueueSlots ?? (() {}),
         _bumpQueueVersion = bumpQueueVersion,
-        _isSameTrack = isSameTrack;
+        _isSameTrack = isSameTrack,
+        _latencyTracker = latencyTracker;
 
   void setQueueSlot(
     int slot, {
@@ -74,320 +104,225 @@ class PlayerQueueController {
     );
   }
 
-  Future<void> addToQueue(SongsTableData song) async {
-    final state = _getState();
-    if (state.queue.length >= maxQueueSize) {
-      _emit(state.copyWith(
-          errorMessage: 'Queue full ($maxQueueSize) — cannot add more'));
+  Future<void> playRadioStation(RadioStation station) async {
+    if (!RadioStation.isHttpUrl(station.url)) {
+      final s = _getState();
+      _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: 'Invalid stream URL')));
       return;
     }
-    try {
-      await _audioHandler.addToQueueEnd(song);
-    } catch (e, st) {
-      ErrorLogger.log('Failed to add to queue end',
-          error: e, stackTrace: st, category: 'PlayerQueueController');
-      if (!_isClosed()) {
-        _emit(state.copyWith(errorMessage: 'Failed to add ${song.title}'));
-      }
-      return;
-    }
-    final updatedQueue = List<SongsTableData>.from(state.queue);
-    final existingIdx = updatedQueue.indexWhere((s) => _isSameTrack(s, song));
-    if (existingIdx != -1) {
-      if (existingIdx != state.currentIndex &&
-          existingIdx != updatedQueue.length - 1) {
-        final item = updatedQueue.removeAt(existingIdx);
-        updatedQueue.add(item);
-      }
-    } else {
-      updatedQueue.add(song);
-    }
-    setQueueSlot(
-      state.activeQueueSlot,
-      songs: updatedQueue,
-      currentIndex: state.currentIndex,
-      position: state.position,
-      speed: state.playbackSpeed,
+    final song = SongsTableData(
+      id: station.songId,
+      title: station.name,
+      artist: (station.genre != null && station.genre!.isNotEmpty)
+          ? station.genre!
+          : station.name,
+      album: '',
+      durationMs: 0,
+      path: station.url,
+      source: SongSource.local,
+      remoteArtworkUrl: station.artworkUrl,
+      isFavorite: false,
+      isMissing: false,
+      isDownloaded: false,
+      playCount: 0,
+      lastPositionMs: 0,
     );
-    _debouncedPersistQueueSlots();
-    _bumpQueueVersion();
-    _emit(state.copyWith(queue: updatedQueue));
-  }
-
-  Future<void> addAllToQueue(List<SongsTableData> songs) async {
-    final state = _getState();
-    if (songs.isEmpty || _isClosed()) return;
-    final room = maxQueueSize - state.queue.length;
-    if (room <= 0) {
-      _emit(state.copyWith(
-          errorMessage: 'Queue full ($maxQueueSize) — cannot add more'));
-      return;
-    }
-    final toAdd = songs
-        .where((s) => !state.queue.any((q) => _isSameTrack(q, s)))
-        .take(room)
-        .toList();
-
-    final added = <SongsTableData>[];
-    for (final s in toAdd) {
-      try {
-        await _audioHandler.addToQueueEnd(s);
-        added.add(s);
-      } catch (e, st) {
-        ErrorLogger.log('Failed to batch-add to queue',
-            error: e, stackTrace: st, category: 'PlayerQueueController');
-        if (!_isClosed()) {
-          _emit(state.copyWith(errorMessage: 'Failed to add ${s.title}'));
-        }
-        break;
-      }
-    }
-    if (added.isEmpty) return;
-    final updatedQueue = List<SongsTableData>.from(state.queue)..addAll(added);
-    setQueueSlot(
-      state.activeQueueSlot,
-      songs: updatedQueue,
-      currentIndex: state.currentIndex,
-      position: state.position,
-      speed: state.playbackSpeed,
-    );
-    _debouncedPersistQueueSlots();
-    _bumpQueueVersion();
-    _emit(state.copyWith(queue: updatedQueue));
-  }
-
-  Future<void> clearQueue() async {
-    final state = _getState();
-    try {
-      await _audioHandler.clearQueue();
-    } catch (e, st) {
-      ErrorLogger.log('Failed to clear queue',
-          error: e, stackTrace: st, category: 'PlayerQueueController');
-      if (!_isClosed()) {
-        _emit(state.copyWith(errorMessage: 'Failed to clear queue'));
-      }
-      return;
-    }
-    final current = state.currentSong;
-    final updatedQueue = current != null ? [current] : <SongsTableData>[];
-    setQueueSlot(
-      state.activeQueueSlot,
-      songs: updatedQueue,
-      currentIndex: 0,
-      position: state.position,
-      speed: state.playbackSpeed,
-    );
-    _debouncedPersistQueueSlots();
-    _bumpQueueVersion();
-    _emit(state.copyWith(queue: updatedQueue, currentIndex: 0));
-  }
-
-  Future<void> reorderQueue(int oldIndex, int newIndex) async {
-    final state = _getState();
-    if (oldIndex < 0 ||
-        oldIndex >= state.queue.length ||
-        newIndex < 0 ||
-        newIndex >= state.queue.length) {
-      return;
-    }
-    if (oldIndex == newIndex) return;
-    try {
-      await _audioHandler.reorderQueue(oldIndex, newIndex);
-    } catch (e, st) {
-      ErrorLogger.log('Failed to reorder queue',
-          error: e, stackTrace: st, category: 'PlayerQueueController');
-      if (!_isClosed()) {
-        _emit(state.copyWith(errorMessage: 'Failed to reorder queue'));
-      }
-      return;
-    }
-    final updatedQueue = List<SongsTableData>.from(state.queue);
-    final song = updatedQueue.removeAt(oldIndex);
-    updatedQueue.insert(newIndex, song);
-    final updatedIndex = calculateReorderedIndex(oldIndex, newIndex, state.currentIndex);
-    setQueueSlot(
-      state.activeQueueSlot,
-      songs: updatedQueue,
-      currentIndex: updatedIndex,
-      position: state.position,
-      speed: state.playbackSpeed,
-    );
-    _debouncedPersistQueueSlots();
-    _bumpQueueVersion();
-    _emit(state.copyWith(queue: updatedQueue, currentIndex: updatedIndex));
-  }
-
-  Future<void> removeQueueItem(int index) async {
-    final state = _getState();
-    if (index < 0 || index >= state.queue.length) return;
-    try {
-      await _audioHandler.removeQueueItemAt(index);
-    } catch (e, st) {
-      ErrorLogger.log('Failed to remove queue item',
-          error: e, stackTrace: st, category: 'PlayerQueueController');
-      if (!_isClosed()) {
-        _emit(state.copyWith(errorMessage: 'Failed to remove track'));
-      }
-      return;
-    }
-    final updatedQueue = List<SongsTableData>.from(state.queue)..removeAt(index);
-    final updatedIndex = calculateRemovedIndex(index, state.currentIndex, updatedQueue.length);
-    if (index == state.currentIndex) {
-      _bumpQueueVersion();
-      if (updatedQueue.isEmpty) {
-        setQueueSlot(state.activeQueueSlot, songs: const [], currentIndex: 0, position: Duration.zero, speed: state.playbackSpeed);
-        _debouncedPersistQueueSlots();
-        _emit(state.copyWith(queue: const [], currentIndex: 0, currentSong: null, isPlaying: false, position: Duration.zero, duration: Duration.zero));
-        _updateWidgetThrottled(force: true);
-        return;
-      }
-      final newCurrent = updatedQueue[updatedIndex];
-      _setQueueSlotAndEmit(state, updatedQueue, updatedIndex, newCurrent);
-      return;
-    }
-    setQueueSlot(
-      state.activeQueueSlot,
-      songs: updatedQueue,
-      currentIndex: updatedIndex,
-      position: state.position,
-      speed: state.playbackSpeed,
-    );
-    _debouncedPersistQueueSlots();
-    _bumpQueueVersion();
-    _emit(state.copyWith(queue: updatedQueue, currentIndex: updatedIndex));
-  }
-
-  void _setQueueSlotAndEmit(PlayerState state, List<SongsTableData> updatedQueue,
-      int updatedIndex, SongsTableData newCurrent) {
-    final sameTrack = _isSameTrack(state.currentSong, newCurrent);
-    _bumpQueueVersion();
-    setQueueSlot(
-      state.activeQueueSlot,
-      songs: updatedQueue,
-      currentIndex: updatedIndex,
-      position: Duration.zero,
-      speed: state.playbackSpeed,
-    );
-    _debouncedPersistQueueSlots();
-    _emit(state.copyWith(
-      queue: updatedQueue,
-      currentIndex: updatedIndex,
-      currentSong: newCurrent,
-      position: Duration.zero,
-      duration: Duration(milliseconds: newCurrent.durationMs),
-      lyrics: sameTrack ? state.lyrics : [],
-      lyricsSource: sameTrack ? state.lyricsSource : LyricsSource.none,
-      isLoadingLyrics: !sameTrack,
+    unawaited(RadioStationStore().markPlayed(
+      station.id,
+      DateTime.now().millisecondsSinceEpoch,
     ));
-    _loadLyrics(newCurrent);
-    _updateWidgetThrottled(force: true);
+    await playSong(song);
   }
 
-  Future<void> switchQueueSlot(int slot) async {
+  Future<void> playSong(
+    SongsTableData song, {
+    List<SongsTableData>? queue,
+    Duration? initialPosition,
+    bool openPlayerIfPlaying = true,
+  }) async {
     final state = _getState();
-    if (_isSwitchingSlot ||
-        slot == state.activeQueueSlot ||
-        slot < 0 ||
-        slot > 2) {
+    if (openPlayerIfPlaying &&
+        initialPosition == null &&
+        _isSameTrack(state.currentSong, song)) {
+      _emit(state.copyWith(playback: state.playback.copyWith(isExpanded: true)));
+      if (!state.isPlaying) {
+        try {
+          await _audioHandler.play();
+        } catch (e, st) {
+          ErrorLogger.log('Resume of current song failed',
+              error: e, stackTrace: st, category: 'PlayerQueueController');
+          if (!_isClosed()) {
+            final s = _getState();
+            _emit(s.copyWith(
+                playback: s.playback.copyWith(errorMessage: 'Failed to play ${song.title}')));
+          }
+        }
+      }
       return;
     }
-    _isSwitchingSlot = true;
+
+    final videoIdForLatency = song.remoteId ?? song.id.toString();
     try {
-      final wasPlaying = state.isPlaying ||
-          _audioHandler.playbackState.value.processingState ==
-              AudioProcessingState.completed;
-      setQueueSlot(
-        state.activeQueueSlot,
-        songs: List.from(state.queue),
-        currentIndex: state.currentIndex,
-        position: state.position,
-        speed: state.playbackSpeed,
-      );
-      final targetSlot = _queueSlots[slot] ??
-          const QueueSlotData(
-              songIds: [], currentIndex: 0, position: Duration.zero, speed: 1.0);
-      final targetSongs = targetSlot.songsFrom(_slotLookupCache);
-      final targetOriginalSong = (targetSlot.currentIndex >= 0 &&
-              targetSlot.currentIndex < targetSongs.length)
-          ? targetSongs[targetSlot.currentIndex]
-          : null;
-      final validSongs = targetSongs.where((s) => !s.isMissing).toList();
+      _latencyTracker?.start(videoId: videoIdForLatency);
+      _latencyTracker?.markStage(PlaybackStage.tap);
+    } catch (_) {}
 
-      _debouncedPersistQueueSlots();
+    try {
+      _audioHandler.streamPreResolver.onTrackEnqueuedOrTapped(song);
+    } catch (_) {}
 
-      if (validSongs.isEmpty) {
-        _emit(state.copyWith(errorMessage: 'Queue slot is empty'));
-        return;
-      }
+    final capturedGen = _mediaItemResolutionGuard.next();
+    final capturedSwapGen = _localMatchSwapGuard.next();
+    _mediaItemGuard.next();
 
-      _bumpQueueVersion();
-      int safeIdx = -1;
-      if (targetOriginalSong != null) {
-        safeIdx = validSongs.indexWhere((s) => _isSameTrack(s, targetOriginalSong));
+    final rawQueue = queue != null ? List<SongsTableData>.from(queue) : [song];
+    var targetIndex = rawQueue.indexWhere((s) => _isSameTrack(s, song));
+    if (targetIndex == -1) {
+      targetIndex = 0;
+      rawQueue.insert(0, song);
+    }
+
+    List<SongsTableData> effectiveQueue;
+    int effectiveIndex;
+    String? queueTruncationWarning;
+
+    if (rawQueue.length > maxQueueSize) {
+      final halfWindow = maxQueueSize ~/ 2;
+      var start = targetIndex - halfWindow;
+      if (start < 0) start = 0;
+      if (start + maxQueueSize > rawQueue.length) {
+        start = (rawQueue.length - maxQueueSize).clamp(0, rawQueue.length);
       }
-      if (safeIdx == -1) {
-        safeIdx = targetSlot.currentIndex.clamp(0, validSongs.length - 1);
-      }
-      final song = validSongs[safeIdx];
-      _emit(state.copyWith(
-        activeQueueSlot: slot,
-        queue: validSongs,
-        currentIndex: safeIdx,
+      effectiveQueue = rawQueue.sublist(start, start + maxQueueSize);
+      effectiveIndex = targetIndex - start;
+      queueTruncationWarning =
+          'Queue truncated to $maxQueueSize (was ${rawQueue.length}) — tail dropped';
+    } else {
+      effectiveQueue = rawQueue;
+      effectiveIndex = targetIndex;
+    }
+
+    final startPos = initialPosition ?? Duration.zero;
+    final prevSlot = _queueSlots[state.activeQueueSlot];
+    final prevQueue = state.queue;
+    final prevIndex = state.currentIndex;
+    final prevSong = state.currentSong;
+    final prevPosition = state.position;
+    final prevDuration = state.duration;
+    final prevLyrics = state.lyrics;
+    final prevLyricsSource = state.lyricsSource;
+
+    setQueueSlot(
+      state.activeQueueSlot,
+      songs: List.from(effectiveQueue),
+      currentIndex: effectiveIndex,
+      position: startPos,
+      speed: state.playbackSpeed,
+    );
+    _debouncedPersistQueueSlots();
+    _bumpQueueVersion();
+
+    final isSameSong = _isSameTrack(state.currentSong, song);
+    _emit(state.copyWith(
+      queueSlice: state.queueSlice.copyWith(
+        queue: effectiveQueue,
+        currentIndex: effectiveIndex,
+      ),
+      playback: state.playback.copyWith(
         currentSong: song,
         duration: Duration(milliseconds: song.durationMs),
-        position: targetSlot.position,
-        playbackSpeed: targetSlot.speed,
-      ));
-      try {
-        await _audioHandler.setSpeed(targetSlot.speed);
-        await _audioHandler.loadQueue(
-          validSongs,
-          initialIndex: safeIdx,
-          initialPosition: targetSlot.position,
-          autoPlay: wasPlaying,
-        );
-        _loadLyrics(song);
-      } catch (e, st) {
-        ErrorLogger.log('Failed to switch queue slot $slot',
-            error: e, stackTrace: st, category: 'PlayerQueueController');
-        if (!_isClosed()) {
-          _emit(_getState().copyWith(errorMessage: 'Failed to switch queue slot'));
+        position: startPos,
+        isPlaying: true,
+        errorMessage: queueTruncationWarning,
+      ),
+      lyricsSlice: state.lyricsSlice.copyWith(
+        lyrics: isSameSong ? state.lyrics : const [],
+        lyricsSource: isSameSong ? state.lyricsSource : LyricsSource.none,
+      ),
+    ));
+
+    _updateWidgetThrottled(force: true);
+
+    try {
+      await _audioHandler.loadQueue(
+        effectiveQueue,
+        initialIndex: effectiveIndex,
+        initialPosition: startPos,
+        autoPlay: true,
+      );
+    } catch (e, st) {
+      ErrorLogger.log('Load queue failed for song ${song.id}',
+          error: e, stackTrace: st, category: 'PlayerQueueController');
+
+      // C3 FIX: Rollback and invalidate parallel guards so late resolution/match futures cannot re-apply failed queue
+      _mediaItemResolutionGuard.invalidate();
+      _localMatchSwapGuard.invalidate();
+      _lyricsGuard.invalidate();
+
+      assert(!_mediaItemResolutionGuard.isValid(capturedGen),
+          'Resolution guard must be invalid after rollback');
+
+      if (!_isClosed()) {
+        if (prevSlot != null) {
+          _queueSlots[state.activeQueueSlot] = prevSlot;
         }
+        _debouncedPersistQueueSlots();
+        _bumpQueueVersion();
+        final s = _getState();
+        _emit(s.copyWith(
+          queueSlice: s.queueSlice.copyWith(
+            queue: prevQueue,
+            currentIndex: prevIndex,
+          ),
+          playback: s.playback.copyWith(
+            currentSong: prevSong,
+            duration: prevDuration,
+            position: prevPosition,
+            isPlaying: false,
+            errorMessage: 'Failed to play ${song.title}',
+          ),
+          lyricsSlice: s.lyricsSlice.copyWith(
+            lyrics: prevLyrics,
+            lyricsSource: prevLyricsSource,
+          ),
+        ));
+        try {
+          if (prevQueue.isNotEmpty) {
+            await _audioHandler.loadQueue(
+              prevQueue,
+              initialIndex: prevIndex,
+              initialPosition: prevPosition,
+              autoPlay: false,
+            );
+          }
+        } catch (_) {}
       }
-    } finally {
-      _isSwitchingSlot = false;
+      return;
+    }
+
+    if (_mediaItemResolutionGuard.isValid(capturedGen) && !_isClosed()) {
+      _loadLyrics(song);
+      _findNextLocalMatch(song, effectiveQueue, effectiveIndex, capturedSwapGen);
     }
   }
 
-  void swapReconciledSong(int oldId, SongsTableData newSong) {
-    _slotLookupCache[newSong.id] = newSong;
-    _slotLookupCache.remove(oldId);
-    _queueMutex.protect(() async {
-      _queueSlots.updateAll((slot, data) {
-        if (!data.songIds.contains(oldId)) return data;
-        return QueueSlotData(
-          songIds: data.songIds.map((id) => id == oldId ? newSong.id : id).toList(),
-          currentIndex: data.currentIndex,
-          position: data.position,
-          speed: data.speed,
-        );
-      });
-    });
-    _debouncedPersistQueueSlots();
+  void _findNextLocalMatch(SongsTableData currentSong, List<SongsTableData> queue,
+      int currentIndex, int capturedSwapGen) {
+    if (currentIndex + 1 >= queue.length) return;
+    final nextTrack = queue[currentIndex + 1];
+    if (nextTrack.source != SongSource.youtube) return;
 
-    final state = _getState();
-    if (state.queue.any((s) => s.id == oldId)) {
-      _bumpQueueVersion();
-      _emit(state.copyWith(
-        queue: state.queue.map((s) => s.id == oldId ? newSong : s).toList(),
-        currentSong:
-            state.currentSong?.id == oldId ? newSong : state.currentSong,
-      ));
-      _updateWidgetThrottled(force: true);
-    }
-
-    try {
-      _audioHandler.swapReconciledSong(oldId, newSong);
-    } catch (_) {}
+    _repository.findMatchingLocalSong(
+      remoteId: nextTrack.remoteId,
+      title: nextTrack.title,
+      artist: nextTrack.artist,
+    ).then((res) {
+      final match = res.fold((_) => null, (s) => s);
+      if (match != null &&
+          _localMatchSwapGuard.isValid(capturedSwapGen) &&
+          !_isClosed()) {
+        swapReconciledSong(nextTrack.id, match);
+      }
+    }).catchError((Object _) {});
   }
 }

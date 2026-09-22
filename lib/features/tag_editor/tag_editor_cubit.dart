@@ -1,6 +1,7 @@
 import 'dart:collection';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/bloc/base_cubit.dart';
 import '../../core/constants/channels.dart';
 import '../../core/services/metadata_search_service.dart';
@@ -11,6 +12,7 @@ import '../../data/scanner/media_scanner_service.dart';
 import 'tag_editor_state.dart';
 
 class TagEditorCubit extends PulsrCubit<TagEditorState> {
+  static const String batchCheckpointKey = 'batch_tag_checkpoint';
   static const MethodChannel _channel = MethodChannel(PulsrChannels.tagEditor);
   final MediaScannerService _scannerService;
   final MetadataSearchService _metadataSearchService;
@@ -494,6 +496,14 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
         final total = state.batchSongs.length;
         final List<String> failedFiles = [];
         final List<SongsTableData> taggedSongs = [];
+        SharedPreferences? prefs;
+        List<String> pendingPaths = [];
+        try {
+          prefs = await SharedPreferences.getInstance();
+          pendingPaths = state.batchSongs.map((s) => s.path).toList();
+          await prefs.setStringList(batchCheckpointKey, pendingPaths);
+        } catch (_) {}
+
         var lastEmitTime = DateTime.now();
         for (int i = 0; i < total; i++) {
           if (isClosed) return;
@@ -549,12 +559,27 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
             if (isClosed) return;
             await _scannerService.rescanSingleFile(s.path);
             taggedSongs.add(s);
+            if (prefs != null) {
+              pendingPaths.remove(s.path);
+              try {
+                if (pendingPaths.isEmpty) {
+                  await prefs.remove(batchCheckpointKey);
+                } else {
+                  await prefs.setStringList(batchCheckpointKey, pendingPaths);
+                }
+              } catch (_) {}
+            }
           } catch (e, st) {
             ErrorLogger.log('Failed to save tags for ${s.path}',
                 error: e, stackTrace: st, category: 'TagEditor');
             failedFiles.add(s.title);
           }
           if (isClosed) return;
+        }
+        if (prefs != null) {
+          try {
+            await prefs.remove(batchCheckpointKey);
+          } catch (_) {}
         }
         // Invalidate only the lyrics caches for the tagged files; a full
         // clearCache() also wiped every other song's cached lyrics + disk
@@ -732,7 +757,7 @@ bool _isWriteVerified(dynamic result) {
   if (result is Map) {
     if (result['verified'] == true) return true;
     if (result['verified'] == false) return false;
-    if (result['ok'] == true && !result.containsKey('verified')) return true;
+    if (result['ok'] == true) return true; // treat ok:true as verified
   }
   return false;
 }

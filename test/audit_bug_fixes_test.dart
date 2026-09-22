@@ -80,10 +80,10 @@ void main() {
 
     test('PlayerState.differsFromBeyondPosition detects sleep timer second-level changes', () {
       const state1 = PlayerState(
-        sleepTimerRemaining: Duration(seconds: 59),
+        playback: PlaybackSlice(sleepTimerRemaining: Duration(seconds: 59)),
       );
       const state2 = PlayerState(
-        sleepTimerRemaining: Duration(seconds: 58),
+        playback: PlaybackSlice(sleepTimerRemaining: Duration(seconds: 58)),
       );
 
       expect(state1.differsFromBeyondPosition(state2), isTrue);
@@ -217,9 +217,9 @@ void main() {
 
     test('Track-count sleep timer sets sleepTimerRemaining to null', () {
       const state = PlayerState(
-        sleepTimerRemaining: Duration(minutes: 15),
+        playback: PlaybackSlice(sleepTimerRemaining: Duration(minutes: 15)),
       );
-      final updated = state.copyWith(sleepTimerRemaining: null);
+      final updated = state.copyWith(playback: state.playback.copyWith(sleepTimerRemaining: null));
       expect(updated.sleepTimerRemaining, isNull);
     });
 

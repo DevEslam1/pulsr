@@ -57,8 +57,10 @@ void main() {
 
     test('PlayerState correctly sets sleep timer duration', () {
       const state = PlayerState(
-        sleepTimerRemaining: Duration(minutes: 15),
-        isPlaying: true,
+        playback: PlaybackSlice(
+          sleepTimerRemaining: Duration(minutes: 15),
+          isPlaying: true,
+        ),
       );
 
       expect(state.sleepTimerRemaining, equals(const Duration(minutes: 15)));

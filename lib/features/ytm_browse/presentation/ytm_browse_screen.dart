@@ -46,9 +46,10 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
     });
     try {
       final sections = await _browseService.getHomeFeed();
+      final nonEmptySections = sections.where((s) => s.items.isNotEmpty).toList();
       if (mounted) {
         setState(() {
-          _sections = sections;
+          _sections = nonEmptySections;
           _isLoading = false;
           // Empty feed is not an error — offline/error surfaces via
           // exception path below. Empty just shows the empty state.

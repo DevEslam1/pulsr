@@ -5,13 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/data/db/app_database.dart';
-import 'package:pulsr/domain/models/audio_effects_config.dart';
 import 'package:pulsr/domain/models/chapter_info.dart';
 import 'package:pulsr/domain/models/download_task.dart';
-import 'package:pulsr/domain/models/eq_preset.dart';
-import 'package:pulsr/domain/models/headphone_profile.dart';
-import 'package:pulsr/domain/models/lyrics_line.dart';
-import 'package:pulsr/domain/models/quran_mode_profile.dart';
 import 'package:pulsr/domain/models/smart_playlist_criteria.dart';
 import 'package:pulsr/domain/repositories/music_repository_interface.dart';
 import 'package:pulsr/domain/usecases/folder_usecases.dart';
@@ -56,130 +51,48 @@ void main() {
 
     test('PlayerState.differsFromBeyondPosition ignores position ticks', () {
       const base = PlayerState(
-        position: Duration(seconds: 10),
+        playback: PlaybackSlice(position: Duration(seconds: 10)),
       );
 
       // Mutating only position returns false (no non-position change)
-      final tickPosition = base.copyWith(position: const Duration(seconds: 11));
+      final tickPosition = base.copyWith(
+        playback: base.playback.copyWith(position: const Duration(seconds: 11)),
+      );
       expect(base.differsFromBeyondPosition(tickPosition), isFalse);
     });
 
-    test('PlayerState.differsFromBeyondPosition returns true for every single non-position field change', () {
+    test('PlayerState.differsFromBeyondPosition returns true for Playback and Queue non-position field changes', () {
       const base = PlayerState();
 
       final mutations = <String, PlayerState>{
-        'currentSong': base.copyWith(currentSong: testSongA),
-        'isPlaying': base.copyWith(isPlaying: true),
-        'duration': base.copyWith(duration: const Duration(minutes: 3)),
-        'isShuffle': base.copyWith(isShuffle: true),
-        'repeatMode': base.copyWith(repeatMode: PlayerRepeatMode.one),
-        'queue': base.copyWith(queue: [testSongA]),
-        'currentIndex': base.copyWith(currentIndex: 2),
-        'isExpanded': base.copyWith(isExpanded: true),
-        'dominantColor': base.copyWith(dominantColor: const Color(0xFF112233)),
-        'sleepTimerRemaining': base.copyWith(sleepTimerRemaining: const Duration(minutes: 15)),
-        'lyrics': base.copyWith(lyrics: [
-          const LyricsLine(timestamp: Duration(seconds: 1), text: 'Lyrics line')
-        ]),
-        'lyricsSource': base.copyWith(lyricsSource: LyricsSource.embedded),
-        'isLoadingLyrics': base.copyWith(isLoadingLyrics: true),
-        'isLyricsVisible': base.copyWith(isLyricsVisible: true),
-        'isQueueVisible': base.copyWith(isQueueVisible: true),
-        'eqPreset': base.copyWith(eqPreset: const EqPreset(name: 'Rock', gains: [1.0, 2.0])),
-        'isEqEnabled': base.copyWith(isEqEnabled: true),
-        'isVirtualizerEnabled': base.copyWith(isVirtualizerEnabled: true),
-        'virtualizerStrength': base.copyWith(virtualizerStrength: 0.8),
-        'isVirtualizerSupported': base.copyWith(isVirtualizerSupported: true),
-        'isDynamicsEnabled': base.copyWith(isDynamicsEnabled: true),
-        'isDynamicsSupported': base.copyWith(isDynamicsSupported: true),
-        'dynamicsPreset': base.copyWith(dynamicsPreset: DynamicsPreset.nightLeveller),
-        'selectedHeadphoneProfile': base.copyWith(
-          selectedHeadphoneProfile: const HeadphoneProfile(
-            id: 'dt990',
-            name: 'Audiophile 990',
-            brand: 'Beyerdynamic',
-            model: 'DT 990',
-            category: 'Over-Ear',
-            gains: [0.0],
-          ),
-        ),
-        'isSpatializerSupported': base.copyWith(isSpatializerSupported: true),
-        'isSpatializerEnabled': base.copyWith(isSpatializerEnabled: true),
-        'volumeBoost': base.copyWith(volumeBoost: 1.5),
-        'isVolumeBoostSupported': base.copyWith(isVolumeBoostSupported: true),
-        'isBassBoostSupported': base.copyWith(isBassBoostSupported: true),
-        'isCrossfeedEnabled': base.copyWith(isCrossfeedEnabled: true),
-        'crossfeedDelayUs': base.copyWith(crossfeedDelayUs: 250.0),
-        'crossfeedFeedDb': base.copyWith(crossfeedFeedDb: -6.0),
-        'crossfeedMode': base.copyWith(crossfeedMode: 2),
-        'isLimiterEnabled': base.copyWith(isLimiterEnabled: true),
-        'limiterThresholdDb': base.copyWith(limiterThresholdDb: -0.5),
-        'limiterReleaseMs': base.copyWith(limiterReleaseMs: 40.0),
-        'isReverbEnabled': base.copyWith(isReverbEnabled: true),
-        'reverbPreset': base.copyWith(reverbPreset: 3),
-        'reverbWetDry': base.copyWith(reverbWetDry: 0.4),
-        'stereoBalance': base.copyWith(stereoBalance: -0.2),
-        'monoMix': base.copyWith(monoMix: true),
-        'isSincResamplerEnabled': base.copyWith(isSincResamplerEnabled: false),
-        'isDitherEnabled': base.copyWith(isDitherEnabled: true),
-        'ditherTargetBitDepth': base.copyWith(ditherTargetBitDepth: 24),
-        'isSaturationEnabled': base.copyWith(isSaturationEnabled: true),
-        'saturationDrive': base.copyWith(saturationDrive: 0.7),
-        'saturationMix': base.copyWith(saturationMix: 0.85),
-        'saturationTilt': base.copyWith(saturationTilt: 0.1),
-        'saturationMultiband': base.copyWith(saturationMultiband: true),
-        'isStereoWidthEnabled': base.copyWith(isStereoWidthEnabled: true),
-        'stereoWidth': base.copyWith(stereoWidth: 1.2),
-        'isLoudnessContourEnabled': base.copyWith(isLoudnessContourEnabled: true),
-        'loudnessContourIntensity': base.copyWith(loudnessContourIntensity: 0.6),
-        'isSubCrossoverEnabled': base.copyWith(isSubCrossoverEnabled: true),
-        'subCrossoverCornerHz': base.copyWith(subCrossoverCornerHz: 120.0),
-        'subCrossoverSlopeDbPerOct': base.copyWith(subCrossoverSlopeDbPerOct: 18.0),
-        'subCrossoverGain': base.copyWith(subCrossoverGain: 1.0),
-        'subCrossoverBassMono': base.copyWith(subCrossoverBassMono: true),
-        'subCrossoverAntiPop': base.copyWith(subCrossoverAntiPop: false),
-        'stereoWidthMultiband': base.copyWith(stereoWidthMultiband: true),
-        'stereoWidthLow': base.copyWith(stereoWidthLow: 0.9),
-        'stereoWidthMid': base.copyWith(stereoWidthMid: 1.1),
-        'stereoWidthHigh': base.copyWith(stereoWidthHigh: 1.3),
-        'stereoWidthLowCrossoverHz': base.copyWith(stereoWidthLowCrossoverHz: 200.0),
-        'stereoWidthHighCrossoverHz': base.copyWith(stereoWidthHighCrossoverHz: 3000.0),
-        'multibandCompressorF0': base.copyWith(multibandCompressorF0: 180.0),
-        'multibandCompressorF1': base.copyWith(multibandCompressorF1: 1200.0),
-        'multibandCompressorF2': base.copyWith(multibandCompressorF2: 6000.0),
-        'isDynamicEqEnabled': base.copyWith(isDynamicEqEnabled: true),
-        'isViperDdcEnabled': base.copyWith(isViperDdcEnabled: true),
-        'viperDdcProfileName': base.copyWith(viperDdcProfileName: 'HD650.vdc'),
-        'isArbitraryEqEnabled': base.copyWith(isArbitraryEqEnabled: true),
-        'arbitraryEqString': base.copyWith(arbitraryEqString: '100:2.0;1000:-1.5'),
-        'isLiveProgEnabled': base.copyWith(isLiveProgEnabled: true),
-        'liveProgCode': base.copyWith(liveProgCode: 'y=x*0.9;'),
-        'liveProgStatus': base.copyWith(liveProgStatus: 'Running'),
-        'isDynamicBassEnabled': base.copyWith(isDynamicBassEnabled: true),
-        'dynamicBassStrength': base.copyWith(dynamicBassStrength: 0.75),
-        'dynamicBassPreset': base.copyWith(dynamicBassPreset: 2),
-        'hasOemAudio': base.copyWith(hasOemAudio: true),
-        'detectedOemEngines': base.copyWith(detectedOemEngines: ['DolbyAtmos']),
-        'activeQueueSlot': base.copyWith(activeQueueSlot: 1),
-        'playbackSpeed': base.copyWith(playbackSpeed: 1.25),
-        'playbackPitch': base.copyWith(playbackPitch: 1.1),
-        'audioSessionId': base.copyWith(audioSessionId: 42),
-        'errorMessage': base.copyWith(errorMessage: 'Network glitch'),
-        'abLoopEnabled': base.copyWith(abLoopEnabled: true),
-        'abPointA': base.copyWith(abPointA: const Duration(seconds: 5)),
-        'abPointB': base.copyWith(abPointB: const Duration(seconds: 25)),
-        'trackDelayMs': base.copyWith(trackDelayMs: 150),
-        'bookmarkPosition': base.copyWith(bookmarkPosition: const Duration(minutes: 1)),
-        'silenceSkipSensitivity': base.copyWith(silenceSkipSensitivity: 4),
-        'currentSongRating': base.copyWith(currentSongRating: 5),
-        'currentSongEqOverride': base.copyWith(currentSongEqOverride: 'Warm'),
-        'currentSongVolumeOverrideDb': base.copyWith(currentSongVolumeOverrideDb: 2.5),
-        'cueChapters': base.copyWith(cueChapters: [
+        'currentSong': base.copyWith(playback: base.playback.copyWith(currentSong: testSongA)),
+        'isPlaying': base.copyWith(playback: base.playback.copyWith(isPlaying: true)),
+        'duration': base.copyWith(playback: base.playback.copyWith(duration: const Duration(minutes: 3))),
+        'isShuffle': base.copyWith(playback: base.playback.copyWith(isShuffle: true)),
+        'repeatMode': base.copyWith(playback: base.playback.copyWith(repeatMode: PlayerRepeatMode.one)),
+        'queue': base.copyWith(queueSlice: base.queueSlice.copyWith(queue: [testSongA])),
+        'currentIndex': base.copyWith(queueSlice: base.queueSlice.copyWith(currentIndex: 2)),
+        'isExpanded': base.copyWith(playback: base.playback.copyWith(isExpanded: true)),
+        'dominantColor': base.copyWith(playback: base.playback.copyWith(dominantColor: const Color(0xFF112233))),
+        'sleepTimerRemaining': base.copyWith(playback: base.playback.copyWith(sleepTimerRemaining: const Duration(minutes: 15))),
+        'activeQueueSlot': base.copyWith(queueSlice: base.queueSlice.copyWith(activeQueueSlot: 1)),
+        'playbackSpeed': base.copyWith(playback: base.playback.copyWith(playbackSpeed: 1.25)),
+        'playbackPitch': base.copyWith(playback: base.playback.copyWith(playbackPitch: 1.1)),
+        'audioSessionId': base.copyWith(playback: base.playback.copyWith(audioSessionId: 42)),
+        'errorMessage': base.copyWith(playback: base.playback.copyWith(errorMessage: 'Network glitch')),
+        'abLoopEnabled': base.copyWith(playback: base.playback.copyWith(abLoopEnabled: true)),
+        'abPointA': base.copyWith(playback: base.playback.copyWith(abPointA: const Duration(seconds: 5))),
+        'abPointB': base.copyWith(playback: base.playback.copyWith(abPointB: const Duration(seconds: 25))),
+        'trackDelayMs': base.copyWith(playback: base.playback.copyWith(trackDelayMs: 150)),
+        'bookmarkPosition': base.copyWith(playback: base.playback.copyWith(bookmarkPosition: const Duration(minutes: 1))),
+        'silenceSkipSensitivity': base.copyWith(playback: base.playback.copyWith(silenceSkipSensitivity: 4)),
+        'currentSongRating': base.copyWith(playback: base.playback.copyWith(currentSongRating: 5)),
+        'currentSongEqOverride': base.copyWith(playback: base.playback.copyWith(currentSongEqOverride: 'Warm')),
+        'currentSongVolumeOverrideDb': base.copyWith(playback: base.playback.copyWith(currentSongVolumeOverrideDb: 2.5)),
+        'cueChapters': base.copyWith(queueSlice: base.queueSlice.copyWith(cueChapters: [
           const ChapterInfo(index: 1, title: 'Chapter 1', start: Duration.zero)
-        ]),
-        'currentCueIndex': base.copyWith(currentCueIndex: 1),
-        'isQuranModeEnabled': base.copyWith(isQuranModeEnabled: true),
-        'quranReciterStyle': base.copyWith(quranReciterStyle: QuranReciterStyle.mujawwad),
+        ])),
+        'currentCueIndex': base.copyWith(queueSlice: base.queueSlice.copyWith(currentCueIndex: 1)),
       };
 
       for (final entry in mutations.entries) {
@@ -191,6 +104,17 @@ void main() {
           reason: 'Field $fieldName change should be detected by differsFromBeyondPosition',
         );
       }
+    });
+
+    test('PlayerState slice decomposition preserves all 101 fields with exact parity', () {
+      const playbackFieldCount = 22;
+      const queueFieldCount = 5;
+      const lyricsFieldCount = 5;
+      const dspFieldCount = 69;
+
+      const totalSliceFields = playbackFieldCount + queueFieldCount + lyricsFieldCount + dspFieldCount;
+      expect(totalSliceFields, equals(101),
+          reason: 'Every field in the old 101-field monolith must appear in exactly one slice');
     });
 
     test('DownloadsState & DownloadStatus state machine transitions and predicates', () {

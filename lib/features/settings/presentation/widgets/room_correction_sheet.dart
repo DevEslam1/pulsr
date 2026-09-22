@@ -32,11 +32,12 @@ class _SweepSource extends StreamAudioSource {
 
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {
-    final from = start ?? 0;
-    final to = end ?? bytes.length;
+    final total = bytes.length;
+    final from = (start ?? 0).clamp(0, total);
+    final to = (end ?? total).clamp(from, total);
     return StreamAudioResponse(
       rangeRequestsSupported: false,
-      sourceLength: bytes.length,
+      sourceLength: total,
       contentLength: to - from,
       offset: from,
       contentType: 'audio/wav',

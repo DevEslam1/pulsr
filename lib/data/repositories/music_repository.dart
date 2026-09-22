@@ -142,6 +142,12 @@ class MusicRepository implements IMusicRepository {
               expression: t.year,
               mode: ascending ? OrderingMode.asc : OrderingMode.desc)
         ]);
+      } else if (sortBy == 'sampleRate') {
+        query.orderBy([
+          (t) => OrderingTerm(
+              expression: t.sampleRate,
+              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
+        ]);
       }
 
       if (limit != null) {
@@ -199,6 +205,7 @@ class MusicRepository implements IMusicRepository {
         'playCount' => 's.play_count',
         'lastPlayed' => 's.last_played',
         'fileSize' => 's.file_size',
+        'sampleRate' => 's.sample_rate',
         'year' => 's.year',
         _ => 's.title COLLATE NOCASE',
       };
@@ -312,6 +319,12 @@ class MusicRepository implements IMusicRepository {
         query.orderBy([
           (t) => OrderingTerm(
               expression: t.year,
+              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
+        ]);
+      } else if (sortBy == 'sampleRate') {
+        query.orderBy([
+          (t) => OrderingTerm(
+              expression: t.sampleRate,
               mode: ascending ? OrderingMode.asc : OrderingMode.desc)
         ]);
       }

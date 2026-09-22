@@ -47,14 +47,16 @@ class AudioQualitySheet extends StatelessWidget {  final SongsTableData song;
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final settingsCubit = context.watch<SettingsCubit?>();
+    final settingsCubit = context.read<SettingsCubit?>();
     final settingsState = settingsCubit?.state;
-    final streamingQuality = settingsState?.streamingQuality;
+    final streamingQuality = context.select<SettingsCubit, YtmAudioQuality?>(
+        (c) => c.state.streamingQuality);
+    final outputDevice = context.select<SettingsCubit, AudioOutputInfo?>(
+        (c) => c.state.currentOutputDevice);
     final info = AudioQualityInfo.fromSong(
       song,
       streamingQuality: streamingQuality,
     );
-    final outputDevice = settingsState?.currentOutputDevice;
 
     return Align(
       alignment: Alignment.bottomCenter,

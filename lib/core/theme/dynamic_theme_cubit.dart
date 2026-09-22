@@ -82,6 +82,22 @@ class _CachedPalette {
       );
 }
 
+class _QueuedThemeRequest {
+  final int songId;
+  final String? remoteArtworkUrl;
+  final String cacheKey;
+  final int token;
+  final _CachedPalette? expiredFallback;
+
+  const _QueuedThemeRequest({
+    required this.songId,
+    required this.remoteArtworkUrl,
+    required this.cacheKey,
+    required this.token,
+    this.expiredFallback,
+  });
+}
+
 @singleton
 class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
   final OnAudioQuery _audioQuery = OnAudioQuery();
@@ -92,6 +108,8 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
   int _currentRequestToken = 0;
   // FIX-C01: Guard against overlapping extractions
   bool _pendingExtraction = false;
+  // H1 FIX: Single-slot queue for pending theme request so rapid track changes drain latest
+  _QueuedThemeRequest? _queuedRequest;
   // FIX-H01: Ultimate fallback if palette extraction fails
   _CachedPalette? _lastEmittedPalette;
 
@@ -161,8 +179,17 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
       required String cacheKey,
       required int token,
       _CachedPalette? expiredFallback}) async {
-    // FIX-C01: Prevent overlapping extractions
-    if (_pendingExtraction) return;
+    // FIX-C01 / H1 FIX: Queue pending request if an extraction is already in flight
+    if (_pendingExtraction) {
+      _queuedRequest = _QueuedThemeRequest(
+        songId: songId,
+        remoteArtworkUrl: remoteArtworkUrl,
+        cacheKey: cacheKey,
+        token: token,
+        expiredFallback: expiredFallback,
+      );
+      return;
+    }
     _pendingExtraction = true;
 
     try {
@@ -283,6 +310,17 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
       return;
     } finally {
       _pendingExtraction = false;
+      final next = _queuedRequest;
+      _queuedRequest = null;
+      if (next != null && !isClosed && next.token == _currentRequestToken) {
+        unawaited(_extractPalette(
+          songId: next.songId,
+          remoteArtworkUrl: next.remoteArtworkUrl,
+          cacheKey: next.cacheKey,
+          token: next.token,
+          expiredFallback: next.expiredFallback,
+        ));
+      }
     }
 
     if (token == _currentRequestToken && !isClosed) {
@@ -294,6 +332,7 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
     if (isClosed) return;
     _debounceTimer?.cancel();
     _currentRequestToken++;
+    _queuedRequest = null;
     // Preserve the current light/dark selection; a bare DynamicThemeState()
     // hard-codes isDark: true and silently reverted the user's mode.
     safeEmit(DynamicThemeState(isDark: state.isDark));
@@ -301,6 +340,8 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
 
   @override
   Future<void> close() {
+    _pendingExtraction = false;
+    _queuedRequest = null;
     // FIX-C07: PulsrCubit handles autoTimer cancellation automatically
     _cachedPalettes.clear();
     return super.close();

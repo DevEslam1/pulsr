@@ -1,4 +1,4 @@
-// lib/features/player/cubit/player_widget_coordinator.dart
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../widgets/widget_service.dart';
@@ -84,10 +84,13 @@ class PlayerWidgetCoordinator {
       return;
     }
     _lastProgressUpdateTime = now;
-    _widgetService?.updateProgress(
-      isPlaying: s.isPlaying,
-      position: s.position,
-      duration: s.duration,
-    );
+    try {
+      unawaited(_widgetService?.updateProgress(
+        isPlaying: s.isPlaying,
+        position: s.position,
+        duration: s.duration,
+      ));
+    } catch (_) {}
   }
 }
+

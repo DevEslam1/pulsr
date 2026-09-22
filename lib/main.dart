@@ -85,6 +85,24 @@ Future<void> main() async {
   };
   ErrorLogger.initialize();
 
+  // FIX-A3: Global error boundary for widget build errors
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    ErrorLogger.log(
+      'Widget build error',
+      error: details.exception,
+      stackTrace: details.stack,
+      category: 'UI',
+    );
+    return const Material(
+      child: Center(
+        child: Text(
+          'Something went wrong',
+          style: TextStyle(color: Colors.white70),
+        ),
+      ),
+    );
+  };
+
   // Rehydrate the GPU budget before first frame (persisted by SettingsCubit).
   try {
     final prefs = await SharedPreferences.getInstance();
@@ -439,8 +457,8 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
         _networkMonitor = monitor;
         monitor.start();
         _networkChangeSub = monitor.onNetworkChanged.listen((_) async {
-          debugPrint(
-              '[PulsrApp] Network path changed — invalidating YTM caches');
+          ErrorLogger.log('Network path changed — invalidating YTM caches',
+              category: 'PulsrApp');
           try {
             if (getIt.isRegistered<YtmService>()) {
               await getIt<YtmService>().handleNetworkChange();

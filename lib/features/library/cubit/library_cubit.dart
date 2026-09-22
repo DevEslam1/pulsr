@@ -306,6 +306,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
               merged = merged.where((s) => s.id != songId).toList();
             }
           });
+          final seen = <int>{};
+          merged = merged.where((s) => seen.add(s.id)).toList();
           safeEmit(state.copyWith(favorites: merged, errorMessage: null));
         },
       );
@@ -359,7 +361,10 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
       final inFlight = _favoriteQueues[songId];
       if (inFlight != null && !inFlight.isCompleted) {
         try {
-          await inFlight.future;
+          await inFlight.future.timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {},
+          );
         } catch (_) {}
       } else {
         break;
@@ -469,6 +474,10 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
         }
       }
     } finally {
+      if (_favoriteOpTokens[songId] == opToken) {
+        _favoriteOpTokens.remove(songId);
+        _pendingFavoriteTargets.remove(songId);
+      }
       _favoriteWriteInFlight.remove(songId);
       if (!writeCompleter.isCompleted) writeCompleter.complete();
       if (_favoriteQueues[songId] == writeCompleter) {

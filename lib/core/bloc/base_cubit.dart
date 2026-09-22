@@ -85,9 +85,11 @@ abstract class PulsrCubit<S> extends Cubit<S> {
     void Function()? onDone,
     bool? cancelOnError,
   }) {
-    // FIX-L1: Return safe no-op StreamSubscription if cubit is already closed when autoSub is called
+    // FIX-L1 / C1: Return safe no-op StreamSubscription if cubit is already closed when autoSub is called
     if (_closed) {
-      return Stream<T>.empty().listen(null);
+      final sub = Stream<T>.empty().listen(null);
+      sub.cancel(); // immediately cancel — no resource leak
+      return sub;
     }
     final sub = stream.listen(
       (data) {
@@ -185,12 +187,14 @@ abstract class PulsrCubit<S> extends Cubit<S> {
     unawaited(_effectController.close().catchError((e, s) {
       ErrorLogger.log('PulsrCubit effect controller close failed',
           error: e, stackTrace: s, category: 'PulsrCubit');
+      addError(e, s);
     }));
     final subsDisposeFuture = _subs.dispose();
     if (subsDisposeFuture != null) {
       unawaited(subsDisposeFuture.catchError((e, s) {
         ErrorLogger.log('PulsrCubit composite dispose failed',
             error: e, stackTrace: s, category: 'PulsrCubit');
+        addError(e, s);
       }));
     }
     // FIX-I01: await super.close() properly so callers awaiting close() have super.close completed

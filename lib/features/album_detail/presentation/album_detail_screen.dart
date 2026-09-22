@@ -78,8 +78,12 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   List<SongsTableData> _cachedSortedSongs = const [];
 
   List<SongsTableData> _sorted(List<SongsTableData> songs) {
-    // FIX-M1: Hash-based check so new list instances with identical songs reuse cached sorted list
-    final songsHash = Object.hash(songs.length, songs.firstOrNull?.id, songs.lastOrNull?.id);
+    // FIX-M1 / H7: Hash-based check so new list instances with identical songs reuse cached sorted list
+    final songsHash = Object.hashAll([
+      songs.length,
+      for (final s in songs.take(10)) s.id,
+      for (final s in songs.skip(songs.length > 10 ? songs.length - 10 : 0)) s.id,
+    ]);
     if (_cachedSongsHash == songsHash && _cachedSort == _sort) {
       return _cachedSortedSongs;
     }

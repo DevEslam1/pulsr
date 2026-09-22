@@ -45,9 +45,11 @@ void main() {
 
     when(() => mockPlayerCubit.state).thenReturn(
       const PlayerState(
-        currentSong: testSong,
-        isPlaying: true,
-        duration: Duration(minutes: 4),
+        playback: PlaybackSlice(
+          currentSong: testSong,
+          isPlaying: true,
+          duration: Duration(minutes: 4),
+        ),
       ),
     );
     when(() => mockPlayerCubit.stream)
@@ -56,10 +58,12 @@ void main() {
 
   Widget buildVinylTheme({required bool isPlaying}) {
     final state = PlayerState(
-      currentSong: testSong,
-      isPlaying: isPlaying,
-      duration: const Duration(minutes: 4),
-      position: const Duration(seconds: 30),
+      playback: PlaybackSlice(
+        currentSong: testSong,
+        isPlaying: isPlaying,
+        duration: const Duration(minutes: 4),
+        position: const Duration(seconds: 30),
+      ),
     );
 
     return MaterialApp(

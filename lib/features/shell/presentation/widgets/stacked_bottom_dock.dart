@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/motion/pulsr_motion.dart';
@@ -89,13 +90,27 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
     if (_lastReportedHeight == height && _lastReportedMiniPlayer == miniPlayer) return;
     _pendingDockHeight = height;
     _pendingMiniPlayer = miniPlayer;
+
+    // H6: If scheduler is idle, update dock tracker immediately without 1-frame latency
+    if (SchedulerBinding.instance.schedulerPhase == SchedulerPhase.idle) {
+      _lastReportedHeight = height;
+      _lastReportedMiniPlayer = miniPlayer;
+      _pendingDockHeight = null;
+      _pendingMiniPlayer = null;
+      PulsrDockTracker.updateDock(height: height, miniPlayer: miniPlayer);
+      return;
+    }
+
     if (_postFrameCallbackScheduled) return;
     _postFrameCallbackScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _postFrameCallbackScheduled = false;
-      if (mounted && _pendingDockHeight != null && _pendingMiniPlayer != null) {
+      if (!mounted) return;
+      if (_pendingDockHeight != null && _pendingMiniPlayer != null) {
         final h = _pendingDockHeight!;
         final mp = _pendingMiniPlayer!;
+        _pendingDockHeight = null;
+        _pendingMiniPlayer = null;
         _lastReportedHeight = h;
         _lastReportedMiniPlayer = mp;
         PulsrDockTracker.updateDock(height: h, miniPlayer: mp);

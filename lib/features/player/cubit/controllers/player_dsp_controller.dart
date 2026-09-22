@@ -1,47 +1,121 @@
 // lib/features/player/cubit/controllers/player_dsp_controller.dart
-// FIX-A1: Focused PlayerDspController coordinating EQ and Effects engines
 import 'dart:async';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/audio_feature_info.dart';
+import '../../../../core/constants/prefs_keys.dart';
+import '../../../../core/services/device_profile_service.dart';
+import '../../../../core/services/hires_audio_service.dart';
+import '../../../../core/services/room_correction_service.dart';
+import '../../../../core/services/settings_profiles_service.dart';
+import '../../../../core/services/smart_audio_service.dart';
+import '../../../../core/utils/error_logger.dart';
 import '../../../../data/audio/audio_handler.dart';
-import '../../../../domain/models/audio_quality_info.dart';
+import '../../../../data/audio/comparison_slot.dart';
+import '../../../../data/audio/headphone_profiles_repository.dart';
+import '../../../../data/audio/ir_file_parser.dart';
+import '../../../../data/db/app_database.dart';
+import '../../../../domain/models/audio_effects_config.dart';
+import '../../../../domain/models/audio_output_info.dart';
 import '../../../../domain/models/eq_preset.dart';
 import '../../../../domain/models/headphone_profile.dart';
+import '../../../../domain/models/reverb_preset.dart';
+import '../../../../domain/services/headphone_device_matcher.dart';
+import '../../../../domain/services/settings_profiles_service.dart';
+import '../../../../domain/services/smart_audio_plan.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../player_state.dart';
-import 'dsp_effects_engine.dart';
-import 'dsp_eq_engine.dart';
+
+part 'player_dsp_effects.dart';
+part 'player_dsp_profiles.dart';
 
 /// Orchestrates all audio DSP effects, equalizer presets, and bit-perfect conflict gating.
 class PlayerDspController {
   final PulsrAudioHandler _audioHandler;
   final SettingsCubit? _settingsCubit;
+  final SettingsProfilesService? _settingsProfilesService;
+  final DeviceProfileService? _deviceProfileService;
+  final HiResAudioService? _hiResAudioService;
+  final SmartAudioService? _smartAudioService;
   final PlayerState Function() _getState;
   final void Function(PlayerState state) _emit;
+  final void Function() _syncAudioEffects;
+  final bool Function() _isClosed;
 
-  late final DspEqEngine _eqEngine;
-  late final DspEffectsEngine _effectsEngine;
+  StreamSubscription<AudioOutputInfo>? _deviceSub;
+  PlayerState? _dspSnapshot;
+  EqPreset? globalEqBackup;
+  HeadphoneProfile? globalHeadphoneProfileBackup;
+  bool perSongOverrideActive = false;
+  String? _lastAutoAppliedDeviceKey;
+  bool _smartAutoBitPerfectApplied = false;
 
   PlayerDspController({
     required PulsrAudioHandler audioHandler,
     required SettingsCubit? settingsCubit,
+    SettingsProfilesService? settingsProfilesService,
+    DeviceProfileService? deviceProfileService,
+    HiResAudioService? hiResAudioService,
+    SmartAudioService? smartAudioService,
     required PlayerState Function() getState,
     required void Function(PlayerState state) emit,
+    required void Function() syncAudioEffects,
+    required bool Function() isClosed,
   })  : _audioHandler = audioHandler,
         _settingsCubit = settingsCubit,
+        _settingsProfilesService = settingsProfilesService,
+        _deviceProfileService = deviceProfileService,
+        _hiResAudioService = hiResAudioService,
+        _smartAudioService = smartAudioService,
         _getState = getState,
-        _emit = emit {
-    _eqEngine = DspEqEngine(
-      audioHandler: _audioHandler,
-      getState: _getState,
-      emit: _emit,
-      guardDsp: guardDsp,
+        _emit = emit,
+        _syncAudioEffects = syncAudioEffects,
+        _isClosed = isClosed {
+    _startDeviceProfileWatcher();
+  }
+
+  void _startDeviceProfileWatcher() {
+    final service = _deviceProfileService;
+    final hiRes = _hiResAudioService;
+    if (service == null || hiRes == null) return;
+    _deviceSub = hiRes.outputDeviceStream.listen((device) {
+      onOutputDeviceChanged(device);
+    });
+  }
+
+  void dispose() {
+    _deviceSub?.cancel();
+    _deviceSub = null;
+  }
+
+  int _followSampleRateGen = 0;
+  int? _lastFollowedSampleRate;
+
+  Future<void> maybeFollowTrackSampleRate(SongsTableData song) async {
+    final service = _hiResAudioService;
+    final settings = _settingsCubit?.state;
+    if (service == null || settings == null) return;
+    final gen = ++_followSampleRateGen;
+    final rate = HiResAudioService.followTrackRateToApply(
+      trackSampleRate: song.sampleRate,
+      lastRequestedSampleRate: _lastFollowedSampleRate,
+      isBluetooth: settings.currentOutputDevice?.isBluetooth == true,
+      followTrackEnabled:
+          settings.followTrackSampleRate || settings.strictBitPerfect,
     );
-    _effectsEngine = DspEffectsEngine(
-      audioHandler: _audioHandler,
-      getState: _getState,
-      emit: _emit,
-      guardDsp: guardDsp,
-    );
+    if (rate == null) return;
+    try {
+      final depth = song.bitDepth ?? 0;
+      await service.setTargetOutputFormat(sampleRate: rate, bitDepth: depth);
+      if (_isClosed() || gen != _followSampleRateGen) return;
+      _lastFollowedSampleRate = rate;
+      await _settingsCubit?.refreshOutputDevice();
+    } catch (e, st) {
+      _lastFollowedSampleRate = null;
+      ErrorLogger.log('Follow-track sample rate failed ($rate)',
+          error: e, stackTrace: st, category: 'PlayerDspController');
+    }
   }
 
   String? dspBlockedReason() {
@@ -52,7 +126,6 @@ class PlayerDspController {
       bypassDspOnBitPerfect: s.bypassDspOnBitPerfect,
       device: s.currentOutputDevice,
       aaudioEnabled: s.aaudioOutputEnabled,
-      dsdDopActive: AudioQualityInfo.dsdDopActive,
     );
   }
 
@@ -60,27 +133,230 @@ class PlayerDspController {
     final reason = dspBlockedReason();
     if (reason != null) {
       if (showError) {
-        _emit(_getState().copyWith(errorMessage: '$feature blocked: $reason'));
+        final state = _getState();
+        _emit(state.copyWith(
+          playback: state.playback.copyWith(
+            errorMessage: '$feature blocked: $reason',
+          ),
+        ));
       }
       return false;
     }
     return true;
   }
 
-  // Equalizer Delegation
-  Future<void> setEqualizerEnabled(bool enabled) => _eqEngine.setEqualizerEnabled(enabled);
-  Future<void> applyPreset(EqPreset preset) => _eqEngine.applyPreset(preset);
-  Future<void> resetEqualizer() => _eqEngine.resetEqualizer();
-  Future<void> applyHeadphoneProfile(HeadphoneProfile? profile) => _eqEngine.applyHeadphoneProfile(profile);
-  Future<void> setBandGain(int bandIndex, double gain) => _eqEngine.setBandGain(bandIndex, gain);
-  Future<void> resetToFlat() => _eqEngine.resetToFlat();
+  /// Declarative helper consolidating repetitive DSP effect setters, guarding,
+  /// state emission, and audio handler sync.
+  Future<void> applyDspEffect({
+    required String featureName,
+    bool requiresGuard = true,
+    bool guardCondition = true,
+    bool showErrorOnGuard = true,
+    required DspSlice Function(DspSlice current) updateDsp,
+    required Future<void> Function() applyAudioHandler,
+    String? failureMessage,
+  }) async {
+    if (requiresGuard &&
+        guardCondition &&
+        !guardDsp(featureName, showError: showErrorOnGuard)) {
+      return;
+    }
+    final state = _getState();
+    _emit(state.copyWith(
+      dsp: updateDsp(state.dsp),
+      playback: state.playback.copyWith(errorMessage: null),
+    ));
+    try {
+      await applyAudioHandler();
+    } catch (e) {
+      _syncAudioEffects();
+      final s = _getState();
+      _emit(s.copyWith(
+        playback: s.playback.copyWith(
+          errorMessage: failureMessage ??
+              'Failed to set ${featureName.toLowerCase()}: $e',
+        ),
+      ));
+    }
+  }
 
-  // Audio Effects Delegation
-  Future<void> setBassBoost(double amount) => _effectsEngine.setBassBoost(amount);
-  Future<void> setVirtualizerEnabled(bool enabled) => _effectsEngine.setVirtualizerEnabled(enabled);
-  Future<void> setVirtualizerStrength(double strength) => _effectsEngine.setVirtualizerStrength(strength);
-  Future<void> setReverbEnabled(bool enabled) => _effectsEngine.setReverbEnabled(enabled);
-  Future<void> setReverbPreset(int preset) => _effectsEngine.setReverbPreset(preset);
-  Future<void> setLimiterEnabled(bool enabled) => _effectsEngine.setLimiterEnabled(enabled);
-  Future<void> setCrossfeedEnabled(bool enabled) => _effectsEngine.setCrossfeedEnabled(enabled);
+  // Equalizer methods
+  Future<void> setEqualizerEnabled(bool enabled) => applyDspEffect(
+        featureName: 'Equalizer',
+        guardCondition: enabled,
+        updateDsp: (dsp) => dsp.copyWith(isEqEnabled: enabled),
+        applyAudioHandler: () => _audioHandler.setEqualizerEnabled(enabled),
+      );
+
+  Future<void> applyPreset(EqPreset preset,
+      {bool isPerSongRestore = false}) async {
+    if (!guardDsp('Equalizer Preset')) return;
+    if (perSongOverrideActive && !isPerSongRestore) {
+      globalEqBackup = preset;
+      globalHeadphoneProfileBackup = null;
+    }
+    final state = _getState();
+    _emit(state.copyWith(
+      dsp: state.dsp.copyWith(
+        isEqEnabled: true,
+        eqPreset: preset,
+        selectedHeadphoneProfile: null,
+      ),
+      playback: state.playback.copyWith(errorMessage: null),
+    ));
+    await _audioHandler.setEqualizerEnabled(true);
+    await _audioHandler.applyPreset(preset);
+  }
+
+  Future<void> resetEqualizer() async {
+    final flat = EqPreset.defaultPresets.first;
+    await applyPreset(flat);
+  }
+
+  Future<void> applyHeadphoneProfile(HeadphoneProfile? profile,
+      {bool isPerSongRestore = false}) async {
+    if (profile != null && !guardDsp('AutoEQ')) return;
+    final state = _getState();
+    if (profile != null) {
+      if (perSongOverrideActive && !isPerSongRestore) {
+        globalEqBackup = EqPreset(
+          name: profile.name,
+          gains: profile.gains,
+          bassBoost: profile.bassBoost,
+        );
+        globalHeadphoneProfileBackup = profile;
+      }
+      _emit(state.copyWith(
+        dsp: state.dsp.copyWith(
+          isEqEnabled: true,
+          selectedHeadphoneProfile: profile,
+          eqPreset: EqPreset(
+            name: profile.name,
+            gains: profile.gains,
+            bassBoost: profile.bassBoost,
+          ),
+        ),
+        playback: state.playback.copyWith(errorMessage: null),
+      ));
+      await _audioHandler.setEqualizerEnabled(true);
+      await _audioHandler.applyHeadphoneProfile(profile);
+    } else {
+      _emit(state.copyWith(
+        dsp: state.dsp.copyWith(selectedHeadphoneProfile: null),
+      ));
+      await _audioHandler.applyHeadphoneProfile(null);
+    }
+  }
+
+  Future<void> resetHeadphoneProfile() => applyHeadphoneProfile(null);
+
+  Future<void> setBandGain(int bandIndex, double gain) async {
+    if (!guardDsp('Band Gain', showError: false)) return;
+    final clamped = gain.clamp(-15.0, 15.0);
+    final state = _getState();
+    final currentGains = List<double>.from(state.eqPreset.gains);
+    if (bandIndex < currentGains.length) {
+      currentGains[bandIndex] = clamped;
+      _emit(state.copyWith(
+        dsp: state.dsp.copyWith(
+          eqPreset: EqPreset(
+            name: 'Custom',
+            gains: currentGains,
+            bassBoost: state.eqPreset.bassBoost,
+          ),
+          selectedHeadphoneProfile: null,
+        ),
+      ));
+    }
+    try {
+      await _audioHandler.setBandGain(bandIndex, clamped);
+    } catch (e) {
+      _syncAudioEffects();
+      final s = _getState();
+      _emit(s.copyWith(
+          playback:
+              s.playback.copyWith(errorMessage: 'Failed to set band gain: $e')));
+    }
+  }
+
+  Future<void> resetToFlat() async {
+    final state = _getState();
+    _emit(state.copyWith(
+      dsp: state.dsp.copyWith(
+        eqPreset: EqPreset.defaultPresets.first,
+        selectedHeadphoneProfile: null,
+      ),
+    ));
+    try {
+      await _audioHandler.resetToFlat();
+    } catch (e) {
+      _syncAudioEffects();
+    }
+  }
+
+  Future<void> startAbComparison() async {
+    await _audioHandler.startAbComparison();
+  }
+
+  Future<void> endAbComparison() async {
+    await _audioHandler.endAbComparison();
+  }
+
+  Future<void> setBandMode(int count) async {
+    if (count == 10 || count == 32) {
+      await _audioHandler.set32BandMode(count == 32);
+    } else if (count == 64) {
+      await _audioHandler.equalizerManager.setBandMode(64);
+    } else {
+      return;
+    }
+    final state = _getState();
+    _emit(state.copyWith(
+        dsp: state.dsp.copyWith(eqPreset: _audioHandler.currentPreset)));
+  }
+
+  Future<void> switchComparisonSlot(ComparisonSlot slot) async {
+    await _audioHandler.switchComparisonSlot(slot);
+    final state = _getState();
+    _emit(state.copyWith(
+        dsp: state.dsp.copyWith(eqPreset: _audioHandler.currentPreset)));
+  }
+
+  String exportPresetToJson() => _audioHandler.exportPresetToJson();
+
+  Future<bool> importPresetFromJson(String jsonStr) async {
+    final ok = await _audioHandler.importPresetFromJson(jsonStr);
+    if (ok) {
+      final state = _getState();
+      _emit(state.copyWith(
+          dsp: state.dsp.copyWith(eqPreset: _audioHandler.currentPreset)));
+    }
+    return ok;
+  }
+
+  List<double> mergeRoomCorrectionWithHeadphoneCurve(
+    List<double> roomGains, {
+    double maxGainDb = 15.0,
+  }) {
+    final profile = _getState().selectedHeadphoneProfile;
+    return RoomCorrectionService.mergeWithHeadphoneCurve(
+      roomGains,
+      profile?.gains ?? const <double>[],
+      maxGainDb: maxGainDb,
+    );
+  }
+
+  List<double> exportCorrectionImpulseResponse(
+    List<double> gains, {
+    List<double>? centers,
+    int sampleRate = RoomCorrectionService.captureSampleRate,
+    int taps = 127,
+  }) {
+    return RoomCorrectionService.exportCorrectionImpulseResponse(
+      gains,
+      centers: centers ?? EqPreset.centerFrequencies,
+      sampleRate: sampleRate,
+      taps: taps,
+    );
+  }
 }

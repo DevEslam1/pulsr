@@ -25,17 +25,24 @@ class DspEqEngine {
 
   Future<void> setEqualizerEnabled(bool enabled) async {
     if (enabled && !_guardDsp('EQ')) return;
-    _emit(_getState().copyWith(isEqEnabled: enabled, errorMessage: null));
+    final state = _getState();
+    _emit(state.copyWith(
+      dsp: state.dsp.copyWith(isEqEnabled: enabled),
+      playback: state.playback.copyWith(errorMessage: null),
+    ));
     await _audioHandler.setEqualizerEnabled(enabled);
   }
 
   Future<void> applyPreset(EqPreset preset) async {
     if (!_guardDsp('Preset')) return;
-    _emit(_getState().copyWith(
-      isEqEnabled: true,
-      eqPreset: preset,
-      selectedHeadphoneProfile: null,
-      errorMessage: null,
+    final state = _getState();
+    _emit(state.copyWith(
+      dsp: state.dsp.copyWith(
+        isEqEnabled: true,
+        eqPreset: preset,
+        selectedHeadphoneProfile: null,
+      ),
+      playback: state.playback.copyWith(errorMessage: null),
     ));
     await _audioHandler.setEqualizerEnabled(true);
     await _audioHandler.applyPreset(preset);
@@ -48,22 +55,27 @@ class DspEqEngine {
 
   Future<void> applyHeadphoneProfile(HeadphoneProfile? profile) async {
     if (profile != null && !_guardDsp('AutoEQ')) return;
+    final state = _getState();
     if (profile != null) {
-      _emit(_getState().copyWith(
-        isEqEnabled: true,
-        eqPreset: EqPreset(
-          name: profile.name,
-          gains: profile.gains,
-          bassBoost: profile.bassBoost,
+      _emit(state.copyWith(
+        dsp: state.dsp.copyWith(
+          isEqEnabled: true,
+          eqPreset: EqPreset(
+            name: profile.name,
+            gains: profile.gains,
+            bassBoost: profile.bassBoost,
+          ),
+          selectedHeadphoneProfile: profile,
         ),
-        selectedHeadphoneProfile: profile,
-        errorMessage: null,
+        playback: state.playback.copyWith(errorMessage: null),
       ));
       await _audioHandler.setEqualizerEnabled(true);
     } else {
-      _emit(_getState().copyWith(
-        eqPreset: EqPreset.defaultPresets.first,
-        selectedHeadphoneProfile: null,
+      _emit(state.copyWith(
+        dsp: state.dsp.copyWith(
+          eqPreset: EqPreset.defaultPresets.first,
+          selectedHeadphoneProfile: null,
+        ),
       ));
     }
     try {
@@ -71,8 +83,12 @@ class DspEqEngine {
     } catch (e, st) {
       ErrorLogger.log('Failed to apply headphone profile',
           error: e, stackTrace: st, category: 'DspEqEngine');
-      _emit(_getState().copyWith(
-          errorMessage: 'Failed to apply headphone profile: $e'));
+      final s = _getState();
+      _emit(s.copyWith(
+        playback: s.playback.copyWith(
+          errorMessage: 'Failed to apply headphone profile: $e',
+        ),
+      ));
     }
   }
 
@@ -85,21 +101,26 @@ class DspEqEngine {
       final hadProfile = state.selectedHeadphoneProfile != null;
       gains[bandIndex] = clamped;
       _emit(state.copyWith(
-        eqPreset: EqPreset(
-          name: 'Custom',
-          gains: gains,
-          bassBoost: hadProfile ? 0.0 : state.eqPreset.bassBoost,
+        dsp: state.dsp.copyWith(
+          eqPreset: EqPreset(
+            name: 'Custom',
+            gains: gains,
+            bassBoost: hadProfile ? 0.0 : state.eqPreset.bassBoost,
+          ),
+          selectedHeadphoneProfile: null,
         ),
-        selectedHeadphoneProfile: null,
       ));
     }
     await _audioHandler.setBandGain(bandIndex, clamped);
   }
 
   Future<void> resetToFlat() async {
-    _emit(_getState().copyWith(
-      eqPreset: EqPreset.defaultPresets.first,
-      selectedHeadphoneProfile: null,
+    final state = _getState();
+    _emit(state.copyWith(
+      dsp: state.dsp.copyWith(
+        eqPreset: EqPreset.defaultPresets.first,
+        selectedHeadphoneProfile: null,
+      ),
     ));
     await _audioHandler.resetToFlat();
   }

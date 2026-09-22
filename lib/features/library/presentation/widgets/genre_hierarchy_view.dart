@@ -44,10 +44,33 @@ class GenreCategory {
   }
 }
 
-class GenreHierarchyView extends StatelessWidget {
+class GenreHierarchyView extends StatefulWidget {
   final List<GenreItem> genres;
 
   const GenreHierarchyView({super.key, required this.genres});
+
+  @override
+  State<GenreHierarchyView> createState() => _GenreHierarchyViewState();
+}
+
+class _GenreHierarchyViewState extends State<GenreHierarchyView> {
+  static int _instanceCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _instanceCount++;
+  }
+
+  @override
+  void dispose() {
+    _instanceCount--;
+    if (_instanceCount <= 0) {
+      _instanceCount = 0;
+      GenreCategory.clearCache();
+    }
+    super.dispose();
+  }
 
   List<GenreCategory> _categories(BuildContext context) => [
     GenreCategory(context.l10n.browseGenreRockMetal, Icons.electric_bolt_rounded,
@@ -137,7 +160,7 @@ class GenreHierarchyView extends StatelessWidget {
 
   Widget _buildCategoryGroup(
       BuildContext context, GenreCategory cat, PulsrPalette p) {
-    final matching = genres.where((g) => cat.matches(g.name)).toList();
+    final matching = widget.genres.where((g) => cat.matches(g.name)).toList();
 
     if (matching.isEmpty) return const SizedBox.shrink();
 
@@ -206,7 +229,7 @@ class GenreHierarchyView extends StatelessWidget {
   }
 
   Widget _buildUncategorizedGroup(BuildContext context, List<GenreCategory> categories, PulsrPalette p) {
-    final uncategorized = genres.where((g) {
+    final uncategorized = widget.genres.where((g) {
       final name = g.name;
       return !categories.any((cat) => cat.matches(name));
     }).toList();

@@ -20,6 +20,7 @@ import '../../../data/db/app_database.dart';
 import '../../../data/scanner/media_scanner_service.dart';
 import '../../../domain/usecases/get_songs_usecase.dart';
 import '../../../core/errors/failures.dart';
+import '../../library/cubit/library_cubit.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../sheets/song_info_sheet.dart';
@@ -111,6 +112,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
   // FIX-M12: Use monotonic Stopwatch for 60-second TTL cache for 200 songs shared by Daily Drive and Focus Flow
   List<SongsTableData>? _cachedSongs200;
   Stopwatch? _cachedSongs200Stopwatch;
+  StreamSubscription? _librarySub;
 
   Future<List<SongsTableData>> _getQuickActionSongs(GetSongsUseCase useCase) async {
     if (_cachedSongs200 != null &&
@@ -138,6 +140,13 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
         isLoggedIn ? 'Recommended For You' : 'Trending Egypt';
     _ytmAccountService.loginState.addListener(_onLoginStateChanged);
     _checkNotificationDenied();
+    final libraryCubit = context.read<LibraryCubit?>();
+    if (libraryCubit != null) {
+      _librarySub = libraryCubit.stream.listen((_) {
+        _cachedSongs200 = null;
+        _cachedSongs200Stopwatch = null;
+      });
+    }
   }
 
   Future<void> _checkNotificationDenied() async {
@@ -162,6 +171,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
 
   @override
   void dispose() {
+    _librarySub?.cancel();
     _ytmAccountService.loginState.removeListener(_onLoginStateChanged);
     super.dispose();
   }

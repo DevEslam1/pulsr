@@ -64,14 +64,18 @@ void main() {
 
     test('PlayerState differsFromBeyondPosition executes 5,000 times in under 50ms', () {
       const state1 = PlayerState(
-        position: Duration(seconds: 10),
-        isPlaying: true,
-        duration: Duration(minutes: 3),
+        playback: PlaybackSlice(
+          position: Duration(seconds: 10),
+          isPlaying: true,
+          duration: Duration(minutes: 3),
+        ),
       );
       const state2 = PlayerState(
-        position: Duration(seconds: 11),
-        isPlaying: true,
-        duration: Duration(minutes: 3),
+        playback: PlaybackSlice(
+          position: Duration(seconds: 11),
+          isPlaying: true,
+          duration: Duration(minutes: 3),
+        ),
       );
 
       bool allFalse = true;

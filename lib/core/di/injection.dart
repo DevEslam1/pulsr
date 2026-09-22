@@ -11,6 +11,8 @@ import 'package:pulsr/data/audio/audio_handler.dart';
 import 'package:pulsr/data/audio/per_song_eq_store.dart';
 import 'package:pulsr/data/audio/per_song_volume_store.dart';
 import 'package:pulsr/data/audio/song_rating_store.dart';
+import 'package:pulsr/data/db/app_database.dart';
+import 'package:pulsr/features/downloads/cubit/downloads_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/ytm_search/cubit/ytm_download_cubit.dart';
 import 'injection.config.dart';
@@ -64,9 +66,18 @@ Future<void> configureDependencies() async {
     try {
       await getIt.allReady().timeout(const Duration(seconds: 5));
     } catch (_) {}
+    validateDependencies(getIt);
   } finally {
     if (!_initializationReady.isCompleted) _initializationReady.complete();
   }
+}
+
+void validateDependencies(GetIt getIt) {
+  assert(getIt.isRegistered<AppDatabase>(), 'AppDatabase must be registered in DI');
+  assert(getIt.isRegistered<PulsrAudioHandler>(), 'PulsrAudioHandler must be registered in DI');
+  assert(getIt.isRegistered<PlayerCubit>(), 'PlayerCubit must be registered in DI');
+  assert(getIt.isRegistered<DownloadsCubit>(), 'DownloadsCubit must be registered in DI');
+  assert(getIt.isRegistered<YtmDownloadCubit>(), 'YtmDownloadCubit must be registered in DI');
 }
 
 FutureOr<void> disposeHttpClient(HttpClient client) {

@@ -51,17 +51,33 @@ class _CloudBackupDashboardScreenState
 
   Future<void> _performSync() async {
     setState(() => _isSyncing = true);
-    final success = await _syncService.syncAll();
-    if (mounted) {
-      setState(() => _isSyncing = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(success
-              ? context.l10n.settingsCloudSyncCompleted
-              : context.l10n.settingsCloudSyncFailed),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+    try {
+      final success = await _syncService.syncAll();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(success
+                ? context.l10n.settingsCloudSyncCompleted
+                : context.l10n.settingsCloudSyncFailed),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Cloud sync error',
+          error: e, stackTrace: st, category: 'CloudBackup');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.settingsCloudSyncFailed),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSyncing = false);
+      }
     }
   }
 

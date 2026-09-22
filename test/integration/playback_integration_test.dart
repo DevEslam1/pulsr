@@ -69,10 +69,14 @@ void main() {
       final queue = [testSong1, testSong2, testSong3];
 
       var state = PlayerState(
-        currentSong: testSong1,
-        queue: queue,
-        currentIndex: 0,
-        isPlaying: true,
+        playback: PlaybackSlice(
+          currentSong: testSong1,
+          isPlaying: true,
+        ),
+        queueSlice: QueueSlice(
+          queue: queue,
+          currentIndex: 0,
+        ),
       );
 
       expect(state.hasPreviousNeighbour, isFalse);
@@ -80,8 +84,8 @@ void main() {
 
       // Advance to middle
       state = state.copyWith(
-        currentSong: testSong2,
-        currentIndex: 1,
+        playback: state.playback.copyWith(currentSong: testSong2),
+        queueSlice: state.queueSlice.copyWith(currentIndex: 1),
       );
 
       expect(state.hasPreviousNeighbour, isTrue);
@@ -89,15 +93,17 @@ void main() {
 
       // Advance to end
       state = state.copyWith(
-        currentSong: testSong3,
-        currentIndex: 2,
+        playback: state.playback.copyWith(currentSong: testSong3),
+        queueSlice: state.queueSlice.copyWith(currentIndex: 2),
       );
 
       expect(state.hasPreviousNeighbour, isTrue);
       expect(state.hasNextNeighbour, isFalse);
 
       // Repeat mode 'all' enables next neighbour even at end
-      state = state.copyWith(repeatMode: PlayerRepeatMode.all);
+      state = state.copyWith(
+        playback: state.playback.copyWith(repeatMode: PlayerRepeatMode.all),
+      );
       expect(state.hasNextNeighbour, isTrue);
     });
 

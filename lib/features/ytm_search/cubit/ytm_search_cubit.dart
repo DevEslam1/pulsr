@@ -112,6 +112,19 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
 
   Future<void> retry() => _executeSearch(state.query);
 
+  Future<void> retryAfterCooldown() async {
+    if (_service.isBotCoolingDown) {
+      safeEmit(state.copyWith(
+        errorMessage: 'YouTube is rate-limiting requests. Please wait a few minutes.',
+      ));
+      while (_service.isBotCoolingDown && !isClosed) {
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+      if (isClosed) return;
+    }
+    await retry();
+  }
+
   Future<void> _executeSearch(
     String query, {
     bool isRetryAfterBotBlock = false,
@@ -204,6 +217,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
             } catch (retryErr, retrySt) {
               ErrorLogger.log('Bot block retry search failed',
                   error: retryErr, stackTrace: retrySt, category: 'YtmSearchCubit');
+              return;
             }
           }
         } finally {
@@ -214,8 +228,11 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
       // FIX-C04: Ensure generation guard precedes every emit in catch blocks
       if (effectiveGeneration != _generation || isClosed) return;
       final errorInfo = YtmErrorClassifier.classify(e);
+      final msg = e.isBotBlocked
+          ? 'YouTube is rate-limiting requests. Please wait a few minutes.'
+          : errorInfo.message;
       safeEmit(state.copyWith(
-          isLoading: false, results: [], errorMessage: errorInfo.message));
+          isLoading: false, results: [], errorMessage: msg));
     } catch (e) {
       // FIX-C04: Ensure generation guard precedes emit
       if (effectiveGeneration != _generation || isClosed) return;
