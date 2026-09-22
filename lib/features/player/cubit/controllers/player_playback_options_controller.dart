@@ -11,6 +11,7 @@ import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/lrc_parser.dart';
 import '../../../../data/audio/audio_handler.dart';
 import '../../../../data/audio/per_song_eq_store.dart';
+import '../../../../data/audio/per_song_playback_store.dart';
 import '../../../../data/audio/per_song_volume_store.dart';
 import '../../../../data/audio/playback_bookmark_store.dart';
 import '../../../../data/audio/sleep_timer_manager.dart';
@@ -115,6 +116,11 @@ class PlayerPlaybackOptionsController {
       await _audioHandler.setSpeed(clamped);
       final prefs = await SharedPreferences.getInstance();
       await prefs.setDouble(PrefsKeys.playbackSpeed, clamped);
+      // A-01: remember this track's speed for its next resume.
+      final songId = s.currentSong?.id;
+      if (songId != null) {
+        await PerSongPlaybackStore().setSpeed(songId.toString(), clamped);
+      }
     } catch (e, st) {
       ErrorLogger.log('Failed to set playback speed',
           error: e, stackTrace: st, category: 'PlayerPlaybackOptionsController');
@@ -132,6 +138,11 @@ class PlayerPlaybackOptionsController {
       await _audioHandler.setPitch(clamped);
       final prefs = await SharedPreferences.getInstance();
       await prefs.setDouble(PrefsKeys.playbackPitch, clamped);
+      // A-01: remember this track's pitch for its next resume.
+      final songId = s.currentSong?.id;
+      if (songId != null) {
+        await PerSongPlaybackStore().setPitch(songId.toString(), clamped);
+      }
     } catch (e, st) {
       ErrorLogger.log('Failed to set playback pitch',
           error: e, stackTrace: st, category: 'PlayerPlaybackOptionsController');
@@ -230,6 +241,69 @@ class PlayerPlaybackOptionsController {
       _emit(s.copyWith(
           playback: s.playback.copyWith(errorMessage: 'Volume change failed')));
     }
+  }
+
+  bool _muted = false;
+  double _volumeBeforeMute = 1.0;
+
+  /// A-06: Toggle output mute, remembering the pre-mute volume so unmuting
+  /// restores it. Exposed for the global keyboard-shortcut layer.
+  Future<void> toggleMute() async {
+    try {
+      if (_muted) {
+        await _audioHandler.setVolume(_volumeBeforeMute);
+        _muted = false;
+      } else {
+        _volumeBeforeMute = _audioHandler.volume;
+        await _audioHandler.setVolume(0.0);
+        _muted = true;
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Toggle mute failed',
+          error: e,
+          stackTrace: st,
+          category: 'PlayerPlaybackOptionsController');
+    }
+  }
+
+  bool get isMuted => _muted;
+
+  /// A-01: Restore a track's remembered speed/pitch and reflect its persisted
+  /// volume/EQ overrides in state when it is resumed from a bookmark or its
+  /// last position. Volume gain is already applied dynamically by the audio
+  /// handler from [PerSongVolumeStore]; EQ is applied by the EQ engine.
+  Future<void> applyPerSongPlaybackMemory(SongsTableData song) async {
+    final key = song.id.toString();
+    final store = PerSongPlaybackStore();
+    final speed = store.getSpeed(key);
+    final pitch = store.getPitch(key);
+    final gainDb = PerSongVolumeStore().getGainDbForTrack(key);
+    final eqPreset = PerSongEqStore().getPresetForTrack(key);
+
+    if (_isClosed()) return;
+    if (_getState().currentSong?.id != song.id) return;
+
+    try {
+      if (speed != null) await _audioHandler.setSpeed(speed);
+      if (pitch != null) await _audioHandler.setPitch(pitch);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to restore per-song playback memory',
+          error: e,
+          stackTrace: st,
+          category: 'PlayerPlaybackOptionsController');
+    }
+
+    if (_isClosed()) return;
+    final s = _getState();
+    if (s.currentSong?.id != song.id) return;
+    _emit(s.copyWith(
+      playback: s.playback.copyWith(
+        playbackSpeed: speed ?? s.playbackSpeed,
+        playbackPitch: pitch ?? s.playbackPitch,
+        currentSongVolumeOverrideDb: gainDb,
+        currentSongEqOverride: eqPreset,
+      ),
+    ));
   }
 
   // ──────────────────────────────────────────────

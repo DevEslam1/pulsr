@@ -18,6 +18,10 @@ import 'headset_controls_section.dart';
 import 'settings_section.dart';
 import 'settings_slider_row.dart';
 import 'settings_tiles.dart';
+import 'package:flutter/services.dart';
+import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/utils/error_logger.dart';
+import '../../../../core/widgets/pulsr_pressable.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -118,21 +122,26 @@ class PlaybackSection extends StatelessWidget {
           onChanged: (v) => cubit.setDuckingMode(v ? 'duck' : 'pause'),
         ),
         settingsCardDivider(p),
-        settingsCardDivider(p),
         const _AudioNormalizationSettingTile(),
         settingsCardDivider(p),
         const _PlaybackPresetsTile(),
-        settingsCardDivider(p),
-        const HeadsetControlsSection(),
       ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Normal mode: the playback essentials only. Streaming-engine tuning,
-    // SponsorBlock, multi-output and calibration stay in Professional mode.
-    if (!state.isProfessional) return _buildNormal(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        state.isProfessional ? _buildProfessional(context) : _buildNormal(context),
+        const HeadsetControlsSection(),
+      ],
+    );
+  }
+
+  /// Full playback control surface for Professional mode.
+  Widget _buildProfessional(BuildContext context) {
     final p = context.palette;
     final cubit = context.read<SettingsCubit>();
     return SettingsSection(
@@ -302,12 +311,9 @@ class PlaybackSection extends StatelessWidget {
         const _AdvancedSpeedSettingTile(),
         settingsCardDivider(p),
         // F-27: manual loudness normalization.
-        settingsCardDivider(p),
         const _AudioNormalizationSettingTile(),
         settingsCardDivider(p),
         const _PlaybackPresetsTile(),
-        settingsCardDivider(p),
-        const HeadsetControlsSection(),
       ],
     );
   }
@@ -606,8 +612,7 @@ class _AudioNormalizationSettingTileState
 }
 
 /// One-tap playback presets: Maximum Quality (audiophile), Smooth Playback
-/// (balanced), Poor Network (data saver). Previously defined on the cubit
-/// with zero UI callers.
+/// (balanced), Poor Network (data saver).
 class _PlaybackPresetsTile extends StatelessWidget {
   const _PlaybackPresetsTile();
 
@@ -615,8 +620,16 @@ class _PlaybackPresetsTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final cubit = context.read<SettingsCubit>();
-    Future<void> apply(
-        Future<void> Function() fn, String label) async {
+    final state = context.watch<SettingsCubit>().state;
+
+    final isMaxQuality = state.bitPerfectOutput && state.gaplessPlayback;
+    final isSmooth = !state.bitPerfectOutput &&
+        (state.crossfadeSeconds - 4.0).abs() < 0.2;
+    final isDataSaver = !state.gaplessPlayback &&
+        state.crossfadeSeconds < 0.1 &&
+        state.streamingQuality == YtmAudioQuality.low;
+
+    Future<void> apply(Future<void> Function() fn, String label) async {
       try {
         await fn();
         if (context.mounted) {
@@ -626,59 +639,204 @@ class _PlaybackPresetsTile extends StatelessWidget {
             duration: const Duration(seconds: 2),
           ));
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Failed to apply preset $label',
+            error: e, stackTrace: st, category: 'PlaybackPresets');
+      }
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(Icons.tune_rounded, color: p.textTertiary, size: 20),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(
+        AppSpacing.md,
+        AppSpacing.sm,
+        AppSpacing.md,
+        AppSpacing.md,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const SettingsIconBox(Icons.tune_rounded),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.l10n.playbackPresetsTitle,
+                      style: TextStyle(
+                        color: p.textPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: AppFontSize.body,
+                        letterSpacing: AppTracking.none,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.s2),
+                    Text(
+                      context.l10n.playbackPresetsSubtitle,
+                      style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: AppFontSize.label,
+                        height: 1.32,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth >= 310;
+              if (isWide) {
+                return Row(
+                  children: [
+                    Expanded(
+                      child: _PresetPill(
+                        icon: Icons.high_quality_rounded,
+                        label: context.l10n.playbackPresetMaxQuality,
+                        isSelected: isMaxQuality,
+                        onTap: () => apply(
+                          cubit.applyMaximumQualityPreset,
+                          context.l10n.playbackPresetMaxQuality,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: _PresetPill(
+                        icon: Icons.spa_rounded,
+                        label: context.l10n.playbackPresetSmooth,
+                        isSelected: isSmooth,
+                        onTap: () => apply(
+                          cubit.applySmoothPlaybackPreset,
+                          context.l10n.playbackPresetSmooth,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: _PresetPill(
+                        icon: Icons.data_saver_on_rounded,
+                        label: context.l10n.playbackPresetDataSaver,
+                        isSelected: isDataSaver,
+                        onTap: () => apply(
+                          cubit.applyPoorNetworkPreset,
+                          context.l10n.playbackPresetDataSaver,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }
+              return Wrap(
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xs,
                 children: [
-                  Text(context.l10n.playbackPresetsTitle,
-                      style: TextStyle(
-                          color: p.textPrimary,
-                          fontWeight: FontWeight.w600,
-                          fontSize: AppFontSize.body)),
-                  Text(context.l10n.playbackPresetsSubtitle,
-                      style: TextStyle(
-                          color: p.textTertiary, fontSize: AppFontSize.label, height: 1.32)),
+                  _PresetPill(
+                    icon: Icons.high_quality_rounded,
+                    label: context.l10n.playbackPresetMaxQuality,
+                    isSelected: isMaxQuality,
+                    onTap: () => apply(
+                      cubit.applyMaximumQualityPreset,
+                      context.l10n.playbackPresetMaxQuality,
+                    ),
+                  ),
+                  _PresetPill(
+                    icon: Icons.spa_rounded,
+                    label: context.l10n.playbackPresetSmooth,
+                    isSelected: isSmooth,
+                    onTap: () => apply(
+                      cubit.applySmoothPlaybackPreset,
+                      context.l10n.playbackPresetSmooth,
+                    ),
+                  ),
+                  _PresetPill(
+                    icon: Icons.data_saver_on_rounded,
+                    label: context.l10n.playbackPresetDataSaver,
+                    isSelected: isDataSaver,
+                    onTap: () => apply(
+                      cubit.applyPoorNetworkPreset,
+                      context.l10n.playbackPresetDataSaver,
+                    ),
+                  ),
                 ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PresetPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _PresetPill({
+    required this.icon,
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return PulsrPressable(
+      pressedScale: 0.95,
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
+      child: AnimatedContainer(
+        duration: context.motionMs(180),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xs,
+          vertical: AppSpacing.s10,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? p.accent.withValues(alpha: 0.16)
+              : p.surfaceContainerHigh.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(AppRadii.r12),
+          border: Border.all(
+            color: isSelected ? p.accent : p.hairline,
+            width: isSelected ? 1.4 : 1.0,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? p.accent : p.textSecondary,
+            ),
+            const SizedBox(width: AppSpacing.s6),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: isSelected ? p.accent : p.textPrimary,
+                  fontSize: AppFontSize.label,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                  letterSpacing: AppTracking.none,
+                ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: AppSpacing.s10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            OutlinedButton.icon(
-              onPressed: () => apply(
-                  cubit.applyMaximumQualityPreset, 'Maximum Quality'),
-              icon: const Icon(Icons.high_quality_rounded, size: 18),
-              label: Text(context.l10n.playbackPresetMaxQuality),
-            ),
-            OutlinedButton.icon(
-              onPressed: () =>
-                  apply(cubit.applySmoothPlaybackPreset, 'Smooth Playback'),
-              icon: const Icon(Icons.spa_rounded, size: 18),
-              label: Text(context.l10n.playbackPresetSmooth),
-            ),
-            OutlinedButton.icon(
-              onPressed: () =>
-                  apply(cubit.applyPoorNetworkPreset, 'Data Saver'),
-              icon: const Icon(Icons.data_saver_on_rounded, size: 18),
-              label: Text(context.l10n.playbackPresetDataSaver),
-            ),
-          ],
-        ),
-      ],
+      ),
     );
   }
 }

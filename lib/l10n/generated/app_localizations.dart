@@ -100,6 +100,18 @@ abstract class AppLocalizations {
     Locale('es')
   ];
 
+  /// No description provided for @saveSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Search'**
+  String get saveSearch;
+
+  /// No description provided for @savedSearches.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved Searches'**
+  String get savedSearches;
+
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:

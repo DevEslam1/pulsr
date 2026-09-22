@@ -136,6 +136,10 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
   /// to rebuild only when this changes, without touching the freezed state.
   final ytmOnline = ValueNotifier<YtmOnlineState>(const YtmOnlineState());
 
+  /// H-08: Set before [ytmOnline] is disposed so late async callbacks bail out
+  /// instead of writing to (or reading) a disposed notifier.
+  bool _disposed = false;
+
   PlaylistCubit({required PlaylistUseCases playlistUseCases})
       : _playlistUseCases = playlistUseCases,
         super(const PlaylistState(isLoading: true)) {
@@ -197,6 +201,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
   }
 
   void _onYtmLoginStateChanged() {
+    if (_disposed || isClosed) return;
     if (!getIt<YtmAccountService>().isLoggedIn) {
       clearOnlinePlaylists();
     }
@@ -704,7 +709,9 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
             .removeListener(_onYtmLoginStateChanged);
       } catch (_) {}
     }
-    // FIX-M04: Reset ytmOnline to default before disposal so listeners don't retain stale state
+    // FIX-M04 / H-08: Mark disposed, then reset ytmOnline to default before
+    // disposal so listeners don't retain stale state or touch a dead notifier.
+    _disposed = true;
     ytmOnline.value = const YtmOnlineState();
     ytmOnline.dispose();
     _playlistsSub?.cancel();

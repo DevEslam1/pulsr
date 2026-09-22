@@ -1,5 +1,7 @@
 {
   "@@locale": "es",
+  "saveSearch": "Guardar búsqueda",
+  "savedSearches": "Búsquedas guardadas",
   "appTitle": "Pulsr Música",
   "appTagline": "Sonido puro sin conexión",
   "navHome": "Inicio",

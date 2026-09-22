@@ -13,6 +13,7 @@ import '../../player/cubit/player_cubit.dart';
 import '../../player/cubit/player_state.dart';
 import '../../player/presentation/widgets/tablet_player_bar.dart';
 import 'widgets/landscape_sidebar.dart';
+import 'widgets/player_shortcut_scope.dart';
 import 'widgets/stacked_bottom_dock.dart';
 import 'widgets/tablet_side_inspector.dart';
 
@@ -146,11 +147,27 @@ class _AppShellState extends State<AppShell> {
 
           await SystemNavigator.pop();
         },
-        child: _buildShellContent(
-          context,
-          useRail: useRail,
-          canShowInspector: canShowInspector,
-          extendedRail: extendedRail,
+        child: PlayerShortcutScope(
+          onTogglePlayPause: () =>
+              context.read<PlayerCubit>().togglePlayPause(),
+          onSeekForward: () => context
+              .read<PlayerCubit>()
+              .fastForward(const Duration(seconds: 10)),
+          onSeekBackward: () =>
+              context.read<PlayerCubit>().rewind(const Duration(seconds: 10)),
+          onVolumeUp: () => context.read<PlayerCubit>().adjustVolume(0.05),
+          onVolumeDown: () => context.read<PlayerCubit>().adjustVolume(-0.05),
+          onNext: () => context.read<PlayerCubit>().next(),
+          onPrevious: () => context.read<PlayerCubit>().previous(),
+          onToggleMute: () => context.read<PlayerCubit>().toggleMute(),
+          onToggleLyrics: () => context.read<PlayerCubit>().toggleLyrics(),
+          onToggleQueue: () => context.read<PlayerCubit>().toggleQueue(),
+          child: _buildShellContent(
+            context,
+            useRail: useRail,
+            canShowInspector: canShowInspector,
+            extendedRail: extendedRail,
+          ),
         ),
       ),
     );

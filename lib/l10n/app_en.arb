@@ -1,5 +1,7 @@
 {
   "@@locale": "en",
+  "saveSearch": "Save Search",
+  "savedSearches": "Saved Searches",
   "appTitle": "Pulsr Music",
   "appTagline": "Pure Offline Sound",
   "navHome": "Home",

@@ -184,14 +184,6 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
       curve: Curves.easeOutCubic,
     );
     _anim = Tween<double>(begin: 0.0, end: 0.0).animate(_curvedAnimation);
-    _animController.addListener(_onAnimTick);
-  }
-
-  void _onAnimTick() {
-    if (!mounted) return;
-    setState(() {
-      _dragOffset = _anim.value;
-    });
   }
 
   @override
@@ -202,9 +194,8 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
 
   @override
   void dispose() {
-    // FIX-H7: Stop controller and remove listener before disposal
+    // FIX-H7: Stop controller before disposal (listener no longer attached).
     _animController.stop();
-    _animController.removeListener(_onAnimTick);
     _curvedAnimation.dispose();
     _animController.dispose();
     super.dispose();
@@ -250,19 +241,11 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.sizeOf(context).height;
-    final progress = (_dragOffset / screenHeight).clamp(0.0, 1.0);
 
-    // Only introduce the (saveLayer-backed) opacity layer while a dismiss drag
-    // is actually in progress: at rest the subtree paints exactly as before.
-    // The RepaintBoundary lets the compositor reuse the cached subtree layer
-    // across drag frames instead of re-rasterising it per frame (A-16).
+    // M-02: Drive the dismiss animation through AnimatedBuilder instead of a
+    // per-frame setState listener. Only the transform/opacity layer rebuilds;
+    // the (RepaintBoundary-wrapped) child subtree is passed through unchanged.
     final boundChild = RepaintBoundary(child: widget.child);
-    final child = progress > 0.0
-        ? Opacity(
-            opacity: (1.0 - progress * 0.4).clamp(0.0, 1.0),
-            child: boundChild,
-          )
-        : boundChild;
 
     final dismissAction = CustomSemanticsAction(
       label: context.l10n.dismissPlayer,
@@ -285,9 +268,28 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
           onVerticalDragStart: _onVerticalDragStart,
           onVerticalDragUpdate: _onVerticalDragUpdate,
           onVerticalDragEnd: _onVerticalDragEnd,
-          child: Transform.translate(
-            offset: Offset(0, _dragOffset),
-            child: child,
+          child: AnimatedBuilder(
+            animation: _animController,
+            child: boundChild,
+            builder: (context, child) {
+              // While the controller runs, read the animated value; otherwise
+              // fall back to the live drag offset.
+              final offset =
+                  _animController.isAnimating ? _anim.value : _dragOffset;
+              final progress = (offset / screenHeight).clamp(0.0, 1.0);
+              // Only introduce the (saveLayer-backed) opacity layer while a
+              // dismiss drag is actually in progress.
+              final content = progress > 0.0
+                  ? Opacity(
+                      opacity: (1.0 - progress * 0.4).clamp(0.0, 1.0),
+                      child: child,
+                    )
+                  : child;
+              return Transform.translate(
+                offset: Offset(0, offset),
+                child: content,
+              );
+            },
           ),
         ),
       ),

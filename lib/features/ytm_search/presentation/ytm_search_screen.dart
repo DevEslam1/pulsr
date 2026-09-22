@@ -45,6 +45,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
   final TextEditingController _searchController = TextEditingController();
   List<String> _history = const [];
   bool _historyLoaded = false;
+  bool _historyLoading = false;
 
   @override
   void initState() {
@@ -53,6 +54,9 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
   }
 
   Future<void> _refreshHistory() async {
+    // M-09: Guard against overlapping loads (initState + BlocListener).
+    if (_historyLoading) return;
+    _historyLoading = true;
     try {
       final items = await context.read<YtmSearchCubit>().getSearchHistory();
       if (mounted) {
@@ -68,6 +72,8 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
           _historyLoaded = true;
         });
       }
+    } finally {
+      _historyLoading = false;
     }
   }
 

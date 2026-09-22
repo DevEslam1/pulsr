@@ -168,6 +168,19 @@ class _MiniPlayerState extends State<MiniPlayer> {
       _isUserDragging = false;
       _swipeInFlight = false;
     });
+    // M-01: `_syncPageController` was suppressed while `_swipeInFlight` was set,
+    // so the state emission from skipToQueueItem may have been dropped. Re-sync
+    // now that the flag is clear, otherwise the carousel can lag the queue.
+    final synced = cubit.state;
+    final syncedQueue = synced.queue.isNotEmpty
+        ? synced.queue
+        : (synced.currentSong != null ? [synced.currentSong!] : const <SongsTableData>[]);
+    if (syncedQueue.isNotEmpty) {
+      _syncPageController(
+        synced.currentIndex.clamp(0, syncedQueue.length - 1).toInt(),
+        syncedQueue.length,
+      );
+    }
   }
 
   @override

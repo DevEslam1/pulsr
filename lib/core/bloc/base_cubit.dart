@@ -85,11 +85,11 @@ abstract class PulsrCubit<S> extends Cubit<S> {
     void Function()? onDone,
     bool? cancelOnError,
   }) {
-    // FIX-L1 / C1: Return safe no-op StreamSubscription if cubit is already closed when autoSub is called
+    // FIX-L1 / C1 / C-08: If the cubit is already closed, hand back a documented
+    // no-op subscription instead of a cancelled empty-stream subscription. Both
+    // are safe to cancel again, but the no-op makes the contract explicit.
     if (_closed) {
-      final sub = Stream<T>.empty().listen(null);
-      sub.cancel(); // immediately cancel — no resource leak
-      return sub;
+      return _NoopSubscription<T>();
     }
     final sub = stream.listen(
       (data) {
@@ -205,4 +205,42 @@ abstract class PulsrCubit<S> extends Cubit<S> {
           error: e, stackTrace: s, category: 'PulsrCubit');
     }
   }
+}
+
+/// C-08: A no-op [StreamSubscription] returned by [PulsrCubit.autoSub] when the
+/// cubit is already closed. Every operation is inert, so a caller that stores
+/// it and later calls [cancel] (or adds it to a composite) cannot throw or leak.
+class _NoopSubscription<T> implements StreamSubscription<T> {
+  const _NoopSubscription();
+
+  @override
+  void onData(void Function(T data)? handleData) {}
+
+  @override
+  void onError(Function? handleError) {}
+
+  @override
+  void onDone(void Function()? handleDone) {}
+
+  @override
+  void pause([Future<void>? resumeSignal]) {}
+
+  @override
+  void resume() {}
+
+  @override
+  bool get isPaused => false;
+
+  @override
+  Future<E> asFuture<E>([E? futureValue]) {
+    if (futureValue == null) {
+      return Future<E>.error(
+        StateError('No-op subscription has no completion value'),
+      );
+    }
+    return Future<E>.value(futureValue);
+  }
+
+  @override
+  Future<void> cancel() async {}
 }

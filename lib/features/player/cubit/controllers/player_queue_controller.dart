@@ -40,6 +40,10 @@ class PlayerQueueController {
   final bool Function(SongsTableData? a, SongsTableData? b) _isSameTrack;
   final PlaybackLatencyTracker? _latencyTracker;
 
+  /// A-01: Invoked when a track is resumed (initialPosition provided) so the
+  /// per-song speed/pitch/volume/EQ memory can be re-applied.
+  final void Function(SongsTableData song)? _onResumePerSongMemory;
+
   Timer? _persistQueueDebounce;
 
   // Async guards for coordination
@@ -70,6 +74,7 @@ class PlayerQueueController {
     required void Function() bumpQueueVersion,
     required bool Function(SongsTableData? a, SongsTableData? b) isSameTrack,
     PlaybackLatencyTracker? latencyTracker,
+    void Function(SongsTableData song)? onResumePerSongMemory,
   })  : _audioHandler = audioHandler,
         _repository = repository,
         _getState = getState,
@@ -84,7 +89,8 @@ class PlayerQueueController {
             debouncedPersistQueueSlots ?? (() {}),
         _bumpQueueVersion = bumpQueueVersion,
         _isSameTrack = isSameTrack,
-        _latencyTracker = latencyTracker;
+        _latencyTracker = latencyTracker,
+        _onResumePerSongMemory = onResumePerSongMemory;
 
   void setQueueSlot(
     int slot, {
@@ -295,9 +301,38 @@ class PlayerQueueController {
               autoPlay: false,
             );
           }
-        } catch (_) {}
+        } catch (rollbackError, rollbackSt) {
+          // C-03: The rollback itself failed. Previously this was swallowed,
+          // leaving state claiming `prevQueue` while the audio handler had
+          // nothing loaded. Log it and clear the queue so the UI is truthful.
+          ErrorLogger.log(
+            'Queue rollback failed after load error',
+            error: rollbackError,
+            stackTrace: rollbackSt,
+            category: 'PlayerQueueController',
+          );
+          if (!_isClosed()) {
+            final broken = _getState();
+            _emit(broken.copyWith(
+              queueSlice:
+                  broken.queueSlice.copyWith(queue: const [], currentIndex: 0),
+              playback: broken.playback.copyWith(
+                currentSong: null,
+                isPlaying: false,
+                errorMessage: 'Playback unavailable — please pick another track',
+              ),
+            ));
+          }
+        }
       }
       return;
+    }
+
+    // A-01: On resume (bookmark / last position) restore this track's remembered
+    // speed/pitch/volume/EQ. Fire-and-forget: it re-checks the current song
+    // before applying so a fast skip cannot clobber the new track.
+    if (initialPosition != null && !_isClosed()) {
+      _onResumePerSongMemory?.call(song);
     }
 
     if (_mediaItemResolutionGuard.isValid(capturedGen) && !_isClosed()) {

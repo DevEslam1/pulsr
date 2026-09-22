@@ -380,13 +380,16 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
   }
 
   @override
-  Future<void> close() {
+  Future<void> close() async {
     _storageStatsDebounceTimer?.cancel(); // FIX-A14
     _resubscribeTimer?.cancel();
-    _lastEmitTimeByVideoId.clear();
-    _deleteMutex.protect(() async {
+    // C-01: Await the mutex-protected tombstone clear. Previously the returned
+    // future was dropped, so `super.close()` could complete while the clear was
+    // still queued behind an in-flight write — leaving dirty tombstones behind.
+    await _deleteMutex.protect(() async {
       _deletedAtMsByVideoId.clear();
     });
-    return super.close();
+    _lastEmitTimeByVideoId.clear();
+    await super.close();
   }
 }

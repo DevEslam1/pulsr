@@ -9,6 +9,12 @@ class AppLocalizationsAr extends AppLocalizations {
   AppLocalizationsAr([String locale = 'ar']) : super(locale);
 
   @override
+  String get saveSearch => 'حفظ البحث';
+
+  @override
+  String get savedSearches => 'عمليات البحث المحفوظة';
+
+  @override
   String get appTitle => 'بولسر للموسيقى';
 
   @override

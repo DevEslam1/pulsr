@@ -9,6 +9,12 @@ class AppLocalizationsEs extends AppLocalizations {
   AppLocalizationsEs([String locale = 'es']) : super(locale);
 
   @override
+  String get saveSearch => 'Guardar búsqueda';
+
+  @override
+  String get savedSearches => 'Búsquedas guardadas';
+
+  @override
   String get appTitle => 'Pulsr Música';
 
   @override

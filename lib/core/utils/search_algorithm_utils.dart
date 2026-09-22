@@ -22,6 +22,53 @@ class SearchAlgorithmUtils {
 
   static const int _normCacheMax = 1000;
 
+  /// C-04: codec sets used by the format filter chips.
+  static const Set<String> _flacCodecs = {'flac'};
+  static const Set<String> _mp3Codecs = {'mp3'};
+  static const Set<String> _losslessCodecs = {
+    'flac',
+    'wav',
+    'wave',
+    'alac',
+    'aiff',
+    'aif',
+    'aifc',
+    'dsd',
+    'dsf',
+    'dff',
+    'ape',
+    'wv',
+  };
+
+  /// True when [song]'s real codec (or, as a fallback, its file extension)
+  /// belongs to [codecs]. Used by the FLAC/MP3/Lossless filter chips.
+  static bool _codecMatches(SongsTableData song, Set<String> codecs) {
+    final codec = (song.codec ?? '').trim().toLowerCase();
+    // Trust the real codec from the header when present; only fall back to the
+    // file extension when it is unknown, so a renamed file cannot slip through.
+    if (codec.isNotEmpty) return codecs.contains(codec);
+    final path = song.path.toLowerCase();
+    final dot = path.lastIndexOf('.');
+    if (dot == -1 || dot == path.length - 1) return false;
+    return codecs.contains(path.substring(dot + 1));
+  }
+
+  static bool _isFormatFilter(String filter) =>
+      filter == 'FLAC' || filter == 'MP3' || filter == 'Lossless';
+
+  static bool _formatMatches(SongsTableData song, String filter) {
+    switch (filter) {
+      case 'FLAC':
+        return _codecMatches(song, _flacCodecs);
+      case 'MP3':
+        return _codecMatches(song, _mp3Codecs);
+      case 'Lossless':
+        return _codecMatches(song, _losslessCodecs);
+      default:
+        return true;
+    }
+  }
+
   // LRU bounded cache to prevent unbounded retention. Keyed by raw metadata so
   // a retagged song is not served stale normalized text; the superseded entry
   // ages out through LRU eviction.
@@ -159,7 +206,13 @@ class SearchAlgorithmUtils {
         _ => matchesField(title) || matchesField(artist) || matchesField(album),
       };
 
-      if (matches) {
+      // C-04: format chips additionally constrain by codec while still
+      // honouring the text query (format filters behave as "All" for fields).
+      final formatOk = _isFormatFilter(filter)
+          ? _formatMatches(song, filter)
+          : true;
+
+      if (matches && formatOk) {
         results.add(song);
       }
     }

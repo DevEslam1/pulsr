@@ -265,4 +265,12 @@ class AuthCubit extends PulsrCubit<AuthState> {
     if (isClosed) return;
     safeEmit(const AuthState(status: AuthStatus.unauthenticated));
   }
+
+  @override
+  Future<void> close() {
+    // H-01: The sync-dedupe stopwatch ran for the whole app lifetime; stop it
+    // so the cubit holds no live timer resource after disposal.
+    _syncStopwatch.stop();
+    return super.close();
+  }
 }
