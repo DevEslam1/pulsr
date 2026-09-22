@@ -92,7 +92,9 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
     PulsrModalTracker.isModalOpen.removeListener(_onModalChanged);
     _dragVolumeNotifier.dispose();
     _dragSeekNotifier.dispose();
-    _maybeUpdateDock(0.0, false);
+    // Reset synchronously: the deferred post-frame callback in _maybeUpdateDock
+    // is skipped once the widget is unmounted, leaving a stale dock reservation.
+    PulsrDockTracker.updateDock(height: 0.0, miniPlayer: false);
     super.dispose();
   }
 

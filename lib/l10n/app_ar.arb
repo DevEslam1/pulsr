@@ -1,5 +1,8 @@
 {
   "@@locale": "ar",
+  "customDurationMinutes": "مدة مخصصة (بالدقائق).",
+  "partialBatchDetected": "تم اكتشاف دفعة جزئية",
+  "somethingWentWrong": "حدث خطأ ما",
   "saveSearch": "حفظ البحث",
   "savedSearches": "عمليات البحث المحفوظة",
   "appTitle": "بولسر للموسيقى",

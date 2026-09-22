@@ -296,6 +296,7 @@ class PlayerThemeScaffold extends StatelessWidget {
                             repeatMode: state.repeatMode,
                             hasPrevious: state.hasPreviousNeighbour,
                             hasNext: state.hasNextNeighbour,
+                            abLoopActive: state.abLoopEnabled,
                             primaryColor: activeColor,
                             mainButtonSize: metrics.isTablet
                                 ? 72

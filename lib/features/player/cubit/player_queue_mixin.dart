@@ -3,6 +3,11 @@ part of 'player_cubit.dart';
 mixin PlayerQueueOps on PulsrCubit<PlayerState> {
   PlayerQueueController get queueController;
 
+  /// Invalidates any in-flight mediaItem resolution. Called when the user
+  /// explicitly selects a track so a slow DB lookup for the previous selection
+  /// cannot clobber the new one when it finally completes.
+  void invalidateMediaItemResolution();
+
   Future<void> playRadioStation(RadioStation station) =>
       queueController.playRadioStation(station);
 
@@ -11,13 +16,15 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
     List<SongsTableData>? queue,
     Duration? initialPosition,
     bool openPlayerIfPlaying = true,
-  }) =>
-      queueController.playSong(
-        song,
-        queue: queue,
-        initialPosition: initialPosition,
-        openPlayerIfPlaying: openPlayerIfPlaying,
-      );
+  }) {
+    invalidateMediaItemResolution();
+    return queueController.playSong(
+      song,
+      queue: queue,
+      initialPosition: initialPosition,
+      openPlayerIfPlaying: openPlayerIfPlaying,
+    );
+  }
 
   Future<void> playNext(SongsTableData song) =>
       queueController.playNext(song);

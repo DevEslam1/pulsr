@@ -105,6 +105,29 @@ class MainActivity : AudioServiceActivity() {
         return lower.contains("youtu.be") || lower.contains("youtube.com")
     }
 
+    private fun isSafeUri(uri: Uri): Boolean {
+        val scheme = uri.scheme?.lowercase() ?: return false
+        val allowedSchemes = listOf("content", "file", "http", "https", "pulsr")
+        if (scheme !in allowedSchemes) {
+            Log.w("MainActivity", "Rejected URI with unsafe scheme: $scheme")
+            return false
+        }
+        if (scheme == "file") {
+            val path = uri.path ?: return false
+            @Suppress("DEPRECATION")
+            val extStorage = android.os.Environment.getExternalStorageDirectory()?.path
+            val extFilesPath = getExternalFilesDir(null)?.path
+            val filesDirPath = filesDir?.path
+            val cacheDirPath = cacheDir?.path
+            val allowedRoots = listOfNotNull(extStorage, extFilesPath, filesDirPath, cacheDirPath, "/storage", "/sdcard")
+            if (!allowedRoots.any { path.startsWith(it) }) {
+                Log.w("MainActivity", "Rejected file URI outside allowed directories: $path")
+                return false
+            }
+        }
+        return true
+    }
+
     private fun handleAudioIntent(intent: Intent?, fromColdStart: Boolean) {
         // Assistant / voice-search entry point: bring the app forward so the
         // Dart layer can resume or start playback. Previously dropped.
@@ -123,12 +146,13 @@ class MainActivity : AudioServiceActivity() {
         // Multi-share (EXTRA_STREAM as list) previously dropped all but one.
         if (intent.action == Intent.ACTION_SEND_MULTIPLE || intent.hasExtra(Intent.EXTRA_STREAM)) {
             try {
-                val list: ArrayList<Uri>? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                val rawList: ArrayList<Uri>? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
                 } else {
                     @Suppress("DEPRECATION")
                     intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)
                 }
+                val list = rawList?.filter { isSafeUri(it) }
                 if (!list.isNullOrEmpty()) {
                     synchronized(pendingAudioUris) {
                         for (u in list) pendingAudioUris.addLast(u.toString())
@@ -148,6 +172,10 @@ class MainActivity : AudioServiceActivity() {
             intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
         }
         val uri = intent.data ?: streamUri ?: (if (!textExtra.isNullOrEmpty() && (isYouTubeUrl(textExtra) || isProxyText(textExtra))) Uri.parse(textExtra) else null) ?: return
+        if (!isSafeUri(uri)) {
+            Log.w("MainActivity", "Ignoring unsafe URI: $uri")
+            return
+        }
         if (!isAudioIntent(intent, uri)) return
 
         if (uri.scheme?.equals("content", ignoreCase = true) == true) {

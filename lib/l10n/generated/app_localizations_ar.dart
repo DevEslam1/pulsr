@@ -9,6 +9,15 @@ class AppLocalizationsAr extends AppLocalizations {
   AppLocalizationsAr([String locale = 'ar']) : super(locale);
 
   @override
+  String get customDurationMinutes => 'مدة مخصصة (بالدقائق).';
+
+  @override
+  String get partialBatchDetected => 'تم اكتشاف دفعة جزئية';
+
+  @override
+  String get somethingWentWrong => 'حدث خطأ ما';
+
+  @override
   String get saveSearch => 'حفظ البحث';
 
   @override

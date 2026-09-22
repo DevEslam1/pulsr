@@ -89,9 +89,6 @@ class PlayerTransportController {
       final enginePlaying = _audioHandler.playbackState.value.playing;
       final shouldPause = state.isPlaying || enginePlaying;
 
-      if (state.isPlaying != shouldPause) {
-        _emit(state.copyWith(playback: state.playback.copyWith(isPlaying: shouldPause)));
-      }
       if (shouldPause) {
         _onUserPausedIntentionally?.call(true);
         _emit(state.copyWith(playback: state.playback.copyWith(isPlaying: false)));
@@ -99,6 +96,10 @@ class PlayerTransportController {
       } else {
         if (state.currentSong == null && state.queue.isEmpty) return;
         _onUserPausedIntentionally?.call(false);
+        // Optimistically reflect play; the engine observer confirms it.
+        if (!state.isPlaying) {
+          _emit(state.copyWith(playback: state.playback.copyWith(isPlaying: true)));
+        }
         await _audioHandler.play();
       }
     } catch (e, st) {
@@ -134,7 +135,7 @@ class PlayerTransportController {
           }
           final pending = _pendingSeek;
           _pendingSeek = null;
-          if (pending != null) {
+          if (pending != null && !_isClosed()) {
             _lastSeekMs = _seekStopwatch.elapsedMilliseconds;
             _audioHandler.seek(pending).catchError((Object e, StackTrace st) {
               ErrorLogger.log('Coalesced seek failed',
@@ -316,5 +317,6 @@ class PlayerTransportController {
   void dispose() {
     _seekThrottleTimer?.cancel();
     _seekThrottleTimer = null;
+    _pendingSeek = null;
   }
 }

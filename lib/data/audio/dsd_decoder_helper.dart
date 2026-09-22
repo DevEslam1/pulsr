@@ -156,6 +156,9 @@ class DsdDecoderHelper {
   /// [dopContainerBits] selects the PCM container width: 24 (standard DoP
   /// packing, default) or 32 (zero-padded 32-bit frames for DACs that require
   /// 32-bit USB frames). Any other value falls back to 24.
+  /// Maximum allowed file size for in-memory DSD decoding (300 MB) (Bug 6 & 18).
+  static const int kMaxInMemoryDecodeBytes = 300 * 1024 * 1024;
+
   static Future<AudioSource> decodeDsdFile(
     SongsTableData song,
     MediaItem tag, {
@@ -166,6 +169,12 @@ class DsdDecoderHelper {
     final file = File(song.path);
     if (!await file.exists()) {
       throw FileSystemException('DSD file not found', song.path);
+    }
+    final fileSize = await file.length();
+    if (fileSize > kMaxInMemoryDecodeBytes) {
+      throw DsdUnsupportedException(
+        'DSD file exceeds max in-memory decode size of 300 MB (${(fileSize / (1024 * 1024)).toStringAsFixed(1)} MB)',
+      );
     }
     final bytes = await file.readAsBytes();
     final ext = song.path.split('.').last.toLowerCase();
@@ -351,7 +360,9 @@ class DsdDecoderHelper {
       throw FormatException('Not a valid DFF file: magic is $magic');
     }
 
-    int pos = 12;
+    // Bytes 0-3 = 'FRM8', 4-11 = chunk size, 12-15 = form type ('DSD ');
+    // the first real sub-chunk begins at offset 16.
+    int pos = 16;
     int dsdRate = 64;
     int dataOffset = -1;
     int dataSize = -1;

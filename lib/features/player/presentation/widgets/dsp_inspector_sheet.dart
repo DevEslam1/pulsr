@@ -30,6 +30,15 @@ class DspInspectorSheet extends StatefulWidget {
     );
   }
 
+  /// Redacts absolute device file paths before exporting for privacy (S2).
+  @visibleForTesting
+  static String sanitizeReport(String raw) {
+    return raw
+        .replaceAll(RegExp(r'(/data/user/\d+/[^"\s\\]+)'), '[REDACTED_APP_PATH]')
+        .replaceAll(RegExp(r'(/storage/emulated/\d+/[^"\s\\]+)'), '[REDACTED_STORAGE_PATH]')
+        .replaceAll(RegExp(r'([A-Za-z]:\\[^"\s]+)'), '[REDACTED_LOCAL_PATH]');
+  }
+
   @override
   State<DspInspectorSheet> createState() => _DspInspectorSheetState();
 }
@@ -92,7 +101,11 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
     }
   }
 
-  String exportReportForShare() => _report?.toFormattedJson() ?? '{}';
+  String exportReportForShare() {
+    final raw = _report?.toFormattedJson() ?? '{}';
+    // S2: Redact absolute device file paths before exporting for privacy
+    return DspInspectorSheet.sanitizeReport(raw);
+  }
 
   Future<void> _shareReport(BuildContext context) async {
     if (_report == null) return;

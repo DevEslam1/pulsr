@@ -479,6 +479,24 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
   SmartCriteria _allLocal(SmartCriteria criteria) =>
       SmartCriteria(matchAll: criteria.matchAll);
 
+  SongRatingStore? get _ratingStore {
+    try {
+      if (getIt.isRegistered<SongRatingStore>()) {
+        return getIt<SongRatingStore>();
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  PulsrAudioHandler? get _audioHandler {
+    try {
+      if (getIt.isRegistered<PulsrAudioHandler>()) {
+        return getIt<PulsrAudioHandler>();
+      }
+    } catch (_) {}
+    return null;
+  }
+
   /// matchAll post-step: AND-filter by every prefs-backed rule, then rating
   /// sort and limit.
   List<SongsTableData> _postProcess(
@@ -487,13 +505,24 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     List<SmartRule> dartRules,
   ) {
     var list = songs;
+    final ratingStore = _ratingStore;
+    final audioHandler = _audioHandler;
     if (dartRules.isNotEmpty) {
       list = list
-          .where((s) => dartRules.every((r) => _matchesDartRule(s, r)))
+          .where((s) => dartRules.every((r) => _matchesDartRule(
+                s,
+                r,
+                ratingStore: ratingStore,
+                audioHandler: audioHandler,
+              )))
           .toList();
     }
     if (criteria.sortBy == 'rating') {
-      list = _sortByRating(list, ascending: criteria.sortAscending);
+      list = _sortByRating(
+        list,
+        ascending: criteria.sortAscending,
+        ratingStore: ratingStore,
+      );
     }
     if (criteria.limit != null && criteria.limit! > 0) {
       list = list.take(criteria.limit!).toList();
@@ -510,13 +539,24 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     SmartCriteria criteria,
     List<SmartRule> dartRules,
   ) {
+    final ratingStore = _ratingStore;
+    final audioHandler = _audioHandler;
     var list = merged
         .where((s) =>
             baseIds.contains(s.id) ||
-            dartRules.any((r) => _matchesDartRule(s, r)))
+            dartRules.any((r) => _matchesDartRule(
+                  s,
+                  r,
+                  ratingStore: ratingStore,
+                  audioHandler: audioHandler,
+                )))
         .toList();
     if (criteria.sortBy == 'rating') {
-      list = _sortByRating(list, ascending: criteria.sortAscending);
+      list = _sortByRating(
+        list,
+        ascending: criteria.sortAscending,
+        ratingStore: ratingStore,
+      );
     }
     if (criteria.limit != null && criteria.limit! > 0) {
       list = list.take(criteria.limit!).toList();
@@ -525,18 +565,20 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
   }
 
   /// Star rating (0–5, prefs-backed) for [song].
-  int _ratingOf(SongsTableData song) {
+  int _ratingOf(SongsTableData song, [SongRatingStore? store]) {
     try {
-      if (getIt.isRegistered<SongRatingStore>()) {
-        return getIt<SongRatingStore>().getRating(song.id.toString());
+      final s = store ?? _ratingStore;
+      if (s != null) {
+        return s.getRating(song.id.toString());
       }
     } catch (_) {}
     return 0;
   }
 
   /// Evaluates one rating rule (numeric operators + between) in Dart.
-  bool _matchesRating(SongsTableData song, SmartRule rule) {
-    final rating = _ratingOf(song);
+  bool _matchesRating(SongsTableData song, SmartRule rule,
+      {SongRatingStore? ratingStore}) {
+    final rating = _ratingOf(song, ratingStore);
     final valStr = rule.value.trim();
     if (rule.operator == SmartOperator.between) {
       final b = _parseIntBetween(valStr);
@@ -562,19 +604,26 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
   }
 
   /// Dispatches a prefs-backed rule to its concrete evaluator.
-  bool _matchesDartRule(SongsTableData song, SmartRule rule) =>
+  bool _matchesDartRule(
+    SongsTableData song,
+    SmartRule rule, {
+    SongRatingStore? ratingStore,
+    PulsrAudioHandler? audioHandler,
+  }) =>
       switch (rule.field) {
-        SmartRuleField.rating => _matchesRating(song, rule),
-        SmartRuleField.bpm => _matchesBpm(song, rule),
+        SmartRuleField.rating =>
+          _matchesRating(song, rule, ratingStore: ratingStore),
+        SmartRuleField.bpm =>
+          _matchesBpm(song, rule, audioHandler: audioHandler),
         _ => false,
       };
 
   /// Manual BPM override (40–240, prefs-backed) for [song], or null.
-  double? _bpmOf(SongsTableData song) {
+  double? _bpmOf(SongsTableData song, [PulsrAudioHandler? handler]) {
     try {
-      if (getIt.isRegistered<PulsrAudioHandler>()) {
-        return getIt<PulsrAudioHandler>()
-            .bpmOverrideStore
+      final h = handler ?? _audioHandler;
+      if (h != null) {
+        return h.bpmOverrideStore
             .getBpmForTrack(PulsrAudioHandler.trackKeyFor(song));
       }
     } catch (_) {}
@@ -582,8 +631,9 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
   }
 
   /// Evaluates one BPM rule (numeric operators + between) in Dart.
-  bool _matchesBpm(SongsTableData song, SmartRule rule) {
-    final bpm = _bpmOf(song);
+  bool _matchesBpm(SongsTableData song, SmartRule rule,
+      {PulsrAudioHandler? audioHandler}) {
+    final bpm = _bpmOf(song, audioHandler);
     if (bpm == null) return false;
     final valStr = rule.value.trim();
     if (rule.operator == SmartOperator.between) {
@@ -609,12 +659,20 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     }
   }
 
-  /// Sorts by rating (title tiebreak for stability).
-  List<SongsTableData> _sortByRating(List<SongsTableData> songs,
-      {bool ascending = false}) {
+  /// Sorts by rating (title tiebreak for stability) with memoized ratings (Issue 22).
+  List<SongsTableData> _sortByRating(
+    List<SongsTableData> songs, {
+    bool ascending = false,
+    SongRatingStore? ratingStore,
+  }) {
+    final store = ratingStore ?? _ratingStore;
+    final ratingMap = <int, int>{};
+    int ratingFor(SongsTableData s) =>
+        ratingMap.putIfAbsent(s.id, () => _ratingOf(s, store));
+
     final sorted = List<SongsTableData>.from(songs);
     sorted.sort((a, b) {
-      final cmp = _ratingOf(a).compareTo(_ratingOf(b));
+      final cmp = ratingFor(a).compareTo(ratingFor(b));
       if (cmp != 0) return ascending ? cmp : -cmp;
       return a.title.toLowerCase().compareTo(b.title.toLowerCase());
     });

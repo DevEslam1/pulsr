@@ -9,6 +9,9 @@ abstract final class SongSource {
   /// A YouTube track that has no local file yet. `path` holds a
   /// `ytmusic://<videoId>` sentinel, so any path-based feature must skip it.
   static const String youtube = 'youtube';
+
+  /// A live internet radio HTTP / HTTPS stream. `path` holds the stream URL.
+  static const String radio = 'radio';
 }
 
 class SongsTable extends Table {

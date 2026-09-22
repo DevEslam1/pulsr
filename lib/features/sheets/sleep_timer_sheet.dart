@@ -243,7 +243,7 @@ class SleepTimerSheet extends StatelessWidget {
                                 child: Icon(Icons.timer_outlined,
                                     color: p.accent),
                               ),
-                              title: Text('Custom duration (minutes)…',
+                              title: Text(context.l10n.customDurationMinutes,
                                   style: TextStyle(color: p.textPrimary)),
                               trailing: Icon(Icons.chevron_right_rounded,
                                   color: p.textSecondary),

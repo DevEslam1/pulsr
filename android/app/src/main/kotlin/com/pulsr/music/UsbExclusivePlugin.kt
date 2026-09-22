@@ -11,6 +11,8 @@ import android.hardware.usb.UsbDeviceConnection
 import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.core.content.ContextCompat
 import io.flutter.plugin.common.BinaryMessenger
@@ -76,7 +78,7 @@ class UsbExclusivePlugin(
     private var resRaw: Int? = null
 
     private var nativeLoaded = false
-    private var streaming = false
+    @Volatile private var streaming = false
     private var claimedStreamingInterface: UsbInterface? = null
 
     // Raw UAC2 isochronous streaming, implemented in UsbAudioSink.cpp.
@@ -607,30 +609,51 @@ class UsbExclusivePlugin(
         // interface so the exclusive endpoint is ours.
         val claimed = try { conn.claimInterface(iface, true) } catch (_: Exception) { false }
         if (!claimed) return failure("claim_failed")
-        try { conn.setInterface(iface) } catch (_: Exception) {}
 
-        val fd = try { conn.fileDescriptor } catch (_: Exception) { -1 }
-        if (fd < 0) {
-            try { conn.releaseInterface(iface) } catch (_: Exception) {}
-            return failure("no_fd")
+        val mainHandler = Handler(Looper.getMainLooper())
+        val watchdog = Runnable {
+            synchronized(this) {
+                if (!streaming) {
+                    try { conn.releaseInterface(iface) } catch (_: Exception) {}
+                    Log.w(TAG, "Watchdog: released force-claimed interface due to streaming startup timeout")
+                }
+            }
         }
-        val ok = try {
-            nativeUsbStreamStart(
-                fd, ep.address, ep.interfaceNumber, ep.altSetting,
-                sampleRate, channels,
-            )
+        mainHandler.postDelayed(watchdog, 5000L)
+
+        try {
+            try { conn.setInterface(iface) } catch (_: Exception) {}
+
+            val fd = try { conn.fileDescriptor } catch (_: Exception) { -1 }
+            if (fd < 0) {
+                mainHandler.removeCallbacks(watchdog)
+                try { conn.releaseInterface(iface) } catch (_: Exception) {}
+                return failure("no_fd")
+            }
+            val ok = try {
+                nativeUsbStreamStart(
+                    fd, ep.address, ep.interfaceNumber, ep.altSetting,
+                    sampleRate, channels,
+                )
+            } catch (e: Throwable) {
+                Log.w(TAG, "nativeUsbStreamStart failed: ${e.message}")
+                false
+            }
+            if (!ok) {
+                mainHandler.removeCallbacks(watchdog)
+                try { conn.releaseInterface(iface) } catch (_: Exception) {}
+                return failure("native_start_failed")
+            }
+            mainHandler.removeCallbacks(watchdog)
+            streaming = true
+            claimedStreamingInterface = iface
+            emitState()
+            return buildStatus() + mapOf("success" to true)
         } catch (e: Exception) {
-            Log.w(TAG, "nativeUsbStreamStart failed: ${e.message}")
-            false
-        }
-        if (!ok) {
+            mainHandler.removeCallbacks(watchdog)
             try { conn.releaseInterface(iface) } catch (_: Exception) {}
-            return failure("native_start_failed")
+            throw e
         }
-        streaming = true
-        claimedStreamingInterface = iface
-        emitState()
-        return buildStatus() + mapOf("success" to true)
     }
 
     private fun stopStreamingInternal(): Map<String, Any?> {
@@ -647,6 +670,7 @@ class UsbExclusivePlugin(
         return buildStatus() + mapOf("success" to true)
     }
 
+    @Synchronized
     private fun closeLocked() {
         if (streaming) {
             if (nativeLoaded) {

@@ -151,7 +151,10 @@ AppError resolveAppError(Object error, [StackTrace? stackTrace]) {
 
   final msg = error.toString();
   final lower = msg.toLowerCase();
-  if (lower.contains('bot') || lower.contains('sign in to confirm you’re not a bot')) {
+  // Word-boundary match so unrelated words containing "bot" (robot, bottle,
+  // both, sabotage) are not misreported as a YouTube bot challenge.
+  if (RegExp(r'\bbots?\b').hasMatch(lower) ||
+      lower.contains('sign in to confirm you’re not a bot')) {
     return YtmError(
       code: 'YTM_BOT_BLOCK',
       userMessage: 'YouTube Music bot check triggered. Please wait a moment.',

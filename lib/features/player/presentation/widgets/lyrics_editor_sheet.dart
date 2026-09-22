@@ -34,6 +34,11 @@ class LyricsEditorSheet extends StatefulWidget {
 
 class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
   late List<LyricsLine> _lines;
+  // Stable per-row widget keys. Keying rows by their list index desynced the
+  // text fields after a deletion (row i+1's editing state moved to key i while
+  // its `initialValue` was only read on first build). Keys travel with their
+  // line through add/delete/sort so the displayed text always matches `_lines`.
+  late List<Key> _rowKeys;
   // Live playback position. The sheet used to stamp `widget.currentPosition`,
   // captured when it opened, so every "stamp" and the "Now at" header were
   // frozen at open time while playback kept running underneath.
@@ -52,6 +57,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
             timestamp: const Duration(seconds: 0), text: 'First lyric line...'),
       ];
     }
+    _rowKeys = List.generate(_lines.length, (_) => UniqueKey());
     try {
       final cubit = context.read<PlayerCubit>();
       _positionSub = cubit.rawPositionStream.listen((pos) {
@@ -114,18 +120,26 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
     setState(() {
       _lines.add(
           LyricsLine(timestamp: _livePosition.value, text: 'New line...'));
+      _rowKeys.add(UniqueKey());
     });
   }
 
   void _deleteLine(int index) {
     setState(() {
-      if (_lines.length > 1) _lines.removeAt(index);
+      if (_lines.length > 1) {
+        _lines.removeAt(index);
+        _rowKeys.removeAt(index);
+      }
     });
   }
 
   void _sortLines() {
     setState(() {
-      _lines.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+      final pairs = List.generate(
+          _lines.length, (i) => (_lines[i], _rowKeys[i]));
+      pairs.sort((a, b) => a.$1.timestamp.compareTo(b.$1.timestamp));
+      _lines = [for (final p in pairs) p.$1];
+      _rowKeys = [for (final p in pairs) p.$2];
     });
   }
 
@@ -277,11 +291,9 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                       // Text input field
                         Expanded(
                           child: TextFormField(
-                            // Keyed by index only: including the timestamp
-                            // rebuilt the field on every stamp-tap and dropped
-                            // keyboard focus. Timestamp edits still repaint
-                            // via the stamp label beside this field.
-                            key: ValueKey('lyric_$index'),
+                            // Stable per-row key so deleting a row cannot make
+                            // the wrong line's editing state render here.
+                            key: _rowKeys[index],
                           initialValue: line.text,
                           style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.bodySmall),
                           decoration: const InputDecoration(

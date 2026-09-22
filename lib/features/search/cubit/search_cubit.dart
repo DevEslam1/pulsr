@@ -142,6 +142,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
     // Ensure the initial load has completed, otherwise it could overwrite the
     // entry we are about to write with the pre-load (empty) snapshot.
     await savedSearchesReady;
+    if (isClosed) return;
     final query = state.query.trim();
     if (query.isEmpty) return;
     final entry = encodeSavedSearch(query, state.selectedFilter);
@@ -155,6 +156,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
 
   Future<void> removeSavedSearch(String entry) async {
     await savedSearchesReady;
+    if (isClosed) return;
     final updated =
         savedSearches.value.where((e) => e != entry).toList(growable: false);
     savedSearches.value = List.unmodifiable(updated);
@@ -385,12 +387,13 @@ class SearchCubit extends PulsrCubit<SearchState> {
   }
 
   @override
-  Future<void> close() {
+  Future<void> close() async {
     _debounceTimer?.cancel();
     _searchSub?.cancel();
-    // C-05: reset then dispose the saved-search notifier.
+    await super.close();
+    // Dispose after the cubit is marked closed so in-flight loads/saves bail out
+    // before writing to the notifier.
     savedSearches.value = const [];
     savedSearches.dispose();
-    return super.close();
   }
 }

@@ -34,8 +34,9 @@ class DecodedSlot {
 /// state emission; all JSON mapping, validation and clamping lives here and is
 /// unit tested. Semantics mirror the previous inline implementation exactly.
 class QueueSlotCodec {
+  static const int currentSchemaVersion = 1;
   static const int maxSlotIndex = 2;
-  static const int maxDocumentKeys = 4; // three slots + activeSlot
+  static const int maxDocumentKeys = 5; // three slots + activeSlot + schemaVersion
   // FIX-L06: 7 days to support audiobooks and long podcasts
   static const int maxPositionMs = 7 * 24 * 3600 * 1000;
   static const double minSpeed = 0.1;
@@ -43,7 +44,9 @@ class QueueSlotCodec {
 
   static Map<String, dynamic> encodeDocument(
       Map<int, SlotView> slots, int activeSlot) {
-    final data = <String, dynamic>{};
+    final data = <String, dynamic>{
+      'schemaVersion': currentSchemaVersion,
+    };
     for (final entry in slots.entries) {
       final songs = entry.value.songs;
       data['${entry.key}'] = {
@@ -77,15 +80,21 @@ class QueueSlotCodec {
   }
 
   /// Validates the top-level document. Returns null when corrupt/oversized
-  /// (DoS guard: three slots + activeSlot key).
+  /// (DoS guard: three slots + activeSlot + schemaVersion key).
   static Map<String, dynamic>? decodeDocument(Object? decoded) {
     if (decoded is! Map) return null;
     if (decoded.length > maxDocumentKeys) return null;
-    return Map<String, dynamic>.from(decoded);
+    final map = Map<String, dynamic>.from(decoded);
+    final version = map['schemaVersion'];
+    if (version != null && (version is! int || version > currentSchemaVersion || version < 1)) {
+      return null;
+    }
+    return map;
   }
 
   /// Parses a restorable slot key ('0'..'2'); null for anything else.
   static int? slotIndexForKey(String key) {
+    if (key == 'schemaVersion' || key == 'activeSlot') return null;
     final i = int.tryParse(key);
     if (i == null || i < 0 || i > maxSlotIndex) return null;
     return i;

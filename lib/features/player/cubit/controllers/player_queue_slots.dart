@@ -366,6 +366,17 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       ));
       return;
     }
+    final existingIdx = state.queue.indexWhere((s) => _isSameTrack(s, song));
+    if (existingIdx != -1) {
+      if (existingIdx == state.currentIndex ||
+          existingIdx == state.queue.length - 1) {
+        return;
+      }
+      // Reorder existing song to end instead of enqueuing duplicate into audio handler
+      await reorderQueue(existingIdx, state.queue.length - 1);
+      return;
+    }
+
     try {
       await _audioHandler.addToQueueEnd(song);
     } catch (e, st) {
@@ -380,17 +391,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       }
       return;
     }
-    final updatedQueue = List<SongsTableData>.from(state.queue);
-    final existingIdx = updatedQueue.indexWhere((s) => _isSameTrack(s, song));
-    if (existingIdx != -1) {
-      if (existingIdx != state.currentIndex &&
-          existingIdx != updatedQueue.length - 1) {
-        final item = updatedQueue.removeAt(existingIdx);
-        updatedQueue.add(item);
-      }
-    } else {
-      updatedQueue.add(song);
-    }
+    final updatedQueue = [...state.queue, song];
     setQueueSlot(
       state.activeQueueSlot,
       songs: updatedQueue,
@@ -403,6 +404,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     _emit(state.copyWith(
       queueSlice: state.queueSlice.copyWith(queue: updatedQueue),
     ));
+    _updateWidgetThrottled();
   }
 
   Future<void> playNext(SongsTableData song) async {
@@ -415,6 +417,18 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       ));
       return;
     }
+    final existingIdx = state.queue.indexWhere((s) => _isSameTrack(s, song));
+    final targetSlot = (state.currentIndex + 1).clamp(0, state.queue.length);
+    if (existingIdx != -1) {
+      if (existingIdx == state.currentIndex || existingIdx == targetSlot) {
+        return;
+      }
+      final adjustedTarget =
+          targetSlot > existingIdx ? targetSlot - 1 : targetSlot;
+      await reorderQueue(existingIdx, adjustedTarget);
+      return;
+    }
+
     try {
       await _audioHandler.insertNextInQueue(song);
     } catch (e, st) {
@@ -430,18 +444,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       return;
     }
     final updatedQueue = List<SongsTableData>.from(state.queue);
-    final existingIdx = updatedQueue.indexWhere((s) => _isSameTrack(s, song));
-    final targetSlot = (state.currentIndex + 1).clamp(0, updatedQueue.length);
-    if (existingIdx != -1) {
-      if (existingIdx != state.currentIndex && existingIdx != targetSlot) {
-        final item = updatedQueue.removeAt(existingIdx);
-        final adjustedTarget =
-            targetSlot > existingIdx ? targetSlot - 1 : targetSlot;
-        updatedQueue.insert(adjustedTarget.clamp(0, updatedQueue.length), item);
-      }
-    } else {
-      updatedQueue.insert(targetSlot, song);
-    }
+    updatedQueue.insert(targetSlot, song);
     setQueueSlot(
       state.activeQueueSlot,
       songs: updatedQueue,

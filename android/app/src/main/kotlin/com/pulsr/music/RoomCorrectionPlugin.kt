@@ -30,6 +30,7 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
     private var audioRecord: AudioRecord? = null
     private var captureThread: Thread? = null
     private val capturing = AtomicBoolean(false)
+    private var currentSampleRate: Int = 0
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
@@ -42,6 +43,12 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
                 result.success(true)
             }
             "isCapturing" -> result.success(capturing.get())
+            "hasRecordPermission" -> {
+                val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+                    appContext, android.Manifest.permission.RECORD_AUDIO
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                result.success(granted)
+            }
             else -> result.notImplemented()
         }
     }
@@ -50,9 +57,23 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
 
     @SuppressLint("MissingPermission")
     private fun startRecording(sampleRate: Int, result: MethodChannel.Result) {
-        if (capturing.get()) {
-            result.success(true)
+        if (androidx.core.content.ContextCompat.checkSelfPermission(
+                appContext, android.Manifest.permission.RECORD_AUDIO
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            result.error(
+                "PERMISSION_DENIED",
+                "RECORD_AUDIO permission is required for room correction",
+                null
+            )
             return
+        }
+        if (capturing.get()) {
+            if (currentSampleRate == sampleRate) {
+                result.success(true)
+                return
+            }
+            stopRecording()
         }
         try {
             val minBuf = AudioRecord.getMinBufferSize(
@@ -87,6 +108,7 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
             }
             audioRecord = record
             capturing.set(true)
+            currentSampleRate = sampleRate
             record.startRecording()
             captureThread = Thread {
                 val buf = ByteArray(4096)
@@ -121,6 +143,7 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
 
     private fun stopRecording() {
         capturing.set(false)
+        currentSampleRate = 0
         val record = audioRecord
         audioRecord = null
         try {

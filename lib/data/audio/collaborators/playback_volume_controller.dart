@@ -144,4 +144,9 @@ class PlaybackVolumeController {
         perSongOffsetDb: perSongOffsetDb);
     await applyVolume(active, target, smoothTransition: true);
   }
+
+  /// Lifecycle teardown hook (Issue 20).
+  void dispose() {
+    // Teardown hook for future streams / timers
+  }
 }

@@ -100,6 +100,24 @@ abstract class AppLocalizations {
     Locale('es')
   ];
 
+  /// No description provided for @customDurationMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom duration (minutes).'**
+  String get customDurationMinutes;
+
+  /// No description provided for @partialBatchDetected.
+  ///
+  /// In en, this message translates to:
+  /// **'Partial batch detected'**
+  String get partialBatchDetected;
+
+  /// No description provided for @somethingWentWrong.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong'**
+  String get somethingWentWrong;
+
   /// No description provided for @saveSearch.
   ///
   /// In en, this message translates to:

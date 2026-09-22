@@ -25,6 +25,7 @@ class NowPlayingScreen extends StatefulWidget {
 
 class _NowPlayingScreenState extends State<NowPlayingScreen> {
   late final PlayerCubit _playerCubit;
+  bool _isPopping = false;
 
   @override
   void initState() {
@@ -100,7 +101,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
         return PopScope(
           canPop: false,
           onPopInvokedWithResult: (didPop, result) {
-            if (didPop) return;
+            if (didPop || _isPopping) return;
+            _isPopping = true;
             final router = GoRouter.of(context);
             if (router.canPop()) {
               router.pop();
@@ -112,6 +114,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
             backgroundColor: bgColor,
             body: _SwipeDownToDismiss(
               onDismiss: () {
+                if (_isPopping) return;
+                _isPopping = true;
                 final router = GoRouter.of(context);
                 if (router.canPop()) {
                   router.pop();

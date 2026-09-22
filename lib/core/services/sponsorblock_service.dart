@@ -157,7 +157,10 @@ class SponsorBlockService {
               merged.add(seg);
             } else {
               final last = merged.last;
-              if (seg.start <= last.end) {
+              // Only merge same-category segments: merging an enabled and a
+              // disabled category would apply one category's policy to the
+              // other's content during eligibility filtering.
+              if (seg.start <= last.end && seg.category == last.category) {
                 final maxEnd = seg.end > last.end ? seg.end : last.end;
                 merged[merged.length - 1] = SponsorBlockSegment(
                   category: last.category,
@@ -216,7 +219,9 @@ class SponsorBlockService {
     var chained = true;
     while (chained) {
       chained = false;
-      for (final other in segments) {
+      // Chain only over eligible segments: extending past a disabled-category
+      // neighbour would skip content the user asked to keep.
+      for (final other in eligible) {
         if (other.end > target && other.contains(target)) {
           target = other.end;
           chained = true;

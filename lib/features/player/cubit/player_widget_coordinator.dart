@@ -18,6 +18,7 @@ class PlayerWidgetCoordinator {
   int? _cachedQueueLength;
   int? _cachedCurrentSongId;
   int? _cachedQueueVersion;
+  int? _cachedNextIdsHash;
   List<String>? _cachedNextTitles;
 
   // FIX-L05: Extract nextTitlesCount constant and middle dot separator
@@ -30,18 +31,24 @@ class PlayerWidgetCoordinator {
       _cachedNextTitlesIndex = null;
       _cachedQueueLength = 0;
       _cachedCurrentSongId = null;
+      _cachedNextIdsHash = null;
       return null;
     }
+    final nextIdsHash = Object.hashAll(
+      s.queue.skip(s.currentIndex + 1).take(nextTitlesCount).map((item) => item.id),
+    );
     if (_cachedQueueVersion == queueVersion &&
         _cachedNextTitlesIndex == s.currentIndex &&
         _cachedQueueLength == s.queue.length &&
-        _cachedCurrentSongId == s.currentSong?.id) {
+        _cachedCurrentSongId == s.currentSong?.id &&
+        _cachedNextIdsHash == nextIdsHash) {
       return _cachedNextTitles;
     }
     _cachedQueueVersion = queueVersion;
     _cachedNextTitlesIndex = s.currentIndex;
     _cachedQueueLength = s.queue.length;
     _cachedCurrentSongId = s.currentSong?.id;
+    _cachedNextIdsHash = nextIdsHash;
     _cachedNextTitles = s.queue
         .skip(s.currentIndex + 1)
         .take(nextTitlesCount)

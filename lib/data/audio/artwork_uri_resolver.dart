@@ -21,7 +21,15 @@ class ArtworkUriResolver {
     if (map.containsKey(key)) {
       map.remove(key);
     } else if (map.length >= _maxCacheSize) {
-      map.remove(map.keys.first);
+      final evictedKey = map.keys.first;
+      final evictedUri = map.remove(evictedKey);
+      // Issue 21: Cap disk-cache size by deleting evicted artwork temp files
+      if (evictedUri != null && evictedUri.isScheme('file')) {
+        try {
+          final f = File(evictedUri.toFilePath());
+          if (f.existsSync()) f.delete().ignore();
+        } catch (_) {}
+      }
     }
     map[key] = value;
   }

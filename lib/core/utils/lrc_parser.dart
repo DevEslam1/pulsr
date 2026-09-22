@@ -270,6 +270,21 @@ class LrcParser {
     return _negativeCacheTimes[cacheKey];
   }
 
+  /// Invalidates memory and disk cache for a song so it can be re-fetched.
+  static void invalidateCache({int? songId, String? path}) {
+    if (songId != null) {
+      final key = 'song_$songId';
+      _lyricsCache.remove(key);
+      _negativeCacheTimes.remove(key);
+      unawaited(_deleteFromDiskCache(key));
+    }
+    if (path != null && path.isNotEmpty) {
+      _lyricsCache.remove(path);
+      _negativeCacheTimes.remove(path);
+      unawaited(_deleteFromDiskCache(path));
+    }
+  }
+
   static Directory? _diskCacheDir;
 
   static String _diskCacheKey(String key) {

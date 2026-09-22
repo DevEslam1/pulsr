@@ -18,6 +18,9 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
     private var visualizer: Visualizer? = null
     private var eventSink: EventChannel.EventSink? = null
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val fftExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+        Thread(r, "PulsrVisualizerFFT")
+    }
 
     companion object {
         const val METHOD_CHANNEL = "com.pulsr.music/visualizer"
@@ -53,6 +56,14 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
         }
         if (::eventChannel.isInitialized) {
             eventChannel.setStreamHandler(null)
+        }
+        fftExecutor.shutdown()
+        try {
+            if (!fftExecutor.awaitTermination(500, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                fftExecutor.shutdownNow()
+            }
+        } catch (_: InterruptedException) {
+            fftExecutor.shutdownNow()
         }
     }
 
@@ -101,47 +112,19 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
                     samplingRate: Int
                 ) {
                     if (fft == null || fft.size < 4 || eventSink == null) return
-                    val n = fft.size
-                    val rawBins = n / 2
-                    val rawMagnitudes = DoubleArray(rawBins)
-                    rawMagnitudes[0] = kotlin.math.abs(fft[0].toInt()).toDouble()
-
-                    for (i in 1 until rawBins) {
-                        val real = fft[2 * i].toDouble()
-                        val imag = fft[2 * i + 1].toDouble()
-                        rawMagnitudes[i] = hypot(real, imag)
-                    }
-
-                    // Map raw FFT bins to 32 logarithmic perceptual frequency bands
-                    val numBands = 32
-                    val bandValues = DoubleArray(numBands)
-                    for (b in 0 until numBands) {
-                        val bFraction = b.toDouble() / numBands
-                        val nextFraction = (b + 1).toDouble() / numBands
-                        val startFraction = bFraction * bFraction
-                        val endFraction = nextFraction * nextFraction
-                        val startBin = (startFraction * (rawBins - 1)).toInt().coerceIn(0, rawBins - 1)
-                        val endBin = (endFraction * rawBins).toInt().coerceIn(startBin + 1, rawBins)
-
-                        var sum = 0.0
-                        var count = 0
-                        for (bin in startBin until endBin) {
-                            sum += rawMagnitudes[bin]
-                            count++
-                        }
-                        val avg = if (count > 0) sum / count else 0.0
-
-                        // High-frequency pre-emphasis tilt (+dB slope for higher bands)
-                        val tiltMultiplier = 1.0 + (b.toDouble() / numBands) * 1.8
-                        val scaled = (avg * tiltMultiplier) / 72.0
-                        bandValues[b] = scaled.coerceIn(0.0, 1.0)
-                    }
-
-                    val normalizedList = bandValues.toList()
-                    mainHandler.post {
+                    val fftCopy = fft.copyOf()
+                    fftExecutor.execute {
                         try {
-                            eventSink?.success(normalizedList)
-                        } catch (_: Throwable) {}
+                            val bandValues = processFftData(fftCopy)
+                            val normalizedList = bandValues.toList()
+                            mainHandler.post {
+                                try {
+                                    eventSink?.success(normalizedList)
+                                } catch (_: Throwable) {}
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.w("VisualizerPlugin", "FFT processing failed: ${e.message}")
+                        }
                     }
                 }
             }, Visualizer.getMaxCaptureRate() / 2, false, true)
@@ -158,6 +141,45 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
             }
             false
         }
+    }
+
+    private fun processFftData(fft: ByteArray): DoubleArray {
+        val n = fft.size
+        val rawBins = n / 2
+        val rawMagnitudes = DoubleArray(rawBins)
+        rawMagnitudes[0] = kotlin.math.abs(fft[0].toInt()).toDouble()
+
+        for (i in 1 until rawBins) {
+            val real = fft[2 * i].toDouble()
+            val imag = fft[2 * i + 1].toDouble()
+            rawMagnitudes[i] = hypot(real, imag)
+        }
+
+        // Map raw FFT bins to 32 logarithmic perceptual frequency bands
+        val numBands = 32
+        val bandValues = DoubleArray(numBands)
+        for (b in 0 until numBands) {
+            val bFraction = b.toDouble() / numBands
+            val nextFraction = (b + 1).toDouble() / numBands
+            val startFraction = bFraction * bFraction
+            val endFraction = nextFraction * nextFraction
+            val startBin = (startFraction * (rawBins - 1)).toInt().coerceIn(0, rawBins - 1)
+            val endBin = (endFraction * rawBins).toInt().coerceIn(startBin + 1, rawBins)
+
+            var sum = 0.0
+            var count = 0
+            for (bin in startBin until endBin) {
+                sum += rawMagnitudes[bin]
+                count++
+            }
+            val avg = if (count > 0) sum / count else 0.0
+
+            // High-frequency pre-emphasis tilt (+dB slope for higher bands)
+            val tiltMultiplier = 1.0 + (b.toDouble() / numBands) * 1.8
+            val scaled = (avg * tiltMultiplier) / 72.0
+            bandValues[b] = scaled.coerceIn(0.0, 1.0)
+        }
+        return bandValues
     }
 
     private fun stopVisualizer() {

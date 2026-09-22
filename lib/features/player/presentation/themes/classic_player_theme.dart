@@ -624,6 +624,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                           repeatMode: state.repeatMode,
                           hasPrevious: state.hasPreviousNeighbour,
                           hasNext: state.hasNextNeighbour,
+                          abLoopActive: state.abLoopEnabled,
                           primaryColor: activeColor,
                           mainButtonSize:
                               isTablet ? 74 : (isLandscape ? 58 : 66),

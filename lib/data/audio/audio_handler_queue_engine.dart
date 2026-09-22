@@ -553,7 +553,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
       ProcessingState.buffering: AudioProcessingState.buffering,
       ProcessingState.ready: AudioProcessingState.ready,
       ProcessingState.completed: AudioProcessingState.completed,
-    }[_activePlayer.processingState]!;
+    }[_activePlayer.processingState] ?? AudioProcessingState.ready;
 
     playbackState.add(
       playbackState.value.copyWith(

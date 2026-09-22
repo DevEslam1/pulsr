@@ -24,6 +24,7 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var channel: MethodChannel
     private var context: Context? = null
     private val backgroundExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private val activeDecodes = java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicBoolean>()
 
     companion object {
         const val CHANNEL_NAME = "com.pulsr.music/waveform"
@@ -63,25 +64,48 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
             "decode" -> {
                 val path = call.argument<String>("path")
                 val count = (call.argument<Int>("count") ?: 60).coerceIn(8, 512)
+                val timeoutMs = (call.argument<Int>("timeoutMs") ?: 30_000).toLong().coerceIn(5_000L, 120_000L)
+                val decodeId = call.argument<String>("decodeId") ?: java.util.UUID.randomUUID().toString()
+
                 if (path.isNullOrEmpty()) {
                     result.error("INVALID_ARGUMENT", "File path is required", null)
                     return
                 }
+
+                val cancellationFlag = java.util.concurrent.atomic.AtomicBoolean(false)
+                activeDecodes[decodeId] = cancellationFlag
+
                 backgroundExecutor.execute {
                     try {
-                        val buckets = decodeToBuckets(path, count)
+                        val buckets = decodeToBuckets(path, count, timeoutMs, cancellationFlag)
                         postSuccess(result, buckets.toList())
+                    } catch (e: java.util.concurrent.CancellationException) {
+                        postError(result, "CANCELLED", "Waveform decode cancelled for $path")
                     } catch (e: Exception) {
                         Log.w(TAG, "Waveform decode failed for $path: ${e.message}")
                         postError(result, "DECODE_ERROR", e.message)
+                    } finally {
+                        activeDecodes.remove(decodeId)
                     }
                 }
+            }
+            "cancelDecode" -> {
+                val decodeId = call.argument<String>("decodeId")
+                if (decodeId != null) {
+                    activeDecodes[decodeId]?.set(true)
+                }
+                result.success(true)
             }
             else -> result.notImplemented()
         }
     }
 
-    private fun decodeToBuckets(path: String, count: Int): DoubleArray {
+    private fun decodeToBuckets(
+        path: String,
+        count: Int,
+        timeoutMs: Long = 30_000L,
+        cancellationFlag: java.util.concurrent.atomic.AtomicBoolean? = null
+    ): DoubleArray {
         val extractor = MediaExtractor()
         var codec: MediaCodec? = null
         try {
@@ -125,15 +149,18 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
             var sawOutputEOS = false
             val maxIterations = 5_000_000
             var iterations = 0
-            val deadline = SystemClock.elapsedRealtime() + 15_000L // 15s timeout
+            val deadline = SystemClock.elapsedRealtime() + timeoutMs
 
             var channelIndex = 0
             var channelAcc = 0.0
 
             while (!sawOutputEOS) {
+                if (cancellationFlag?.get() == true) {
+                    throw java.util.concurrent.CancellationException("Decode was cancelled")
+                }
                 if (SystemClock.elapsedRealtime() > deadline) {
-                    Log.w(TAG, "Waveform decode exceeded 15s timeout for $path; terminating loop")
-                    break
+                    Log.w(TAG, "Waveform decode exceeded ${timeoutMs}ms timeout for $path; aborting")
+                    throw java.util.concurrent.TimeoutException("Waveform decode exceeded ${timeoutMs}ms timeout")
                 }
                 if (++iterations > maxIterations) {
                     Log.w(TAG, "Exceeded maximum decode iterations ($maxIterations) for $path; terminating loop")

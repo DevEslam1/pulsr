@@ -142,7 +142,9 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
 
     // The dialog's controller is local to this call and must not leak; dispose post-frame to ensure modal exit animation finishes.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      controller.dispose();
+      try {
+        controller.dispose();
+      } catch (_) {}
     });
 
     if (result != null && result.trim().isNotEmpty && mounted) {

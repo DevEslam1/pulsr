@@ -30,6 +30,12 @@ object ProxyPool {
 
     /** 2026-09: YouTube pre-flags datacenter IPs before cookie checks. */
     enum class Quality { RESIDENTIAL, UNKNOWN, DATACENTER }
+    enum class FailureType {
+        NETWORK, // Temporary network issue - retry in 30s
+        TIMEOUT, // Server timeout - retry in 60s
+        AUTH,    // Authentication failed - retry in 15m
+        UNKNOWN  // Unknown failure - retry in 15m
+    }
     private const val DEAD_TIMEOUT_MS = 15 * 60 * 1000L // 15 minutes
     private const val MAX_CONSECUTIVE_FAILURES = 3
 
@@ -66,7 +72,8 @@ object ProxyPool {
         var consecutiveFailures: Int = 0,
         var deadUntilTimestamp: Long = 0L,
         var isEnabled: Boolean = true,
-        val quality: Quality = Quality.UNKNOWN
+        val quality: Quality = Quality.UNKNOWN,
+        var lastFailureType: FailureType = FailureType.UNKNOWN
     ) {
         val isAlive: Boolean
             get() {
@@ -87,7 +94,8 @@ object ProxyPool {
     @Volatile
     private var activeProxyId: String? = null
     private var autoRotateEnabled = true
-    private val executor = Executors.newFixedThreadPool(2)
+    private val executor = Executors.newFixedThreadPool(8)
+    private val probeExecutor = Executors.newCachedThreadPool()
 
     @Volatile
     var hasExplicitPool: Boolean = false
@@ -163,7 +171,10 @@ object ProxyPool {
             Authenticator.setDefault(object : Authenticator() {
                 override fun getPasswordAuthentication(): PasswordAuthentication? {
                     if (requestorType == RequestorType.PROXY) {
-                        return PasswordAuthentication(selected.username, selected.password.toCharArray())
+                        if (requestingHost.equals(selected.host, ignoreCase = true) &&
+                            (requestingPort == selected.port || requestingPort == -1)) {
+                            return PasswordAuthentication(selected.username, selected.password.toCharArray())
+                        }
                     }
                     return null
                 }
@@ -175,10 +186,23 @@ object ProxyPool {
         return selected.toJavaProxy()
     }
 
+    fun resetNetworkFailures() {
+        synchronized(lock) {
+            proxies.filter { it.lastFailureType == FailureType.NETWORK }.forEach { node ->
+                node.consecutiveFailures = 0
+                node.deadUntilTimestamp = 0L
+            }
+        }
+    }
+
     /**
      * Triggered on IP block or connection failure: marks current node failing and rotates.
      */
-    fun onPathFailed(targetUrl: String? = null, failedHostOrId: String? = null) {
+    fun onPathFailed(
+        targetUrl: String? = null,
+        failedHostOrId: String? = null,
+        failureType: FailureType = FailureType.UNKNOWN
+    ) {
         var newLabelToNotify: String? = null
         synchronized(lock) {
             if (proxies.isEmpty()) return
@@ -194,10 +218,16 @@ object ProxyPool {
             }
 
             if (failing != null) {
+                failing.lastFailureType = failureType
                 failing.consecutiveFailures++
+                val timeout = when (failureType) {
+                    FailureType.NETWORK -> 30_000L
+                    FailureType.TIMEOUT -> 60_000L
+                    FailureType.AUTH, FailureType.UNKNOWN -> DEAD_TIMEOUT_MS
+                }
                 if (failing.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-                    failing.deadUntilTimestamp = nowMs() + DEAD_TIMEOUT_MS
-                    logW(TAG, "Proxy ${failing.host}:${failing.port} tripped circuit breaker; disabled for 15m")
+                    failing.deadUntilTimestamp = nowMs() + timeout
+                    logW(TAG, "Proxy ${failing.host}:${failing.port} tripped circuit breaker; disabled for ${timeout / 1000}s due to $failureType")
                 }
             }
 
@@ -247,37 +277,52 @@ object ProxyPool {
         timeoutMs: Int = 8000,
         callback: (List<Map<String, Any?>>) -> Unit
     ) {
+        val snapshot = proxies.toList()
+        if (snapshot.isEmpty()) {
+            callback(emptyList())
+            return
+        }
+
         executor.execute {
-            val results = mutableListOf<Map<String, Any?>>()
-            for (node in proxies) {
-                val start = System.currentTimeMillis()
-                var conn: HttpURLConnection? = null
-                try {
-                    val url = URL(probeUrl)
-                    conn = url.openConnection(node.toJavaProxy()) as HttpURLConnection
-                    conn.connectTimeout = timeoutMs
-                    conn.readTimeout = timeoutMs
-                    conn.instanceFollowRedirects = true
-                    conn.requestMethod = "GET"
+            val results = java.util.concurrent.ConcurrentHashMap<String, Map<String, Any?>>()
+            val latch = java.util.concurrent.CountDownLatch(snapshot.size)
 
-                    val code = conn.responseCode
-                    val latency = System.currentTimeMillis() - start
-                    val success = code in 200..399
-
-                    node.latencyMs = if (success) latency else -1L
-                    if (success) {
-                        node.consecutiveFailures = 0
-                        node.deadUntilTimestamp = 0L
-                    } else {
-                        node.consecutiveFailures++
-                        if (node.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-                            node.deadUntilTimestamp = nowMs() + DEAD_TIMEOUT_MS
-                            logW(TAG, "Proxy ${node.host}:${node.port} tripped circuit breaker during health check (HTTP $code); disabled for 15m")
+            for (node in snapshot) {
+                probeExecutor.execute {
+                    val start = System.currentTimeMillis()
+                    var conn: HttpURLConnection? = null
+                    try {
+                        val url = URL(probeUrl)
+                        conn = url.openConnection(node.toJavaProxy()) as HttpURLConnection
+                        conn.connectTimeout = timeoutMs
+                        conn.readTimeout = timeoutMs
+                        conn.instanceFollowRedirects = true
+                        conn.requestMethod = "GET"
+                        if (node.username.isNotEmpty()) {
+                            val userPass = "${node.username}:${node.password}"
+                            val basicAuth = "Basic " + android.util.Base64.encodeToString(userPass.toByteArray(), android.util.Base64.NO_WRAP)
+                            conn.setRequestProperty("Proxy-Authorization", basicAuth)
                         }
-                    }
 
-                    results.add(
-                        mapOf(
+                        val code = conn.responseCode
+                        val latency = System.currentTimeMillis() - start
+                        val success = code in 200..399
+
+                        node.latencyMs = if (success) latency else -1L
+                        if (success) {
+                            node.consecutiveFailures = 0
+                            node.deadUntilTimestamp = 0L
+                        } else {
+                            node.lastFailureType = if (code == 401 || code == 407) FailureType.AUTH else FailureType.NETWORK
+                            node.consecutiveFailures++
+                            val timeout = if (node.lastFailureType == FailureType.AUTH) DEAD_TIMEOUT_MS else 30_000L
+                            if (node.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+                                node.deadUntilTimestamp = nowMs() + timeout
+                                logW(TAG, "Proxy ${node.host}:${node.port} tripped circuit breaker during health check (HTTP $code); disabled for ${timeout / 1000}s")
+                            }
+                        }
+
+                        results[node.id] = mapOf(
                             "id" to node.id,
                             "host" to node.host,
                             "port" to node.port,
@@ -285,16 +330,17 @@ object ProxyPool {
                             "latencyMs" to latency.toInt(),
                             "error" to if (!success) "HTTP $code" else null
                         )
-                    )
-                } catch (e: Throwable) {
-                    val latency = System.currentTimeMillis() - start
-                    node.consecutiveFailures++
-                    if (node.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-                        node.deadUntilTimestamp = nowMs() + DEAD_TIMEOUT_MS
-                        logW(TAG, "Proxy ${node.host}:${node.port} tripped circuit breaker during health check (${e.message}); disabled for 15m")
-                    }
-                    results.add(
-                        mapOf(
+                    } catch (e: Throwable) {
+                        val latency = System.currentTimeMillis() - start
+                        val isTimeout = e is java.net.SocketTimeoutException
+                        node.lastFailureType = if (isTimeout) FailureType.TIMEOUT else FailureType.NETWORK
+                        node.consecutiveFailures++
+                        val timeout = if (isTimeout) 60_000L else 30_000L
+                        if (node.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+                            node.deadUntilTimestamp = nowMs() + timeout
+                            logW(TAG, "Proxy ${node.host}:${node.port} tripped circuit breaker during health check (${e.message}); disabled for ${timeout / 1000}s")
+                        }
+                        results[node.id] = mapOf(
                             "id" to node.id,
                             "host" to node.host,
                             "port" to node.port,
@@ -302,12 +348,21 @@ object ProxyPool {
                             "latencyMs" to latency.toInt(),
                             "error" to (e.message ?: e.javaClass.simpleName)
                         )
-                    )
-                } finally {
-                    conn?.disconnect()
+                    } finally {
+                        conn?.disconnect()
+                        latch.countDown()
+                    }
                 }
             }
-            callback(results)
+
+            try {
+                latch.await(timeoutMs * 2L, java.util.concurrent.TimeUnit.MILLISECONDS)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
+
+            val ordered = snapshot.mapNotNull { results[it.id] }
+            callback(ordered)
         }
     }
 }

@@ -19,9 +19,16 @@ const Map<String, int> kBtCodecLatencyMs = {
 int estimateBtLatencyForCodec(String? codecName) {
   if (codecName == null || codecName.isEmpty) return kBtCodecLatencyMs['default']!;
   final key = codecName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
-  for (final entry in kBtCodecLatencyMs.entries) {
-    final ck = entry.key.replaceAll('_', '');
-    if (key.contains(ck)) return entry.value;
+  // Match the most specific alias first: 'aptxhd'/'aptxadaptive' must win over
+  // the generic 'aptx' entry, which would otherwise always match first.
+  final candidates = kBtCodecLatencyMs.keys
+      .where((k) => k != 'default')
+      .toList()
+    ..sort((a, b) => b.length.compareTo(a.length));
+  for (final candidate in candidates) {
+    if (key.contains(candidate.replaceAll('_', ''))) {
+      return kBtCodecLatencyMs[candidate]!;
+    }
   }
   return kBtCodecLatencyMs['default']!;
 }

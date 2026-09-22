@@ -75,11 +75,17 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   late final PlayerWidgetBridge widgetBridge;
 
   bool _userPausedIntentionally = false;
+  // Monotonic counter bumped whenever the queue is mutated; used to invalidate
+  // the home-widget "up next" title cache on reorder.
+  int _queueVersion = 0;
   final AsyncGuard _trackChangedGuard = AsyncGuard();
   final AsyncGuard _mediaItemGuard = AsyncGuard();
   final AsyncGuard _queueSyncGuard = AsyncGuard();
 
   Stream<Duration> get rawPositionStream => _audioHandler.positionStream;
+
+  @override
+  void invalidateMediaItemResolution() => _mediaItemGuard.next();
 
   PlayerCubit({
     required PulsrAudioHandler audioHandler,
@@ -128,11 +134,12 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       slotLookupCache: slotLookupCache,
       queueSlots: queueSlots,
       updateWidgetThrottled: ({bool force = false}) =>
-          widgetBridge.updateWidgetThrottled(state, force: force),
+          widgetBridge.updateWidgetThrottled(state,
+              queueVersion: _queueVersion, force: force),
       loadLyrics: (song) => unawaited(metadataController.loadLyrics(song)),
       debouncedPersistQueueSlots: () =>
           queueController.debouncedPersistQueueSlots(),
-      bumpQueueVersion: () {},
+      bumpQueueVersion: () => _queueVersion++,
       isSameTrack: _isSameTrack,
       latencyTracker: dependencies?.latencyTracker ?? latencyTracker,
       // A-01: resolve lazily at call time (playbackOptionsController is
@@ -193,10 +200,10 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     );
     _listenToSettings();
     _listenToAudioService();
-    _syncAudioEffects();
+    _syncAudioEffects(force: true);
     unawaited(_audioHandler.effectsReady.then((_) async {
       if (isClosed) return;
-      _syncAudioEffects();
+      _syncAudioEffects(force: true);
       await _audioHandler.setVolume(_audioHandler.volume);
     }).catchError((Object e, StackTrace st) {
       ErrorLogger.log('Post-init effects re-sync failed',
@@ -204,7 +211,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     }));
   }
 
-  void _syncAudioEffects() {
+  void _syncAudioEffects({bool force = false}) {
+    if (!force && dspController.isUserInteracting) return;
     safeEmit(state.copyWith(
       dsp: state.dsp.copyWith(
         isEqEnabled: _audioHandler.isEqualizerEnabled,
@@ -361,19 +369,20 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       }
 
       if (resolvedSong != null) {
+        final song = resolvedSong!;
         if (!_mediaItemGuard.isValid(mediaGen) || isClosed) return;
-        final isSameSong = _isSameTrack(state.currentSong, resolvedSong);
+        final isSameSong = _isSameTrack(state.currentSong, song);
         final duration = (item.duration != null && item.duration! > Duration.zero)
             ? item.duration!
-            : (resolvedSong!.durationMs > 0
-                ? Duration(milliseconds: resolvedSong!.durationMs)
+            : (song.durationMs > 0
+                ? Duration(milliseconds: song.durationMs)
                 : (isSameSong ? state.duration : Duration.zero));
-        final songQueueIndex = state.queue.indexWhere((s) => _isSameTrack(s, resolvedSong));
+        final songQueueIndex = state.queue.indexWhere((s) => _isSameTrack(s, song));
         final effectiveIndex = songQueueIndex != -1 ? songQueueIndex : state.currentIndex;
 
         safeEmit(state.copyWith(
           playback: state.playback.copyWith(
-            currentSong: resolvedSong,
+            currentSong: song,
             duration: duration,
             position: isSameSong ? state.position : Duration.zero,
             errorMessage: null,
@@ -389,11 +398,11 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         ));
 
         if (!isSameSong) {
-          unawaited(metadataController.enrichTrackParallel(resolvedSong!));
-          unawaited(dspController.maybeFollowTrackSampleRate(resolvedSong!));
+          unawaited(metadataController.enrichTrackParallel(song));
+          unawaited(dspController.maybeFollowTrackSampleRate(song));
         }
         widgetBridge.updateWidgetThrottled(state, force: true);
-        widgetBridge.scrobble(resolvedSong!, state.position, state.isPlaying);
+        widgetBridge.scrobble(song, state.position, state.isPlaying);
       }
     });
 
@@ -515,6 +524,10 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       safeEmit(state.copyWith(playback: state.playback.copyWith(sleepTimerRemaining: rem)));
     });
 
+    autoSub(_audioHandler.sleepTimerRemainingTracksStream, (tracks) {
+      safeEmit(state.copyWith(playback: state.playback.copyWith(sleepTimerRemainingTracks: tracks)));
+    });
+
     autoSub(_audioHandler.audioSessionIdStream, (id) {
       safeEmit(state.copyWith(playback: state.playback.copyWith(audioSessionId: id)));
     });
@@ -547,10 +560,16 @@ class PlayerCubit extends PulsrCubit<PlayerState>
 
   @override
   Future<void> close() async {
-    transportController.dispose();
-    dspController.dispose();
-    widgetBridge.dispose();
-    await queueController.persistQueueSlotsNow();
-    return super.close();
+    try {
+      transportController.dispose();
+      dspController.dispose();
+      widgetBridge.dispose();
+      await queueController.persistQueueSlotsNow();
+    } catch (e, st) {
+      ErrorLogger.log('PlayerCubit close cleanup failed',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+    } finally {
+      await super.close();
+    }
   }
 }

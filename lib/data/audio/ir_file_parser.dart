@@ -98,7 +98,9 @@ class IrFileParser {
           final b2 = bytes[sampleOffset + 2];
           int val24 = (b2 << 16) | (b1 << 8) | b0;
           if ((val24 & 0x800000) != 0) {
-            val24 |= 0xFF000000;
+            // Dart ints are 64-bit, so `|= 0xFF000000` would yield a large
+            // positive value; subtract 2^24 to recover the signed sample.
+            val24 -= 0x1000000;
           }
           chVal = val24 / 8388608.0;
         } else if (bitsPerSample == 32) {

@@ -22,7 +22,17 @@ object DnsOverHttpsResolver {
     private const val MAX_CACHE_SIZE = 256
 
     private fun isNumericIp(ip: String): Boolean {
-        return ip.matches(Regex("^(\\d{1,3}\\.){3}\\d{1,3}$")) || ip.contains(":")
+        val parts = ip.split('.')
+        if (parts.size == 4) {
+            return parts.all { part ->
+                part.toIntOrNull()?.let { it in 0..255 } == true && (part == "0" || !part.startsWith("0"))
+            }
+        }
+        if (ip.contains(':') && ip.count { it == ':' } >= 2) {
+            val hexParts = ip.split(':')
+            return hexParts.all { it.isEmpty() || (it.length <= 4 && it.all { c -> c in '0'..'9' || c in 'a'..'f' || c in 'A'..'F' }) }
+        }
+        return false
     }
 
     private fun putInCache(hostname: String, address: InetAddress, now: Long) {
@@ -83,11 +93,17 @@ object DnsOverHttpsResolver {
                 if (conn.responseCode == 200) {
                     val json = conn.inputStream.bufferedReader().use { it.readText() }
                     val root = JSONObject(json)
+                    val status = root.optInt("Status", -1)
+                    if (status != 0) {
+                        return@runCatching null
+                    }
                     val answers = root.optJSONArray("Answer")
                     if (answers != null && answers.length() > 0) {
                         for (i in 0 until answers.length()) {
                             val ans = answers.getJSONObject(i)
                             val type = ans.optInt("type")
+                            val ttl = ans.optInt("TTL", 0)
+                            if (ttl <= 0) continue
                             // Type 1 = A, Type 28 = AAAA
                             if (type == 1 || type == 28) {
                                 val ip = ans.optString("data")

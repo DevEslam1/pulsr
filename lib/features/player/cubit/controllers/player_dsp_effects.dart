@@ -332,7 +332,12 @@ extension PlayerDspEffectsExtension on PlayerDspController {
       );
       if (result != null && result.path != null) {
         final path = result.path!;
-        final samples = await IrFileParser.parseWavFile(File(path));
+        final file = File(path);
+        // E3: Protect against out-of-memory on oversized impulse response files (>25MB)
+        if (await file.length() > PlayerDspController.maxIrFileSizeBytes) {
+          throw Exception('IR WAV file exceeds 25 MB limit');
+        }
+        final samples = await IrFileParser.parseWavFile(file);
         if (await loadCustomImpulseResponse(samples)) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString(PrefsKeys.customReverbIrPath, path);

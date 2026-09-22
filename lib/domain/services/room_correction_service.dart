@@ -333,8 +333,10 @@ class RoomCorrectionService {
       }
       time[m] = sum / fftSize;
     }
-    // Crop center (n-1)/2 delay to n taps + Hamming window.
-    final start = fftSize ~/ 2 - n ~/ 2;
+    // Crop the first n taps + Hamming window. The linear-phase delay is
+    // (n-1)/2, which already places the impulse peak inside [0, n); the previous
+    // centered crop (fftSize/2 - n/2) read past it and returned an all-zero IR.
+    const start = 0;
     final ir = Float32List(n);
     for (var i = 0; i < n; i++) {
       final w = 0.54 - 0.46 * math.cos(2 * math.pi * i / (n - 1));

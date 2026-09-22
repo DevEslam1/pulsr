@@ -92,83 +92,93 @@ class AudioEffectsChannel {
 
   Future<void> init() async {
     if (!_isAndroid) return;
-    // Isolate each probe so partial success is retained
-    try {
-      final caps = await _channel
-          .invokeMapMethod<String, dynamic>('getCapabilities')
-          .timeout(const Duration(seconds: 8));
-      if (caps != null) {
-        _isVirtualizerSupported =
-            (caps['isVirtualizerSupported'] == true ||
-                caps['isVirtualizerSupported'] == 1);
-        _isDynamicsSupported =
-            (caps['isDynamicsSupported'] == true ||
-                caps['isDynamicsSupported'] == 1);
-        _isVolumeBoostSupported =
-            (caps['isVolumeBoostSupported'] == true ||
-                caps['isVolumeBoostSupported'] == 1);
-        _isBassBoostSupported =
-            (caps['isBassBoostSupported'] == true ||
-                caps['isBassBoostSupported'] == 1);
-        _isFloatOutputSupported =
-            (caps['isFloatOutputSupported'] == true ||
-                caps['isFloatOutputSupported'] == 1);
-        _isHardwareOffloadSupported =
-            (caps['isHardwareOffloadSupported'] == true ||
-                caps['isHardwareOffloadSupported'] == 1);
-      }
-    } catch (e, st) {
-      ErrorLogger.log(
-        'Failed to getCapabilities',
-        error: e,
-        stackTrace: st,
-        category: 'AudioEffectsChannel',
-      );
-    }
-    try {
-      final pipeline = await _channel
-          .invokeMapMethod<String, dynamic>('getProcessingCapabilities')
-          .timeout(const Duration(seconds: 8));
-      _isPcmDspAttached = pipeline?['isPcmDspAttached'] == true;
-      _hasPcmDspPath = pipeline?['hasPcmDspPath'] == true;
-    } catch (e, st) {
-      ErrorLogger.log(
-        'Failed to get DSP processing capabilities',
-        error: e,
-        stackTrace: st,
-        category: 'AudioEffectsChannel',
-      );
-    }
-    try {
-      final spatialMap = await _channel
-          .invokeMapMethod<String, dynamic>('getSpatializerState')
-          .timeout(const Duration(seconds: 8));
-      if (spatialMap != null) {
-        _isSpatializerSupported = (spatialMap['isSupported'] == true);
-        _isHeadTrackerAvailable =
-            (spatialMap['isHeadTrackerAvailable'] == true);
-      }
-    } catch (e, st) {
-      ErrorLogger.log(
-        'Failed to getSpatializerState',
-        error: e,
-        stackTrace: st,
-        category: 'AudioEffectsChannel',
-      );
-    }
-    try {
-      final oemMap = await detectOemAudio();
-      _hasOemAudio = (oemMap['hasOemAudio'] == true);
-      _detectedOemEngines =
-          (oemMap['detectedEngines'] as List<dynamic>?)?.cast<String>() ?? [];
-    } catch (e, st) {
-      ErrorLogger.log(
-        'Failed to detectOemAudio',
-        error: e,
-        stackTrace: st,
-        category: 'AudioEffectsChannel',
-      );
-    }
+    // Run capability probes in parallel to prevent sequential timeout stacking (worst case 32s -> 8s)
+    await Future.wait([
+      () async {
+        try {
+          final caps = await _channel
+              .invokeMapMethod<String, dynamic>('getCapabilities')
+              .timeout(const Duration(seconds: 8));
+          if (caps != null) {
+            _isVirtualizerSupported =
+                (caps['isVirtualizerSupported'] == true ||
+                    caps['isVirtualizerSupported'] == 1);
+            _isDynamicsSupported =
+                (caps['isDynamicsSupported'] == true ||
+                    caps['isDynamicsSupported'] == 1);
+            _isVolumeBoostSupported =
+                (caps['isVolumeBoostSupported'] == true ||
+                    caps['isVolumeBoostSupported'] == 1);
+            _isBassBoostSupported =
+                (caps['isBassBoostSupported'] == true ||
+                    caps['isBassBoostSupported'] == 1);
+            _isFloatOutputSupported =
+                (caps['isFloatOutputSupported'] == true ||
+                    caps['isFloatOutputSupported'] == 1);
+            _isHardwareOffloadSupported =
+                (caps['isHardwareOffloadSupported'] == true ||
+                    caps['isHardwareOffloadSupported'] == 1);
+          }
+        } catch (e, st) {
+          ErrorLogger.log(
+            'Failed to getCapabilities',
+            error: e,
+            stackTrace: st,
+            category: 'AudioEffectsChannel',
+          );
+        }
+      }(),
+      () async {
+        try {
+          final pipeline = await _channel
+              .invokeMapMethod<String, dynamic>('getProcessingCapabilities')
+              .timeout(const Duration(seconds: 8));
+          _isPcmDspAttached = pipeline?['isPcmDspAttached'] == true;
+          _hasPcmDspPath = pipeline?['hasPcmDspPath'] == true;
+        } catch (e, st) {
+          ErrorLogger.log(
+            'Failed to get DSP processing capabilities',
+            error: e,
+            stackTrace: st,
+            category: 'AudioEffectsChannel',
+          );
+        }
+      }(),
+      () async {
+        try {
+          final spatialMap = await _channel
+              .invokeMapMethod<String, dynamic>('getSpatializerState')
+              .timeout(const Duration(seconds: 8));
+          if (spatialMap != null) {
+            _isSpatializerSupported = (spatialMap['isSupported'] == true);
+            _isHeadTrackerAvailable =
+                (spatialMap['isHeadTrackerAvailable'] == true);
+          }
+        } catch (e, st) {
+          ErrorLogger.log(
+            'Failed to getSpatializerState',
+            error: e,
+            stackTrace: st,
+            category: 'AudioEffectsChannel',
+          );
+        }
+      }(),
+      () async {
+        try {
+          final oemMap = await detectOemAudio();
+          _hasOemAudio = (oemMap['hasOemAudio'] == true);
+          _detectedOemEngines =
+              (oemMap['detectedEngines'] as List<dynamic>?)?.cast<String>() ?? [];
+        } catch (e, st) {
+          ErrorLogger.log(
+            'Failed to detectOemAudio',
+            error: e,
+            stackTrace: st,
+            category: 'AudioEffectsChannel',
+          );
+        }
+      }(),
+    ]);
   }
 
   Future<Map<String, dynamic>> detectOemAudio() async {

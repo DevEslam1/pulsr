@@ -72,7 +72,18 @@ class SortFilterSheet extends StatelessWidget {
             return PulsrPressable(
               pressedScale: 0.985,
               onTap: () {
-                final newAsc = isSelected ? !ascending : true;
+                // Newly selected options start in their natural direction:
+                // "Most Played" / "Top Rated" / "Recently ..." are descending,
+                // everything else is ascending. Re-tapping flips the direction.
+                const descendingFirst = {
+                  'playCount',
+                  'rating',
+                  'dateAdded',
+                  'lastPlayed',
+                };
+                final newAsc = isSelected
+                    ? !ascending
+                    : !descendingFirst.contains(option['key']);
                 onApply(option['key']!, newAsc);
                 Navigator.pop(context);
               },

@@ -68,7 +68,16 @@ void main() {
       expect(QueueSlotCodec.decodeDocument({'a': 1}), isNotNull);
       expect(
         QueueSlotCodec.decodeDocument(
-            {'0': 1, '1': 1, '2': 1, 'activeSlot': 1, 'extra': 1}),
+            {'0': 1, '1': 1, '2': 1, 'activeSlot': 1, 'schemaVersion': 1, 'extra': 1}),
+        isNull,
+      );
+      // Rejects incompatible schema version
+      expect(
+        QueueSlotCodec.decodeDocument({'0': 1, 'schemaVersion': 999}),
+        isNull,
+      );
+      expect(
+        QueueSlotCodec.decodeDocument({'0': 1, 'schemaVersion': 'invalid'}),
         isNull,
       );
     });

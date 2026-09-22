@@ -513,6 +513,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
       fetchLikedSongsPlaylist(),
       fetchAccountPlaylists(),
     ]);
+    if (_disposed || isClosed) return;
     ytmOnline.value = ytmOnline.value.copyWith(isAutoFetching: false);
   }
 
@@ -535,6 +536,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
 
     try {
       final tracks = await account.fetchLikedSongs();
+      if (_disposed || isClosed) return;
       ytmOnline.value = ytmOnline.value.copyWith(
         likedStatus:
             tracks.isNotEmpty ? YtmFetchStatus.done : YtmFetchStatus.error,
@@ -554,6 +556,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
         } catch (_) {}
       }
     } on YtmException catch (e) {
+      if (_disposed || isClosed) return;
       ytmOnline.value = ytmOnline.value.copyWith(
         likedStatus: YtmFetchStatus.error,
         likedError: e.isAuth
@@ -561,6 +564,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
             : (e.details ?? e.code),
       );
     } catch (e) {
+      if (_disposed || isClosed) return;
       ytmOnline.value = ytmOnline.value.copyWith(
         likedStatus: YtmFetchStatus.error,
         likedError: e.toString().replaceAll('Exception: ', ''),
@@ -587,6 +591,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
 
     try {
       final playlists = await account.fetchAccountPlaylists();
+      if (_disposed || isClosed) return;
       ytmOnline.value = ytmOnline.value.copyWith(
         accountStatus: YtmFetchStatus.done,
         accountPlaylists: playlists,
@@ -596,6 +601,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
         await _saveOnlineCache();
       }
     } on YtmException catch (e) {
+      if (_disposed || isClosed) return;
       ytmOnline.value = ytmOnline.value.copyWith(
         accountStatus: YtmFetchStatus.error,
         accountError: e.isAuth
@@ -603,6 +609,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
             : (e.details ?? e.code),
       );
     } catch (e) {
+      if (_disposed || isClosed) return;
       ytmOnline.value = ytmOnline.value.copyWith(
         accountStatus: YtmFetchStatus.error,
         accountError: e.toString().replaceAll('Exception: ', ''),
@@ -631,11 +638,13 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
           ? getIt<YtmAccountService>()
           : null;
       final details = await accountService?.fetchPlaylistDetails(input, maxTracks: 200);
+      if (_disposed || isClosed) return;
 
       List<YtmTrack> tracks = details?.tracks ?? const [];
       if (tracks.isEmpty) {
         final ytmService = getIt<YtmService>();
         tracks = await ytmService.getPlaylistTracks(input, limit: 200);
+        if (_disposed || isClosed) return;
       }
 
       if (tracks.isEmpty) {
@@ -679,6 +688,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
       );
       await _saveOnlineCache();
     } catch (e) {
+      if (_disposed || isClosed) return;
       ytmOnline.value = ytmOnline.value.copyWith(
         customStatus: YtmFetchStatus.error,
         customError: e.toString().replaceAll('Exception: ', ''),

@@ -150,8 +150,10 @@ class MusicRepository implements IMusicRepository {
         ]);
       }
 
-      if (limit != null) {
-        query.limit(limit, offset: offset);
+      final effectiveLimit =
+          limit ?? (searchQuery != null && searchQuery.trim().isNotEmpty ? 200 : null);
+      if (effectiveLimit != null) {
+        query.limit(effectiveLimit, offset: offset);
       }
 
       return query

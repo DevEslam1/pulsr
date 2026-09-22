@@ -31,9 +31,8 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen> {
 
   @override
   void dispose() {
-    // Restore the app's edge-to-edge chrome and ensure overlays are fully re-enabled.
+    // Restore the app's edge-to-edge chrome cleanly without double-call flickering
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
     super.dispose();
   }
 

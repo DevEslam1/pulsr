@@ -168,19 +168,21 @@ class _MiniPlayerState extends State<MiniPlayer> {
       _isUserDragging = false;
       _swipeInFlight = false;
     });
-    // M-01: `_syncPageController` was suppressed while `_swipeInFlight` was set,
-    // so the state emission from skipToQueueItem may have been dropped. Re-sync
-    // now that the flag is clear, otherwise the carousel can lag the queue.
-    final synced = cubit.state;
-    final syncedQueue = synced.queue.isNotEmpty
-        ? synced.queue
-        : (synced.currentSong != null ? [synced.currentSong!] : const <SongsTableData>[]);
-    if (syncedQueue.isNotEmpty) {
-      _syncPageController(
-        synced.currentIndex.clamp(0, syncedQueue.length - 1).toInt(),
-        syncedQueue.length,
-      );
-    }
+    // Schedule re-sync in post-frame callback so carousel state and layout
+    // have settled, preventing desync or frame-gap jumps (Bug 7).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final synced = cubit.state;
+      final syncedQueue = synced.queue.isNotEmpty
+          ? synced.queue
+          : (synced.currentSong != null ? [synced.currentSong!] : const <SongsTableData>[]);
+      if (syncedQueue.isNotEmpty) {
+        _syncPageController(
+          synced.currentIndex.clamp(0, syncedQueue.length - 1).toInt(),
+          syncedQueue.length,
+        );
+      }
+    });
   }
 
   @override
@@ -420,14 +422,15 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                             unawaited(_completeSwipe(page, cubit));
                                           }
                                         },
-                                      itemBuilder: (context, index) {
+                                       itemBuilder: (context, index) {
                                         final item = queue[index];
                                         final isCurrent = index == currentIndex;
 
-                                        return GestureDetector(
-                                          behavior: HitTestBehavior.opaque,
-                                          onTap: widget.onTap,
-                                          child: Row(
+                                        return RepaintBoundary(
+                                          child: GestureDetector(
+                                            behavior: HitTestBehavior.opaque,
+                                            onTap: widget.onTap,
+                                            child: Row(
                                             children: [
                                               // Artwork or Vinyl Disc
                                               Stack(
@@ -526,10 +529,11 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                                   ),
                                                 ),
                                               ),
-                                              ],
-                                            ),
-                                          );
-                                        },
+                                               ],
+                                             ),
+                                           ),
+                                         );
+                                       },
                                       ),
                                     ),
                                   ),

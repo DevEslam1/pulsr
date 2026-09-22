@@ -116,6 +116,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
 
       return _withUpNext(
         FutureBuilder<List<double>>(
+          key: ValueKey(effectiveSongId),
           future: _cachedWaveformFuture,
           builder: (context, snapshot) {
             if (snapshot.hasData && snapshot.data!.isNotEmpty) {
@@ -150,6 +151,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                 stackTrace: snapshot.stackTrace,
                 category: 'WaveformSeekBar',
               );
+              _cachedWaveformFuture = null;
             }
             // Hard failure fallback to standard seek bar
             return _buildStandardSeekBar(context);

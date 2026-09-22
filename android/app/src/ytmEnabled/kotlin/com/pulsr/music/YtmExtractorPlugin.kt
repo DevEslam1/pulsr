@@ -11,6 +11,8 @@ import android.util.Log
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import org.json.JSONArray
+import org.json.JSONObject
 import org.schabi.newpipe.extractor.Image
 import org.schabi.newpipe.extractor.MediaFormat
 import org.schabi.newpipe.extractor.NewPipe
@@ -26,77 +28,123 @@ import org.schabi.newpipe.extractor.search.SearchInfo
 import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor
 import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeSearchQueryHandlerFactory
 import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeStreamLinkHandlerFactory
-import org.schabi.newpipe.extractor.stream.DeliveryMethod
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 import org.schabi.newpipe.extractor.stream.StreamType
-import java.io.IOException
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.ThreadFactory
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * YouTube Music search, playlist extraction, and multi-client stream resolution.
  *
- * Hardened with:
- * - Proactive PoTokenManager attestation
- * - Multi-client stream resolution fallback (NewPipe -> Innertube WEB_REMIX -> ANDROID -> IOS -> TV)
- * - Continuation pagination for long playlists
- * - Multi-filter search fallback & deduplication
- * - Centralized YtmCookieStore integration
+ * Production-hardened with:
+ * - Thread-safe off-main-thread execution for all MethodChannel handlers
+ * - Selective NewPipe initialization (only for methods requiring NewPipe)
+ * - Safe MethodChannel result encoding handling (no hung Dart futures on codec failures)
+ * - Canonical track map schema harmonized across NewPipe and InnerTube
+ * - Distinguishes empty playlists from network/auth/bot browse errors
+ * - Deep cause-chain error classification with HTTP status code and multi-lingual bot detection
+ * - Sanitized parameter bounds, safe locale resolution, and lifecycle cleanup
  */
 class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
     private var channel: MethodChannel? = null
     private var context: Context? = null
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val executor: ExecutorService = Executors.newFixedThreadPool(3)
+
+    private val threadCounter = AtomicInteger(0)
+    private val executor: ExecutorService = Executors.newFixedThreadPool(3, ThreadFactory { r ->
+        Thread(r, "ytm-plugin-${threadCounter.incrementAndGet()}").apply {
+            isDaemon = true
+        }
+    })
 
     companion object {
         private const val TAG = "YtmExtractorPlugin"
         private const val CHANNEL_NAME = "com.pulsr.music/ytm"
         private const val DEFAULT_SEARCH_LIMIT = 30
+        private const val MAX_SEARCH_LIMIT = 200
+        private const val DEFAULT_PLAYLIST_LIMIT = 100
+        private const val MAX_PLAYLIST_LIMIT = 1000
+        private const val MAX_PAGES = 30
+        private const val DEFAULT_EXPIRY_SECONDS = 21600L // 6 hours
+        private const val DEFAULT_COUNTRY_CODE = "US"
+        private const val MAX_TRAVERSAL_DEPTH = 40
 
         private val VIDEO_ID = Regex("^[A-Za-z0-9_-]{11}$")
+        private val CLIENT_VERSION_REGEX = Regex("^\\d+(\\.\\d+)+$")
+        private val LANGUAGE_REGEX = Regex("^[a-zA-Z]{2,8}$")
+        private val COUNTRY_REGEX = Regex("^[a-zA-Z]{2}$")
+        private val HTTP_429_REGEX = Regex("\\b429\\b")
+        private val HTTP_407_REGEX = Regex("\\b407\\b")
+        private val HTTP_403_REGEX = Regex("\\b403\\b")
+
+        private val MEDIA_TYPE_LABELS = setOf(
+            "song", "video", "canción", "cancion", "vídeo", "música", "musica",
+            "chanson", "titel", "lied", "piste", "brano", "faixa", "أغنية", "فيديو",
+            "曲", "노래", "歌曲", "音乐", "音樂", "песня", "видео", "şarkı", "गीत", "गाना"
+        )
+
+        private fun normalizeDigits(input: String): String {
+            val sb = StringBuilder(input.length)
+            for (ch in input) {
+                when (ch) {
+                    in '0'..'9' -> sb.append(ch)
+                    in '\u0660'..'\u0669' -> sb.append((ch.code - 0x0660 + '0'.code).toChar())
+                    in '\u06f0'..'\u06f9' -> sb.append((ch.code - 0x06f0 + '0'.code).toChar())
+                    in '\u0966'..'\u096f' -> sb.append((ch.code - 0x0966 + '0'.code).toChar())
+                    else -> sb.append(ch)
+                }
+            }
+            return sb.toString()
+        }
+
+        private val initLock = Any()
 
         @Volatile
         private var extractorReady = false
 
+        @Volatile
+        private var pendingCountry: String? = null
+
+        @Volatile
+        private var pendingLang: String? = null
+
         fun registerWith(flutterEngine: FlutterEngine, context: Context? = null): YtmExtractorPlugin {
             val plugin = YtmExtractorPlugin()
-            plugin.context = context
+            val appContext = context?.applicationContext
+            plugin.context = appContext
             val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME)
             plugin.channel = channel
             channel.setMethodCallHandler(plugin)
+
             // Off the main thread: the first init decrypts the persisted poToken via
             // EncryptedSharedPreferences, which is keystore-backed disk I/O and ran
             // during engine attach.
-            context?.let { ctx -> plugin.executor.execute { runCatching { PoTokenManager.init(ctx) } } }
-            // Warm up the YouTube player base.js decipher engine at startup.
-            // Without this, every ciphered stream format is discarded until the
-            // first successful /player response delivers an assets.js URL — which
-            // never happens on a flagged IP. Starting the fetch here covers the
-            // entire app launch window before any song tries to resolve.
-            context?.let { plugin.executor.execute { runCatching { PlayerJavaScript.warmUp() } } }
-            // 2026-09 gap 2: proxy rotation changes the egress -> re-mint tokens.
+            appContext?.let { ctx ->
+                plugin.executor.execute { runCatching { PoTokenManager.init(ctx) } }
+                plugin.executor.execute { runCatching { PlayerJavaScript.warmUp() } }
+            }
+
+            // Proxy rotation changes egress -> re-mint tokens
             ProxyPool.setOnPathChangeListener { label -> EgressSignals.onEgressChanged?.invoke(label) }
             EgressSignals.onEgressChanged = { id -> PoTokenManager.onEgressChanged(id) }
             return plugin
         }
     }
 
-    @Volatile
-    private var pendingCountry: String? = null
-    @Volatile
-    private var pendingLang: String? = null
-
     private fun ensureExtractorReady() {
         if (extractorReady) return
-        synchronized(Companion) {
+        synchronized(initLock) {
             if (extractorReady) return
             val appContext = context?.applicationContext
+                ?: throw ExtractionException("No application context available for NewPipe initialization")
+
             val locale = resolveLocale()
             val countryCode = (pendingCountry?.takeIf { it.isNotBlank() }
-                ?: locale.country).ifBlank { "EG" }
+                ?: locale.country).ifBlank { DEFAULT_COUNTRY_CODE }
 
             NewPipe.init(
                 PulsrDownloader(appContext),
@@ -104,28 +152,20 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 ContentCountry(countryCode),
             )
 
-            if (appContext != null) {
-                PoTokenManager.init(appContext)
-                RateLimiter.shared.initPrefs(appContext)
-                YoutubeStreamExtractor.setPoTokenProvider(PoTokenProviderImpl(appContext))
-            } else {
-                Log.w(TAG, "No context available during NewPipe initialization")
-            }
+            PoTokenManager.init(appContext)
+            RateLimiter.shared.initPrefs(appContext)
+            YoutubeStreamExtractor.setPoTokenProvider(PoTokenProviderImpl(appContext))
             extractorReady = true
         }
     }
 
-    private fun resolveLocale(): Locale {
-        val lang = pendingLang?.takeIf { it.isNotBlank() }
-        val country = pendingCountry?.takeIf { it.isNotBlank() }
-        if (lang != null) {
-            return if (country != null) Locale(lang, country) else Locale(lang)
-        }
+    private fun resolveDefaultLocale(): Locale {
         val ctx = context
         if (ctx != null) {
             val config = ctx.resources.configuration
             val loc = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                config.locales[0]
+                val locales = config.locales
+                if (!locales.isEmpty) locales[0] else null
             } else {
                 @Suppress("DEPRECATION")
                 config.locale
@@ -135,307 +175,351 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         return Locale.getDefault()
     }
 
-    private fun captureLocale(call: MethodCall) {
-        val country = call.argument<String>("country")?.takeIf { it.isNotBlank() }
-        val lang = call.argument<String>("lang")?.takeIf { it.isNotBlank() }
-        var changed = false
-        if (country != null && country != pendingCountry) {
-            pendingCountry = country
-            changed = true
-        }
-        if (lang != null && lang != pendingLang) {
-            pendingLang = lang
-            changed = true
-        }
-        if (changed && extractorReady) {
-            val ctx = context?.applicationContext
-            if (ctx != null) {
-                FingerprintStore.updateLocale(ctx, pendingLang, pendingCountry)
-                runCatching {
-                    val locale = resolveLocale()
-                    val countryCode = (pendingCountry ?: locale.country).ifBlank { "US" }
-                    NewPipe.init(
-                        PulsrDownloader(ctx),
-                        Localization.fromLocale(locale),
-                        ContentCountry(countryCode),
-                    )
+    private fun resolveLocale(): Locale {
+        return runCatching {
+            val lang = pendingLang?.takeIf { LANGUAGE_REGEX.matches(it) }
+            val country = pendingCountry?.takeIf { COUNTRY_REGEX.matches(it) }
+            if (lang != null) {
+                Locale.Builder().setLanguage(lang).apply {
+                    if (country != null) setRegion(country)
+                }.build()
+            } else {
+                resolveDefaultLocale()
+            }
+        }.getOrElse { resolveDefaultLocale() }
+    }
+
+    private fun captureLocale(countryArg: String?, langArg: String?) {
+        val country = countryArg?.trim()?.takeIf { it.isNotBlank() }
+        val lang = langArg?.trim()?.takeIf { it.isNotBlank() }
+        synchronized(initLock) {
+            var changed = false
+            if (country != null && country != pendingCountry) {
+                pendingCountry = country
+                changed = true
+            }
+            if (lang != null && lang != pendingLang) {
+                pendingLang = lang
+                changed = true
+            }
+            if (changed && extractorReady) {
+                val ctx = context?.applicationContext
+                if (ctx != null) {
+                    FingerprintStore.updateLocale(ctx, pendingLang, pendingCountry)
+                    val ok = runCatching {
+                        val locale = resolveLocale()
+                        val countryCode = (pendingCountry ?: locale.country).ifBlank { DEFAULT_COUNTRY_CODE }
+                        NewPipe.init(
+                            PulsrDownloader(ctx),
+                            Localization.fromLocale(locale),
+                            ContentCountry(countryCode),
+                        )
+                    }.isSuccess
+                    if (!ok) {
+                        Log.w(TAG, "Failed to re-initialize NewPipe with new locale, marking extractor unready")
+                        extractorReady = false
+                    }
                 }
             }
         }
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
-        when (call.method) {
-            "isAvailable" -> result.success(true)
-            "isWifiConnected" -> result.success(isWifiConnected())
-            "ensurePoTokenReady" -> {
-                runOffMainThread(result) {
-                    val appContext = context?.applicationContext
-                    if (appContext != null) {
-                        PoTokenManager.init(appContext)
-                        PoTokenManager.ensureReadySync()
-                    } else {
-                        false
+        try {
+            when (call.method) {
+                "isAvailable" -> result.success(true)
+                "isWifiConnected" -> {
+                    runOffMainThread(result, requireExtractorReady = false) { isWifiConnected() }
+                }
+                "ensurePoTokenReady" -> {
+                    runOffMainThread(result, requireExtractorReady = false) {
+                        val appContext = context?.applicationContext
+                        if (appContext == null) {
+                            false
+                        } else {
+                            PoTokenManager.init(appContext)
+                            PoTokenManager.ensureReadySync()
+                        }
                     }
                 }
-            }
-            "invalidatePoToken" -> {
-                runOffMainThread(result) {
-                    PoTokenManager.invalidate()
-                    true
+                "invalidatePoToken" -> {
+                    runOffMainThread(result, requireExtractorReady = false) {
+                        PoTokenManager.invalidate()
+                        true
+                    }
                 }
-            }
-            "getPlayerPoToken" -> {
-                // Content-bound (videoId) poToken for a /player request. The
-                // visitor-bound `streamingPoToken` must never be used here: a
-                // guest WEB_REMIX player request carrying it answers UNPLAYABLE
-                // "Video unavailable". Dart's account chain needs this because it
-                // previously reused streamingPoToken for its web clients.
-                val videoId = call.argument<String>("videoId")?.trim()
-                if (videoId.isNullOrEmpty() || !VIDEO_ID.matches(videoId)) {
-                    result.success(null)
-                    return
+                "getPlayerPoToken" -> {
+                    val videoId = call.argument<String>("videoId")?.trim()
+                    if (videoId.isNullOrEmpty() || !VIDEO_ID.matches(videoId)) {
+                        result.success(null)
+                        return
+                    }
+                    runOffMainThread(result, requireExtractorReady = false) {
+                        val appContext = context?.applicationContext
+                        if (appContext != null) PoTokenManager.init(appContext)
+                        PoTokenManager.poTokenForSync(videoId)
+                    }
                 }
-                runOffMainThread(result) {
-                    val appContext = context?.applicationContext
-                    if (appContext != null) PoTokenManager.init(appContext)
-                    PoTokenManager.poTokenForSync(videoId)
+                "isVpnConnected" -> {
+                    runOffMainThread(result, requireExtractorReady = false) {
+                        val ctx = context?.applicationContext
+                        if (ctx != null) CellularFailoverHelper.isVpnActive(ctx) else false
+                    }
                 }
-            }
-            "isVpnConnected" -> {
-                val ctx = context?.applicationContext
-                val isVpn = if (ctx != null) CellularFailoverHelper.isVpnActive(ctx) else false
-                result.success(isVpn)
-            }
-            "updateClientCapabilities" -> {
-                val json = call.argument<String>("json") ?: ""
-                val ctx = context?.applicationContext
-                if (ctx == null) {
-                    result.success(false)
-                    return
+                "updateClientCapabilities" -> {
+                    val json = call.argument<String>("json") ?: ""
+                    val ctx = context?.applicationContext
+                    if (ctx == null) {
+                        result.success(false)
+                        return
+                    }
+                    runOffMainThread(result, requireExtractorReady = false) {
+                        ClientCapabilityMatrix.applyRemoteCapabilities(json, ctx)
+                        true
+                    }
                 }
-                runOffMainThread(result) { ClientCapabilityMatrix.applyRemoteCapabilities(json, ctx) }
-            }
-            "getClientCapabilitiesState" -> {
-                val ctx = context?.applicationContext
-                if (ctx == null) {
-                    result.success(null)
-                    return
+                "getClientCapabilitiesState" -> {
+                    val ctx = context?.applicationContext
+                    if (ctx == null) {
+                        result.success(null)
+                        return
+                    }
+                    runOffMainThread(result, requireExtractorReady = false) {
+                        ClientCapabilityMatrix.remoteState(ctx)
+                    }
                 }
-                result.success(ClientCapabilityMatrix.remoteState(ctx))
-            }
-            "setClientVersion" -> {
-                // Dart's YtmClientVersionResolver scrapes the live WEB_REMIX
-                // version from music.youtube.com. Pushing it here keeps the
-                // pinned asset value from aging into UNPLAYABLE responses.
-                ClientCapabilityMatrix.setWebMusicClientVersion(
-                    call.argument<String>("clientVersion") ?: ""
-                )
-                result.success(true)
-            }
-            "clearNetworkCaches" -> {
-                // VPN up/down (or Wi-Fi <-> mobile) moves the egress IP, which
-                // invalidates cached googlevideo edges, throttle verdicts, and
-                // BotGuard attestation (poToken+visitorData are IP-bound). Dart
-                // already drops its URL caches. 08-2026 fix: VPN datacenter IPs
-                // trigger BOT_CHALLENGE on WEB_REMIX even when logged in, so we
-                // invalidate visitorData/poToken (keep dataSyncId) and pre-warm a
-                // fresh one bound to the new IP in background.
-                runOffMainThread(result) {
-                    YtmHttpClient.TtlDnsCache.instance.clear()
-                    RateLimiter.shared.resetAfterNetworkChange()
-                    // Player base.js is bound to the egress it was fetched from;
-                    // re-fetch and re-extract after a path change.
-                    PlayerJavaScript.clearCaches()
-                    try {
-                        val isVpn = context?.let { CellularFailoverHelper.isVpnActive(it) } ?: false
-                        if (isVpn || PoTokenManager.isExpired() || PoTokenManager.webViewBroken) {
-                            PoTokenManager.invalidate()
-                            val ctx2 = context?.applicationContext
-                            if (ctx2 != null) PoTokenManager.preWarm(ctx2)
-                        }
-                    } catch (_: Throwable) {}
-                    true
+                "setClientVersion" -> {
+                    val version = call.argument<String>("clientVersion")?.trim()
+                    if (version.isNullOrEmpty() || !CLIENT_VERSION_REGEX.matches(version)) {
+                        result.success(false)
+                        return
+                    }
+                    runOffMainThread(result, requireExtractorReady = false) {
+                        ClientCapabilityMatrix.setWebMusicClientVersion(version)
+                        true
+                    }
                 }
-            }
-            "preWarm" -> {
-                val ctx = context?.applicationContext
-                if (ctx == null) {
-                    result.success(true)
-                    return
+                "clearNetworkCaches" -> {
+                    runOffMainThread(result, requireExtractorReady = false) {
+                        YtmHttpClient.TtlDnsCache.instance.clear()
+                        RateLimiter.shared.resetAfterNetworkChange()
+                        PlayerJavaScript.clearCaches()
+                        try {
+                            val ctx = context?.applicationContext
+                            if (ctx != null) {
+                                PoTokenManager.invalidate()
+                                PoTokenManager.preWarm(ctx)
+                            }
+                        } catch (_: Throwable) {}
+                        true
+                    }
                 }
-                runOffMainThread(result) {
-                    ClientCapabilityMatrix.init(ctx)
-                    // Proactively fetch the YouTube player base.js and parse decipher
-                    // rules so they are cached before the first song resolution. Without
-                    // this warmUp(), playerUrl stays empty and every ciphered format gets
-                    // discarded ("No cached decipher rules for player hash default"),
-                    // forcing the 9-client chain to time out every session.
-                    executor.execute { runCatching { PlayerJavaScript.warmUp() } }
-                    PoTokenManager.preWarm(ctx)
-                    true
+                "preWarm" -> {
+                    val ctx = context?.applicationContext
+                    if (ctx == null) {
+                        result.success(true)
+                        return
+                    }
+                    // Non-blocking background warm-up of JavaScript player and PoToken generator
+                    runOffMainThread(result, requireExtractorReady = false) {
+                        ClientCapabilityMatrix.init(ctx)
+                        executor.execute { runCatching { PlayerJavaScript.warmUp() } }
+                        PoTokenManager.preWarm(ctx)
+                        true
+                    }
                 }
-            }
-            "resetIdentities" -> {
-                val ctx = context?.applicationContext
-                if (ctx == null) {
-                    result.success(true)
-                    return
+                "resetIdentities" -> {
+                    val ctx = context?.applicationContext
+                    if (ctx == null) {
+                        result.success(true)
+                        return
+                    }
+                    runOffMainThread(result, requireExtractorReady = false) {
+                        PoTokenManager.invalidate()
+                        FingerprintStore.resetFingerprint(ctx)
+                        true
+                    }
                 }
-                // Deliberately does not touch cookies: this resets the anti-block
-                // identity (poToken + fingerprint) to escape a block, and wiping the
-                // cookie jar here silently signed the user out as a side effect.
-                runOffMainThread(result) {
-                    PoTokenManager.invalidate()
-                    FingerprintStore.resetFingerprint(ctx)
-                    true
+                "getLimitedMode" -> {
+                    runOffMainThread(result, requireExtractorReady = false) { PoTokenManager.isLimitedMode }
                 }
-            }
-            "getLimitedMode" -> {
-                result.success(PoTokenManager.isLimitedMode)
-            }
-            "getPoTokenState" -> {
-                result.success(
-                    mapOf(
-                        "isReady" to PoTokenManager.isReady,
-                        "isExpired" to PoTokenManager.isExpired(),
-                        "isExpiringSoon" to PoTokenManager.isExpiringSoon(),
-                        "visitorData" to PoTokenManager.visitorData,
-                        "streamingPoToken" to PoTokenManager.streamingPoToken,
-                        "webViewBroken" to PoTokenManager.webViewBroken,
-                        "isLimitedMode" to PoTokenManager.isLimitedMode,
-                    )
-                )
-            }
-            "getAccountPoToken" -> {
-                val dataSyncId = call.argument<String>("dataSyncId")?.trim()
-                if (dataSyncId.isNullOrEmpty()) {
-                    result.error("YTM_INVALID_ARGUMENT", "dataSyncId is required", null)
-                    return
+                "getPoTokenState" -> {
+                    runOffMainThread(result, requireExtractorReady = false) {
+                        mapOf(
+                            "isReady" to PoTokenManager.isReady,
+                            "isExpired" to PoTokenManager.isExpired(),
+                            "isExpiringSoon" to PoTokenManager.isExpiringSoon(),
+                            "visitorData" to PoTokenManager.visitorData,
+                            "streamingPoToken" to PoTokenManager.streamingPoToken,
+                            "webViewBroken" to PoTokenManager.webViewBroken,
+                            "isLimitedMode" to PoTokenManager.isLimitedMode,
+                        )
+                    }
                 }
-                runOffMainThread(result) {
-                    PoTokenManager.setDataSyncId(dataSyncId)
-                    mapOf(
-                        "poToken" to PoTokenManager.accountPoTokenForSync(dataSyncId),
-                        "visitorData" to PoTokenManager.sessionVisitorData.ifEmpty { PoTokenManager.visitorData },
-                    )
+                "getAccountPoToken" -> {
+                    val dataSyncId = call.argument<String>("dataSyncId")?.trim()
+                    if (dataSyncId.isNullOrEmpty()) {
+                        result.error("YTM_INVALID_ARGUMENT", "dataSyncId is required", null)
+                        return
+                    }
+                    runOffMainThread(result, requireExtractorReady = false) {
+                        PoTokenManager.setDataSyncId(dataSyncId)
+                        mapOf(
+                            "poToken" to PoTokenManager.accountPoTokenForSync(dataSyncId),
+                            "visitorData" to PoTokenManager.sessionVisitorData.ifEmpty { PoTokenManager.visitorData },
+                        )
+                    }
                 }
-            }
-            "setDataSyncId" -> {
-                val dataSyncId = call.argument<String>("dataSyncId")?.trim()
-                if (!dataSyncId.isNullOrEmpty()) {
-                    val appContext = context?.applicationContext
-                    if (appContext != null) PoTokenManager.init(appContext)
-                    PoTokenManager.setDataSyncId(dataSyncId)
+                "setDataSyncId" -> {
+                    val dataSyncId = call.argument<String>("dataSyncId")?.trim()
+                    if (dataSyncId.isNullOrEmpty()) {
+                        result.success(false)
+                        return
+                    }
+                    runOffMainThread(result, requireExtractorReady = false) {
+                        val appContext = context?.applicationContext
+                        if (appContext != null) PoTokenManager.init(appContext)
+                        PoTokenManager.setDataSyncId(dataSyncId)
+                        true
+                    }
                 }
-                result.success(true)
-            }
-            "search" -> {
-                val query = call.argument<String>("query")?.trim()
-                if (query.isNullOrEmpty()) {
-                    result.error("YTM_INVALID_ARGUMENT", "query is required", null)
-                    return
+                "search" -> {
+                    val query = call.argument<String>("query")?.trim()
+                    if (query.isNullOrEmpty()) {
+                        result.error("YTM_INVALID_ARGUMENT", "query is required", null)
+                        return
+                    }
+                    val country = call.argument<String>("country")
+                    val lang = call.argument<String>("lang")
+                    val limit = sanitizeLimit(call.argument<Int>("limit"), DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT)
+                    runOffMainThread(result, requireExtractorReady = true) {
+                        captureLocale(country, lang)
+                        search(query, limit)
+                    }
                 }
-                captureLocale(call)
-                val limit = call.argument<Int>("limit") ?: DEFAULT_SEARCH_LIMIT
-                runOffMainThread(result) { search(query, limit) }
-            }
-            "searchContinuation" -> {
-                val token = call.argument<String>("continuation")?.trim()
-                if (token.isNullOrEmpty()) {
-                    result.error("YTM_INVALID_ARGUMENT", "continuation is required", null)
-                    return
+                "searchContinuation" -> {
+                    val token = call.argument<String>("continuation")?.trim()
+                    if (token.isNullOrEmpty()) {
+                        result.error("YTM_INVALID_ARGUMENT", "continuation is required", null)
+                        return
+                    }
+                    val limit = sanitizeLimit(call.argument<Int>("limit"), DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT)
+                    runOffMainThread(result, requireExtractorReady = false) { searchContinuation(token, limit) }
                 }
-                val limit = call.argument<Int>("limit") ?: DEFAULT_SEARCH_LIMIT
-                runOffMainThread(result) { searchContinuation(token, limit) }
-            }
-            "trending" -> {
-                captureLocale(call)
-                val limit = call.argument<Int>("limit") ?: DEFAULT_SEARCH_LIMIT
-                runOffMainThread(result) { trending(limit) }
-            }
-            "getCharts" -> {
-                captureLocale(call)
-                val limit = call.argument<Int>("limit") ?: DEFAULT_SEARCH_LIMIT
-                runOffMainThread(result) { browseMusicSection("FEmusic_charts", limit) }
-            }
-            "getMoods" -> {
-                captureLocale(call)
-                val limit = call.argument<Int>("limit") ?: DEFAULT_SEARCH_LIMIT
-                runOffMainThread(result) { browseMusicSection("FEmusic_moods_and_genres", limit) }
-            }
-            "getPlaylist" -> {
-                val url = call.argument<String>("url")?.trim()
-                if (url.isNullOrEmpty()) {
-                    result.error("YTM_INVALID_ARGUMENT", "url is required", null)
-                    return
+                "trending" -> {
+                    val country = call.argument<String>("country")
+                    val lang = call.argument<String>("lang")
+                    val limit = sanitizeLimit(call.argument<Int>("limit"), DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT)
+                    runOffMainThread(result, requireExtractorReady = false) {
+                        captureLocale(country, lang)
+                        trending(limit)
+                    }
                 }
-                val limit = call.argument<Int>("limit") ?: 100
-                runOffMainThread(result) { getPlaylist(url, limit) }
+                "getCharts" -> {
+                    val country = call.argument<String>("country")
+                    val lang = call.argument<String>("lang")
+                    val limit = sanitizeLimit(call.argument<Int>("limit"), DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT)
+                    runOffMainThread(result, requireExtractorReady = false) {
+                        captureLocale(country, lang)
+                        browseMusicSection("FEmusic_charts", limit)
+                    }
+                }
+                "getMoods" -> {
+                    val country = call.argument<String>("country")
+                    val lang = call.argument<String>("lang")
+                    val limit = sanitizeLimit(call.argument<Int>("limit"), DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT)
+                    runOffMainThread(result, requireExtractorReady = false) {
+                        captureLocale(country, lang)
+                        browseMusicSection("FEmusic_moods_and_genres", limit)
+                    }
+                }
+                "getPlaylist" -> {
+                    val url = call.argument<String>("url")?.trim()
+                    if (url.isNullOrEmpty()) {
+                        result.error("YTM_INVALID_ARGUMENT", "url is required", null)
+                        return
+                    }
+                    val limit = sanitizeLimit(call.argument<Int>("limit"), DEFAULT_PLAYLIST_LIMIT, MAX_PLAYLIST_LIMIT)
+                    runOffMainThread(result, requireExtractorReady = true) { getPlaylist(url, limit) }
+                }
+                "getCookies" -> {
+                    val ctx = context?.applicationContext
+                    if (ctx == null) {
+                        result.success(null)
+                        return
+                    }
+                    runOffMainThread(result, requireExtractorReady = false) {
+                        val cookieStore = YtmCookieStore.getInstance(ctx)
+                        val cookies = cookieStore.readFromCookieManager()
+                        if (cookies.isNullOrBlank()) cookieStore.getMergedCookieHeader() else cookies
+                    }
+                }
+                "setCookies" -> {
+                    val cookies = call.argument<String>("cookies")
+                    val ctx = context?.applicationContext
+                    if (ctx == null) {
+                        result.success(true)
+                        return
+                    }
+                    runOffMainThread(result, requireExtractorReady = false) {
+                        YtmCookieStore.getInstance(ctx).setCookies(cookies ?: "")
+                        true
+                    }
+                }
+                "clearCookies" -> {
+                    val ctx = context?.applicationContext
+                    if (ctx == null) {
+                        result.success(true)
+                        return
+                    }
+                    runOffMainThread(result, requireExtractorReady = false) {
+                        YtmCookieStore.getInstance(ctx).clear()
+                        PoTokenManager.init(ctx)
+                        PoTokenManager.clearSession()
+                        true
+                    }
+                }
+                "resolveStream" -> {
+                    val videoId = call.argument<String>("videoId")?.trim()
+                    if (videoId.isNullOrEmpty() || !VIDEO_ID.matches(videoId)) {
+                        result.error("YTM_INVALID_ARGUMENT", "videoId is not a valid YouTube id", null)
+                        return
+                    }
+                    val quality = call.argument<String>("quality")?.trim() ?: "high"
+                    runOffMainThread(result, requireExtractorReady = true) { resolveStreamWithFallback(videoId, quality) }
+                }
+                else -> result.notImplemented()
             }
-            "getCookies" -> {
-                val ctx = context
-                if (ctx == null) {
-                    result.success(null)
-                    return
-                }
-                // Off the platform thread: the first touch builds an
-                // EncryptedSharedPreferences, which hits the keystore.
-                runOffMainThread(result) {
-                    val cookieStore = YtmCookieStore.getInstance(ctx)
-                    cookieStore.readFromCookieManager() ?: cookieStore.getMergedCookieHeader()
-                }
-            }
-            "setCookies" -> {
-                val cookies = call.argument<String>("cookies")
-                val ctx = context
-                if (ctx == null) {
-                    result.success(true)
-                    return
-                }
-                runOffMainThread(result) {
-                    YtmCookieStore.getInstance(ctx).setCookies(cookies ?: "")
-                    true
-                }
-            }
-            // Explicit disconnect. `setCookies("")` only empties the in-process
-            // store and its prefs; this also expires the tracked names in the
-            // WebView CookieManager and drops the account-bound poToken state, so
-            // a logout cannot be undone by the next cold start re-reading the jar.
-            "clearCookies" -> {
-                val ctx = context
-                if (ctx == null) {
-                    result.success(true)
-                    return
-                }
-                runOffMainThread(result) {
-                    YtmCookieStore.getInstance(ctx).clear()
-                    PoTokenManager.init(ctx.applicationContext)
-                    PoTokenManager.clearSession()
-                    true
-                }
-            }
-            "resolveStream" -> {
-                val videoId = call.argument<String>("videoId")
-                if (videoId == null || !VIDEO_ID.matches(videoId)) {
-                    result.error("YTM_INVALID_ARGUMENT", "videoId is not a YouTube id", null)
-                    return
-                }
-                val quality = call.argument<String>("quality") ?: "high"
-                runOffMainThread(result) { resolveStreamWithFallback(videoId, quality) }
-            }
-            else -> result.notImplemented()
+        } catch (t: Throwable) {
+            Log.e(TAG, "Unhandled exception in onMethodCall: ${t.message}", t)
+            result.error("EXTRACTOR_ERROR", t.message, null)
         }
     }
 
+    private fun sanitizeLimit(limit: Int?, default: Int, max: Int): Int {
+        return (limit ?: default).coerceIn(1, max)
+    }
+
     private fun isWifiConnected(): Boolean {
-        val ctx = context ?: return true
-        val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return true
+        val ctx = context?.applicationContext ?: return false
+        val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val network = cm.activeNetwork ?: return false
-            val caps = cm.getNetworkCapabilities(network) ?: return false
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-                caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+            val activeNetwork = cm.activeNetwork
+            val activeCaps = if (activeNetwork != null) cm.getNetworkCapabilities(activeNetwork) else null
+            if (activeCaps != null && (activeCaps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                    activeCaps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))) {
+                return true
+            }
+            // If activeNetwork has TRANSPORT_VPN, query all physical networks
+            @Suppress("DEPRECATION")
+            for (network in cm.allNetworks) {
+                val caps = cm.getNetworkCapabilities(network) ?: continue
+                if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                    caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
+                    return true
+                }
+            }
+            false
         } else {
             @Suppress("DEPRECATION")
             val netInfo = cm.activeNetworkInfo ?: return false
@@ -445,7 +529,11 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         }
     }
 
-    private fun runOffMainThread(result: MethodChannel.Result, work: () -> Any?) {
+    private fun runOffMainThread(
+        result: MethodChannel.Result,
+        requireExtractorReady: Boolean = true,
+        work: () -> Any?,
+    ) {
         if (executor.isShutdown || executor.isTerminated) {
             result.error("YTM_SHUTDOWN", "YTM extractor is shutting down", null)
             return
@@ -453,9 +541,24 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         try {
             executor.execute {
                 try {
-                    ensureExtractorReady()
+                    if (requireExtractorReady) {
+                        ensureExtractorReady()
+                    }
                     val value = work()
-                    mainHandler.post { runCatching { result.success(value) } }
+                    mainHandler.post {
+                        try {
+                            result.success(value)
+                        } catch (t: Throwable) {
+                            Log.e(TAG, "Failed to encode MethodChannel result: ${t.message}", t)
+                            runCatching {
+                                result.error(
+                                    "YTM_ENCODE_ERROR",
+                                    "Native result could not be encoded: ${t.message}",
+                                    mapOf("type" to (value?.javaClass?.name ?: "null")),
+                                )
+                            }
+                        }
+                    }
                 } catch (e: Throwable) {
                     Log.w(TAG, "YTM native request failed: ${e.message}")
                     val code = errorCodeFor(e)
@@ -467,48 +570,99 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                     mainHandler.post { runCatching { result.error(code, e.message, details) } }
                 }
             }
-        } catch (e: java.util.concurrent.RejectedExecutionException) {
+        } catch (_: java.util.concurrent.RejectedExecutionException) {
             result.error("YTM_SHUTDOWN", "YTM extractor is shutting down", null)
         }
     }
 
     private fun errorCodeFor(e: Throwable): String {
-        if (e is InnertubeClient.InnertubeException) {
-            return e.signal.code
-        }
-        val msg = e.message?.lowercase() ?: ""
-        if (msg.contains("not a bot") || msg.contains("login_required") || msg.contains("recaptcha") || msg.contains("bot_block")) {
-            return "BOT_CHALLENGE"
-        }
-        return when {
-            e is ReCaptchaException -> "BOT_CHALLENGE"
-            e is ContentNotAvailableException -> {
-                // NewPipe wraps "Sign in to confirm that you're not a bot" as a
-                // ContentNotAvailableException. Without this check it was always
-                // reported as VIDEO_GONE, masking the real BotChallenge signal from
-                // the Dart recovery layer (no cooldown, no poToken refresh, infinite
-                // 9-client retry loop on every subsequent track while on VPN).
-                val m = e.message?.lowercase() ?: ""
-                if (m.contains("not a bot") || m.contains("sign in to confirm") ||
-                    m.contains("confirm you're") || m.contains("confirm you’re") ||
-                    m.contains("bot_block") || m.contains("botguard") ||
-                    m.contains("recaptcha") || m.contains("automated queries") ||
-                    m.contains("unusual traffic")) {
-                    "BOT_CHALLENGE"
-                } else {
-                    "VIDEO_GONE"
-                }
+        var current: Throwable? = e
+        var depth = 0
+        var isRateLimited = false
+        var isBotChallenge = false
+        var isIpBlocked = false
+        var isProxyAuth = false
+        var isNetwork = false
+        var isAuth = false
+        var isLiveUnsupported = false
+        var isEmptyResult = false
+        var sawContentNotAvailable = false
+        var sawExtractionException = false
+        var innertubeSignal: String? = null
+
+        while (current != null && depth < 10) {
+            if (current is InnertubeClient.InnertubeException) {
+                innertubeSignal = current.signal.code
+                break
             }
-            // A thrown IOException means the HTTP call never completed, so it is a
-            // transport failure — YouTube's own blocks arrive as 403/429 *responses*.
-            // Reporting these as IP_BLOCKED made Dart impose a multi-minute cooldown
-            // and rotate proxies every time the device lost signal for a second.
-            isNetworkFailure(e) -> "YTM_NETWORK"
-            e is ExtractionException -> "CLIENT_DEPRECATED"
-            // Unknown failures (parse errors, IllegalState, …) are bugs, not throttling:
-            // RATE_LIMITED here bought a cooldown that could never help.
-            else -> "EXTRACTOR_ERROR"
+            if (current is RateLimitedException) {
+                isRateLimited = true
+                break
+            }
+            if (current is ReCaptchaException) {
+                isBotChallenge = true
+                break
+            }
+            if (current is ContentNotAvailableException) {
+                sawContentNotAvailable = true
+            }
+            if (current is ExtractionException) {
+                sawExtractionException = true
+            }
+
+            val msg = (current.message ?: "").lowercase(Locale.ROOT)
+            if (msg.contains("no trending tracks found") || msg.contains("no tracks found")) {
+                isEmptyResult = true
+            }
+            if (msg.contains("live streams are not supported") || msg.contains("live stream unsupported")) {
+                isLiveUnsupported = true
+                break
+            }
+            if (msg.contains("too many requests") || msg.contains("rate_limit") || msg.contains("rate limit") ||
+                HTTP_429_REGEX.containsMatchIn(msg)
+            ) {
+                isRateLimited = true
+                break
+            }
+            if (HTTP_407_REGEX.containsMatchIn(msg) || msg.contains("proxy authentication")) {
+                isProxyAuth = true
+                break
+            }
+            if (HTTP_403_REGEX.containsMatchIn(msg) || msg.contains("forbidden") || msg.contains("ip_block") || msg.contains("access denied")) {
+                isIpBlocked = true
+            }
+            if (msg.contains("not a bot") || msg.contains("login_required") || msg.contains("recaptcha") ||
+                msg.contains("bot_block") || msg.contains("botguard") || msg.contains("sign in to confirm") ||
+                msg.contains("confirm you're") || msg.contains("confirm you’re") || msg.contains("automated queries") ||
+                msg.contains("unusual traffic") || msg.contains("device check") || msg.contains("verify you're human")
+            ) {
+                isBotChallenge = true
+                break
+            }
+            if (msg.contains("sign in") || msg.contains("unauthenticated") || msg.contains("login required")) {
+                isAuth = true
+            }
+            if (isNetworkFailure(current)) {
+                isNetwork = true
+            }
+
+            current = current.cause
+            depth++
         }
+
+        if (innertubeSignal != null) return innertubeSignal
+        if (isLiveUnsupported) return "LIVE_UNSUPPORTED"
+        if (isRateLimited) return "RATE_LIMITED"
+        if (isBotChallenge) return "BOT_CHALLENGE"
+        if (isProxyAuth) return "PROXY_AUTH_REQUIRED"
+        if (isIpBlocked) return "IP_BLOCKED"
+        if (isAuth) return "SIGN_IN_REQUIRED"
+        if (isNetwork) return "YTM_NETWORK"
+        if (sawContentNotAvailable) return "VIDEO_GONE"
+        if (isEmptyResult) return "YTM_EMPTY"
+        if (sawExtractionException) return "CLIENT_DEPRECATED"
+
+        return "EXTRACTOR_ERROR"
     }
 
     private fun isNetworkFailure(e: Throwable): Boolean {
@@ -529,13 +683,55 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
     }
 
     /**
-     * Search with multi-filter fallback:
-     * If MUSIC_SONGS produces no results, retries with playlists and artists and merges.
+     * Canonical track representation matching Dart YtmTrack.fromChannel expectations.
+     * Backwards-compatible aliases (uploader, thumbnailUrl, duration) are retained.
+     */
+    private fun buildTrackMap(
+        videoId: String,
+        title: String,
+        artist: String,
+        durationMs: Long,
+        artworkUrl: String?,
+        url: String? = null,
+        isLive: Boolean = false,
+    ): Map<String, Any?> {
+        val safeArtist = artist.ifBlank { "Unknown Artist" }
+        val safeTitle = title.ifBlank { "Unknown Title" }
+        val safeDurationMs = durationMs.coerceAtLeast(0L)
+        val safeUrl = url ?: "https://music.youtube.com/watch?v=$videoId"
+        val safeArtwork = artworkUrl?.takeIf { it.isNotBlank() }
+
+        return mapOf(
+            // Canonical schema matching Dart YtmTrack.fromChannel
+            "videoId" to videoId,
+            "title" to safeTitle,
+            "artist" to safeArtist,
+            "durationMs" to safeDurationMs,
+            "artworkUrl" to safeArtwork,
+            "url" to safeUrl,
+            "isLive" to isLive,
+
+            // Backwards-compatibility aliases
+            "uploader" to safeArtist,
+            "thumbnailUrl" to safeArtwork,
+            "duration" to (safeDurationMs / 1000L),
+            "viewCount" to -1L,
+            "shortDescription" to null,
+        )
+    }
+
+    /**
+     * Search with multi-tier fallback:
+     * 1. Primary: NewPipe MUSIC_SONGS filter.
+     * 2. If results < limit: fallback to NewPipe general search.
+     * 3. If results < limit: supplement with native InnerTube search.
+     * Propagates bot challenges / rate limits if no tracks could be extracted.
      */
     private fun search(query: String, limit: Int): List<Map<String, Any?>> {
         val results = mutableListOf<Map<String, Any?>>()
         val seenVideoIds = mutableSetOf<String>()
         var primaryError: Throwable? = null
+        var innerTubeError: Throwable? = null
 
         // 1. Primary: MUSIC_SONGS
         try {
@@ -545,7 +741,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 "",
             )
             songsExtractor.fetchPage()
-            val songItems = SearchInfo.getInfo(songsExtractor).relatedItems.asSequence().filterIsInstance<StreamInfoItem>()
+            val songItems = (SearchInfo.getInfo(songsExtractor).relatedItems ?: emptyList()).asSequence().filterIsInstance<StreamInfoItem>()
             for (map in streamItemsToMaps(songItems, limit)) {
                 val vid = map["videoId"] as? String
                 if (vid != null && seenVideoIds.add(vid)) {
@@ -557,16 +753,14 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             primaryError = e
         }
 
-        // 2. Fallback if empty: General search only if not throttled/blocked
-        if (results.isEmpty()) {
-            if (primaryError is ReCaptchaException || primaryError is RateLimitedException) {
-                // Let InnerTube fallback run below before throwing
-            } else {
+        // 2. Fallback / supplement: General search if not throttled
+        if (results.size < limit) {
+            if (primaryError !is ReCaptchaException && primaryError !is RateLimitedException) {
                 try {
                     val generalExtractor = ServiceList.YouTube.getSearchExtractor(query)
                     generalExtractor.fetchPage()
-                    val items = SearchInfo.getInfo(generalExtractor).relatedItems.asSequence().filterIsInstance<StreamInfoItem>()
-                    for (map in streamItemsToMaps(items, limit)) {
+                    val items = (SearchInfo.getInfo(generalExtractor).relatedItems ?: emptyList()).asSequence().filterIsInstance<StreamInfoItem>()
+                    for (map in streamItemsToMaps(items, limit - results.size)) {
                         val vid = map["videoId"] as? String
                         if (vid != null && seenVideoIds.add(vid)) {
                             results.add(map)
@@ -578,137 +772,137 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             }
         }
 
-        // 3. Fallback if still empty: Native InnerTube search
-        if (results.isEmpty()) {
+        // 3. Fallback / supplement: Native InnerTube search
+        if (results.size < limit) {
             val ctx = context?.applicationContext
             if (ctx != null) {
                 try {
                     YtmCookieStore.getInstance(ctx).readFromCookieManager()
                     val client = InnertubeClient(ctx)
                     val json = client.requestSearch(query)
-                    val innerTracks = parseInnertubeTracksFromJson(json, limit)
+                    val innerTracks = parseInnertubeTracksFromJson(json, limit - results.size)
                     for (map in innerTracks) {
                         val vid = map["videoId"] as? String
                         if (vid != null && seenVideoIds.add(vid)) {
                             results.add(map)
                         }
                     }
-                    if (results.isNotEmpty()) {
-                        Log.i(TAG, "InnerTube search fallback returned ${results.size} tracks")
-                    }
                 } catch (e: Throwable) {
                     Log.w(TAG, "InnerTube search fallback failed: ${e.message}")
+                    innerTubeError = e
                 }
             }
         }
 
-        if (results.isEmpty() && primaryError != null && isNetworkFailure(primaryError)) {
-            throw primaryError
+        // Propagate genuine errors when no results could be extracted
+        if (results.isEmpty()) {
+            val errToRethrow = primaryError ?: innerTubeError
+            if (errToRethrow != null) {
+                throw errToRethrow
+            }
         }
 
         return results.take(limit)
     }
 
     private fun trending(limit: Int): List<Map<String, Any?>> {
-        // Prefer YouTube Music Charts via InnerTube — the previous kiosk pointed
-        // at generic YouTube Trending (gaming/news), not Music.
         val ctx = context?.applicationContext
-        if (ctx != null) {
+            ?: throw ExtractionException("No context available for trending")
+        YtmCookieStore.getInstance(ctx).readFromCookieManager()
+        val client = InnertubeClient(ctx)
+        var lastError: Throwable? = null
+        val browseIds = listOf("FEmusic_charts", "FEmusic_moods_and_genres")
+        for (bid in browseIds) {
             try {
-                YtmCookieStore.getInstance(ctx).readFromCookieManager()
-                val client = InnertubeClient(ctx)
-                // FEmusic_charts is the canonical Music charts browseId; fallback to
-                // FEmusic_moods_and_genres then generic kiosk if both fail.
-                val browseIds = listOf("FEmusic_charts", "FEmusic_moods_and_genres")
-                for (bid in browseIds) {
-                    try {
-                        val json = client.requestBrowse(bid)
-                        val tracks = parseInnertubeTracksFromJson(json, limit)
-                        if (tracks.isNotEmpty()) {
-                            Log.i(TAG, "trending: $bid returned ${tracks.size} tracks")
-                            return tracks.take(limit)
-                        }
-                    } catch (e: Throwable) {
-                        Log.w(TAG, "trending browse $bid failed: ${e.message}")
-                    }
+                val json = client.requestBrowse(bid)
+                val tracks = parseInnertubeTracksFromJson(json, limit)
+                if (tracks.isNotEmpty()) {
+                    Log.i(TAG, "trending: $bid returned ${tracks.size} tracks")
+                    return tracks.take(limit)
                 }
             } catch (e: Throwable) {
-                Log.w(TAG, "trending InnerTube path failed: ${e.message}")
+                Log.w(TAG, "trending browse $bid failed: ${e.message}")
+                lastError = e
             }
         }
-        // Fallback: generic YouTube kiosk (non-music) to avoid empty screen.
-        return try {
-            val kioskList = ServiceList.YouTube.kioskList
-            val kioskExtractor = kioskList.getExtractorById(kioskList.defaultKioskId, null)
-            kioskExtractor.fetchPage()
-            val kioskInfo = org.schabi.newpipe.extractor.kiosk.KioskInfo.getInfo(kioskExtractor)
-            streamItemsToMaps(
-                kioskInfo.relatedItems.asSequence().filterIsInstance<StreamInfoItem>(),
-                limit,
-            )
-        } catch (e: Throwable) {
-            Log.w(TAG, "trending kiosk fallback failed: ${e.message}")
-            emptyList()
-        }
+
+        // Fail with real error rather than serving unrelated non-music kiosk videos
+        throw lastError ?: ExtractionException("No trending tracks found in YouTube Music sections")
     }
 
     private fun searchContinuation(token: String, limit: Int): List<Map<String, Any?>> {
-        val ctx = context?.applicationContext ?: return emptyList()
-        return try {
-            YtmCookieStore.getInstance(ctx).readFromCookieManager()
-            val client = InnertubeClient(ctx)
-            val json = client.requestContinuation(token)
-            parseInnertubeTracksFromJson(json, limit).take(limit)
-        } catch (e: Throwable) {
-            Log.w(TAG, "searchContinuation failed: ${e.message}")
-            emptyList()
+        val ctx = context?.applicationContext
+            ?: throw ExtractionException("No context available for searchContinuation")
+        YtmCookieStore.getInstance(ctx).readFromCookieManager()
+        val client = InnertubeClient(ctx)
+        val json = client.requestContinuation(token)
+        val errorObj = json.optJSONObject("error")
+        if (errorObj != null) {
+            val errMsg = errorObj.optString("message").takeIf { it.isNotBlank() }
+                ?: "InnerTube continuation error ${errorObj.optInt("code")}"
+            throw ExtractionException(errMsg)
         }
+        return parseInnertubeTracksFromJson(json, limit).take(limit)
     }
 
     private fun browseMusicSection(browseId: String, limit: Int): List<Map<String, Any?>> {
-        val ctx = context?.applicationContext ?: return emptyList()
-        return try {
-            YtmCookieStore.getInstance(ctx).readFromCookieManager()
-            val client = InnertubeClient(ctx)
-            val json = client.requestBrowse(browseId)
-            parseInnertubeTracksFromJson(json, limit).take(limit)
-        } catch (e: Throwable) {
-            Log.w(TAG, "browseMusicSection $browseId failed: ${e.message}")
-            emptyList()
+        val ctx = context?.applicationContext
+            ?: throw ExtractionException("No context available for browseMusicSection")
+        YtmCookieStore.getInstance(ctx).readFromCookieManager()
+        val client = InnertubeClient(ctx)
+        val json = client.requestBrowse(browseId)
+        val errorObj = json.optJSONObject("error")
+        if (errorObj != null) {
+            val errMsg = errorObj.optString("message").takeIf { it.isNotBlank() }
+                ?: "InnerTube browse error ${errorObj.optInt("code")}"
+            throw ExtractionException(errMsg)
         }
+        return parseInnertubeTracksFromJson(json, limit).take(limit)
+    }
+
+    private fun maskId(id: String): String {
+        return if (id.length <= 8) "***" else id.take(4) + "..." + id.takeLast(4)
     }
 
     /**
      * Playlist extraction with continuation pagination up to [limit].
-     *
-     * Liked-songs variants (LM, VLLM, LL, FEmusic_liked_*) are routed through
-     * [InnertubeClient.requestBrowse] because NewPipe's PlaylistExtractor cannot
-     * authenticate against YouTube's private `LL` playlist and always throws
-     * "URL not accepted". All other playlists continue to use NewPipe.
+     * Tries InnerTube first (authenticated cookies, private playlists, mixes),
+     * then falls back to NewPipe for public playlists.
      */
     private fun getPlaylist(urlOrId: String, limit: Int): Map<String, Any?> {
         val trimmed = urlOrId.trim()
+        var lastError: Throwable? = null
 
-        // 1. Try InnertubeClient first for all playlists (handles auth, cookies, mixes, private and public playlists)
+        // 1. Try InnertubeClient first
         try {
             val result = getPlaylistViaInnertube(trimmed, limit)
             val tracks = result["tracks"] as? List<*>
-            if (!tracks.isNullOrEmpty()) {
+            // If request succeeded (even with 0 tracks, if explicitly empty), return result
+            if (result.isNotEmpty() && (tracks != null)) {
                 return result
             }
         } catch (e: Throwable) {
-            Log.w(TAG, "getPlaylist: Innertube failed for $trimmed: ${e.message}")
+            Log.w(TAG, "getPlaylist: Innertube failed for ${maskId(trimmed)}: ${e.message}")
+            lastError = e
         }
 
         // 2. Fallback to NewPipe for public playlists
         try {
-            val cleanId = trimmed
+            val listParam = runCatching {
+                val uri = Uri.parse(trimmed)
+                val list = uri.getQueryParameter("list")
+                if (!list.isNullOrBlank()) list else {
+                    val lastSegment = uri.lastPathSegment
+                    if (lastSegment != null && lastSegment != "playlist") lastSegment else null
+                }
+            }.getOrNull()
+
+            val cleanId = (listParam ?: trimmed).removePrefix("VL")
             val rawUrl = if (cleanId.startsWith("http://") || cleanId.startsWith("https://")) {
                 cleanId
             } else {
                 "https://www.youtube.com/playlist?list=$cleanId"
             }
-            // Normalise music.youtube.com → www.youtube.com for NewPipe compatibility
             val url = rawUrl.replace("music.youtube.com", "www.youtube.com")
 
             val extractor = ServiceList.YouTube.getPlaylistExtractor(url)
@@ -716,15 +910,14 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             val playlistInfo = PlaylistInfo.getInfo(extractor)
 
             val allItems = mutableListOf<StreamInfoItem>()
-            allItems.addAll(playlistInfo.relatedItems.filterIsInstance<StreamInfoItem>())
+            allItems.addAll((playlistInfo.relatedItems ?: emptyList()).filterIsInstance<StreamInfoItem>())
 
-            // Follow continuation pagination if available and limit not reached
             var nextPage: Page? = playlistInfo.nextPage
             var pageCount = 0
-            while (nextPage != null && allItems.size < limit && pageCount < 10) {
+            while (nextPage != null && allItems.size < limit && pageCount < MAX_PAGES) {
                 try {
                     val pageResult = extractor.getPage(nextPage)
-                    val newItems = pageResult.items.filterIsInstance<StreamInfoItem>()
+                    val newItems = (pageResult.items ?: emptyList()).filterIsInstance<StreamInfoItem>()
                     if (newItems.isEmpty()) break
                     allItems.addAll(newItems)
                     nextPage = pageResult.nextPage
@@ -745,16 +938,16 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 "isTruncated" to isTruncated,
             )
         } catch (e: Throwable) {
-            Log.w(TAG, "getPlaylist: NewPipe fallback failed for $trimmed: ${e.message}")
+            Log.w(TAG, "getPlaylist: NewPipe fallback failed for ${maskId(trimmed)}: ${e.message}")
+            if (lastError != null) {
+                lastError.addSuppressed(e)
+            } else {
+                lastError = e
+            }
         }
 
-        return mapOf(
-            "title" to "Playlist",
-            "uploader" to "",
-            "thumbnailUrl" to null,
-            "tracks" to emptyList<Map<String, Any?>>(),
-            "isTruncated" to false,
-        )
+        // Propagate real failure to Dart instead of masking with dummy empty playlist
+        throw lastError ?: ExtractionException("Playlist extraction failed")
     }
 
     /**
@@ -765,9 +958,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         val ctx = context?.applicationContext
             ?: throw ExtractionException("No context for InnertubeClient")
 
-        // Ensure latest cookies from webview are in the store
         YtmCookieStore.getInstance(ctx).readFromCookieManager()
-
         val client = InnertubeClient(ctx)
         val trimmed = urlOrId.trim()
 
@@ -784,7 +975,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         } else {
             var cleanId = trimmed
             if (cleanId.contains("list=")) {
-                val uri = android.net.Uri.parse(cleanId)
+                val uri = Uri.parse(cleanId)
                 cleanId = uri.getQueryParameter("list") ?: cleanId
             }
             cleanId = cleanId.removePrefix("VL")
@@ -792,26 +983,57 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         }
 
         var lastError: Throwable? = null
+        var anyBrowseSucceeded = false
+        var emptyPlaylistFallback: Map<String, Any?>? = null
 
         for (bId in browseIds) {
             try {
-                Log.d(TAG, "Playlist: trying InnertubeClient browse with browseId=$bId")
                 val json = client.requestBrowse(bId)
+                val errorObj = json.optJSONObject("error")
+                if (errorObj != null) {
+                    val errMsg = errorObj.optString("message").takeIf { it.isNotBlank() }
+                        ?: "InnerTube error ${errorObj.optInt("code")}"
+                    throw ExtractionException(errMsg)
+                }
+                val alerts = json.optJSONArray("alerts")
+                if (alerts != null) {
+                    for (i in 0 until alerts.length()) {
+                        val alert = alerts.optJSONObject(i)?.optJSONObject("alertRenderer")
+                        val alertType = alert?.optString("type")
+                        if (alertType.equals("ERROR", ignoreCase = true)) {
+                            val alertText = extractTextRuns(alert?.optJSONObject("text")?.optJSONArray("runs"))
+                            throw ExtractionException(alertText?.takeIf { it.isNotBlank() } ?: "InnerTube alert error")
+                        }
+                    }
+                }
+                anyBrowseSucceeded = true
                 val tracks = parsePlaylistTracksFromJson(json, limit)
-                if (tracks.isNotEmpty()) {
-                    Log.i(TAG, "Playlist: parsed ${tracks.size} tracks via browseId=$bId")
+                val (extractedTitle, extractedUploader, extractedThumb) = extractPlaylistHeader(
+                    json,
+                    if (isLikedSongs) "Liked Music" else "YouTube Playlist"
+                )
 
-                    // Follow continuation pages
+                if (tracks.isNotEmpty()) {
                     val allTracks = tracks.toMutableList()
                     val seenIds = tracks.mapNotNull { it["videoId"] as? String }.toMutableSet()
                     var currentJson = json
                     var pageCount = 0
-                    while (allTracks.size < limit && pageCount < 10) {
-                        val token = extractPlaylistContinuationToken(currentJson) ?: break
+                    var hasContinuation = false
+
+                    while (allTracks.size < limit && pageCount < MAX_PAGES) {
+                        val token = extractPlaylistContinuationToken(currentJson)
+                        if (token == null) {
+                            hasContinuation = false
+                            break
+                        }
+                        hasContinuation = true
                         try {
                             val contJson = client.requestContinuation(token)
                             val contTracks = parsePlaylistTracksFromJson(contJson, limit - allTracks.size)
-                            if (contTracks.isEmpty()) break
+                            if (contTracks.isEmpty()) {
+                                hasContinuation = false
+                                break
+                            }
                             for (t in contTracks) {
                                 val vid = t["videoId"] as? String
                                 if (vid == null || seenIds.add(vid)) {
@@ -826,66 +1048,218 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                         }
                     }
 
+                    // Re-check if continuation remains after loop
+                    if (hasContinuation) {
+                        hasContinuation = extractPlaylistContinuationToken(currentJson) != null
+                    }
+
                     return mapOf(
-                        "title" to if (isLikedSongs) "Liked Music" else "YouTube Playlist",
-                        "uploader" to "",
-                        "thumbnailUrl" to allTracks.firstOrNull()?.get("thumbnailUrl"),
+                        "title" to extractedTitle,
+                        "uploader" to extractedUploader,
+                        "thumbnailUrl" to (extractedThumb ?: allTracks.firstOrNull()?.get("artworkUrl")),
                         "tracks" to allTracks.take(limit),
-                        "isTruncated" to (allTracks.size >= limit || pageCount >= 10),
+                        "isTruncated" to hasContinuation,
+                    )
+                } else if (emptyPlaylistFallback == null) {
+                    // Valid browse response, but 0 tracks found (empty playlist)
+                    emptyPlaylistFallback = mapOf(
+                        "title" to extractedTitle,
+                        "uploader" to extractedUploader,
+                        "thumbnailUrl" to extractedThumb,
+                        "tracks" to emptyList<Map<String, Any?>>(),
+                        "isTruncated" to false,
                     )
                 }
             } catch (e: Throwable) {
-                Log.w(TAG, "Playlist InnertubeClient browse $bId failed: ${e.message}")
+                Log.w(TAG, "Playlist InnertubeClient browse ${maskId(bId)} failed: ${e.message}")
                 lastError = e
             }
         }
 
-        return mapOf(
-            "title" to "Playlist",
-            "uploader" to "",
-            "thumbnailUrl" to null,
-            "tracks" to emptyList<Map<String, Any?>>(),
-            "isTruncated" to false,
-        )
+        // If at least one browse succeeded but returned 0 tracks, return the empty playlist
+        if (anyBrowseSucceeded && emptyPlaylistFallback != null) {
+            return emptyPlaylistFallback
+        }
+
+        throw lastError ?: ExtractionException("No tracks found in playlist browse response")
+    }
+
+    private fun extractPlaylistHeader(json: JSONObject, defaultTitle: String): Triple<String, String, String?> {
+        fun findHeaderNode(node: Any?, depth: Int = 0): JSONObject? {
+            if (depth > MAX_TRAVERSAL_DEPTH) return null
+            return when (node) {
+                is JSONObject -> {
+                    val header = node.optJSONObject("musicDetailHeaderRenderer")
+                        ?: node.optJSONObject("musicEditablePlaylistDetailHeaderRenderer")?.optJSONObject("header")?.optJSONObject("musicDetailHeaderRenderer")
+                        ?: node.optJSONObject("musicResponsiveHeaderRenderer")
+                    if (header != null) return header
+                    val keys = node.keys()
+                    while (keys.hasNext()) {
+                        val found = findHeaderNode(node.opt(keys.next()), depth + 1)
+                        if (found != null) return found
+                    }
+                    null
+                }
+                is JSONArray -> {
+                    for (i in 0 until node.length()) {
+                        val found = findHeaderNode(node.opt(i), depth + 1)
+                        if (found != null) return found
+                    }
+                    null
+                }
+                else -> null
+            }
+        }
+
+        val detailHeader = (json.optJSONObject("header")?.let { findHeaderNode(it) })
+            ?: findHeaderNode(json)
+            ?: return Triple(defaultTitle, "", null)
+
+        val title = extractTextRuns(detailHeader.optJSONObject("title")?.optJSONArray("runs")) ?: defaultTitle
+
+        var uploader = ""
+        val subtitleRuns = detailHeader.optJSONObject("subtitle")?.optJSONArray("runs")
+            ?: detailHeader.optJSONObject("straplineTextOne")?.optJSONArray("runs")
+        val playlistMetaRegex = Regex("^\\d+\\s*(songs?|tracks?|minutes?|hours?|mins?|hrs?)$", RegexOption.IGNORE_CASE)
+        val genericLabelRegex = Regex("^(playlist|album|ep|single)$", RegexOption.IGNORE_CASE)
+
+        if (subtitleRuns != null) {
+            for (i in 0 until subtitleRuns.length()) {
+                val fullText = subtitleRuns.optJSONObject(i)?.optString("text")?.trim() ?: continue
+                if (fullText.isEmpty()) continue
+                val segments = fullText.split("•", "·").map { it.trim() }.filter { it.isNotEmpty() }
+                for (t in segments) {
+                    if (!playlistMetaRegex.matches(t) &&
+                        !genericLabelRegex.matches(t) &&
+                        !MEDIA_TYPE_LABELS.contains(t.lowercase(Locale.ROOT))
+                    ) {
+                        uploader = t
+                        break
+                    }
+                }
+                if (uploader.isNotEmpty()) break
+            }
+        }
+
+        val thumbObj = detailHeader.optJSONObject("thumbnail")?.optJSONObject("musicThumbnailRenderer")?.optJSONObject("thumbnail")
+            ?: detailHeader.optJSONObject("thumbnail")?.optJSONObject("croppedSquareThumbnailRenderer")?.optJSONObject("thumbnail")
+        val thumbUrl = extractThumbnailUrl(thumbObj)
+
+        return Triple(title, uploader, thumbUrl)
+    }
+
+    private fun extractTextRuns(runs: JSONArray?): String? {
+        if (runs == null || runs.length() == 0) return null
+        val sb = StringBuilder()
+        for (i in 0 until runs.length()) {
+            val text = runs.optJSONObject(i)?.optString("text")
+            if (!text.isNullOrEmpty()) {
+                sb.append(text)
+            }
+        }
+        return sb.toString().trim().takeIf { it.isNotEmpty() }
+    }
+
+    private fun extractThumbnailUrl(thumbnailsObj: JSONObject?): String? {
+        val arr = thumbnailsObj?.optJSONArray("thumbnails") ?: return null
+        var bestUrl: String? = null
+        var maxPixels = -1
+        for (i in 0 until arr.length()) {
+            val item = arr.optJSONObject(i) ?: continue
+            val url = item.optString("url").trim()
+            if (url.isEmpty()) continue
+            val w = item.optInt("width", 0)
+            val h = item.optInt("height", 0)
+            val pixels = w * h
+            if (pixels > maxPixels || bestUrl == null) {
+                maxPixels = pixels
+                bestUrl = url
+            }
+        }
+        return bestUrl?.let { upgradeToHighRes(it) }
+    }
+
+    private fun isRendererLive(renderer: JSONObject): Boolean {
+        val badges = renderer.optJSONArray("badges")
+        if (badges != null) {
+            for (i in 0 until badges.length()) {
+                val badgeObj = badges.optJSONObject(i)?.optJSONObject("musicInlineBadgeRenderer")
+                    ?: badges.optJSONObject(i)?.optJSONObject("liveBadgeRenderer")
+                val style = badgeObj?.optString("icon") ?: badgeObj?.optString("style") ?: ""
+                val label = badgeObj?.optJSONObject("accessibilityData")?.optJSONObject("accessibilityData")?.optString("label") ?: ""
+                if (style.contains("LIVE", ignoreCase = true) ||
+                    label.contains("live", ignoreCase = true) ||
+                    label.contains("directo", ignoreCase = true) ||
+                    label.contains("vivo", ignoreCase = true) ||
+                    label.contains("مباشر", ignoreCase = true)
+                ) {
+                    return true
+                }
+            }
+        }
+        val overlays = renderer.optJSONObject("thumbnailOverlay")
+            ?.optJSONObject("musicItemThumbnailOverlayRenderer")
+            ?.optJSONObject("content")
+        if (overlays != null) {
+            val overlayBadge = overlays.optJSONObject("musicPlayButtonRenderer")
+                ?.optJSONObject("playNavigationEndpoint")
+                ?.optJSONObject("watchEndpoint")
+                ?.optJSONObject("watchEndpointMusicSupportedConfigs")
+                ?.optJSONObject("watchEndpointMusicConfig")
+                ?.optString("musicVideoType")
+            if (overlayBadge?.contains("LIVE", ignoreCase = true) == true) {
+                return true
+            }
+        }
+        val fixedCols = renderer.optJSONArray("fixedColumns")
+        if (fixedCols != null && fixedCols.length() > 0) {
+            val durText = extractTextRuns(
+                fixedCols.optJSONObject(0)
+                    ?.optJSONObject("musicResponsiveListItemFixedColumnRenderer")
+                    ?.optJSONObject("text")
+                    ?.optJSONArray("runs")
+            )
+            if (durText != null && (durText.equals("LIVE", ignoreCase = true) ||
+                    durText.equals("DIRECTO", ignoreCase = true) ||
+                    durText.equals("EN VIVO", ignoreCase = true) ||
+                    durText.equals("مباشر", ignoreCase = true))
+            ) {
+                return true
+            }
+        }
+        return false
     }
 
     /**
      * Parses track maps from an InnerTube browse JSON response.
-     * Handles `musicPlaylistShelfRenderer`, `musicShelfRenderer`, and
-     * `musicResponsiveListItemRenderer` containers.
+     * Handles musicPlaylistShelfRenderer, musicShelfRenderer, and musicResponsiveListItemRenderer containers.
      */
     private fun parseInnertubeTracksFromJson(
-        json: org.json.JSONObject,
+        json: JSONObject,
         limit: Int,
     ): List<Map<String, Any?>> {
         val results = mutableListOf<Map<String, Any?>>()
         val seenVideoIds = mutableSetOf<String>()
 
-        fun parseRenderer(renderer: org.json.JSONObject) {
+        fun parseRenderer(renderer: JSONObject) {
             val videoId = renderer.optString("videoId").takeIf { it.length == 11 } ?: run {
-                // Try nested watchEndpoint paths
                 renderer.optJSONObject("navigationEndpoint")
                     ?.optJSONObject("watchEndpoint")
                     ?.optString("videoId")
                     ?.takeIf { it.length == 11 }
             } ?: return
 
+            if (isRendererLive(renderer)) return
             if (!seenVideoIds.add(videoId)) return
 
-            // Title from flexColumns[0]
-            var title = "Unknown Title"
             val flexCols = renderer.optJSONArray("flexColumns")
-            if (flexCols != null && flexCols.length() > 0) {
-                val runs = flexCols.optJSONObject(0)
+            val title = extractTextRuns(
+                flexCols?.optJSONObject(0)
                     ?.optJSONObject("musicResponsiveListItemFlexColumnRenderer")
                     ?.optJSONObject("text")
                     ?.optJSONArray("runs")
-                if (runs != null && runs.length() > 0) {
-                    title = runs.optJSONObject(0)?.optString("text") ?: title
-                }
-            }
+            ) ?: "Unknown Title"
 
-            // Artist from flexColumns[1] subtitle runs
             var artist = "Unknown Artist"
             if (flexCols != null && flexCols.length() > 1) {
                 val runs = flexCols.optJSONObject(1)
@@ -896,7 +1270,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                     for (i in 0 until runs.length()) {
                         val text = runs.optJSONObject(i)?.optString("text")?.trim() ?: continue
                         if (text.isNotEmpty() && text != "•" && text != "·" &&
-                            text.lowercase() != "song" && text.lowercase() != "video"
+                            !MEDIA_TYPE_LABELS.contains(text.lowercase(Locale.ROOT))
                         ) {
                             artist = text
                             break
@@ -905,18 +1279,17 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 }
             }
 
-            // Duration from fixedColumns[0]
             var durationSec = 0
             val fixedCols = renderer.optJSONArray("fixedColumns")
             if (fixedCols != null && fixedCols.length() > 0) {
-                val durText = fixedCols.optJSONObject(0)
-                    ?.optJSONObject("musicResponsiveListItemFixedColumnRenderer")
-                    ?.optJSONObject("text")
-                    ?.optJSONArray("runs")
-                    ?.optJSONObject(0)
-                    ?.optString("text")
+                val durText = extractTextRuns(
+                    fixedCols.optJSONObject(0)
+                        ?.optJSONObject("musicResponsiveListItemFixedColumnRenderer")
+                        ?.optJSONObject("text")
+                        ?.optJSONArray("runs")
+                )
                 if (durText != null) {
-                    val parts = durText.split(":").mapNotNull { it.toIntOrNull() }
+                    val parts = normalizeDigits(durText).split(":").mapNotNull { it.toIntOrNull() }
                     durationSec = when (parts.size) {
                         2 -> parts[0] * 60 + parts[1]
                         3 -> parts[0] * 3600 + parts[1] * 60 + parts[2]
@@ -925,33 +1298,26 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 }
             }
 
-            // Thumbnail
-            val thumbUrl: String? = renderer
+            val thumbObj = renderer
                 .optJSONObject("thumbnail")
                 ?.optJSONObject("musicThumbnailRenderer")
                 ?.optJSONObject("thumbnail")
-                ?.optJSONArray("thumbnails")
-                ?.let { arr ->
-                    if (arr.length() > 0) arr.optJSONObject(arr.length() - 1)?.optString("url")
-                    else null
-                }
+            val thumbUrl = extractThumbnailUrl(thumbObj)
 
             results.add(
-                mapOf(
-                    "videoId" to videoId,
-                    "title" to title,
-                    "uploader" to artist,
-                    "thumbnailUrl" to thumbUrl,
-                    "duration" to durationSec.toLong(),
-                    "viewCount" to -1L,
-                    "isLive" to false,
-                    "shortDescription" to null,
-                    "url" to "https://music.youtube.com/watch?v=$videoId",
+                buildTrackMap(
+                    videoId = videoId,
+                    title = title,
+                    artist = artist,
+                    durationMs = durationSec * 1000L,
+                    artworkUrl = thumbUrl,
+                    url = "https://music.youtube.com/watch?v=$videoId",
+                    isLive = false,
                 )
             )
         }
 
-        fun parseTwoRowRenderer(renderer: org.json.JSONObject) {
+        fun parseTwoRowRenderer(renderer: JSONObject) {
             val videoId = renderer.optJSONObject("navigationEndpoint")
                 ?.optJSONObject("watchEndpoint")
                 ?.optString("videoId")
@@ -965,13 +1331,10 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                     ?.takeIf { it.length == 11 }
                 ?: return
 
+            if (isRendererLive(renderer)) return
             if (!seenVideoIds.add(videoId)) return
 
-            var title = "Unknown Title"
-            val titleRuns = renderer.optJSONObject("title")?.optJSONArray("runs")
-            if (titleRuns != null && titleRuns.length() > 0) {
-                title = titleRuns.optJSONObject(0)?.optString("text") ?: title
-            }
+            val title = extractTextRuns(renderer.optJSONObject("title")?.optJSONArray("runs")) ?: "Unknown Title"
 
             var artist = "Unknown Artist"
             val subtitleRuns = renderer.optJSONObject("subtitle")?.optJSONArray("runs")
@@ -979,7 +1342,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 for (i in 0 until subtitleRuns.length()) {
                     val text = subtitleRuns.optJSONObject(i)?.optString("text")?.trim() ?: continue
                     if (text.isNotEmpty() && text != "•" && text != "·" &&
-                        text.lowercase() != "song" && text.lowercase() != "video"
+                        !MEDIA_TYPE_LABELS.contains(text.lowercase(Locale.ROOT))
                     ) {
                         artist = text
                         break
@@ -987,57 +1350,46 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 }
             }
 
-            val thumbUrl: String? = renderer
-                .optJSONObject("thumbnailRenderer")
+            val thumbObj = renderer.optJSONObject("thumbnailRenderer")
                 ?.optJSONObject("musicThumbnailRenderer")
                 ?.optJSONObject("thumbnail")
-                ?.optJSONArray("thumbnails")
-                ?.let { arr ->
-                    if (arr.length() > 0) arr.optJSONObject(arr.length() - 1)?.optString("url")
-                    else null
-                } ?: renderer
-                .optJSONObject("thumbnail")
-                ?.optJSONObject("musicThumbnailRenderer")
-                ?.optJSONObject("thumbnail")
-                ?.optJSONArray("thumbnails")
-                ?.let { arr ->
-                    if (arr.length() > 0) arr.optJSONObject(arr.length() - 1)?.optString("url")
-                    else null
-                }
+                ?: renderer.optJSONObject("thumbnail")
+                    ?.optJSONObject("musicThumbnailRenderer")
+                    ?.optJSONObject("thumbnail")
+            val thumbUrl = extractThumbnailUrl(thumbObj)
 
             results.add(
-                mapOf(
-                    "videoId" to videoId,
-                    "title" to title,
-                    "uploader" to artist,
-                    "thumbnailUrl" to thumbUrl,
-                    "duration" to 0L,
-                    "viewCount" to -1L,
-                    "isLive" to false,
-                    "shortDescription" to null,
-                    "url" to "https://music.youtube.com/watch?v=$videoId",
+                buildTrackMap(
+                    videoId = videoId,
+                    title = title,
+                    artist = artist,
+                    durationMs = 0L,
+                    artworkUrl = thumbUrl,
+                    url = "https://music.youtube.com/watch?v=$videoId",
+                    isLive = false,
                 )
             )
         }
 
-        fun traverseJson(node: Any?) {
+        fun traverseJson(node: Any?, depth: Int = 0) {
+            if (depth > MAX_TRAVERSAL_DEPTH || results.size >= limit) return
             when (node) {
-                is org.json.JSONObject -> {
-                    // Container renderers — recurse into contents
+                is JSONObject -> {
                     val shelfKeys = listOf("musicPlaylistShelfRenderer", "musicShelfRenderer", "musicCarouselShelfRenderer")
                     for (key in shelfKeys) {
                         if (node.has(key)) {
-                            val contents = node.optJSONObject(key)?.optJSONArray("contents")
+                            val shelfObj = node.optJSONObject(key)
+                            val contents = shelfObj?.optJSONArray("contents")
+                                ?: shelfObj?.optJSONArray("continuationItems")
                             if (contents != null) {
                                 for (i in 0 until contents.length()) {
                                     if (results.size >= limit) return
-                                    traverseJson(contents.opt(i))
+                                    traverseJson(contents.opt(i), depth + 1)
                                 }
                             }
                             return
                         }
                     }
-                    // Leaf renderer
                     if (node.has("musicResponsiveListItemRenderer")) {
                         parseRenderer(node.getJSONObject("musicResponsiveListItemRenderer"))
                         return
@@ -1046,17 +1398,16 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                         parseTwoRowRenderer(node.getJSONObject("musicTwoRowItemRenderer"))
                         return
                     }
-                    // Generic recursion
                     val keys = node.keys()
                     while (keys.hasNext()) {
                         if (results.size >= limit) return
-                        traverseJson(node.opt(keys.next()))
+                        traverseJson(node.opt(keys.next()), depth + 1)
                     }
                 }
-                is org.json.JSONArray -> {
+                is JSONArray -> {
                     for (i in 0 until node.length()) {
                         if (results.size >= limit) return
-                        traverseJson(node.opt(i))
+                        traverseJson(node.opt(i), depth + 1)
                     }
                 }
             }
@@ -1066,76 +1417,42 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         return results
     }
 
-    /** Extracts a continuation token from an InnerTube JSON response object. */
-    private fun extractContinuationToken(json: org.json.JSONObject): String? {
-        fun find(node: Any?): String? {
-            return when (node) {
-                is org.json.JSONObject -> {
-                    // nextContinuationData.continuation
-                    node.optJSONObject("nextContinuationData")
-                        ?.optString("continuation")?.takeIf { it.isNotEmpty() }
-                        // continuationEndpoint.continuationCommand.token
-                        ?: node.optJSONObject("continuationEndpoint")
-                            ?.optJSONObject("continuationCommand")
-                            ?.optString("token")?.takeIf { it.isNotEmpty() }
-                        ?: node.optJSONObject("continuationCommand")
-                            ?.optString("token")?.takeIf { it.isNotEmpty() }
-                        ?: run {
-                            val keys = node.keys()
-                            while (keys.hasNext()) {
-                                val r = find(node.opt(keys.next()))
-                                if (r != null) return@run r
-                            }
-                            null
-                        }
-                }
-                is org.json.JSONArray -> {
-                    for (i in 0 until node.length()) {
-                        val r = find(node.opt(i))
-                        if (r != null) return r
-                    }
-                    null
-                }
-                else -> null
-            }
-        }
-        return find(json)
-    }
-
     /**
-     * Parses tracks strictly belonging to a playlist.
-     * Scopes extraction to musicPlaylistShelfContinuation or musicPlaylistShelfRenderer
-     * to avoid pulling in suggested/recommended tracks.
+     * Parses tracks strictly belonging to a playlist shelf.
+     * Scopes extraction to musicPlaylistShelfContinuation or musicPlaylistShelfRenderer.
+     * Returns emptyList() if no playlist shelf is present to avoid unrelated recommendations.
      */
     private fun parsePlaylistTracksFromJson(
-        json: org.json.JSONObject,
+        json: JSONObject,
         limit: Int,
     ): List<Map<String, Any?>> {
-        // 1. Check for musicPlaylistShelfContinuation in continuation responses
         val contContents = json.optJSONObject("continuationContents")
         val playlistCont = contContents?.optJSONObject("musicPlaylistShelfContinuation")
+            ?: contContents?.optJSONObject("musicShelfContinuation")
         if (playlistCont != null) {
             return parseShelfListItems(playlistCont, limit)
         }
 
-        // 2. Check for musicPlaylistShelfRenderer in browse responses
-        fun findShelf(node: Any?): org.json.JSONObject? {
+        fun findShelf(node: Any?, depth: Int = 0): JSONObject? {
+            if (depth > MAX_TRAVERSAL_DEPTH) return null
             return when (node) {
-                is org.json.JSONObject -> {
+                is JSONObject -> {
                     if (node.has("musicPlaylistShelfRenderer")) {
                         node.optJSONObject("musicPlaylistShelfRenderer")
+                    } else if (node.has("musicShelfRenderer")) {
+                        node.optJSONObject("musicShelfRenderer")
                     } else {
                         val keys = node.keys()
                         while (keys.hasNext()) {
-                            val res = findShelf(node.opt(keys.next()))
+                            val res = findShelf(node.opt(keys.next()), depth + 1)
                             if (res != null) return res
                         }
                         null
                     }
                 }
-                is org.json.JSONArray -> {
+                is JSONArray -> {
                     for (i in 0 until node.length()) {
-                        val res = findShelf(node.opt(i))
+                        val res = findShelf(node.opt(i), depth + 1)
                         if (res != null) return res
                     }
                     null
@@ -1149,21 +1466,28 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             return parseShelfListItems(shelf, limit)
         }
 
-        return parseInnertubeTracksFromJson(json, limit)
+        return emptyList()
     }
 
     private fun parseShelfListItems(
-        shelf: org.json.JSONObject,
+        shelf: JSONObject,
         limit: Int,
     ): List<Map<String, Any?>> {
-        val contents = shelf.optJSONArray("contents") ?: return emptyList()
+        val contents = shelf.optJSONArray("contents")
+            ?: shelf.optJSONArray("continuationItems")
+            ?: return emptyList()
         val results = mutableListOf<Map<String, Any?>>()
         val seenVideoIds = mutableSetOf<String>()
         for (i in 0 until contents.length()) {
             if (results.size >= limit) break
             val item = contents.optJSONObject(i) ?: continue
-            val renderer = item.optJSONObject("musicResponsiveListItemRenderer") ?: continue
-            val track = parseSingleResponsiveRenderer(renderer, seenVideoIds)
+            val responsive = item.optJSONObject("musicResponsiveListItemRenderer")
+            val track = if (responsive != null) {
+                parseSingleResponsiveRenderer(responsive, seenVideoIds)
+            } else {
+                val twoRow = item.optJSONObject("musicTwoRowItemRenderer")
+                if (twoRow != null) parseSingleTwoRowRenderer(twoRow, seenVideoIds) else null
+            }
             if (track != null) {
                 results.add(track)
             }
@@ -1172,7 +1496,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
     }
 
     private fun parseSingleResponsiveRenderer(
-        renderer: org.json.JSONObject,
+        renderer: JSONObject,
         seenVideoIds: MutableSet<String>,
     ): Map<String, Any?>? {
         val videoId = renderer.optString("videoId").takeIf { it.length == 11 } ?: run {
@@ -1182,19 +1506,16 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 ?.takeIf { it.length == 11 }
         } ?: return null
 
+        if (isRendererLive(renderer)) return null
         if (!seenVideoIds.add(videoId)) return null
 
-        var title = "Unknown Title"
         val flexCols = renderer.optJSONArray("flexColumns")
-        if (flexCols != null && flexCols.length() > 0) {
-            val runs = flexCols.optJSONObject(0)
+        val title = extractTextRuns(
+            flexCols?.optJSONObject(0)
                 ?.optJSONObject("musicResponsiveListItemFlexColumnRenderer")
                 ?.optJSONObject("text")
                 ?.optJSONArray("runs")
-            if (runs != null && runs.length() > 0) {
-                title = runs.optJSONObject(0)?.optString("text") ?: title
-            }
-        }
+        ) ?: "Unknown Title"
 
         var artist = "Unknown Artist"
         if (flexCols != null && flexCols.length() > 1) {
@@ -1206,7 +1527,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 for (i in 0 until runs.length()) {
                     val text = runs.optJSONObject(i)?.optString("text")?.trim() ?: continue
                     if (text.isNotEmpty() && text != "•" && text != "·" &&
-                        text.lowercase() != "song" && text.lowercase() != "video"
+                        !MEDIA_TYPE_LABELS.contains(text.lowercase(Locale.ROOT))
                     ) {
                         artist = text
                         break
@@ -1218,14 +1539,14 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         var durationSec = 0
         val fixedCols = renderer.optJSONArray("fixedColumns")
         if (fixedCols != null && fixedCols.length() > 0) {
-            val durText = fixedCols.optJSONObject(0)
-                ?.optJSONObject("musicResponsiveListItemFixedColumnRenderer")
-                ?.optJSONObject("text")
-                ?.optJSONArray("runs")
-                ?.optJSONObject(0)
-                ?.optString("text")
+            val durText = extractTextRuns(
+                fixedCols.optJSONObject(0)
+                    ?.optJSONObject("musicResponsiveListItemFixedColumnRenderer")
+                    ?.optJSONObject("text")
+                    ?.optJSONArray("runs")
+            )
             if (durText != null) {
-                val parts = durText.split(":").mapNotNull { it.toIntOrNull() }
+                val parts = normalizeDigits(durText).split(":").mapNotNull { it.toIntOrNull() }
                 durationSec = when (parts.size) {
                     2 -> parts[0] * 60 + parts[1]
                     3 -> parts[0] * 3600 + parts[1] * 60 + parts[2]
@@ -1234,54 +1555,115 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             }
         }
 
-        val thumbUrl: String? = renderer
+        val thumbObj = renderer
             .optJSONObject("thumbnail")
             ?.optJSONObject("musicThumbnailRenderer")
             ?.optJSONObject("thumbnail")
-            ?.optJSONArray("thumbnails")
-            ?.let { arr ->
-                if (arr.length() > 0) arr.optJSONObject(arr.length() - 1)?.optString("url")
-                else null
-            }
+        val thumbUrl = extractThumbnailUrl(thumbObj)
 
-        return mapOf(
-            "videoId" to videoId,
-            "title" to title,
-            "uploader" to artist,
-            "thumbnailUrl" to thumbUrl,
-            "duration" to durationSec.toLong(),
-            "viewCount" to -1L,
-            "isLive" to false,
-            "shortDescription" to null,
-            "url" to "https://music.youtube.com/watch?v=$videoId",
+        return buildTrackMap(
+            videoId = videoId,
+            title = title,
+            artist = artist,
+            durationMs = durationSec * 1000L,
+            artworkUrl = thumbUrl,
+            url = "https://music.youtube.com/watch?v=$videoId",
+            isLive = false,
         )
     }
 
-    /** Extracts a playlist continuation token strictly from playlist shelf/continuation nodes. */
-    private fun extractPlaylistContinuationToken(json: org.json.JSONObject): String? {
-        val contContents = json.optJSONObject("continuationContents")
-        val playlistCont = contContents?.optJSONObject("musicPlaylistShelfContinuation")
-        if (playlistCont != null) {
-            return extractTokenFromShelfContinuations(playlistCont)
+    private fun parseSingleTwoRowRenderer(
+        renderer: JSONObject,
+        seenVideoIds: MutableSet<String>,
+    ): Map<String, Any?>? {
+        val videoId = renderer.optJSONObject("navigationEndpoint")
+            ?.optJSONObject("watchEndpoint")
+            ?.optString("videoId")
+            ?.takeIf { it.length == 11 }
+            ?: renderer.optJSONObject("title")
+                ?.optJSONArray("runs")
+                ?.optJSONObject(0)
+                ?.optJSONObject("navigationEndpoint")
+                ?.optJSONObject("watchEndpoint")
+                ?.optString("videoId")
+                ?.takeIf { it.length == 11 }
+            ?: return null
+
+        if (isRendererLive(renderer)) return null
+        if (!seenVideoIds.add(videoId)) return null
+
+        val title = extractTextRuns(renderer.optJSONObject("title")?.optJSONArray("runs")) ?: "Unknown Title"
+
+        var artist = "Unknown Artist"
+        val subtitleRuns = renderer.optJSONObject("subtitle")?.optJSONArray("runs")
+        if (subtitleRuns != null && subtitleRuns.length() > 0) {
+            for (i in 0 until subtitleRuns.length()) {
+                val text = subtitleRuns.optJSONObject(i)?.optString("text")?.trim() ?: continue
+                if (text.isNotEmpty() && text != "•" && text != "·" &&
+                    !MEDIA_TYPE_LABELS.contains(text.lowercase(Locale.ROOT))
+                ) {
+                    artist = text
+                    break
+                }
+            }
         }
 
-        fun findShelf(node: Any?): org.json.JSONObject? {
+        val thumbObj = renderer.optJSONObject("thumbnailRenderer")
+            ?.optJSONObject("musicThumbnailRenderer")
+            ?.optJSONObject("thumbnail")
+            ?: renderer.optJSONObject("thumbnail")
+                ?.optJSONObject("musicThumbnailRenderer")
+                ?.optJSONObject("thumbnail")
+        val thumbUrl = extractThumbnailUrl(thumbObj)
+
+        return buildTrackMap(
+            videoId = videoId,
+            title = title,
+            artist = artist,
+            durationMs = 0L,
+            artworkUrl = thumbUrl,
+            url = "https://music.youtube.com/watch?v=$videoId",
+            isLive = false,
+        )
+    }
+
+    /** Extracts a playlist continuation token across all InnerTube shelf and section representations. */
+    private fun extractPlaylistContinuationToken(json: JSONObject): String? {
+        val contContents = json.optJSONObject("continuationContents")
+        if (contContents != null) {
+            val playlistCont = contContents.optJSONObject("musicPlaylistShelfContinuation")
+                ?: contContents.optJSONObject("musicShelfContinuation")
+            if (playlistCont != null) {
+                val token = extractTokenFromShelfContinuations(playlistCont)
+                if (token != null) return token
+            }
+            val sectionCont = contContents.optJSONObject("sectionListContinuation")
+            if (sectionCont != null) {
+                val token = extractTokenFromSectionContinuation(sectionCont)
+                if (token != null) return token
+            }
+        }
+
+        fun findShelf(node: Any?, depth: Int = 0): JSONObject? {
+            if (depth > MAX_TRAVERSAL_DEPTH) return null
             return when (node) {
-                is org.json.JSONObject -> {
+                is JSONObject -> {
                     if (node.has("musicPlaylistShelfRenderer")) {
                         node.optJSONObject("musicPlaylistShelfRenderer")
+                    } else if (node.has("musicShelfRenderer")) {
+                        node.optJSONObject("musicShelfRenderer")
                     } else {
                         val keys = node.keys()
                         while (keys.hasNext()) {
-                            val res = findShelf(node.opt(keys.next()))
+                            val res = findShelf(node.opt(keys.next()), depth + 1)
                             if (res != null) return res
                         }
                         null
                     }
                 }
-                is org.json.JSONArray -> {
+                is JSONArray -> {
                     for (i in 0 until node.length()) {
-                        val res = findShelf(node.opt(i))
+                        val res = findShelf(node.opt(i), depth + 1)
                         if (res != null) return res
                     }
                     null
@@ -1292,26 +1674,75 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
 
         val shelf = findShelf(json)
         if (shelf != null) {
-            return extractTokenFromShelfContinuations(shelf)
+            val token = extractTokenFromShelfContinuations(shelf)
+            if (token != null) return token
         }
-        return null
+
+        // Generic fallback search for continuationItemRenderer
+        return findContinuationTokenGeneric(json)
     }
 
-    private fun extractTokenFromShelfContinuations(shelf: org.json.JSONObject): String? {
-        val continuations = shelf.optJSONArray("continuations") ?: return null
+    private fun extractTokenFromShelfContinuations(shelf: JSONObject): String? {
+        val continuations = shelf.optJSONArray("continuations")
+            ?: shelf.optJSONArray("continuationItems")
+            ?: return null
         for (i in 0 until continuations.length()) {
             val c = continuations.optJSONObject(i) ?: continue
-            val nextData = c.optJSONObject("nextContinuationData")
+            val cir = c.optJSONObject("continuationItemRenderer") ?: c
+            val nextData = cir.optJSONObject("nextContinuationData")
             val token = nextData?.optString("continuation")?.takeIf { it.isNotEmpty() }
             if (token != null) return token
-            val endpoint = c.optJSONObject("continuationEndpoint")
+            val endpoint = cir.optJSONObject("continuationEndpoint")
             val cmdToken = endpoint?.optJSONObject("continuationCommand")?.optString("token")?.takeIf { it.isNotEmpty() }
             if (cmdToken != null) return cmdToken
-            val cmd = c.optJSONObject("continuationCommand")
+            val cmd = cir.optJSONObject("continuationCommand")
             val directToken = cmd?.optString("token")?.takeIf { it.isNotEmpty() }
             if (directToken != null) return directToken
         }
         return null
+    }
+
+    private fun extractTokenFromSectionContinuation(section: JSONObject): String? {
+        val contents = section.optJSONArray("contents") ?: return null
+        for (i in 0 until contents.length()) {
+            val item = contents.optJSONObject(i) ?: continue
+            val cir = item.optJSONObject("continuationItemRenderer") ?: continue
+            val token = cir.optJSONObject("continuationEndpoint")
+                ?.optJSONObject("continuationCommand")
+                ?.optString("token")
+                ?.takeIf { it.isNotEmpty() }
+            if (token != null) return token
+        }
+        return null
+    }
+
+    private fun findContinuationTokenGeneric(node: Any?, depth: Int = 0): String? {
+        if (depth > MAX_TRAVERSAL_DEPTH) return null
+        return when (node) {
+            is JSONObject -> {
+                val cir = node.optJSONObject("continuationItemRenderer")
+                if (cir != null) {
+                    val cmd = cir.optJSONObject("continuationEndpoint")?.optJSONObject("continuationCommand")
+                        ?: cir.optJSONObject("continuationCommand")
+                    val token = cmd?.optString("token")?.takeIf { it.isNotEmpty() }
+                    if (token != null) return token
+                }
+                val keys = node.keys()
+                while (keys.hasNext()) {
+                    val token = findContinuationTokenGeneric(node.opt(keys.next()), depth + 1)
+                    if (token != null) return token
+                }
+                null
+            }
+            is JSONArray -> {
+                for (i in 0 until node.length()) {
+                    val token = findContinuationTokenGeneric(node.opt(i), depth + 1)
+                    if (token != null) return token
+                }
+                null
+            }
+            else -> null
+        }
     }
 
     /**
@@ -1334,20 +1765,11 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             }
         }
 
-        // 2. Fallback: NewPipeExtractor.
-        // Always attempted. NewPipe drives its own client set (freshly scraped
-        // WEB/ANDROID/IOS versions and its own PoTokenProvider), so it can and
-        // does resolve tracks that the pinned native client chain refuses with
-        // BotChallenge/UNPLAYABLE on the same egress. Skipping it on those
-        // verdicts turned a recoverable failure into a hard one: the native
-        // chain's signal reached Dart with no second engine ever tried.
+        // 2. Fallback: NewPipeExtractor
         try {
-            val stream = resolveStreamNewPipe(videoId, quality)
-            return stream
+            return resolveStreamNewPipe(videoId, quality)
         } catch (newPipeError: Throwable) {
             Log.w(TAG, "NewPipeExtractor fallback also failed for $videoId: ${newPipeError.message}")
-            // Re-throw the Innertube error (carries the structured signal/traceId) with
-            // the NewPipe error suppressed for full diagnostics.
             val primary = innertubeError ?: newPipeError
             if (primary !== newPipeError) primary.addSuppressed(newPipeError)
             throw primary
@@ -1367,41 +1789,53 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             throw ExtractionException("No playable audio stream available in NewPipe extractor")
         }
 
-        val m4aStreams = playable.filter { it.format == MediaFormat.M4A }
-        val streamPool = if (m4aStreams.isNotEmpty()) m4aStreams else playable
+        val selected = when (quality.lowercase(Locale.ROOT)) {
+            "low" -> playable.minByOrNull { bitrateToKbps(it.averageBitrate) }
+            "medium" -> playable.minByOrNull { kotlin.math.abs(bitrateToKbps(it.averageBitrate) - 128) }
+            else -> {
+                val maxBitrate = playable.maxOfOrNull { bitrateToKbps(it.averageBitrate) } ?: 0
+                val highStreams = playable.filter { bitrateToKbps(it.averageBitrate) >= (maxBitrate - 16) }
+                highStreams.firstOrNull { it.format == MediaFormat.M4A } ?: playable.maxByOrNull { bitrateToKbps(it.averageBitrate) }
+            }
+        } ?: playable.first()
 
-        val selected = when (quality.lowercase()) {
-            "low" -> streamPool.minByOrNull { bitrateToKbps(it.averageBitrate) }
-            "medium" -> streamPool.minByOrNull { kotlin.math.abs(bitrateToKbps(it.averageBitrate) - 128) }
-            else -> streamPool.maxByOrNull { bitrateToKbps(it.averageBitrate) }
-        } ?: streamPool.first()
+        val url = selected.content.orEmpty()
+        if (url.isBlank()) {
+            throw ExtractionException("Selected audio stream has no URL")
+        }
 
-        val url = selected.content
+        val ctx = context?.applicationContext
+        val cookieHeader = if (ctx != null) YtmCookieStore.getInstance(ctx).getMergedCookieHeader() else null
+        val headers = mutableMapOf<String, String>(
+            "User-Agent" to PulsrDownloader.USER_AGENT
+        )
+        if (!cookieHeader.isNullOrBlank()) {
+            headers["Cookie"] = cookieHeader
+        }
+
+        val expirySeconds = urlExpiryEpochSeconds(url) ?: (System.currentTimeMillis() / 1000L + DEFAULT_EXPIRY_SECONDS)
+
         return mapOf(
             "videoId" to videoId,
             "url" to url,
             "mimeType" to (selected.format?.mimeType ?: "audio/mp4"),
-            "container" to (selected.format?.suffix ?: ""),
+            "container" to (selected.format?.suffix ?: "m4a"),
             "bitrateKbps" to bitrateToKbps(selected.averageBitrate),
             "durationMs" to info.duration.coerceAtLeast(0L) * 1000L,
             "title" to info.name,
-            "artist" to (info.uploaderName ?: ""),
+            "artist" to (info.uploaderName ?: "Unknown Artist"),
             "artworkUrl" to bestArtwork(info.thumbnails),
             "userAgent" to PulsrDownloader.USER_AGENT,
-            // Without this the Dart cache treats a googlevideo URL as never expiring
-            // and keeps re-serving it long after the `expire` stamp has passed.
-            "expiresAt" to urlExpiryEpochSeconds(url),
+            "headers" to headers,
+            "expiresAt" to expirySeconds,
         )
     }
 
-    /**
-     * YouTube reports `averageBitrate` in bits/sec for most itags but the extractor's
-     * static itag table carries kbps, so the same field arrives in either unit.
-     */
     private fun bitrateToKbps(raw: Int): Int = when {
         raw <= 0 -> 0
-        raw > 10_000 -> raw / 1000
-        else -> raw
+        raw < 1000 -> raw // Already in kbps (e.g. 48, 64, 128, 160, 256)
+        raw < 10_000 -> raw // Ambiguous low range edge cases
+        else -> raw / 1000 // In bits/sec (e.g. 48000, 128000, 256000)
     }
 
     private fun urlExpiryEpochSeconds(url: String?): Long? {
@@ -1416,12 +1850,14 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             .mapNotNull { item ->
                 val videoId = videoIdOf(item.url) ?: return@mapNotNull null
                 if (!seen.add(videoId)) return@mapNotNull null
-                mapOf(
-                    "videoId" to videoId,
-                    "title" to item.name,
-                    "artist" to (item.uploaderName ?: ""),
-                    "durationMs" to item.duration.coerceAtLeast(0L) * 1000L,
-                    "artworkUrl" to bestArtwork(item.thumbnails),
+                buildTrackMap(
+                    videoId = videoId,
+                    title = item.name,
+                    artist = item.uploaderName ?: "Unknown Artist",
+                    durationMs = item.duration.coerceAtLeast(0L) * 1000L,
+                    artworkUrl = bestArtwork(item.thumbnails),
+                    url = item.url,
+                    isLive = false,
                 )
             }
             .take(limit)
@@ -1441,9 +1877,9 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         val sized = images.filter { it.width > 0 }
         val rawUrl = sized.maxByOrNull { it.width * it.height }?.url
             ?: sized.maxByOrNull { it.width }?.url
-            ?: images.last().url
+            ?: images.lastOrNull()?.url
 
-        return upgradeToHighRes(rawUrl)
+        return rawUrl?.let { upgradeToHighRes(it) }
     }
 
     private fun upgradeToHighRes(url: String): String {
@@ -1455,9 +1891,20 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         return upgraded
     }
 
+    /**
+     * Cleans up plugin resources on engine detachment.
+     * Note: Pulsr is a single Flutter engine application; global teardown is safe here.
+     */
     fun cleanup() {
         channel?.setMethodCallHandler(null)
         channel = null
+        EgressSignals.onEgressChanged = null
+        ProxyPool.setOnPathChangeListener { }
+        synchronized(initLock) {
+            extractorReady = false
+            pendingCountry = null
+            pendingLang = null
+        }
         try {
             executor.shutdownNow()
         } catch (_: Exception) {}

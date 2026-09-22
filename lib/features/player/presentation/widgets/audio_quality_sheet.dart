@@ -23,7 +23,8 @@ import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
-class AudioQualitySheet extends StatelessWidget {  final SongsTableData song;
+class AudioQualitySheet extends StatelessWidget {
+  final SongsTableData song;
   final Color activeColor;
 
   const AudioQualitySheet({

@@ -243,8 +243,11 @@ class RingtonePlugin : FlutterPlugin, MethodCallHandler {
             path.endsWith(".m4a", ignoreCase = true) -> "audio/m4a"
             path.endsWith(".wav", ignoreCase = true) -> "audio/wav"
             path.endsWith(".ogg", ignoreCase = true) -> "audio/ogg"
+            path.endsWith(".opus", ignoreCase = true) -> "audio/opus"
             path.endsWith(".flac", ignoreCase = true) -> "audio/flac"
             path.endsWith(".aac", ignoreCase = true) -> "audio/aac"
+            path.endsWith(".wma", ignoreCase = true) -> "audio/x-ms-wma"
+            path.endsWith(".dsf", ignoreCase = true) || path.endsWith(".dff", ignoreCase = true) -> "audio/x-dsd"
             else -> "audio/*"
         }
     }

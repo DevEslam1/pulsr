@@ -25,6 +25,7 @@ class PlayerControls extends StatelessWidget {
   /// true so standalone usages keep the pre-existing always-enabled behavior.
   final bool hasPrevious;
   final bool hasNext;
+  final bool abLoopActive;
 
   const PlayerControls({
     super.key,
@@ -40,6 +41,7 @@ class PlayerControls extends StatelessWidget {
     required this.primaryColor,
     this.hasPrevious = true,
     this.hasNext = true,
+    this.abLoopActive = false,
   });
 
   @override
@@ -150,8 +152,10 @@ class PlayerControls extends StatelessWidget {
                       ),
                     ],
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.25),
-                      width: 1.2,
+                      color: abLoopActive
+                          ? p.accent
+                          : Colors.white.withValues(alpha: 0.25),
+                      width: abLoopActive ? 2.2 : 1.2,
                     ),
                   ),
                   child: Center(

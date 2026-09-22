@@ -91,6 +91,7 @@ import 'package:pulsr/features/auth/cubit/auth_cubit.dart' as _i918;
 import 'package:pulsr/features/downloads/cubit/downloads_cubit.dart' as _i752;
 import 'package:pulsr/features/library/cubit/library_cubit.dart' as _i633;
 import 'package:pulsr/features/player/cubit/player_cubit.dart' as _i147;
+import 'package:pulsr/features/player/cubit/player_dependencies.dart' as _i1046;
 import 'package:pulsr/features/playlists/cubit/playlist_cubit.dart' as _i431;
 import 'package:pulsr/features/search/cubit/search_cubit.dart' as _i984;
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart' as _i41;
@@ -291,10 +292,11 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i902.ResumeDownloadUseCase(gh<_i783.IDownloadRepository>()));
     gh.singleton<_i19.RetryDownloadUseCase>(
         () => _i19.RetryDownloadUseCase(gh<_i783.IDownloadRepository>()));
-    gh.singletonAsync<_i147.PlayerCubit>(() async => _i147.PlayerCubit(
+    gh.lazySingletonAsync<_i147.PlayerCubit>(() async => _i147.PlayerCubit(
           audioHandler: await getAsync<_i366.PulsrAudioHandler>(),
           repository: gh<_i320.IMusicRepository>(),
           toggleFavoriteUseCase: gh<_i800.ToggleFavoriteUseCase>(),
+          dependencies: gh<_i1046.PlayerDependencies>(),
           settingsCubit: gh<_i41.SettingsCubit>(),
           widgetService: gh<_i42.WidgetService>(),
           scrobblerService: gh<_i629.ScrobblerService>(),
@@ -307,17 +309,12 @@ extension GetItInjectableX on _i174.GetIt {
           perSongVolumeStore: gh<_i866.PerSongVolumeStore>(),
           songRatingStore: gh<_i227.SongRatingStore>(),
           sponsorBlockService: gh<_i912.SponsorBlockService>(),
-          quranModeService: gh<_i322.QuranModeService>(),
-          earbudOptimizationService: gh<_i260.EarbudOptimizationService>(),
           lrclibService: gh<_i622.LrclibService>(),
           ytmAccountService: gh<_i631.YtmAccountService>(),
+          earbudOptimizationService: gh<_i260.EarbudOptimizationService>(),
+          quranModeService: gh<_i322.QuranModeService>(),
           mediaScannerService: gh<_i483.MediaScannerService>(),
         ));
-    gh.singletonAsync<_i134.FileIntentHandler>(
-        () async => _i134.FileIntentHandler(
-              gh<_i320.IMusicRepository>(),
-              await getAsync<_i147.PlayerCubit>(),
-            ));
     gh.singleton<_i752.DownloadsCubit>(() => _i752.DownloadsCubit(
           gh<_i634.QueueDownloadUseCase>(),
           gh<_i308.PauseDownloadUseCase>(),
@@ -333,6 +330,11 @@ extension GetItInjectableX on _i174.GetIt {
               gh<_i742.YtDownloadService>(),
               await getAsync<_i147.PlayerCubit>(),
               downloadsCubit: gh<_i752.DownloadsCubit>(),
+            ));
+    gh.singletonAsync<_i134.FileIntentHandler>(
+        () async => _i134.FileIntentHandler(
+              gh<_i320.IMusicRepository>(),
+              await getAsync<_i147.PlayerCubit>(),
             ));
     return this;
   }

@@ -25,6 +25,7 @@ import java.io.FileOutputStream
 class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var channel: MethodChannel
     private var context: Context? = null
+    private val saveExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
 
     companion object {
         const val CHANNEL_NAME = "com.pulsr.music/yt_download"
@@ -92,6 +93,12 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
         if (::channel.isInitialized) {
             channel.setMethodCallHandler(null)
         }
+        saveExecutor.shutdown()
+        try {
+            saveExecutor.awaitTermination(100, java.util.concurrent.TimeUnit.MILLISECONDS)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
         context = null
     }
 
@@ -125,7 +132,7 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                 // thread (jank, and an ANR when the file is slow to write), so
                 // it moves to a worker and the outcome is delivered back on the
                 // platform thread — which is where `result` must be invoked.
-                Thread {
+                saveExecutor.execute {
                     try {
                         val finalPath = saveToMediaStore(currentContext, source, displayName, title, mimeType)
                         mainHandler.post {
@@ -140,7 +147,7 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                             result.error("SAVE_FAILED", e.localizedMessage ?: "Unknown error", e.stackTraceToString())
                         }
                     }
-                }.start()
+                }
             }
             "getFreeDiskSpace" -> {
                 // Returns available bytes, or -1L when unknown. Dart callers

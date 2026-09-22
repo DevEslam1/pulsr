@@ -32,6 +32,9 @@ part 'player_dsp_profiles.dart';
 
 /// Orchestrates all audio DSP effects, equalizer presets, and bit-perfect conflict gating.
 class PlayerDspController {
+  /// Maximum allowed size for custom impulse response WAV files (25 MB) (E3).
+  static const int maxIrFileSizeBytes = 25 * 1024 * 1024;
+
   final PulsrAudioHandler _audioHandler;
   final SettingsCubit? _settingsCubit;
   final SettingsProfilesService? _settingsProfilesService;
@@ -50,6 +53,14 @@ class PlayerDspController {
   bool perSongOverrideActive = false;
   String? _lastAutoAppliedDeviceKey;
   bool _smartAutoBitPerfectApplied = false;
+  DateTime _lastUserInteraction = DateTime.fromMillisecondsSinceEpoch(0);
+
+  void markUserInteracting() {
+    _lastUserInteraction = DateTime.now();
+  }
+
+  bool get isUserInteracting =>
+      DateTime.now().difference(_lastUserInteraction).inMilliseconds < 1500;
 
   PlayerDspController({
     required PulsrAudioHandler audioHandler,
@@ -156,6 +167,7 @@ class PlayerDspController {
     required Future<void> Function() applyAudioHandler,
     String? failureMessage,
   }) async {
+    markUserInteracting();
     if (requiresGuard &&
         guardCondition &&
         !guardDsp(featureName, showError: showErrorOnGuard)) {
@@ -255,7 +267,7 @@ class PlayerDspController {
     final clamped = gain.clamp(-15.0, 15.0);
     final state = _getState();
     final currentGains = List<double>.from(state.eqPreset.gains);
-    if (bandIndex < currentGains.length) {
+    if (bandIndex >= 0 && bandIndex < currentGains.length) {
       currentGains[bandIndex] = clamped;
       _emit(state.copyWith(
         dsp: state.dsp.copyWith(

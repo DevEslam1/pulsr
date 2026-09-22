@@ -5,13 +5,9 @@ import android.net.Uri
 import android.util.Log
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
 import java.io.IOException
-import java.io.InputStream
-import java.net.HttpURLConnection
-import java.net.InetAddress
-import java.net.URL
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.net.UnknownHostException
@@ -23,7 +19,18 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import java.util.UUID
-import java.util.zip.GZIPInputStream
+import java.util.concurrent.Callable
+import java.util.concurrent.CancellationException
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.ExecutorCompletionService
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Hardened Innertube API Client with Multi-Client Context Support and Strategy Engine.
@@ -34,7 +41,7 @@ import java.util.zip.GZIPInputStream
  * - L3: Dynamic ResolutionStrategy & Capability Matrix Fallback
  * - L4: ProxyPool, DoH, and Cellular Failover Integration
  * - L5: Adaptive Multi-Bucket Rate Limiter with Jitter and Persistence
- * - L6: Stream itag Fallback Ladder (140 -> 251 -> 139 -> 250 -> 249)
+ * - L6: Stream itag Fallback Ladder (251 -> 140 -> 139 -> 250 -> 249)
  */
 internal class InnertubeClient(
     private val context: Context,
@@ -186,6 +193,20 @@ internal class InnertubeClient(
             get() = this == WEB_REMIX
     }
 
+    /**
+     * Typed result of resolving a client attempt.
+     *
+     * Distinguishes successful payloads from real client-specific failures vs.
+     * neutral skips (short-circuits, thread interruptions, network outages).
+     * Prevents [ClientWinnerStore] pollution.
+     */
+    sealed class AttemptResult {
+        data class Success(val payload: Map<String, Any?>) : AttemptResult()
+        data class Failure(val signal: YtmBlockSignal?, val isClientSpecific: Boolean = true) : AttemptResult()
+        object ShortCircuited : AttemptResult()
+        object Interrupted : AttemptResult()
+    }
+
     class InnertubeException(
         val signal: YtmBlockSignal,
         message: String,
@@ -198,7 +219,7 @@ internal class InnertubeClient(
      * 1. Consults ResolutionStrategy for eligible client chain
      * 2. Executes parallel race for high-priority tier
      * 3. Fallback sequential check for remaining clients
-     * 4. Selects optimal itag via audio itag ladder (140, 251, 139, 250, 249)
+     * 4. Selects optimal itag via audio itag ladder (251 -> 140 -> 139 -> 250 -> 249)
      */
     /**
      * 2026-09 gap 4: GVS (googlevideo) gating is expanding per-client. For
@@ -210,55 +231,73 @@ internal class InnertubeClient(
         val host = runCatching { Uri.parse(url).host ?: "" }.getOrDefault("")
         if (!host.contains("googlevideo.com")) return url
         if (!ClientCapabilityMatrix.getCapability(client).requiresPoToken) return url
-        // GVS (streaming URL) poTokens are session-bound, not content-bound: the
-        // visitorData for a guest, the account's dataSyncId when signed in. The
-        // content-bound /player token minted in buildPlayerBody() must not be
-        // reused here, and vice-versa (yt-dlp: "GVS WebPO Token is bound to
-        // visitor_data / Visitor ID when logged out" and to "data_sync_id /
-        // account Session ID when logged in").
         val dataSyncId = PoTokenManager.dataSyncId
-        val token = if (client.acceptsSessionAuth &&
-            cookieStore.isSessionValid() &&
-            dataSyncId.isNotEmpty()
-        ) {
-            PoTokenManager.accountPoTokenForSync(dataSyncId)
+        val isAuthed = client.acceptsSessionAuth && cookieStore.isSessionValid()
+        val token = if (isAuthed) {
+            // FIX #9: For authenticated session, only use account token if dataSyncId is present.
+            // Do NOT fall back to guest streamingPoToken!
+            if (dataSyncId.isNotEmpty()) {
+                PoTokenManager.accountPoTokenForSync(dataSyncId)
+            } else {
+                ""
+            }
         } else {
             PoTokenManager.streamingPoToken
         }
         if (token.isEmpty()) return url
+
         return runCatching {
             val uri = Uri.parse(url)
-            if (uri.getQueryParameter("pot") != null) return url
-            uri.buildUpon().appendQueryParameter("pot", token).toString()
+            val existingPot = uri.getQueryParameter("pot")
+            // FIX #17: If pot is already present and non-empty, do not re-append
+            if (!existingPot.isNullOrEmpty()) return url
+
+            // If pot parameter is present but empty (e.g. pot=, ?pot&, or ?pot#), replace it
+            val emptyPotPattern = Regex("([?&])pot=?(?=&|#|$)")
+            if (emptyPotPattern.containsMatchIn(url)) {
+                val encodedToken = URLEncoder.encode(token, "UTF-8")
+                val replacement = "$1pot=" + Regex.escapeReplacement(encodedToken)
+                emptyPotPattern.replaceFirst(url, replacement)
+            } else {
+                uri.buildUpon().appendQueryParameter("pot", token).toString()
+            }
         }.getOrDefault(url)
     }
 
     fun resolvePlayerStream(videoId: String, quality: String = "high"): Map<String, Any?> {
+        val traceId = UUID.randomUUID().toString()
+
+        // FIX #13 & #16: Shared egress bot/block circuit breaker check
+        val nowMs = android.os.SystemClock.elapsedRealtime()
+        val breakerUntil = globalBlockCooldownUntilMs.get()
+        if (nowMs < breakerUntil && consecutiveEgressBlocks.get() >= 1) {
+            val remainingSec = ((breakerUntil - nowMs) / 1000L).coerceAtLeast(1)
+            val signal = globalBlockSignal.get()
+            Log.w(TAG, "[$traceId] Fast-failing: egress bot/block breaker active ($signal) for another ${remainingSec}s")
+            throw InnertubeException(
+                signal = signal,
+                message = "Egress is currently under $signal cooldown ($remainingSec s remaining)",
+                traceId = traceId
+            )
+        }
+
         val clientChain = resolutionStrategy.buildChain(
             ResolutionStrategy.Operation.STREAM_RESOLVE,
             limitedMode = PoTokenManager.isLimitedMode,
             hasJsEngine = true
         )
 
-        val traceId = UUID.randomUUID().toString()
+        // FIX #1: Nullable AtomicReference with neutral default on throw
+        val lastSignalRef = AtomicReference<YtmBlockSignal?>(null)
+        val lastExceptionRef = AtomicReference<Throwable?>(null)
 
-        // These are written from up to three pool threads during the hedged
-        // race, so they cannot be plain captured vars.
-        val lastSignalRef = java.util.concurrent.atomic.AtomicReference(YtmBlockSignal.RateLimited)
-        val lastExceptionRef = java.util.concurrent.atomic.AtomicReference<Throwable?>(null)
-
-        // Priority-based signal update: a BotChallenge seen on client 1 must not
-        // be silently overwritten by a VideoGone from ANDROID_TESTSUITE (the last
-        // fallback). Higher priority = more actionable recovery action.
-        // VideoGone from the tail client was the entire VPN breakage: Dart got
-        // VIDEO_GONE, treated it as skipToNextTrack, never fired _noteBotChallenge,
-        // and every subsequent track burned the full 9-client chain with no cooldown.
+        // Priority-based signal update: higher priority = more actionable recovery action.
         fun signalPriority(s: YtmBlockSignal?): Int = when (s) {
             YtmBlockSignal.BotChallenge            -> 8
             YtmBlockSignal.PoTokenInvalid          -> 7
             YtmBlockSignal.RateLimited             -> 6
             YtmBlockSignal.IpBlocked               -> 5
-            YtmBlockSignal.SignatureDecipherFailed  -> 4
+            YtmBlockSignal.SignatureDecipherFailed -> 4
             YtmBlockSignal.SabrEnforced            -> 3
             YtmBlockSignal.SignInRequired          -> 2
             YtmBlockSignal.ClientDeprecated        -> 2
@@ -275,25 +314,49 @@ internal class InnertubeClient(
         }
 
         // Track IP-level blocks AND bot challenges to short-circuit early.
-        // Previously only IpBlocked was counted, so a full VPN sweep (all clients
-        // returning BotChallenge) never short-circuited — 9 clients × ~1s each.
-        // Threshold 6 gives the main chain plus the no-login last-resort tail
-        // (EMBED/MWEB/TV/TESTSUITE) a chance to prove the egress is usable
-        // while still aborting a doomed sweep instead of running all nine.
-        val blockSignalCount = java.util.concurrent.atomic.AtomicInteger(0)
-        val blockClients = java.util.concurrent.CopyOnWriteArrayList<String>()
-        // attemptClient cannot throw the short-circuit itself: its own
-        // `catch (t: Throwable)` would swallow it. It parks the exception here
-        // and the race / sequential loops rethrow it.
-        val shortCircuit = java.util.concurrent.atomic.AtomicReference<InnertubeException?>(null)
+        val blockSignalCount = AtomicInteger(0)
+        val blockClients = CopyOnWriteArrayList<String>()
+        val shortCircuit = AtomicReference<InnertubeException?>(null)
 
-        fun attemptClient(client: ClientType): Map<String, Any?>? {
-            if (Thread.currentThread().isInterrupted) return null
-            if (shortCircuit.get() != null) return null
+        // FIX #24: Dynamic short-circuit threshold relative to eligible chain size
+        val shortCircuitThreshold = (clientChain.size * 0.65).toInt().coerceIn(3, 6)
+
+        // FIX #11 & #12: Track active okhttp3.Calls per client in thread-safe lists
+        val activeCalls = ConcurrentHashMap<ClientType, CopyOnWriteArrayList<okhttp3.Call>>()
+        val activeFutures = CopyOnWriteArrayList<Future<Pair<ClientType, AttemptResult>>>()
+
+        fun cancelAll(exceptFuture: Future<*>? = null, exceptClient: ClientType? = null) {
+            for (f in activeFutures) {
+                if (f != exceptFuture) f.cancel(true)
+            }
+            for ((client, callList) in activeCalls) {
+                if (client != exceptClient) {
+                    for (call in callList) {
+                        runCatching { call.cancel() }
+                    }
+                }
+            }
+            activeFutures.clear()
+        }
+
+        fun attemptClient(
+            client: ClientType,
+            ignoreShortCircuit: Boolean = false
+        ): AttemptResult {
+            if (Thread.currentThread().isInterrupted) return AttemptResult.Interrupted
+            // FIX #2: Allow bypass during PoToken recovery
+            if (!ignoreShortCircuit && shortCircuit.get() != null) return AttemptResult.ShortCircuited
+
+            // FIX #7: Keep default safe and wrap fingerprint store in try block
+            var actualRequestUa = client.userAgent
+
             try {
+                val fp = FingerprintStore.getFingerprint(context)
+                actualRequestUa = fp.buildUserAgent(client)
+
                 Log.d(TAG, "[$traceId] Attempting player resolution for $videoId using client: ${client.name}")
-                val playerJson = requestPlayer(videoId, client)
-                if (Thread.currentThread().isInterrupted) return null
+                val playerJson = requestPlayer(videoId, client, activeCalls)
+                if (Thread.currentThread().isInterrupted) return AttemptResult.Interrupted
 
                 val playability = playerJson.optJSONObject("playabilityStatus")
                 val status = playability?.optString("status") ?: ""
@@ -303,69 +366,72 @@ internal class InnertubeClient(
                     ?.optJSONObject("subreason")
                     ?.optString("simpleText") ?: ""
 
+                // FIX #10 & #6: Explicitly include ERROR, CONTENT_CHECK_REQUIRED, and LIVE_STREAM in playability check
                 if (status.equals("LOGIN_REQUIRED", ignoreCase = true) ||
                     status.equals("UNPLAYABLE", ignoreCase = true) ||
+                    status.equals("ERROR", ignoreCase = true) ||
+                    status.equals("CONTENT_CHECK_REQUIRED", ignoreCase = true) ||
+                    status.startsWith("LIVE_STREAM", ignoreCase = true) ||
                     status.contains("BOT", ignoreCase = true)) {
+
                     val parsedSignal = YtmBlockSignal.parse(200, status, playability)
                     updateBestSignal(parsedSignal)
-                    Log.w(TAG, "[$traceId] Client ${client.name} returned status $status (reason='$reason', sub='$subreason') -> $parsedSignal")
+                    // FIX #18 & #19: Log reason and subreason with redaction/truncation
+                    val logReason = if (subreason.isNotEmpty()) "$reason ($subreason)" else reason
+                    Log.w(TAG, "[$traceId] Client ${client.name} returned status $status (reason='${logReason.take(100)}') -> $parsedSignal")
+
                     if ((parsedSignal == YtmBlockSignal.PoTokenInvalid ||
                             PoTokenManager.isExpired() ||
                             PoTokenManager.isLimitedMode) &&
                         (client == ClientType.ANDROID_MUSIC || client == ClientType.WEB_REMIX)) {
-                        // Only re-mint when attestation is actually suspect: an
-                        // explicit token rejection, or an expired/limited token.
-                        // Refreshing on a generic BotChallenge while the token is
-                        // still valid just burns a BotGuard round trip and churns
-                        // state for an IP-level verdict the token cannot change.
+                        // FIX #21: AtomicLong check-and-set for thread-safe throttle
                         val now = android.os.SystemClock.elapsedRealtime()
-                        if (now - lastBotRefreshTriggerMs > 30_000L) {
-                            lastBotRefreshTriggerMs = now
+                        val last = lastBotRefreshTriggerMs.get()
+                        if (now - last > 30_000L && lastBotRefreshTriggerMs.compareAndSet(last, now)) {
                             PoTokenManager.invalidate()
                             PoTokenManager.triggerBackgroundRefresh()
                         }
                     }
-                    // Count every "this egress is refused" signal. On a VPN exit
-                    // the clients do not all return the same thing: typically one
-                    // BotChallenge plus several "please sign in" / "no usable
-                    // formats" replies. Only BotChallenge/IpBlocked used to count,
-                    // so a sweep that was already clearly doomed ran all nine
-                    // clients (~25s) with no exit. Threshold 6 lets the full
-                    // main chain plus the no-login last resorts
-                    // (WEB_EMBEDDED_PLAYER, MWEB, TVHTML5_SIMPLY_EMBEDDED_PLAYER,
-                    // ANDROID_TESTSUITE) run before aborting: aborting at 3
-                    // killed the sweep right after VR/MUSIC/CREATOR and the tail
-                    // — the only clients that can succeed on a flagged egress —
-                    // never got tried.
+
                     val isEgressBlock = parsedSignal == YtmBlockSignal.IpBlocked ||
                         parsedSignal == YtmBlockSignal.BotChallenge ||
                         parsedSignal == YtmBlockSignal.PoTokenInvalid
-                    // A guest client that normally streams anonymously answering
-                    // "please sign in" is an egress challenge, not a per-video
-                    // condition. Fold it in only once a bot/attestation signal has
-                    // already appeared, so a genuinely private or members-only
-                    // track (which asks every client to sign in) is not misread as
-                    // an IP block.
+
+                    // FIX #15: Applies to any client executing without session auth
+                    val isGuestClient = !client.acceptsSessionAuth || !cookieStore.isSessionValid()
                     val guestSignInAsBlock =
                         parsedSignal == YtmBlockSignal.SignInRequired &&
-                            !cookieStore.isSessionValid() &&
+                            isGuestClient &&
                             blockSignalCount.get() > 0
+
                     if (isEgressBlock || guestSignInAsBlock) {
                         blockClients.add(client.name)
                         val count = blockSignalCount.incrementAndGet()
-                        if (count >= 6) {
-                            Log.w(TAG, "[$traceId] Short-circuiting chain: $count block signals ($parsedSignal) from (${blockClients.joinToString()}) for $videoId")
-                            shortCircuit.compareAndSet(
-                                null,
-                                InnertubeException(
-                                    signal = lastSignalRef.get(),
-                                    message = "Blocked by $count clients (${blockClients.joinToString()}) for video $videoId",
-                                    traceId = traceId
-                                )
+                        if (count >= shortCircuitThreshold) {
+                            val winningSignal = lastSignalRef.get() ?: parsedSignal
+                            Log.w(TAG, "[$traceId] Short-circuiting chain: $count block signals ($winningSignal) from (${blockClients.joinToString()}) for $videoId")
+                            val exc = InnertubeException(
+                                signal = winningSignal,
+                                message = "Blocked by $count clients (${blockClients.joinToString()}) for video $videoId",
+                                traceId = traceId
                             )
+                            // FIX #2 & #11: Only increment global breaker if this thread actually sets the short circuit!
+                            if (shortCircuit.compareAndSet(null, exc)) {
+                                globalBlockSignal.set(winningSignal)
+                                consecutiveEgressBlocks.incrementAndGet()
+                                globalBlockCooldownUntilMs.set(android.os.SystemClock.elapsedRealtime() + 15_000L)
+                            }
                         }
                     }
-                    return null
+
+                    // FIX #1: Base client-specific failure only on true client signals, not raw UNPLAYABLE
+                    val isClientSpecific = parsedSignal == YtmBlockSignal.ClientDeprecated ||
+                        parsedSignal == YtmBlockSignal.SabrEnforced ||
+                        parsedSignal == YtmBlockSignal.SignatureDecipherFailed
+                    if (parsedSignal == YtmBlockSignal.SabrEnforced) {
+                        SabrDemotionStore.markSabrEnforced(client)
+                    }
+                    return AttemptResult.Failure(parsedSignal, isClientSpecific = isClientSpecific)
                 }
 
                 val streamingData = playerJson.optJSONObject("streamingData")
@@ -374,150 +440,298 @@ internal class InnertubeClient(
                     streamingData?.optJSONArray("formats")
                 )
 
+                // FIX #9: Single pass counting formats, URLs, and ciphers without duplicate extraction
+                var totalFormats = 0
+                var totalUrls = 0
+                var cipheredCount = 0
                 val audioFormats = mutableListOf<Pair<JSONObject, String>>()
+
                 for (array in formatArrays) {
                     for (i in 0 until array.length()) {
                         val format = array.optJSONObject(i) ?: continue
-                        val mime = format.optString("mimeType")
+                        totalFormats++
+                        if (format.optString("signatureCipher").isNotEmpty() ||
+                            format.optString("cipher").isNotEmpty()) {
+                            cipheredCount++
+                        }
                         val url = extractUrlFromFormat(format)
-                        if (mime.startsWith("audio/") && !url.isNullOrEmpty()) {
-                            audioFormats.add(format to url)
+                        if (!url.isNullOrEmpty()) {
+                            totalUrls++
+                            val mime = format.optString("mimeType")
+                            if (mime.startsWith("audio/")) {
+                                audioFormats.add(format to url)
+                            }
                         }
                     }
                 }
 
                 if (audioFormats.isEmpty()) {
-                    // 2026-09: count urls/cipher across ALL formats so SABR-forced
-                    // clients (formats present, zero urls, zero cipher) are
-                    // classified SabrEnforced instead of VideoGone/PoTokenInvalid.
-                    var totalFormats = 0
-                    var totalUrls = 0
-                    var cipheredCount = 0
-                    for (array in formatArrays) {
-                        for (i in 0 until array.length()) {
-                            val f = array.optJSONObject(i) ?: continue
-                            totalFormats++
-                            if (!extractUrlFromFormat(f).isNullOrEmpty()) totalUrls++
-                            if (f.optString("signatureCipher").isNotEmpty() ||
-                                f.optString("cipher").isNotEmpty()) cipheredCount++
-                        }
-                    }
                     val hadFormatArrays = totalFormats > 0
                     val hadCiphered = cipheredCount > 0
-                    updateBestSignal(
-                        when {
-                            YtmBlockSignal.detectSabrStructural(
-                                hasStreamingData = streamingData != null,
-                                formatCount = totalFormats,
-                                urlCount = totalUrls,
-                                cipherCount = cipheredCount,
-                            ) -> {
-                                // Demote the client for 24h; do NOT invalidate
-                                // poTokens — SABR is not an attestation failure.
-                                SabrDemotionStore.markSabrEnforced(client)
-                                Log.w(TAG, "[$traceId] " + client.name + " SABR-enforced (formats=$totalFormats, urls=0) -> demoted")
-                                YtmBlockSignal.SabrEnforced
-                            }
-                            hadCiphered -> YtmBlockSignal.SignatureDecipherFailed
-                            hadFormatArrays -> YtmBlockSignal.VideoGone
-                            else -> YtmBlockSignal.PoTokenInvalid
+                    val emptySignal = when {
+                        YtmBlockSignal.detectSabrStructural(
+                            hasStreamingData = streamingData != null,
+                            formatCount = totalFormats,
+                            urlCount = totalUrls,
+                            cipherCount = cipheredCount,
+                        ) -> {
+                            SabrDemotionStore.markSabrEnforced(client)
+                            Log.w(TAG, "[$traceId] ${client.name} SABR-enforced (formats=$totalFormats, urls=0) -> demoted")
+                            YtmBlockSignal.SabrEnforced
                         }
-                    )
-                    Log.w(TAG, "[$traceId] Client ${client.name} returned no usable audio formats (hadCiphered=$hadCiphered)")
-                    return null
+                        hadCiphered -> YtmBlockSignal.SignatureDecipherFailed
+                        hadFormatArrays -> YtmBlockSignal.VideoGone
+                        else -> YtmBlockSignal.PoTokenInvalid
+                    }
+                    updateBestSignal(emptySignal)
+                    Log.w(TAG, "[$traceId] Client ${client.name} returned no usable audio formats (hadCiphered=$hadCiphered) -> $emptySignal")
+                    val isClientSpecific = emptySignal == YtmBlockSignal.SabrEnforced || emptySignal == YtmBlockSignal.SignatureDecipherFailed
+                    return AttemptResult.Failure(emptySignal, isClientSpecific = isClientSpecific)
                 }
 
-                // Layer 6: Itag Ladder 2026 — Opus 251 (160kbps) preferred over AAC 140,
-                // matches YouTube.js / InnerTune: 251 > 140 > 139 > 250 > 249
+                // Layer 6: Itag Ladder 2026 — Opus 251 (160kbps) preferred over AAC 140
                 val itagLadder = listOf(251, 140, 139, 250, 249)
                 val selectedPair = when (quality.lowercase()) {
-                    "low" -> audioFormats.minByOrNull { it.first.optInt("bitrate", 0) }
-                    "medium" -> audioFormats.minByOrNull { kotlin.math.abs(it.first.optInt("bitrate", 128000) - 128000) }
+                    "low" -> audioFormats.minByOrNull { safeBitrate(it.first) }
+                    "medium" -> audioFormats.minByOrNull { kotlin.math.abs(safeBitrate(it.first) - 128000) }
                     else -> {
-                        // High quality: prefer ladder itags in order, or highest bitrate
                         audioFormats.sortedWith(
                             compareBy<Pair<JSONObject, String>> { pair ->
                                 val itag = pair.first.optInt("itag", 0)
                                 val idx = itagLadder.indexOf(itag)
                                 if (idx >= 0) idx else 99
-                            }.thenByDescending { it.first.optInt("bitrate", 0) }
-                        ).firstOrNull() ?: audioFormats.maxByOrNull { it.first.optInt("bitrate", 0) }
+                            }.thenByDescending { safeBitrate(it.first) }
+                        ).firstOrNull() ?: audioFormats.maxByOrNull { safeBitrate(it.first) }
                     }
                 } ?: audioFormats.first()
 
                 val selected = selectedPair.first
                 val selectedUrl = selectedPair.second
                 val selectedMime = selected.optString("mimeType", "audio/mp4")
-                val selectedBitrate = selected.optInt("bitrate", 128000)
+                val selectedBitrate = safeBitrate(selected)
                 val durationMs = selected.optLong("approxDurationMs", 0L)
                 val videoDetails = playerJson.optJSONObject("videoDetails")
 
                 val title = videoDetails?.optString("title") ?: ""
                 val author = videoDetails?.optString("author") ?: ""
 
+                // FIX #27: Extract highest resolution thumbnail if present
+                val artworkUrl = extractBestArtworkUrl(videoDetails)
+
+                // FIX #28: Robust container inference
+                val container = when {
+                    selectedMime.contains("mp4", ignoreCase = true) ||
+                        selectedMime.contains("m4a", ignoreCase = true) ||
+                        selectedMime.contains("aac", ignoreCase = true) -> "m4a"
+                    selectedMime.contains("webm", ignoreCase = true) ||
+                        selectedMime.contains("opus", ignoreCase = true) -> "webm"
+                    selectedMime.contains("ogg", ignoreCase = true) -> "ogg"
+                    else -> if (selected.optInt("itag", 0) in listOf(140, 139)) "m4a" else "webm"
+                }
+
                 Log.i(TAG, "[$traceId] Successfully resolved $videoId via ${client.name} (itag: ${selected.optInt("itag")}, bitrate: $selectedBitrate)")
                 val finalUrl = maybeAppendStreamPot(selectedUrl, client)
-                YtmHttpClient.preConnect(finalUrl)
-                return mapOf(
+
+                // FIX #8 & #20: Pre-connect non-blocking, non-fatal, on dedicated executor with wrapped scheduling
+                runCatching {
+                    preConnectExecutor.execute {
+                        runCatching {
+                            YtmHttpClient.preConnect(finalUrl)
+                        }.onFailure {
+                            Log.w(TAG, "[$traceId] preConnect async failed for ${client.name}: ${it.message}")
+                        }
+                    }
+                }.onFailure {
+                    Log.w(TAG, "[$traceId] Could not schedule preConnect for ${client.name}: ${it.message}")
+                }
+
+                val payload = mapOf(
                     "videoId" to videoId,
                     "url" to finalUrl,
                     "mimeType" to selectedMime.split(";").first().trim(),
-                    "container" to if (selectedMime.contains("mp4")) "m4a" else "webm",
+                    "container" to container,
                     "bitrateKbps" to (selectedBitrate / 1000),
                     "durationMs" to durationMs,
                     "title" to title,
                     "artist" to author,
-                    "artworkUrl" to null,
-                    "userAgent" to client.userAgent,
+                    "artworkUrl" to artworkUrl,
+                    "userAgent" to actualRequestUa, // FIX #8: Matches actual request UA
                     "activeClient" to client.name,
                     "traceId" to traceId,
-                    // googlevideo URLs are time-boxed. Without this the Dart
-                    // model's isExpired/isExpiringSoon are permanently false and
-                    // both the player and the downloader run on dead URLs.
                     "expiresAt" to parseUrlExpiryEpochSeconds(finalUrl)
                 )
+                return AttemptResult.Success(payload)
             } catch (t: Throwable) {
+                // FIX #13: Never mask fatal JVM errors
+                if (t is VirtualMachineError) throw t
+                if (t is ThreadDeath) throw t
+                if (t is InterruptedException || Thread.currentThread().isInterrupted) {
+                    return AttemptResult.Interrupted
+                }
                 Log.w(TAG, "[$traceId] Failed resolving with ${client.name}: ${t.message}")
                 lastExceptionRef.set(t)
-                if (t is InnertubeException) updateBestSignal(t.signal)
-                return null
+                val sig = if (t is InnertubeException) {
+                    updateBestSignal(t.signal)
+                    t.signal
+                } else null
+
+                // FIX #2: Count transport-level egress blocks toward short-circuit
+                val isTransportEgressBlock =
+                    sig == YtmBlockSignal.IpBlocked ||
+                    sig == YtmBlockSignal.BotChallenge ||
+                    sig == YtmBlockSignal.PoTokenInvalid
+
+                val isGuestClient = !client.acceptsSessionAuth || !cookieStore.isSessionValid()
+                val transportGuestSignInAsBlock =
+                    sig == YtmBlockSignal.SignInRequired &&
+                    isGuestClient &&
+                    blockSignalCount.get() > 0
+
+                if (isTransportEgressBlock || transportGuestSignInAsBlock) {
+                    blockClients.add(client.name)
+                    val count = blockSignalCount.incrementAndGet()
+                    if (count >= shortCircuitThreshold) {
+                        val winningSignal = lastSignalRef.get() ?: YtmBlockSignal.BotChallenge
+                        Log.w(TAG, "[$traceId] Short-circuiting chain on transport block: $count block signals ($winningSignal) from (${blockClients.joinToString()}) for $videoId")
+                        val exc = InnertubeException(
+                            signal = winningSignal,
+                            message = "Blocked by $count clients (${blockClients.joinToString()}) for video $videoId",
+                            traceId = traceId
+                        )
+                        if (shortCircuit.compareAndSet(null, exc)) {
+                            globalBlockSignal.set(winningSignal)
+                            consecutiveEgressBlocks.incrementAndGet()
+                            globalBlockCooldownUntilMs.set(
+                                android.os.SystemClock.elapsedRealtime() + 15_000L
+                            )
+                        }
+                    }
+                }
+
+                val isClientSpecific = sig == YtmBlockSignal.ClientDeprecated ||
+                    sig == YtmBlockSignal.SabrEnforced ||
+                    sig == YtmBlockSignal.SignatureDecipherFailed
+                if (sig == YtmBlockSignal.SabrEnforced) {
+                    SabrDemotionStore.markSabrEnforced(client)
+                }
+                return AttemptResult.Failure(sig, isClientSpecific = isClientSpecific)
             }
         }
 
         val trackType = ClientWinnerStore.TRACK_TYPE_MUSIC
         val winnerStore = ClientWinnerStore.getInstance(context)
 
-        // Authenticated cold-start datasyncId bootstrap. harvestSessionState only
-        // yields a datasyncId on some responses, so a signed-in cold start needs
-        // one WEB_REMIX round trip before an account-bound poToken can be minted.
-        //
-        // Its result is now used instead of discarded: the response was thrown
-        // away, so every track resolved in the throttle window paid a full extra
-        // authenticated player request that could not do anything but fail or be
-        // ignored. If it resolves, that *is* the answer; if it does not, the
-        // datasyncId it harvested still benefits the chain below.
+        // Authenticated cold-start datasyncId bootstrap
         if (cookieStore.isSessionValid() && PoTokenManager.dataSyncId.isEmpty()) {
             val now = android.os.SystemClock.elapsedRealtime()
-            if (now - lastDataSyncBootstrapMs > DATASYNC_BOOTSTRAP_INTERVAL_MS) {
-                lastDataSyncBootstrapMs = now
-                val bootstrapped = attemptClient(ClientType.WEB_REMIX)
-                if (bootstrapped != null) {
-                    winnerStore.recordWinningClient(trackType, ClientType.WEB_REMIX)
-                    return bootstrapped
+            val last = lastDataSyncBootstrapMs.get()
+            // FIX #21: Atomic check-and-set for datasync bootstrap
+            if (now - last > DATASYNC_BOOTSTRAP_INTERVAL_MS && lastDataSyncBootstrapMs.compareAndSet(last, now)) {
+                val bootstrapped = attemptClient(ClientType.WEB_REMIX, ignoreShortCircuit = true)
+                // FIX #3 & #14: Comprehensive handling of AttemptResult in datasync bootstrap
+                when (bootstrapped) {
+                    is AttemptResult.Success -> {
+                        winnerStore.recordWinningClient(trackType, ClientType.WEB_REMIX)
+                        consecutiveEgressBlocks.set(0)
+                        globalBlockCooldownUntilMs.set(0L)
+                        globalBlockSignal.set(YtmBlockSignal.BotChallenge)
+                        return bootstrapped.payload
+                    }
+                    is AttemptResult.Failure -> {
+                        if (bootstrapped.isClientSpecific) {
+                            winnerStore.recordFailure(trackType, ClientType.WEB_REMIX)
+                        }
+                        // FIX #11: Differentiate bootstrap retry cooldown by failure signal
+                        val backoffMs = when (bootstrapped.signal) {
+                            YtmBlockSignal.RateLimited -> 60_000L
+                            YtmBlockSignal.NetworkUnavailable -> 10_000L
+                            else -> 30_000L
+                        }
+                        lastDataSyncBootstrapMs.set(now - DATASYNC_BOOTSTRAP_INTERVAL_MS + backoffMs)
+                    }
+                    is AttemptResult.Interrupted -> {
+                        Thread.currentThread().interrupt()
+                        lastDataSyncBootstrapMs.set(now - DATASYNC_BOOTSTRAP_INTERVAL_MS + 5_000L)
+                        throw InnertubeException(
+                            signal = YtmBlockSignal.NetworkUnavailable,
+                            message = "Stream resolution interrupted during datasync bootstrap for $videoId",
+                            traceId = traceId
+                        )
+                    }
+                    is AttemptResult.ShortCircuited -> {
+                        shortCircuit.get()?.let { throw it }
+                    }
                 }
-                winnerStore.recordFailure(trackType, ClientType.WEB_REMIX)
-                shortCircuit.get()?.let { throw it }
             }
+        }
+
+        fun tryPoTokenRecovery(): Map<String, Any?>? {
+            val sc = shortCircuit.get()
+            val recoverySignal = sc?.signal ?: lastSignalRef.get()
+            val tokenStale = PoTokenManager.isExpired() || PoTokenManager.isLimitedMode
+            if (recoverySignal == YtmBlockSignal.PoTokenInvalid ||
+                (recoverySignal == YtmBlockSignal.BotChallenge && tokenStale)) {
+                val refreshed = runCatching { PoTokenManager.ensureReadySync() }.getOrDefault(false)
+                if (refreshed && !PoTokenManager.isLimitedMode) {
+                    Log.i(TAG, "[$traceId] PoToken refreshed, retrying WEB_REMIX...")
+                    val webRes = attemptClient(ClientType.WEB_REMIX, ignoreShortCircuit = true)
+                    // FIX #4: Abort on Interrupted in recovery
+                    if (webRes is AttemptResult.Interrupted) {
+                        Thread.currentThread().interrupt()
+                        throw InnertubeException(
+                            signal = YtmBlockSignal.NetworkUnavailable,
+                            message = "Stream resolution interrupted during PoToken recovery for $videoId",
+                            traceId = traceId
+                        )
+                    }
+                    if (webRes is AttemptResult.Success) {
+                        shortCircuit.set(null) // clear short-circuit on recovery
+                        winnerStore.recordWinningClient(trackType, ClientType.WEB_REMIX)
+                        consecutiveEgressBlocks.set(0)
+                        globalBlockCooldownUntilMs.set(0L)
+                        globalBlockSignal.set(YtmBlockSignal.BotChallenge)
+                        return webRes.payload
+                    }
+                    // FIX #10: Skip subsequent recovery attempt if failure is NetworkUnavailable or RateLimited
+                    if (webRes is AttemptResult.Failure &&
+                        (webRes.signal == YtmBlockSignal.NetworkUnavailable ||
+                         webRes.signal == YtmBlockSignal.RateLimited)) {
+                        Log.d(TAG, "[$traceId] WEB_REMIX recovery failed with ${webRes.signal}; skipping Android client retry")
+                        return null
+                    }
+
+                    Log.i(TAG, "[$traceId] WEB_REMIX retry failed, retrying ANDROID_MUSIC with fresh poToken...")
+                    val androidRes = attemptClient(ClientType.ANDROID_MUSIC, ignoreShortCircuit = true)
+                    // FIX #4: Abort on Interrupted in recovery
+                    if (androidRes is AttemptResult.Interrupted) {
+                        Thread.currentThread().interrupt()
+                        throw InnertubeException(
+                            signal = YtmBlockSignal.NetworkUnavailable,
+                            message = "Stream resolution interrupted during PoToken recovery for $videoId",
+                            traceId = traceId
+                        )
+                    }
+                    if (androidRes is AttemptResult.Success) {
+                        shortCircuit.set(null) // clear short-circuit on recovery
+                        winnerStore.recordWinningClient(trackType, ClientType.ANDROID_MUSIC)
+                        consecutiveEgressBlocks.set(0)
+                        globalBlockCooldownUntilMs.set(0L)
+                        globalBlockSignal.set(YtmBlockSignal.BotChallenge)
+                        return androidRes.payload
+                    }
+                }
+            }
+            return null
         }
 
         val candidate1 = clientChain.firstOrNull()
         val candidate2 = clientChain.getOrNull(1)
 
-        val activeFutures = java.util.concurrent.CopyOnWriteArrayList<java.util.concurrent.Future<Pair<ClientType, Map<String, Any?>?>>>()
+        val completionService = ExecutorCompletionService<Pair<ClientType, AttemptResult>>(streamResolverPool)
 
-        fun submitCandidate(client: ClientType): java.util.concurrent.Future<Pair<ClientType, Map<String, Any?>?>>? {
+        fun submitCandidate(client: ClientType): Future<Pair<ClientType, AttemptResult>>? {
             return try {
-                val future = streamResolverPool.submit(java.util.concurrent.Callable {
+                val future = completionService.submit(Callable {
                     val res = attemptClient(client)
                     client to res
                 })
@@ -529,137 +743,200 @@ internal class InnertubeClient(
             }
         }
 
-        fun cancelAll(except: java.util.concurrent.Future<*>? = null) {
-            for (f in activeFutures) { if (f != except) f.cancel(true) }
-            activeFutures.clear()
+        if (Thread.currentThread().isInterrupted) {
+            throw InnertubeException(
+                signal = YtmBlockSignal.NetworkUnavailable,
+                message = "Stream resolution interrupted before start for $videoId",
+                traceId = traceId
+            )
         }
 
+        var candidate1Submitted = false
         if (candidate1 != null) {
-            submitCandidate(candidate1)
+            candidate1Submitted = submitCandidate(candidate1) != null
         }
 
-        // Task 4: Wait up to HEDGE_DELAY_MS (350 ms) for candidate 1
-        val hedgeDeadline = android.os.SystemClock.elapsedRealtime() + HEDGE_DELAY_MS
-        while (android.os.SystemClock.elapsedRealtime() < hedgeDeadline) {
-            val done = activeFutures.firstOrNull { it.isDone }
-            if (done != null) {
-                try {
-                    val (client, res) = done.get()
-                    if (res != null) {
-                        cancelAll(done)
-                        winnerStore.recordWinningClient(trackType, client)
-                        return res
-                    } else {
-                        if (!done.isCancelled && !Thread.currentThread().isInterrupted) {
-                            winnerStore.recordFailure(trackType, client)
-                        }
-                        activeFutures.remove(done)
-                        break
-                    }
-                } catch (_: Throwable) {
-                    activeFutures.remove(done)
-                    break
-                }
-            }
-            shortCircuit.get()?.let { cancelAll(); throw it }
+        // Wait up to HEDGE_DELAY_MS (350 ms) for candidate 1 via completionService.poll
+        if (candidate1Submitted) {
             try {
-                Thread.sleep(10L)
-            } catch (_: InterruptedException) {
+                val completedFuture = completionService.poll(HEDGE_DELAY_MS, TimeUnit.MILLISECONDS)
+                if (completedFuture != null) {
+                    activeFutures.remove(completedFuture)
+                    val (client, res) = completedFuture.get()
+                    when (res) {
+                        is AttemptResult.Success -> {
+                            // FIX #5: Cleanly cancel all in-flight calls on success
+                            cancelAll()
+                            winnerStore.recordWinningClient(trackType, client)
+                            consecutiveEgressBlocks.set(0)
+                            globalBlockCooldownUntilMs.set(0L)
+                            globalBlockSignal.set(YtmBlockSignal.BotChallenge)
+                            return res.payload
+                        }
+                        is AttemptResult.Failure -> {
+                            if (res.isClientSpecific) {
+                                winnerStore.recordFailure(trackType, client)
+                            }
+                        }
+                        is AttemptResult.Interrupted -> {
+                            cancelAll()
+                            throw InnertubeException(
+                                signal = YtmBlockSignal.NetworkUnavailable,
+                                message = "Stream resolution interrupted for video $videoId",
+                                traceId = traceId
+                            )
+                        }
+                        is AttemptResult.ShortCircuited -> {}
+                    }
+                }
+            } catch (e: InterruptedException) {
                 Thread.currentThread().interrupt()
-                break
+                cancelAll()
+                throw InnertubeException(
+                    signal = YtmBlockSignal.NetworkUnavailable,
+                    message = "Stream resolution interrupted during hedge delay for $videoId",
+                    traceId = traceId
+                )
+            } catch (e: CancellationException) {
+                // FIX #5: Catch CancellationException explicitly around Future.get()
+                Log.d(TAG, "[$traceId] Candidate 1 was canceled: ${e.message}")
+            } catch (e: ExecutionException) {
+                val cause = e.cause
+                if (cause is VirtualMachineError || cause is ThreadDeath) {
+                    throw cause
+                }
+                Log.w(TAG, "Candidate 1 execution threw: ${cause?.message}")
             }
         }
 
-        // Task 4 Hedged race: launch candidate 2 if candidate 1 did not complete within 350ms
-        if (candidate2 != null && activeFutures.none { it.isDone }) {
+        shortCircuit.get()?.let { cancelAll(); throw it }
+
+        if (Thread.currentThread().isInterrupted) {
+            cancelAll()
+            throw InnertubeException(
+                signal = YtmBlockSignal.NetworkUnavailable,
+                message = "Stream resolution interrupted before launching candidate 2 for $videoId",
+                traceId = traceId
+            )
+        }
+
+        // Hedged race: launch candidate 2 if candidate 1 did not complete in hedge window
+        if (candidate2 != null) {
             submitCandidate(candidate2)
         }
 
-        // Poll for either candidate 1 or candidate 2 to complete
+        // Race remaining active candidates using completionService.poll with remaining timeout
         val hedgeRaceDeadline = android.os.SystemClock.elapsedRealtime() + HEDGE_RACE_TIMEOUT_MS
-        while (android.os.SystemClock.elapsedRealtime() < hedgeRaceDeadline && activeFutures.isNotEmpty()) {
-            val doneList = activeFutures.filter { it.isDone }
-            for (done in doneList) {
-                try {
-                    val (client, res) = done.get()
-                    if (res != null) {
-                        cancelAll(done)
+        while (activeFutures.isNotEmpty()) {
+            val remainingMs = hedgeRaceDeadline - android.os.SystemClock.elapsedRealtime()
+            if (remainingMs <= 0) break
+
+            try {
+                val completed = completionService.poll(remainingMs, TimeUnit.MILLISECONDS) ?: break
+                activeFutures.remove(completed)
+                val (client, res) = completed.get()
+                when (res) {
+                    is AttemptResult.Success -> {
+                        // FIX #5: Cleanly cancel all in-flight calls on success
+                        cancelAll()
                         winnerStore.recordWinningClient(trackType, client)
-                        return res
-                    } else {
-                        if (!done.isCancelled && !Thread.currentThread().isInterrupted) {
+                        consecutiveEgressBlocks.set(0)
+                        globalBlockCooldownUntilMs.set(0L)
+                        globalBlockSignal.set(YtmBlockSignal.BotChallenge)
+                        return res.payload
+                    }
+                    is AttemptResult.Failure -> {
+                        if (res.isClientSpecific) {
                             winnerStore.recordFailure(trackType, client)
                         }
-                        activeFutures.remove(done)
                     }
-                } catch (_: Throwable) {
-                    activeFutures.remove(done)
+                    is AttemptResult.Interrupted -> {
+                        cancelAll()
+                        throw InnertubeException(
+                            signal = YtmBlockSignal.NetworkUnavailable,
+                            message = "Stream resolution interrupted for video $videoId",
+                            traceId = traceId
+                        )
+                    }
+                    is AttemptResult.ShortCircuited -> {}
                 }
-            }
-            if (activeFutures.isEmpty()) break
-            shortCircuit.get()?.let { cancelAll(); throw it }
-            try {
-                Thread.sleep(15L)
-            } catch (_: InterruptedException) {
+            } catch (e: InterruptedException) {
                 Thread.currentThread().interrupt()
-                break
+                cancelAll()
+                throw InnertubeException(
+                    signal = YtmBlockSignal.NetworkUnavailable,
+                    message = "Stream resolution interrupted during hedged race for $videoId",
+                    traceId = traceId
+                )
+            } catch (e: CancellationException) {
+                // FIX #5: Catch CancellationException explicitly around Future.get()
+                Log.d(TAG, "[$traceId] Candidate future was canceled during race: ${e.message}")
+            } catch (e: ExecutionException) {
+                val cause = e.cause
+                if (cause is VirtualMachineError || cause is ThreadDeath) {
+                    throw cause
+                }
+                Log.w(TAG, "Candidate execution threw in race: ${cause?.message}")
             }
+
+            shortCircuit.get()?.let { cancelAll(); throw it }
         }
 
-        // The race timed out with candidates still running. Cancel them before
-        // the sequential fallback: leaving them in flight holds 2 of the 3 pool
-        // threads, so every sequential attempt queues behind work whose result
-        // is already being discarded.
+        // Race timed out or candidates finished: cancel any remaining in-flight calls
         cancelAll()
 
-        fun tryPoTokenRecovery(): Map<String, Any?>? {
-            val sc = shortCircuit.get()
-            val recoverySignal = sc?.signal ?: lastSignalRef.get()
-            // Recovery only helps when the attestation itself is the problem. A
-            // generic BotChallenge against a valid (non-expired) token is an
-            // egress/IP verdict, so re-minting the same token on the same IP just
-            // repeats the refusal and doubles the chain cost on every track.
-            val tokenStale = PoTokenManager.isExpired() || PoTokenManager.isLimitedMode
-            if (recoverySignal == YtmBlockSignal.PoTokenInvalid ||
-                (recoverySignal == YtmBlockSignal.BotChallenge && tokenStale)) {
-                val refreshed = runCatching { PoTokenManager.ensureReadySync() }.getOrDefault(false)
-                if (refreshed && !PoTokenManager.isLimitedMode) {
-                    Log.i(TAG, "[$traceId] PoToken refreshed, retrying WEB_REMIX...")
-                    val webRes = attemptClient(ClientType.WEB_REMIX)
-                    if (webRes != null) {
-                        winnerStore.recordWinningClient(trackType, ClientType.WEB_REMIX)
-                        return webRes
-                    }
-                    Log.i(TAG, "[$traceId] WEB_REMIX retry failed, retrying ANDROID_MUSIC with fresh poToken...")
-                    val androidRes = attemptClient(ClientType.ANDROID_MUSIC)
-                    if (androidRes != null) {
-                        winnerStore.recordWinningClient(trackType, ClientType.ANDROID_MUSIC)
-                        return androidRes
-                    }
-                }
-            }
-            return null
-        }
-
         shortCircuit.get()?.let { sc ->
-            if (sc.signal == YtmBlockSignal.BotChallenge) {
+            if (sc.signal == YtmBlockSignal.BotChallenge || sc.signal == YtmBlockSignal.PoTokenInvalid) {
                 tryPoTokenRecovery()?.let { return it }
             }
             throw sc
         }
 
+        if (Thread.currentThread().isInterrupted) {
+            throw InnertubeException(
+                signal = YtmBlockSignal.NetworkUnavailable,
+                message = "Stream resolution interrupted before sequential fallback for $videoId",
+                traceId = traceId
+            )
+        }
+
         // Fallback: sequential check on remaining candidates in chain
         val remainingClients = clientChain.drop(2)
         for (client in remainingClients) {
-            val res = attemptClient(client)
-            if (res != null) {
-                winnerStore.recordWinningClient(trackType, client)
-                return res
-            } else {
-                winnerStore.recordFailure(trackType, client)
+            if (Thread.currentThread().isInterrupted) {
+                throw InnertubeException(
+                    signal = YtmBlockSignal.NetworkUnavailable,
+                    message = "Stream resolution interrupted during sequential fallback for $videoId",
+                    traceId = traceId
+                )
             }
+
+            val res = attemptClient(client)
+            when (res) {
+                is AttemptResult.Success -> {
+                    winnerStore.recordWinningClient(trackType, client)
+                    consecutiveEgressBlocks.set(0)
+                    globalBlockCooldownUntilMs.set(0L)
+                    globalBlockSignal.set(YtmBlockSignal.BotChallenge)
+                    return res.payload
+                }
+                is AttemptResult.Failure -> {
+                    if (res.isClientSpecific) {
+                        winnerStore.recordFailure(trackType, client)
+                    }
+                }
+                is AttemptResult.Interrupted -> {
+                    throw InnertubeException(
+                        signal = YtmBlockSignal.NetworkUnavailable,
+                        message = "Stream resolution interrupted during sequential fallback for $videoId",
+                        traceId = traceId
+                    )
+                }
+                is AttemptResult.ShortCircuited -> {}
+            }
+
             shortCircuit.get()?.let { sc ->
-                if (sc.signal == YtmBlockSignal.BotChallenge) {
+                if (sc.signal == YtmBlockSignal.BotChallenge || sc.signal == YtmBlockSignal.PoTokenInvalid) {
                     tryPoTokenRecovery()?.let { return it }
                 }
                 throw sc
@@ -668,8 +945,12 @@ internal class InnertubeClient(
 
         tryPoTokenRecovery()?.let { return it }
 
+        // FIX #3: Respect any short-circuit triggered by the final recovery attempt
+        shortCircuit.get()?.let { throw it }
+
+        val finalSignal = lastSignalRef.get() ?: YtmBlockSignal.NetworkUnavailable
         throw InnertubeException(
-            signal = lastSignalRef.get(),
+            signal = finalSignal,
             message = "All Innertube client fallback resolutions failed for video $videoId",
             traceId = traceId,
             cause = lastExceptionRef.get()
@@ -677,7 +958,6 @@ internal class InnertubeClient(
     }
 
     private fun extractUrlFromFormat(format: JSONObject): String? {
-        // Direct URL (may still contain throttling `n` param)
         val directUrl = format.optString("url")
         if (directUrl.isNotEmpty()) {
             return applyNTransformIfNeeded(directUrl)
@@ -724,6 +1004,10 @@ internal class InnertubeClient(
         return null
     }
 
+    /**
+     * FIX #9: Surgically replaces only the 'n' parameter in the query string with boundary anchoring,
+     * preserving parameter order, other parameters, and percent-encoding.
+     */
     private fun applyNTransformIfNeeded(url: String): String {
         return try {
             val uri = Uri.parse(url)
@@ -731,33 +1015,77 @@ internal class InnertubeClient(
             if (n.isEmpty()) return url
             val cache = JsDecipherCache.getInstance(context)
             val transformed = cache.decipherN(n)
-            if (transformed == n) return url // no rule cached → keep as-is (plays but throttled)
-            // Rebuild URL with transformed n
-            val newUri = uri.buildUpon().clearQuery().apply {
-                for (name in uri.queryParameterNames) {
-                    if (name == "n") appendQueryParameter("n", transformed)
-                    else uri.getQueryParameters(name).forEach { appendQueryParameter(name, it) }
+            // FIX #4: Guard against empty or unchanged transformed n
+            if (transformed.isNullOrEmpty() || transformed == n) return url
+
+            val encodedOld = URLEncoder.encode(n, "UTF-8")
+            val encodedNew = URLEncoder.encode(transformed, "UTF-8")
+
+            // FIX #9: Anchor boundaries ([?&] ... (?=&|$)) so other params containing "n=" are not replaced
+            val patternExact = Regex("([?&])n=${Regex.escape(n)}(?=&|$)")
+            val patternEncoded = Regex("([?&])n=${Regex.escape(encodedOld)}(?=&|$)")
+
+            when {
+                patternExact.containsMatchIn(url) -> patternExact.replaceFirst(url, "$1n=$encodedNew")
+                patternEncoded.containsMatchIn(url) -> patternEncoded.replaceFirst(url, "$1n=$encodedNew")
+                else -> {
+                    uri.buildUpon().clearQuery().apply {
+                        for (name in uri.queryParameterNames) {
+                            if (name == "n") appendQueryParameter("n", transformed)
+                            else uri.getQueryParameters(name).forEach { appendQueryParameter(name, it) }
+                        }
+                    }.build().toString()
                 }
-            }.build().toString()
-            newUri
+            }
         } catch (t: Throwable) {
             Log.w(TAG, "n-transform failed: ${t.message}")
             url
         }
     }
 
-    /**
-     * googlevideo URLs carry an `expire` query param (epoch seconds, ~6h out).
-     * Returns null when the parameter is absent or unparseable.
-     */
+    private fun safeBitrate(format: JSONObject): Int {
+        val b = format.optInt("bitrate", 0)
+        if (b > 0) return b
+        val avgB = format.optInt("averageBitrate", 0)
+        if (avgB > 0) return avgB
+        return when (format.optInt("itag", 0)) {
+            251 -> 160000
+            140 -> 128000
+            139, 250 -> 70000
+            249 -> 50000
+            else -> 128000
+        }
+    }
+
+    private fun extractBestArtworkUrl(videoDetails: JSONObject?): String? {
+        val thumbnails = videoDetails?.optJSONObject("thumbnail")?.optJSONArray("thumbnails") ?: return null
+        if (thumbnails.length() == 0) return null
+        var maxW = 0
+        var bestUrl: String? = null
+        for (i in 0 until thumbnails.length()) {
+            val t = thumbnails.optJSONObject(i) ?: continue
+            val w = t.optInt("width", 0)
+            val u = t.optString("url")
+            if (w >= maxW && u.isNotEmpty()) {
+                maxW = w
+                bestUrl = u
+            }
+        }
+        return bestUrl
+    }
+
     private fun parseUrlExpiryEpochSeconds(url: String): Long? = runCatching {
         Uri.parse(url).getQueryParameter("expire")?.toLongOrNull()
     }.getOrNull()
 
-    fun requestPlayer(videoId: String, clientType: ClientType): JSONObject {
+    fun requestPlayer(
+        videoId: String,
+        clientType: ClientType,
+        activeCalls: ConcurrentHashMap<ClientType, CopyOnWriteArrayList<okhttp3.Call>>? = null
+    ): JSONObject {
         val endpoint = "${clientType.endpointHost}/youtubei/v1/player?prettyPrint=false&key=$API_KEY"
         val payload = buildPlayerBody(videoId, clientType)
-        return postWithRetry(endpoint, payload, clientType, RateLimiter.Bucket.PLAYER, maxRetries = 2)
+        return postWithRetry(endpoint, payload, clientType, RateLimiter.Bucket.PLAYER, maxAttempts = 2, activeCalls = activeCalls)
     }
 
     fun requestBrowse(browseId: String, clientType: ClientType = ClientType.WEB_REMIX): JSONObject {
@@ -790,18 +1118,56 @@ internal class InnertubeClient(
         return postWithRetry(endpoint, payload, clientType, RateLimiter.Bucket.SEARCH)
     }
 
+    private fun addActiveCall(
+        activeCalls: ConcurrentHashMap<ClientType, CopyOnWriteArrayList<okhttp3.Call>>?,
+        clientType: ClientType,
+        call: okhttp3.Call
+    ) {
+        if (activeCalls == null) return
+        synchronized(activeCalls) {
+            val list = activeCalls[clientType]
+                ?: CopyOnWriteArrayList<okhttp3.Call>().also {
+                    activeCalls[clientType] = it
+                }
+            list.add(call)
+        }
+    }
+
+    private fun removeActiveCall(
+        activeCalls: ConcurrentHashMap<ClientType, CopyOnWriteArrayList<okhttp3.Call>>?,
+        clientType: ClientType,
+        call: okhttp3.Call
+    ) {
+        if (activeCalls == null) return
+        synchronized(activeCalls) {
+            activeCalls[clientType]?.let { list ->
+                list.remove(call)
+                if (list.isEmpty()) {
+                    activeCalls.remove(clientType)
+                }
+            }
+        }
+    }
+
     private fun postWithRetry(
         urlStr: String,
         body: JSONObject,
         clientType: ClientType,
         bucket: RateLimiter.Bucket,
-        maxRetries: Int = 3,
+        maxAttempts: Int = 3,
+        activeCalls: ConcurrentHashMap<ClientType, CopyOnWriteArrayList<okhttp3.Call>>? = null,
     ): JSONObject {
         var lastError: Exception? = null
         val traceId = UUID.randomUUID().toString()
         var sleepAfterAttemptMs = 0L
 
-        for (attempt in 0 until maxRetries) {
+        for (attempt in 0 until maxAttempts) {
+            // FIX #6: Check interruption at the start of every attempt
+            if (Thread.currentThread().isInterrupted) {
+                lastError = IOException("Innertube request interrupted before attempt $attempt for ${clientType.name}")
+                break
+            }
+
             if (sleepAfterAttemptMs > 0) {
                 try {
                     Thread.sleep(sleepAfterAttemptMs)
@@ -814,11 +1180,19 @@ internal class InnertubeClient(
             }
 
             if (!rateLimiter.acquirePermit(bucket)) {
-                Thread.currentThread().interrupt()
-                lastError = IOException("Rate limiter wait interrupted for ${clientType.name}")
+                if (Thread.currentThread().isInterrupted) {
+                    lastError = IOException("Rate limiter wait interrupted for ${clientType.name}")
+                } else {
+                    lastError = InnertubeException(
+                        signal = YtmBlockSignal.RateLimited,
+                        message = "Rate limiter permit acquisition timed out for ${clientType.name}",
+                        traceId = traceId
+                    )
+                }
                 break
             }
 
+            var call: okhttp3.Call? = null
             try {
                 val fp = FingerprintStore.getFingerprint(context)
                 val mediaType = "application/json; charset=UTF-8".toMediaTypeOrNull()
@@ -832,17 +1206,15 @@ internal class InnertubeClient(
                     .header("X-Goog-Api-Key", API_KEY)
                     .header("x-youtube-client-name", clientType.effectiveClientNameId)
                     .header("x-youtube-client-version", clientType.effectiveClientVersion)
-                // 2026 rolloutToken (YouTubeSessionGenerator) — if present, improves
-                // session trust for WEB_REMIX. Optional but cheap.
+
                 val rollout = PoTokenManager.rolloutToken
-                if (rollout.isNotEmpty()) {
+                if (clientType.isWeb && rollout.isNotEmpty()) {
                     reqBuilder.header("X-Goog-RolloutToken", rollout)
                 }
 
-                // Attach visitorData if available
                 val authedWeb = clientType.acceptsSessionAuth && cookieStore.isSessionValid()
                 val visitorData = if (authedWeb) {
-                    PoTokenManager.sessionVisitorData.ifEmpty { PoTokenManager.visitorData }
+                    PoTokenManager.sessionVisitorData
                 } else {
                     PoTokenManager.visitorData
                 }
@@ -855,23 +1227,16 @@ internal class InnertubeClient(
                     reqBuilder.header("Origin", origin)
                     reqBuilder.header("Referer", "$origin/")
                     reqBuilder.header("X-Origin", origin)
-                    // Only an authenticated request has an "auth user" to index.
-                    if (authedWeb) {
-                        reqBuilder.header("x-goog-authuser", "0")
-                    }
                 } else {
                     reqBuilder.header("X-Origin", clientType.endpointHost)
                 }
 
-                // Attach cookies and SAPISIDHASH only for the one client allowed
-                // to carry the session (see ClientType.acceptsSessionAuth). Also
-                // gated on isSessionValid(): CookieManager hands back empty and
-                // "EXPIRED" values, and attaching a jar plus a SAPISIDHASH built
-                // from those is an authenticated request with no credential.
                 if (authedWeb) {
                     val cookieHeader = cookieStore.getMergedCookieHeader(clientType.endpointHost)
                     if (!cookieHeader.isNullOrEmpty()) {
                         reqBuilder.header("Cookie", cookieHeader)
+                        // FIX #1: Only send x-goog-authuser when auth cookies are actually present
+                        reqBuilder.header("x-goog-authuser", "0")
 
                         val sapisid = cookieStore.getCookie("SAPISID")
                         val sapisid3p = cookieStore.getCookie("__Secure-3PAPISID")
@@ -893,13 +1258,14 @@ internal class InnertubeClient(
                     }
                 }
 
-                val response = YtmHttpClient.okHttpClient.newCall(reqBuilder.build()).execute()
+                // FIX #3 & #12: Thread-safe tracking in activeCalls list per ClientType
+                val builtCall = YtmHttpClient.okHttpClient.newCall(reqBuilder.build())
+                call = builtCall
+                addActiveCall(activeCalls, clientType, builtCall)
+
+                val response = builtCall.execute()
                 val code = response.code
 
-                // Only the authenticated client's Set-Cookie may touch the jar.
-                // A guest embed/MWEB response hands out its own VISITOR_INFO1_LIVE
-                // / YSC, and merging those into the session jar overwrote the
-                // signed-in values with anonymous ones.
                 if (authedWeb) {
                     val setCookies = response.headers("Set-Cookie")
                     if (setCookies.isNotEmpty()) {
@@ -912,6 +1278,11 @@ internal class InnertubeClient(
                     val backoff = rateLimiter.onRateLimited(retryAfter)
                     ProxyManager.onPathFailed(urlStr)
                     Log.w(TAG, "[$traceId] Rate limited (429) on attempt $attempt. Backing off for ${backoff}ms")
+                    lastError = InnertubeException(
+                        signal = YtmBlockSignal.RateLimited,
+                        message = "HTTP 429 Rate limited from ${clientType.name}",
+                        traceId = traceId
+                    )
                     response.close()
                     sleepAfterAttemptMs = backoff
                     continue
@@ -923,6 +1294,8 @@ internal class InnertubeClient(
 
                 if (code in 500..599) {
                     Log.w(TAG, "[$traceId] Server error ($code) on attempt $attempt. Retrying...")
+                    // FIX #15: Set server error message in lastError
+                    lastError = IOException("HTTP $code server error from ${clientType.name}")
                     response.close()
                     val sleepMs = (1000L shl attempt) + (0..500).random()
                     sleepAfterAttemptMs = sleepMs
@@ -933,27 +1306,40 @@ internal class InnertubeClient(
 
                 if (code !in 200..299) {
                     val signal = YtmBlockSignal.parse(code, responseStr)
-                    Log.w(TAG, "[$traceId] Innertube (${clientType.name}) non-200 ($code) -> $signal: $responseStr")
-                    throw InnertubeException(signal, "HTTP error $code ($signal): $responseStr", traceId)
+                    val truncated = responseStr.take(300)
+                    Log.w(TAG, "[$traceId] Innertube (${clientType.name}) non-200 ($code) -> $signal: $truncated")
+                    throw InnertubeException(signal, "HTTP error $code ($signal): $truncated", traceId)
                 }
 
+                // FIX #13 & #16: Parse JSON before reporting success; handle JSON parse errors explicitly
+                val parsed = JSONObject(responseStr)
                 rateLimiter.onSuccess()
                 ProxyManager.onPathSuccess()
-                val parsed = JSONObject(responseStr)
                 harvestSessionState(parsed, clientType)
                 return parsed
             } catch (e: InnertubeException) {
-                if (e.signal == YtmBlockSignal.SignInRequired || e.signal == YtmBlockSignal.VideoGone) {
+                // FIX #2: Fail fast on egress/terminal blocks so short-circuit trips immediately
+                if (
+                    e.signal == YtmBlockSignal.SignInRequired ||
+                    e.signal == YtmBlockSignal.VideoGone ||
+                    e.signal == YtmBlockSignal.BotChallenge ||
+                    e.signal == YtmBlockSignal.IpBlocked ||
+                    e.signal == YtmBlockSignal.PoTokenInvalid ||
+                    e.signal == YtmBlockSignal.ClientDeprecated ||
+                    e.signal == YtmBlockSignal.SabrEnforced ||
+                    e.signal == YtmBlockSignal.SignatureDecipherFailed ||
+                    e.signal == YtmBlockSignal.GeoBlocked
+                ) {
                     throw e
                 }
                 lastError = e
             } catch (e: UnknownHostException) {
-                // DoH fallback: resolve via DNS-over-HTTPS, inject into the
-                // shared TTL cache so the immediate retry hits the fresh IP
-                // instead of the same failing system DNS.
+                ProxyManager.onPathFailed(urlStr)
                 val host = Uri.parse(urlStr).host
                 if (host != null) {
-                    val dohResolved = DnsOverHttpsResolver.resolve(host)
+                    val dohResolved = runCatching { DnsOverHttpsResolver.resolve(host) }
+                        .onFailure { Log.w(TAG, "[$traceId] DoH resolution failed for $host: ${it.message}") }
+                        .getOrNull()
                     if (dohResolved != null) {
                         Log.i(TAG, "[$traceId] Resolved host $host via DoH: ${dohResolved.hostAddress}")
                         runCatching {
@@ -965,32 +1351,44 @@ internal class InnertubeClient(
             } catch (e: IOException) {
                 lastError = e
                 ProxyManager.onPathFailed(urlStr)
+                // FIX #6: Abort retries if thread was interrupted or call was explicitly canceled
+                if (Thread.currentThread().isInterrupted || call?.isCanceled() == true) {
+                    break
+                }
                 Log.w(TAG, "[$traceId] Network error on attempt $attempt for ${clientType.name}: ${e.message}")
+            } catch (e: JSONException) {
+                // FIX #1: JSON parse errors indicate response malformation, not client deprecation
+                lastError = e
+                Log.e(TAG, "[$traceId] Malformed JSON in response from ${clientType.name}: ${e.message}")
+                break
             } catch (e: Exception) {
                 lastError = e
                 Log.e(TAG, "[$traceId] Unexpected error in Innertube post: ${e.message}", e)
             } finally {
-                rateLimiter.releasePermit()
+                // FIX #8 & #12: Safe cleanup in finally to prevent masking exceptions
+                if (call != null) {
+                    runCatching { removeActiveCall(activeCalls, clientType, call) }
+                }
+                runCatching { rateLimiter.releasePermit() }
             }
         }
 
-        // The signal must reflect what actually went wrong. Hardcoding
-        // RateLimited here converted every real BotChallenge into a global
-        // backoff, so the app cooled down instead of refreshing the poToken —
-        // and turned every offline blip into a rate-limit cooldown.
+        // FIX #1 & #7: Classify terminal signal accurately (JSONException -> NetworkUnavailable)
         val terminalSignal = when (val err = lastError) {
             is InnertubeException -> err.signal
+            is JSONException -> YtmBlockSignal.NetworkUnavailable
             is UnknownHostException,
             is java.net.ConnectException,
             is java.net.NoRouteToHostException,
             is java.net.SocketTimeoutException,
             is javax.net.ssl.SSLException -> YtmBlockSignal.NetworkUnavailable
-            else -> YtmBlockSignal.RateLimited
+            is IOException -> YtmBlockSignal.NetworkUnavailable
+            else -> YtmBlockSignal.NetworkUnavailable
         }
 
         throw InnertubeException(
             signal = terminalSignal,
-            message = "Innertube request failed after $maxRetries attempts for ${clientType.name}",
+            message = "Innertube request failed after $maxAttempts attempts for ${clientType.name}",
             traceId = traceId,
             cause = lastError
         )
@@ -1028,9 +1426,7 @@ internal class InnertubeClient(
             put("html5Preference", "HTML5_PREF_WANTS")
             if (sts != null) put("signatureTimestamp", sts)
         }
-        // YouTube.js sends vis/lact/signatureTimestamp in contentPlaybackContext
         playbackContext.put("contentPlaybackContext", contentPlaybackContext)
-        // Also include top-level cpn helper as some clients expect it
         if (sts != null) {
             try { playbackContext.put("signatureTimestamp", sts) } catch (_: Throwable) {}
         }
@@ -1041,27 +1437,14 @@ internal class InnertubeClient(
             val hasPo = PoTokenManager.isReady ||
                 (!PoTokenManager.webViewBroken && !PoTokenManager.isLimitedMode && PoTokenManager.ensureReadySync())
             if (hasPo) {
-                // Two attestation pairs, kept strictly apart. For a guest request
-                // the `/player` poToken is content-bound: BotGuard must be run with
-                // the videoId as its identifier, not the visitorData (yt-dlp
-                // requires `video_id` for the PLAYER context; NewPipe's
-                // PoTokenProvider mints getWebClientPoToken(videoId) the same way).
-                // The visitorData/account bound token belongs on the streaming URLs
-                // instead, see maybeAppendStreamPot().
-                //
-                // Sending the visitor-bound streamingPoToken here is what made every
-                // guest WEB_REMIX player request answer UNPLAYABLE ("Video
-                // unavailable") even with a token attached, which collapsed the
-                // whole client chain into a BotChallenge cooldown.
-                //
-                // Signed-in WEB_REMIX keeps the account-bound token, matching the
-                // Dart Tier-1 path (YtmAccountService._resolvePlayerStreamInternal).
                 val dataSyncId = PoTokenManager.dataSyncId
-                val poToken = if (clientType.acceptsSessionAuth &&
-                    cookieStore.isSessionValid() &&
-                    dataSyncId.isNotEmpty()
-                ) {
-                    PoTokenManager.accountPoTokenForSync(dataSyncId)
+                val isAuthed = clientType.acceptsSessionAuth && cookieStore.isSessionValid()
+                val poToken = if (isAuthed) {
+                    if (dataSyncId.isNotEmpty()) {
+                        PoTokenManager.accountPoTokenForSync(dataSyncId)
+                    } else {
+                        ""
+                    }
                 } else {
                     PoTokenManager.poTokenForSync(videoId)
                 }
@@ -1071,7 +1454,7 @@ internal class InnertubeClient(
                         JSONObject().put("poToken", poToken),
                     )
                     contentPlaybackContext.put("poToken", poToken)
-                    Log.d(TAG, "[$clientType] Attached player poToken (len=${poToken.length}, video=$videoId, visitorData=${PoTokenManager.visitorData.take(15)}...)")
+                    Log.d(TAG, "[$clientType] Attached player poToken (len=${poToken.length}, video=$videoId)")
                 }
             }
         }
@@ -1087,11 +1470,8 @@ internal class InnertubeClient(
             put("hl", fp.hl)
             put("gl", fp.gl)
             val authedWeb = clientType.acceptsSessionAuth && cookieStore.isSessionValid()
-            // Must mirror the X-Goog-Visitor-Id header built in postWithRetry.
-            // Sending the header without the matching context.client.visitorData
-            // is an identity mismatch and reliably provokes a bot challenge.
             val visitorData = if (authedWeb) {
-                PoTokenManager.sessionVisitorData.ifEmpty { PoTokenManager.visitorData }
+                PoTokenManager.sessionVisitorData
             } else {
                 PoTokenManager.visitorData
             }
@@ -1134,9 +1514,13 @@ internal class InnertubeClient(
                 }
                 ClientType.ANDROID_TESTSUITE -> {
                     put("androidSdkVersion", 28)
+                    put("osName", "Android")
+                    put("osVersion", "9")
+                    put("platform", "MOBILE")
                 }
                 ClientType.MWEB -> {
                     put("platform", "MOBILE")
+                    put("clientFormFactor", "SMALL_FORM_FACTOR")
                 }
                 ClientType.WEB_EMBEDDED_PLAYER -> {
                     put("platform", "DESKTOP")
@@ -1152,9 +1536,6 @@ internal class InnertubeClient(
 
         if (clientType == ClientType.WEB_EMBEDDED_PLAYER || clientType == ClientType.TVHTML5_SIMPLY_EMBEDDED_PLAYER) {
             val thirdParty = JSONObject()
-            // Must be the full video URL (not just the domain) — YouTube validates
-            // this against the videoId being requested. A bare domain returns ERROR
-            // with no streamingData.
             val embedVideoUrl = if (!videoId.isNullOrEmpty()) {
                 "https://www.youtube.com/watch?v=$videoId"
             } else {
@@ -1182,15 +1563,40 @@ internal class InnertubeClient(
     companion object {
         private const val TAG = "InnertubeClient"
         const val HEDGE_DELAY_MS = 350L
-        // Ceiling on the hedged race before falling back to the sequential tail.
         const val HEDGE_RACE_TIMEOUT_MS = 3000L
         private const val DATASYNC_BOOTSTRAP_INTERVAL_MS = 300_000L
-        // Last bot-refresh trigger across all resolve calls (throttle).
+
+        private val lastBotRefreshTriggerMs = AtomicLong(0L)
+        private val lastDataSyncBootstrapMs = AtomicLong(0L)
+
+        private val globalBlockCooldownUntilMs = AtomicLong(0L)
+        private val consecutiveEgressBlocks = AtomicInteger(0)
+        private val globalBlockSignal = AtomicReference(YtmBlockSignal.BotChallenge)
+
+        private val threadCounter = AtomicInteger(0)
+
+        // FIX #6 & #20: Recreatable dedicated executor for non-blocking pre-connect
         @Volatile
-        private var lastBotRefreshTriggerMs = 0L
-        @Volatile
-        private var lastDataSyncBootstrapMs = 0L
-        var API_KEY: String = YtmConfig.getYtmApiKey()
+        private var _preConnectExecutor: java.util.concurrent.ExecutorService? = null
+        val preConnectExecutor: java.util.concurrent.ExecutorService
+            get() {
+                val existing = _preConnectExecutor
+                if (existing != null && !existing.isShutdown && !existing.isTerminated) return existing
+                synchronized(this) {
+                    val existing2 = _preConnectExecutor
+                    if (existing2 != null && !existing2.isShutdown && !existing2.isTerminated) return existing2
+                    val newExecutor = Executors.newFixedThreadPool(2) { r ->
+                        Thread(r).apply {
+                            isDaemon = true
+                            name = "InnertubePreConnect-${threadCounter.incrementAndGet()}"
+                        }
+                    }
+                    _preConnectExecutor = newExecutor
+                    return newExecutor
+                }
+            }
+
+        val API_KEY: String = YtmConfig.getYtmApiKey()
         @Volatile
         private var _streamResolverPool: java.util.concurrent.ExecutorService? = null
         val streamResolverPool: java.util.concurrent.ExecutorService
@@ -1200,14 +1606,10 @@ internal class InnertubeClient(
                 synchronized(this) {
                     val existing2 = _streamResolverPool
                     if (existing2 != null && !existing2.isShutdown && !existing2.isTerminated) return existing2
-                    // 3 threads over-subscribed as soon as a prefetch and a user
-                    // tap overlapped: the hedge's second candidate queued behind
-                    // the other resolve and could not complete inside the 350ms
-                    // window, defeating the race entirely.
-                    val newPool = java.util.concurrent.Executors.newFixedThreadPool(6) { r ->
+                    val newPool = Executors.newFixedThreadPool(6) { r ->
                         Thread(r).apply {
                             isDaemon = true
-                            name = "InnertubeStream-${id}"
+                            name = "InnertubeStream-${threadCounter.incrementAndGet()}"
                         }
                     }
                     _streamResolverPool = newPool
@@ -1219,7 +1621,11 @@ internal class InnertubeClient(
             try {
                 _streamResolverPool?.shutdownNow()
             } catch (_: Exception) {}
+            try {
+                _preConnectExecutor?.shutdownNow()
+            } catch (_: Exception) {}
             _streamResolverPool = null
+            _preConnectExecutor = null
         }
     }
 }

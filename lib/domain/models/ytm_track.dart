@@ -82,17 +82,29 @@ class YtmTrack {
     if (videoId == null || videoId.isEmpty || title == null || title.isEmpty) {
       return null;
     }
+    final rawArtist = (map['artist'] as String?)?.trim();
+    final rawUploader = (map['uploader'] as String?)?.trim();
+    final artist = (rawArtist != null && rawArtist.isNotEmpty)
+        ? rawArtist
+        : ((rawUploader != null && rawUploader.isNotEmpty)
+            ? rawUploader
+            : 'Unknown Artist');
+
+    final durationMs = (map['durationMs'] as num?)?.toInt() ??
+        (((map['duration'] as num?)?.toInt() ?? 0) * 1000);
+
+    final rawArtwork = (map['artworkUrl'] as String?)?.trim();
+    final rawThumb = (map['thumbnailUrl'] as String?)?.trim();
+    final artworkUrl = (rawArtwork != null && rawArtwork.isNotEmpty)
+        ? rawArtwork
+        : ((rawThumb != null && rawThumb.isNotEmpty) ? rawThumb : null);
+
     return YtmTrack(
       videoId: videoId,
       title: title,
-      artist: (map['artist'] as String?)?.trim().isNotEmpty == true
-          ? (map['artist'] as String).trim()
-          : 'Unknown Artist',
-      duration:
-          Duration(milliseconds: (map['durationMs'] as num?)?.toInt() ?? 0),
-      artworkUrl: (map['artworkUrl'] as String?)?.trim().isNotEmpty == true
-          ? (map['artworkUrl'] as String).trim()
-          : null,
+      artist: artist,
+      duration: Duration(milliseconds: durationMs),
+      artworkUrl: artworkUrl,
     );
   }
 

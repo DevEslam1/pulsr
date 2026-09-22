@@ -9,6 +9,15 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get customDurationMinutes => 'Custom duration (minutes).';
+
+  @override
+  String get partialBatchDetected => 'Partial batch detected';
+
+  @override
+  String get somethingWentWrong => 'Something went wrong';
+
+  @override
   String get saveSearch => 'Save Search';
 
   @override

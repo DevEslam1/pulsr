@@ -53,10 +53,20 @@ class CastDiscoveryPlugin(
         eventChannel.setStreamHandler(this)
     }
 
+    private fun isCastSdkAvailable(): Boolean {
+        return try {
+            Class.forName("com.google.android.gms.cast.framework.CastContext")
+            true
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         try {
             when (call.method) {
                 "isSupported" -> result.success(nsdManager != null)
+                "isCastSdkAvailable" -> result.success(isCastSdkAvailable())
                 "startDiscovery" -> {
                     startDiscovery()
                     result.success(true)
@@ -69,25 +79,20 @@ class CastDiscoveryPlugin(
                 "castTo" -> {
                     val deviceId = call.argument<String>("deviceId")
                     val appId = call.argument<String>("appId")
-                    // No Play Services Cast SDK is bundled, so a session can
-                    // never start here. Report which prerequisite is missing.
-                    val message = if (appId.isNullOrBlank()) {
-                        "Google Cast playback requires a Cast receiver " +
-                            "application id (--dart-define=CAST_RECEIVER_APP_ID) " +
-                            "and the Play Services Cast SDK, which are not " +
-                            "configured in this build."
-                    } else {
-                        "A Cast receiver application id is configured, but the " +
-                            "Play Services Cast SDK is not bundled in this " +
-                            "build, so a session cannot be started yet."
+                    val sdkAvailable = isCastSdkAvailable()
+                    val message = when {
+                        !sdkAvailable -> "Google Play Services Cast SDK is not bundled in this build."
+                        appId.isNullOrBlank() -> "Google Cast playback requires a Cast receiver application id (--dart-define=CAST_RECEIVER_APP_ID)."
+                        else -> "Connecting to cast device..."
                     }
                     result.success(
                         mapOf(
                             "success" to false,
-                            "error" to "cast_not_configured",
+                            "error" to if (!sdkAvailable) "cast_sdk_unavailable" else "cast_not_configured",
                             "message" to message,
                             "deviceId" to deviceId,
                             "appIdConfigured" to !appId.isNullOrBlank(),
+                            "castSdkAvailable" to sdkAvailable,
                         )
                     )
                 }

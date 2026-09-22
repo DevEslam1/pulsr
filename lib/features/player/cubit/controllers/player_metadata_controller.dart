@@ -1,6 +1,7 @@
 // lib/features/player/cubit/controllers/player_metadata_controller.dart
 // FIX-A1: Focused PlayerMetadataController for lyrics, SponsorBlock, CUE sheets, and quality enrichment
 import 'dart:async';
+import '../../../../core/services/sponsorblock_service.dart';
 import '../../../../core/utils/cue_parser.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../data/db/app_database.dart';
@@ -55,11 +56,16 @@ class PlayerMetadataController {
     }
 
     final gen = _lyricsManager.bumpGeneration();
-    final result = await _lyricsManager.resolveLyrics(
-      song,
-      isOfflineOnly: isOfflineOnly,
-      isStale: () => _isClosed() || gen != _lyricsManager.generation || !_isSameTrack(_getState().currentSong, song),
-    );
+    final result = await _lyricsManager
+        .resolveLyrics(
+          song,
+          isOfflineOnly: isOfflineOnly,
+          isStale: () =>
+              _isClosed() ||
+              gen != _lyricsManager.generation ||
+              !_isSameTrack(_getState().currentSong, song),
+        )
+        .timeout(const Duration(seconds: 10), onTimeout: () => null);
 
     if (_isClosed() || gen != _lyricsManager.generation || !_isSameTrack(_getState().currentSong, song)) {
       return;
@@ -76,11 +82,19 @@ class PlayerMetadataController {
   }
 
   Future<void> loadSponsorBlock(SongsTableData song, {bool isOfflineOnly = false}) async {
-    await _sponsorBlockManager.loadSegmentsForSong(
-      song,
-      isOfflineOnly: isOfflineOnly,
-      isStale: () => _isClosed() || !_isSameTrack(_getState().currentSong, song),
-    );
+    try {
+      await _sponsorBlockManager
+          .loadSegmentsForSong(
+            song,
+            isOfflineOnly: isOfflineOnly,
+            isStale: () =>
+                _isClosed() || !_isSameTrack(_getState().currentSong, song),
+          )
+          .timeout(const Duration(seconds: 10), onTimeout: () => const <SponsorBlockSegment>[]);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load SponsorBlock for ${song.id}',
+          error: e, stackTrace: st, category: 'PlayerMetadataController');
+    }
   }
 
   Future<void> loadCueChapters(SongsTableData song) async {
@@ -133,10 +147,22 @@ class PlayerMetadataController {
 
   Future<void> enrichTrackParallel(SongsTableData song, {bool isOfflineOnly = false}) async {
     await Future.wait([
-      loadLyrics(song, isOfflineOnly: isOfflineOnly),
-      loadSponsorBlock(song, isOfflineOnly: isOfflineOnly),
-      loadCueChapters(song),
-      enrichAudioQuality(song),
-    ]);
+      loadLyrics(song, isOfflineOnly: isOfflineOnly).catchError((Object e, StackTrace st) {
+        ErrorLogger.log('Parallel lyrics failed',
+            error: e, stackTrace: st, category: 'PlayerMetadataController');
+      }),
+      loadSponsorBlock(song, isOfflineOnly: isOfflineOnly).catchError((Object e, StackTrace st) {
+        ErrorLogger.log('Parallel sponsorBlock failed',
+            error: e, stackTrace: st, category: 'PlayerMetadataController');
+      }),
+      loadCueChapters(song).catchError((Object e, StackTrace st) {
+        ErrorLogger.log('Parallel cue chapters failed',
+            error: e, stackTrace: st, category: 'PlayerMetadataController');
+      }),
+      enrichAudioQuality(song).catchError((Object e, StackTrace st) {
+        ErrorLogger.log('Parallel audio quality enrichment failed',
+            error: e, stackTrace: st, category: 'PlayerMetadataController');
+      }),
+    ], eagerError: false);
   }
 }
