@@ -135,6 +135,10 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       bumpQueueVersion: () {},
       isSameTrack: _isSameTrack,
       latencyTracker: dependencies?.latencyTracker ?? latencyTracker,
+      // A-01: resolve lazily at call time (playbackOptionsController is
+      // constructed just below).
+      onResumePerSongMemory: (song) => unawaited(
+          playbackOptionsController.applyPerSongPlaybackMemory(song)),
     );
     unawaited(queueController.restoreQueueSlots());
     dspController = PlayerDspController(

@@ -1,7 +1,7 @@
 // test/eq_preset_test.dart
+import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/domain/models/eq_preset.dart';
-
 void main() {
   group('EqPreset 10-band migration', () {
     test('centerFrequencies are the 10 ISO octave centers', () {
@@ -51,6 +51,35 @@ void main() {
 
     test('a single value fills all 10 bands', () {
       expect(EqPreset.interpolateGains([2.5]), List<double>.filled(10, 2.5));
+    });
+  });
+
+  // E-01: EQ preset export/import JSON round-trip + validation.
+  group('EqPreset JSON export/import', () {
+    test('round-trips name, gains, bassBoost, freqs and Q factors', () {
+      final preset = EqPreset(
+        name: 'My Custom',
+        gains: const [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        bassBoost: 0.3,
+        customFrequencies: const [
+          31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000,
+        ],
+        qFactors: const [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+      );
+      final decoded =
+          EqPreset.fromJson(jsonDecode(jsonEncode(preset.toJson())) as Map<String, dynamic>);
+      expect(decoded.name, 'My Custom');
+      expect(decoded.gains, preset.gains);
+      expect(decoded.bassBoost, 0.3);
+      expect(decoded.customFrequencies, preset.customFrequencies);
+      expect(decoded.qFactors, preset.qFactors);
+    });
+
+    test('missing fields fall back to safe defaults', () {
+      final decoded = EqPreset.fromJson(const {});
+      expect(decoded.name, 'Custom');
+      expect(decoded.gains, isEmpty);
+      expect(decoded.bassBoost, 0.0);
     });
   });
 }

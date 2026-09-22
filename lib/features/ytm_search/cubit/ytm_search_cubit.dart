@@ -245,6 +245,9 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
   @override
   Future<void> close() {
     _debounceTimer?.cancel();
+    // H-04: Invalidate any in-flight search so its late network completion
+    // cannot still be doing work for a dead cubit.
+    _generation++;
     return super.close();
   }
 }

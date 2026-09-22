@@ -109,6 +109,19 @@ class SettingsCubit extends PulsrCubit<SettingsState>
   /// FIX-H07: Track dirty fields modified while an async load is in flight.
   final Set<String> _dirtyFields = <String>{};
 
+  /// C-07: Completes once the first preference load has been applied. UI can
+  /// await this to avoid rendering persisted defaults (theme flash on cold
+  /// start). Re-completion is guarded because [reloadSettings] may re-run the
+  /// load.
+  final Completer<void> _prefsLoaded = Completer<void>();
+
+  /// Resolves after the initial preference load (or its failure) completes.
+  Future<void> get preferencesReady => _prefsLoaded.future;
+
+  void _markPrefsLoaded() {
+    if (!_prefsLoaded.isCompleted) _prefsLoaded.complete();
+  }
+
   @override
   // ignore: unused_element
   bool get _proxyDirty => _dirtyFields.contains('proxy');
@@ -662,6 +675,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     } catch (e, st) {
       ErrorLogger.log('Failed to get SharedPreferences',
           error: e, stackTrace: st, category: 'Settings');
+      _markPrefsLoaded();
       return;
     }
     String proxyPassword = '';
@@ -839,6 +853,8 @@ class SettingsCubit extends PulsrCubit<SettingsState>
         stackTrace: st,
         category: 'SettingsCubit',
       );
+    } finally {
+      _markPrefsLoaded();
     }
   }
 

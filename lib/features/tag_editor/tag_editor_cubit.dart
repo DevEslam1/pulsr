@@ -559,15 +559,18 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
             if (isClosed) return;
             await _scannerService.rescanSingleFile(s.path);
             taggedSongs.add(s);
-            if (prefs != null) {
-              pendingPaths.remove(s.path);
+            pendingPaths.remove(s.path);
+            // C-04: Persist the shrinking checkpoint periodically rather than
+            // for every single file — a 200-track batch previously issued a
+            // platform-channel disk write per file. The final remove below
+            // always clears it.
+            if (prefs != null && taggedSongs.length % 10 == 0) {
               try {
-                if (pendingPaths.isEmpty) {
-                  await prefs.remove(batchCheckpointKey);
-                } else {
-                  await prefs.setStringList(batchCheckpointKey, pendingPaths);
-                }
-              } catch (_) {}
+                await prefs.setStringList(batchCheckpointKey, pendingPaths);
+              } catch (e, st) {
+                ErrorLogger.log('Failed to update batch checkpoint',
+                    error: e, stackTrace: st, category: 'TagEditor');
+              }
             }
           } catch (e, st) {
             ErrorLogger.log('Failed to save tags for ${s.path}',
@@ -647,6 +650,8 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
         if (isClosed) return;
         final writeOutcome = _checkTagWriteOutcome(writeResult);
         final errorText = switch (writeOutcome) {
+          _TagWriteOutcome.unavailable =>
+            'Tag editor unavailable on this device (native bridge did not respond).',
           _TagWriteOutcome.rejected =>
             'Tag write was rejected by the native bridge or audio subsystem.',
           _TagWriteOutcome.failed =>
@@ -726,10 +731,13 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
   }
 }
 
-// FIX-M08: Distinct outcomes for native bridge responses
-enum _TagWriteOutcome { verified, accepted, rejected, failed, unverified }
+// FIX-M08 / H-10: Distinct outcomes for native bridge responses
+enum _TagWriteOutcome { verified, accepted, rejected, failed, unverified, unavailable }
 
 _TagWriteOutcome _checkTagWriteOutcome(dynamic result) {
+  // H-10: A null response means the platform channel never answered (bridge
+  // disconnected). Surface that distinctly instead of "could not be verified".
+  if (result == null) return _TagWriteOutcome.unavailable;
   if (result is bool) {
     if (result) return _TagWriteOutcome.accepted;
     return _TagWriteOutcome.failed;

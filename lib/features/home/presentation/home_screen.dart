@@ -143,6 +143,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
     final libraryCubit = context.read<LibraryCubit?>();
     if (libraryCubit != null) {
       _librarySub = libraryCubit.stream.listen((_) {
+        // H-06: A library emission can land while this screen is being disposed.
+        if (!mounted) return;
         _cachedSongs200 = null;
         _cachedSongs200Stopwatch = null;
       });
@@ -172,6 +174,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
   @override
   void dispose() {
     _librarySub?.cancel();
+    // H-06: Stop the TTL stopwatch so it doesn't keep running after disposal.
+    _cachedSongs200Stopwatch?.stop();
     _ytmAccountService.loginState.removeListener(_onLoginStateChanged);
     super.dispose();
   }

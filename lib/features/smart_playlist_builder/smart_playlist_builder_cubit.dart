@@ -101,20 +101,22 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
   void _updatePreview() {
     _debounceTimer?.cancel();
     _debounceTimer = autoTimer(Timer(const Duration(milliseconds: 150), () {
-      _executePreview();
+      unawaited(_executePreview());
     }));
   }
 
-  void _executePreview() {
+  Future<void> _executePreview() async {
     if (isClosed) return;
     _debounceTimer?.cancel();
     final oldSub = _previewSub;
     _previewSub = null;
     if (oldSub != null) {
       removeFromComposite(oldSub);
-      // FIX-H3: Cancel previous subscription to avoid competing streams
-      unawaited(oldSub.cancel());
+      // FIX-H3 / H-09: Await cancellation before subscribing so the previous
+      // stream cannot fire one more stale preview into the new generation.
+      await oldSub.cancel();
     }
+    if (isClosed) return;
     final gen = ++_previewGen;
 
     final queryLimit = (state.criteria.limit == null || state.criteria.limit! > previewCap)

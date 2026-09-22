@@ -55,8 +55,16 @@ class _SearchScreenState extends State<SearchScreen> {
     'All',
     'Songs',
     'Artists',
-    'Albums'
+    'Albums',
+    'FLAC',
+    'MP3',
+    'Lossless',
   ];
+
+  // C-02: autocomplete suggestions
+  final FocusNode _searchFocus = FocusNode();
+  List<String> _suggestions = const [];
+  Timer? _suggestTimer;
 
   @override
   void initState() {
@@ -93,6 +101,8 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void dispose() {
     _settingsSub?.cancel();
+    _suggestTimer?.cancel();
+    _searchFocus.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -102,11 +112,40 @@ class _SearchScreenState extends State<SearchScreen> {
       context.read<YtmSearchCubit>().onQueryChanged(value);
     } else {
       context.read<SearchCubit>().onQueryChanged(value);
+      _scheduleSuggestions(context, value);
     }
+  }
+
+  /// C-02: debounced (200 ms) autocomplete lookup for the local search tab.
+  void _scheduleSuggestions(BuildContext context, String value) {
+    _suggestTimer?.cancel();
+    final trimmed = value.trim();
+    if (trimmed.isEmpty || _isOnlineTab) {
+      if (_suggestions.isNotEmpty) setState(() => _suggestions = const []);
+      return;
+    }
+    _suggestTimer = Timer(const Duration(milliseconds: 200), () async {
+      final cubit = context.read<SearchCubit>();
+      final results = await cubit.suggestionsFor(trimmed);
+      if (!mounted) return;
+      // Ignore stale responses for a query the user has since changed.
+      if (_searchController.text.trim() != trimmed) return;
+      setState(() => _suggestions = results);
+    });
+  }
+
+  void _applySuggestion(BuildContext context, String suggestion) {
+    _searchController.text = suggestion;
+    _searchController.selection = TextSelection.collapsed(
+        offset: suggestion.length);
+    setState(() => _suggestions = const []);
+    _onQueryChanged(context, suggestion, immediate: true);
   }
 
   void _clear(BuildContext context) {
     _searchController.clear();
+    _suggestTimer?.cancel();
+    if (_suggestions.isNotEmpty) setState(() => _suggestions = const []);
     if (_isOnlineTab) {
       context.read<YtmSearchCubit>().clearQuery();
     } else {
@@ -203,6 +242,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           horizontal: Adaptive.pagePadding(context)),
                       child: TextField(
                         controller: _searchController,
+                        focusNode: _searchFocus,
                         onChanged: (value) => _onQueryChanged(context, value),
                         decoration: InputDecoration(
                           hintText: (showOnline && currentTab == 1)
@@ -226,6 +266,41 @@ class _SearchScreenState extends State<SearchScreen> {
                       ),
                     ),
 
+                    // ---------- C-02: Autocomplete Suggestions ----------
+                    if (currentTab == 0 && _suggestions.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      Padding(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: Adaptive.pagePadding(context)),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          physics: const BouncingScrollPhysics(),
+                          child: Row(
+                            children: [
+                              for (final suggestion in _suggestions)
+                                Padding(
+                                  padding: const EdgeInsetsDirectional.only(
+                                      end: AppSpacing.xs),
+                                  child: ActionChip(
+                                    avatar: Icon(Icons.search_rounded,
+                                        size: 16, color: p.textTertiary),
+                                    label: Text(suggestion),
+                                    backgroundColor: p.surfaceContainer,
+                                    side: BorderSide(color: p.hairline),
+                                    labelStyle: TextStyle(
+                                        color: p.textPrimary,
+                                        fontSize: AppFontSize.label,
+                                        fontWeight: FontWeight.w600),
+                                    onPressed: () =>
+                                        _applySuggestion(context, suggestion),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+
                     // ---------- Filter Chips (Local Tab Only) ----------
                     if (currentTab == 0) ...[
                       const SizedBox(height: AppSpacing.xs),
@@ -242,6 +317,25 @@ class _SearchScreenState extends State<SearchScreen> {
                                   padding: const EdgeInsetsDirectional.only(
                                       end: AppSpacing.xs),
                                   child: _buildChip(context, state, filter, p),
+                                ),
+                              // C-05: save the current query + filter.
+                              if (state.query.trim().isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsetsDirectional.only(
+                                      start: AppSpacing.xs),
+                                  child: ActionChip(
+                                    avatar: Icon(Icons.bookmark_add_outlined,
+                                        size: 16, color: p.accent),
+                                    label: Text(context.l10n.saveSearch),                                    backgroundColor: p.surfaceContainer,
+                                    side: BorderSide(color: p.hairline),
+                                    labelStyle: TextStyle(
+                                        color: p.accent,
+                                        fontSize: AppFontSize.label,
+                                        fontWeight: FontWeight.w700),
+                                    onPressed: () => context
+                                        .read<SearchCubit>()
+                                        .saveCurrentSearch(),
+                                  ),
                                 ),
                             ],
                           ),
@@ -330,6 +424,63 @@ class _SearchScreenState extends State<SearchScreen> {
                   style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                 ),
                 const SizedBox(height: AppSpacing.lg),
+                // C-05: saved searches (query + filter), re-executed on tap.
+                ValueListenableBuilder<List<String>>(
+                  valueListenable: context.read<SearchCubit>().savedSearches,
+                  builder: (context, saved, _) {
+                    if (saved.isEmpty) return const SizedBox.shrink();
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(context.l10n.savedSearches,
+                          style: TextStyle(
+                              fontSize: AppFontSize.caption,
+                              fontWeight: FontWeight.w800,
+                              color: p.textTertiary,
+                              letterSpacing: AppTracking.wide),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          alignment: WrapAlignment.center,
+                          children: [
+                            for (final entry in saved)
+                              InputChip(
+                                avatar: Icon(Icons.bookmark_outline_rounded,
+                                    size: 16, color: p.accent),
+                                label: Text(
+                                    SearchCubit.decodeSavedSearch(entry).query),
+                                backgroundColor: p.surfaceContainer,
+                                side: BorderSide(color: p.hairline),
+                                deleteIcon:
+                                    const Icon(Icons.close_rounded, size: 16),
+                                deleteIconColor: p.textTertiary,
+                                labelStyle: TextStyle(
+                                    color: p.textPrimary,
+                                    fontSize: AppFontSize.label,
+                                    fontWeight: FontWeight.w600),
+                                onDeleted: () => context
+                                    .read<SearchCubit>()
+                                    .removeSavedSearch(entry),
+                                onPressed: () {
+                                  final decoded =
+                                      SearchCubit.decodeSavedSearch(entry);
+                                  _searchController.text = decoded.query;
+                                  context
+                                      .read<SearchCubit>()
+                                      .setFilter(decoded.filter);
+                                  _onQueryChanged(context, decoded.query,
+                                      immediate: true);
+                                },
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                      ],
+                    );
+                  },
+                ),
                 if (state.history.isNotEmpty) ...[
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,

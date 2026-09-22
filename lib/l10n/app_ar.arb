@@ -1,5 +1,7 @@
 {
   "@@locale": "ar",
+  "saveSearch": "حفظ البحث",
+  "savedSearches": "عمليات البحث المحفوظة",
   "appTitle": "بولسر للموسيقى",
   "appTagline": "صوت نقي بدون اتصال",
   "navHome": "الرئيسية",

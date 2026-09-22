@@ -7,6 +7,7 @@ import 'package:injectable/injectable.dart';
 import '../../../core/bloc/base_cubit.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/yt_download_service.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/models/download_task.dart';
 import '../../../domain/models/ytm_track.dart';
@@ -207,7 +208,14 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
     if (localId != null) {
       try {
         await _playerCubit.swapReconciledSong(oldId, localId);
-      } catch (_) {}
+      } catch (e, st) {
+        // H-12: Log and surface the failure. Swallowing it left a placeholder
+        // (negative-ID) entry in the queue with no user-visible explanation.
+        ErrorLogger.log('Failed to link downloaded file to queue',
+            error: e, stackTrace: st, category: 'YtmDownloadCubit');
+        emitEffect(const ShowToastEffect(
+            'Downloaded file could not be linked to the queue.'));
+      }
     }
   }
 

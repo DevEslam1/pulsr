@@ -21,22 +21,32 @@ class WidgetService {
   static const String appGroupId = 'group.com.pulsr.music';
 
   bool _appGroupConfigured = false;
+  bool _androidInitialized = false;
   Future<void> _ensureAppGroup() async {
-    if (_appGroupConfigured) return;
     if (Platform.isIOS) {
+      if (_appGroupConfigured) return;
       try {
         await HomeWidget.setAppGroupId(appGroupId);
       } catch (e) {
         ErrorLogger.log('Failed to set iOS app group ID',
             error: e, category: 'WidgetService');
       }
+      // C-06: Only mark the app group as configured on iOS. Previously this was
+      // set unconditionally (including on Android, where setAppGroupId is never
+      // called), which would silently skip future iOS-only setup.
+      _appGroupConfigured = true;
+    } else if (Platform.isAndroid) {
+      if (_androidInitialized) return;
+      _androidInitialized = true;
     }
-    _appGroupConfigured = true;
   }
 
   final OnAudioQuery _audioQuery = OnAudioQuery();
-  final Map<int, String> _artworkCache = {};
-  final Map<int, Uint8List> _roundedArtworkCache = {};
+  // L-09: LinkedHashMap with manual access-order refresh on hit, so eviction
+  // (`keys.first`) drops the least-recently-*used* entry, not merely the
+  // least-recently-inserted one.
+  final LinkedHashMap<int, String> _artworkCache = LinkedHashMap();
+  final LinkedHashMap<int, Uint8List> _roundedArtworkCache = LinkedHashMap();
   static const int _maxCacheSize = 50;
 
   int? _lastSavedArtworkSongId;
@@ -249,7 +259,12 @@ class WidgetService {
     final cachedPath = _artworkCache[songId];
     if (cachedPath != null) {
       final f = File(cachedPath);
-      if (await f.exists() && await f.length() > 0) return cachedPath;
+      if (await f.exists() && await f.length() > 0) {
+        // L-09: refresh LRU position on hit.
+        _artworkCache.remove(songId);
+        _artworkCache[songId] = cachedPath;
+        return cachedPath;
+      }
       _artworkCache.remove(songId);
       _roundedArtworkCache.remove(songId);
     }
@@ -264,6 +279,11 @@ class WidgetService {
       }
 
       Uint8List? rawBytes = _roundedArtworkCache[songId];
+      if (rawBytes != null) {
+        // L-09: refresh LRU position on hit.
+        _roundedArtworkCache.remove(songId);
+        _roundedArtworkCache[songId] = rawBytes;
+      }
       if (rawBytes == null) {
         final remoteUrl = song.remoteArtworkUrl ??
             (song.artworkUri?.startsWith('http') == true

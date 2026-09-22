@@ -21,8 +21,9 @@ class PlayerTransportController {
   final void Function()? _debouncedPersistQueueSlots;
   final void Function({bool force})? _updateWidgetThrottled;
 
-  // Monotonic stopwatch for seek throttling
-  static final Stopwatch _seekStopwatch = Stopwatch()..start();
+  // Monotonic stopwatch for seek throttling. H-05: instance-scoped so separate
+  // controller instances (e.g. test + prod) never share throttle state.
+  final Stopwatch _seekStopwatch = Stopwatch()..start();
   int _lastSeekMs = 0;
   Timer? _seekThrottleTimer;
   Duration? _pendingSeek;

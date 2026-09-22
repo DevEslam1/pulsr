@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -24,6 +25,8 @@ class SearchCubit extends PulsrCubit<SearchState> {
         _folderUseCases = folderUseCases,
         super(const SearchState()) {
     _loadHistory();
+    _loadFilter();
+    savedSearchesReady = _loadSavedSearches();
   }
 
   Future<void> _loadHistoryAsync() async {
@@ -42,6 +45,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
 
   void setFilter(String filter) {
     safeEmit(state.copyWith(selectedFilter: filter));
+    unawaited(_persistFilter(filter));
     _executeSearch(state.query, filterOverride: filter);
   }
 
@@ -73,6 +77,161 @@ class SearchCubit extends PulsrCubit<SearchState> {
   /// return (defect 08-01).
   static const int maxResultCount = 200;
   static const String _historyKey = 'search_history';
+
+  // ── C-04: filter chips ──────────────────────────────────────────────
+  static const String _filterKey = 'search_selected_filter';
+  static const List<String> filterOptions = [
+    'All',
+    'Songs',
+    'Artists',
+    'Albums',
+    'FLAC',
+    'MP3',
+    'Lossless',
+  ];
+
+  // ── C-05: saved searches ────────────────────────────────────────────
+  static const String _savedSearchesKey = 'saved_searches';
+  static const int savedSearchMax = 10;
+
+  /// Reactive list of saved searches (query + filter). Kept outside the freezed
+  /// state so no code generation is required.
+  final ValueNotifier<List<String>> savedSearches =
+      ValueNotifier<List<String>>(const []);
+  late final Future<void> savedSearchesReady;
+
+  // ── C-02: autocomplete ──────────────────────────────────────────────
+  static const int suggestionMax = 5;
+
+  Future<void> _loadFilter() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final stored = prefs.getString(_filterKey);
+      if (stored != null && filterOptions.contains(stored) && !isClosed) {
+        safeEmit(state.copyWith(selectedFilter: stored));
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load search filter',
+          error: e, stackTrace: st, category: 'SearchCubit');
+    }
+  }
+
+  Future<void> _persistFilter(String filter) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_filterKey, filter);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist search filter',
+          error: e, stackTrace: st, category: 'SearchCubit');
+    }
+  }
+
+  Future<void> _loadSavedSearches() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList(_savedSearchesKey) ?? const <String>[];
+      if (!isClosed) savedSearches.value = List.unmodifiable(list);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load saved searches',
+          error: e, stackTrace: st, category: 'SearchCubit');
+    }
+  }
+
+  /// Saves the current query + filter (deduped, capped at [savedSearchMax]).
+  Future<void> saveCurrentSearch() async {
+    // Ensure the initial load has completed, otherwise it could overwrite the
+    // entry we are about to write with the pre-load (empty) snapshot.
+    await savedSearchesReady;
+    final query = state.query.trim();
+    if (query.isEmpty) return;
+    final entry = encodeSavedSearch(query, state.selectedFilter);
+    final updated = <String>[
+      entry,
+      ...savedSearches.value.where((e) => e != entry),
+    ].take(savedSearchMax).toList();
+    savedSearches.value = List.unmodifiable(updated);
+    await _persistSavedSearches(updated);
+  }
+
+  Future<void> removeSavedSearch(String entry) async {
+    await savedSearchesReady;
+    final updated =
+        savedSearches.value.where((e) => e != entry).toList(growable: false);
+    savedSearches.value = List.unmodifiable(updated);
+    await _persistSavedSearches(updated);
+  }
+
+  Future<void> _persistSavedSearches(List<String> list) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_savedSearchesKey, list);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist saved searches',
+          error: e, stackTrace: st, category: 'SearchCubit');
+    }
+  }
+
+  /// Encodes a saved search as JSON so queries containing separators round-trip.
+  static String encodeSavedSearch(String query, String filter) =>
+      jsonEncode({'q': query, 'f': filter});
+
+  /// Decodes a saved search entry. Malformed entries degrade to a plain query.
+  static ({String query, String filter}) decodeSavedSearch(String entry) {
+    try {
+      final decoded = jsonDecode(entry);
+      if (decoded is Map) {
+        final q = (decoded['q'] as String?)?.trim() ?? '';
+        final f = (decoded['f'] as String?) ?? 'All';
+        if (q.isNotEmpty) {
+          return (query: q, filter: filterOptions.contains(f) ? f : 'All');
+        }
+      }
+    } catch (_) {
+      // Legacy/plain-text entry.
+    }
+    return (query: entry, filter: 'All');
+  }
+
+  /// C-02: up to [suggestionMax] suggestions for [query] drawn from search
+  /// history and library title/artist prefixes.
+  Future<List<String>> suggestionsFor(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return const [];
+    final q = normalize(trimmed);
+    final seen = <String>{};
+    final out = <String>[];
+
+    void add(String value) {
+      final v = value.trim();
+      if (v.isEmpty || out.length >= suggestionMax) return;
+      if (seen.add(v.toLowerCase())) out.add(v);
+    }
+
+    for (final h in state.history) {
+      if (out.length >= suggestionMax) break;
+      if (normalize(h).startsWith(q)) add(h);
+    }
+
+    if (out.length < suggestionMax) {
+      try {
+        final res =
+            await _searchUseCase.searchSongs(trimmed, limit: 20).first;
+        final songs = res.fold((_) => <SongsTableData>[], (r) => r);
+        for (final s in songs) {
+          if (out.length >= suggestionMax) break;
+          if (normalize(s.title).startsWith(q)) add(s.title);
+        }
+        for (final s in songs) {
+          if (out.length >= suggestionMax) break;
+          if (normalize(s.artist).startsWith(q)) add(s.artist);
+        }
+      } catch (e, st) {
+        ErrorLogger.log('Search suggestions failed',
+            error: e, stackTrace: st, category: 'SearchCubit');
+      }
+    }
+    return out;
+  }
 
   Future<void> _persistHistory(String query) async {
     final q = query.trim();
@@ -229,6 +388,9 @@ class SearchCubit extends PulsrCubit<SearchState> {
   Future<void> close() {
     _debounceTimer?.cancel();
     _searchSub?.cancel();
+    // C-05: reset then dispose the saved-search notifier.
+    savedSearches.value = const [];
+    savedSearches.dispose();
     return super.close();
   }
 }

@@ -342,7 +342,10 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
   Future<void> close() {
     _pendingExtraction = false;
     _queuedRequest = null;
-    // FIX-C07: PulsrCubit handles autoTimer cancellation automatically
+    // H-02: Cancel explicitly. autoTimer normally covers this, but if close()
+    // runs before the first updateFromDetails the timer was never registered.
+    _debounceTimer?.cancel();
+    _debounceTimer = null;
     _cachedPalettes.clear();
     return super.close();
   }

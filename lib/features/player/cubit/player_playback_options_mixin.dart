@@ -64,6 +64,13 @@ mixin PlayerPlaybackOptions on PulsrCubit<PlayerState> {
   Future<void> adjustVolume(double delta) =>
       playbackOptionsController.adjustVolume(delta);
 
+  /// A-06: Toggle output mute (restores pre-mute volume on unmute).
+  Future<void> toggleMute() => playbackOptionsController.toggleMute();
+
+  /// A-01: Restore a resumed track's per-song speed/pitch/volume/EQ memory.
+  Future<void> applyPerSongPlaybackMemory(SongsTableData song) =>
+      playbackOptionsController.applyPerSongPlaybackMemory(song);
+
   String exportCurrentEqPreset() =>
       playbackOptionsController.exportCurrentEqPreset();
 

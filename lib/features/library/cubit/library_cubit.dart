@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
+import 'package:mutex/mutex.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/bloc/base_cubit.dart';
 import '../../../core/errors/failures.dart';
@@ -351,28 +352,19 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
   /// reconciled against it so the row does not flip back to the pre-toggle DB
   /// truth for the duration of the write.
   final Map<int, bool> _pendingFavoriteTargets = {};
-  // FIX-C5: Track in-flight favorite writes and serialize concurrent calls per song ID
-  final Set<int> _favoriteWriteInFlight = {};
-  final Map<int, Completer<void>> _favoriteQueues = {};
+  // FIX-C02: Per-song mutex serializes concurrent favorite writes. Replaces the
+  // hand-rolled Completer queue whose 10s timeout could stall the awaiting tap
+  // and re-check a stale entry.
+  final Map<int, Mutex> _favoriteLocks = {};
 
   Future<void> toggleFavorite(int songId) async {
     if (isClosed) return;
-    while (_favoriteWriteInFlight.contains(songId)) {
-      final inFlight = _favoriteQueues[songId];
-      if (inFlight != null && !inFlight.isCompleted) {
-        try {
-          await inFlight.future.timeout(
-            const Duration(seconds: 10),
-            onTimeout: () {},
-          );
-        } catch (_) {}
-      } else {
-        break;
-      }
+    final lock = _favoriteLocks.putIfAbsent(songId, Mutex.new);
+    await lock.acquire();
+    if (isClosed) {
+      lock.release();
+      return;
     }
-    _favoriteWriteInFlight.add(songId);
-    final writeCompleter = Completer<void>();
-    _favoriteQueues[songId] = writeCompleter;
 
     final opToken = (_favoriteOpTokens[songId] ?? 0) + 1;
     _favoriteOpTokens[songId] = opToken;
@@ -468,21 +460,14 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
           errorMessage: failureMessage,
         ));
       } finally {
-        if (_favoriteOpTokens[songId] == opToken) {
-          _favoriteOpTokens.remove(songId);
-          _pendingFavoriteTargets.remove(songId);
-        }
+        // Bookkeeping is handled once in the outer finally below.
       }
     } finally {
       if (_favoriteOpTokens[songId] == opToken) {
         _favoriteOpTokens.remove(songId);
         _pendingFavoriteTargets.remove(songId);
       }
-      _favoriteWriteInFlight.remove(songId);
-      if (!writeCompleter.isCompleted) writeCompleter.complete();
-      if (_favoriteQueues[songId] == writeCompleter) {
-        _favoriteQueues.remove(songId);
-      }
+      lock.release();
     }
   }
 

@@ -10,6 +10,10 @@ class LeakDetector {
   static final Set<Object> _trackedCubits = {};
 
   /// Records the creation of a cubit instance.
+  ///
+  /// L-05: Idempotent — tracking the same instance twice is a no-op because the
+  /// registry is a [Set]. Callers may safely call this more than once; only the
+  /// matching [untrack] (also idempotent) removes it.
   static void track(Object cubit) {
     if (!kDebugMode) return;
     _trackedCubits.add(cubit);
