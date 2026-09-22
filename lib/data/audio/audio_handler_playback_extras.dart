@@ -67,7 +67,12 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
     if (!adaptiveQualityManager.enabled) return;
     final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
     final current = prefs.getString('setting_streaming_quality') ?? 'high';
-    adaptiveQualityManager.setQuality(current);
+    // Only re-sync the policy when the persisted quality actually changed;
+    // resetting on every tick cleared the underrun counter before it could ever
+    // reach the threshold, so a step-down never fired.
+    if (current != adaptiveQualityManager.currentQuality) {
+      adaptiveQualityManager.setQuality(current);
+    }
     final next = await adaptiveQualityManager.reportUnderrun();
     if (next != null) await _applyAdaptiveQuality(next);
   }
@@ -76,13 +81,13 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
     if (!adaptiveQualityManager.enabled) return;
     final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
     final current = prefs.getString('setting_streaming_quality') ?? 'high';
-    // Only step up toward the user's chosen ceiling.
-    if (qualityRank(current) >= qualityRank(adaptiveQualityManager.currentQuality)) {
+    // `current` is the user's ceiling. Snap down only if the manager believes a
+    // higher quality is playing than the ceiling allows; never reset it upward.
+    if (qualityRank(adaptiveQualityManager.currentQuality) > qualityRank(current)) {
       adaptiveQualityManager.setQuality(current);
     }
     final next = await adaptiveQualityManager.reportHealthy();
-    if (next != null &&
-        qualityRank(next) <= qualityRank(current)) {
+    if (next != null && qualityRank(next) <= qualityRank(current)) {
       await _applyAdaptiveQuality(next);
     }
   }

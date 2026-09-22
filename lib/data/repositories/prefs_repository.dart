@@ -36,35 +36,39 @@ class PrefsRepository {
   double? getDouble(String key) => get<double>(key);
   List<String>? getStringList(String key) => get<List<String>>(key);
 
-  /// Synchronously updates the in-memory cache and schedules a batched disk write.
-  void set<T>(String key, T value, {bool immediate = false}) {
+  /// Synchronously updates the in-memory cache and schedules a batched disk write,
+  /// or writes immediately to disk if [immediate] is true (Issue 14).
+  Future<void> set<T>(String key, T value, {bool immediate = false}) async {
     _memoryCache[key] = value;
     if (immediate) {
-      _writeToDisk(key, value);
+      _pendingWrites.remove(key);
+      await _writeToDisk(key, value);
     } else {
       _pendingWrites[key] = value;
       _scheduleBatchWrite();
     }
   }
 
-  Future<void> setBool(String key, bool value, {bool immediate = false}) async {
-    set(key, value, immediate: immediate);
-  }
+  Future<void> setBool(String key, bool value, {bool immediate = false}) =>
+      set(key, value, immediate: immediate);
 
-  Future<void> setString(String key, String value, {bool immediate = false}) async {
-    set(key, value, immediate: immediate);
-  }
+  Future<void> setString(String key, String value, {bool immediate = false}) =>
+      set(key, value, immediate: immediate);
 
-  Future<void> setInt(String key, int value, {bool immediate = false}) async {
-    set(key, value, immediate: immediate);
-  }
+  Future<void> setInt(String key, int value, {bool immediate = false}) =>
+      set(key, value, immediate: immediate);
 
-  Future<void> setDouble(String key, double value, {bool immediate = false}) async {
-    set(key, value, immediate: immediate);
-  }
+  Future<void> setDouble(String key, double value, {bool immediate = false}) =>
+      set(key, value, immediate: immediate);
 
-  Future<void> setStringList(String key, List<String> value, {bool immediate = false}) async {
-    set(key, value, immediate: immediate);
+  Future<void> setStringList(String key, List<String> value, {bool immediate = false}) =>
+      set(key, value, immediate: immediate);
+
+  /// Cancels the batch timer and flushes any pending writes to prevent data loss.
+  void dispose() {
+    _batchTimer?.cancel();
+    _batchTimer = null;
+    unawaited(flush());
   }
 
   Future<void> remove(String key) async {

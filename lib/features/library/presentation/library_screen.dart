@@ -93,7 +93,7 @@ enum LibraryTabItem {
       case LibraryTabItem.songs:
         return Formatters.formatSongCount(state.songs.length);
       case LibraryTabItem.downloaded:
-        final count = state.songs.where((s) => s.isDownloaded == true).length;
+        final count = state.songs.where(isDownloadedOnlineTrack).length;
         return '$count ${context.l10n.downloaded.toLowerCase()}';
       case LibraryTabItem.albums:
         return '${state.albums.length} ${context.l10n.albums.toLowerCase()}';
@@ -282,7 +282,9 @@ class _LibraryScreenState extends State<LibraryScreen>
           _tabController.index != targetIndex) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
-            _rebuildTabController(initialIndex: targetIndex);
+            // Rebuild with the new controller; disposing the old one without a
+            // setState left mounted TabBar/TabBarView holding a dead controller.
+            setState(() => _rebuildTabController(initialIndex: targetIndex));
           }
         });
       }
@@ -612,7 +614,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         content = Text(context.l10n.songs);
         break;
       case LibraryTabItem.downloaded:
-        final count = state.songs.where((s) => s.isDownloaded == true).length;
+        final count = state.songs.where(isDownloadedOnlineTrack).length;
         content = Row(
           mainAxisSize: MainAxisSize.min,
           children: [

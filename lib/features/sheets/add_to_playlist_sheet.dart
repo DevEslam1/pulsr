@@ -68,33 +68,33 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
       try {
         final result = await _useCases.createPlaylist(name);
         if (!context.mounted) return;
-        result.fold(
-          (failure) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(failure.message)),
-            );
-          },
-          (id) async {
-            if (_allSongs.length == 1) {
-              await _useCases.addSongToPlaylist(id, widget.song.id);
-            } else {
-              await _useCases.addSongsToPlaylist(
-                  id, _allSongs.map((s) => s.id).toList());
-            }
-            if (context.mounted) {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    _allSongs.length == 1
-                        ? '${widget.song.title}: ${context.l10n.addedToPlaylist} ($name)'
-                        : '${context.l10n.addedToPlaylist} (${_allSongs.length}): $name',
-                  ),
-                ),
-              );
-            }
-          },
-        );
+        final createdId = result.fold((failure) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(failure.message)),
+          );
+          return null;
+        }, (id) => id);
+        if (createdId == null) return;
+        // Await the insert inside the try so `_isMutating` is not cleared before
+        // the write completes (the previous async `fold` callback was dropped).
+        if (_allSongs.length == 1) {
+          await _useCases.addSongToPlaylist(createdId, widget.song.id);
+        } else {
+          await _useCases.addSongsToPlaylist(
+              createdId, _allSongs.map((s) => s.id).toList());
+        }
+        if (context.mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                _allSongs.length == 1
+                    ? '${widget.song.title}: ${context.l10n.addedToPlaylist} ($name)'
+                    : '${context.l10n.addedToPlaylist} (${_allSongs.length}): $name',
+              ),
+            ),
+          );
+        }
       } finally {
         if (mounted) setState(() => _isMutating = false);
       }

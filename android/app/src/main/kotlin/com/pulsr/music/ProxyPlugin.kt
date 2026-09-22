@@ -59,6 +59,7 @@ class ProxyPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         context = null
         try {
             executor.shutdownNow()
+            executor.awaitTermination(100, java.util.concurrent.TimeUnit.MILLISECONDS)
         } catch (_: Exception) {}
         ProxyManager.dispose()
     }

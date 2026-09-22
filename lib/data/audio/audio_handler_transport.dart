@@ -69,7 +69,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     final stillLoading = playerState == ProcessingState.loading ||
         playerState == ProcessingState.buffering ||
         playerState == ProcessingState.idle;
-    if (stillLoading) {
+    if (stillLoading && !_gaplessMode) {
       _playGeneration++;
       cancelPrefetches();
       _pendingLazyPosition = _activePlayer.position;
@@ -546,6 +546,8 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     }
     final songId = int.tryParse(mediaItem.id);
     if (songId != null) {
+      final existingIdx = _songs.indexWhere((s) => s.id == songId);
+      if (existingIdx != -1) return;
       final songRes = await _repository.getSongById(songId);
       final song = songRes.fold((l) => null, (r) => r);
       if (song != null) {
@@ -571,7 +573,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
         return;
       }
       await reorderQueue(
-          existingIdx, targetSlot > existingIdx ? targetSlot + 1 : targetSlot);
+          existingIdx, targetSlot > existingIdx ? targetSlot - 1 : targetSlot);
       return;
     }
 

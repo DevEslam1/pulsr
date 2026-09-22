@@ -9,8 +9,11 @@ class AsyncLock {
 
   Future<T> lock<T>(Future<T> Function() fn) {
     final future = _chain.then((_) => fn());
-    // Always chain the next operation to maintain serialization, even if this one fails
-    _chain = future.whenComplete(() {});
+    // Chain the next operation to maintain serialization even if this one
+    // fails. `whenComplete` rethrows the error into `_chain`, which would poison
+    // every later `lock` call; swallow it on the chain while still surfacing it
+    // to the caller via the returned future.
+    _chain = future.then<void>((_) {}, onError: (Object _) {});
     return future;
   }
 }

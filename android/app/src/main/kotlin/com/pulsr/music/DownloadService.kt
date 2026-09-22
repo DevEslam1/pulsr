@@ -173,6 +173,7 @@ class DownloadService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
+                degraded = false
                 val vid = intent.getStringExtra(EXTRA_VIDEO_ID) ?: return START_NOT_STICKY
                 val title = intent.getStringExtra(EXTRA_TITLE)?.takeIf { it.isNotBlank() }
                     ?: getString(R.string.download_notification_default_title)
@@ -246,6 +247,7 @@ class DownloadService : Service() {
                 activeDownloads.clear()
                 downloadTitles.clear()
                 pausedDownloads.clear()
+                timeoutPausedIds.clear()
                 stopForegroundAndSelf()
             }
         }
@@ -261,11 +263,12 @@ class DownloadService : Service() {
             stopForegroundAndSelf()
             return
         }
-        val vid = if (preferredVid != null && activeDownloads.containsKey(preferredVid)) {
-            preferredVid
-        } else {
-            activeDownloads.keys.first()
-        }
+        val vid = preferredVid?.takeIf { activeDownloads.containsKey(it) }
+            ?: activeDownloads.keys.firstOrNull()
+            ?: run {
+                stopForegroundAndSelf()
+                return
+            }
         val single = activeDownloads.size == 1
         val title = if (single) {
             downloadTitles[vid] ?: getString(R.string.download_notification_downloads)
@@ -429,13 +432,8 @@ class DownloadService : Service() {
         downloadTitles.clear()
         pausedDownloads.clear()
         foregroundStarted = false
-        // C-8: these are process-global statics. Holding them past the service's
-        // life keeps a detached Flutter plugin/channel reachable; clear them here.
-        // YtDownloadPlugin re-registers before every startDownloadForeground call.
-        onDownloadCancelledListener = null
-        onDownloadPausedListener = null
-        onDownloadResumedListener = null
-        onDownloadDegradedListener = null
+        // Listeners are lifecycle-managed by YtDownloadPlugin (cleared in plugin cleanup)
+        // so that transient service restarts do not drop notification action events.
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

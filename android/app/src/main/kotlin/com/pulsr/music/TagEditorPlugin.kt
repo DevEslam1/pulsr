@@ -60,6 +60,11 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
             channel.setMethodCallHandler(null)
         }
         backgroundExecutor.shutdown()
+        try {
+            backgroundExecutor.awaitTermination(100, java.util.concurrent.TimeUnit.MILLISECONDS)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
         context = null
     }
 
@@ -177,9 +182,11 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                 }
 
                 backgroundExecutor.execute {
+                    val isContentUri = path.startsWith("content:")
                     var tempFile: java.io.File? = null
+                    var backupFile: java.io.File? = null
+                    var verified = false
                     try {
-                        val isContentUri = path.startsWith("content:")
                         val file = if (isContentUri) {
                             val uri = android.net.Uri.parse(path)
                             tempFile = java.io.File.createTempFile("tag_write_", ".tmp", context?.cacheDir)
@@ -320,13 +327,14 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                         // Atomic safety net (defect 24-01): backup the original so an
                         // interrupted write is recoverable instead of corrupting the
                         // user's only copy.
-                        var backupFile: java.io.File? = null
+                        backupFile = null
                         if (!isContentUri) {
                             try {
                                 val src = File(path)
-                                backupFile = java.io.File(src.parent, ".${src.name}.pulsr.bak")
-                                runCatching { if (backupFile.exists()) backupFile.delete() }
-                                src.copyTo(backupFile, overwrite = true)
+                                val bak = java.io.File(src.parent, ".${src.name}.pulsr.bak")
+                                runCatching { if (bak.exists()) bak.delete() }
+                                src.copyTo(bak, overwrite = true)
+                                backupFile = bak
                             } catch (_: Exception) {
                                 backupFile = null
                             }
@@ -354,7 +362,7 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                         // Post-write verification: re-read and compare key fields.
                         // Returns a map so Dart can distinguish written-but-unverified
                         // from fully verified (defect 24-03 scoped-storage honesty).
-                        var verified = false
+                        verified = false
                         try {
                             val reread = AudioFileIO.read(if (isContentUri) file else File(path))
                             val rtag = reread.tag
@@ -365,9 +373,6 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                             }
                         } catch (_: Exception) {
                             verified = false
-                        }
-                        if (verified) {
-                            runCatching { backupFile?.delete() }
                         }
 
                         // Trigger Android system MediaStore scan so filesystem changes are indexed immediately.
@@ -389,6 +394,18 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                         }
                     } finally {
                         tempFile?.let { runCatching { it.delete() } }
+                        backupFile?.let { backup ->
+                            if (verified) {
+                                runCatching { backup.delete() }
+                            } else {
+                                try {
+                                    if (!isContentUri && backup.exists()) {
+                                        backup.copyTo(File(path), overwrite = true)
+                                    }
+                                    backup.delete()
+                                } catch (_: Exception) {}
+                            }
+                        }
                     }
                 }
             }

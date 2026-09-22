@@ -623,12 +623,9 @@ class _SearchScreenState extends State<SearchScreen> {
 
     int _computeResultsHash(List<SongsTableData> results) {
       if (results.isEmpty) return 0;
-      return Object.hash(
-        results.length,
-        results.first.id,
-        results.last.id,
-        results[results.length ~/ 2].id,
-      );
+      // Hash every id, not just the endpoints: interior changes (re-rank, edited
+      // metadata) must invalidate the derived artist/album chip caches.
+      return Object.hashAll(results.map((s) => s.id));
     }
 
     void _ensureDerivedCache(SearchState state) {

@@ -134,6 +134,9 @@ extension EqualizerSnapshotOps on EqualizerManager {
   /// snapshot state is still written to memory and takes effect on
   /// [restoreFromDegrade].
   Future<void> applyEffectsState(Map<String, dynamic> m) async {
+    // Battery degrade intentionally suppressed the heavy DSP stages; a snapshot
+    // recall must not resurrect them mid-session (see the doc above).
+    if (_isDegradedForPower) return;
     double d(String k, double fallback) =>
         (m[k] as num?)?.toDouble() ?? fallback;
     int i(String k, int fallback) => (m[k] as num?)?.toInt() ?? fallback;

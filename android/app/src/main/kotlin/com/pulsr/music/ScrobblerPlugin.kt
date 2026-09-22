@@ -61,14 +61,26 @@ class ScrobblerPlugin(private val context: Context) : MethodChannel.MethodCallHa
         lastScrobblerCheckMs = now
         var found = false
         try {
+            val pm = context.packageManager
             val intent = Intent("com.android.music.metachanged")
-            val receivers = context.packageManager.queryBroadcastReceivers(intent, 0)
+            val receivers = if (android.os.Build.VERSION.SDK_INT >= 33) {
+                pm.queryBroadcastReceivers(intent, android.content.pm.PackageManager.ResolveInfoFlags.of(android.content.pm.PackageManager.MATCH_ALL.toLong()))
+            } else {
+                @Suppress("DEPRECATION")
+                pm.queryBroadcastReceivers(intent, android.content.pm.PackageManager.MATCH_ALL)
+            }
             if (receivers.isNotEmpty()) {
                 found = true
             } else {
                 for (pkg in knownScrobblerPackages) {
                     val pkgIntent = Intent("com.android.music.metachanged").setPackage(pkg)
-                    if (context.packageManager.queryBroadcastReceivers(pkgIntent, 0).isNotEmpty()) {
+                    val pkgReceivers = if (android.os.Build.VERSION.SDK_INT >= 33) {
+                        pm.queryBroadcastReceivers(pkgIntent, android.content.pm.PackageManager.ResolveInfoFlags.of(android.content.pm.PackageManager.MATCH_ALL.toLong()))
+                    } else {
+                        @Suppress("DEPRECATION")
+                        pm.queryBroadcastReceivers(pkgIntent, android.content.pm.PackageManager.MATCH_ALL)
+                    }
+                    if (pkgReceivers.isNotEmpty()) {
                         found = true
                         break
                     }

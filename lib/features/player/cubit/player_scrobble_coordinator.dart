@@ -30,8 +30,8 @@ class PlayerScrobbleCoordinator {
   bool? _lastIsPlaying;
   // Track position in milliseconds to avoid precision loss on sub-second seeks.
   int? _lastPosMs;
-  // FIX-G3: Monotonic clock for ordering & throttle timing
-  static final Stopwatch _monotonicClock = Stopwatch()..start();
+  // FIX-G3: Monotonic clock for ordering & throttle timing (instance field per coordinator)
+  final Stopwatch _monotonicClock = Stopwatch()..start();
   int? _lastScrobbleElapsedMs;
   int? get lastScrobbleElapsedMs => _lastScrobbleElapsedMs;
   // FIX-C06: Track last scrobble notification time

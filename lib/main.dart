@@ -93,11 +93,14 @@ Future<void> main() async {
       stackTrace: details.stack,
       category: 'UI',
     );
-    return const Material(
-      child: Center(
-        child: Text(
-          'Something went wrong',
-          style: TextStyle(color: Colors.white70),
+    return Builder(
+      builder: (context) => Material(
+        child: Center(
+          child: Text(
+            AppLocalizations.of(context)?.somethingWentWrong ??
+                'Error',
+            style: const TextStyle(color: Colors.white70),
+          ),
         ),
       ),
     );

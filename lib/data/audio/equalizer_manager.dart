@@ -423,6 +423,7 @@ class EqualizerManager {
       crossfeedDelayUs = prefs.getDouble(PrefsKeys.crossfeedDelayUs) ?? 350.0;
       crossfeedFeedDb = prefs.getDouble(PrefsKeys.crossfeedFeedDb) ?? -9.0;
       crossfeedMode = prefs.getInt(PrefsKeys.crossfeedMode) ?? 0;
+      crossfeedFcut = prefs.getDouble(PrefsKeys.crossfeedFcut) ?? 650.0;
 
       isLimiterEnabled =
           prefs.getBool(PrefsKeys.lookaheadLimiterEnabled) ?? false;
@@ -480,6 +481,8 @@ class EqualizerManager {
         reverbPreset = storedReverb.wireValue;
       }
       reverbWetDry = prefs.getDouble(PrefsKeys.convolutionReverbWetDry) ?? 0.20;
+      reverbPredelayMs = prefs.getDouble(PrefsKeys.convolutionReverbPredelayMs) ?? 0.0;
+      reverbDamping = prefs.getDouble(PrefsKeys.convolutionReverbDamping) ?? 0.5;
 
       stereoBalance = prefs.getDouble(PrefsKeys.stereoBalance) ?? 0.0;
       monoMix = prefs.getBool(PrefsKeys.monoMix) ?? false;
@@ -678,7 +681,11 @@ class EqualizerManager {
       
       if (isCrossfeedEnabled) {
         pendingFutures.add(
-          _effectsChannel.setCrossfeedParams(crossfeedDelayUs, crossfeedFeedDb),
+          _effectsChannel.setCrossfeedParams(
+            crossfeedDelayUs,
+            crossfeedFeedDb,
+            fcut: crossfeedFcut,
+          ),
         );
         pendingFutures.add(_effectsChannel.setCrossfeedMode(crossfeedMode));
       }
@@ -702,11 +709,13 @@ class EqualizerManager {
       if (isReverbEnabled) {
         pendingFutures.add(_effectsChannel.setReverbPreset(reverbPreset));
         pendingFutures.add(_effectsChannel.setReverbWetDry(reverbWetDry));
-        if (reverbCrossChannel > 0.0) {
-          pendingFutures.add(
-            _effectsChannel.setReverbCrossChannel(reverbCrossChannel),
-          );
-        }
+        pendingFutures.add(
+          _effectsChannel.setReverbParams(
+            predelayMs: reverbPredelayMs,
+            damping: reverbDamping,
+            crossChannel: reverbCrossChannel,
+          ),
+        );
       }
       pendingFutures.add(_effectsChannel.setReverbEnabled(isReverbEnabled));
       
@@ -2491,7 +2500,11 @@ class EqualizerManager {
     }
     if (isCrossfeedEnabled) {
       futures.add(
-        _effectsChannel.setCrossfeedParams(crossfeedDelayUs, crossfeedFeedDb),
+        _effectsChannel.setCrossfeedParams(
+          crossfeedDelayUs,
+          crossfeedFeedDb,
+          fcut: crossfeedFcut,
+        ),
       );
       futures.add(_effectsChannel.setCrossfeedMode(crossfeedMode));
       futures.add(_effectsChannel.setCrossfeedEnabled(true));
@@ -2512,11 +2525,13 @@ class EqualizerManager {
     }
     if (isReverbEnabled) {
       futures.add(_effectsChannel.setReverbWetDry(reverbWetDry));
-      if (reverbCrossChannel > 0.0) {
-        futures.add(
-          _effectsChannel.setReverbCrossChannel(reverbCrossChannel),
-        );
-      }
+      futures.add(
+        _effectsChannel.setReverbParams(
+          predelayMs: reverbPredelayMs,
+          damping: reverbDamping,
+          crossChannel: reverbCrossChannel,
+        ),
+      );
       if (reverbPreset == ReverbPreset.custom.wireValue &&
           customImpulseResponse.isNotEmpty) {
         futures.add(

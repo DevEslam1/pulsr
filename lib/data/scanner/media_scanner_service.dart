@@ -43,6 +43,7 @@ class MediaScannerService {
   int? _lastScanEpochSec;
   DateTime? get lastScanAt => _lastScanAt;
   int? get lastScanEpochSec => _lastScanEpochSec;
+  bool _isEnrichingQuality = false;
 
   /// True when a resume-triggered delta scan is worthwhile (default: 15 min
   /// since last successful scan). Used by app-resume hooks to avoid a full
@@ -316,6 +317,7 @@ class MediaScannerService {
       // Full-scan design: the query is DATE_ADDED DESC and the repository
       // remaps onto existing paths, so re-scans converge without delta args.
       markScanComplete();
+      scheduleAudioQualityEnrichment();
       return parseResult.songs.length;
     } catch (e, st) {
       ErrorLogger.log('Media scanner failed',
@@ -420,6 +422,38 @@ class MediaScannerService {
         category: 'MediaScanner',
       );
     }
+  }
+
+  /// Schedules a background pass to enrich audio quality metadata (sample rate,
+  /// bit depth, bitrate, codec, loudness range) for local songs that do not
+  /// yet have codec information.
+  @visibleForTesting
+  void scheduleAudioQualityEnrichment() {
+    if (!Platform.isAndroid || _isEnrichingQuality) return;
+    _isEnrichingQuality = true;
+    unawaited(() async {
+      try {
+        final res = await _repository.getAllSongs();
+        final songs = res.fold((_) => <SongsTableData>[], (s) => s);
+        for (final song in songs) {
+          if (_progressController.isClosed) break;
+          if (song.codec != null && song.codec!.isNotEmpty) continue;
+          if (song.path.isEmpty ||
+              song.path.startsWith('http') ||
+              song.path.startsWith('ytmusic://')) {
+            continue;
+          }
+          await enrichAudioQuality(song.id, song.path);
+          // Yield to event loop to avoid starving UI and playback
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+      } catch (e, st) {
+        ErrorLogger.log('Background audio quality enrichment failed',
+            error: e, stackTrace: st, category: 'MediaScanner');
+      } finally {
+        _isEnrichingQuality = false;
+      }
+    }());
   }
 
   static int? _asInt(Object? value) {

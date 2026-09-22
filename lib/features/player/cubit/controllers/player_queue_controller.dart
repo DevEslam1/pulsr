@@ -111,9 +111,14 @@ class PlayerQueueController {
   }
 
   Future<void> playRadioStation(RadioStation station) async {
-    if (!RadioStation.isHttpUrl(station.url)) {
+    final uri = Uri.tryParse(station.url);
+    if (!RadioStation.isHttpUrl(station.url) ||
+        uri == null ||
+        (uri.scheme != 'http' && uri.scheme != 'https')) {
       final s = _getState();
-      _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: 'Invalid stream URL')));
+      _emit(s.copyWith(
+          playback: s.playback
+              .copyWith(errorMessage: 'Invalid stream URL (must be HTTP/HTTPS)')));
       return;
     }
     final song = SongsTableData(
@@ -125,7 +130,7 @@ class PlayerQueueController {
       album: '',
       durationMs: 0,
       path: station.url,
-      source: SongSource.local,
+      source: SongSource.radio,
       remoteArtworkUrl: station.artworkUrl,
       isFavorite: false,
       isMissing: false,
@@ -150,21 +155,32 @@ class PlayerQueueController {
     if (openPlayerIfPlaying &&
         initialPosition == null &&
         _isSameTrack(state.currentSong, song)) {
-      _emit(state.copyWith(playback: state.playback.copyWith(isExpanded: true)));
-      if (!state.isPlaying) {
-        try {
-          await _audioHandler.play();
-        } catch (e, st) {
-          ErrorLogger.log('Resume of current song failed',
-              error: e, stackTrace: st, category: 'PlayerQueueController');
-          if (!_isClosed()) {
-            final s = _getState();
-            _emit(s.copyWith(
-                playback: s.playback.copyWith(errorMessage: 'Failed to play ${song.title}')));
+      // A supplied queue is a request to replace/reorder the current queue (e.g.
+      // the Queue screen "Shuffle" action passes the current song with a freshly
+      // shuffled queue). Only take the plain resume shortcut when the queue is
+      // unchanged; otherwise fall through so the new order is actually applied.
+      final queueUnchanged = queue == null ||
+          listEquals(
+            queue.map((s) => s.id).toList(growable: false),
+            state.queue.map((s) => s.id).toList(growable: false),
+          );
+      if (queueUnchanged) {
+        _emit(state.copyWith(playback: state.playback.copyWith(isExpanded: true)));
+        if (!state.isPlaying) {
+          try {
+            await _audioHandler.play();
+          } catch (e, st) {
+            ErrorLogger.log('Resume of current song failed',
+                error: e, stackTrace: st, category: 'PlayerQueueController');
+            if (!_isClosed()) {
+              final s = _getState();
+              _emit(s.copyWith(
+                  playback: s.playback.copyWith(errorMessage: 'Failed to play ${song.title}')));
+            }
           }
         }
+        return;
       }
-      return;
     }
 
     final videoIdForLatency = song.remoteId ?? song.id.toString();
@@ -190,7 +206,6 @@ class PlayerQueueController {
 
     List<SongsTableData> effectiveQueue;
     int effectiveIndex;
-    String? queueTruncationWarning;
 
     if (rawQueue.length > maxQueueSize) {
       final halfWindow = maxQueueSize ~/ 2;
@@ -201,14 +216,20 @@ class PlayerQueueController {
       }
       effectiveQueue = rawQueue.sublist(start, start + maxQueueSize);
       effectiveIndex = targetIndex - start;
-      queueTruncationWarning =
-          'Queue truncated to $maxQueueSize (was ${rawQueue.length}) — tail dropped';
+      ErrorLogger.log(
+        'Queue truncated to $maxQueueSize (was ${rawQueue.length}) — tail dropped',
+        category: 'PlayerQueueController',
+      );
     } else {
       effectiveQueue = rawQueue;
       effectiveIndex = targetIndex;
     }
 
-    final startPos = initialPosition ?? Duration.zero;
+    final isSameSong = _isSameTrack(state.currentSong, song);
+    // When the same track keeps playing but its queue is being replaced (e.g.
+    // Shuffle), preserve the current position instead of restarting from zero.
+    final startPos = initialPosition ??
+        ((queue != null && isSameSong) ? state.position : Duration.zero);
     final prevSlot = _queueSlots[state.activeQueueSlot];
     final prevQueue = state.queue;
     final prevIndex = state.currentIndex;
@@ -228,7 +249,6 @@ class PlayerQueueController {
     _debouncedPersistQueueSlots();
     _bumpQueueVersion();
 
-    final isSameSong = _isSameTrack(state.currentSong, song);
     _emit(state.copyWith(
       queueSlice: state.queueSlice.copyWith(
         queue: effectiveQueue,
@@ -239,7 +259,7 @@ class PlayerQueueController {
         duration: Duration(milliseconds: song.durationMs),
         position: startPos,
         isPlaying: true,
-        errorMessage: queueTruncationWarning,
+        errorMessage: null,
       ),
       lyricsSlice: state.lyricsSlice.copyWith(
         lyrics: isSameSong ? state.lyrics : const [],
@@ -248,6 +268,13 @@ class PlayerQueueController {
     ));
 
     _updateWidgetThrottled(force: true);
+
+    // FIX (Bug 1): Dispatch lyrics pre-load immediately so lyrics resolve
+    // concurrently with audio buffering. If loadQueue fails, _lyricsGuard.invalidate()
+    // cancels any late emissions.
+    if (_mediaItemResolutionGuard.isValid(capturedGen) && !_isClosed()) {
+      _loadLyrics(song);
+    }
 
     try {
       await _audioHandler.loadQueue(
@@ -311,6 +338,10 @@ class PlayerQueueController {
             stackTrace: rollbackSt,
             category: 'PlayerQueueController',
           );
+          try {
+            await _audioHandler.pause();
+            await _audioHandler.clearQueue();
+          } catch (_) {}
           if (!_isClosed()) {
             final broken = _getState();
             _emit(broken.copyWith(
@@ -336,13 +367,23 @@ class PlayerQueueController {
     }
 
     if (_mediaItemResolutionGuard.isValid(capturedGen) && !_isClosed()) {
-      _loadLyrics(song);
-      _findNextLocalMatch(song, effectiveQueue, effectiveIndex, capturedSwapGen);
+      _findNextLocalMatch(
+        song,
+        effectiveQueue,
+        effectiveIndex,
+        capturedSwapGen,
+        capturedGen,
+      );
     }
   }
 
-  void _findNextLocalMatch(SongsTableData currentSong, List<SongsTableData> queue,
-      int currentIndex, int capturedSwapGen) {
+  void _findNextLocalMatch(
+    SongsTableData currentSong,
+    List<SongsTableData> queue,
+    int currentIndex,
+    int capturedSwapGen,
+    int capturedResolutionGen,
+  ) {
     if (currentIndex + 1 >= queue.length) return;
     final nextTrack = queue[currentIndex + 1];
     if (nextTrack.source != SongSource.youtube) return;
@@ -355,9 +396,13 @@ class PlayerQueueController {
       final match = res.fold((_) => null, (s) => s);
       if (match != null &&
           _localMatchSwapGuard.isValid(capturedSwapGen) &&
+          _mediaItemResolutionGuard.isValid(capturedResolutionGen) &&
           !_isClosed()) {
         swapReconciledSong(nextTrack.id, match);
       }
-    }).catchError((Object _) {});
+    }).catchError((Object e, StackTrace st) {
+      ErrorLogger.log('Find next local match failed',
+          error: e, stackTrace: st, category: 'PlayerQueueController');
+    });
   }
 }

@@ -127,20 +127,21 @@ class _AudioVisualizerState extends State<AudioVisualizer>
     } else if (widget.style == VisualizerStyle.custom) {
       _loadCustomPreset();
     }
-    _initVisualizer();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Cosmetic audio-reactive animation: stop entirely under Reduce Motion.
-    if (!context.motionEnabled) {
+    final isVisible = TickerMode.valuesOf(context).enabled;
+    // Cosmetic audio-reactive animation: stop entirely under Reduce Motion or when invisible
+    if (!isVisible || !context.motionEnabled) {
       _stopAnimation();
       return;
     }
     // Motion decisions must not read MediaQuery during initState.
     if (widget.isPlaying && widget.style != VisualizerStyle.off) {
       _startAnimation();
+      _initVisualizer();
     } else {
       _stopAnimation();
     }
@@ -247,6 +248,7 @@ class _AudioVisualizerState extends State<AudioVisualizer>
         oldWidget.style != widget.style) {
       if (widget.isPlaying && widget.style != VisualizerStyle.off) {
         _startAnimation();
+        _initVisualizer();
         _restartNativeStream();
       } else {
         _stopAnimation();

@@ -78,10 +78,13 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   List<SongsTableData> _cachedSortedSongs = const [];
 
   List<SongsTableData> _sorted(List<SongsTableData> songs) {
-    // FIX-M1 / H7 / H-07: Hash ALL song ids. The previous first-10/last-10
-    // window made an edit to e.g. song #50 of a 100-song album invisible, so a
-    // stale sort order was served from cache.
-    final songsHash = Object.hashAll(songs.map((s) => s.id));
+    // FIX-M1 / H7 / H-07: Hash every song's identity AND its sort-relevant
+    // fields. Hashing ids alone served a stale order (and stale metadata) after
+    // a tag edit changed a title/track/duration while the id stayed the same.
+    final songsHash = Object.hashAll([
+      for (final s in songs)
+        Object.hash(s.id, s.title, s.durationMs, s.discNumber, s.trackNumber),
+    ]);
     if (_cachedSongsHash == songsHash && _cachedSort == _sort) {
       return _cachedSortedSongs;
     }

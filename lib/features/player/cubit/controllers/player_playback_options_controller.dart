@@ -23,6 +23,7 @@ import '../player_state.dart';
 import '../quran_restore_snapshot.dart';
 
 part 'player_playback_options_lyrics.dart';
+part 'player_playback_options_quran.dart';
 
 /// Owns playback options: sleep timer, speed, pitch, ratings, per-track overrides, AB loop, and overlays.
 class PlayerPlaybackOptionsController {
@@ -81,19 +82,34 @@ class PlayerPlaybackOptionsController {
   void startAfterNTracksTimer(int trackCount) {
     _audioHandler.startAfterNTracksTimer(trackCount);
     final s = _getState();
-    _emit(s.copyWith(playback: s.playback.copyWith(sleepTimerRemaining: null)));
+    _emit(s.copyWith(
+      playback: s.playback.copyWith(
+        sleepTimerRemaining: null,
+        sleepTimerRemainingTracks: trackCount,
+      ),
+    ));
   }
 
   void startEndOfQueueTimer() {
     _audioHandler.startEndOfQueueTimer();
     final s = _getState();
-    _emit(s.copyWith(playback: s.playback.copyWith(sleepTimerRemaining: null)));
+    _emit(s.copyWith(
+      playback: s.playback.copyWith(
+        sleepTimerRemaining: null,
+        sleepTimerRemainingTracks: null,
+      ),
+    ));
   }
 
   void cancelSleepTimer() {
     _audioHandler.cancelSleepTimer();
     final s = _getState();
-    _emit(s.copyWith(playback: s.playback.copyWith(sleepTimerRemaining: null)));
+    _emit(s.copyWith(
+      playback: s.playback.copyWith(
+        sleepTimerRemaining: null,
+        sleepTimerRemainingTracks: null,
+      ),
+    ));
   }
 
   int? get sleepTimerRemainingTracks => _audioHandler.sleepTimerRemainingTracks;
@@ -185,25 +201,31 @@ class PlayerPlaybackOptionsController {
     return _audioHandler.importPresetFromJson(jsonString);
   }
 
+  Future<void> setSongEqOverrideById(int songId, String? presetName) async {
+    final store = PerSongEqStore();
+    await store.setPresetForTrack(songId.toString(), presetName);
+    final s = _getState();
+    if (s.currentSong?.id == songId) {
+      _emit(s.copyWith(
+          playback: s.playback.copyWith(currentSongEqOverride: presetName)));
+    }
+  }
+
+  Future<void> setCurrentSongEqOverride(String? presetName) async {
+    final songId = _getState().currentSong?.id;
+    if (songId != null) {
+      await setSongEqOverrideById(songId, presetName);
+    }
+  }
+
   Future<void> setSongEqOverride(dynamic songIdOrPreset,
       [String? presetName]) async {
-    int? songId;
-    String? name;
     if (songIdOrPreset is int) {
-      songId = songIdOrPreset;
-      name = presetName;
-    } else if (songIdOrPreset is String?) {
-      songId = _getState().currentSong?.id;
-      name = songIdOrPreset;
-    }
-    if (songId != null) {
-      final store = PerSongEqStore();
-      await store.setPresetForTrack(songId.toString(), name);
-      final s = _getState();
-      if (s.currentSong?.id == songId) {
-        _emit(s.copyWith(
-            playback: s.playback.copyWith(currentSongEqOverride: name)));
-      }
+      await setSongEqOverrideById(songIdOrPreset, presetName);
+    } else if (songIdOrPreset is String) {
+      await setCurrentSongEqOverride(songIdOrPreset);
+    } else if (songIdOrPreset == null) {
+      await setCurrentSongEqOverride(null);
     }
   }
 
@@ -365,85 +387,4 @@ class PlayerPlaybackOptionsController {
     final s = _getState();
     _emit(s.copyWith(playback: s.playback.copyWith(silenceSkipSensitivity: sensitivity)));
   }
-
-  // ──────────────────────────────────────────────
-  // Quran Mode & Persistence
-  // ──────────────────────────────────────────────
-  Future<void> _persistQuranSnapshot(QuranRestoreSnapshot snapshot) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-          PrefsKeys.quranRestoreSnapshot, jsonEncode(snapshot.toJson()));
-    } catch (e, st) {
-      ErrorLogger.log('Failed to persist Quran Mode restore snapshot',
-          error: e, stackTrace: st, category: 'PlayerPlaybackOptionsController');
-    }
-  }
-
-  Future<QuranRestoreSnapshot?> loadQuranSnapshot() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(PrefsKeys.quranRestoreSnapshot);
-      if (raw == null || raw.isEmpty) return null;
-      return QuranRestoreSnapshot.fromJson(
-          jsonDecode(raw) as Map<String, dynamic>);
-    } catch (e, st) {
-      ErrorLogger.log('Failed to load Quran Mode restore snapshot',
-          error: e, stackTrace: st, category: 'PlayerPlaybackOptionsController');
-      return null;
-    }
-  }
-
-  Future<void> _clearQuranSnapshot() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(PrefsKeys.quranRestoreSnapshot);
-    } catch (_) {}
-  }
-
-  QuranRestoreSnapshot _captureQuranRestoreSnapshot(PlayerState s) {
-    return QuranRestoreSnapshot(
-      eqPreset: s.eqPreset,
-      isEqEnabled: s.isEqEnabled,
-      headphoneProfile: s.selectedHeadphoneProfile,
-      isReverbEnabled: s.isReverbEnabled,
-      reverbPreset: s.reverbPreset,
-      reverbWetDry: s.reverbWetDry,
-      isDynamicsEnabled: s.isDynamicsEnabled,
-      dynamicsPreset: s.dynamicsPreset,
-      isSaturationEnabled: s.isSaturationEnabled,
-      saturationDrive: s.saturationDrive,
-      saturationMix: s.saturationMix,
-      saturationTilt: s.saturationTilt,
-      playbackSpeed: s.playbackSpeed,
-      isShuffle: s.isShuffle,
-      preampDb: s.selectedHeadphoneProfile?.preampGain ?? 0.0,
-    );
-  }
-
-  Future<void> setQuranModeEnabled(bool enabled) async {
-    final s = _getState();
-    if (enabled == s.isQuranModeEnabled) return;
-    if (enabled) {
-      final snapshot = _captureQuranRestoreSnapshot(s);
-      await _persistQuranSnapshot(snapshot);
-      _emit(s.copyWith(dsp: s.dsp.copyWith(isQuranModeEnabled: true)));
-    } else {
-      await _clearQuranSnapshot();
-      _emit(s.copyWith(dsp: s.dsp.copyWith(isQuranModeEnabled: false)));
-    }
-  }
-
-  void setQuranReciterStyle(QuranReciterStyle style) {
-    final s = _getState();
-    _emit(s.copyWith(dsp: s.dsp.copyWith(quranReciterStyle: style)));
-  }
-
-  Future<void> setQuranAmbience(double v) async {
-    final s = _getState();
-    _emit(s.copyWith(dsp: s.dsp.copyWith(reverbWetDry: v)));
-    await _audioHandler.setReverb(s.isReverbEnabled, wetDry: v);
-  }
-
-  Future<void> reapplyQuranProfile() async {}
 }

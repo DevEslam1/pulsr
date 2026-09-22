@@ -44,6 +44,7 @@ class WaveformSeekBar extends StatefulWidget {
 class _WaveformSeekBarState extends State<WaveformSeekBar> {
   double? _dragValue;
   double _zoomScale = 1.0;
+  int _lastScaleMs = 0;
 
   @override
   void didUpdateWidget(covariant WaveformSeekBar oldWidget) {
@@ -160,10 +161,14 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                     },
                     onScaleUpdate: (details) {
                       if (details.scale != 1.0) {
-                        setState(() {
-                          _zoomScale =
-                              (_zoomScale * details.scale).clamp(1.0, 4.0);
-                        });
+                        final now = DateTime.now().millisecondsSinceEpoch;
+                        if (now - _lastScaleMs >= 33) {
+                          _lastScaleMs = now;
+                          setState(() {
+                            _zoomScale =
+                                (_zoomScale * details.scale).clamp(1.0, 4.0);
+                          });
+                        }
                       }
                     },
                     onHorizontalDragStart: (details) {

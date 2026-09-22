@@ -1,5 +1,8 @@
 {
   "@@locale": "es",
+  "customDurationMinutes": "Duración personalizada (minutos).",
+  "partialBatchDetected": "Lote parcial detectado",
+  "somethingWentWrong": "Algo salió mal",
   "saveSearch": "Guardar búsqueda",
   "savedSearches": "Búsquedas guardadas",
   "appTitle": "Pulsr Música",

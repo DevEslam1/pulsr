@@ -27,6 +27,9 @@ String _shapeName(VisualizerShape shape) => shape.name;
 /// into an opaque ARGB int. Returns [fallback] for anything unrecognized.
 int _parseColor(dynamic value, int fallback) {
   if (value is int) {
+    // Preserve a fully-transparent color (the default background is
+    // 0x00000000); only promote RGB values to opaque when alpha is unset.
+    if (value == 0) return value;
     return value <= 0xFFFFFF ? (0xFF000000 | value) : value;
   }
   if (value is String) {

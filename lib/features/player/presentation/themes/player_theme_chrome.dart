@@ -553,7 +553,12 @@ class PlayerBottomActionDock extends StatelessWidget {
     final outputDevice = settingsState.currentOutputDevice;
     final isEqActive = props.state.isEqEnabled;
     final speed = props.state.playbackSpeed;
-    final hasTimer = props.state.sleepTimerRemaining != null;
+    final remainingTracks =
+        props.state.sleepTimerRemainingTracks ?? props.cubit.sleepTimerRemainingTracks;
+    final isEndQ = props.cubit.isEndOfQueueSleepTimer;
+    final hasTimer = props.state.sleepTimerRemaining != null ||
+        remainingTracks != null ||
+        isEndQ;
     final custom = context.select<SettingsCubit, ({double radius, bool glow, bool active})>(
         (c) => (
               radius: c.state.customThemeRadius,
@@ -679,9 +684,13 @@ class PlayerBottomActionDock extends StatelessWidget {
                       icon: Icons.timer_outlined,
                       tooltip: l10n.sleepTimer,
                       badgeText: hasTimer
-                          ? (props.cubit.sleepTimerRemainingTracks != null
-                              ? '${props.cubit.sleepTimerRemainingTracks} tr'
-                              : '${props.state.sleepTimerRemaining!.inMinutes}m')
+                          ? (remainingTracks != null
+                              ? '$remainingTracks tr'
+                              : (isEndQ
+                                  ? 'End Q'
+                                  : (props.state.sleepTimerRemaining != null
+                                      ? '${props.state.sleepTimerRemaining!.inMinutes}m'
+                                      : '')))
                           : null,
                       isActive: hasTimer,
                       activeColor: props.activeColor,

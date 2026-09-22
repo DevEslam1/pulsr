@@ -444,7 +444,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                         },
                         child: SongTile(
                           song: song,
-                          index: index + 1,
+                          index: index,
                           selected: state.selectedSongIds.contains(song.id),
                           onTap: () {
                             if (state.isMultiSelectMode) {
@@ -499,7 +499,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                         },
                         child: SongTile(
                           song: song,
-                          index: index + 1,
+                          index: index,
                           selected: state.selectedSongIds.contains(song.id),
                           onTap: () {
                             if (state.isMultiSelectMode) {

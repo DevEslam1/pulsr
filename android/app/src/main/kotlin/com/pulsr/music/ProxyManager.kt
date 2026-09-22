@@ -76,7 +76,10 @@ object ProxyManager {
                 val auth = object : Authenticator() {
                     override fun getPasswordAuthentication(): PasswordAuthentication? {
                         if (requestorType == RequestorType.PROXY) {
-                            return PasswordAuthentication(this@ProxyManager.username, this@ProxyManager.password.toCharArray())
+                            if (requestingHost.equals(this@ProxyManager.host, ignoreCase = true) &&
+                                (requestingPort == this@ProxyManager.port || requestingPort == -1)) {
+                                return PasswordAuthentication(this@ProxyManager.username, this@ProxyManager.password.toCharArray())
+                            }
                         }
                         return null
                     }

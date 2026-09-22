@@ -107,6 +107,7 @@ class AdaptiveQualityManager {
       // decision (qualityRank, step-up ceiling) reason against a quality we
       // never reached, and the failed switch would never be retried.
       currentQuality = previous;
+      _lastSwitchAt = null; // Reset so retry is not blocked by cooldown
       return null;
     }
     currentQuality = next;

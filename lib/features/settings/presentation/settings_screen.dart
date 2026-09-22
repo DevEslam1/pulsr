@@ -883,26 +883,52 @@ class _SettingsScreenState extends State<SettingsScreen>
           Semantics(
             button: true,
             label: '$title, ${isExpanded ? "expanded" : "collapsed"}',
-            child: InkWell(
-              onTap: onToggle,
-              borderRadius: BorderRadius.circular(AppRadii.tile),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.sm, vertical: AppSpacing.s10),
+            child: PulsrPressable(
+              pressedScale: 0.985,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                onToggle();
+              },
+              child: AnimatedContainer(
+                duration: context.motionMs(200),
+                curve: Curves.easeOutCubic,
+                padding: const EdgeInsetsDirectional.fromSTEB(
+                  AppSpacing.xs,
+                  AppSpacing.xs,
+                  AppSpacing.sm,
+                  AppSpacing.xs,
+                ),
                 decoration: BoxDecoration(
-                  color: p.surfaceContainerHigh.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(AppRadii.tile),
-                  border: Border.all(color: p.hairline),
+                  color: isExpanded
+                      ? p.surfaceContainer
+                      : p.surfaceContainer.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(AppRadii.card),
+                  border: Border.all(
+                    color: isExpanded
+                        ? p.accent.withValues(alpha: 0.45)
+                        : p.hairline,
+                    width: isExpanded ? 1.4 : 1.0,
+                  ),
                 ),
                 child: Row(
                   children: [
-                    Icon(icon, color: p.accent, size: 20),
-                    const SizedBox(width: AppSpacing.xs),
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: isExpanded
+                            ? p.accent.withValues(alpha: 0.16)
+                            : p.accentContainer.withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(AppRadii.r10),
+                      ),
+                      child: Icon(icon, color: p.accent, size: 18),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Text(
                         title.toUpperCase(),
                         style: TextStyle(
-                          color: p.textPrimary,
+                          color: isExpanded ? p.textPrimary : p.textSecondary,
                           fontSize: AppFontSize.callout,
                           fontWeight: FontWeight.w800,
                           letterSpacing: AppTracking.heading,
@@ -911,12 +937,22 @@ class _SettingsScreenState extends State<SettingsScreen>
                     ),
                     AnimatedRotation(
                       turns: isExpanded ? 0.0 : -0.25,
-                      duration: context.motionMs(200),
+                      duration: context.motionMs(220),
                       curve: Curves.easeOutCubic,
-                      child: Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        color: p.textSecondary,
-                        size: 20,
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: isExpanded
+                              ? p.accent.withValues(alpha: 0.12)
+                              : Colors.transparent,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: isExpanded ? p.accent : p.textTertiary,
+                          size: 20,
+                        ),
                       ),
                     ),
                   ],

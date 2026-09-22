@@ -33,6 +33,7 @@ abstract class PlaybackSlice with _$PlaybackSlice {
     @Default(false) bool isExpanded,
     Color? dominantColor,
     Duration? sleepTimerRemaining,
+    int? sleepTimerRemainingTracks,
     @Default(false) bool abLoopEnabled,
     Duration? abPointA,
     Duration? abPointB,
@@ -62,6 +63,7 @@ abstract class PlaybackSlice with _$PlaybackSlice {
                 other.sleepTimerRemaining != null &&
                 sleepTimerRemaining!.inSeconds !=
                     other.sleepTimerRemaining!.inSeconds)) ||
+        sleepTimerRemainingTracks != other.sleepTimerRemainingTracks ||
         abLoopEnabled != other.abLoopEnabled ||
         abPointA != other.abPointA ||
         abPointB != other.abPointB ||
@@ -281,6 +283,7 @@ abstract class PlayerState with _$PlayerState {
   bool get isExpanded => playback.isExpanded;
   Color? get dominantColor => playback.dominantColor;
   Duration? get sleepTimerRemaining => playback.sleepTimerRemaining;
+  int? get sleepTimerRemainingTracks => playback.sleepTimerRemainingTracks;
   bool get abLoopEnabled => playback.abLoopEnabled;
   Duration? get abPointA => playback.abPointA;
   Duration? get abPointB => playback.abPointB;

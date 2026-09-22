@@ -798,18 +798,16 @@ class ScrobblerService {
               DateTime.now().millisecondsSinceEpoch;
 
           if (artist != null && track != null) {
-            try {
-              await _submitScrobbleDirect(
-                artist: artist,
-                track: track,
-                album: album,
-                durationSec: durationSec,
-                timestamp: DateTime.fromMillisecondsSinceEpoch(tsMillis),
-              );
-              return null;
-            } catch (_) {
-              return item;
-            }
+            final delivered = await _submitScrobbleDirect(
+              artist: artist,
+              track: track,
+              album: album,
+              durationSec: durationSec,
+              timestamp: DateTime.fromMillisecondsSinceEpoch(tsMillis),
+            );
+            // Keep the entry queued when no service accepted it, so a flush
+            // performed while offline retries later instead of dropping it.
+            return delivered ? null : item;
           }
           return null;
         }));
@@ -849,11 +847,14 @@ class ScrobblerService {
   }
 
   /// Submit scrobble without re-enqueueing on failure (used by flushOfflineQueue).
+  /// Returns true when the entry may be dropped from the queue: either a service
+  /// accepted it, the duplicate window already covered it, or no service is
+  /// configured to receive it.
   ///
   /// Serialized: a flush batch submits in parallel, and every submission
   /// read-modifies the shared dedup keys and stats counters, so unsynchronized
   /// runs could double-count or drop dedup.
-  Future<void> _submitScrobbleDirect({
+  Future<bool> _submitScrobbleDirect({
     required String artist,
     required String track,
     required String album,
@@ -869,7 +870,7 @@ class ScrobblerService {
         ));
   }
 
-  Future<void> _submitScrobbleDirectLocked({
+  Future<bool> _submitScrobbleDirectLocked({
     required String artist,
     required String track,
     required String album,
@@ -884,12 +885,14 @@ class ScrobblerService {
     final now = DateTime.now().millisecondsSinceEpoch;
 
     if (lastScrobbledKey == dedupKey && (now - lastScrobbledTime) < 300000) {
-      return;
+      return true;
     }
 
     bool anySuccess = false;
+    bool anyServiceEnabled = false;
 
     if (prefs.getBool(keyLastFmEnabled) == true) {
+      anyServiceEnabled = true;
       final apiKey =
           await _getSecureOrMigrate(keyLastFmApiKeySecure, keyLastFmApiKey);
       final secret =
@@ -962,5 +965,8 @@ class ScrobblerService {
       await prefs.setInt('last_scrobble_time', now);
       await _recordSuccessfulScrobble(prefs, timestamp.millisecondsSinceEpoch);
     }
+    // With no scrobbling service configured there is nothing to retry, so the
+    // entry is safe to drop; otherwise retain it unless it was delivered.
+    return anySuccess || !anyServiceEnabled;
   }
 }

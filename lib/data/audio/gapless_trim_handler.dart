@@ -48,7 +48,9 @@ class GaplessTrimHandler {
   }) {
     final lower = path.toLowerCase();
     final c = (codec ?? '').toLowerCase();
-    final isOpus = c.contains('opus') || lower.endsWith('.opus') || lower.endsWith('.ogg') && c.isEmpty && lower.contains('opus');
+    final isOpus = c.contains('opus') ||
+        lower.endsWith('.opus') ||
+        (lower.endsWith('.ogg') && (c.isEmpty || c.contains('opus') || lower.contains('opus')));
     final isOgg = lower.endsWith('.ogg') || lower.endsWith('.oga');
     final isVorbis = c.contains('vorbis') || (isOgg && !isOpus);
 

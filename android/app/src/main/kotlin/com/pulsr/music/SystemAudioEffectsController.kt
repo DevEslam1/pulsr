@@ -181,21 +181,13 @@ class SystemAudioEffectsController(private val context: Context) {
 
                 if (isMatched && desc.type != null && desc.uuid != null) {
                     try {
-                        // Instantiate AudioEffect on session 0 (AUDIO_SESSION_OUTPUT_MIX) with priority 0 via reflection
-                        val constructor = AudioEffect::class.java.getConstructor(
-                            UUID::class.java,
-                            UUID::class.java,
-                            Int::class.javaPrimitiveType,
-                            Int::class.javaPrimitiveType
-                        )
-                        constructor.isAccessible = true
-                        val effect = constructor.newInstance(desc.type, desc.uuid, 0, 0) as AudioEffect
-                        if (effect.hasControl()) {
+                        val effect = createEffectSafely(desc.type, desc.uuid, 0, 0)
+                        if (effect != null && effect.hasControl()) {
                             effect.enabled = false
                             managedEffects.add(effect)
                             disableSuccessCount++
                         } else {
-                            effect.release()
+                            effect?.release()
                         }
                     } catch (secEx: SecurityException) {
                         Log.w(TAG, "Lacking permission or OEM blocked session 0 access for ${desc.name}: ${secEx.message}")
@@ -228,12 +220,31 @@ class SystemAudioEffectsController(private val context: Context) {
         releaseManagedEffects()
     }
 
+    private fun createEffectSafely(type: UUID, uuid: UUID, priority: Int = 0, audioSession: Int = 0): AudioEffect? {
+        return try {
+            val constructor = AudioEffect::class.java.getDeclaredConstructor(
+                UUID::class.java,
+                UUID::class.java,
+                Int::class.javaPrimitiveType,
+                Int::class.javaPrimitiveType
+            )
+            constructor.isAccessible = true
+            constructor.newInstance(type, uuid, priority, audioSession) as? AudioEffect
+        } catch (e: NoSuchMethodException) {
+            Log.d(TAG, "AudioEffect reflection constructor not found: ${e.message}")
+            null
+        } catch (e: SecurityException) {
+            Log.w(TAG, "SecurityException accessing AudioEffect constructor: ${e.message}")
+            null
+        } catch (e: Exception) {
+            Log.d(TAG, "Cannot create AudioEffect via reflection: ${e.message}")
+            null
+        }
+    }
+
     private fun releaseManagedEffects() {
         for (effect in managedEffects) {
             try {
-                if (effect.hasControl()) {
-                    effect.enabled = true
-                }
                 effect.release()
             } catch (_: Exception) {}
         }

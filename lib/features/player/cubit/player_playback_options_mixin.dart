@@ -47,6 +47,12 @@ mixin PlayerPlaybackOptions on PulsrCubit<PlayerState> {
   Future<void> setSongRating(int songId, int rating) =>
       playbackOptionsController.setSongRating(songId, rating);
 
+  Future<void> setSongEqOverrideById(int songId, String? presetName) =>
+      playbackOptionsController.setSongEqOverrideById(songId, presetName);
+
+  Future<void> setCurrentSongEqOverride(String? presetName) =>
+      playbackOptionsController.setCurrentSongEqOverride(presetName);
+
   Future<void> setSongEqOverride(dynamic songIdOrPreset,
           [String? presetName]) =>
       playbackOptionsController.setSongEqOverride(songIdOrPreset, presetName);

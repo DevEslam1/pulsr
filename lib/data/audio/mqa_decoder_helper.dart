@@ -132,6 +132,9 @@ class MqaDecoderHelper {
     return outBytes;
   }
 
+  /// Maximum allowed file size for in-memory MQA decoding (300 MB) (Bug 6 & 18).
+  static const int kMaxInMemoryDecodeBytes = 300 * 1024 * 1024;
+
   /// Decodes and unfolds MQA track into an [AudioSource].
   static Future<AudioSource> decodeMqaFile(
     SongsTableData song,
@@ -140,6 +143,13 @@ class MqaDecoderHelper {
     final file = File(song.path);
     if (!await file.exists()) {
       throw FileSystemException('MQA file not found', song.path);
+    }
+
+    final fileSize = await file.length();
+    if (fileSize > kMaxInMemoryDecodeBytes) {
+      throw UnsupportedError(
+        'MQA file exceeds max in-memory decode size of 300 MB (${(fileSize / (1024 * 1024)).toStringAsFixed(1)} MB)',
+      );
     }
 
     final bytes = await file.readAsBytes();

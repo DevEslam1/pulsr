@@ -415,7 +415,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                           },
                           child: SongTile(
                             song: song,
-                            index: index + 1,
+                            index: index,
                             onTap: () => playerCubit.playSong(song, queue: songs),
                             onMorePressed: () => SongInfoSheet.show(context, song: song),
                               trailing: IconButton(

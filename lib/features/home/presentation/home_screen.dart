@@ -987,7 +987,7 @@ class _OnlineCategorySection extends StatelessWidget {
                         : '${songs.first.id}-${songs.length}',
                     child: SongTile(
                       song: songs[i],
-                      index: i + 1,
+                      index: i,
                       onTap: () => playerCubit.playSong(songs[i], queue: songs),
                       trailing: YtmDownloadButton(song: songs[i]),
                       onMorePressed: () =>
@@ -1004,7 +1004,7 @@ class _OnlineCategorySection extends StatelessWidget {
                         : '${songs.first.id}-${songs.length}',
                     child: SongTile(
                       song: songs[i],
-                      index: i + 1,
+                      index: i,
                       onTap: () => playerCubit.playSong(songs[i], queue: songs),
                       trailing: YtmDownloadButton(song: songs[i]),
                       onMorePressed: () =>
@@ -1488,6 +1488,15 @@ class _RecentlyAddedSectionState extends State<_RecentlyAddedSection> {
         final hasMore = songs.length >= _currentLimit;
         final loading = _isLoadingMore && songs.length < _currentLimit;
         final totalItemCount = songs.length + (hasMore ? 1 : 0);
+        // The requested page has arrived; clear the guard so "Load more" can be
+        // tapped again (previously it stayed set and disabled the button forever).
+        if (_isLoadingMore && !loading) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _isLoadingMore) {
+              setState(() => _isLoadingMore = false);
+            }
+          });
+        }
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1575,7 +1584,7 @@ class _RecentlyAddedSectionState extends State<_RecentlyAddedSection> {
                       ),
                       child: Center(
                         child: OutlinedButton.icon(
-                          onPressed: _isLoadingMore ? null : _loadMore,
+                          onPressed: loading ? null : _loadMore,
                           style: OutlinedButton.styleFrom(
                             side: BorderSide(color: p.accent.withValues(alpha: 0.3)),
                             shape: RoundedRectangleBorder(
@@ -1586,7 +1595,7 @@ class _RecentlyAddedSectionState extends State<_RecentlyAddedSection> {
                               vertical: AppSpacing.s10,
                             ),
                           ),
-                          icon: _isLoadingMore
+                          icon: loading
                               ? SizedBox(
                                   width: 16,
                                   height: 16,

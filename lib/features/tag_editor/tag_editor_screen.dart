@@ -65,14 +65,14 @@ class _TagEditorViewState extends State<_TagEditorView> {
         showDialog<void>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Partial batch detected'),
+            title: Text(context.l10n.partialBatchDetected),
             content: Text(
               '${checkpoint.length} file(s) were not updated due to an interrupted batch.',
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('OK'),
+                child: Text(context.l10n.ok),
               ),
             ],
           ),

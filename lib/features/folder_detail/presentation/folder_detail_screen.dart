@@ -69,33 +69,39 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
             onPressed: () async {
               final newExcluded = !_isExcluded;
               setState(() => _isExcluded = newExcluded);
-              await _useCase.toggleExcludeFolder(folder.path);
-              if (context.mounted) {
-                LibraryCubit? libraryCubit;
-                try {
-                  libraryCubit = context.read<LibraryCubit>();
-                  libraryCubit.loadFolders();
-                } catch (_) {}
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      newExcluded
-                          ? context.l10n.folderExcluded
-                          : context.l10n.folderIncluded,
-                    ),
-                    action: SnackBarAction(
-                      label: context.l10n.undo,
-                      onPressed: () async {
-                        if (mounted) setState(() => _isExcluded = !newExcluded);
-                        await _useCase.toggleExcludeFolder(folder.path);
-                        try {
-                          libraryCubit?.loadFolders();
-                        } catch (_) {}
-                      },
-                    ),
-                  ),
-                );
+              LibraryCubit? libraryCubit;
+              try {
+                libraryCubit = context.read<LibraryCubit>();
+              } catch (_) {}
+              // Route through LibraryCubit so the songs stream is re-subscribed
+              // with the new exclusion. Toggling the raw use case only refreshed
+              // the folder list, leaving excluded songs visible in the Library.
+              if (libraryCubit != null) {
+                await libraryCubit.toggleFolderExclusion(folder.path);
+              } else {
+                await _useCase.toggleExcludeFolder(folder.path);
               }
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    newExcluded
+                        ? context.l10n.folderExcluded
+                        : context.l10n.folderIncluded,
+                  ),
+                  action: SnackBarAction(
+                    label: context.l10n.undo,
+                    onPressed: () async {
+                      if (mounted) setState(() => _isExcluded = !newExcluded);
+                      if (libraryCubit != null) {
+                        await libraryCubit.toggleFolderExclusion(folder.path);
+                      } else {
+                        await _useCase.toggleExcludeFolder(folder.path);
+                      }
+                    },
+                  ),
+                ),
+              );
             },
           ),
         ],

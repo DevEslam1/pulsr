@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/services.dart';
 import 'package:fpdart/fpdart.dart';
@@ -23,6 +24,7 @@ import '../../domain/repositories/download_repository_interface.dart';
 class DownloadRepositoryImpl implements IDownloadRepository {
   static const _downloadChannel = MethodChannel(PulsrChannels.ytDownload);
   static const String _prefKey = 'pulsr_download_tasks_v2';
+  static final _random = Random();
 
   final YtDownloadService _ytDownloadService;
 
@@ -598,7 +600,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         }
         if (attempt > 0) {
           // Exponential backoff with ~20% jitter: ~2s, ~4s.
-          final backoffMs = (2000 << (attempt - 1)) + DateTime.now().millisecond % 400;
+          final backoffMs = (2000 << (attempt - 1)) + _random.nextInt(400);
           await Future.delayed(Duration(milliseconds: backoffMs));
           if (_pausedVideoIds.contains(videoId) || !_tasks.containsKey(videoId)) {
             break;

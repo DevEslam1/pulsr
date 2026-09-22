@@ -632,8 +632,11 @@ class _LyricsViewState extends State<LyricsView> {
         // PlayerCubit would throw ProviderNotFoundException.
         context.read<PlayerCubit>();
         content = BlocListener<PlayerCubit, PlayerState>(
-          listenWhen: (previous, current) =>
-              previous.position != current.position,
+          listenWhen: (previous, current) {
+            if (!_isSynced) return false;
+            final delta = (current.position - previous.position).inMilliseconds;
+            return delta.abs() >= 100 || delta < 0;
+          },
           listener: (context, state) {
             _updateProgress(state.position);
           },

@@ -115,7 +115,7 @@ class _DspSubState {
       : isEqEnabled = s.isEqEnabled,
         eqPresetName = s.eqPreset.name,
         eqGains = List<double>.unmodifiable(s.eqPreset.gains),
-        eqGainsHash = s.eqPreset.gains.fold<int>(0, (h, e) => h ^ e.hashCode),
+        eqGainsHash = Object.hashAll(s.eqPreset.gains),
         eqBassBoost = s.eqPreset.bassBoost,
         isVirtualizerEnabled = s.isVirtualizerEnabled,
         virtualizerStrength = s.virtualizerStrength,
@@ -434,9 +434,18 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   final Set<int> _mutedBands = <int>{};
   final Set<int> _soloedBands = <int>{};
 
+  EqualizerManager? _cachedEqualizerManager;
+
   @override
   void initState() {
     super.initState();
+    try {
+      _cachedEqualizerManager = getIt.isRegistered<EqualizerManager>()
+          ? getIt<EqualizerManager>()
+          : null;
+    } catch (_) {
+      _cachedEqualizerManager = null;
+    }
     _tabController = TabController(length: 3, vsync: this);
     _loadHeadphoneProfiles();
     _listenForDspAutoDegrade();
@@ -505,15 +514,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
 
   /// The EqualizerManager singleton, when DI has registered it. Widget tests
   /// that do not register it must not crash the sheet, so this is defensive.
-  EqualizerManager? _equalizerManagerOrNull() {
-    try {
-      return getIt.isRegistered<EqualizerManager>()
-          ? getIt<EqualizerManager>()
-          : null;
-    } catch (_) {
-      return null;
-    }
-  }
+  EqualizerManager? _equalizerManagerOrNull() => _cachedEqualizerManager;
 
   /// F-32: active band plan length (10, 32 or 64). The manager is the source of
   /// truth; fall back to the emitted preset length when DI is not registered.
@@ -799,6 +800,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
         ],
       ),
     );
+
+    // The dialog has closed; release the controller (previously leaked on every
+    // import).
+    textController.dispose();
 
     if (jsonString != null && jsonString.isNotEmpty) {
       final success = await cubit.importEqPreset(jsonString);

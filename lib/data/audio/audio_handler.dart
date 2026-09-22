@@ -779,18 +779,20 @@ class PulsrAudioHandler extends BaseAudioHandler
     // Native pre-gain owns RG: mixer carries only user volume + per-song
     // offset (bit-transparent, 20ms-smoothed natively, no double-apply).
     if (_nativeRgActive && Platform.isAndroid) {
-      var base = _volume;
-      // _perSongVolumeDbFor is total (returns 0.0 on any lookup failure),
-      // so no catch is needed here.
       final perSongDb = _perSongVolumeDbFor(song);
-      if (perSongDb != 0.0) {
-        base = (base * math.pow(10, perSongDb / 20).toDouble()).clamp(0.0, 1.0);
-      }
       if (_dvcEnabled) {
+        // The native DVC stage applies the user volume; the player-side mixer
+        // must therefore carry only the per-song offset. Returning `_volume *
+        // factor` here double-applied the user volume (volume²).
         if (song.id == currentSong?.id) {
           unawaited(_pushDvcGain(_volume));
         }
-        return base == _volume ? 1.0 : base;
+        if (perSongDb == 0.0) return 1.0;
+        return math.pow(10, perSongDb / 20).toDouble().clamp(0.0, 1.0);
+      }
+      var base = _volume;
+      if (perSongDb != 0.0) {
+        base = (base * math.pow(10, perSongDb / 20).toDouble()).clamp(0.0, 1.0);
       }
       return base;
     }
@@ -1047,10 +1049,11 @@ class PulsrAudioHandler extends BaseAudioHandler
         // the last structural queue edit (skipToNext never dirtied the queue).
         await _repository.updateQueuePosition(posMs);
       }
-      // Only clear AFTER a successful write: clearing first meant a failed
-      // write was never retried and resume-after-kill could restore a stale
-      // position (B-4).
-      _positionDirty = false;
+      // Only clear AFTER a successful write, and only if no newer position arrived
+      // while the async database write was in flight.
+      if (_activePlayer.position.inMilliseconds == posMs) {
+        _positionDirty = false;
+      }
     } catch (e, st) {
       // Re-dirty so the periodic timer (and a later app pause) retries.
       _positionDirty = true;
@@ -1068,8 +1071,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     _positionSaveTimer?.cancel();
     _positionSaveTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       if (_positionDirty) {
-        _positionDirty = false;
-        saveCurrentPositionImmediate();
+        unawaited(saveCurrentPositionImmediate());
       }
     });
   }
@@ -1433,7 +1435,8 @@ class PulsrAudioHandler extends BaseAudioHandler
               if (_crossfadeManager.duration > Duration.zero &&
                   duration > _crossfadeManager.duration &&
                   compensatedPos >= duration - _crossfadeManager.duration &&
-                  !_crossfadeManager.isCrossfading) {
+                  !_crossfadeManager.isCrossfading &&
+                  !_gaplessMode) {
                 final nextIdx = _getNextIndex();
                 if (nextIdx != null && nextIdx != _currentIndex) {
                   _startCrossfade(nextIdx);
@@ -1737,7 +1740,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     // Register lifecycle observer to persist playback state and manage buffers on app background/resume
     _lifecycleObserver = AudioHandlerLifecycleObserver(
       onBackground: () {
-        saveCurrentPositionImmediate();
+        unawaited(saveCurrentPositionImmediate());
         _equalizerManager.onAppPaused();
         _memoryManager.onAppBackgrounded(inactivePlayer: _inactivePlayer);
       },
@@ -1889,17 +1892,12 @@ class PulsrAudioHandler extends BaseAudioHandler
         throw const YtmException(
             'YTM_UNAVAILABLE', 'Resolved stream URL is empty');
       }
-      final expireParam = Uri.tryParse(stream.url)?.queryParameters['expire'];
-      DateTime expireAt;
-      if (expireParam != null) {
-        final rawExpire = int.tryParse(expireParam) ?? 0;
-        if (rawExpire > 9999999999) {
-          expireAt = DateTime.fromMillisecondsSinceEpoch(rawExpire);
-        } else if (rawExpire > 0) {
-          expireAt = DateTime.fromMillisecondsSinceEpoch(rawExpire * 1000);
-        } else {
-          expireAt = DateTime.now().add(const Duration(hours: 5));
-        }
+      // Prefer the resolver-provided expiry, then the URL stamp (which may be a
+      // ?expire= query param or /expire/<s>/ path segment), then a safe default.
+      final expireStamp = stream.expiresAt ?? YtmStream.expiryFromUrl(stream.url);
+      final DateTime expireAt;
+      if (expireStamp != null) {
+        expireAt = DateTime.fromMillisecondsSinceEpoch(expireStamp);
       } else {
         expireAt = DateTime.now().add(const Duration(hours: 5));
       }
@@ -2089,6 +2087,10 @@ class PulsrAudioHandler extends BaseAudioHandler
     await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
         restoreVolume: _volume);
     _saveCurrentPosition();
+    _gaplessLoaded = false;
+    _gaplessTargetIndex = null;
+    mediaItem.add(null);
+    queue.add([]);
     await _playerA.stop();
     await _playerB.stop();
     await AudioEffectsChannel().releaseEffects();
@@ -2157,12 +2159,22 @@ class PulsrAudioHandler extends BaseAudioHandler
     try {
       _memoryManager.clearAll();
     } catch (_) {}
+    try {
+      adaptiveQualityManager.dispose();
+    } catch (_) {}
+    try {
+      if (_volumeControllerReady) {
+        _volumeController.dispose();
+      }
+    } catch (_) {}
     if (!_positionSubject.isClosed) _positionSubject.close();
     if (!_highRatePositionSubject.isClosed) _highRatePositionSubject.close();
     if (!_audioSessionIdSubject.isClosed) _audioSessionIdSubject.close();
     if (!_errorSubject.isClosed) _errorSubject.close();
     if (!_onTrackChangedSubject.isClosed) _onTrackChangedSubject.close();
-    _equalizerManager.dispose();
+    try {
+      _equalizerManager.dispose();
+    } catch (_) {}
     _crossfadeManager.dispose();
     try {
       await AudioEffectsChannel().releaseEffects();

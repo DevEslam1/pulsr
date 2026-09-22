@@ -103,9 +103,37 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
     private var cachedSetMixerMethod: java.lang.reflect.Method? = null
     private var cachedClearMixerMethod: java.lang.reflect.Method? = null
     private var cachedGetMixerMethod: java.lang.reflect.Method? = null
+    private var cachedGetCodecStatusMethod: java.lang.reflect.Method? = null
+    private var cachedGetCodecConfigMethod: java.lang.reflect.Method? = null
+    private var cachedGetCodecsLocalCapabilitiesMethod: java.lang.reflect.Method? = null
+    private var cachedGetCodecsSelectableCapabilitiesMethod: java.lang.reflect.Method? = null
+    private var cachedSetCodecPrefMethod: java.lang.reflect.Method? = null
+
+    @Volatile private var cachedOutputDetails: Map<String, Any?>? = null
+    @Volatile private var outputDetailsCacheTimestamp: Long = 0L
+    private val OUTPUT_DETAILS_CACHE_TTL_MS = 1000L
+
+    private fun invalidateOutputDetailsCache() {
+        cachedOutputDetails = null
+        outputDetailsCacheTimestamp = 0L
+    }
 
     // Bluetooth A2DP codec control
     private var bluetoothA2dp: BluetoothA2dp? = null
+    private val codecControlAvailable: Boolean by lazy {
+        try {
+            BluetoothA2dp::class.java.getDeclaredMethod(
+                "getCodecStatus", BluetoothDevice::class.java
+            )
+            true
+        } catch (e: NoSuchMethodException) {
+            Log.w(TAG, "Bluetooth codec control not available on this device")
+            false
+        } catch (e: SecurityException) {
+            Log.w(TAG, "SecurityException checking Bluetooth codec control")
+            false
+        }
+    }
     private val bluetoothAdapter: BluetoothAdapter? =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             (context.getSystemService(Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager)?.adapter
@@ -170,7 +198,8 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
     }
 
     private fun notifyDeviceChange() {
-        val info = try { getAudioOutputDetails() } catch (e: Exception) { return }
+        invalidateOutputDetailsCache()
+        val info = try { getAudioOutputDetails(forceRefresh = true) } catch (e: Exception) { return }
         // Don't emit if no Dart listener yet; latest info will be sent on onListen
         val sink = eventSink ?: return
         android.os.Handler(android.os.Looper.getMainLooper()).post {
@@ -444,7 +473,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 a2dpAudioDev.address
             } else null
             if (devAddress != null) {
-                val adapter = BluetoothAdapter.getDefaultAdapter()
+                val adapter = bluetoothAdapter
                 adapter?.bondedDevices?.firstOrNull { it.address == devAddress }
             } else null
         } catch (_: Exception) { null }
@@ -500,28 +529,59 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 }
             )
         }
+        if (!codecControlAvailable) {
+            return mapOf(
+                "supported" to false,
+                "connected" to true,
+                "a2dpPresent" to a2dpPresent,
+                "reason" to "api_not_available",
+                "codecName" to "SBC",
+                "sampleRateHz" to 44100,
+                "bitDepth" to 16
+            )
+        }
         return try {
             // getCodecStatus is @SystemApi — use reflection
-            val getCodecStatusMethod = BluetoothA2dp::class.java
-                .getDeclaredMethod("getCodecStatus", BluetoothDevice::class.java)
-            getCodecStatusMethod.isAccessible = true
+            val getCodecStatusMethod = cachedGetCodecStatusMethod ?: run {
+                BluetoothA2dp::class.java
+                    .getDeclaredMethod("getCodecStatus", BluetoothDevice::class.java).apply {
+                        isAccessible = true
+                        cachedGetCodecStatusMethod = this
+                    }
+            }
             val status = getCodecStatusMethod.invoke(a2dp, device)
                 ?: return mapOf("supported" to true, "connected" to true,
                     "reason" to "codec_status_null")
 
             val statusClass = status.javaClass
             // BluetoothCodecStatus.getCodecConfig() → BluetoothCodecConfig
-            val current = statusClass.getMethod("getCodecConfig").invoke(status) as? BluetoothCodecConfig
+            val getCodecConfigMethod = cachedGetCodecConfigMethod ?: run {
+                statusClass.getMethod("getCodecConfig").apply {
+                    cachedGetCodecConfigMethod = this
+                }
+            }
+            val current = getCodecConfigMethod.invoke(status) as? BluetoothCodecConfig
                 ?: return mapOf("supported" to true, "connected" to true,
                     "reason" to "no_codec_config")
 
+            val getLocalCapsMethod = cachedGetCodecsLocalCapabilitiesMethod ?: run {
+                statusClass.getMethod("getCodecsLocalCapabilities").apply {
+                    cachedGetCodecsLocalCapabilitiesMethod = this
+                }
+            }
             @Suppress("UNCHECKED_CAST")
             val localCaps: List<BluetoothCodecConfig> =
-                (statusClass.getMethod("getCodecsLocalCapabilities").invoke(status) as? List<*>)
+                (getLocalCapsMethod.invoke(status) as? List<*>)
                     ?.filterIsInstance<BluetoothCodecConfig>() ?: emptyList()
+
+            val getSelectableCapsMethod = cachedGetCodecsSelectableCapabilitiesMethod ?: run {
+                statusClass.getMethod("getCodecsSelectableCapabilities").apply {
+                    cachedGetCodecsSelectableCapabilitiesMethod = this
+                }
+            }
             @Suppress("UNCHECKED_CAST")
             val selectableCaps: List<BluetoothCodecConfig> =
-                (statusClass.getMethod("getCodecsSelectableCapabilities").invoke(status) as? List<*>)
+                (getSelectableCapsMethod.invoke(status) as? List<*>)
                     ?.filterIsInstance<BluetoothCodecConfig>() ?: emptyList()
 
             // LDAC quality mode from codecSpecific1 (Long)
@@ -591,6 +651,10 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         ldacQualityMode: Int? = null,
     ): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+        if (!codecControlAvailable) {
+            Log.w(TAG, "setBluetoothCodecPreference called but codec control is not available")
+            return false
+        }
         val a2dp = bluetoothA2dp ?: return false
         val device = getConnectedA2dpDevice() ?: return false
         return try {
@@ -677,12 +741,16 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 .build()
 
             // setCodecConfigPreference is also @SystemApi — use reflection
-            val setCodecPrefMethod = BluetoothA2dp::class.java.getDeclaredMethod(
-                "setCodecConfigPreference",
-                BluetoothDevice::class.java,
-                BluetoothCodecConfig::class.java
-            )
-            setCodecPrefMethod.isAccessible = true
+            val setCodecPrefMethod = cachedSetCodecPrefMethod ?: run {
+                BluetoothA2dp::class.java.getDeclaredMethod(
+                    "setCodecConfigPreference",
+                    BluetoothDevice::class.java,
+                    BluetoothCodecConfig::class.java
+                ).apply {
+                    isAccessible = true
+                    cachedSetCodecPrefMethod = this
+                }
+            }
             setCodecPrefMethod.invoke(a2dp, device, newConfig)
 
             Log.d(TAG, "BT codec set: type=${codecTypeName(targetCodecType)} rate=${sampleRateHz}Hz bits=${bitDepth}")
@@ -1090,7 +1158,19 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         )
     }
 
-    private fun getAudioOutputDetails(): Map<String, Any?> {
+    private fun getAudioOutputDetails(forceRefresh: Boolean = false): Map<String, Any?> {
+        val now = System.currentTimeMillis()
+        val cached = cachedOutputDetails
+        if (!forceRefresh && cached != null && (now - outputDetailsCacheTimestamp < OUTPUT_DETAILS_CACHE_TTL_MS)) {
+            return cached
+        }
+        val details = buildAudioOutputDetails()
+        cachedOutputDetails = details
+        outputDetailsCacheTimestamp = now
+        return details
+    }
+
+    private fun buildAudioOutputDetails(): Map<String, Any?> {
         val result = mutableMapOf<String, Any?>()
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || audioManager == null) {
             result["deviceName"] = "Default Audio Output"

@@ -625,7 +625,7 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
       } else {
         mgr.bpmOverrides.remove(trackId);
       }
-      if (mgr.bpmOverrides.length > 500) {
+      if (mgr.bpmOverrides.length > 500 && _songs.isNotEmpty) {
         final keep = _songs.map((s) => s.id.toString()).toSet();
         mgr.bpmOverrides.removeWhere((k, _) => !keep.contains(k));
       }

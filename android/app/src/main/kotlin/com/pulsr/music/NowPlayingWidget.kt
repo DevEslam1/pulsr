@@ -110,7 +110,7 @@ class NowPlayingWidget : AppWidgetProvider() {
         }
 
         val token = intent.getStringExtra(EXTRA_WIDGET_TOKEN)
-        if (token != null && token == WIDGET_INTERNAL_TOKEN) return true
+        if (token != null && token == getWidgetToken(context)) return true
         return try {
             context.checkCallingOrSelfPermission(WIDGET_CONTROL_PERMISSION) ==
                 PackageManager.PERMISSION_GRANTED
@@ -274,7 +274,24 @@ class NowPlayingWidget : AppWidgetProvider() {
         private const val EXTRA_WIDGET_TOKEN = "com.pulsr.music.widget.extra.TOKEN"
         private const val WIDGET_ACTION_PREFIX = "com.pulsr.music.widget."
         private const val WIDGET_CONTROL_PERMISSION = "com.pulsr.music.permission.WIDGET_CONTROL"
-        private val WIDGET_INTERNAL_TOKEN = java.util.UUID.randomUUID().toString()
+
+        private val secureRandom by lazy { java.security.SecureRandom() }
+        private val widgetTokenLock = Any()
+
+        private fun generateToken(): String {
+            val bytes = ByteArray(32)
+            secureRandom.nextBytes(bytes)
+            return android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+        }
+
+        private fun getWidgetToken(context: Context): String = synchronized(widgetTokenLock) {
+            val prefs = context.getSharedPreferences("widget_tokens", Context.MODE_PRIVATE)
+            prefs.getString("token_active", null) ?: run {
+                val newToken = generateToken()
+                prefs.edit().putString("token_active", newToken).commit()
+                newToken
+            }
+        }
 
         /// C-10: the complete set of broadcasts this receiver will act on.
         private val WIDGET_ACTIONS = setOf(
@@ -371,6 +388,7 @@ class NowPlayingWidget : AppWidgetProvider() {
         private fun performMediaAction(
             context: Context,
             fallbackKeyCode: Int? = null,
+            timeoutMs: Long = 5000L,
             onDispatched: (() -> Unit)? = null,
             action: (MediaControllerCompat.TransportControls, Boolean, Long, Long) -> Unit
         ) {
@@ -467,7 +485,7 @@ class NowPlayingWidget : AppWidgetProvider() {
                     }
                     fallbackKeyCode?.let { sendExplicitMediaButton(appContext, it) }
                 }
-                mainHandler.postDelayed(timeoutRunnable, 5000)
+                mainHandler.postDelayed(timeoutRunnable, timeoutMs)
             } catch (_: Throwable) {
                 fallbackKeyCode?.let { sendExplicitMediaButton(context, it) }
             }
@@ -793,7 +811,7 @@ class NowPlayingWidget : AppWidgetProvider() {
         private fun createBroadcastPendingIntent(context: Context, actionName: String, requestCode: Int): PendingIntent {
             val intent = Intent(context, NowPlayingWidget::class.java).apply {
                 action = actionName
-                putExtra(EXTRA_WIDGET_TOKEN, WIDGET_INTERNAL_TOKEN)
+                putExtra(EXTRA_WIDGET_TOKEN, getWidgetToken(context))
                 `package` = context.packageName
             }
             val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -808,7 +826,7 @@ class NowPlayingWidget : AppWidgetProvider() {
             val intent = Intent(context, NowPlayingWidget::class.java).apply {
                 action = ACTION_SEEK_RATIO
                 putExtra(EXTRA_RATIO, ratio)
-                putExtra(EXTRA_WIDGET_TOKEN, WIDGET_INTERNAL_TOKEN)
+                putExtra(EXTRA_WIDGET_TOKEN, getWidgetToken(context))
                 `package` = context.packageName
             }
             val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {

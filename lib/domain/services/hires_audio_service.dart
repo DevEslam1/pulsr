@@ -117,6 +117,25 @@ class HiResAudioService {
     _init();
   }
 
+  static bool _isSameOutputInfo(AudioOutputInfo a, AudioOutputInfo b) =>
+      a.deviceName == b.deviceName &&
+      a.sampleRate == b.sampleRate &&
+      a.bitDepth == b.bitDepth &&
+      a.isBitPerfectActive == b.isBitPerfectActive &&
+      a.isBitPerfectSupported == b.isBitPerfectSupported &&
+      a.targetSampleRate == b.targetSampleRate &&
+      a.targetBitDepth == b.targetBitDepth &&
+      a.activeDeviceType == b.activeDeviceType &&
+      a.isBluetooth == b.isBluetooth &&
+      a.isLeAudio == b.isLeAudio &&
+      a.bleAudioPresent == b.bleAudioPresent &&
+      a.btCodecName == b.btCodecName &&
+      a.btSampleRateHz == b.btSampleRateHz &&
+      a.btBitDepth == b.btBitDepth &&
+      a.btLdacQualityMode == b.btLdacQualityMode &&
+      a.usbAudioClass == b.usbAudioClass &&
+      a.btCodecConnected == b.btCodecConnected;
+
   void _init() {
     if (!PlatformCapabilities.isAndroid) return;
     try {
@@ -131,12 +150,12 @@ class HiResAudioService {
         (data) {
           if (data is Map) {
             final info = AudioOutputInfo.fromMap(data);
-            // Deduplicate consecutive identical emissions
+            // Deduplicate consecutive identical emissions. Compare every field a
+            // consumer can observe: deduping on only name/rate/bit-perfect hid
+            // route changes (Bluetooth codec, LE Audio, USB class) from device
+            // profiles and the earbud/automation UI.
             if (_cachedOutputInfo != null &&
-                _cachedOutputInfo!.deviceName == info.deviceName &&
-                _cachedOutputInfo!.sampleRate == info.sampleRate &&
-                _cachedOutputInfo!.isBitPerfectActive ==
-                    info.isBitPerfectActive) {
+                _isSameOutputInfo(_cachedOutputInfo!, info)) {
               return;
             }
             _cachedOutputInfo = info;
