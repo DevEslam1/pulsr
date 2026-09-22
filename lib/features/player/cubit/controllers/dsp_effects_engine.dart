@@ -26,50 +26,75 @@ class DspEffectsEngine {
     final clamped = amount.clamp(0.0, 1.0);
     final state = _getState();
     _emit(state.copyWith(
-      eqPreset: EqPreset(
-        name: state.eqPreset.name,
-        gains: state.eqPreset.gains,
-        bassBoost: clamped,
+      dsp: state.dsp.copyWith(
+        eqPreset: EqPreset(
+          name: state.dsp.eqPreset.name,
+          gains: state.dsp.eqPreset.gains,
+          bassBoost: clamped,
+        ),
       ),
-      errorMessage: null,
+      playback: state.playback.copyWith(errorMessage: null),
     ));
     await _audioHandler.setBassBoost(clamped);
   }
 
   Future<void> setVirtualizerEnabled(bool enabled) async {
     if (enabled && !_guardDsp('Virtualizer')) return;
-    _emit(_getState().copyWith(isVirtualizerEnabled: enabled, errorMessage: null));
+    final state = _getState();
+    _emit(state.copyWith(
+      dsp: state.dsp.copyWith(isVirtualizerEnabled: enabled),
+      playback: state.playback.copyWith(errorMessage: null),
+    ));
     await _audioHandler.setVirtualizerEnabled(enabled);
   }
 
   Future<void> setVirtualizerStrength(double strength) async {
     if (!_guardDsp('Virtualizer', showError: false)) return;
     final clamped = strength.clamp(0.0, 1.0);
-    _emit(_getState().copyWith(virtualizerStrength: clamped, errorMessage: null));
+    final state = _getState();
+    _emit(state.copyWith(
+      dsp: state.dsp.copyWith(virtualizerStrength: clamped),
+      playback: state.playback.copyWith(errorMessage: null),
+    ));
     await _audioHandler.setVirtualizerStrength(clamped);
   }
 
   Future<void> setReverbEnabled(bool enabled) async {
     if (enabled && !_guardDsp('Reverb')) return;
-    _emit(_getState().copyWith(isReverbEnabled: enabled, errorMessage: null));
+    final state = _getState();
+    _emit(state.copyWith(
+      dsp: state.dsp.copyWith(isReverbEnabled: enabled),
+      playback: state.playback.copyWith(errorMessage: null),
+    ));
     await _audioHandler.setReverb(enabled);
   }
 
   Future<void> setReverbPreset(int preset) async {
     final state = _getState();
-    _emit(state.copyWith(reverbPreset: preset, errorMessage: null));
+    _emit(state.copyWith(
+      dsp: state.dsp.copyWith(reverbPreset: preset),
+      playback: state.playback.copyWith(errorMessage: null),
+    ));
     await _audioHandler.setReverb(state.isReverbEnabled, preset: preset);
   }
 
   Future<void> setLimiterEnabled(bool enabled) async {
     if (enabled && !_guardDsp('Limiter')) return;
-    _emit(_getState().copyWith(isLimiterEnabled: enabled, errorMessage: null));
+    final state = _getState();
+    _emit(state.copyWith(
+      dsp: state.dsp.copyWith(isLimiterEnabled: enabled),
+      playback: state.playback.copyWith(errorMessage: null),
+    ));
     await _audioHandler.setLookaheadLimiter(enabled);
   }
 
   Future<void> setCrossfeedEnabled(bool enabled) async {
     if (enabled && !_guardDsp('Crossfeed')) return;
-    _emit(_getState().copyWith(isCrossfeedEnabled: enabled, errorMessage: null));
+    final state = _getState();
+    _emit(state.copyWith(
+      dsp: state.dsp.copyWith(isCrossfeedEnabled: enabled),
+      playback: state.playback.copyWith(errorMessage: null),
+    ));
     await _audioHandler.setCrossfeed(enabled);
   }
 }

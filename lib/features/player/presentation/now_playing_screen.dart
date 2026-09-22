@@ -24,15 +24,19 @@ class NowPlayingScreen extends StatefulWidget {
 }
 
 class _NowPlayingScreenState extends State<NowPlayingScreen> {
+  late final PlayerCubit _playerCubit;
+
   @override
   void initState() {
     super.initState();
-    // Always default to Cover (Track) view when opening Now Playing screen
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        context.read<PlayerCubit>().resetOverlayViews();
-      }
-    });
+    _playerCubit = context.read<PlayerCubit>();
+    _playerCubit.resetOverlayViews();
+  }
+
+  @override
+  void dispose() {
+    _playerCubit.resetOverlayViews();
+    super.dispose();
   }
 
   @override
@@ -53,7 +57,10 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
         ));
 
     return BlocConsumer<PlayerCubit, PlayerState>(
-      buildWhen: (prev, curr) => prev.differsFromBeyondPosition(curr),
+      buildWhen: (prev, curr) =>
+          prev.differsFromBeyondPosition(curr) ||
+          prev.lyricsSlice != curr.lyricsSlice ||
+          prev.isDspActive != curr.isDspActive,
       listenWhen: (prev, curr) => prev.currentSong?.id != curr.currentSong?.id,
       listener: (context, state) {
         final song = state.currentSong;

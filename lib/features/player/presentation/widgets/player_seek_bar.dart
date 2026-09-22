@@ -98,18 +98,21 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
     final effectiveSongId = widget.songId ?? songId;
     final effectiveFilePath = widget.filePath ?? songPath;
 
+    if (_lastSongId != effectiveSongId || _lastFilePath != effectiveFilePath) {
+      _lastSongId = effectiveSongId;
+      _lastFilePath = effectiveFilePath;
+      _dragValue = null;
+      _tapSeekPending = false;
+      _tapSeekRatio = null;
+      _cachedWaveformFuture = null;
+    }
+
     // Check if Waveform Seek Bar is enabled in settings and song ID is available
     if (waveformEnabled && effectiveSongId != null) {
-      if (_lastSongId != effectiveSongId ||
-          _lastFilePath != effectiveFilePath ||
-          _cachedWaveformFuture == null) {
-        _lastSongId = effectiveSongId;
-        _lastFilePath = effectiveFilePath;
-        _cachedWaveformFuture = WaveformService.instance.getWaveform(
-          songId: effectiveSongId,
-          filePath: effectiveFilePath,
-        );
-      }
+      _cachedWaveformFuture ??= WaveformService.instance.getWaveform(
+        songId: effectiveSongId,
+        filePath: effectiveFilePath,
+      );
 
       return _withUpNext(
         FutureBuilder<List<double>>(

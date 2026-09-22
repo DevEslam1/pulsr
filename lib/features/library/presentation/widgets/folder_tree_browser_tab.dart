@@ -39,12 +39,13 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
         }
 
         // Determine all unique folders (normalize separators first so
-        // MediaStore `/storage/...` paths behave identically on Windows).
+        // MediaStore `/storage/...` paths behave identically on Windows,
+        // and UNC paths like //server/share are preserved in POSIX form).
         final folders = <String>{};
         for (final song in songs) {
           if (!song.path.startsWith('ytmusic://') &&
               !song.path.startsWith('content://')) {
-            final normalized = song.path.replaceAll('\\', '/');
+            final normalized = p_path.posix.normalize(song.path.replaceAll('\\', '/'));
             final dir = p_path.posix.dirname(normalized);
             if (dir.isNotEmpty && dir != '.') folders.add(dir);
           }
@@ -63,25 +64,26 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
           _currentPath = sorted.first;
         }
 
-        final currentDir = (_currentPath ?? '').replaceAll('\\', '/');
+        final currentDir = p_path.posix.normalize((_currentPath ?? '').replaceAll('\\', '/'));
         final dirPrefix = currentDir.endsWith('/') ? currentDir : '$currentDir/';
         final childSongs = songs.where((s) {
-          final dir =
-              p_path.posix.dirname(s.path.replaceAll('\\', '/'));
+          final dir = p_path.posix.dirname(
+            p_path.posix.normalize(s.path.replaceAll('\\', '/')),
+          );
           return dir == currentDir;
         }).toList();
         final childFolders = folders
             .where((f) {
-              final normF = f.replaceAll('\\', '/');
+              final normF = p_path.posix.normalize(f.replaceAll('\\', '/'));
               return normF != currentDir && normF.startsWith(dirPrefix);
             })
             .toList()
           ..sort();
 
         FolderItem? folderItemFor(String path) {
-          final normalized = path.replaceAll('\\', '/').toLowerCase();
+          final normalized = p_path.posix.normalize(path.replaceAll('\\', '/')).toLowerCase();
           for (final f in state.folders) {
-            if (f.path.replaceAll('\\', '/').toLowerCase() == normalized) {
+            if (p_path.posix.normalize(f.path.replaceAll('\\', '/')).toLowerCase() == normalized) {
               return f;
             }
           }

@@ -1,6 +1,7 @@
 // lib/features/tag_editor/tag_editor_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/di/injection.dart';
 import '../../core/services/metadata_search_service.dart';
 import '../../core/theme/aura_theme.dart';
@@ -38,8 +39,47 @@ class TagEditorScreen extends StatelessWidget {
   }
 }
 
-class _TagEditorView extends StatelessWidget {
+class _TagEditorView extends StatefulWidget {
   const _TagEditorView();
+
+  @override
+  State<_TagEditorView> createState() => _TagEditorViewState();
+}
+
+class _TagEditorViewState extends State<_TagEditorView> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkInterruptedBatch();
+    });
+  }
+
+  Future<void> _checkInterruptedBatch() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final checkpoint = prefs.getStringList(TagEditorCubit.batchCheckpointKey);
+      if (checkpoint != null && checkpoint.isNotEmpty && mounted) {
+        await prefs.remove(TagEditorCubit.batchCheckpointKey);
+        if (!mounted) return;
+        showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Partial batch detected'),
+            content: Text(
+              '${checkpoint.length} file(s) were not updated due to an interrupted batch.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {

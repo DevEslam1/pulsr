@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:injectable/injectable.dart';
+import 'package:mutex/mutex.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/bloc/base_cubit.dart';
 import '../../../core/constants/channels.dart';
@@ -103,6 +104,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
   // FIX-C6: Flag to track if proxy password was loaded, preventing overwrites
   @override
   bool _proxyPasswordLoaded = false;
+  final Mutex _migrationMutex = Mutex();
 
   /// FIX-H07: Track dirty fields modified while an async load is in flight.
   final Set<String> _dirtyFields = <String>{};
@@ -535,33 +537,35 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     final current = baseState ?? state;
     String proxyPassword = initialPassword;
 
-    // Migration verification for proxy password
-    if (prefs.containsKey(_keyProxyPassword) && proxyPassword.isEmpty) {
-      final legacyPass = prefs.getString(_keyProxyPassword) ?? '';
-      if (legacyPass.isNotEmpty) {
-        try {
-          await _secureStorage.write(
-            key: _keyProxyPasswordSecure,
-            value: legacyPass,
-          );
-          final verify = await _secureStorage.read(
-            key: _keyProxyPasswordSecure,
-          );
-          if (verify == legacyPass) {
-            await prefs.remove(_keyProxyPassword);
-            proxyPassword = legacyPass;
-          } else {
-            ErrorLogger.log(
-              'Secure storage migration mismatch for proxy password',
-              category: 'SettingsCubit',
+    // Migration verification for proxy password protected by _migrationMutex
+    await _migrationMutex.protect(() async {
+      if (prefs.containsKey(_keyProxyPassword) && proxyPassword.isEmpty) {
+        final legacyPass = prefs.getString(_keyProxyPassword) ?? '';
+        if (legacyPass.isNotEmpty) {
+          try {
+            await _secureStorage.write(
+              key: _keyProxyPasswordSecure,
+              value: legacyPass,
             );
+            final verify = await _secureStorage.read(
+              key: _keyProxyPasswordSecure,
+            );
+            if (verify == legacyPass) {
+              await prefs.remove(_keyProxyPassword);
+              proxyPassword = legacyPass;
+            } else {
+              ErrorLogger.log(
+                'Secure storage migration mismatch for proxy password',
+                category: 'SettingsCubit',
+              );
+              proxyPassword = legacyPass;
+            }
+          } catch (e) {
             proxyPassword = legacyPass;
           }
-        } catch (e) {
-          proxyPassword = legacyPass;
         }
       }
-    }
+    });
 
     final proxyTypeStr =
         prefs.getString(_keyProxyType) ?? AppProxyType.http.name;
@@ -652,14 +656,23 @@ class SettingsCubit extends PulsrCubit<SettingsState>
   Future<void> _loadPreferences() async {
     // FIX-H07 / B-07: Snapshot state before await and preserve dirty fields
     final preLoadState = state;
+    final SharedPreferences prefs;
     try {
-      final results = await Future.wait([
-        SharedPreferences.getInstance(),
-        _safeSecureRead(_keyProxyPasswordSecure),
-      ]);
-      final prefs = results[0] as SharedPreferences;
-      final String proxyPassword = (results[1] as String?) ?? '';
+      prefs = await SharedPreferences.getInstance();
+    } catch (e, st) {
+      ErrorLogger.log('Failed to get SharedPreferences',
+          error: e, stackTrace: st, category: 'Settings');
+      return;
+    }
+    String proxyPassword = '';
+    try {
+      proxyPassword = (await _safeSecureRead(_keyProxyPasswordSecure)) ?? '';
+    } catch (e, st) {
+      ErrorLogger.log('Failed to read proxy password from secure storage',
+          error: e, stackTrace: st, category: 'Settings');
+    }
 
+    try {
       var runningState = preLoadState;
 
       // FIX-H01: Load preferences in modular chunks with error isolation.
@@ -810,11 +823,12 @@ class SettingsCubit extends PulsrCubit<SettingsState>
         );
       }
       await refreshOutputDevice();
-      // FIX-E01: Wrap _syncProxySettings in try/catch so native proxy failure doesn't abort settings load
+      // FIX-E01 / M8: Wrap _syncProxySettings in try/catch so native proxy failure doesn't abort settings load
       try {
         await _syncProxySettings(activeProxyConfig);
-      } catch (e) {
-        debugPrint('[SettingsCubit] Failed to sync proxy settings during load: $e');
+      } catch (e, st) {
+        ErrorLogger.log('Failed to sync proxy settings',
+            error: e, stackTrace: st, category: 'Settings');
       }
       // Resume scheduled theming across restarts only when the user opted in.
       _themeScheduleController?.start();

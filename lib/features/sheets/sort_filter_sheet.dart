@@ -50,6 +50,7 @@ class SortFilterSheet extends StatelessWidget {
       {'key': 'rating', 'label': context.l10n.browseTopRated},
       {'key': 'lastPlayed', 'label': context.l10n.recentlyPlayed},
       {'key': 'fileSize', 'label': context.l10n.fileSize},
+      {'key': 'sampleRate', 'label': context.l10n.sampleRate},
       {'key': 'year', 'label': context.l10n.browseReleaseYear},
     ];
 

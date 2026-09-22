@@ -229,7 +229,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
         subtitle: state.errorMessage!,
         primaryActionLabel: context.l10n.tryAgain,
         primaryActionIcon: Icons.refresh_rounded,
-        onPrimaryAction: cubit.retry,
+        onPrimaryAction: cubit.retryAfterCooldown,
       );
     }
 

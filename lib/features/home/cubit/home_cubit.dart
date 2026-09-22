@@ -89,6 +89,9 @@ class HomeCubit extends PulsrCubit<HomeState> {
 
   /// Returns the cached future for [category], refetching once its TTL lapses.
   Future<List<YtmTrack>> categoryFuture(String category) {
+    if (_inFlightCategories.contains(category)) {
+      return _categoryFutures[category] ?? Future.value(<YtmTrack>[]);
+    }
     final nowMs = _monotonicClock.elapsedMilliseconds;
     final lastFetchMs = _categoryFetchTimestamps[category];
     // FIX-H6 / FIX-G3: If TTL expired but fetch is still in flight, do not evict to avoid race conditions

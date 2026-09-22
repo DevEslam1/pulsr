@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -27,16 +28,22 @@ class _AppShellState extends State<AppShell> {
   bool _isSideInspectorOpen = false;
   bool? _isSidebarExtended;
   DockStackMode _dockMode = DockStackMode.defaultLayout;
-  // FIX-H9: Cap tab history at 50 entries to prevent memory leak
+  // FIX-H9: Cap tab history at 50 entries with O(1) ListQueue trimming
   static const int _maxTabHistory = 50;
-  final List<int> _tabHistory = [0];
+  final ListQueue<int> _tabHistory = ListQueue<int>()..add(0);
+  int _lastNavMs = 0;
+  int _lastPopMs = 0;
   DateTime? _lastBackPressTime;
 
   void _onTapNav(int index) {
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    if (nowMs - _lastNavMs < 200) return;
+    _lastNavMs = nowMs;
+
     if (_tabHistory.isEmpty || _tabHistory.last != index) {
-      _tabHistory.add(index);
-      if (_tabHistory.length > _maxTabHistory) {
-        _tabHistory.removeRange(0, _tabHistory.length - _maxTabHistory);
+      _tabHistory.addLast(index);
+      while (_tabHistory.length > _maxTabHistory) {
+        _tabHistory.removeFirst();
       }
     }
     widget.navigationShell.goBranch(
@@ -84,6 +91,10 @@ class _AppShellState extends State<AppShell> {
         onPopInvokedWithResult: (didPop, result) async {
           if (didPop) return;
 
+          final nowMs = DateTime.now().millisecondsSinceEpoch;
+          if (nowMs - _lastPopMs < 200) return;
+          _lastPopMs = nowMs;
+
           // 1. If any dialog, bottom sheet, or modal route is open on the root navigator, pop it first:
           final rootNav = rootNavigatorKey.currentState;
           if (PulsrModalTracker.isModalOpen.value && rootNav != null && rootNav.canPop()) {
@@ -113,7 +124,7 @@ class _AppShellState extends State<AppShell> {
           // 4. If not on the Home tab (0), go back to Home:
           if (widget.navigationShell.currentIndex != 0) {
             _tabHistory.clear();
-            _tabHistory.add(0);
+            _tabHistory.addLast(0);
             widget.navigationShell.goBranch(0);
             setState(() {});
             return;

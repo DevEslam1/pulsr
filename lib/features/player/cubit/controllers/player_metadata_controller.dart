@@ -42,10 +42,13 @@ class PlayerMetadataController {
     final cached = _lyricsManager.getCachedLyrics(song);
     if (cached != null) {
       if (_isSameTrack(_getState().currentSong, song)) {
-        _emit(_getState().copyWith(
-          lyrics: cached.lines,
-          lyricsSource: cached.source,
-          isLoadingLyrics: false,
+        final s = _getState();
+        _emit(s.copyWith(
+          lyricsSlice: s.lyricsSlice.copyWith(
+            lyrics: cached.lines,
+            lyricsSource: cached.source,
+            isLoadingLyrics: false,
+          ),
         ));
         return;
       }
@@ -62,10 +65,13 @@ class PlayerMetadataController {
       return;
     }
 
-    _emit(_getState().copyWith(
-      lyrics: result?.lines ?? const [],
-      lyricsSource: result?.source ?? LyricsSource.none,
-      isLoadingLyrics: false,
+    final s = _getState();
+    _emit(s.copyWith(
+      lyricsSlice: s.lyricsSlice.copyWith(
+        lyrics: result?.lines ?? const [],
+        lyricsSource: result?.source ?? LyricsSource.none,
+        isLoadingLyrics: false,
+      ),
     ));
   }
 
@@ -81,16 +87,21 @@ class PlayerMetadataController {
     if (song.cueFile == null || song.cueStartMs == null) {
       final state = _getState();
       if (state.cueChapters.isEmpty && state.currentCueIndex == 0) return;
-      _emit(state.copyWith(cueChapters: const [], currentCueIndex: 0));
+      _emit(state.copyWith(
+        queueSlice: state.queueSlice.copyWith(cueChapters: const [], currentCueIndex: 0),
+      ));
       return;
     }
     try {
       final chapters = await CueParser.findAndParseCue(song.path);
       if (_isClosed() || !_isSameTrack(_getState().currentSong, song)) return;
       final index = chapters.indexWhere((c) => c.index == song.trackNumber);
-      _emit(_getState().copyWith(
-        cueChapters: chapters,
-        currentCueIndex: index < 0 ? 0 : index,
+      final s = _getState();
+      _emit(s.copyWith(
+        queueSlice: s.queueSlice.copyWith(
+          cueChapters: chapters,
+          currentCueIndex: index < 0 ? 0 : index,
+        ),
       ));
     } catch (e, st) {
       ErrorLogger.log('Failed to load cue chapters for ${song.path}',
@@ -110,8 +121,8 @@ class PlayerMetadataController {
             .map((s) => _isSameTrack(s, updated) ? updated : s)
             .toList();
         _emit(state.copyWith(
-          currentSong: updated,
-          queue: updatedQueue,
+          playback: state.playback.copyWith(currentSong: updated),
+          queueSlice: state.queueSlice.copyWith(queue: updatedQueue),
         ));
       }
     } catch (e, st) {
@@ -123,7 +134,7 @@ class PlayerMetadataController {
   Future<void> enrichTrackParallel(SongsTableData song, {bool isOfflineOnly = false}) async {
     await Future.wait([
       loadLyrics(song, isOfflineOnly: isOfflineOnly),
-      loadSponsorBlock(song),
+      loadSponsorBlock(song, isOfflineOnly: isOfflineOnly),
       loadCueChapters(song),
       enrichAudioQuality(song),
     ]);

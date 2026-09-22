@@ -15,6 +15,7 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
   final ISmartPlaylistEngine _engine;
   final PlaylistUseCases _playlistUseCases;
   StreamSubscription? _previewSub;
+  Timer? _debounceTimer;
   // FIX-H3: Generation counter to discard stale preview results
   int _previewGen = 0;
 
@@ -98,6 +99,15 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
   }
 
   void _updatePreview() {
+    _debounceTimer?.cancel();
+    _debounceTimer = autoTimer(Timer(const Duration(milliseconds: 150), () {
+      _executePreview();
+    }));
+  }
+
+  void _executePreview() {
+    if (isClosed) return;
+    _debounceTimer?.cancel();
     final oldSub = _previewSub;
     _previewSub = null;
     if (oldSub != null) {
@@ -118,9 +128,8 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
       (songs) {
         // FIX-H3: Guard against superseded generation
         if (isClosed || gen != _previewGen) return;
-        // FIX-M7: Truncation check comparing against previewCap and queryLimit
-        final truncated = songs.length > previewCap ||
-            (queryLimit != null && queryLimit > previewCap && songs.length >= queryLimit);
+        // Simplified truncation check: any query returning > previewCap is truncated
+        final truncated = songs.length > previewCap;
         final visible = songs.take(previewCap).toList();
         safeEmit(state.copyWith(
           previewSongs: visible,
@@ -175,5 +184,12 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
       ));
     }
     return succeeded;
+  }
+
+  @override
+  Future<void> close() {
+    _debounceTimer?.cancel();
+    _previewSub?.cancel();
+    return super.close();
   }
 }

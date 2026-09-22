@@ -43,21 +43,29 @@ void main() {
       );
 
       const state1 = PlayerState(
-        position: Duration(seconds: 10),
-        duration: Duration(seconds: 180),
-        isPlaying: true,
-        playbackPitch: 1.0,
+        playback: PlaybackSlice(
+          position: Duration(seconds: 10),
+          duration: Duration(seconds: 180),
+          isPlaying: true,
+          playbackPitch: 1.0,
+        ),
       );
 
       const state2 = PlayerState(
-        position: Duration(seconds: 11), // only position differs
-        duration: Duration(seconds: 180),
-        isPlaying: true,
-        playbackPitch: 1.0,
+        playback: PlaybackSlice(
+          position: Duration(seconds: 11), // only position differs
+          duration: Duration(seconds: 180),
+          isPlaying: true,
+          playbackPitch: 1.0,
+        ),
       );
 
-      final state3 = state1.copyWith(currentSong: songA);
-      final state4 = state1.copyWith(currentSong: songB);
+      final state3 = state1.copyWith(
+        playback: state1.playback.copyWith(currentSong: songA),
+      );
+      final state4 = state1.copyWith(
+        playback: state1.playback.copyWith(currentSong: songB),
+      );
 
       final stopwatch = Stopwatch()..start();
       const iterations = 10000;

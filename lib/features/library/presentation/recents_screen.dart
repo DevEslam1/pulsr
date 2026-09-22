@@ -48,6 +48,12 @@ class _RecentsScreenState extends State<RecentsScreen> {
   }
 
   @override
+  void deactivate() {
+    _searchDebounce?.cancel();
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
     _searchDebounce?.cancel();
     _searchController.dispose();
@@ -383,7 +389,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                     ),
                   ),
                 ),
-              if (allRecents.length >= _historyLimit && _searchQuery.isEmpty && _historyLimit < 500)
+              if (allRecents.length >= _historyLimit && _searchQuery.isEmpty)
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
@@ -393,7 +399,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                         label: Text(context.l10n.loadMoreHistory),
                         onPressed: () {
                           setState(() {
-                            _historyLimit = (_historyLimit + 100).clamp(100, 500);
+                            _historyLimit += 100;
                           });
                         },
                       ),

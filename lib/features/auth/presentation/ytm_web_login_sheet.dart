@@ -1007,6 +1007,10 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       try {
         if (_disposed) return false;
         return await _detectLoginState(url);
+      } catch (e, st) {
+        ErrorLogger.log('Login check failed',
+            error: e, stackTrace: st, category: 'YtmWebLogin');
+        return false;
       } finally {
         _loginCheckInFlight = null;
       }
@@ -1852,13 +1856,17 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                           _webViewController = controller;
                           final wasGone = _webViewGone;
                           _webViewGone = false;
-                          // A fresh native instance: the previous handle may have
-                          // died and paused the auth poll, so bring it back.
+                          // A fresh native instance: check immediately if already logged in,
+                          // otherwise resume auth poll loop.
                           if (wasGone) {
                             _pollIntervalSeconds = 2;
                             _authPollAttempts = 0;
-                            _scheduleNextAuthPoll();
                           }
+                          unawaited(_checkIfLoggedIn().then((loggedIn) {
+                            if (!loggedIn && mounted && !_disposed && wasGone) {
+                              _scheduleNextAuthPoll();
+                            }
+                          }));
                         },
                         onCreateWindow: (controller, createWindowAction) async {
                           final url = createWindowAction.request.url;

@@ -185,6 +185,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
                 }
               }
 
+              if (generation != _generation || isClosed) return;
               safeEmit(state.copyWith(
                   results: filtered, isLoading: false, errorMessage: null));
               if (filtered.isNotEmpty) unawaited(_persistHistory(boundedQuery));

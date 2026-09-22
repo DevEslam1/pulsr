@@ -1,287 +1,86 @@
+// lib/features/player/cubit/player_cubit.dart
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 import 'package:audio_service/audio_service.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter/material.dart'
-    show
-        AlertDialog,
-        FilledButton,
-        Navigator,
-        Text,
-        TextButton,
-        WidgetsBinding,
-        showDialog;
 import 'package:injectable/injectable.dart';
 import 'package:mutex/mutex.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:rxdart/rxdart.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../../../data/audio/ir_file_parser.dart';
 import '../../../core/bloc/base_cubit.dart';
-import '../../../core/constants/prefs_keys.dart';
-import '../../../core/di/injection.dart';
-import '../../../core/router/app_router.dart';
 import '../../../core/services/lrclib_service.dart';
-import '../../../core/services/radio_station_store.dart';
 import '../../../core/services/scrobbler_service.dart';
 import '../../../core/services/sponsorblock_service.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/telemetry/playback_latency_tracker.dart';
+import '../../../core/utils/async_guard.dart';
 import '../../../core/utils/error_logger.dart';
-import '../../../core/utils/l10n_extensions.dart';
-import '../../../core/utils/lrc_parser.dart';
-import '../../../core/utils/cue_parser.dart';
-import '../../../core/constants/audio_feature_info.dart';
 import '../../../data/audio/audio_handler.dart';
-import '../../../data/audio/equalizer_manager.dart';
 import '../../../data/audio/per_song_eq_store.dart';
 import '../../../data/audio/per_song_volume_store.dart';
-import '../../../data/audio/playback_bookmark_store.dart';
-import '../../../data/audio/sleep_timer_manager.dart';
 import '../../../data/audio/song_rating_store.dart';
 import '../../../data/db/app_database.dart';
-import '../../../data/scanner/media_scanner_service.dart';
-import '../../../domain/models/audio_effects_config.dart';
-import '../../../domain/models/audio_quality_info.dart';
-import '../../../domain/models/eq_preset.dart';
-import '../../../domain/models/headphone_profile.dart';
-import '../../../domain/models/reverb_preset.dart';
-import '../../../data/audio/headphone_profiles_repository.dart';
-import '../../../domain/models/lyrics_line.dart';
 import '../../../domain/models/radio_station.dart';
 import '../../../domain/repositories/music_repository_interface.dart';
 import '../../../domain/usecases/toggle_favorite_usecase.dart';
 import '../../../core/services/device_profile_service.dart';
-import '../../../core/services/earbud_optimization_service.dart';
 import '../../../core/services/hires_audio_service.dart';
-import '../../../core/services/quran_mode_service.dart';
-import '../../../core/services/room_correction_service.dart';
 import '../../../core/services/settings_profiles_service.dart';
 import '../../../core/services/smart_audio_service.dart';
-import '../../../domain/services/headphone_device_matcher.dart';
-import '../../../domain/services/smart_audio_plan.dart';
-import '../../../domain/models/audio_output_info.dart';
+import '../../../domain/models/eq_preset.dart';
+import '../../../domain/models/headphone_profile.dart';
+import '../../../core/services/earbud_optimization_service.dart';
+import '../../../core/services/quran_mode_service.dart';
+import '../../../data/audio/comparison_slot.dart';
+import '../../../data/audio/playback_bookmark_store.dart';
+import '../../../data/audio/sleep_timer_manager.dart';
+import '../../../data/scanner/media_scanner_service.dart';
+import '../../../domain/models/lyrics_line.dart';
 import '../../../domain/models/quran_mode_profile.dart';
+import '../../../core/services/room_correction_service.dart';
+import '../../../domain/models/audio_effects_config.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../widgets/widget_service.dart';
-import 'player_dependencies.dart';
-import 'player_state.dart';
-import 'player_scrobble_coordinator.dart';
-import 'player_widget_coordinator.dart';
 import 'controllers/player_controllers.dart';
 import 'managers/player_managers.dart';
-import 'quran_restore_snapshot.dart';
-import 'queue_slot_codec.dart';
+import 'player_dependencies.dart';
+import 'player_state.dart';
+
 part 'player_queue_mixin.dart';
 part 'player_transport_mixin.dart';
 part 'player_dsp_mixin.dart';
 part 'player_playback_options_mixin.dart';
 
-typedef _QueueSlotData = QueueSlotData;
-
-String _encodeQueueSlotsSync(Map<String, dynamic> data) {
-  final activeSlot = data['activeSlot'] as int;
-  final slots = data['slots'] as Map<dynamic, dynamic>;
-  final doc = <String, dynamic>{
-    'activeSlot': activeSlot,
-    for (final e in slots.entries) e.key.toString(): e.value,
-  };
-  return jsonEncode(doc);
-}
-
-@singleton
+/// Thin coordinator owning player controllers, audio handler subscriptions, and state emission.
+@lazySingleton
 class PlayerCubit extends PulsrCubit<PlayerState>
     with PlayerQueueOps, PlayerTransportControls, PlayerDspControls, PlayerPlaybackOptions {
-  static const int _maxQueueSize = 500;
-  static const Duration _scrobbleInterval = Duration(seconds: 5);
-
-  @override
   final PulsrAudioHandler _audioHandler;
-  @override
   final IMusicRepository _repository;
-  @override
-  final ToggleFavoriteUseCase _toggleFavoriteUseCase;
-  @override
   final SettingsCubit? _settingsCubit;
-  final WidgetService? _widgetService;
-  final ScrobblerService? _scrobblerService;
-  final PlaybackLatencyTracker? _latencyTracker;
-  @override
-  final SettingsProfilesService? _settingsProfilesService;
-  @override
-  final DeviceProfileService? _deviceProfileService;
-  @override
-  final HiResAudioService? _hiResAudioService;
-  @override
-  final SmartAudioService? _smartAudioService;
-  @override
-  final PerSongEqStore _perSongEqStore;
-  @override
-  final PerSongVolumeStore _perSongVolumeStore;
-  @override
-  final SongRatingStore _songRatingStore;
-  final SponsorBlockService _sponsorBlockService;
-  final QuranModeService? _quranModeService;
-  final EarbudOptimizationService? _earbudOptimizationService;
-  final LrclibService? _lrclibService;
-  final YtmAccountService? _ytmAccountService;
-  final MediaScannerService? _mediaScannerService;
-  QuranRestoreSnapshot? _quranRestore;
-  @override
-  String? _lastAutoAppliedDeviceKey;
-  /// True when Smart Auto itself enabled bit-perfect output, so it only ever
-  /// turns off what it turned on (a manual bit-perfect choice is respected).
-  @override
-  bool _smartAutoBitPerfectApplied = false;
 
-  // FIX(BUG-14): Expose unthrottled position stream for high-fps UI components like MiniPlayer
-  Stream<Duration> get rawPositionStream => _audioHandler.positionStream;
-
-  SponsorBlockService get _sponsorBlock => _sponsorBlockService;
-
-  // FIX-A1: Composed controllers decomposing PlayerCubit
+  @override
+  @visibleForTesting
   late final PlayerTransportController transportController;
+  @override
+  @visibleForTesting
   late final PlayerQueueController queueController;
+  @override
+  @visibleForTesting
   late final PlayerDspController dspController;
+  @override
+  @visibleForTesting
+  late final PlayerPlaybackOptionsController playbackOptionsController;
+  @visibleForTesting
   late final PlayerMetadataController metadataController;
+  @visibleForTesting
   late final PlayerWidgetBridge widgetBridge;
 
-  StreamSubscription<void>? _widgetClickSub;
-  DateTime? _lastSlotPersistAt;
-  PlayerWidgetCoordinator? _widgetCoordinator;
-  PlayerWidgetCoordinator get _widgetUpdater =>
-      _widgetCoordinator ??= PlayerWidgetCoordinator(_widgetService);
-  PlayerScrobbleCoordinator? _scrobbleCoordinator;
-  PlayerScrobbleCoordinator get _scrobble =>
-      _scrobbleCoordinator ??= PlayerScrobbleCoordinator(
-        service: () => _scrobblerService,
-        isQuranMode: () => state.isQuranModeEnabled,
-        isClosed: () => isClosed,
-        interval: _scrobbleInterval,
-      );
-  // FIX-C02: Separate generation counters for onTrackChanged and mediaItem listeners
-  int _trackChangedGen = 0;
-  int _mediaItemGen = 0;
-  int _mediaItemResolutionGen = 0;
-  // FIX-C09: Completer to serialize per-track sync operations
-  Completer<void>? _perTrackSyncCompleter;
-  int _localMatchSwapGen = 0;
-  int _perTrackSyncGen = 0;
-  int _followSampleRateGen = 0;
-  List<SponsorBlockSegment> _currentSponsorSegments = const [];
-  String? _sponsorSegmentsVideoId;
-  @override
-  Duration? _lastSkippedSegmentEnd;
-  @override
-  DateTime? _lastSponsorSkipTime;
-
-  Timer? _persistQueueDebounce;
-  @override
-  Timer? _seekThrottleTimer;
-  @override
-  Duration? _pendingSeek;
-
-  /// T2: last sample rate successfully pushed for follow-track. Used to
-  /// de-dupe so tracks sharing a rate do not trigger redundant native churn.
-  int? _lastFollowedSampleRate;
-
-  /// Per-song EQ override backup: the global preset active before a per-song
-  /// override is applied. Restored when a track without an override starts,
-  /// so a per-song curve never leaks into the rest of the queue.
-  @override
-  EqPreset? _globalEqBackup;
-  @override
-  HeadphoneProfile? _globalHeadphoneProfileBackup;
-  @override
-  bool _perSongOverrideActive = false;
-
-  /// Idempotence key for per-track sync (AB loop, bookmark, rating, per-song
-  /// EQ/volume). Both onTrackChanged and mediaItem can fire for one change
-  /// and in either order — without this the second path would double-apply
-  /// (or, worse, the first path wins the race and the second skips the reset
-  /// entirely, leaving the previous song's AB/EQ on the new song).
-  ///
-  /// The guard is time-bounded rather than id-only: two listeners for the SAME
-  /// change fire within milliseconds and are deduped, while a genuine replay of
-  /// the same song id (repeat-one / duplicate queue entry) happens well after
-  /// the window and re-runs the reset.
-  int? _lastPerTrackSyncSongId;
-  DateTime? _lastPerTrackSyncAt;
-  // FIX-M09: Track position at last per-track sync to detect backward jumps/restarts
-  Duration? _lastPerTrackSyncPosition;
-
-  /// Guards playbackState echoes against optimistic UI:
-  /// - a transient loading/buffering `playing:false` must not regress an
-  ///   optimistic `isPlaying:true` from playSong (flash paused);
-  /// - a stale speed echo must not clobber a just-set speed.
-  @override
-  double? _lastSpeedPushed;
-  @override
-  DateTime? _lastSpeedPushAt;
-
-  /// True when the user explicitly paused while a track was still loading or
-  /// buffering (e.g. an online stream that has not been fetched yet). It
-  /// suppresses the optimistic "still playing" re-assert during loading so the
-  /// pause is not visually reverted, and is cleared as soon as playback really
-  /// starts or a new track is requested.
-  @override
   bool _userPausedIntentionally = false;
+  final AsyncGuard _trackChangedGuard = AsyncGuard();
+  final AsyncGuard _mediaItemGuard = AsyncGuard();
+  final AsyncGuard _queueSyncGuard = AsyncGuard();
 
-  /// Bumped on every queue mutation. [_getNextTitles]'s cache is keyed by
-  /// index/length/current song, none of which changes when songs AFTER the
-  /// current one are reordered - the version counter is what actually
-  /// invalidates it.
-  @override
-  int _queueVersion = 0;
+  Stream<Duration> get rawPositionStream => _audioHandler.positionStream;
 
-  @override
-  final Map<int, SongsTableData> _slotLookupCache = {};
-
-  // FIX-G2: Single-writer mutex for queue slots and slot lookup cache
-  @override
-  final Mutex _queueMutex = Mutex();
-
-  @override
-  final Map<int, _QueueSlotData> _queueSlots = {
-    0: const _QueueSlotData(
-        songIds: [], currentIndex: 0, position: Duration.zero, speed: 1.0),
-    1: const _QueueSlotData(
-        songIds: [], currentIndex: 0, position: Duration.zero, speed: 1.0),
-    2: const _QueueSlotData(
-        songIds: [], currentIndex: 0, position: Duration.zero, speed: 1.0),
-  };
-  bool _queueRestorationDone = false;
-
-  @override
-  void _setQueueSlot(
-    int slot, {
-    required List<SongsTableData> songs,
-    required int currentIndex,
-    required Duration position,
-    required double speed,
-  }) {
-    for (final s in songs) {
-      _slotLookupCache[s.id] = s;
-    }
-    if (_slotLookupCache.length > 1500) {
-      final activeIds = <int>{
-        for (final slotData in _queueSlots.values) ...slotData.songIds,
-        for (final s in state.queue) s.id,
-      };
-      _slotLookupCache.removeWhere((id, _) => !activeIds.contains(id));
-    }
-    _queueSlots[slot] = _QueueSlotData(
-      songIds: songs.map((s) => s.id).toList(),
-      currentIndex: currentIndex,
-      position: position,
-      speed: speed,
-    );
-  }
-
-  // FIX-A03: PlayerDependencies bundles optional auxiliary services for PlayerCubit
   PlayerCubit({
     required PulsrAudioHandler audioHandler,
     required IMusicRepository repository,
@@ -299,251 +98,168 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     PerSongVolumeStore? perSongVolumeStore,
     SongRatingStore? songRatingStore,
     SponsorBlockService? sponsorBlockService,
-    QuranModeService? quranModeService,
-    EarbudOptimizationService? earbudOptimizationService,
     LrclibService? lrclibService,
     YtmAccountService? ytmAccountService,
+    EarbudOptimizationService? earbudOptimizationService,
+    QuranModeService? quranModeService,
     MediaScannerService? mediaScannerService,
   })  : _audioHandler = audioHandler,
         _repository = repository,
-        _toggleFavoriteUseCase = toggleFavoriteUseCase,
         _settingsCubit = dependencies?.settingsCubit ?? settingsCubit,
-        _widgetService = dependencies?.widgetService ?? widgetService,
-        _scrobblerService = dependencies?.scrobblerService ?? scrobblerService,
-        _settingsProfilesService = dependencies?.settingsProfilesService ??
-            settingsProfilesService ??
-            (getIt.isRegistered<SettingsProfilesService>()
-                ? getIt<SettingsProfilesService>()
-                : null),
-        _deviceProfileService = dependencies?.deviceProfileService ??
-            deviceProfileService ??
-            (getIt.isRegistered<DeviceProfileService>()
-                ? getIt<DeviceProfileService>()
-                : null),
-        _hiResAudioService = dependencies?.hiResAudioService ??
-            hiResAudioService ??
-            (getIt.isRegistered<HiResAudioService>()
-                ? getIt<HiResAudioService>()
-                : null),
-        _smartAudioService = dependencies?.smartAudioService ??
-            smartAudioService ??
-            (getIt.isRegistered<SmartAudioService>()
-                ? getIt<SmartAudioService>()
-                : SmartAudioService()),
-        _latencyTracker = dependencies?.latencyTracker ??
-            latencyTracker ??
-            (getIt.isRegistered<PlaybackLatencyTracker>()
-                ? getIt<PlaybackLatencyTracker>()
-                : null),
-        _perSongEqStore = dependencies?.perSongEqStore ??
-            perSongEqStore ??
-            (getIt.isRegistered<PerSongEqStore>()
-                ? getIt<PerSongEqStore>()
-                : PerSongEqStore()),
-        _perSongVolumeStore = dependencies?.perSongVolumeStore ??
-            perSongVolumeStore ??
-            (getIt.isRegistered<PerSongVolumeStore>()
-                ? getIt<PerSongVolumeStore>()
-                : PerSongVolumeStore()),
-        _songRatingStore = dependencies?.songRatingStore ??
-            songRatingStore ??
-            (getIt.isRegistered<SongRatingStore>()
-                ? getIt<SongRatingStore>()
-                : SongRatingStore()),
-        _sponsorBlockService = dependencies?.sponsorBlockService ??
-            sponsorBlockService ??
-            (getIt.isRegistered<SponsorBlockService>()
-                ? getIt<SponsorBlockService>()
-                : SponsorBlockService.instance),
-        _quranModeService = dependencies?.quranModeService ??
-            quranModeService ??
-            (getIt.isRegistered<QuranModeService>()
-                ? getIt<QuranModeService>()
-                : null),
-        _earbudOptimizationService = dependencies?.earbudOptimizationService ??
-            earbudOptimizationService ??
-            (getIt.isRegistered<EarbudOptimizationService>()
-                ? getIt<EarbudOptimizationService>()
-                : null),
-        _lrclibService = dependencies?.lrclibService ??
-            lrclibService ??
-            (getIt.isRegistered<LrclibService>()
-                ? getIt<LrclibService>()
-                : null),
-        _ytmAccountService = dependencies?.ytmAccountService ??
-            ytmAccountService ??
-            (getIt.isRegistered<YtmAccountService>()
-                ? getIt<YtmAccountService>()
-                : null),
-        _mediaScannerService = dependencies?.mediaScannerService ??
-            mediaScannerService ??
-            (getIt.isRegistered<MediaScannerService>()
-                ? getIt<MediaScannerService>()
-                : null),
         super(const PlayerState()) {
-    // Share fallback instances process-wide so the handler (which resolves
-    // the same types via getIt) never operates on a divergent throwaway
-    // copy when DI isn't set up (tests / manual construction).
-    if (!getIt.isRegistered<PerSongEqStore>()) {
-      try {
-        getIt.registerSingleton<PerSongEqStore>(_perSongEqStore);
-      } catch (_) {}
-    }
-    if (!getIt.isRegistered<PerSongVolumeStore>()) {
-      try {
-        getIt.registerSingleton<PerSongVolumeStore>(_perSongVolumeStore);
-      } catch (_) {}
-    }
-    if (!getIt.isRegistered<SongRatingStore>()) {
-      try {
-        getIt.registerSingleton<SongRatingStore>(_songRatingStore);
-      } catch (_) {}
-    }
-    if (!getIt.isRegistered<SponsorBlockService>()) {
-      try {
-        getIt.registerSingleton<SponsorBlockService>(_sponsorBlockService);
-      } catch (_) {}
-    }
-    _listenToAudioService();
-    _loadPlaybackSpeed();
-    _loadPlaybackPitch();
-    _listenToSettings();
-    _listenToWidgetClicks();
-    _syncAudioEffects();
-    // Re-sync effect state once the handler finishes its async init: the
-    // sync above can race the preference restore and read pre-restore
-    // defaults, leaving toggles showing OFF for saved-ON stages.
-    _audioHandler.effectsReady.then((_) async {
-      if (isClosed) return;
-      _syncAudioEffects();
-      await _restoreQuranMode();
-      // ReplayGain re-apply: with the fully restored session (song tags +
-      // cached prefs) a restored 'on' gain mode must be actually audible,
-      // not just displayed as enabled.
-      await _audioHandler.setVolume(_audioHandler.volume);
-    }).catchError((Object e, StackTrace st) {
-      ErrorLogger.log('Post-init effects re-sync failed',
-          error: e, stackTrace: st, category: 'PlayerCubit');
-    });
-    _restoreQueueSlots();
-    _startDeviceProfileWatcher();
-    _updateWidgetThrottled(force: true);
-
-    // FIX-A1: Initialize decomposed controllers
     transportController = PlayerTransportController(
       audioHandler: _audioHandler,
       getState: () => state,
       emit: safeEmit,
       isClosed: () => isClosed,
+      onUserPausedIntentionally: (val) => _userPausedIntentionally = val,
+      toggleFavoriteUseCase: toggleFavoriteUseCase,
     );
+    final queueMutex = Mutex();
+    final slotLookupCache = <int, SongsTableData>{};
+    final queueSlots = <int, QueueSlotData>{};
     queueController = PlayerQueueController(
       audioHandler: _audioHandler,
+      repository: _repository,
       getState: () => state,
       emit: safeEmit,
       isClosed: () => isClosed,
-      queueMutex: _queueMutex,
-      slotLookupCache: _slotLookupCache,
-      queueSlots: _queueSlots,
-      updateWidgetThrottled: ({bool force = false}) => _updateWidgetThrottled(force: force),
-      loadLyrics: (song) => unawaited(_loadLyricsForSong(song)),
-      debouncedPersistQueueSlots: _debouncedPersistQueueSlots,
-      bumpQueueVersion: () => _queueVersion++,
-      isSameTrack: (a, b) => _isSameTrack(a, b),
+      queueMutex: queueMutex,
+      slotLookupCache: slotLookupCache,
+      queueSlots: queueSlots,
+      updateWidgetThrottled: ({bool force = false}) =>
+          widgetBridge.updateWidgetThrottled(state, force: force),
+      loadLyrics: (song) => unawaited(metadataController.loadLyrics(song)),
+      debouncedPersistQueueSlots: () =>
+          queueController.debouncedPersistQueueSlots(),
+      bumpQueueVersion: () {},
+      isSameTrack: _isSameTrack,
+      latencyTracker: dependencies?.latencyTracker ?? latencyTracker,
     );
+    unawaited(queueController.restoreQueueSlots());
     dspController = PlayerDspController(
       audioHandler: _audioHandler,
       settingsCubit: _settingsCubit,
+      settingsProfilesService: dependencies?.settingsProfilesService ?? settingsProfilesService,
+      deviceProfileService: dependencies?.deviceProfileService ?? deviceProfileService,
+      hiResAudioService: dependencies?.hiResAudioService ?? hiResAudioService,
+      smartAudioService: dependencies?.smartAudioService ?? smartAudioService,
       getState: () => state,
       emit: safeEmit,
+      syncAudioEffects: _syncAudioEffects,
+      isClosed: () => isClosed,
+    );
+    playbackOptionsController = PlayerPlaybackOptionsController(
+      audioHandler: _audioHandler,
+      earbudOptimizationService: dependencies?.earbudOptimizationService ?? earbudOptimizationService,
+      hiResAudioService: dependencies?.hiResAudioService ?? hiResAudioService,
+      getState: () => state,
+      emit: safeEmit,
+      isClosed: () => isClosed,
     );
     metadataController = PlayerMetadataController(
       lyricsManager: PlayerLyricsManager(
-        lrclibService: _lrclibService,
-        ytmAccountService: _ytmAccountService,
+        lrclibService: dependencies?.lrclibService ?? lrclibService,
+        ytmAccountService: dependencies?.ytmAccountService ?? ytmAccountService,
       ),
       sponsorBlockManager: PlayerSponsorBlockManager(
-        service: _sponsorBlockService,
+        service: dependencies?.sponsorBlockService ?? sponsorBlockService ?? SponsorBlockService.instance,
       ),
       repository: _repository,
       getState: () => state,
       emit: safeEmit,
       isClosed: () => isClosed,
-      isSameTrack: (a, b) => _isSameTrack(a, b),
+      isSameTrack: _isSameTrack,
     );
     widgetBridge = PlayerWidgetBridge(
-      widgetService: _widgetService,
-      scrobblerService: () => _scrobblerService,
-      latencyTracker: _latencyTracker,
+      widgetService: dependencies?.widgetService ?? widgetService,
+      scrobblerService: () => dependencies?.scrobblerService ?? scrobblerService,
+      latencyTracker: dependencies?.latencyTracker ?? latencyTracker,
       isQuranMode: () => state.isQuranModeEnabled,
       isClosed: () => isClosed,
     );
+    widgetBridge.listenToClicks(
+      onPlayPause: togglePlayPause,
+      onPrevious: previous,
+      onNext: next,
+      onFavorite: () {
+        final s = state.currentSong;
+        if (s != null) toggleFavorite(s.id);
+      },
+    );
+    _listenToSettings();
+    _listenToAudioService();
+    _syncAudioEffects();
+    unawaited(_audioHandler.effectsReady.then((_) async {
+      if (isClosed) return;
+      _syncAudioEffects();
+      await _audioHandler.setVolume(_audioHandler.volume);
+    }).catchError((Object e, StackTrace st) {
+      ErrorLogger.log('Post-init effects re-sync failed',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+    }));
   }
 
-  @override
   void _syncAudioEffects() {
     safeEmit(state.copyWith(
-      isEqEnabled: _audioHandler.isEqualizerEnabled,
-      eqPreset: _audioHandler.currentPreset,
-      isVirtualizerEnabled: _audioHandler.isVirtualizerEnabled,
-      virtualizerStrength: _audioHandler.virtualizerStrength,
-      isVirtualizerSupported: _audioHandler.isVirtualizerSupported,
-      // Effective dynamics: enabled AND not bypassed, so the toggle can never
-      // show ON while the native stage is muted by the bypass.
-      isDynamicsEnabled: _audioHandler.isDynamicsEffectivelyEnabled,
-      isDynamicsSupported: _audioHandler.isDynamicsSupported,
-      dynamicsPreset: _audioHandler.dynamicsPreset,
-      selectedHeadphoneProfile: _audioHandler.selectedHeadphoneProfile,
-      isSpatializerEnabled: _audioHandler.isSpatializerEnabled,
-      isSpatializerSupported: _audioHandler.isSpatializerSupported,
-      isBassBoostSupported: _audioHandler.isBassBoostSupported,
-      isVolumeBoostSupported: _audioHandler.isVolumeBoostSupported,
-      volumeBoost: _audioHandler.volumeBoost,
-      isCrossfeedEnabled: _audioHandler.isCrossfeedEnabled,
-      crossfeedDelayUs: _audioHandler.crossfeedDelayUs,
-      crossfeedFeedDb: _audioHandler.crossfeedFeedDb,
-      crossfeedMode: _audioHandler.crossfeedMode,
-      isLimiterEnabled: _audioHandler.isLimiterEnabled,
-      limiterThresholdDb: _audioHandler.limiterThresholdDb,
-      limiterReleaseMs: _audioHandler.limiterReleaseMs,
-      isReverbEnabled: _audioHandler.isReverbEnabled,
-      reverbPreset: _audioHandler.reverbPreset,
-      reverbWetDry: _audioHandler.reverbWetDry,
-      stereoBalance: _audioHandler.stereoBalance,
-      monoMix: _audioHandler.monoMix,
-      isSincResamplerEnabled: _audioHandler.isSincResamplerEnabled,
-      isDitherEnabled: _audioHandler.isDitherEnabled,
-      ditherTargetBitDepth: _audioHandler.ditherTargetBitDepth,
-      isSaturationEnabled: _audioHandler.isSaturationEnabled,
-      saturationDrive: _audioHandler.saturationDrive,
-      saturationMix: _audioHandler.saturationMix,
-      saturationTilt: _audioHandler.saturationTilt,
-      saturationMultiband: _audioHandler.saturationMultiband,
-      isStereoWidthEnabled: _audioHandler.isStereoWidthEnabled,
-      stereoWidth: _audioHandler.stereoWidth,
-      isLoudnessContourEnabled: _audioHandler.isLoudnessContourEnabled,
-      loudnessContourIntensity: _audioHandler.loudnessContourIntensity,
-      isSubCrossoverEnabled: _audioHandler.isSubCrossoverEnabled,
-      subCrossoverCornerHz: _audioHandler.subCrossoverCornerHz,
-      subCrossoverSlopeDbPerOct: _audioHandler.subCrossoverSlopeDbPerOct,
-      subCrossoverGain: _audioHandler.subCrossoverGain,
-      isDynamicEqEnabled: _audioHandler.isDynamicEqEnabled,
-      dynamicEqBands: _audioHandler.dynamicEqBands,
-      isViperDdcEnabled: _audioHandler.isViperDdcEnabled,
-      viperDdcProfileName: _audioHandler.viperDdcProfileName,
-      isArbitraryEqEnabled: _audioHandler.isArbitraryEqEnabled,
-      arbitraryEqString: _audioHandler.arbitraryEqString,
-      isLiveProgEnabled: _audioHandler.isLiveProgEnabled,
-      liveProgCode: _audioHandler.liveProgCode,
-      isDynamicBassEnabled: _audioHandler.isDynamicBassEnabled,
-      dynamicBassStrength: _audioHandler.dynamicBassStrength,
-      dynamicBassPreset: _audioHandler.dynamicBassPreset,
-      hasOemAudio: _audioHandler.hasOemAudio,
-      detectedOemEngines: _audioHandler.detectedOemEngines,
+      dsp: state.dsp.copyWith(
+        isEqEnabled: _audioHandler.isEqualizerEnabled,
+        eqPreset: _audioHandler.currentPreset,
+        isVirtualizerEnabled: _audioHandler.isVirtualizerEnabled,
+        virtualizerStrength: _audioHandler.virtualizerStrength,
+        isVirtualizerSupported: _audioHandler.isVirtualizerSupported,
+        isDynamicsEnabled: _audioHandler.isDynamicsEffectivelyEnabled,
+        isDynamicsSupported: _audioHandler.isDynamicsSupported,
+        dynamicsPreset: _audioHandler.dynamicsPreset,
+        selectedHeadphoneProfile: _audioHandler.selectedHeadphoneProfile,
+        isSpatializerEnabled: _audioHandler.isSpatializerEnabled,
+        isSpatializerSupported: _audioHandler.isSpatializerSupported,
+        isBassBoostSupported: _audioHandler.isBassBoostSupported,
+        isVolumeBoostSupported: _audioHandler.isVolumeBoostSupported,
+        volumeBoost: _audioHandler.volumeBoost,
+        isCrossfeedEnabled: _audioHandler.isCrossfeedEnabled,
+        crossfeedDelayUs: _audioHandler.crossfeedDelayUs,
+        crossfeedFeedDb: _audioHandler.crossfeedFeedDb,
+        crossfeedMode: _audioHandler.crossfeedMode,
+        isLimiterEnabled: _audioHandler.isLimiterEnabled,
+        limiterThresholdDb: _audioHandler.limiterThresholdDb,
+        limiterReleaseMs: _audioHandler.limiterReleaseMs,
+        isReverbEnabled: _audioHandler.isReverbEnabled,
+        reverbPreset: _audioHandler.reverbPreset,
+        reverbWetDry: _audioHandler.reverbWetDry,
+        stereoBalance: _audioHandler.stereoBalance,
+        monoMix: _audioHandler.monoMix,
+        isSincResamplerEnabled: _audioHandler.isSincResamplerEnabled,
+        isDitherEnabled: _audioHandler.isDitherEnabled,
+        ditherTargetBitDepth: _audioHandler.ditherTargetBitDepth,
+        isSaturationEnabled: _audioHandler.isSaturationEnabled,
+        saturationDrive: _audioHandler.saturationDrive,
+        saturationMix: _audioHandler.saturationMix,
+        saturationTilt: _audioHandler.saturationTilt,
+        saturationMultiband: _audioHandler.saturationMultiband,
+        isStereoWidthEnabled: _audioHandler.isStereoWidthEnabled,
+        stereoWidth: _audioHandler.stereoWidth,
+        isLoudnessContourEnabled: _audioHandler.isLoudnessContourEnabled,
+        loudnessContourIntensity: _audioHandler.loudnessContourIntensity,
+        isSubCrossoverEnabled: _audioHandler.isSubCrossoverEnabled,
+        subCrossoverCornerHz: _audioHandler.subCrossoverCornerHz,
+        subCrossoverSlopeDbPerOct: _audioHandler.subCrossoverSlopeDbPerOct,
+        subCrossoverGain: _audioHandler.subCrossoverGain,
+        isDynamicEqEnabled: _audioHandler.isDynamicEqEnabled,
+        dynamicEqBands: _audioHandler.dynamicEqBands,
+        isViperDdcEnabled: _audioHandler.isViperDdcEnabled,
+        viperDdcProfileName: _audioHandler.viperDdcProfileName,
+        isArbitraryEqEnabled: _audioHandler.isArbitraryEqEnabled,
+        arbitraryEqString: _audioHandler.arbitraryEqString,
+        isLiveProgEnabled: _audioHandler.isLiveProgEnabled,
+        liveProgCode: _audioHandler.liveProgCode,
+        isDynamicBassEnabled: _audioHandler.isDynamicBassEnabled,
+        dynamicBassStrength: _audioHandler.dynamicBassStrength,
+        dynamicBassPreset: _audioHandler.dynamicBassPreset,
+        hasOemAudio: _audioHandler.hasOemAudio,
+        detectedOemEngines: _audioHandler.detectedOemEngines,
+      ),
     ));
-  }
-
-  void clearError() {
-    safeEmit(state.copyWith(errorMessage: null));
   }
 
   void _listenToSettings() {
@@ -560,306 +276,254 @@ class PlayerCubit extends PulsrCubit<PlayerState>
           Duration(
               milliseconds: (settingsState.crossfadeSeconds * 1000).round()),
         );
-        // Persisted gapless toggle actually selects the gapless engine.
         _audioHandler.setGaplessEnabled(settingsState.gaplessPlayback);
-        // Re-apply gain when ReplayGain settings change
         _audioHandler.setVolume(_audioHandler.volume);
-        // T2: when follow-track is toggled on mid-track, (re)apply it now. The
-        // de-dupe inside the helper keeps repeated settings emissions cheap.
         if (settingsState.followTrackSampleRate) {
           final song = state.currentSong;
-          if (song != null) unawaited(_maybeFollowTrackSampleRate(song));
+          if (song != null) {
+            unawaited(dspController.maybeFollowTrackSampleRate(song));
+          }
         }
       });
     }
   }
 
-  /// T2: request the current track's native sample rate when the preference is
-  /// on. Pure decision (de-dupe + Bluetooth skip) lives in
-  /// [HiResAudioService.followTrackRateToApply]; this method owns the side
-  /// effect and the last-requested bookkeeping.
-  Future<void> _maybeFollowTrackSampleRate(SongsTableData song) async {
-    final service = _hiResAudioService;
-    final settings = _settingsCubit?.state;
-    if (service == null || settings == null) return;
-    final gen = ++_followSampleRateGen;
-    final rate = HiResAudioService.followTrackRateToApply(
-      trackSampleRate: song.sampleRate,
-      lastRequestedSampleRate: _lastFollowedSampleRate,
-      isBluetooth: settings.currentOutputDevice?.isBluetooth == true,
-      followTrackEnabled:
-          settings.followTrackSampleRate || settings.strictBitPerfect,
-    );
-    if (rate == null) return;
-    try {
-      final depth = song.bitDepth ?? 0;
-      await service.setTargetOutputFormat(sampleRate: rate, bitDepth: depth);
-      if (isClosed ||
-          gen != _followSampleRateGen ||
-          !_isSameTrack(state.currentSong, song)) {
-        return;
+  void _listenToAudioService() {
+    autoSub(_audioHandler.onTrackChanged, (song) {
+      if (isClosed) return;
+      _trackChangedGuard.next();
+      final songIndex = state.queue.indexWhere((s) => _isSameTrack(s, song));
+      final isSameSong = _isSameTrack(state.currentSong, song);
+      safeEmit(state.copyWith(
+        playback: state.playback.copyWith(
+          currentSong: song,
+          duration: song.durationMs > 0
+              ? Duration(milliseconds: song.durationMs)
+              : (isSameSong ? state.duration : Duration.zero),
+          position: isSameSong ? state.position : Duration.zero,
+          errorMessage: null,
+        ),
+        queueSlice: state.queueSlice.copyWith(
+          currentIndex: songIndex != -1 ? songIndex : state.currentIndex,
+        ),
+        lyricsSlice: state.lyricsSlice.copyWith(
+          lyrics: isSameSong ? state.lyrics : const [],
+          lyricsSource: isSameSong ? state.lyricsSource : LyricsSource.none,
+          isLoadingLyrics: !isSameSong,
+        ),
+      ));
+      if (!isSameSong) {
+        unawaited(metadataController.enrichTrackParallel(song));
+        unawaited(dspController.maybeFollowTrackSampleRate(song));
       }
-      _lastFollowedSampleRate = rate;
-      await _settingsCubit?.refreshOutputDevice();
-    } catch (e, st) {
-      // FIX-M01: Unconditionally reset followed sample rate on failure so next track retries cleanly
-      _lastFollowedSampleRate = null;
-      ErrorLogger.log('Follow-track sample rate failed ($rate)',
-          error: e, stackTrace: st, category: 'PlayerCubit');
-    }
-  }
+      widgetBridge.updateWidgetThrottled(state, force: true);
+      widgetBridge.scrobble(song, state.position, state.isPlaying);
+    });
 
-  @override
-  void _debouncedPersistQueueSlots() {
-    _persistQueueDebounce?.cancel();
-    _persistQueueDebounce = autoTimer(Timer(const Duration(seconds: 2), () {
-      _persistQueueSlots();
-    }));
-  }
+    autoSub(_audioHandler.mediaItem, (item) async {
+      if (item == null) return;
+      final mediaGen = _mediaItemGuard.next();
+      final id = int.tryParse(item.id);
+      if (id == null) return;
 
-  /// Flushes the debounced queue-slot write immediately.
-  ///
-  /// Called on app background/detach so a process kill inside the 2s debounce
-  /// window cannot drop the most recent queue state.
-  Future<void> persistQueueSlotsNow() {
-    _persistQueueDebounce?.cancel();
-    _persistQueueDebounce = null;
-    return _persistQueueSlots(force: true);
-  }
+      SongsTableData? resolvedSong = _audioHandler.currentSong?.id == id
+          ? _audioHandler.currentSong
+          : state.queue.where((s) => s.id == id).firstOrNull;
 
-  Future<void> _persistQueueSlots({bool force = false}) async {
-    if (!force && isClosed) return;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      // B-29: Build map and json-encode in background isolate via compute
-      final rawSlotPayload = {
-        for (final entry in _queueSlots.entries)
-          entry.key.toString(): {
-            'songIds': entry.value.songIds,
-            'currentIndex': entry.value.currentIndex,
-            'positionMs': entry.value.position.inMilliseconds,
-            'speed': entry.value.speed,
-            'onlineSongs': entry.value.songIds
-                .map((id) => _slotLookupCache[id])
-                .whereType<SongsTableData>()
-                .where((s) => s.source == SongSource.youtube || s.id < 0)
-                .map((s) => {
-                      'id': s.id,
-                      'title': s.title,
-                      'artist': s.artist,
-                      'album': s.album,
-                      'durationMs': s.durationMs,
-                      'path': s.path,
-                      'source': s.source,
-                      'remoteId': s.remoteId,
-                      'remoteArtworkUrl': s.remoteArtworkUrl,
-                      'isFavorite': s.isFavorite,
-                    })
-                .toList(),
-          },
-      };
-      final encoded = await compute(_encodeQueueSlotsSync, {
-        'slots': rawSlotPayload,
-        'activeSlot': state.activeQueueSlot,
-      });
-      await prefs.setString(PrefsKeys.queueSlots, encoded);
-    } catch (e, st) {
-      ErrorLogger.log('Failed to persist queue slots',
-          error: e, stackTrace: st, category: 'PlayerCubit');
-      // Don't clobber a more important error (e.g. 'Failed to play X').
-      if (!isClosed && state.errorMessage == null) {
-        safeEmit(state.copyWith(errorMessage: 'Failed to save queue'));
+      if (resolvedSong == null) {
+        final songResult = await _repository.getSongById(id);
+        if (!_mediaItemGuard.isValid(mediaGen) || isClosed) return;
+        songResult.fold((_) => null, (song) => resolvedSong = song);
       }
-    }
-  }
+      if (!_mediaItemGuard.isValid(mediaGen) || isClosed) return;
 
-  Future<void> _restoreQueueSlots() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      if (_queueRestorationDone) return;
-      final raw = prefs.getString(PrefsKeys.queueSlots);
-      if (raw == null) return;
-      final data =
-          QueueSlotCodec.decodeDocument(await compute(jsonDecode, raw));
-      if (data == null) return;
-      for (final key in data.keys) {
-        if (_queueRestorationDone) return;
-        final slotIndex = QueueSlotCodec.slotIndexForKey(key);
-        if (slotIndex == null) continue;
-        // One corrupt slot must not abort the others.
-        final rawSlot = data[key];
-        if (rawSlot is! Map) continue;
-        final decoded = QueueSlotCodec.decodeSlot(
-            Map<String, dynamic>.from(rawSlot), _maxQueueSize);
-        if (decoded == null) continue;
-        final songsResult = await _repository.getSongsByIds(decoded.songIds);
-        if (_queueRestorationDone) return;
-        final songsMap = {
-          for (final s
-              in songsResult.fold((_) => <SongsTableData>[], (r) => r))
-            s.id: s
-        };
-        _slotLookupCache.addAll(songsMap);
-        _slotLookupCache.addAll(decoded.onlineSongsById);
-        final songs = QueueSlotCodec.mergeInPersistedOrder(
-            decoded.songIds, songsMap, decoded.onlineSongsById);
-        if (songs.isEmpty) continue;
-        _queueSlots[slotIndex] = _QueueSlotData(
-          songIds: songs.map((s) => s.id).toList(),
-          currentIndex: QueueSlotCodec.clampCurrentIndex(
-              decoded.currentIndex, songs.length),
-          position: QueueSlotCodec.clampPosition(decoded.positionMs),
-          speed: QueueSlotCodec.clampSpeed(decoded.speed),
+      if (resolvedSong == null && item.id.isNotEmpty) {
+        resolvedSong = SongsTableData(
+          id: id,
+          title: item.title,
+          artist: item.artist ?? 'Unknown',
+          album: item.album ?? '',
+          durationMs: item.duration?.inMilliseconds ?? 0,
+          path: (item.extras?['path'] as String?) ?? '',
+          source: (item.extras?['source'] as String?) ?? SongSource.youtube,
+          remoteId: item.extras?['remoteId'] as String?,
+          remoteArtworkUrl: (item.extras?['remoteArtworkUrl'] as String?) ?? item.artUri?.toString(),
+          isFavorite: (item.extras?['isFavorite'] as bool?) ?? false,
+          isMissing: false,
+          isDownloaded: (item.extras?['isDownloaded'] as bool?) ?? false,
+          playCount: (item.extras?['playCount'] as int?) ?? 0,
+          lastPositionMs: 0,
         );
       }
-      if (!_queueRestorationDone && !isClosed) {
-        final restoredSlot = QueueSlotCodec.activeSlotFrom(data['activeSlot']);
-        if (restoredSlot != null) {
-          safeEmit(state.copyWith(activeQueueSlot: restoredSlot));
+
+      if (resolvedSong != null) {
+        if (!_mediaItemGuard.isValid(mediaGen) || isClosed) return;
+        final isSameSong = _isSameTrack(state.currentSong, resolvedSong);
+        final duration = (item.duration != null && item.duration! > Duration.zero)
+            ? item.duration!
+            : (resolvedSong!.durationMs > 0
+                ? Duration(milliseconds: resolvedSong!.durationMs)
+                : (isSameSong ? state.duration : Duration.zero));
+        final songQueueIndex = state.queue.indexWhere((s) => _isSameTrack(s, resolvedSong));
+        final effectiveIndex = songQueueIndex != -1 ? songQueueIndex : state.currentIndex;
+
+        safeEmit(state.copyWith(
+          playback: state.playback.copyWith(
+            currentSong: resolvedSong,
+            duration: duration,
+            position: isSameSong ? state.position : Duration.zero,
+            errorMessage: null,
+          ),
+          queueSlice: state.queueSlice.copyWith(
+            currentIndex: effectiveIndex,
+          ),
+          lyricsSlice: state.lyricsSlice.copyWith(
+            lyrics: isSameSong ? state.lyrics : const [],
+            lyricsSource: isSameSong ? state.lyricsSource : LyricsSource.none,
+            isLoadingLyrics: !isSameSong,
+          ),
+        ));
+
+        if (!isSameSong) {
+          unawaited(metadataController.enrichTrackParallel(resolvedSong!));
+          unawaited(dspController.maybeFollowTrackSampleRate(resolvedSong!));
+        }
+        widgetBridge.updateWidgetThrottled(state, force: true);
+        widgetBridge.scrobble(resolvedSong!, state.position, state.isPlaying);
+      }
+    });
+
+    autoSub(_audioHandler.queue, (mediaItems) async {
+      if (mediaItems.isEmpty) return;
+      final gen = _queueSyncGuard.next();
+      final ids = mediaItems.map((m) => int.tryParse(m.id)).whereType<int>().toList();
+      if (ids.isEmpty) return;
+      final songsRes = await _repository.getSongsByIds(ids);
+      if (isClosed || !_queueSyncGuard.isValid(gen)) return;
+      final songsMap = {for (final s in songsRes.fold((_) => <SongsTableData>[], (r) => r)) s.id: s};
+      final restored = <SongsTableData>[];
+      for (final m in mediaItems) {
+        final mid = int.tryParse(m.id);
+        if (mid != null && songsMap.containsKey(mid)) {
+          restored.add(songsMap[mid]!);
+        } else if (mid != null) {
+          restored.add(SongsTableData(
+            id: mid,
+            title: m.title,
+            artist: m.artist ?? 'Unknown',
+            album: m.album ?? '',
+            durationMs: m.duration?.inMilliseconds ?? 0,
+            path: (m.extras?['path'] as String?) ?? '',
+            source: (m.extras?['source'] as String?) ?? SongSource.youtube,
+            remoteId: m.extras?['remoteId'] as String?,
+            remoteArtworkUrl: (m.extras?['remoteArtworkUrl'] as String?) ?? m.artUri?.toString(),
+            isFavorite: (m.extras?['isFavorite'] as bool?) ?? false,
+            isMissing: false,
+            isDownloaded: (m.extras?['isDownloaded'] as bool?) ?? false,
+            playCount: (m.extras?['playCount'] as int?) ?? 0,
+            lastPositionMs: 0,
+          ));
         }
       }
-      _queueRestorationDone = true;
-    } catch (e, st) {
-      ErrorLogger.log('Failed to restore queue slots',
-          error: e, stackTrace: st, category: 'PlayerCubit');
+      if (restored.isNotEmpty && !_isSameQueue(state.queue, restored)) {
+        final current = state.currentSong;
+        final anchored = current == null ? -1 : restored.indexWhere((s) => _isSameTrack(s, current));
+        safeEmit(state.copyWith(
+          queueSlice: state.queueSlice.copyWith(
+            queue: restored,
+            currentIndex: (anchored != -1 ? anchored : state.currentIndex).clamp(0, restored.length - 1),
+          ),
+        ));
+      }
+    });
+
+    autoSub(_audioHandler.playbackState, (ps) {
+      final isCompleted = ps.processingState == AudioProcessingState.completed;
+      final isPlaying = ps.playing && !isCompleted;
+      if (isPlaying) {
+        _userPausedIntentionally = false;
+      }
+      if (isPlaying && ps.processingState == AudioProcessingState.ready) {
+        widgetBridge.onAudiblePlaybackStarted();
+      }
+      final repeat = switch (ps.repeatMode) {
+        AudioServiceRepeatMode.one => PlayerRepeatMode.one,
+        AudioServiceRepeatMode.all || AudioServiceRepeatMode.group => PlayerRepeatMode.all,
+        _ => PlayerRepeatMode.off,
+      };
+
+      var resolvedPlaying = isPlaying;
+      if (!isPlaying &&
+          state.isPlaying &&
+          !_userPausedIntentionally &&
+          ps.processingState != AudioProcessingState.ready &&
+          ps.processingState != AudioProcessingState.completed) {
+        resolvedPlaying = true;
+      }
+
+      final resolvedIndex = ps.queueIndex != null && ps.queueIndex! >= 0 && ps.queueIndex! < state.queue.length
+          ? ps.queueIndex!
+          : state.currentIndex;
+
+      final effectivePos = isCompleted ? Duration.zero : ps.position;
+      final resolvedShuffle = ps.shuffleMode == AudioServiceShuffleMode.all;
+      if (resolvedPlaying == state.isPlaying &&
+          effectivePos == state.position &&
+          resolvedShuffle == state.isShuffle &&
+          repeat == state.repeatMode &&
+          resolvedIndex == state.currentIndex &&
+          (ps.speed - state.playbackSpeed).abs() < 1e-9) {
+        return;
+      }
+
+      safeEmit(state.copyWith(
+        playback: state.playback.copyWith(
+          isPlaying: resolvedPlaying,
+          position: effectivePos,
+          isShuffle: resolvedShuffle,
+          repeatMode: repeat,
+          playbackSpeed: ps.speed,
+        ),
+        queueSlice: state.queueSlice.copyWith(
+          currentIndex: resolvedIndex,
+        ),
+      ));
+      widgetBridge.updateWidgetProgressThrottled(state);
+    });
+
+    Stream<Duration> positionUpdates;
+    try {
+      positionUpdates = _audioHandler.compensatedPositionStream;
+    } catch (_) {
+      positionUpdates = _audioHandler.positionStream;
     }
-  }
+    autoSub(positionUpdates.throttleTime(const Duration(milliseconds: 200), trailing: true), (pos) {
+      safeEmit(state.copyWith(playback: state.playback.copyWith(position: pos)));
+      if (state.isPlaying) widgetBridge.updateWidgetProgressThrottled(state);
+    });
 
-  void _debouncedScrobble(
-          SongsTableData song, Duration position, bool isPlaying) =>
-      _scrobble.debouncedScrobble(song, position, isPlaying);
+    autoSub(_audioHandler.errorStream, (err) {
+      widgetBridge.onPlaybackError(err);
+      safeEmit(state.copyWith(playback: state.playback.copyWith(errorMessage: err)));
+    });
 
-  void _listenToWidgetClicks() {
-    _widgetClickSub = _widgetService?.listenToWidgetClicks((uri) {
-      if (uri != null && uri.scheme.toLowerCase() == 'pulsrwidget') {
-        final action =
-            uri.host.isNotEmpty ? uri.host : uri.path.replaceAll('/', '');
-        switch (action) {
-          case 'play_pause':
-            togglePlayPause();
-            break;
-          case 'prev':
-            previous();
-            break;
-          case 'next':
-            next();
-            break;
-          case 'favorite':
-            final song = state.currentSong;
-            if (song != null) toggleFavorite(song.id);
-            break;
-          case 'open':
-          case 'main':
-            safeEmit(state.copyWith(isExpanded: true));
-            break;
-        }
-      }
+    autoSub(_audioHandler.sleepTimerRemainingStream, (rem) {
+      safeEmit(state.copyWith(playback: state.playback.copyWith(sleepTimerRemaining: rem)));
+    });
+
+    autoSub(_audioHandler.audioSessionIdStream, (id) {
+      safeEmit(state.copyWith(playback: state.playback.copyWith(audioSessionId: id)));
     });
   }
 
-  @override
-  void _updateWidgetThrottled({bool force = false}) =>
-      _widgetUpdater.updateThrottled(state, _queueVersion, force: force);
-
-  void _updateWidgetProgressThrottled() =>
-      _widgetUpdater.updateProgressThrottled(state);
-
-  bool _notificationPermissionPrompted = false;
-
-  /// Bounded retry counter for the case where the first playback starts before
-  /// the navigator is mounted (e.g. a restored session auto-playing at cold
-  /// start). Prevents both suppressing the ask for the whole session and an
-  /// unbounded post-frame loop on a headless launch.
-  int _notificationPermissionRetries = 0;
-  static const int _maxNotificationPermissionRetries = 30;
-
-  /// B-5: Android 13+ hides the media notification until POST_NOTIFICATIONS is
-  /// granted, which silently removes the app's main background control surface
-  /// (audio_service 0.18.19 declares the permission but never requests it).
-  ///
-  /// Asked at the first start of playback rather than at cold start, behind an
-  /// in-app rationale, and fired-and-forgotten so a denial can never block or
-  /// fail playback — the notification simply does not appear.
-  Future<void> _maybeRequestNotificationPermission() async {
-    if (_notificationPermissionPrompted || !Platform.isAndroid) return;
-    try {
-      final status = await Permission.notification.status;
-      // Only a state Android can still prompt from. `permanentlyDenied` means
-      // the user turned it off and only Settings can undo it; asking again
-      // would be a no-op with no dialog.
-      if (status.isGranted ||
-          status.isPermanentlyDenied ||
-          status.isRestricted) {
-        _notificationPermissionPrompted = true;
-        return;
-      }
-      final ctx = rootNavigatorKey.currentContext;
-      if (ctx == null || !ctx.mounted) {
-        // UI is not mounted yet: retry after the next frame instead of latching
-        // the prompt off for the entire session.
-        if (_notificationPermissionRetries++ <
-            _maxNotificationPermissionRetries) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!_notificationPermissionPrompted) {
-              unawaited(_maybeRequestNotificationPermission());
-            }
-          });
-        }
-        return;
-      }
-      // Commit only once the dialog can actually be shown, so a missing context
-      // never burns the single ask.
-      _notificationPermissionPrompted = true;
-      final proceed = await showDialog<bool>(
-        context: ctx,
-        builder: (dialogCtx) => AlertDialog(
-          title: Text(dialogCtx.l10n.notificationPermissionTitle),
-          content: Text(dialogCtx.l10n.notificationPermissionRationale),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogCtx).pop(false),
-              child: Text(dialogCtx.l10n.notificationPermissionNotNow),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogCtx).pop(true),
-              child: Text(dialogCtx.l10n.notificationPermissionAllow),
-            ),
-          ],
-        ),
-      );
-      if (proceed == true) {
-        await Permission.notification.request();
-      }
-    } catch (e, st) {
-      // Suppress repeats on a hard failure rather than risk a dialog loop.
-      _notificationPermissionPrompted = true;
-      ErrorLogger.log('Notification permission request failed',
-          error: e, stackTrace: st, category: 'PlayerCubit');
-    }
-  }
-
-  @override
   bool _isSameTrack(SongsTableData? a, SongsTableData? b) {
     if (identical(a, b)) return true;
     if (a == null || b == null) return false;
     if (a.id == b.id) return true;
-    if (a.remoteId != null &&
-        b.remoteId != null &&
-        a.remoteId!.isNotEmpty &&
-        a.remoteId == b.remoteId) {
-      return true;
-    }
+    if (a.remoteId != null && b.remoteId != null && a.remoteId!.isNotEmpty && a.remoteId == b.remoteId) return true;
     if (a.path.isNotEmpty && a.path == b.path) return true;
     return false;
   }
-
-  /// Monotonic per-event counter for handler-queue syncs: only the most
-  /// recent queue event may apply its resolved songs. Guarding this with
-  /// [_mediaItemResolutionGen] used to abort the sync whenever a concurrent
-  /// mediaItem/track resolution bumped that generation, leaving the queue
-  /// view stale (or empty after a cold-start session restore).
-  int _queueSyncGen = 0;
-  bool _handlerQueueHasEverEmittedNonEmpty = false;
 
   bool _isSameQueue(List<SongsTableData> a, List<SongsTableData> b) {
     if (identical(a, b)) return true;
@@ -870,1650 +534,19 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     return true;
   }
 
-  /// Resolves the now-playing index from a playbackState snapshot. The
-  /// handler's queueIndex is only trustworthy when the handler queue and the
-  /// state queue agree: during playSong's optimistic window an old queueIndex
-  /// clamped into the new queue pointed the highlight at a plausible-looking
-  /// wrong row. When they disagree, keep the state's own index - the
-  /// onTrackChanged/mediaItem listeners re-derive it from the actual song.
-  int _resolvePlaybackStateIndex(PlaybackState playbackState) {
-    final handlerIndex = playbackState.queueIndex;
-    if (state.queue.isEmpty) {
-      return 0;
-    }
-    if (handlerIndex != null &&
-        handlerIndex >= 0 &&
-        handlerIndex < state.queue.length) {
-      final current = state.currentSong;
-      if (current == null || _isSameTrack(state.queue[handlerIndex], current)) {
-        return handlerIndex;
-      }
-    }
-    return state.currentIndex.clamp(0, state.queue.length - 1);
+  void clearError() {
+    safeEmit(state.copyWith(playback: state.playback.copyWith(errorMessage: null)));
   }
 
-  void _listenToAudioService() {
-    autoSub(_audioHandler.onTrackChanged, (song) {
-      if (isClosed) return;
-      // FIX-C02: Use dedicated _trackChangedGen for track-change listener
-      final trackGen = ++_trackChangedGen;
-      final mediaGen = _mediaItemGen;
-      final songQueueIndex =
-          state.queue.indexWhere((s) => _isSameTrack(s, song));
-      final effectiveIndex =
-          songQueueIndex != -1 ? songQueueIndex : state.currentIndex;
-      final isSameSong = _isSameTrack(state.currentSong, song);
-
-      final duration = song.durationMs > 0
-          ? Duration(milliseconds: song.durationMs)
-          : (isSameSong ? state.duration : Duration.zero);
-
-      safeEmit(
-        state.copyWith(
-          currentSong: song,
-          currentIndex: effectiveIndex,
-          duration: duration,
-          position: isSameSong ? state.position : Duration.zero,
-          errorMessage: null,
-          lyrics: isSameSong ? state.lyrics : [],
-          lyricsSource: isSameSong ? state.lyricsSource : LyricsSource.none,
-          isLoadingLyrics: !isSameSong,
-        ),
-      );
-
-      if (!isSameSong) {
-        // FIX-G1: Wrap background enrichment tasks in Future.wait for unified execution & atomic cancellation
-        unawaited(
-          Future.wait([
-            _loadLyricsForSong(song, trackGen: trackGen, mediaGen: mediaGen),
-            _enrichAudioQuality(song, trackGen: trackGen, mediaGen: mediaGen),
-            _loadSponsorBlockSegments(song, trackGen: trackGen, mediaGen: mediaGen),
-            _loadCueChapters(song),
-          ]),
-          // reason: Background track metadata enrichment runs concurrently with playback
-        );
-        unawaited(
-          _maybeFollowTrackSampleRate(song),
-          // reason: Hardware audio output sample rate adjustment
-        );
-      }
-      _updateWidgetThrottled(force: true);
-      _debouncedScrobble(song, state.position, state.isPlaying);
-      if (!isSameSong) {
-        unawaited(
-          _syncPerTrackState(song),
-          // reason: Restore per-track audio effects and bookmarks
-        );
-      }
-    });
-
-    autoSub(_audioHandler.mediaItem, (item) async {
-      if (item != null) {
-        // FIX-C02: Use dedicated _mediaItemGen for mediaItem listener
-        final mediaGen = ++_mediaItemGen;
-        final trackGen = _trackChangedGen;
-        final id = int.tryParse(item.id);
-        if (id != null) {
-          SongsTableData? resolvedSong;
-          // Try in-memory sources first (no I/O) before hitting Drift — avoids stale overwrite
-          resolvedSong = _audioHandler.currentSong?.id == id
-              ? _audioHandler.currentSong
-              : state.queue.where((s) => s.id == id).firstOrNull;
-          if (resolvedSong == null) {
-            final songResult = await _repository.getSongById(id);
-            if (mediaGen != _mediaItemGen || isClosed) return;
-            songResult.fold((_) => null, (song) => resolvedSong = song);
-          }
-          if (mediaGen != _mediaItemGen || isClosed) return;
-
-          // Final fallback — construct from MediaItem extras
-          if (resolvedSong == null && item.id.isNotEmpty) {
-            resolvedSong = SongsTableData(
-              id: id,
-              title: item.title,
-              artist: item.artist ?? 'Unknown',
-              album: item.album ?? '',
-              durationMs: item.duration?.inMilliseconds ?? 0,
-              path: (item.extras?['path'] as String?) ?? '',
-              source: (item.extras?['source'] as String?) ?? SongSource.youtube,
-              remoteId: item.extras?['remoteId'] as String?,
-              remoteArtworkUrl: (item.extras?['remoteArtworkUrl'] as String?) ??
-                  item.artUri?.toString(),
-              isFavorite: (item.extras?['isFavorite'] as bool?) ?? false,
-              isMissing: false,
-              isDownloaded: (item.extras?['isDownloaded'] as bool?) ?? false,
-              playCount: (item.extras?['playCount'] as int?) ?? 0,
-              lastPositionMs: 0,
-            );
-          }
-
-          if (resolvedSong != null) {
-            if (mediaGen != _mediaItemGen || isClosed) return;
-            final isSameSong = _isSameTrack(state.currentSong, resolvedSong);
-            final duration =
-                (item.duration != null && item.duration! > Duration.zero)
-                    ? item.duration!
-                    : (resolvedSong!.durationMs > 0
-                        ? Duration(milliseconds: resolvedSong!.durationMs)
-                        : (isSameSong ? state.duration : Duration.zero));
-            final songQueueIndex =
-                state.queue.indexWhere((s) => _isSameTrack(s, resolvedSong));
-            final effectiveIndex =
-                songQueueIndex != -1 ? songQueueIndex : state.currentIndex;
-
-            safeEmit(
-              state.copyWith(
-                currentSong: resolvedSong,
-                currentIndex: effectiveIndex,
-                duration: duration,
-                position: isSameSong ? state.position : Duration.zero,
-                errorMessage: null,
-                lyrics: isSameSong ? state.lyrics : [],
-                lyricsSource:
-                    isSameSong ? state.lyricsSource : LyricsSource.none,
-                isLoadingLyrics: !isSameSong,
-              ),
-            );
-
-            if (mediaGen != _mediaItemGen || isClosed) return;
-
-            if (!isSameSong) {
-              // FIX-G1: Wrap background enrichment tasks in Future.wait for atomic execution
-              unawaited(
-                Future.wait([
-                  _loadLyricsForSong(resolvedSong!, trackGen: trackGen, mediaGen: mediaGen),
-                  _enrichAudioQuality(resolvedSong!, trackGen: trackGen, mediaGen: mediaGen),
-                  _loadSponsorBlockSegments(resolvedSong!, trackGen: trackGen, mediaGen: mediaGen),
-                  _loadCueChapters(resolvedSong!),
-                ]),
-                // reason: MediaItem-driven metadata enrichment runs concurrently with playback
-              );
-              unawaited(
-                _maybeFollowTrackSampleRate(resolvedSong!),
-                // reason: Hardware audio output sample rate adjustment
-              );
-              unawaited(
-                _syncPerTrackState(resolvedSong!),
-                // reason: Per-track state sync for resolved song
-              );
-            }
-            if (mediaGen != _mediaItemGen || isClosed) return;
-            _updateWidgetThrottled(force: true);
-            _debouncedScrobble(resolvedSong!, state.position, state.isPlaying);
-          }
-        }
-      }
-    });
-
-    autoSub(_audioHandler.errorStream, (err) {
-      try {
-        _latencyTracker?.finishWithError(err, stage: PlaybackStage.playing);
-      } catch (_) {}
-      safeEmit(state.copyWith(errorMessage: err));
-    });
-
-    autoSub(_audioHandler.queue, (mediaItems) async {
-      if (mediaItems.isEmpty) {
-        if (_handlerQueueHasEverEmittedNonEmpty) {
-          safeEmit(state.copyWith(
-            queue: [],
-            currentIndex: 0,
-            currentSong: null,
-            duration: Duration.zero,
-            position: Duration.zero,
-            lyrics: [],
-            isLoadingLyrics: false,
-            cueChapters: const [],
-            currentCueIndex: 0,
-          ));
-        }
-        return;
-      }
-      _handlerQueueHasEverEmittedNonEmpty = true;
-      final gen = ++_queueSyncGen;
-      final ids =
-          mediaItems.map((m) => int.tryParse(m.id)).whereType<int>().toList();
-      if (ids.isEmpty) return;
-
-      final songsRes = await _repository.getSongsByIds(ids);
-      if (isClosed || gen != _queueSyncGen) return;
-
-      final songsMap = {
-        for (final s in songsRes.fold((_) => <SongsTableData>[], (r) => r))
-          s.id: s
-      };
-      final restoredSongs = <SongsTableData>[];
-      for (final m in mediaItems) {
-        final mid = int.tryParse(m.id);
-        if (mid != null && songsMap.containsKey(mid)) {
-          restoredSongs.add(songsMap[mid]!);
-        } else if (mid != null) {
-          restoredSongs.add(SongsTableData(
-            id: mid,
-            title: m.title,
-            artist: m.artist ?? 'Unknown',
-            album: m.album ?? '',
-            durationMs: m.duration?.inMilliseconds ?? 0,
-            path: (m.extras?['path'] as String?) ?? '',
-            source: (m.extras?['source'] as String?) ?? SongSource.youtube,
-            remoteId: m.extras?['remoteId'] as String?,
-            remoteArtworkUrl: (m.extras?['remoteArtworkUrl'] as String?) ??
-                m.artUri?.toString(),
-            isFavorite: (m.extras?['isFavorite'] as bool?) ?? false,
-            isMissing: false,
-            isDownloaded: (m.extras?['isDownloaded'] as bool?) ?? false,
-            playCount: (m.extras?['playCount'] as int?) ?? 0,
-            lastPositionMs: 0,
-          ));
-        }
-      }
-      if (isClosed || gen != _queueSyncGen) return;
-      if (restoredSongs.isNotEmpty &&
-          !_isSameQueue(state.queue, restoredSongs)) {
-        // Re-anchor the highlight to the running song: at cold start the
-        // queue sync can land after the mediaItem resolution, and the stale
-        // index would mark the wrong row as "now playing".
-        final current = state.currentSong;
-        final anchoredIndex = current == null
-            ? -1
-            : restoredSongs.indexWhere((s) => _isSameTrack(s, current));
-        final safeIndex =
-            (anchoredIndex != -1 ? anchoredIndex : state.currentIndex)
-                .clamp(0, restoredSongs.length - 1);
-        safeEmit(state.copyWith(
-          queue: restoredSongs,
-          currentIndex: safeIndex,
-        ));
-      }
-    });
-
-    autoSub(_audioHandler.playbackState, (playbackState) {
-      final isCompleted =
-          playbackState.processingState == AudioProcessingState.completed;
-      final repeat = switch (playbackState.repeatMode) {
-        AudioServiceRepeatMode.one => PlayerRepeatMode.one,
-        AudioServiceRepeatMode.all ||
-        AudioServiceRepeatMode.group =>
-          PlayerRepeatMode.all,
-        _ => PlayerRepeatMode.off,
-      };
-
-      final isPlaying = playbackState.playing && !isCompleted;
-      // Real playback resuming clears the explicit-pause latch.
-      if (isPlaying) {
-        _userPausedIntentionally = false;
-        // B-5: the permission ask is anchored to the first start of playback,
-        // not to app launch. It self-guards, so repeated calls are cheap no-ops.
-        unawaited(_maybeRequestNotificationPermission());
-      }
-      // Task 0: mark first bytes / playing stages — TTFA telemetry must
-      // reflect real audible start, so only mark when ExoPlayer is actually
-      // ready (just_audio processingState == ready) AND playing, never while
-      // still loading/buffering.
-      if (isPlaying &&
-          playbackState.processingState == AudioProcessingState.ready) {
-        try {
-          if (_latencyTracker?.hasActiveSession == true) {
-            // firstBytesReady precedes playing by one frame if not yet marked
-            _latencyTracker?.markStage(PlaybackStage.firstBytesReady);
-            _latencyTracker?.markStage(PlaybackStage.playing);
-          }
-        } catch (_) {}
-      }
-      final effectivePos = isCompleted ? Duration.zero : playbackState.position;
-      final wasPlaying = state.isPlaying;
-      final wasRepeat = state.repeatMode;
-
-      // Transient loading/buffering echoes report playing:false while the
-      // engine is actually spinning up after an optimistic playSong(true).
-      // Regressing here flashes the UI to paused for one frame — but an
-      // explicit user pause during the fetch must win, so it is honored.
-      var resolvedPlaying = isPlaying;
-      if (!isPlaying &&
-          state.isPlaying &&
-          !_userPausedIntentionally &&
-          (playbackState.processingState == AudioProcessingState.loading ||
-              playbackState.processingState ==
-                  AudioProcessingState.buffering)) {
-        resolvedPlaying = true;
-      }
-      // Stale speed echo guard: within 500ms of a local setPlaybackSpeed,
-      // only accept the echo if it matches what was pushed.
-      var resolvedSpeed = playbackState.speed;
-      if (_lastSpeedPushAt != null &&
-          _lastSpeedPushed != null &&
-          DateTime.now().difference(_lastSpeedPushAt!) <
-              const Duration(milliseconds: 500) &&
-          (resolvedSpeed - _lastSpeedPushed!).abs() > 1e-9) {
-        resolvedSpeed = state.playbackSpeed;
-      }
-      final resolvedShuffle =
-          playbackState.shuffleMode == AudioServiceShuffleMode.all;
-      final resolvedIndex = _resolvePlaybackStateIndex(playbackState);
-      if (resolvedPlaying == state.isPlaying &&
-          effectivePos == state.position &&
-          resolvedShuffle == state.isShuffle &&
-          repeat == state.repeatMode &&
-          resolvedIndex == state.currentIndex &&
-          (resolvedSpeed - state.playbackSpeed).abs() < 1e-9) {
-        return;
-      }
-      safeEmit(
-        state.copyWith(
-          isPlaying: resolvedPlaying,
-          position: effectivePos,
-          isShuffle: resolvedShuffle,
-          repeatMode: repeat,
-          currentIndex: resolvedIndex,
-          playbackSpeed: resolvedSpeed,
-        ),
-      );
-      if (resolvedPlaying != wasPlaying || repeat != wasRepeat) {
-        _updateWidgetThrottled(force: true);
-      } else {
-        _updateWidgetProgressThrottled();
-      }
-      final currentSong = state.currentSong;
-      if (currentSong != null) {
-        _debouncedScrobble(currentSong, effectivePos, isPlaying);
-      }
-    });
-
-    // Latency-compensated positions keep lyric highlights in sync with
-    // audible DSP output. Older handler doubles (tests) may not implement
-    // compensatedPositionStream — fall back to the raw position stream.
-    Stream<Duration> positionUpdates;
-    try {
-      positionUpdates = _audioHandler.compensatedPositionStream;
-    } catch (_) {
-      positionUpdates = _audioHandler.positionStream;
-    }
-    autoSub(
-      positionUpdates.throttleTime(const Duration(milliseconds: 200),
-          trailing: true),
-      (pos) {
-        final skipped = _checkSponsorBlockSkip(pos);
-        final effectivePos = skipped ? state.position : pos;
-        if (!skipped) {
-          safeEmit(state.copyWith(position: pos));
-        }
-        if (state.isPlaying) {
-          _updateWidgetProgressThrottled();
-          // Keep the active slot's restore position near-live. It used to be
-          // written only at queue-mutation time, so an app kill mid-song
-          // resumed from the last mutation's position (often 0:00).
-          _setQueueSlot(
-            state.activeQueueSlot,
-            songs: state.queue,
-            currentIndex: state.currentIndex,
-            position: effectivePos,
-            speed: state.playbackSpeed,
-          );
-          final slotNow = DateTime.now();
-          if (_lastSlotPersistAt == null ||
-              slotNow.difference(_lastSlotPersistAt!) >=
-                  const Duration(seconds: 15)) {
-            _lastSlotPersistAt = slotNow;
-            _debouncedPersistQueueSlots();
-          }
-        }
-      },
-    );
-
-    autoSub(_audioHandler.sleepTimerRemainingStream, (remaining) {
-      safeEmit(state.copyWith(sleepTimerRemaining: remaining));
-    });
-
-    if (_audioHandler.currentAudioSessionId != null) {
-      safeEmit(
-          state.copyWith(audioSessionId: _audioHandler.currentAudioSessionId));
-    }
-    autoSub(_audioHandler.audioSessionIdStream, (id) {
-      safeEmit(state.copyWith(audioSessionId: id));
-    });
-  }
-
-  Future<void> _loadSponsorBlockSegments(
-    SongsTableData song, {
-    int? gen,
-    int? trackGen,
-    int? mediaGen,
-  }) async {
-    // FIX-C04: Respect persisted enable flag after loadPreferences succeeds, without wiping existing segments on throw
-    try {
-      await _sponsorBlock.loadPreferences();
-    } catch (e, st) {
-      ErrorLogger.log('Failed to load SponsorBlock preferences',
-          error: e, stackTrace: st, category: 'PlayerCubit');
-      return;
-    }
-    if (!_sponsorBlock.isEnabled) {
-      _currentSponsorSegments = const [];
-      _sponsorSegmentsVideoId = null;
-      _lastSkippedSegmentEnd = null;
-      return;
-    }
-    // Offline-only mode disables all network lookups including SponsorBlock.
-    if (_settingsCubit?.state.offlineOnlyMode == true) {
-      _currentSponsorSegments = const [];
-      _sponsorSegmentsVideoId = null;
-      _lastSkippedSegmentEnd = null;
-      return;
-    }
-    final videoId = (song.remoteId != null && song.remoteId!.isNotEmpty)
-        ? song.remoteId!
-        : (song.path.startsWith('ytmusic://')
-            ? song.path.replaceFirst('ytmusic://', '').split('?').first
-            : null);
-    if (videoId == null || videoId.isEmpty) {
-      _currentSponsorSegments = const [];
-      _sponsorSegmentsVideoId = null;
-      _lastSkippedSegmentEnd = null;
-      return;
-    }
-    if (_sponsorSegmentsVideoId == videoId &&
-        _currentSponsorSegments.isNotEmpty) {
-      return;
-    }
-    // Clear synchronously BEFORE any await.
-    _currentSponsorSegments = const [];
-    _sponsorSegmentsVideoId = null;
-    _lastSkippedSegmentEnd = null;
-
-    try {
-      final service = _sponsorBlock;
-      final segments = await service.getSegments(videoId);
-      // FIX-C02: Verify both listener generations
-      if (isClosed) return;
-      if (trackGen != null && trackGen != _trackChangedGen) return;
-      if (mediaGen != null && mediaGen != _mediaItemGen) return;
-      if (gen != null && gen != _mediaItemResolutionGen) return;
-
-      _currentSponsorSegments = segments;
-      _sponsorSegmentsVideoId = videoId;
-      _lastSkippedSegmentEnd = null;
-    } catch (e, st) {
-      // FIX-A05: Log SponsorBlock segment fetch failure
-      ErrorLogger.log('Failed to fetch SponsorBlock segments for $videoId',
-          error: e, stackTrace: st, category: 'PlayerCubit');
-    }
-  }
-
-  /// Loads the chapter list for a song expanded from a CUE sheet, so the
-  /// advanced bar / song info can render and tap-to-seek the image's tracks.
-  Future<void> _loadCueChapters(SongsTableData song) async {
-    if (song.cueFile == null || song.cueStartMs == null) {
-      if (state.cueChapters.isEmpty && state.currentCueIndex == 0) return;
-      safeEmit(state.copyWith(cueChapters: const [], currentCueIndex: 0));
-      return;
-    }
-    try {
-      final chapters = await CueParser.findAndParseCue(song.path);
-      if (isClosed || !_isSameTrack(state.currentSong, song)) return;
-      final index = chapters.indexWhere((c) => c.index == song.trackNumber);
-      safeEmit(state.copyWith(
-        cueChapters: chapters,
-        currentCueIndex: index < 0 ? 0 : index,
-      ));
-    } catch (e, st) {
-      ErrorLogger.log('Failed to load cue chapters for ${song.path}',
-          error: e, stackTrace: st, category: 'PlayerCubit');
-    }
-  }
-
-  bool _checkSponsorBlockSkip(Duration pos) {
-    if (_currentSponsorSegments.isEmpty || !state.isPlaying) return false;
-    // F-67: gate auto-skip on the persisted enable flag and enabled categories.
-    final service = _sponsorBlock;
-    if (!service.isEnabled) return false;
-    final now = DateTime.now();
-    if (_lastSponsorSkipTime != null &&
-        now.difference(_lastSponsorSkipTime!).inMilliseconds < 1500) {
-      return false;
-    }
-    // Pure decision lives in the service (god-object split); only guards and
-    // side effects remain here.
-    final seekTarget = service.findSkipTarget(
-      segments: _currentSponsorSegments,
-      enabledCategories: service.enabledCategories,
-      position: pos,
-    );
-    if (seekTarget == null) return false;
-    final target = seekTarget <= const Duration(milliseconds: 50)
-        ? Duration.zero
-        : seekTarget - const Duration(milliseconds: 50);
-    if (_lastSkippedSegmentEnd != null &&
-        (_lastSkippedSegmentEnd == target ||
-            (pos - _lastSkippedSegmentEnd!).abs() <
-                const Duration(seconds: 2))) {
-      return false;
-    }
-    _lastSkippedSegmentEnd = target;
-    _lastSponsorSkipTime = now;
-    debugPrint('[SPONSORBLOCK] Auto-skipping segment: $pos -> $seekTarget');
-    // FIX-C03: Handle seek failure to prevent UI/audio desync
-    _audioHandler.seek(seekTarget).then((_) {
-      if (!isClosed) {
-        safeEmit(state.copyWith(position: seekTarget));
-      }
-    }).catchError((e, st) {
-      if (!isClosed) {
-        safeEmit(state.copyWith(position: pos));
-      }
-      ErrorLogger.log('SponsorBlock seek failed',
-          error: e, stackTrace: st, category: 'PlayerCubit');
-    });
-    return true;
-  }
-
-  /// Reads real audio-header fields for a local song the first time it plays
-  /// and caches them, so the quality badge shows actual metadata. Cheap: runs
-  /// once per file (skips songs already enriched) and only for local files.
-  Future<void> _enrichAudioQuality(
-    SongsTableData song, {
-    int? gen,
-    int? trackGen,
-    int? mediaGen,
-  }) async {
-    if (song.source != SongSource.local) return;
-    if (song.codec != null) return;
-    final path = song.path;
-    if (path.isEmpty ||
-        path.startsWith('http') ||
-        path.startsWith('ytmusic://')) {
-      return;
-    }
-    final scanner = _mediaScannerService;
-    if (scanner == null) return;
-    try {
-      await scanner.enrichAudioQuality(song.id, path);
-      // FIX-C02: Check both listener generation counters
-      if (isClosed) return;
-      if (trackGen != null && trackGen != _trackChangedGen) return;
-      if (mediaGen != null && mediaGen != _mediaItemGen) return;
-      if (gen != null && gen != _mediaItemResolutionGen) return;
-
-      final refreshed = await _repository.getSongById(song.id);
-      final updated = refreshed.fold((_) => null, (s) => s);
-      if (updated != null &&
-          !isClosed &&
-          (trackGen == null || trackGen == _trackChangedGen) &&
-          (mediaGen == null || mediaGen == _mediaItemGen) &&
-          (gen == null || gen == _mediaItemResolutionGen) &&
-          _isSameTrack(state.currentSong, updated)) {
-        final updatedQueue = state.queue
-            .map((s) => _isSameTrack(s, updated) ? updated : s)
-            .toList();
-        safeEmit(state.copyWith(
-          currentSong: updated,
-          queue: updatedQueue,
-        ));
-      }
-    } catch (e, st) {
-      // FIX-A05: Log audio quality enrichment failure
-      ErrorLogger.log('Failed to enrich audio quality for song ${song.id}',
-          error: e, stackTrace: st, category: 'PlayerCubit');
-    }
-  }
-
-  /// Monotonic loader generation: only the most recently started lyrics load
-  /// may emit, so a slow fetch for a superseded song can never overwrite the
-  /// current track's lyrics.
-  int _lyricsLoadGen = 0;
-
-  @override
-  Future<void> _loadLyricsForSong(
-    SongsTableData song, {
-    int? trackGen,
-    int? mediaGen,
-  }) async {
-    if (isClosed || !_isSameTrack(state.currentSong, song)) return;
-    // FIX-C02: Generation check for caller
-    if (trackGen != null && trackGen != _trackChangedGen) return;
-    if (mediaGen != null && mediaGen != _mediaItemGen) return;
-
-    // Check central in-memory cache first, including a valid negative entry
-    if (LrcParser.hasCachedLyrics(songId: song.id, path: song.path)) {
-      final cached =
-          LrcParser.getCachedLyrics(songId: song.id, path: song.path);
-      // FIX-H02: Negative cache TTL verification (10 minutes)
-      final cacheTs = LrcParser.getCacheTimestamp(songId: song.id, path: song.path);
-      final isNegative = cached == null;
-      final isFresh = cacheTs == null ||
-          DateTime.now().difference(cacheTs) <= const Duration(minutes: 10);
-      if (!isNegative || isFresh) {
-        if (_isSameTrack(state.currentSong, song)) {
-          ++_lyricsLoadGen;
-          safeEmit(state.copyWith(
-            isLoadingLyrics: false,
-            lyrics: cached?.lines ?? const [],
-            lyricsSource: cached?.source ?? LyricsSource.none,
-          ));
-        }
-        return;
-      }
-    }
-
-    final gen = ++_lyricsLoadGen;
-    safeEmit(state.copyWith(
-      isLoadingLyrics: true,
-      lyrics: [],
-      lyricsSource: LyricsSource.none,
-    ));
-
-    // Offline-only mode disables every network lyrics lookup (LRCLIB, YTM).
-    // It also means any miss below is non-authoritative, so it must not be
-    // negative-cached — otherwise going back online would keep reporting
-    // "no lyrics" for the TTL.
-    final offlineOnly = _settingsCubit?.state.offlineOnlyMode == true;
-
-    LyricsResult? lyricsResult;
-
-    try {
-      // 1. For local files, check embedded metadata and sidecar .lrc files
-      if (song.source == SongSource.local &&
-          !song.path.startsWith('http') &&
-          !song.path.startsWith('ytmusic://')) {
-        lyricsResult = await LrcParser.resolveLyrics(
-          song.path,
-          songId: song.id,
-        );
-      }
-
-      if (isClosed ||
-          gen != _lyricsLoadGen ||
-          (trackGen != null && trackGen != _trackChangedGen) ||
-          (mediaGen != null && mediaGen != _mediaItemGen) ||
-          !_isSameTrack(state.currentSong, song)) {
-        return;
-      }
-
-      // 2. Query LRCLIB for synchronized karaoke lyrics (works for local and online tracks).
-      // If local source only produced plain unsynced text, still attempt to fetch synced LRC.
-      final hasSynced = lyricsResult != null &&
-          lyricsResult.lines.isNotEmpty &&
-          lyricsResult.isSynced;
-
-      if (!hasSynced && !offlineOnly) {
-        final plainFallback = lyricsResult;
-        final lrclib = _lrclibService;
-        if (lrclib != null) {
-          try {
-            final onlineResult = await lrclib
-                .fetchLyrics(
-                  trackName: song.title,
-                  artistName: song.artist,
-                  albumName: song.album,
-                  durationSeconds:
-                      song.durationMs > 0 ? song.durationMs ~/ 1000 : null,
-                )
-                .timeout(const Duration(seconds: 5), onTimeout: () => null);
-
-            if (onlineResult != null && onlineResult.lines.isNotEmpty) {
-              // Prefer synced online lyrics; if unsynced, only prefer if we had nothing
-              if (onlineResult.isSynced ||
-                  plainFallback == null ||
-                  plainFallback.lines.isEmpty) {
-                lyricsResult = onlineResult;
-              }
-            }
-          } catch (e, st) {
-            ErrorLogger.log('LRCLIB fetch error for ${song.title}',
-                error: e, stackTrace: st, category: 'Lyrics');
-          }
-        }
-      }
-
-      if (isClosed ||
-          gen != _lyricsLoadGen ||
-          (trackGen != null && trackGen != _trackChangedGen) ||
-          (mediaGen != null && mediaGen != _mediaItemGen) ||
-          !_isSameTrack(state.currentSong, song)) {
-        return;
-      }
-
-      // 3. For YouTube Music tracks without LRCLIB matches, fetch native YTM lyrics
-      final videoId = song.remoteId;
-      if (!offlineOnly &&
-          (lyricsResult == null || lyricsResult.lines.isEmpty) &&
-          videoId != null &&
-          videoId.isNotEmpty) {
-        final ytmAccount = _ytmAccountService;
-        if (ytmAccount != null) {
-          try {
-            lyricsResult = await ytmAccount
-                .fetchYtmLyrics(videoId)
-                .timeout(const Duration(seconds: 5), onTimeout: () => null);
-          } catch (e, st) {
-            ErrorLogger.log('YTM lyrics fetch error for $videoId',
-                error: e, stackTrace: st, category: 'Lyrics');
-          }
-        }
-      }
-
-      // Cache the resolved result, including null for negative caching, so a
-      // miss on any source (local or online) is not re-resolved on every play.
-      // Skip negative caching while offline: the miss reflects "could not
-      // check", not "no lyrics exist".
-      if (lyricsResult != null || !offlineOnly) {
-        LrcParser.cacheLyricsResult(
-          lyricsResult,
-          songId: song.id,
-          path: song.path,
-        );
-      }
-    } catch (e, st) {
-      ErrorLogger.log('Lyrics load error for ${song.title}',
-          error: e, stackTrace: st, category: 'Lyrics');
-    } finally {
-      if (!isClosed && gen == _lyricsLoadGen) {
-        if (_isSameTrack(state.currentSong, song)) {
-          safeEmit(state.copyWith(
-            isLoadingLyrics: false,
-            lyrics: lyricsResult?.lines ?? [],
-            lyricsSource: lyricsResult?.source ?? LyricsSource.none,
-          ));
-        } else {
-          safeEmit(state.copyWith(
-            isLoadingLyrics: false,
-          ));
-        }
-      }
-    }
-  }
-
-  Future<void> refreshLyrics() async {
-    final song = state.currentSong;
-    if (song != null) {
-      LrcParser.invalidateSong(songId: song.id, path: song.path);
-      await _loadLyricsForSong(song);
-    }
-  }
-
-  /// Applies user-edited lyrics for the current song (F-31).
-  ///
-  /// Updates in-memory state and, for local files with a real path, writes a
-  /// sidecar `.lrc` next to the audio file so the edit survives restarts.
-  /// Returns true when the sidecar was persisted; false means the change is
-  /// session-only (e.g. online tracks or a write failure).
-  Future<bool> updateLyrics(List<LyricsLine> lines) async {
-    // Discard any in-flight loader so its late result cannot overwrite this edit.
-    ++_lyricsLoadGen;
-    final source =
-        lines.isNotEmpty ? LyricsSource.externalLrc : LyricsSource.none;
-    safeEmit(state.copyWith(
-      lyrics: lines,
-      lyricsSource: source,
-      isLoadingLyrics: false,
-    ));
-
-    final song = state.currentSong;
-    if (song == null) return false;
-
-    LrcParser.invalidateSong(songId: song.id, path: song.path);
-
-    final path = song.path;
-    final isLocal = song.source == SongSource.local &&
-        path.isNotEmpty &&
-        !path.startsWith('http') &&
-        !path.startsWith('ytmusic://');
-    if (!isLocal) {
-      LrcParser.cacheLyricsResult(
-        LyricsResult(lines: lines, source: source),
-        songId: song.id,
-        path: path,
-      );
-      return false;
-    }
-
-    try {
-      final file = File(path);
-      final dir = file.parent;
-      final baseName = path.split(RegExp(r'[\\/]')).last;
-      final dot = baseName.lastIndexOf('.');
-      final stem = dot > 0 ? baseName.substring(0, dot) : baseName;
-      final sidecar = File('${dir.path}${Platform.pathSeparator}$stem.lrc');
-      await sidecar.writeAsString(LrcParser.formatToLrc(lines), flush: true);
-      LrcParser.cacheLyricsResult(
-        LyricsResult(lines: lines, source: source),
-        songId: song.id,
-        path: path,
-      );
-      return true;
-    } catch (e, st) {
-      ErrorLogger.log('Failed to persist sidecar .lrc for $path',
-          error: e, stackTrace: st, category: 'Lyrics');
-      return false;
-    }
-  }
-
-  @override
-  Future<void> playSong(SongsTableData song,
-      {List<SongsTableData>? queue,
-      Duration? initialPosition,
-      bool openPlayerIfPlaying = true}) async {
-    // If this song is already the active song, expand the player and resume if paused instead of restarting from 0:00
-    if (openPlayerIfPlaying &&
-        initialPosition == null &&
-        _isSameTrack(state.currentSong, song)) {
-      safeEmit(state.copyWith(isExpanded: true));
-      if (!state.isPlaying) {
-        try {
-          await _audioHandler.play();
-        } catch (e, st) {
-          // Was unguarded: an expired online stream turned a resume tap into
-          // an unhandled exception.
-          ErrorLogger.log('Resume of current song failed',
-              error: e, stackTrace: st, category: 'PlayerCubit');
-          if (!isClosed) {
-            safeEmit(
-                state.copyWith(errorMessage: 'Failed to play ${song.title}'));
-          }
-        }
-      }
-      return;
-    }
-    // Task 0: start latency tracking from tap
-    final videoIdForLatency = song.remoteId ?? song.id.toString();
-    try {
-      _latencyTracker?.start(videoId: videoIdForLatency);
-      _latencyTracker?.markStage(PlaybackStage.tap);
-    } catch (_) {}
-    // P0-2: Speculative resolution on tap: begin resolving URL in background immediately
-    try {
-      _audioHandler.streamPreResolver.onTrackEnqueuedOrTapped(song);
-    } catch (_) {}
-    ++_mediaItemResolutionGen;
-    final capturedGen = _mediaItemResolutionGen;
-    // Dedicated token for mediaItem stream listener to discard stale DB lookups
-    ++_mediaItemGen;
-    // Dedicated token for the async downloaded-twin swap. It must NOT share
-    // _mediaItemResolutionGen: the handler's own onTrackChanged bump for the
-    // navigation that started this playSong would otherwise cancel every swap.
-    ++_localMatchSwapGen;
-    final capturedSwapGen = _localMatchSwapGen;
-    // Mark restoration as done: any in-flight _restoreQueueSlots must abort
-    _queueRestorationDone = true;
-    final rawQueue = queue != null ? List<SongsTableData>.from(queue) : [song];
-
-    var targetIndex = rawQueue.indexWhere((s) => _isSameTrack(s, song));
-    if (targetIndex == -1) {
-      targetIndex = 0;
-      rawQueue.insert(0, song);
-    }
-
-    List<SongsTableData> effectiveQueue;
-    int effectiveIndex;
-
-    String? queueTruncationWarning;
-    if (rawQueue.length > _maxQueueSize) {
-      final halfWindow = _maxQueueSize ~/ 2;
-      var start = targetIndex - halfWindow;
-      if (start < 0) start = 0;
-      if (start + _maxQueueSize > rawQueue.length) {
-        start = (rawQueue.length - _maxQueueSize).clamp(0, rawQueue.length);
-      }
-      effectiveQueue = rawQueue.sublist(start, start + _maxQueueSize);
-      effectiveIndex = targetIndex - start;
-      queueTruncationWarning =
-          'Queue truncated to $_maxQueueSize (was ${rawQueue.length}) — tail dropped';
-    } else {
-      effectiveQueue = rawQueue;
-      effectiveIndex = targetIndex;
-    }
-
-    final startPos = initialPosition ?? Duration.zero;
-    // Failure-rollback snapshot: everything the optimistic path below
-    // mutates before loadQueue can throw.
-    final prevSlot = _queueSlots[state.activeQueueSlot];
-    final prevQueue = state.queue;
-    final prevIndex = state.currentIndex;
-    final prevSong = state.currentSong;
-    final prevPosition = state.position;
-    final prevDuration = state.duration;
-    final prevLyrics = state.lyrics;
-    final prevLyricsSource = state.lyricsSource;
-    _setQueueSlot(
-      state.activeQueueSlot,
-      songs: List.from(effectiveQueue),
-      currentIndex: effectiveIndex,
-      position: startPos,
-      speed: state.playbackSpeed,
-    );
-    _debouncedPersistQueueSlots();
-    _queueVersion++;
-
-    // Immediate emission so tap feels instant: song row highlights,
-    // play/pause updates to playing, and miniplayer shows the track.
-    final isSameSong = _isSameTrack(state.currentSong, song);
-    _userPausedIntentionally = false;
-    safeEmit(state.copyWith(
-      queue: effectiveQueue,
-      currentIndex: effectiveIndex,
-      currentSong: song,
-      isPlaying: true,
-      position: startPos,
-      duration: Duration(milliseconds: song.durationMs),
-      errorMessage: queueTruncationWarning,
-      lyrics: isSameSong ? state.lyrics : [],
-      lyricsSource: isSameSong ? state.lyricsSource : LyricsSource.none,
-      isLoadingLyrics: !isSameSong,
-    ));
-
-    // Start loadQueue immediately — don't block on local-match DB query.
-    // The local-match check runs in parallel and swaps the source if found.
-    try {
-      _latencyTracker?.markStage(PlaybackStage.resolutionRequested);
-    } catch (_) {}
-
-    // Fire-and-forget: check if a downloaded local copy exists and swap it in
-    if (song.source == SongSource.youtube) {
-      unawaited(() async {
-        try {
-          final match = await _repository.findMatchingLocalSong(
-            remoteId: song.remoteId,
-            title: song.title,
-            artist: song.artist,
-          );
-          if (_localMatchSwapGen != capturedSwapGen ||
-              isClosed ||
-              !_isSameTrack(state.currentSong, song)) {
-            return;
-          }
-          final local = match.fold((_) => null, (s) => s);
-          if (local != null &&
-              (local.path.startsWith('content:') ||
-                  await File(local.path).exists())) {
-            if (_localMatchSwapGen != capturedSwapGen ||
-                isClosed ||
-                !_isSameTrack(state.currentSong, song)) {
-              return;
-            }
-            if (local.id != song.id) {
-              _audioHandler.swapReconciledSong(song.id, local);
-              final swappedQueue = effectiveQueue
-                  .map((s) => _isSameTrack(s, song) ? local : s)
-                  .toList();
-              _queueVersion++;
-              safeEmit(state.copyWith(
-                queue: swappedQueue,
-                currentSong: local,
-                // The local twin carries the real audio-header duration; the
-                // optimistic emit above kept the YouTube metadata value.
-                duration: local.durationMs > 0
-                    ? Duration(milliseconds: local.durationMs)
-                    : state.duration,
-              ));
-              final currentPos =
-                  state.position > startPos ? state.position : startPos;
-              _setQueueSlot(
-                state.activeQueueSlot,
-                songs: List.from(swappedQueue),
-                currentIndex: effectiveIndex,
-                position: currentPos,
-                speed: state.playbackSpeed,
-              );
-              _debouncedPersistQueueSlots();
-              unawaited(_loadLyricsForSong(local));
-            }
-          }
-        } catch (e, st) {
-          // Local-match swap failed: queue would claim a local file while
-          // the handler still streams YouTube. Log + surface, don't swallow.
-          ErrorLogger.log('Local-match swap failed for ${song.title}',
-              error: e, stackTrace: st, category: 'PlayerCubit');
-          if (!isClosed && _localMatchSwapGen == capturedSwapGen) {
-            safeEmit(state.copyWith(
-                errorMessage: 'Local match unavailable, streaming online'));
-          }
-        }
-      }());
-    }
-
-    try {
-      await _audioHandler.loadQueue(
-        effectiveQueue,
-        initialIndex: effectiveIndex,
-        initialPosition: startPos,
-      );
-      try {
-        _latencyTracker?.markStage(PlaybackStage.sourceSet);
-      } catch (_) {}
-      if (_mediaItemResolutionGen == capturedGen &&
-          !isClosed &&
-          !_userPausedIntentionally) {
-        safeEmit(state.copyWith(isPlaying: true));
-      }
-    } catch (e) {
-      try {
-        _latencyTracker?.finishWithError(e, stage: PlaybackStage.sourceSet);
-      } catch (_) {}
-      if (isClosed || _mediaItemResolutionGen != capturedGen) {
-        // Stale failure: a newer playSong already took over (its success path
-        // is gen-gated; this path was not). Emitting here would pause the
-        // newer song and flag an error for an abandoned request, and
-        // rethrowing would deliver a rejection nobody can act on.
-        ErrorLogger.log('Stale playSong failure ignored for ${song.title}',
-            error: e, category: 'PlayerCubit');
-        return;
-      }
-      // Invalidate everything captured against this request: the parallel
-      // local-match swap re-checks the gen and must not re-apply the failed
-      // queue after the rollback below.
-      // FIX-H06: Invalidate lyrics loader generation so in-flight fetch doesn't overwrite rollback lyrics
-      _lyricsLoadGen++;
-      _mediaItemResolutionGen++;
-      _localMatchSwapGen++;
-      // Roll back the optimistic mutations: the unplayable queue must not
-      // present itself as active, and the pending 2s persist must not write
-      // the broken slot over the previously saved session. Re-scheduling the
-      // persist is deliberate - if loadQueue threw late, the broken slot may
-      // already be persisted, and persisting the restored slot heals that.
-      _queueSlots[state.activeQueueSlot] = prevSlot ??
-          const _QueueSlotData(
-              songIds: [], currentIndex: 0, position: Duration.zero);
-      _debouncedPersistQueueSlots();
-      _queueVersion++;
-      safeEmit(state.copyWith(
-        queue: prevQueue,
-        currentIndex: prevIndex,
-        currentSong: prevSong,
-        isPlaying: false,
-        position: prevPosition,
-        duration: prevDuration,
-        lyrics: prevLyrics,
-        lyricsSource: prevLyricsSource,
-        isLoadingLyrics: false,
-        errorMessage: 'Failed to play ${song.title}',
-      ));
-      // FIX-C3: Invalidate widget coordinator on rollback
-      _updateWidgetThrottled(force: true);
-      return;
-    }
-    unawaited(
-      Future.wait([
-        _loadLyricsForSong(song, mediaGen: capturedGen),
-        _loadSponsorBlockSegments(song, mediaGen: capturedGen),
-      ]),
-      // reason: Background lyrics and sponsorblock loading once track playback has initiated
-    );
-    _updateWidgetThrottled(force: true);
-  }
-
-
-  @override
-  bool _isSwitchingSlot = false;
-
-
-  @override
-  int _lastSeekMs = 0;
-
-
-  @override
-  PlayerState? _dspSnapshot;
-
-
-  // --- NATIVE DSP METHODS ---
-
-
-  // --- PHASE 1 DSP EXPANSION METHODS ---
-
-
-  // --- JAMESDSP FEATURE PARITY METHODS ---
-
-
-  // --- PHASE 3: PER-DEVICE PROFILE AUTOSWITCH ---
-
-
-  // ── F1: AB loop ────────────────────────────────────────────────────
-  void setAbPointA() {
-    final pos = state.position;
-    _audioHandler.setAbPointA(pos);
-    // Emit manager truth, not the requested pos: the manager rejects
-    // B<=A / pos<=A, and emitting pos would diverge UI from engine.
-    final mgr = _audioHandler.abLoopManager;
-    safeEmit(state.copyWith(
-      abPointA: mgr.pointA,
-      abLoopEnabled: mgr.isEnabled,
-      abPointB: mgr.pointB,
-    ));
-  }
-
-  void setAbPointB() {
-    final pos = state.position;
-    _audioHandler.setAbPointB(pos);
-    final mgr = _audioHandler.abLoopManager;
-    safeEmit(state.copyWith(
-      abPointB: mgr.pointB,
-      abPointA: mgr.pointA,
-      abLoopEnabled: mgr.isEnabled,
-    ));
-  }
-
-  void toggleAbLoop() {
-    _audioHandler.toggleAbLoop();
-    safeEmit(
-        state.copyWith(abLoopEnabled: _audioHandler.abLoopManager.isEnabled));
-  }
-
-  void clearAbLoop() {
-    _audioHandler.clearAbLoop();
-    safeEmit(
-        state.copyWith(abLoopEnabled: false, abPointA: null, abPointB: null));
-  }
-
-  /// Shared per-track reset used by BOTH track-change paths (onTrackChanged
-  /// and mediaItem, which can fire in either order). Deduped within a short
-  /// window so two listeners for one change apply once, while a genuine replay
-  /// of the same song id (repeat-one / duplicate queue entry) still re-runs.
-  Future<void> _syncPerTrackState(SongsTableData song) async {
-    final now = DateTime.now();
-    final pos = state.position;
-    final sameId = _lastPerTrackSyncSongId == song.id;
-    // FIX-C9: 800ms dedupe window
-    final withinDedupeWindow = _lastPerTrackSyncAt != null &&
-        now.difference(_lastPerTrackSyncAt!) <
-            const Duration(milliseconds: 800);
-    // FIX-M09: Allow sync if position jumped backwards by > 1s (e.g. track restart)
-    final jumpedBackwards = _lastPerTrackSyncPosition != null &&
-        (_lastPerTrackSyncPosition! - pos) > const Duration(seconds: 1);
-    final restartedAtZero = pos == Duration.zero &&
-        _lastPerTrackSyncPosition != null &&
-        _lastPerTrackSyncPosition! > Duration.zero;
-    // FIX-C9: Secondary guard: if same song and exact same position, skip redundant sync
-    final samePosition = _lastPerTrackSyncPosition != null &&
-        _lastPerTrackSyncPosition == pos;
-    if (sameId && ((withinDedupeWindow && !jumpedBackwards && !restartedAtZero) || samePosition)) return;
-    _lastPerTrackSyncSongId = song.id;
-    _lastPerTrackSyncAt = now;
-    _lastPerTrackSyncPosition = pos;
-    final gen = ++_perTrackSyncGen;
-
-    // FIX-C9: Serialize in-flight per-track store reads
-    final prevCompleter = _perTrackSyncCompleter;
-    final completer = Completer<void>();
-    _perTrackSyncCompleter = completer;
-    if (prevCompleter != null && !prevCompleter.isCompleted) {
-      try {
-        await prevCompleter.future;
-      } catch (_) {}
-    }
-
-    try {
-      // The stores load their SharedPreferences map asynchronously; reading
-      // before `ready` completes returns defaults (0/null) and silently drops
-      // the saved per-song overrides.
-      try {
-        await Future.wait<void>([
-          _songRatingStore.ready,
-          _perSongEqStore.ready,
-          _perSongVolumeStore.ready,
-        ]).timeout(
-          const Duration(seconds: 2),
-          onTimeout: () {
-            ErrorLogger.log('Store ready timeout in _syncPerTrackState',
-                category: 'PlayerCubit');
-            return const [];
-          },
-        );
-      } catch (_) {}
-      if (isClosed ||
-          gen != _perTrackSyncGen ||
-          !_isSameTrack(state.currentSong, song)) {
-        return;
-      }
-
-    final trackKey = song.id.toString();
-    final songRating = _songRatingStore.getRating(trackKey);
-    final songEq = _perSongEqStore.getPresetForTrack(trackKey);
-    final songVol = _perSongVolumeStore.getGainDbForTrack(trackKey);
-
-    var delayMs = state.trackDelayMs;
-    try {
-      delayMs = _audioHandler.currentTrackDelayMs;
-    } catch (_) {}
-    safeEmit(state.copyWith(
-      abPointA: null,
-      abPointB: null,
-      abLoopEnabled: false,
-      trackDelayMs: delayMs,
-      bookmarkPosition: null,
-      currentSongRating: songRating,
-      currentSongEqOverride: songEq,
-      currentSongVolumeOverrideDb: songVol,
-    ));
-    unawaited(_syncAbLoopUi(song));
-    try {
-      checkBookmarkOffer();
-    } catch (e, st) {
-      ErrorLogger.log('Bookmark offer check failed',
-          error: e, stackTrace: st, category: 'PlayerCubit');
-    }
-
-    if (songEq != null) {
-      if (!_perSongOverrideActive) {
-        _globalEqBackup = state.eqPreset;
-        _globalHeadphoneProfileBackup = state.selectedHeadphoneProfile;
-        _perSongOverrideActive = true;
-      }
-      final lower = songEq.toLowerCase();
-      final match = EqPreset.defaultPresets
-          .where((p) => p.name.toLowerCase() == lower)
-          .firstOrNull;
-      if (match != null) {
-        unawaited(applyPreset(match, isPerSongRestore: true));
-      } else {
-        try {
-          final custom = _equalizerCustomPresets()
-              .where((p) => p.name.toLowerCase() == lower)
-              .firstOrNull;
-          if (custom != null) {
-            unawaited(applyPreset(custom, isPerSongRestore: true));
-          } else {
-            unawaited(() async {
-              final hp = await _headphoneProfileByName(songEq);
-              if (hp != null && !isClosed) {
-                await applyHeadphoneProfile(hp, isPerSongRestore: true);
-              }
-            }());
-          }
-        } catch (_) {}
-      }
-    } else if (_perSongOverrideActive) {
-      final restore = _globalEqBackup;
-      final profileRestore = _globalHeadphoneProfileBackup;
-      _globalEqBackup = null;
-      _globalHeadphoneProfileBackup = null;
-      _perSongOverrideActive = false;
-      if (profileRestore != null) {
-        unawaited(applyHeadphoneProfile(profileRestore, isPerSongRestore: true));
-      } else if (restore != null) {
-        unawaited(applyPreset(restore, isPerSongRestore: true));
-      }
-    }
-    // Push per-song volume so the emitted override is actually audible.
-    // setVolume combines master + ReplayGain + per-song gain in the handler.
-    try {
-      unawaited(_audioHandler.setVolume(_audioHandler.volume));
-    } catch (e, st) {
-      ErrorLogger.log('Per-song volume push failed',
-          error: e, stackTrace: st, category: 'PlayerCubit');
-    }
-  } finally {
-    if (!completer.isCompleted) completer.complete();
-  }
-}
-
-  /// Syncs AB-loop UI with the (possibly restored) handler state after a
-  /// track change. Guarded for handler test doubles without F1 members.
-  Future<void> _syncAbLoopUi(SongsTableData song) async {
-    try {
-      await _audioHandler.restoreAbLoopForCurrentSong();
-    } catch (_) {}
-    if (isClosed || state.currentSong?.id != song.id) return;
-    try {
-      final mgr = _audioHandler.abLoopManager;
-      if (mgr.pointA == null && mgr.pointB == null) return;
-      safeEmit(state.copyWith(
-        abPointA: mgr.pointA,
-        abPointB: mgr.pointB,
-        abLoopEnabled: mgr.isEnabled,
-      ));
-    } catch (_) {}
-  }
-
-  // ── F2: per-track delay ──────────────────────────────────────────────
-  Future<void> setTrackDelayMs(int ms) async {
-    final clamped = ms.clamp(-2000, 2000);
-    await _audioHandler.setCurrentTrackDelay(clamped);
-    safeEmit(state.copyWith(trackDelayMs: clamped));
-  }
-
-  void syncTrackDelay() {
-    safeEmit(state.copyWith(trackDelayMs: _audioHandler.currentTrackDelayMs));
-  }
-
-  // ── BPM override (feeds BPM-synced crossfade) ──────────────────────
-  /// Sets (or clears with null) the manual BPM override for [song].
-  /// Returns false when out of range or the handler lacks the API.
-  Future<bool> setTrackBpm(SongsTableData song, double? bpm) async {
-    try {
-      return await _audioHandler.setTrackBpm(song, bpm);
-    } catch (_) {
-      return false;
-    }
-  }
-
-  // ── F10: silence-skip sensitivity ────────────────────────────────────
-  Future<void> setSilenceSkipSensitivity(int v) async {
-    await _audioHandler.setSilenceSkipSensitivity(v);
-    safeEmit(state.copyWith(silenceSkipSensitivity: v.clamp(0, 100)));
-  }
-
-  // ── F11: bookmarks ───────────────────────────────────────────────────
-  void dismissBookmark() {
-    safeEmit(state.copyWith(bookmarkPosition: null));
-  }
-
-  Future<void> seekToBookmark() async {
-    final b = state.bookmarkPosition;
-    if (b != null) {
-      await _audioHandler.seek(b);
-      safeEmit(state.copyWith(bookmarkPosition: null, position: b));
-    }
-  }
-
-  Future<void> clearBookmark() async {
-    final song = state.currentSong;
-    if (song != null) await _audioHandler.clearBookmarkFor(song);
-    safeEmit(state.copyWith(bookmarkPosition: null));
-  }
-
-  /// Saves the current playback position as a bookmark. Returns false when
-  /// there is no current song or the position is too close to the head for the
-  /// store to accept it.
-  Future<bool> saveBookmark() async {
-    final song = state.currentSong;
-    if (song == null) return false;
-    final posMs = state.position.inMilliseconds;
-    if (posMs < 5000) return false;
-    try {
-      final key = PlaybackBookmarkStore.keyFor(
-          songId: song.id, remoteId: song.remoteId, path: song.path);
-      _audioHandler.bookmarkStore
-          .save(key, posMs, durationMs: state.duration.inMilliseconds);
-      await _audioHandler.persistBookmarks();
-      safeEmit(state.copyWith(bookmarkPosition: Duration(milliseconds: posMs)));
-      return true;
-    } catch (e, st) {
-      // FIX-A05: Log bookmark persistence failure
-      ErrorLogger.log('Failed to save bookmark for song ${song.id}',
-          error: e, stackTrace: st, category: 'PlayerCubit');
-      return false;
-    }
-  }
-
-  /// Reads the stored bookmark for [song] without mutating playback state.
-  PlaybackBookmark? storedBookmarkFor(SongsTableData song) {
-    try {
-      return _audioHandler.recallBookmarkFor(song);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  void checkBookmarkOffer() {
-    final song = state.currentSong;
-    if (song == null) return;
-    PlaybackBookmark? b;
-    try {
-      b = _audioHandler.recallBookmarkFor(song);
-    } catch (_) {
-      return;
-    }
-    if (b != null && b.positionMs > 5000) {
-      // Only offer when starting near the head.
-      if (state.position.inMilliseconds < 8000) {
-        safeEmit(state.copyWith(
-            bookmarkPosition: Duration(milliseconds: b.positionMs)));
-      }
-    }
-  }
-
-  // ── Quran Mode ───────────────────────────────────────────────────────
-
-  /// Restores Quran Mode from preferences on launch. No snapshot is captured:
-  /// the restored prefs already reflect whatever the previous session left.
-  Future<void> _restoreQuranMode() async {
-    final service = _quranModeService;
-    if (service == null) return;
-    try {
-      final profile = await service.loadActiveProfile();
-      if (profile == null || isClosed) return;
-      // Reload the snapshot captured when the mode was last enabled: the
-      // in-memory one did not survive the process, and without it disabling
-      // Quran Mode would leave its vocal EQ/reverb/dynamics applied.
-      _quranRestore ??= await _loadQuranSnapshot();
-      safeEmit(state.copyWith(
-        quranReciterStyle: profile.style,
-        isQuranModeEnabled: true,
-      ));
-      await _applyQuranProfile(profile.style);
-    } catch (e, st) {
-      ErrorLogger.log('Failed to restore Quran Mode',
-          error: e, stackTrace: st, category: 'PlayerCubit');
-    }
-  }
-
-  /// Enables or disables Quran Mode. Enabling snapshots the current DSP state,
-  /// then applies the vocal-optimized profile. Disabling restores the snapshot.
-  Future<void> setQuranModeEnabled(bool enabled) async {
-    if (enabled == state.isQuranModeEnabled) return;
-    if (enabled) {
-      _quranRestore = _captureQuranRestoreSnapshot();
-      await _persistQuranSnapshot(_quranRestore!);
-      await _applyQuranProfile(state.quranReciterStyle);
-      await _quranModeService?.setEnabled(true);
-      if (!isClosed) {
-        safeEmit(state.copyWith(isQuranModeEnabled: true, errorMessage: null));
-      }
-    } else {
-      await _quranModeService?.setEnabled(false);
-      // Fall back to the persisted snapshot when the in-memory one is gone
-      // (mode restored on launch, then disabled in this session).
-      _quranRestore ??= await _loadQuranSnapshot();
-      await _restoreQuranSnapshot();
-      _quranRestore = null;
-      await _clearQuranSnapshot();
-      if (!isClosed) {
-        safeEmit(state.copyWith(isQuranModeEnabled: false, errorMessage: null));
-      }
-    }
-  }
-
-  Future<void> toggleQuranMode() =>
-      setQuranModeEnabled(!state.isQuranModeEnabled);
-
-  /// Switches the active reciter style, re-applying the profile when the mode
-  /// is already on.
-  Future<void> setQuranReciterStyle(QuranReciterStyle style) async {
-    await _quranModeService?.setStyle(style);
-    if (isClosed) return;
-    safeEmit(state.copyWith(quranReciterStyle: style));
-    if (state.isQuranModeEnabled) {
-      await _applyQuranProfile(style);
-    }
-  }
-
-  /// Re-applies the current style's profile (e.g. after a "reset" tap).
-  Future<void> reapplyQuranProfile() =>
-      _applyQuranProfile(state.quranReciterStyle);
-
-  /// Applies a single reverb tweak on top of the active Quran profile (used by
-  /// the ambience slider).
-  Future<void> setQuranAmbience(double wetDry) async {
-    final profile = QuranModeProfile.forStyle(state.quranReciterStyle);
-    final caps = _earbudOptimizationService
-        ?.detect(_hiResAudioService?.currentOutputInfo);
-    await setReverb(
-      wetDry > 0.001,
-      preset: profile.reverbPreset.wireValue,
-      wetDry: (wetDry * (caps?.reverbScale ?? 1.0)).clamp(0.0, 1.0),
-    );
-  }
-
-  /// Detects the current output route's real capabilities for display.
-  Future<EarbudCapabilities> detectEarbudCapabilities() async {
-    final service = _earbudOptimizationService;
-    if (service == null) {
-      return const EarbudCapabilities(
-        deviceName: 'Default output',
-        codec: EarbudCodec.unknown,
-        isBluetooth: false,
-        isLeAudio: false,
-        isUsbDac: false,
-        sampleRateHz: 44100,
-        bitDepth: 16,
-        latencyMs: 0,
-      );
-    }
-    var info = _hiResAudioService?.currentOutputInfo;
-    try {
-      info ??= await _hiResAudioService?.getAudioOutputInfo();
-    } catch (_) {
-      info = null;
-    }
-    return service.detect(info);
-  }
-
-  Future<void> _applyQuranProfile(QuranReciterStyle style) async {
-    final profile = QuranModeProfile.forStyle(style);
-    final caps = _earbudOptimizationService
-        ?.detect(_hiResAudioService?.currentOutputInfo);
-    final gains = caps == null
-        ? profile.eqGains
-        : _earbudOptimizationService!.mergeCompensation(profile.eqGains, caps);
-
-    // 1. Vocal-optimized EQ (bulk apply, single native push).
-    await applyPreset(profile.toEqPreset(gains));
-    try {
-      await _audioHandler.equalizerManager.setPreamp(profile.preampDb);
-    } catch (_) {}
-
-    // 2. Room / mosque-style convolution reverb, scaled for lossy Bluetooth.
-    await setReverb(
-      profile.reverbEnabled,
-      preset: profile.reverbPreset.wireValue,
-      wetDry:
-          (profile.reverbWetDry * (caps?.reverbScale ?? 1.0)).clamp(0.0, 1.0),
-    );
-
-    // 3. Gentle harmonic warmth.
-    await setSaturation(
-      profile.saturationEnabled,
-      drive: profile.saturationDrive,
-      mix: profile.saturationMix,
-      tilt: profile.saturationTilt,
-    );
-
-    // 4. Vocal dynamics.
-    await setDynamicsPreset(
-      profile.dynamicsPreset,
-      enabled: profile.dynamicsEnabled,
-    );
-
-    // 5. Learning speed (memorization style only; others are 1.0x).
-    if ((state.playbackSpeed - profile.playbackSpeed).abs() > 0.001) {
-      await setPlaybackSpeed(profile.playbackSpeed);
-    }
-
-    // 6. Continuous order: recitation is never shuffled.
-    if (state.isShuffle) {
-      await toggleShuffle();
-    }
-  }
-
-  QuranRestoreSnapshot _captureQuranRestoreSnapshot() {
-    return QuranRestoreSnapshot(
-      eqPreset: state.eqPreset,
-      isEqEnabled: state.isEqEnabled,
-      headphoneProfile: state.selectedHeadphoneProfile,
-      isReverbEnabled: state.isReverbEnabled,
-      reverbPreset: state.reverbPreset,
-      reverbWetDry: state.reverbWetDry,
-      isDynamicsEnabled: state.isDynamicsEnabled,
-      dynamicsPreset: state.dynamicsPreset,
-      isSaturationEnabled: state.isSaturationEnabled,
-      saturationDrive: state.saturationDrive,
-      saturationMix: state.saturationMix,
-      saturationTilt: state.saturationTilt,
-      playbackSpeed: state.playbackSpeed,
-      isShuffle: state.isShuffle,
-      preampDb: _audioHandler.equalizerManager.preampDb,
-    );
-  }
-
-  Future<void> _restoreQuranSnapshot() async {
-    final s = _quranRestore;
-    if (s == null) return;
-    if (s.headphoneProfile != null) {
-      await applyHeadphoneProfile(s.headphoneProfile);
-    } else {
-      await applyPreset(s.eqPreset);
-    }
-    await setEqualizerEnabled(s.isEqEnabled);
-    try {
-      await _audioHandler.equalizerManager.setPreamp(s.preampDb);
-    } catch (_) {}
-    await setReverb(s.isReverbEnabled,
-        preset: s.reverbPreset, wetDry: s.reverbWetDry);
-    await setDynamicsPreset(s.dynamicsPreset, enabled: s.isDynamicsEnabled);
-    await setSaturation(s.isSaturationEnabled,
-        drive: s.saturationDrive, mix: s.saturationMix, tilt: s.saturationTilt);
-    await setPlaybackSpeed(s.playbackSpeed);
-    if (state.isShuffle != s.isShuffle) {
-      await toggleShuffle();
-    }
-  }
-
-  Future<void> _persistQuranSnapshot(QuranRestoreSnapshot snapshot) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-          PrefsKeys.quranRestoreSnapshot, jsonEncode(snapshot.toJson()));
-    } catch (e, st) {
-      ErrorLogger.log('Failed to persist Quran Mode restore snapshot',
-          error: e, stackTrace: st, category: 'PlayerCubit');
-    }
-  }
-
-  Future<QuranRestoreSnapshot?> _loadQuranSnapshot() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(PrefsKeys.quranRestoreSnapshot);
-      if (raw == null || raw.isEmpty) return null;
-      return QuranRestoreSnapshot.fromJson(
-          jsonDecode(raw) as Map<String, dynamic>);
-    } catch (e, st) {
-      ErrorLogger.log('Failed to load Quran Mode restore snapshot',
-          error: e, stackTrace: st, category: 'PlayerCubit');
-      return null;
-    }
-  }
-
-  Future<void> _clearQuranSnapshot() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(PrefsKeys.quranRestoreSnapshot);
-    } catch (_) {}
-  }
-
-  // ── F9: DSP snapshot ─────────────────────────────────────────────────
+  Future<void> persistQueueSlotsNow() => queueController.persistQueueSlotsNow();
   Future<void> saveDspSnapshot() => _audioHandler.saveDspSnapshotForCurrent();
 
   @override
   Future<void> close() async {
     transportController.dispose();
+    dspController.dispose();
     widgetBridge.dispose();
-    _persistQueueDebounce?.cancel();
-    _scrobbleCoordinator?.dispose();
-    _seekThrottleTimer?.cancel();
-    _seekThrottleTimer = null;
-    _pendingSeek = null;
-    try {
-      await _widgetClickSub?.cancel();
-    } catch (_) {}
-    _widgetClickSub = null;
-    // Final persist: the cancelled debounce would otherwise lose the most
-    // recent slot state (e.g. the near-live position written by the position
-    // listener). Awaited so the write lands before the cubit is gone.
-    try {
-      await _persistQueueSlots(force: true);
-    } catch (e, st) {
-      // FIX-A05: Log failure during final queue persistence on close
-      ErrorLogger.log('Failed to persist queue slots on close',
-          error: e, stackTrace: st, category: 'PlayerCubit');
-    }
+    await queueController.persistQueueSlotsNow();
     return super.close();
   }
 }

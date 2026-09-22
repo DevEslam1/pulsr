@@ -1,5 +1,6 @@
 // lib/features/playlists/cubit/playlist_cubit.dart
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:injectable/injectable.dart';
@@ -127,7 +128,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
   StreamSubscription? _playlistSongsSub;
   final Map<int, StreamSubscription> _smartSubscriptions = {};
   final Map<int, String> _smartCriteriaJson = {};
-  Future<void> _pendingCacheSave = Future<void>.value();
+  final Queue<Future<void> Function()> _cacheSaveQueue = Queue<Future<void> Function()>();
+  bool _cacheSaveRunning = false;
   bool _isSeedingChecked = false;
 
   /// Reactive online-playlist state. Widgets use [ValueListenableBuilder]
@@ -265,9 +267,23 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
   /// Serializes cache writes so concurrent callers cannot persist a snapshot
   /// taken before another section landed.
   Future<void> _saveOnlineCache() {
-    final next = _pendingCacheSave.then((_) => _writeOnlineCache());
-    _pendingCacheSave = next;
-    return next;
+    _cacheSaveQueue.add(_writeOnlineCache);
+    return _drainCacheSaveQueue();
+  }
+
+  Future<void> _drainCacheSaveQueue() async {
+    if (_cacheSaveRunning) return;
+    _cacheSaveRunning = true;
+    while (_cacheSaveQueue.isNotEmpty) {
+      final fn = _cacheSaveQueue.removeFirst();
+      try {
+        await fn();
+      } catch (e, st) {
+        ErrorLogger.log('Online cache save queue task failed',
+            error: e, stackTrace: st, category: 'PlaylistCubit');
+      }
+    }
+    _cacheSaveRunning = false;
   }
 
     Future<void> _writeOnlineCache() async {

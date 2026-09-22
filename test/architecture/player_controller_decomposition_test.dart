@@ -79,6 +79,7 @@ void main() {
 
       final controller = PlayerQueueController(
         audioHandler: mockAudioHandler,
+        repository: mockRepository,
         getState: () => state,
         emit: (s) => state = s,
         isClosed: () => false,
@@ -105,6 +106,8 @@ void main() {
         settingsCubit: null,
         getState: () => state,
         emit: (s) => state = s,
+        syncAudioEffects: () {},
+        isClosed: () => false,
       );
 
       expect(controller.guardDsp('EQ'), isTrue);
@@ -120,7 +123,7 @@ void main() {
     });
 
     test('PlayerMetadataController executes cue chapters check cleanly', () async {
-      var state = const PlayerState(currentSong: testSong);
+      var state = const PlayerState(playback: PlaybackSlice(currentSong: testSong));
       final controller = PlayerMetadataController(
         lyricsManager: PlayerLyricsManager(),
         sponsorBlockManager: PlayerSponsorBlockManager(),
@@ -145,7 +148,7 @@ void main() {
         isClosed: () => false,
       );
 
-      expect(() => bridge.updateWidgetThrottled(const PlayerState(), 1), returnsNormally);
+      expect(() => bridge.updateWidgetThrottled(const PlayerState(), queueVersion: 1), returnsNormally);
       expect(() => bridge.updateProgressThrottled(const PlayerState()), returnsNormally);
       bridge.dispose();
     });

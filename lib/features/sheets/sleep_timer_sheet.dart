@@ -240,6 +240,29 @@ class SleepTimerSheet extends StatelessWidget {
                                   color: p.surfaceContainer,
                                   borderRadius: BorderRadius.circular(AppRadii.r8),
                                 ),
+                                child: Icon(Icons.timer_outlined,
+                                    color: p.accent),
+                              ),
+                              title: Text('Custom duration (minutes)…',
+                                  style: TextStyle(color: p.textPrimary)),
+                              trailing: Icon(Icons.chevron_right_rounded,
+                                  color: p.textSecondary),
+                              onTap: () async {
+                                final minutes = await _showCustomMinutesDialog(context);
+                                if (minutes != null && minutes > 0 && context.mounted) {
+                                  cubit.startSleepTimer(minutes);
+                                  Navigator.pop(context);
+                                }
+                              },
+                            ),
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Container(
+                                padding: const EdgeInsets.all(AppSpacing.xs),
+                                decoration: BoxDecoration(
+                                  color: p.surfaceContainer,
+                                  borderRadius: BorderRadius.circular(AppRadii.r8),
+                                ),
                                 child: Icon(Icons.access_time_rounded,
                                     color: p.accent),
                               ),
@@ -278,4 +301,46 @@ class SleepTimerSheet extends StatelessWidget {
                 },
               );
             }
-          }
+
+  Future<int?> _showCustomMinutesDialog(BuildContext context) async {
+    final controller = TextEditingController();
+    final p = context.palette;
+    return showDialog<int>(
+      context: context,
+      useRootNavigator: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: p.surfaceContainer,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.r18)),
+        title: Text(
+          context.l10n.customTime,
+          style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700),
+        ),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Duration (minutes)',
+            hintText: 'e.g. 25',
+            suffixText: 'min',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(context.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              final val = int.tryParse(controller.text.trim());
+              if (val != null && val > 0 && val <= 720) {
+                Navigator.pop(ctx, val);
+              }
+            },
+            child: Text(context.l10n.ok),
+          ),
+        ],
+      ),
+    );
+  }
+}

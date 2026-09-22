@@ -1118,61 +1118,65 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             const SizedBox(height: AppSpacing.xxs),
             // F-35: fast solo/mute toggles. State is transient (native has no
             // getter), so it is mirrored locally for the current session only.
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _bandToggle(
-                  label: 'M',
-                  tooltip: isMuted
-                      ? context.l10n.dspUnmuteBand
-                      : context.l10n.dspMuteBand,
-                  active: isMuted,
-                  activeColor: errorColor,
-                  onTap: isEnabled
-                      ? () async {
-                          final next = !isMuted;
-                          final manager = _equalizerManagerOrNull();
-                          if (manager != null) {
-                            await manager.setBandMute(index, next);
-                          }
-                          if (!mounted) return;
-                          setState(() {
-                            if (next) {
-                              _mutedBands.add(index);
-                            } else {
-                              _mutedBands.remove(index);
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _bandToggle(
+                    label: 'M',
+                    tooltip: isMuted
+                        ? context.l10n.dspUnmuteBand
+                        : context.l10n.dspMuteBand,
+                    active: isMuted,
+                    activeColor: errorColor,
+                    onTap: isEnabled
+                        ? () async {
+                            final next = !isMuted;
+                            final manager = _equalizerManagerOrNull();
+                            if (manager != null) {
+                              await manager.setBandMute(index, next);
                             }
-                          });
-                        }
-                      : null,
-                ),
-                const SizedBox(width: AppSpacing.s2),
-                _bandToggle(
-                  label: 'S',
-                  tooltip: isSoloed
-                      ? context.l10n.dspUnsoloBand
-                      : context.l10n.dspSoloBand,
-                  active: isSoloed,
-                  activeColor: accentColor,
-                  onTap: isEnabled
-                      ? () async {
-                          final next = !isSoloed;
-                          final manager = _equalizerManagerOrNull();
-                          if (manager != null) {
-                            await manager.setBandSolo(index, next);
+                            if (!mounted) return;
+                            setState(() {
+                              if (next) {
+                                _mutedBands.add(index);
+                              } else {
+                                _mutedBands.remove(index);
+                              }
+                            });
                           }
-                          if (!mounted) return;
-                          setState(() {
-                            if (next) {
-                              _soloedBands.add(index);
-                            } else {
-                              _soloedBands.remove(index);
+                        : null,
+                  ),
+                  const SizedBox(width: AppSpacing.s2),
+                  _bandToggle(
+                    label: 'S',
+                    tooltip: isSoloed
+                        ? context.l10n.dspUnsoloBand
+                        : context.l10n.dspSoloBand,
+                    active: isSoloed,
+                    activeColor: accentColor,
+                    onTap: isEnabled
+                        ? () async {
+                            final next = !isSoloed;
+                            final manager = _equalizerManagerOrNull();
+                            if (manager != null) {
+                              await manager.setBandSolo(index, next);
                             }
-                          });
-                        }
-                      : null,
-                ),
-              ],
+                            if (!mounted) return;
+                            setState(() {
+                              if (next) {
+                                _soloedBands.add(index);
+                              } else {
+                                _soloedBands.remove(index);
+                              }
+                            });
+                          }
+                        : null,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -1196,10 +1200,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           onTap: onTap,
           borderRadius: BorderRadius.circular(AppRadii.r4),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 1.5, vertical: 3),
             child: Container(
-              width: 18,
-              height: 18,
+              width: 15,
+              height: 15,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: active

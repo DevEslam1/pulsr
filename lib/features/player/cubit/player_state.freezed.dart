@@ -14,23 +14,1763 @@ part of 'player_state.dart';
 T _$identity<T>(T value) => value;
 
 /// @nodoc
-mixin _$PlayerState {
+mixin _$PlaybackSlice {
   SongsTableData? get currentSong;
   bool get isPlaying;
   Duration get position;
   Duration get duration;
   bool get isShuffle;
   PlayerRepeatMode get repeatMode;
-  List<SongsTableData> get queue;
-  int get currentIndex;
+  double get playbackSpeed;
+  double get playbackPitch;
+  int? get audioSessionId;
+  String? get errorMessage;
   bool get isExpanded;
   Color? get dominantColor;
   Duration? get sleepTimerRemaining;
+  bool get abLoopEnabled;
+  Duration? get abPointA;
+  Duration? get abPointB;
+  int get trackDelayMs;
+  Duration? get bookmarkPosition;
+  int get silenceSkipSensitivity;
+  int get currentSongRating;
+  String? get currentSongEqOverride;
+  double get currentSongVolumeOverrideDb;
+
+  /// Create a copy of PlaybackSlice
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @pragma('vm:prefer-inline')
+  $PlaybackSliceCopyWith<PlaybackSlice> get copyWith =>
+      _$PlaybackSliceCopyWithImpl<PlaybackSlice>(
+          this as PlaybackSlice, _$identity);
+
+  @override
+  bool operator ==(Object other) {
+    final _this = this as PlaybackSlice;
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is PlaybackSlice &&
+            (identical(other.currentSong, _this.currentSong) ||
+                other.currentSong == _this.currentSong) &&
+            (identical(other.isPlaying, _this.isPlaying) ||
+                other.isPlaying == _this.isPlaying) &&
+            (identical(other.position, _this.position) ||
+                other.position == _this.position) &&
+            (identical(other.duration, _this.duration) ||
+                other.duration == _this.duration) &&
+            (identical(other.isShuffle, _this.isShuffle) ||
+                other.isShuffle == _this.isShuffle) &&
+            (identical(other.repeatMode, _this.repeatMode) ||
+                other.repeatMode == _this.repeatMode) &&
+            (identical(other.playbackSpeed, _this.playbackSpeed) ||
+                other.playbackSpeed == _this.playbackSpeed) &&
+            (identical(other.playbackPitch, _this.playbackPitch) ||
+                other.playbackPitch == _this.playbackPitch) &&
+            (identical(other.audioSessionId, _this.audioSessionId) ||
+                other.audioSessionId == _this.audioSessionId) &&
+            (identical(other.errorMessage, _this.errorMessage) ||
+                other.errorMessage == _this.errorMessage) &&
+            (identical(other.isExpanded, _this.isExpanded) ||
+                other.isExpanded == _this.isExpanded) &&
+            (identical(other.dominantColor, _this.dominantColor) ||
+                other.dominantColor == _this.dominantColor) &&
+            (identical(other.sleepTimerRemaining, _this.sleepTimerRemaining) ||
+                other.sleepTimerRemaining == _this.sleepTimerRemaining) &&
+            (identical(other.abLoopEnabled, _this.abLoopEnabled) ||
+                other.abLoopEnabled == _this.abLoopEnabled) &&
+            (identical(other.abPointA, _this.abPointA) ||
+                other.abPointA == _this.abPointA) &&
+            (identical(other.abPointB, _this.abPointB) ||
+                other.abPointB == _this.abPointB) &&
+            (identical(other.trackDelayMs, _this.trackDelayMs) ||
+                other.trackDelayMs == _this.trackDelayMs) &&
+            (identical(other.bookmarkPosition, _this.bookmarkPosition) ||
+                other.bookmarkPosition == _this.bookmarkPosition) &&
+            (identical(other.silenceSkipSensitivity,
+                    _this.silenceSkipSensitivity) ||
+                other.silenceSkipSensitivity == _this.silenceSkipSensitivity) &&
+            (identical(other.currentSongRating, _this.currentSongRating) ||
+                other.currentSongRating == _this.currentSongRating) &&
+            (identical(
+                    other.currentSongEqOverride, _this.currentSongEqOverride) ||
+                other.currentSongEqOverride == _this.currentSongEqOverride) &&
+            (identical(other.currentSongVolumeOverrideDb,
+                    _this.currentSongVolumeOverrideDb) ||
+                other.currentSongVolumeOverrideDb ==
+                    _this.currentSongVolumeOverrideDb));
+  }
+
+  @override
+  int get hashCode {
+    final _this = this as PlaybackSlice;
+    return Object.hashAll([
+      runtimeType,
+      _this.currentSong,
+      _this.isPlaying,
+      _this.position,
+      _this.duration,
+      _this.isShuffle,
+      _this.repeatMode,
+      _this.playbackSpeed,
+      _this.playbackPitch,
+      _this.audioSessionId,
+      _this.errorMessage,
+      _this.isExpanded,
+      _this.dominantColor,
+      _this.sleepTimerRemaining,
+      _this.abLoopEnabled,
+      _this.abPointA,
+      _this.abPointB,
+      _this.trackDelayMs,
+      _this.bookmarkPosition,
+      _this.silenceSkipSensitivity,
+      _this.currentSongRating,
+      _this.currentSongEqOverride,
+      _this.currentSongVolumeOverrideDb
+    ]);
+  }
+
+  @override
+  String toString() {
+    final _this = this as PlaybackSlice;
+    return 'PlaybackSlice(currentSong: ${_this.currentSong}, isPlaying: ${_this.isPlaying}, position: ${_this.position}, duration: ${_this.duration}, isShuffle: ${_this.isShuffle}, repeatMode: ${_this.repeatMode}, playbackSpeed: ${_this.playbackSpeed}, playbackPitch: ${_this.playbackPitch}, audioSessionId: ${_this.audioSessionId}, errorMessage: ${_this.errorMessage}, isExpanded: ${_this.isExpanded}, dominantColor: ${_this.dominantColor}, sleepTimerRemaining: ${_this.sleepTimerRemaining}, abLoopEnabled: ${_this.abLoopEnabled}, abPointA: ${_this.abPointA}, abPointB: ${_this.abPointB}, trackDelayMs: ${_this.trackDelayMs}, bookmarkPosition: ${_this.bookmarkPosition}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, currentSongRating: ${_this.currentSongRating}, currentSongEqOverride: ${_this.currentSongEqOverride}, currentSongVolumeOverrideDb: ${_this.currentSongVolumeOverrideDb})';
+  }
+}
+
+/// @nodoc
+abstract mixin class $PlaybackSliceCopyWith<$Res> {
+  factory $PlaybackSliceCopyWith(
+          PlaybackSlice value, $Res Function(PlaybackSlice) _then) =
+      _$PlaybackSliceCopyWithImpl;
+  @useResult
+  $Res call(
+      {SongsTableData? currentSong,
+      bool isPlaying,
+      Duration position,
+      Duration duration,
+      bool isShuffle,
+      PlayerRepeatMode repeatMode,
+      double playbackSpeed,
+      double playbackPitch,
+      int? audioSessionId,
+      String? errorMessage,
+      bool isExpanded,
+      Color? dominantColor,
+      Duration? sleepTimerRemaining,
+      bool abLoopEnabled,
+      Duration? abPointA,
+      Duration? abPointB,
+      int trackDelayMs,
+      Duration? bookmarkPosition,
+      int silenceSkipSensitivity,
+      int currentSongRating,
+      String? currentSongEqOverride,
+      double currentSongVolumeOverrideDb});
+}
+
+/// @nodoc
+class _$PlaybackSliceCopyWithImpl<$Res>
+    implements $PlaybackSliceCopyWith<$Res> {
+  _$PlaybackSliceCopyWithImpl(this._self, this._then);
+
+  final PlaybackSlice _self;
+  final $Res Function(PlaybackSlice) _then;
+
+  /// Create a copy of PlaybackSlice
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? currentSong = freezed,
+    Object? isPlaying = null,
+    Object? position = null,
+    Object? duration = null,
+    Object? isShuffle = null,
+    Object? repeatMode = null,
+    Object? playbackSpeed = null,
+    Object? playbackPitch = null,
+    Object? audioSessionId = freezed,
+    Object? errorMessage = freezed,
+    Object? isExpanded = null,
+    Object? dominantColor = freezed,
+    Object? sleepTimerRemaining = freezed,
+    Object? abLoopEnabled = null,
+    Object? abPointA = freezed,
+    Object? abPointB = freezed,
+    Object? trackDelayMs = null,
+    Object? bookmarkPosition = freezed,
+    Object? silenceSkipSensitivity = null,
+    Object? currentSongRating = null,
+    Object? currentSongEqOverride = freezed,
+    Object? currentSongVolumeOverrideDb = null,
+  }) {
+    return _then(PlaybackSlice(
+      currentSong: freezed == currentSong
+          ? _self.currentSong
+          : currentSong // ignore: cast_nullable_to_non_nullable
+              as SongsTableData?,
+      isPlaying: null == isPlaying
+          ? _self.isPlaying
+          : isPlaying // ignore: cast_nullable_to_non_nullable
+              as bool,
+      position: null == position
+          ? _self.position
+          : position // ignore: cast_nullable_to_non_nullable
+              as Duration,
+      duration: null == duration
+          ? _self.duration
+          : duration // ignore: cast_nullable_to_non_nullable
+              as Duration,
+      isShuffle: null == isShuffle
+          ? _self.isShuffle
+          : isShuffle // ignore: cast_nullable_to_non_nullable
+              as bool,
+      repeatMode: null == repeatMode
+          ? _self.repeatMode
+          : repeatMode // ignore: cast_nullable_to_non_nullable
+              as PlayerRepeatMode,
+      playbackSpeed: null == playbackSpeed
+          ? _self.playbackSpeed
+          : playbackSpeed // ignore: cast_nullable_to_non_nullable
+              as double,
+      playbackPitch: null == playbackPitch
+          ? _self.playbackPitch
+          : playbackPitch // ignore: cast_nullable_to_non_nullable
+              as double,
+      audioSessionId: freezed == audioSessionId
+          ? _self.audioSessionId
+          : audioSessionId // ignore: cast_nullable_to_non_nullable
+              as int?,
+      errorMessage: freezed == errorMessage
+          ? _self.errorMessage
+          : errorMessage // ignore: cast_nullable_to_non_nullable
+              as String?,
+      isExpanded: null == isExpanded
+          ? _self.isExpanded
+          : isExpanded // ignore: cast_nullable_to_non_nullable
+              as bool,
+      dominantColor: freezed == dominantColor
+          ? _self.dominantColor
+          : dominantColor // ignore: cast_nullable_to_non_nullable
+              as Color?,
+      sleepTimerRemaining: freezed == sleepTimerRemaining
+          ? _self.sleepTimerRemaining
+          : sleepTimerRemaining // ignore: cast_nullable_to_non_nullable
+              as Duration?,
+      abLoopEnabled: null == abLoopEnabled
+          ? _self.abLoopEnabled
+          : abLoopEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      abPointA: freezed == abPointA
+          ? _self.abPointA
+          : abPointA // ignore: cast_nullable_to_non_nullable
+              as Duration?,
+      abPointB: freezed == abPointB
+          ? _self.abPointB
+          : abPointB // ignore: cast_nullable_to_non_nullable
+              as Duration?,
+      trackDelayMs: null == trackDelayMs
+          ? _self.trackDelayMs
+          : trackDelayMs // ignore: cast_nullable_to_non_nullable
+              as int,
+      bookmarkPosition: freezed == bookmarkPosition
+          ? _self.bookmarkPosition
+          : bookmarkPosition // ignore: cast_nullable_to_non_nullable
+              as Duration?,
+      silenceSkipSensitivity: null == silenceSkipSensitivity
+          ? _self.silenceSkipSensitivity
+          : silenceSkipSensitivity // ignore: cast_nullable_to_non_nullable
+              as int,
+      currentSongRating: null == currentSongRating
+          ? _self.currentSongRating
+          : currentSongRating // ignore: cast_nullable_to_non_nullable
+              as int,
+      currentSongEqOverride: freezed == currentSongEqOverride
+          ? _self.currentSongEqOverride
+          : currentSongEqOverride // ignore: cast_nullable_to_non_nullable
+              as String?,
+      currentSongVolumeOverrideDb: null == currentSongVolumeOverrideDb
+          ? _self.currentSongVolumeOverrideDb
+          : currentSongVolumeOverrideDb // ignore: cast_nullable_to_non_nullable
+              as double,
+    ));
+  }
+}
+
+/// Adds pattern-matching-related methods to [PlaybackSlice].
+extension PlaybackSlicePatterns on PlaybackSlice {
+  /// A variant of `map` that fallback to returning `orElse`.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case _:
+  ///     return orElse();
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>(
+    TResult Function(_PlaybackSlice value)? $default, {
+    required TResult orElse(),
+  }) {
+    final _that = this;
+    switch (_that) {
+      case _PlaybackSlice() when $default != null:
+        return $default(_that);
+      case _:
+        return orElse();
+    }
+  }
+
+  /// A `switch`-like method, using callbacks.
+  ///
+  /// Callbacks receives the raw object, upcasted.
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case final Subclass2 value:
+  ///     return ...;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>(
+    TResult Function(_PlaybackSlice value) $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _PlaybackSlice():
+        return $default(_that);
+      case _:
+        throw StateError('Unexpected subclass');
+    }
+  }
+
+  /// A variant of `map` that fallback to returning `null`.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case _:
+  ///     return null;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>(
+    TResult? Function(_PlaybackSlice value)? $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _PlaybackSlice() when $default != null:
+        return $default(_that);
+      case _:
+        return null;
+    }
+  }
+
+  /// A variant of `when` that fallback to an `orElse` callback.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case _:
+  ///     return orElse();
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>(
+    TResult Function(
+            SongsTableData? currentSong,
+            bool isPlaying,
+            Duration position,
+            Duration duration,
+            bool isShuffle,
+            PlayerRepeatMode repeatMode,
+            double playbackSpeed,
+            double playbackPitch,
+            int? audioSessionId,
+            String? errorMessage,
+            bool isExpanded,
+            Color? dominantColor,
+            Duration? sleepTimerRemaining,
+            bool abLoopEnabled,
+            Duration? abPointA,
+            Duration? abPointB,
+            int trackDelayMs,
+            Duration? bookmarkPosition,
+            int silenceSkipSensitivity,
+            int currentSongRating,
+            String? currentSongEqOverride,
+            double currentSongVolumeOverrideDb)?
+        $default, {
+    required TResult orElse(),
+  }) {
+    final _that = this;
+    switch (_that) {
+      case _PlaybackSlice() when $default != null:
+        return $default(
+            _that.currentSong,
+            _that.isPlaying,
+            _that.position,
+            _that.duration,
+            _that.isShuffle,
+            _that.repeatMode,
+            _that.playbackSpeed,
+            _that.playbackPitch,
+            _that.audioSessionId,
+            _that.errorMessage,
+            _that.isExpanded,
+            _that.dominantColor,
+            _that.sleepTimerRemaining,
+            _that.abLoopEnabled,
+            _that.abPointA,
+            _that.abPointB,
+            _that.trackDelayMs,
+            _that.bookmarkPosition,
+            _that.silenceSkipSensitivity,
+            _that.currentSongRating,
+            _that.currentSongEqOverride,
+            _that.currentSongVolumeOverrideDb);
+      case _:
+        return orElse();
+    }
+  }
+
+  /// A `switch`-like method, using callbacks.
+  ///
+  /// As opposed to `map`, this offers destructuring.
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case Subclass2(:final field2):
+  ///     return ...;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>(
+    TResult Function(
+            SongsTableData? currentSong,
+            bool isPlaying,
+            Duration position,
+            Duration duration,
+            bool isShuffle,
+            PlayerRepeatMode repeatMode,
+            double playbackSpeed,
+            double playbackPitch,
+            int? audioSessionId,
+            String? errorMessage,
+            bool isExpanded,
+            Color? dominantColor,
+            Duration? sleepTimerRemaining,
+            bool abLoopEnabled,
+            Duration? abPointA,
+            Duration? abPointB,
+            int trackDelayMs,
+            Duration? bookmarkPosition,
+            int silenceSkipSensitivity,
+            int currentSongRating,
+            String? currentSongEqOverride,
+            double currentSongVolumeOverrideDb)
+        $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _PlaybackSlice():
+        return $default(
+            _that.currentSong,
+            _that.isPlaying,
+            _that.position,
+            _that.duration,
+            _that.isShuffle,
+            _that.repeatMode,
+            _that.playbackSpeed,
+            _that.playbackPitch,
+            _that.audioSessionId,
+            _that.errorMessage,
+            _that.isExpanded,
+            _that.dominantColor,
+            _that.sleepTimerRemaining,
+            _that.abLoopEnabled,
+            _that.abPointA,
+            _that.abPointB,
+            _that.trackDelayMs,
+            _that.bookmarkPosition,
+            _that.silenceSkipSensitivity,
+            _that.currentSongRating,
+            _that.currentSongEqOverride,
+            _that.currentSongVolumeOverrideDb);
+      case _:
+        throw StateError('Unexpected subclass');
+    }
+  }
+
+  /// A variant of `when` that fallback to returning `null`
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case _:
+  ///     return null;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>(
+    TResult? Function(
+            SongsTableData? currentSong,
+            bool isPlaying,
+            Duration position,
+            Duration duration,
+            bool isShuffle,
+            PlayerRepeatMode repeatMode,
+            double playbackSpeed,
+            double playbackPitch,
+            int? audioSessionId,
+            String? errorMessage,
+            bool isExpanded,
+            Color? dominantColor,
+            Duration? sleepTimerRemaining,
+            bool abLoopEnabled,
+            Duration? abPointA,
+            Duration? abPointB,
+            int trackDelayMs,
+            Duration? bookmarkPosition,
+            int silenceSkipSensitivity,
+            int currentSongRating,
+            String? currentSongEqOverride,
+            double currentSongVolumeOverrideDb)?
+        $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _PlaybackSlice() when $default != null:
+        return $default(
+            _that.currentSong,
+            _that.isPlaying,
+            _that.position,
+            _that.duration,
+            _that.isShuffle,
+            _that.repeatMode,
+            _that.playbackSpeed,
+            _that.playbackPitch,
+            _that.audioSessionId,
+            _that.errorMessage,
+            _that.isExpanded,
+            _that.dominantColor,
+            _that.sleepTimerRemaining,
+            _that.abLoopEnabled,
+            _that.abPointA,
+            _that.abPointB,
+            _that.trackDelayMs,
+            _that.bookmarkPosition,
+            _that.silenceSkipSensitivity,
+            _that.currentSongRating,
+            _that.currentSongEqOverride,
+            _that.currentSongVolumeOverrideDb);
+      case _:
+        return null;
+    }
+  }
+}
+
+/// @nodoc
+
+class _PlaybackSlice extends PlaybackSlice {
+  const _PlaybackSlice(
+      {this.currentSong,
+      this.isPlaying = false,
+      this.position = Duration.zero,
+      this.duration = Duration.zero,
+      this.isShuffle = false,
+      this.repeatMode = PlayerRepeatMode.off,
+      this.playbackSpeed = 1.0,
+      this.playbackPitch = 1.0,
+      this.audioSessionId,
+      this.errorMessage,
+      this.isExpanded = false,
+      this.dominantColor,
+      this.sleepTimerRemaining,
+      this.abLoopEnabled = false,
+      this.abPointA,
+      this.abPointB,
+      this.trackDelayMs = 0,
+      this.bookmarkPosition,
+      this.silenceSkipSensitivity = 0,
+      this.currentSongRating = 0,
+      this.currentSongEqOverride,
+      this.currentSongVolumeOverrideDb = 0.0})
+      : super._();
+
+  @override
+  final SongsTableData? currentSong;
+  @override
+  @JsonKey()
+  final bool isPlaying;
+  @override
+  @JsonKey()
+  final Duration position;
+  @override
+  @JsonKey()
+  final Duration duration;
+  @override
+  @JsonKey()
+  final bool isShuffle;
+  @override
+  @JsonKey()
+  final PlayerRepeatMode repeatMode;
+  @override
+  @JsonKey()
+  final double playbackSpeed;
+  @override
+  @JsonKey()
+  final double playbackPitch;
+  @override
+  final int? audioSessionId;
+  @override
+  final String? errorMessage;
+  @override
+  @JsonKey()
+  final bool isExpanded;
+  @override
+  final Color? dominantColor;
+  @override
+  final Duration? sleepTimerRemaining;
+  @override
+  @JsonKey()
+  final bool abLoopEnabled;
+  @override
+  final Duration? abPointA;
+  @override
+  final Duration? abPointB;
+  @override
+  @JsonKey()
+  final int trackDelayMs;
+  @override
+  final Duration? bookmarkPosition;
+  @override
+  @JsonKey()
+  final int silenceSkipSensitivity;
+  @override
+  @JsonKey()
+  final int currentSongRating;
+  @override
+  final String? currentSongEqOverride;
+  @override
+  @JsonKey()
+  final double currentSongVolumeOverrideDb;
+
+  /// Create a copy of PlaybackSlice
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @pragma('vm:prefer-inline')
+  _$PlaybackSliceCopyWith<_PlaybackSlice> get copyWith =>
+      __$PlaybackSliceCopyWithImpl<_PlaybackSlice>(this, _$identity);
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _PlaybackSlice &&
+            (identical(other.currentSong, currentSong) ||
+                other.currentSong == currentSong) &&
+            (identical(other.isPlaying, isPlaying) ||
+                other.isPlaying == isPlaying) &&
+            (identical(other.position, position) ||
+                other.position == position) &&
+            (identical(other.duration, duration) ||
+                other.duration == duration) &&
+            (identical(other.isShuffle, isShuffle) ||
+                other.isShuffle == isShuffle) &&
+            (identical(other.repeatMode, repeatMode) ||
+                other.repeatMode == repeatMode) &&
+            (identical(other.playbackSpeed, playbackSpeed) ||
+                other.playbackSpeed == playbackSpeed) &&
+            (identical(other.playbackPitch, playbackPitch) ||
+                other.playbackPitch == playbackPitch) &&
+            (identical(other.audioSessionId, audioSessionId) ||
+                other.audioSessionId == audioSessionId) &&
+            (identical(other.errorMessage, errorMessage) ||
+                other.errorMessage == errorMessage) &&
+            (identical(other.isExpanded, isExpanded) ||
+                other.isExpanded == isExpanded) &&
+            (identical(other.dominantColor, dominantColor) ||
+                other.dominantColor == dominantColor) &&
+            (identical(other.sleepTimerRemaining, sleepTimerRemaining) ||
+                other.sleepTimerRemaining == sleepTimerRemaining) &&
+            (identical(other.abLoopEnabled, abLoopEnabled) ||
+                other.abLoopEnabled == abLoopEnabled) &&
+            (identical(other.abPointA, abPointA) ||
+                other.abPointA == abPointA) &&
+            (identical(other.abPointB, abPointB) ||
+                other.abPointB == abPointB) &&
+            (identical(other.trackDelayMs, trackDelayMs) ||
+                other.trackDelayMs == trackDelayMs) &&
+            (identical(other.bookmarkPosition, bookmarkPosition) ||
+                other.bookmarkPosition == bookmarkPosition) &&
+            (identical(other.silenceSkipSensitivity, silenceSkipSensitivity) ||
+                other.silenceSkipSensitivity == silenceSkipSensitivity) &&
+            (identical(other.currentSongRating, currentSongRating) ||
+                other.currentSongRating == currentSongRating) &&
+            (identical(other.currentSongEqOverride, currentSongEqOverride) ||
+                other.currentSongEqOverride == currentSongEqOverride) &&
+            (identical(other.currentSongVolumeOverrideDb,
+                    currentSongVolumeOverrideDb) ||
+                other.currentSongVolumeOverrideDb ==
+                    currentSongVolumeOverrideDb));
+  }
+
+  @override
+  int get hashCode {
+    return Object.hashAll([
+      runtimeType,
+      currentSong,
+      isPlaying,
+      position,
+      duration,
+      isShuffle,
+      repeatMode,
+      playbackSpeed,
+      playbackPitch,
+      audioSessionId,
+      errorMessage,
+      isExpanded,
+      dominantColor,
+      sleepTimerRemaining,
+      abLoopEnabled,
+      abPointA,
+      abPointB,
+      trackDelayMs,
+      bookmarkPosition,
+      silenceSkipSensitivity,
+      currentSongRating,
+      currentSongEqOverride,
+      currentSongVolumeOverrideDb
+    ]);
+  }
+
+  @override
+  String toString() {
+    return 'PlaybackSlice(currentSong: $currentSong, isPlaying: $isPlaying, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, playbackSpeed: $playbackSpeed, playbackPitch: $playbackPitch, audioSessionId: $audioSessionId, errorMessage: $errorMessage, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, abLoopEnabled: $abLoopEnabled, abPointA: $abPointA, abPointB: $abPointB, trackDelayMs: $trackDelayMs, bookmarkPosition: $bookmarkPosition, silenceSkipSensitivity: $silenceSkipSensitivity, currentSongRating: $currentSongRating, currentSongEqOverride: $currentSongEqOverride, currentSongVolumeOverrideDb: $currentSongVolumeOverrideDb)';
+  }
+}
+
+/// @nodoc
+abstract mixin class _$PlaybackSliceCopyWith<$Res>
+    implements $PlaybackSliceCopyWith<$Res> {
+  factory _$PlaybackSliceCopyWith(
+          _PlaybackSlice value, $Res Function(_PlaybackSlice) _then) =
+      __$PlaybackSliceCopyWithImpl;
+  @override
+  @useResult
+  $Res call(
+      {SongsTableData? currentSong,
+      bool isPlaying,
+      Duration position,
+      Duration duration,
+      bool isShuffle,
+      PlayerRepeatMode repeatMode,
+      double playbackSpeed,
+      double playbackPitch,
+      int? audioSessionId,
+      String? errorMessage,
+      bool isExpanded,
+      Color? dominantColor,
+      Duration? sleepTimerRemaining,
+      bool abLoopEnabled,
+      Duration? abPointA,
+      Duration? abPointB,
+      int trackDelayMs,
+      Duration? bookmarkPosition,
+      int silenceSkipSensitivity,
+      int currentSongRating,
+      String? currentSongEqOverride,
+      double currentSongVolumeOverrideDb});
+}
+
+/// @nodoc
+class __$PlaybackSliceCopyWithImpl<$Res>
+    implements _$PlaybackSliceCopyWith<$Res> {
+  __$PlaybackSliceCopyWithImpl(this._self, this._then);
+
+  final _PlaybackSlice _self;
+  final $Res Function(_PlaybackSlice) _then;
+
+  /// Create a copy of PlaybackSlice
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $Res call({
+    Object? currentSong = freezed,
+    Object? isPlaying = null,
+    Object? position = null,
+    Object? duration = null,
+    Object? isShuffle = null,
+    Object? repeatMode = null,
+    Object? playbackSpeed = null,
+    Object? playbackPitch = null,
+    Object? audioSessionId = freezed,
+    Object? errorMessage = freezed,
+    Object? isExpanded = null,
+    Object? dominantColor = freezed,
+    Object? sleepTimerRemaining = freezed,
+    Object? abLoopEnabled = null,
+    Object? abPointA = freezed,
+    Object? abPointB = freezed,
+    Object? trackDelayMs = null,
+    Object? bookmarkPosition = freezed,
+    Object? silenceSkipSensitivity = null,
+    Object? currentSongRating = null,
+    Object? currentSongEqOverride = freezed,
+    Object? currentSongVolumeOverrideDb = null,
+  }) {
+    return _then(_PlaybackSlice(
+      currentSong: freezed == currentSong
+          ? _self.currentSong
+          : currentSong // ignore: cast_nullable_to_non_nullable
+              as SongsTableData?,
+      isPlaying: null == isPlaying
+          ? _self.isPlaying
+          : isPlaying // ignore: cast_nullable_to_non_nullable
+              as bool,
+      position: null == position
+          ? _self.position
+          : position // ignore: cast_nullable_to_non_nullable
+              as Duration,
+      duration: null == duration
+          ? _self.duration
+          : duration // ignore: cast_nullable_to_non_nullable
+              as Duration,
+      isShuffle: null == isShuffle
+          ? _self.isShuffle
+          : isShuffle // ignore: cast_nullable_to_non_nullable
+              as bool,
+      repeatMode: null == repeatMode
+          ? _self.repeatMode
+          : repeatMode // ignore: cast_nullable_to_non_nullable
+              as PlayerRepeatMode,
+      playbackSpeed: null == playbackSpeed
+          ? _self.playbackSpeed
+          : playbackSpeed // ignore: cast_nullable_to_non_nullable
+              as double,
+      playbackPitch: null == playbackPitch
+          ? _self.playbackPitch
+          : playbackPitch // ignore: cast_nullable_to_non_nullable
+              as double,
+      audioSessionId: freezed == audioSessionId
+          ? _self.audioSessionId
+          : audioSessionId // ignore: cast_nullable_to_non_nullable
+              as int?,
+      errorMessage: freezed == errorMessage
+          ? _self.errorMessage
+          : errorMessage // ignore: cast_nullable_to_non_nullable
+              as String?,
+      isExpanded: null == isExpanded
+          ? _self.isExpanded
+          : isExpanded // ignore: cast_nullable_to_non_nullable
+              as bool,
+      dominantColor: freezed == dominantColor
+          ? _self.dominantColor
+          : dominantColor // ignore: cast_nullable_to_non_nullable
+              as Color?,
+      sleepTimerRemaining: freezed == sleepTimerRemaining
+          ? _self.sleepTimerRemaining
+          : sleepTimerRemaining // ignore: cast_nullable_to_non_nullable
+              as Duration?,
+      abLoopEnabled: null == abLoopEnabled
+          ? _self.abLoopEnabled
+          : abLoopEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      abPointA: freezed == abPointA
+          ? _self.abPointA
+          : abPointA // ignore: cast_nullable_to_non_nullable
+              as Duration?,
+      abPointB: freezed == abPointB
+          ? _self.abPointB
+          : abPointB // ignore: cast_nullable_to_non_nullable
+              as Duration?,
+      trackDelayMs: null == trackDelayMs
+          ? _self.trackDelayMs
+          : trackDelayMs // ignore: cast_nullable_to_non_nullable
+              as int,
+      bookmarkPosition: freezed == bookmarkPosition
+          ? _self.bookmarkPosition
+          : bookmarkPosition // ignore: cast_nullable_to_non_nullable
+              as Duration?,
+      silenceSkipSensitivity: null == silenceSkipSensitivity
+          ? _self.silenceSkipSensitivity
+          : silenceSkipSensitivity // ignore: cast_nullable_to_non_nullable
+              as int,
+      currentSongRating: null == currentSongRating
+          ? _self.currentSongRating
+          : currentSongRating // ignore: cast_nullable_to_non_nullable
+              as int,
+      currentSongEqOverride: freezed == currentSongEqOverride
+          ? _self.currentSongEqOverride
+          : currentSongEqOverride // ignore: cast_nullable_to_non_nullable
+              as String?,
+      currentSongVolumeOverrideDb: null == currentSongVolumeOverrideDb
+          ? _self.currentSongVolumeOverrideDb
+          : currentSongVolumeOverrideDb // ignore: cast_nullable_to_non_nullable
+              as double,
+    ));
+  }
+}
+
+/// @nodoc
+mixin _$QueueSlice {
+  List<SongsTableData> get queue;
+  int get currentIndex;
+  int get activeQueueSlot;
+  List<ChapterInfo> get cueChapters;
+  int get currentCueIndex;
+
+  /// Create a copy of QueueSlice
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @pragma('vm:prefer-inline')
+  $QueueSliceCopyWith<QueueSlice> get copyWith =>
+      _$QueueSliceCopyWithImpl<QueueSlice>(this as QueueSlice, _$identity);
+
+  @override
+  bool operator ==(Object other) {
+    final _this = this as QueueSlice;
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is QueueSlice &&
+            const DeepCollectionEquality().equals(other.queue, _this.queue) &&
+            (identical(other.currentIndex, _this.currentIndex) ||
+                other.currentIndex == _this.currentIndex) &&
+            (identical(other.activeQueueSlot, _this.activeQueueSlot) ||
+                other.activeQueueSlot == _this.activeQueueSlot) &&
+            const DeepCollectionEquality()
+                .equals(other.cueChapters, _this.cueChapters) &&
+            (identical(other.currentCueIndex, _this.currentCueIndex) ||
+                other.currentCueIndex == _this.currentCueIndex));
+  }
+
+  @override
+  int get hashCode {
+    final _this = this as QueueSlice;
+    return Object.hash(
+        runtimeType,
+        const DeepCollectionEquality().hash(_this.queue),
+        _this.currentIndex,
+        _this.activeQueueSlot,
+        const DeepCollectionEquality().hash(_this.cueChapters),
+        _this.currentCueIndex);
+  }
+
+  @override
+  String toString() {
+    final _this = this as QueueSlice;
+    return 'QueueSlice(queue: ${_this.queue}, currentIndex: ${_this.currentIndex}, activeQueueSlot: ${_this.activeQueueSlot}, cueChapters: ${_this.cueChapters}, currentCueIndex: ${_this.currentCueIndex})';
+  }
+}
+
+/// @nodoc
+abstract mixin class $QueueSliceCopyWith<$Res> {
+  factory $QueueSliceCopyWith(
+          QueueSlice value, $Res Function(QueueSlice) _then) =
+      _$QueueSliceCopyWithImpl;
+  @useResult
+  $Res call(
+      {List<SongsTableData> queue,
+      int currentIndex,
+      int activeQueueSlot,
+      List<ChapterInfo> cueChapters,
+      int currentCueIndex});
+}
+
+/// @nodoc
+class _$QueueSliceCopyWithImpl<$Res> implements $QueueSliceCopyWith<$Res> {
+  _$QueueSliceCopyWithImpl(this._self, this._then);
+
+  final QueueSlice _self;
+  final $Res Function(QueueSlice) _then;
+
+  /// Create a copy of QueueSlice
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? queue = null,
+    Object? currentIndex = null,
+    Object? activeQueueSlot = null,
+    Object? cueChapters = null,
+    Object? currentCueIndex = null,
+  }) {
+    return _then(QueueSlice(
+      queue: null == queue
+          ? _self.queue
+          : queue // ignore: cast_nullable_to_non_nullable
+              as List<SongsTableData>,
+      currentIndex: null == currentIndex
+          ? _self.currentIndex
+          : currentIndex // ignore: cast_nullable_to_non_nullable
+              as int,
+      activeQueueSlot: null == activeQueueSlot
+          ? _self.activeQueueSlot
+          : activeQueueSlot // ignore: cast_nullable_to_non_nullable
+              as int,
+      cueChapters: null == cueChapters
+          ? _self.cueChapters
+          : cueChapters // ignore: cast_nullable_to_non_nullable
+              as List<ChapterInfo>,
+      currentCueIndex: null == currentCueIndex
+          ? _self.currentCueIndex
+          : currentCueIndex // ignore: cast_nullable_to_non_nullable
+              as int,
+    ));
+  }
+}
+
+/// Adds pattern-matching-related methods to [QueueSlice].
+extension QueueSlicePatterns on QueueSlice {
+  /// A variant of `map` that fallback to returning `orElse`.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case _:
+  ///     return orElse();
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>(
+    TResult Function(_QueueSlice value)? $default, {
+    required TResult orElse(),
+  }) {
+    final _that = this;
+    switch (_that) {
+      case _QueueSlice() when $default != null:
+        return $default(_that);
+      case _:
+        return orElse();
+    }
+  }
+
+  /// A `switch`-like method, using callbacks.
+  ///
+  /// Callbacks receives the raw object, upcasted.
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case final Subclass2 value:
+  ///     return ...;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>(
+    TResult Function(_QueueSlice value) $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _QueueSlice():
+        return $default(_that);
+      case _:
+        throw StateError('Unexpected subclass');
+    }
+  }
+
+  /// A variant of `map` that fallback to returning `null`.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case _:
+  ///     return null;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>(
+    TResult? Function(_QueueSlice value)? $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _QueueSlice() when $default != null:
+        return $default(_that);
+      case _:
+        return null;
+    }
+  }
+
+  /// A variant of `when` that fallback to an `orElse` callback.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case _:
+  ///     return orElse();
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>(
+    TResult Function(
+            List<SongsTableData> queue,
+            int currentIndex,
+            int activeQueueSlot,
+            List<ChapterInfo> cueChapters,
+            int currentCueIndex)?
+        $default, {
+    required TResult orElse(),
+  }) {
+    final _that = this;
+    switch (_that) {
+      case _QueueSlice() when $default != null:
+        return $default(_that.queue, _that.currentIndex, _that.activeQueueSlot,
+            _that.cueChapters, _that.currentCueIndex);
+      case _:
+        return orElse();
+    }
+  }
+
+  /// A `switch`-like method, using callbacks.
+  ///
+  /// As opposed to `map`, this offers destructuring.
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case Subclass2(:final field2):
+  ///     return ...;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>(
+    TResult Function(
+            List<SongsTableData> queue,
+            int currentIndex,
+            int activeQueueSlot,
+            List<ChapterInfo> cueChapters,
+            int currentCueIndex)
+        $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _QueueSlice():
+        return $default(_that.queue, _that.currentIndex, _that.activeQueueSlot,
+            _that.cueChapters, _that.currentCueIndex);
+      case _:
+        throw StateError('Unexpected subclass');
+    }
+  }
+
+  /// A variant of `when` that fallback to returning `null`
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case _:
+  ///     return null;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>(
+    TResult? Function(
+            List<SongsTableData> queue,
+            int currentIndex,
+            int activeQueueSlot,
+            List<ChapterInfo> cueChapters,
+            int currentCueIndex)?
+        $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _QueueSlice() when $default != null:
+        return $default(_that.queue, _that.currentIndex, _that.activeQueueSlot,
+            _that.cueChapters, _that.currentCueIndex);
+      case _:
+        return null;
+    }
+  }
+}
+
+/// @nodoc
+
+class _QueueSlice extends QueueSlice {
+  const _QueueSlice(
+      {List<SongsTableData> queue = const [],
+      this.currentIndex = 0,
+      this.activeQueueSlot = 0,
+      List<ChapterInfo> cueChapters = const [],
+      this.currentCueIndex = 0})
+      : _queue = queue,
+        _cueChapters = cueChapters,
+        super._();
+
+  final List<SongsTableData> _queue;
+  @override
+  @JsonKey()
+  List<SongsTableData> get queue {
+    if (_queue is EqualUnmodifiableListView) return _queue;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_queue);
+  }
+
+  @override
+  @JsonKey()
+  final int currentIndex;
+  @override
+  @JsonKey()
+  final int activeQueueSlot;
+  final List<ChapterInfo> _cueChapters;
+  @override
+  @JsonKey()
+  List<ChapterInfo> get cueChapters {
+    if (_cueChapters is EqualUnmodifiableListView) return _cueChapters;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_cueChapters);
+  }
+
+  @override
+  @JsonKey()
+  final int currentCueIndex;
+
+  /// Create a copy of QueueSlice
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @pragma('vm:prefer-inline')
+  _$QueueSliceCopyWith<_QueueSlice> get copyWith =>
+      __$QueueSliceCopyWithImpl<_QueueSlice>(this, _$identity);
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _QueueSlice &&
+            const DeepCollectionEquality().equals(other.queue, _queue) &&
+            (identical(other.currentIndex, currentIndex) ||
+                other.currentIndex == currentIndex) &&
+            (identical(other.activeQueueSlot, activeQueueSlot) ||
+                other.activeQueueSlot == activeQueueSlot) &&
+            const DeepCollectionEquality()
+                .equals(other.cueChapters, _cueChapters) &&
+            (identical(other.currentCueIndex, currentCueIndex) ||
+                other.currentCueIndex == currentCueIndex));
+  }
+
+  @override
+  int get hashCode {
+    return Object.hash(
+        runtimeType,
+        const DeepCollectionEquality().hash(_queue),
+        currentIndex,
+        activeQueueSlot,
+        const DeepCollectionEquality().hash(_cueChapters),
+        currentCueIndex);
+  }
+
+  @override
+  String toString() {
+    return 'QueueSlice(queue: $queue, currentIndex: $currentIndex, activeQueueSlot: $activeQueueSlot, cueChapters: $cueChapters, currentCueIndex: $currentCueIndex)';
+  }
+}
+
+/// @nodoc
+abstract mixin class _$QueueSliceCopyWith<$Res>
+    implements $QueueSliceCopyWith<$Res> {
+  factory _$QueueSliceCopyWith(
+          _QueueSlice value, $Res Function(_QueueSlice) _then) =
+      __$QueueSliceCopyWithImpl;
+  @override
+  @useResult
+  $Res call(
+      {List<SongsTableData> queue,
+      int currentIndex,
+      int activeQueueSlot,
+      List<ChapterInfo> cueChapters,
+      int currentCueIndex});
+}
+
+/// @nodoc
+class __$QueueSliceCopyWithImpl<$Res> implements _$QueueSliceCopyWith<$Res> {
+  __$QueueSliceCopyWithImpl(this._self, this._then);
+
+  final _QueueSlice _self;
+  final $Res Function(_QueueSlice) _then;
+
+  /// Create a copy of QueueSlice
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $Res call({
+    Object? queue = null,
+    Object? currentIndex = null,
+    Object? activeQueueSlot = null,
+    Object? cueChapters = null,
+    Object? currentCueIndex = null,
+  }) {
+    return _then(_QueueSlice(
+      queue: null == queue
+          ? _self._queue
+          : queue // ignore: cast_nullable_to_non_nullable
+              as List<SongsTableData>,
+      currentIndex: null == currentIndex
+          ? _self.currentIndex
+          : currentIndex // ignore: cast_nullable_to_non_nullable
+              as int,
+      activeQueueSlot: null == activeQueueSlot
+          ? _self.activeQueueSlot
+          : activeQueueSlot // ignore: cast_nullable_to_non_nullable
+              as int,
+      cueChapters: null == cueChapters
+          ? _self._cueChapters
+          : cueChapters // ignore: cast_nullable_to_non_nullable
+              as List<ChapterInfo>,
+      currentCueIndex: null == currentCueIndex
+          ? _self.currentCueIndex
+          : currentCueIndex // ignore: cast_nullable_to_non_nullable
+              as int,
+    ));
+  }
+}
+
+/// @nodoc
+mixin _$LyricsSlice {
   List<LyricsLine> get lyrics;
   LyricsSource get lyricsSource;
   bool get isLoadingLyrics;
   bool get isLyricsVisible;
   bool get isQueueVisible;
+
+  /// Create a copy of LyricsSlice
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @pragma('vm:prefer-inline')
+  $LyricsSliceCopyWith<LyricsSlice> get copyWith =>
+      _$LyricsSliceCopyWithImpl<LyricsSlice>(this as LyricsSlice, _$identity);
+
+  @override
+  bool operator ==(Object other) {
+    final _this = this as LyricsSlice;
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is LyricsSlice &&
+            const DeepCollectionEquality().equals(other.lyrics, _this.lyrics) &&
+            (identical(other.lyricsSource, _this.lyricsSource) ||
+                other.lyricsSource == _this.lyricsSource) &&
+            (identical(other.isLoadingLyrics, _this.isLoadingLyrics) ||
+                other.isLoadingLyrics == _this.isLoadingLyrics) &&
+            (identical(other.isLyricsVisible, _this.isLyricsVisible) ||
+                other.isLyricsVisible == _this.isLyricsVisible) &&
+            (identical(other.isQueueVisible, _this.isQueueVisible) ||
+                other.isQueueVisible == _this.isQueueVisible));
+  }
+
+  @override
+  int get hashCode {
+    final _this = this as LyricsSlice;
+    return Object.hash(
+        runtimeType,
+        const DeepCollectionEquality().hash(_this.lyrics),
+        _this.lyricsSource,
+        _this.isLoadingLyrics,
+        _this.isLyricsVisible,
+        _this.isQueueVisible);
+  }
+
+  @override
+  String toString() {
+    final _this = this as LyricsSlice;
+    return 'LyricsSlice(lyrics: ${_this.lyrics}, lyricsSource: ${_this.lyricsSource}, isLoadingLyrics: ${_this.isLoadingLyrics}, isLyricsVisible: ${_this.isLyricsVisible}, isQueueVisible: ${_this.isQueueVisible})';
+  }
+}
+
+/// @nodoc
+abstract mixin class $LyricsSliceCopyWith<$Res> {
+  factory $LyricsSliceCopyWith(
+          LyricsSlice value, $Res Function(LyricsSlice) _then) =
+      _$LyricsSliceCopyWithImpl;
+  @useResult
+  $Res call(
+      {List<LyricsLine> lyrics,
+      LyricsSource lyricsSource,
+      bool isLoadingLyrics,
+      bool isLyricsVisible,
+      bool isQueueVisible});
+}
+
+/// @nodoc
+class _$LyricsSliceCopyWithImpl<$Res> implements $LyricsSliceCopyWith<$Res> {
+  _$LyricsSliceCopyWithImpl(this._self, this._then);
+
+  final LyricsSlice _self;
+  final $Res Function(LyricsSlice) _then;
+
+  /// Create a copy of LyricsSlice
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? lyrics = null,
+    Object? lyricsSource = null,
+    Object? isLoadingLyrics = null,
+    Object? isLyricsVisible = null,
+    Object? isQueueVisible = null,
+  }) {
+    return _then(LyricsSlice(
+      lyrics: null == lyrics
+          ? _self.lyrics
+          : lyrics // ignore: cast_nullable_to_non_nullable
+              as List<LyricsLine>,
+      lyricsSource: null == lyricsSource
+          ? _self.lyricsSource
+          : lyricsSource // ignore: cast_nullable_to_non_nullable
+              as LyricsSource,
+      isLoadingLyrics: null == isLoadingLyrics
+          ? _self.isLoadingLyrics
+          : isLoadingLyrics // ignore: cast_nullable_to_non_nullable
+              as bool,
+      isLyricsVisible: null == isLyricsVisible
+          ? _self.isLyricsVisible
+          : isLyricsVisible // ignore: cast_nullable_to_non_nullable
+              as bool,
+      isQueueVisible: null == isQueueVisible
+          ? _self.isQueueVisible
+          : isQueueVisible // ignore: cast_nullable_to_non_nullable
+              as bool,
+    ));
+  }
+}
+
+/// Adds pattern-matching-related methods to [LyricsSlice].
+extension LyricsSlicePatterns on LyricsSlice {
+  /// A variant of `map` that fallback to returning `orElse`.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case _:
+  ///     return orElse();
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>(
+    TResult Function(_LyricsSlice value)? $default, {
+    required TResult orElse(),
+  }) {
+    final _that = this;
+    switch (_that) {
+      case _LyricsSlice() when $default != null:
+        return $default(_that);
+      case _:
+        return orElse();
+    }
+  }
+
+  /// A `switch`-like method, using callbacks.
+  ///
+  /// Callbacks receives the raw object, upcasted.
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case final Subclass2 value:
+  ///     return ...;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>(
+    TResult Function(_LyricsSlice value) $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _LyricsSlice():
+        return $default(_that);
+      case _:
+        throw StateError('Unexpected subclass');
+    }
+  }
+
+  /// A variant of `map` that fallback to returning `null`.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case _:
+  ///     return null;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>(
+    TResult? Function(_LyricsSlice value)? $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _LyricsSlice() when $default != null:
+        return $default(_that);
+      case _:
+        return null;
+    }
+  }
+
+  /// A variant of `when` that fallback to an `orElse` callback.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case _:
+  ///     return orElse();
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>(
+    TResult Function(List<LyricsLine> lyrics, LyricsSource lyricsSource,
+            bool isLoadingLyrics, bool isLyricsVisible, bool isQueueVisible)?
+        $default, {
+    required TResult orElse(),
+  }) {
+    final _that = this;
+    switch (_that) {
+      case _LyricsSlice() when $default != null:
+        return $default(_that.lyrics, _that.lyricsSource, _that.isLoadingLyrics,
+            _that.isLyricsVisible, _that.isQueueVisible);
+      case _:
+        return orElse();
+    }
+  }
+
+  /// A `switch`-like method, using callbacks.
+  ///
+  /// As opposed to `map`, this offers destructuring.
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case Subclass2(:final field2):
+  ///     return ...;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>(
+    TResult Function(List<LyricsLine> lyrics, LyricsSource lyricsSource,
+            bool isLoadingLyrics, bool isLyricsVisible, bool isQueueVisible)
+        $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _LyricsSlice():
+        return $default(_that.lyrics, _that.lyricsSource, _that.isLoadingLyrics,
+            _that.isLyricsVisible, _that.isQueueVisible);
+      case _:
+        throw StateError('Unexpected subclass');
+    }
+  }
+
+  /// A variant of `when` that fallback to returning `null`
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case _:
+  ///     return null;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>(
+    TResult? Function(List<LyricsLine> lyrics, LyricsSource lyricsSource,
+            bool isLoadingLyrics, bool isLyricsVisible, bool isQueueVisible)?
+        $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _LyricsSlice() when $default != null:
+        return $default(_that.lyrics, _that.lyricsSource, _that.isLoadingLyrics,
+            _that.isLyricsVisible, _that.isQueueVisible);
+      case _:
+        return null;
+    }
+  }
+}
+
+/// @nodoc
+
+class _LyricsSlice implements LyricsSlice {
+  const _LyricsSlice(
+      {List<LyricsLine> lyrics = const [],
+      this.lyricsSource = LyricsSource.none,
+      this.isLoadingLyrics = false,
+      this.isLyricsVisible = false,
+      this.isQueueVisible = false})
+      : _lyrics = lyrics;
+
+  final List<LyricsLine> _lyrics;
+  @override
+  @JsonKey()
+  List<LyricsLine> get lyrics {
+    if (_lyrics is EqualUnmodifiableListView) return _lyrics;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_lyrics);
+  }
+
+  @override
+  @JsonKey()
+  final LyricsSource lyricsSource;
+  @override
+  @JsonKey()
+  final bool isLoadingLyrics;
+  @override
+  @JsonKey()
+  final bool isLyricsVisible;
+  @override
+  @JsonKey()
+  final bool isQueueVisible;
+
+  /// Create a copy of LyricsSlice
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @pragma('vm:prefer-inline')
+  _$LyricsSliceCopyWith<_LyricsSlice> get copyWith =>
+      __$LyricsSliceCopyWithImpl<_LyricsSlice>(this, _$identity);
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _LyricsSlice &&
+            const DeepCollectionEquality().equals(other.lyrics, _lyrics) &&
+            (identical(other.lyricsSource, lyricsSource) ||
+                other.lyricsSource == lyricsSource) &&
+            (identical(other.isLoadingLyrics, isLoadingLyrics) ||
+                other.isLoadingLyrics == isLoadingLyrics) &&
+            (identical(other.isLyricsVisible, isLyricsVisible) ||
+                other.isLyricsVisible == isLyricsVisible) &&
+            (identical(other.isQueueVisible, isQueueVisible) ||
+                other.isQueueVisible == isQueueVisible));
+  }
+
+  @override
+  int get hashCode {
+    return Object.hash(
+        runtimeType,
+        const DeepCollectionEquality().hash(_lyrics),
+        lyricsSource,
+        isLoadingLyrics,
+        isLyricsVisible,
+        isQueueVisible);
+  }
+
+  @override
+  String toString() {
+    return 'LyricsSlice(lyrics: $lyrics, lyricsSource: $lyricsSource, isLoadingLyrics: $isLoadingLyrics, isLyricsVisible: $isLyricsVisible, isQueueVisible: $isQueueVisible)';
+  }
+}
+
+/// @nodoc
+abstract mixin class _$LyricsSliceCopyWith<$Res>
+    implements $LyricsSliceCopyWith<$Res> {
+  factory _$LyricsSliceCopyWith(
+          _LyricsSlice value, $Res Function(_LyricsSlice) _then) =
+      __$LyricsSliceCopyWithImpl;
+  @override
+  @useResult
+  $Res call(
+      {List<LyricsLine> lyrics,
+      LyricsSource lyricsSource,
+      bool isLoadingLyrics,
+      bool isLyricsVisible,
+      bool isQueueVisible});
+}
+
+/// @nodoc
+class __$LyricsSliceCopyWithImpl<$Res> implements _$LyricsSliceCopyWith<$Res> {
+  __$LyricsSliceCopyWithImpl(this._self, this._then);
+
+  final _LyricsSlice _self;
+  final $Res Function(_LyricsSlice) _then;
+
+  /// Create a copy of LyricsSlice
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $Res call({
+    Object? lyrics = null,
+    Object? lyricsSource = null,
+    Object? isLoadingLyrics = null,
+    Object? isLyricsVisible = null,
+    Object? isQueueVisible = null,
+  }) {
+    return _then(_LyricsSlice(
+      lyrics: null == lyrics
+          ? _self._lyrics
+          : lyrics // ignore: cast_nullable_to_non_nullable
+              as List<LyricsLine>,
+      lyricsSource: null == lyricsSource
+          ? _self.lyricsSource
+          : lyricsSource // ignore: cast_nullable_to_non_nullable
+              as LyricsSource,
+      isLoadingLyrics: null == isLoadingLyrics
+          ? _self.isLoadingLyrics
+          : isLoadingLyrics // ignore: cast_nullable_to_non_nullable
+              as bool,
+      isLyricsVisible: null == isLyricsVisible
+          ? _self.isLyricsVisible
+          : isLyricsVisible // ignore: cast_nullable_to_non_nullable
+              as bool,
+      isQueueVisible: null == isQueueVisible
+          ? _self.isQueueVisible
+          : isQueueVisible // ignore: cast_nullable_to_non_nullable
+              as bool,
+    ));
+  }
+}
+
+/// @nodoc
+mixin _$DspSlice {
   EqPreset get eqPreset;
   bool get isEqEnabled;
   bool get isVirtualizerEnabled;
@@ -98,68 +1838,22 @@ mixin _$PlayerState {
   int get dynamicBassPreset;
   bool get hasOemAudio;
   List<String> get detectedOemEngines;
-  int get activeQueueSlot;
-  double get playbackSpeed;
-  double get playbackPitch;
-  int? get audioSessionId;
-  String? get errorMessage;
-  bool get abLoopEnabled;
-  Duration? get abPointA;
-  Duration? get abPointB;
-  int get trackDelayMs;
-  Duration? get bookmarkPosition;
-  int get silenceSkipSensitivity;
-  int get currentSongRating;
-  String? get currentSongEqOverride;
-  double get currentSongVolumeOverrideDb;
-  List<ChapterInfo> get cueChapters;
-  int get currentCueIndex;
   bool get isQuranModeEnabled;
   QuranReciterStyle get quranReciterStyle;
 
-  /// Create a copy of PlayerState
+  /// Create a copy of DspSlice
   /// with the given fields replaced by the non-null parameter values.
   @JsonKey(includeFromJson: false, includeToJson: false)
   @pragma('vm:prefer-inline')
-  $PlayerStateCopyWith<PlayerState> get copyWith =>
-      _$PlayerStateCopyWithImpl<PlayerState>(this as PlayerState, _$identity);
+  $DspSliceCopyWith<DspSlice> get copyWith =>
+      _$DspSliceCopyWithImpl<DspSlice>(this as DspSlice, _$identity);
 
   @override
   bool operator ==(Object other) {
-    final _this = this as PlayerState;
+    final _this = this as DspSlice;
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
-            other is PlayerState &&
-            (identical(other.currentSong, _this.currentSong) ||
-                other.currentSong == _this.currentSong) &&
-            (identical(other.isPlaying, _this.isPlaying) ||
-                other.isPlaying == _this.isPlaying) &&
-            (identical(other.position, _this.position) ||
-                other.position == _this.position) &&
-            (identical(other.duration, _this.duration) ||
-                other.duration == _this.duration) &&
-            (identical(other.isShuffle, _this.isShuffle) ||
-                other.isShuffle == _this.isShuffle) &&
-            (identical(other.repeatMode, _this.repeatMode) ||
-                other.repeatMode == _this.repeatMode) &&
-            const DeepCollectionEquality().equals(other.queue, _this.queue) &&
-            (identical(other.currentIndex, _this.currentIndex) ||
-                other.currentIndex == _this.currentIndex) &&
-            (identical(other.isExpanded, _this.isExpanded) ||
-                other.isExpanded == _this.isExpanded) &&
-            (identical(other.dominantColor, _this.dominantColor) ||
-                other.dominantColor == _this.dominantColor) &&
-            (identical(other.sleepTimerRemaining, _this.sleepTimerRemaining) ||
-                other.sleepTimerRemaining == _this.sleepTimerRemaining) &&
-            const DeepCollectionEquality().equals(other.lyrics, _this.lyrics) &&
-            (identical(other.lyricsSource, _this.lyricsSource) ||
-                other.lyricsSource == _this.lyricsSource) &&
-            (identical(other.isLoadingLyrics, _this.isLoadingLyrics) ||
-                other.isLoadingLyrics == _this.isLoadingLyrics) &&
-            (identical(other.isLyricsVisible, _this.isLyricsVisible) ||
-                other.isLyricsVisible == _this.isLyricsVisible) &&
-            (identical(other.isQueueVisible, _this.isQueueVisible) ||
-                other.isQueueVisible == _this.isQueueVisible) &&
+            other is DspSlice &&
             (identical(other.eqPreset, _this.eqPreset) ||
                 other.eqPreset == _this.eqPreset) &&
             (identical(other.isEqEnabled, _this.isEqEnabled) ||
@@ -199,10 +1893,14 @@ mixin _$PlayerState {
                 other.crossfeedMode == _this.crossfeedMode) &&
             (identical(other.isLimiterEnabled, _this.isLimiterEnabled) ||
                 other.isLimiterEnabled == _this.isLimiterEnabled) &&
-            (identical(other.limiterThresholdDb, _this.limiterThresholdDb) || other.limiterThresholdDb == _this.limiterThresholdDb) &&
-            (identical(other.limiterReleaseMs, _this.limiterReleaseMs) || other.limiterReleaseMs == _this.limiterReleaseMs) &&
-            (identical(other.isReverbEnabled, _this.isReverbEnabled) || other.isReverbEnabled == _this.isReverbEnabled) &&
-            (identical(other.reverbPreset, _this.reverbPreset) || other.reverbPreset == _this.reverbPreset) &&
+            (identical(other.limiterThresholdDb, _this.limiterThresholdDb) ||
+                other.limiterThresholdDb == _this.limiterThresholdDb) &&
+            (identical(other.limiterReleaseMs, _this.limiterReleaseMs) ||
+                other.limiterReleaseMs == _this.limiterReleaseMs) &&
+            (identical(other.isReverbEnabled, _this.isReverbEnabled) ||
+                other.isReverbEnabled == _this.isReverbEnabled) &&
+            (identical(other.reverbPreset, _this.reverbPreset) ||
+                other.reverbPreset == _this.reverbPreset) &&
             (identical(other.reverbWetDry, _this.reverbWetDry) || other.reverbWetDry == _this.reverbWetDry) &&
             (identical(other.stereoBalance, _this.stereoBalance) || other.stereoBalance == _this.stereoBalance) &&
             (identical(other.monoMix, _this.monoMix) || other.monoMix == _this.monoMix) &&
@@ -247,47 +1945,15 @@ mixin _$PlayerState {
             (identical(other.dynamicBassPreset, _this.dynamicBassPreset) || other.dynamicBassPreset == _this.dynamicBassPreset) &&
             (identical(other.hasOemAudio, _this.hasOemAudio) || other.hasOemAudio == _this.hasOemAudio) &&
             const DeepCollectionEquality().equals(other.detectedOemEngines, _this.detectedOemEngines) &&
-            (identical(other.activeQueueSlot, _this.activeQueueSlot) || other.activeQueueSlot == _this.activeQueueSlot) &&
-            (identical(other.playbackSpeed, _this.playbackSpeed) || other.playbackSpeed == _this.playbackSpeed) &&
-            (identical(other.playbackPitch, _this.playbackPitch) || other.playbackPitch == _this.playbackPitch) &&
-            (identical(other.audioSessionId, _this.audioSessionId) || other.audioSessionId == _this.audioSessionId) &&
-            (identical(other.errorMessage, _this.errorMessage) || other.errorMessage == _this.errorMessage) &&
-            (identical(other.abLoopEnabled, _this.abLoopEnabled) || other.abLoopEnabled == _this.abLoopEnabled) &&
-            (identical(other.abPointA, _this.abPointA) || other.abPointA == _this.abPointA) &&
-            (identical(other.abPointB, _this.abPointB) || other.abPointB == _this.abPointB) &&
-            (identical(other.trackDelayMs, _this.trackDelayMs) || other.trackDelayMs == _this.trackDelayMs) &&
-            (identical(other.bookmarkPosition, _this.bookmarkPosition) || other.bookmarkPosition == _this.bookmarkPosition) &&
-            (identical(other.silenceSkipSensitivity, _this.silenceSkipSensitivity) || other.silenceSkipSensitivity == _this.silenceSkipSensitivity) &&
-            (identical(other.currentSongRating, _this.currentSongRating) || other.currentSongRating == _this.currentSongRating) &&
-            (identical(other.currentSongEqOverride, _this.currentSongEqOverride) || other.currentSongEqOverride == _this.currentSongEqOverride) &&
-            (identical(other.currentSongVolumeOverrideDb, _this.currentSongVolumeOverrideDb) || other.currentSongVolumeOverrideDb == _this.currentSongVolumeOverrideDb) &&
-            const DeepCollectionEquality().equals(other.cueChapters, _this.cueChapters) &&
-            (identical(other.currentCueIndex, _this.currentCueIndex) || other.currentCueIndex == _this.currentCueIndex) &&
             (identical(other.isQuranModeEnabled, _this.isQuranModeEnabled) || other.isQuranModeEnabled == _this.isQuranModeEnabled) &&
             (identical(other.quranReciterStyle, _this.quranReciterStyle) || other.quranReciterStyle == _this.quranReciterStyle));
   }
 
   @override
   int get hashCode {
-    final _this = this as PlayerState;
+    final _this = this as DspSlice;
     return Object.hashAll([
       runtimeType,
-      _this.currentSong,
-      _this.isPlaying,
-      _this.position,
-      _this.duration,
-      _this.isShuffle,
-      _this.repeatMode,
-      const DeepCollectionEquality().hash(_this.queue),
-      _this.currentIndex,
-      _this.isExpanded,
-      _this.dominantColor,
-      _this.sleepTimerRemaining,
-      const DeepCollectionEquality().hash(_this.lyrics),
-      _this.lyricsSource,
-      _this.isLoadingLyrics,
-      _this.isLyricsVisible,
-      _this.isQueueVisible,
       _this.eqPreset,
       _this.isEqEnabled,
       _this.isVirtualizerEnabled,
@@ -355,22 +2021,6 @@ mixin _$PlayerState {
       _this.dynamicBassPreset,
       _this.hasOemAudio,
       const DeepCollectionEquality().hash(_this.detectedOemEngines),
-      _this.activeQueueSlot,
-      _this.playbackSpeed,
-      _this.playbackPitch,
-      _this.audioSessionId,
-      _this.errorMessage,
-      _this.abLoopEnabled,
-      _this.abPointA,
-      _this.abPointB,
-      _this.trackDelayMs,
-      _this.bookmarkPosition,
-      _this.silenceSkipSensitivity,
-      _this.currentSongRating,
-      _this.currentSongEqOverride,
-      _this.currentSongVolumeOverrideDb,
-      const DeepCollectionEquality().hash(_this.cueChapters),
-      _this.currentCueIndex,
       _this.isQuranModeEnabled,
       _this.quranReciterStyle
     ]);
@@ -378,35 +2028,18 @@ mixin _$PlayerState {
 
   @override
   String toString() {
-    final _this = this as PlayerState;
-    return 'PlayerState(currentSong: ${_this.currentSong}, isPlaying: ${_this.isPlaying}, position: ${_this.position}, duration: ${_this.duration}, isShuffle: ${_this.isShuffle}, repeatMode: ${_this.repeatMode}, queue: ${_this.queue}, currentIndex: ${_this.currentIndex}, isExpanded: ${_this.isExpanded}, dominantColor: ${_this.dominantColor}, sleepTimerRemaining: ${_this.sleepTimerRemaining}, lyrics: ${_this.lyrics}, lyricsSource: ${_this.lyricsSource}, isLoadingLyrics: ${_this.isLoadingLyrics}, isLyricsVisible: ${_this.isLyricsVisible}, isQueueVisible: ${_this.isQueueVisible}, eqPreset: ${_this.eqPreset}, isEqEnabled: ${_this.isEqEnabled}, isVirtualizerEnabled: ${_this.isVirtualizerEnabled}, virtualizerStrength: ${_this.virtualizerStrength}, isVirtualizerSupported: ${_this.isVirtualizerSupported}, isDynamicsEnabled: ${_this.isDynamicsEnabled}, isDynamicsSupported: ${_this.isDynamicsSupported}, dynamicsPreset: ${_this.dynamicsPreset}, selectedHeadphoneProfile: ${_this.selectedHeadphoneProfile}, isSpatializerSupported: ${_this.isSpatializerSupported}, isSpatializerEnabled: ${_this.isSpatializerEnabled}, volumeBoost: ${_this.volumeBoost}, isVolumeBoostSupported: ${_this.isVolumeBoostSupported}, isBassBoostSupported: ${_this.isBassBoostSupported}, isCrossfeedEnabled: ${_this.isCrossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, crossfeedMode: ${_this.crossfeedMode}, isLimiterEnabled: ${_this.isLimiterEnabled}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, isReverbEnabled: ${_this.isReverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, isSincResamplerEnabled: ${_this.isSincResamplerEnabled}, isDitherEnabled: ${_this.isDitherEnabled}, ditherTargetBitDepth: ${_this.ditherTargetBitDepth}, isSaturationEnabled: ${_this.isSaturationEnabled}, saturationDrive: ${_this.saturationDrive}, saturationMix: ${_this.saturationMix}, saturationTilt: ${_this.saturationTilt}, saturationMultiband: ${_this.saturationMultiband}, isStereoWidthEnabled: ${_this.isStereoWidthEnabled}, stereoWidth: ${_this.stereoWidth}, isLoudnessContourEnabled: ${_this.isLoudnessContourEnabled}, loudnessContourIntensity: ${_this.loudnessContourIntensity}, isSubCrossoverEnabled: ${_this.isSubCrossoverEnabled}, subCrossoverCornerHz: ${_this.subCrossoverCornerHz}, subCrossoverSlopeDbPerOct: ${_this.subCrossoverSlopeDbPerOct}, subCrossoverGain: ${_this.subCrossoverGain}, subCrossoverBassMono: ${_this.subCrossoverBassMono}, subCrossoverAntiPop: ${_this.subCrossoverAntiPop}, stereoWidthMultiband: ${_this.stereoWidthMultiband}, stereoWidthLow: ${_this.stereoWidthLow}, stereoWidthMid: ${_this.stereoWidthMid}, stereoWidthHigh: ${_this.stereoWidthHigh}, stereoWidthLowCrossoverHz: ${_this.stereoWidthLowCrossoverHz}, stereoWidthHighCrossoverHz: ${_this.stereoWidthHighCrossoverHz}, multibandCompressorF0: ${_this.multibandCompressorF0}, multibandCompressorF1: ${_this.multibandCompressorF1}, multibandCompressorF2: ${_this.multibandCompressorF2}, isDynamicEqEnabled: ${_this.isDynamicEqEnabled}, dynamicEqBands: ${_this.dynamicEqBands}, isViperDdcEnabled: ${_this.isViperDdcEnabled}, viperDdcProfileName: ${_this.viperDdcProfileName}, isArbitraryEqEnabled: ${_this.isArbitraryEqEnabled}, arbitraryEqString: ${_this.arbitraryEqString}, isLiveProgEnabled: ${_this.isLiveProgEnabled}, liveProgCode: ${_this.liveProgCode}, liveProgStatus: ${_this.liveProgStatus}, isDynamicBassEnabled: ${_this.isDynamicBassEnabled}, dynamicBassStrength: ${_this.dynamicBassStrength}, dynamicBassPreset: ${_this.dynamicBassPreset}, hasOemAudio: ${_this.hasOemAudio}, detectedOemEngines: ${_this.detectedOemEngines}, activeQueueSlot: ${_this.activeQueueSlot}, playbackSpeed: ${_this.playbackSpeed}, playbackPitch: ${_this.playbackPitch}, audioSessionId: ${_this.audioSessionId}, errorMessage: ${_this.errorMessage}, abLoopEnabled: ${_this.abLoopEnabled}, abPointA: ${_this.abPointA}, abPointB: ${_this.abPointB}, trackDelayMs: ${_this.trackDelayMs}, bookmarkPosition: ${_this.bookmarkPosition}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, currentSongRating: ${_this.currentSongRating}, currentSongEqOverride: ${_this.currentSongEqOverride}, currentSongVolumeOverrideDb: ${_this.currentSongVolumeOverrideDb}, cueChapters: ${_this.cueChapters}, currentCueIndex: ${_this.currentCueIndex}, isQuranModeEnabled: ${_this.isQuranModeEnabled}, quranReciterStyle: ${_this.quranReciterStyle})';
+    final _this = this as DspSlice;
+    return 'DspSlice(eqPreset: ${_this.eqPreset}, isEqEnabled: ${_this.isEqEnabled}, isVirtualizerEnabled: ${_this.isVirtualizerEnabled}, virtualizerStrength: ${_this.virtualizerStrength}, isVirtualizerSupported: ${_this.isVirtualizerSupported}, isDynamicsEnabled: ${_this.isDynamicsEnabled}, isDynamicsSupported: ${_this.isDynamicsSupported}, dynamicsPreset: ${_this.dynamicsPreset}, selectedHeadphoneProfile: ${_this.selectedHeadphoneProfile}, isSpatializerSupported: ${_this.isSpatializerSupported}, isSpatializerEnabled: ${_this.isSpatializerEnabled}, volumeBoost: ${_this.volumeBoost}, isVolumeBoostSupported: ${_this.isVolumeBoostSupported}, isBassBoostSupported: ${_this.isBassBoostSupported}, isCrossfeedEnabled: ${_this.isCrossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, crossfeedMode: ${_this.crossfeedMode}, isLimiterEnabled: ${_this.isLimiterEnabled}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, isReverbEnabled: ${_this.isReverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, isSincResamplerEnabled: ${_this.isSincResamplerEnabled}, isDitherEnabled: ${_this.isDitherEnabled}, ditherTargetBitDepth: ${_this.ditherTargetBitDepth}, isSaturationEnabled: ${_this.isSaturationEnabled}, saturationDrive: ${_this.saturationDrive}, saturationMix: ${_this.saturationMix}, saturationTilt: ${_this.saturationTilt}, saturationMultiband: ${_this.saturationMultiband}, isStereoWidthEnabled: ${_this.isStereoWidthEnabled}, stereoWidth: ${_this.stereoWidth}, isLoudnessContourEnabled: ${_this.isLoudnessContourEnabled}, loudnessContourIntensity: ${_this.loudnessContourIntensity}, isSubCrossoverEnabled: ${_this.isSubCrossoverEnabled}, subCrossoverCornerHz: ${_this.subCrossoverCornerHz}, subCrossoverSlopeDbPerOct: ${_this.subCrossoverSlopeDbPerOct}, subCrossoverGain: ${_this.subCrossoverGain}, subCrossoverBassMono: ${_this.subCrossoverBassMono}, subCrossoverAntiPop: ${_this.subCrossoverAntiPop}, stereoWidthMultiband: ${_this.stereoWidthMultiband}, stereoWidthLow: ${_this.stereoWidthLow}, stereoWidthMid: ${_this.stereoWidthMid}, stereoWidthHigh: ${_this.stereoWidthHigh}, stereoWidthLowCrossoverHz: ${_this.stereoWidthLowCrossoverHz}, stereoWidthHighCrossoverHz: ${_this.stereoWidthHighCrossoverHz}, multibandCompressorF0: ${_this.multibandCompressorF0}, multibandCompressorF1: ${_this.multibandCompressorF1}, multibandCompressorF2: ${_this.multibandCompressorF2}, isDynamicEqEnabled: ${_this.isDynamicEqEnabled}, dynamicEqBands: ${_this.dynamicEqBands}, isViperDdcEnabled: ${_this.isViperDdcEnabled}, viperDdcProfileName: ${_this.viperDdcProfileName}, isArbitraryEqEnabled: ${_this.isArbitraryEqEnabled}, arbitraryEqString: ${_this.arbitraryEqString}, isLiveProgEnabled: ${_this.isLiveProgEnabled}, liveProgCode: ${_this.liveProgCode}, liveProgStatus: ${_this.liveProgStatus}, isDynamicBassEnabled: ${_this.isDynamicBassEnabled}, dynamicBassStrength: ${_this.dynamicBassStrength}, dynamicBassPreset: ${_this.dynamicBassPreset}, hasOemAudio: ${_this.hasOemAudio}, detectedOemEngines: ${_this.detectedOemEngines}, isQuranModeEnabled: ${_this.isQuranModeEnabled}, quranReciterStyle: ${_this.quranReciterStyle})';
   }
 }
 
 /// @nodoc
-abstract mixin class $PlayerStateCopyWith<$Res> {
-  factory $PlayerStateCopyWith(
-          PlayerState value, $Res Function(PlayerState) _then) =
-      _$PlayerStateCopyWithImpl;
+abstract mixin class $DspSliceCopyWith<$Res> {
+  factory $DspSliceCopyWith(DspSlice value, $Res Function(DspSlice) _then) =
+      _$DspSliceCopyWithImpl;
   @useResult
   $Res call(
-      {SongsTableData? currentSong,
-      bool isPlaying,
-      Duration position,
-      Duration duration,
-      bool isShuffle,
-      PlayerRepeatMode repeatMode,
-      List<SongsTableData> queue,
-      int currentIndex,
-      bool isExpanded,
-      Color? dominantColor,
-      Duration? sleepTimerRemaining,
-      List<LyricsLine> lyrics,
-      LyricsSource lyricsSource,
-      bool isLoadingLyrics,
-      bool isLyricsVisible,
-      bool isQueueVisible,
-      EqPreset eqPreset,
+      {EqPreset eqPreset,
       bool isEqEnabled,
       bool isVirtualizerEnabled,
       double virtualizerStrength,
@@ -473,54 +2106,22 @@ abstract mixin class $PlayerStateCopyWith<$Res> {
       int dynamicBassPreset,
       bool hasOemAudio,
       List<String> detectedOemEngines,
-      int activeQueueSlot,
-      double playbackSpeed,
-      double playbackPitch,
-      int? audioSessionId,
-      String? errorMessage,
-      bool abLoopEnabled,
-      Duration? abPointA,
-      Duration? abPointB,
-      int trackDelayMs,
-      Duration? bookmarkPosition,
-      int silenceSkipSensitivity,
-      int currentSongRating,
-      String? currentSongEqOverride,
-      double currentSongVolumeOverrideDb,
-      List<ChapterInfo> cueChapters,
-      int currentCueIndex,
       bool isQuranModeEnabled,
       QuranReciterStyle quranReciterStyle});
 }
 
 /// @nodoc
-class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
-  _$PlayerStateCopyWithImpl(this._self, this._then);
+class _$DspSliceCopyWithImpl<$Res> implements $DspSliceCopyWith<$Res> {
+  _$DspSliceCopyWithImpl(this._self, this._then);
 
-  final PlayerState _self;
-  final $Res Function(PlayerState) _then;
+  final DspSlice _self;
+  final $Res Function(DspSlice) _then;
 
-  /// Create a copy of PlayerState
+  /// Create a copy of DspSlice
   /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
-    Object? currentSong = freezed,
-    Object? isPlaying = null,
-    Object? position = null,
-    Object? duration = null,
-    Object? isShuffle = null,
-    Object? repeatMode = null,
-    Object? queue = null,
-    Object? currentIndex = null,
-    Object? isExpanded = null,
-    Object? dominantColor = freezed,
-    Object? sleepTimerRemaining = freezed,
-    Object? lyrics = null,
-    Object? lyricsSource = null,
-    Object? isLoadingLyrics = null,
-    Object? isLyricsVisible = null,
-    Object? isQueueVisible = null,
     Object? eqPreset = null,
     Object? isEqEnabled = null,
     Object? isVirtualizerEnabled = null,
@@ -588,90 +2189,10 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
     Object? dynamicBassPreset = null,
     Object? hasOemAudio = null,
     Object? detectedOemEngines = null,
-    Object? activeQueueSlot = null,
-    Object? playbackSpeed = null,
-    Object? playbackPitch = null,
-    Object? audioSessionId = freezed,
-    Object? errorMessage = freezed,
-    Object? abLoopEnabled = null,
-    Object? abPointA = freezed,
-    Object? abPointB = freezed,
-    Object? trackDelayMs = null,
-    Object? bookmarkPosition = freezed,
-    Object? silenceSkipSensitivity = null,
-    Object? currentSongRating = null,
-    Object? currentSongEqOverride = freezed,
-    Object? currentSongVolumeOverrideDb = null,
-    Object? cueChapters = null,
-    Object? currentCueIndex = null,
     Object? isQuranModeEnabled = null,
     Object? quranReciterStyle = null,
   }) {
-    return _then(PlayerState(
-      currentSong: freezed == currentSong
-          ? _self.currentSong
-          : currentSong // ignore: cast_nullable_to_non_nullable
-              as SongsTableData?,
-      isPlaying: null == isPlaying
-          ? _self.isPlaying
-          : isPlaying // ignore: cast_nullable_to_non_nullable
-              as bool,
-      position: null == position
-          ? _self.position
-          : position // ignore: cast_nullable_to_non_nullable
-              as Duration,
-      duration: null == duration
-          ? _self.duration
-          : duration // ignore: cast_nullable_to_non_nullable
-              as Duration,
-      isShuffle: null == isShuffle
-          ? _self.isShuffle
-          : isShuffle // ignore: cast_nullable_to_non_nullable
-              as bool,
-      repeatMode: null == repeatMode
-          ? _self.repeatMode
-          : repeatMode // ignore: cast_nullable_to_non_nullable
-              as PlayerRepeatMode,
-      queue: null == queue
-          ? _self.queue
-          : queue // ignore: cast_nullable_to_non_nullable
-              as List<SongsTableData>,
-      currentIndex: null == currentIndex
-          ? _self.currentIndex
-          : currentIndex // ignore: cast_nullable_to_non_nullable
-              as int,
-      isExpanded: null == isExpanded
-          ? _self.isExpanded
-          : isExpanded // ignore: cast_nullable_to_non_nullable
-              as bool,
-      dominantColor: freezed == dominantColor
-          ? _self.dominantColor
-          : dominantColor // ignore: cast_nullable_to_non_nullable
-              as Color?,
-      sleepTimerRemaining: freezed == sleepTimerRemaining
-          ? _self.sleepTimerRemaining
-          : sleepTimerRemaining // ignore: cast_nullable_to_non_nullable
-              as Duration?,
-      lyrics: null == lyrics
-          ? _self.lyrics
-          : lyrics // ignore: cast_nullable_to_non_nullable
-              as List<LyricsLine>,
-      lyricsSource: null == lyricsSource
-          ? _self.lyricsSource
-          : lyricsSource // ignore: cast_nullable_to_non_nullable
-              as LyricsSource,
-      isLoadingLyrics: null == isLoadingLyrics
-          ? _self.isLoadingLyrics
-          : isLoadingLyrics // ignore: cast_nullable_to_non_nullable
-              as bool,
-      isLyricsVisible: null == isLyricsVisible
-          ? _self.isLyricsVisible
-          : isLyricsVisible // ignore: cast_nullable_to_non_nullable
-              as bool,
-      isQueueVisible: null == isQueueVisible
-          ? _self.isQueueVisible
-          : isQueueVisible // ignore: cast_nullable_to_non_nullable
-              as bool,
+    return _then(DspSlice(
       eqPreset: null == eqPreset
           ? _self.eqPreset
           : eqPreset // ignore: cast_nullable_to_non_nullable
@@ -940,70 +2461,6 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
           ? _self.detectedOemEngines
           : detectedOemEngines // ignore: cast_nullable_to_non_nullable
               as List<String>,
-      activeQueueSlot: null == activeQueueSlot
-          ? _self.activeQueueSlot
-          : activeQueueSlot // ignore: cast_nullable_to_non_nullable
-              as int,
-      playbackSpeed: null == playbackSpeed
-          ? _self.playbackSpeed
-          : playbackSpeed // ignore: cast_nullable_to_non_nullable
-              as double,
-      playbackPitch: null == playbackPitch
-          ? _self.playbackPitch
-          : playbackPitch // ignore: cast_nullable_to_non_nullable
-              as double,
-      audioSessionId: freezed == audioSessionId
-          ? _self.audioSessionId
-          : audioSessionId // ignore: cast_nullable_to_non_nullable
-              as int?,
-      errorMessage: freezed == errorMessage
-          ? _self.errorMessage
-          : errorMessage // ignore: cast_nullable_to_non_nullable
-              as String?,
-      abLoopEnabled: null == abLoopEnabled
-          ? _self.abLoopEnabled
-          : abLoopEnabled // ignore: cast_nullable_to_non_nullable
-              as bool,
-      abPointA: freezed == abPointA
-          ? _self.abPointA
-          : abPointA // ignore: cast_nullable_to_non_nullable
-              as Duration?,
-      abPointB: freezed == abPointB
-          ? _self.abPointB
-          : abPointB // ignore: cast_nullable_to_non_nullable
-              as Duration?,
-      trackDelayMs: null == trackDelayMs
-          ? _self.trackDelayMs
-          : trackDelayMs // ignore: cast_nullable_to_non_nullable
-              as int,
-      bookmarkPosition: freezed == bookmarkPosition
-          ? _self.bookmarkPosition
-          : bookmarkPosition // ignore: cast_nullable_to_non_nullable
-              as Duration?,
-      silenceSkipSensitivity: null == silenceSkipSensitivity
-          ? _self.silenceSkipSensitivity
-          : silenceSkipSensitivity // ignore: cast_nullable_to_non_nullable
-              as int,
-      currentSongRating: null == currentSongRating
-          ? _self.currentSongRating
-          : currentSongRating // ignore: cast_nullable_to_non_nullable
-              as int,
-      currentSongEqOverride: freezed == currentSongEqOverride
-          ? _self.currentSongEqOverride
-          : currentSongEqOverride // ignore: cast_nullable_to_non_nullable
-              as String?,
-      currentSongVolumeOverrideDb: null == currentSongVolumeOverrideDb
-          ? _self.currentSongVolumeOverrideDb
-          : currentSongVolumeOverrideDb // ignore: cast_nullable_to_non_nullable
-              as double,
-      cueChapters: null == cueChapters
-          ? _self.cueChapters
-          : cueChapters // ignore: cast_nullable_to_non_nullable
-              as List<ChapterInfo>,
-      currentCueIndex: null == currentCueIndex
-          ? _self.currentCueIndex
-          : currentCueIndex // ignore: cast_nullable_to_non_nullable
-              as int,
       isQuranModeEnabled: null == isQuranModeEnabled
           ? _self.isQuranModeEnabled
           : isQuranModeEnabled // ignore: cast_nullable_to_non_nullable
@@ -1016,8 +2473,8 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
   }
 }
 
-/// Adds pattern-matching-related methods to [PlayerState].
-extension PlayerStatePatterns on PlayerState {
+/// Adds pattern-matching-related methods to [DspSlice].
+extension DspSlicePatterns on DspSlice {
   /// A variant of `map` that fallback to returning `orElse`.
   ///
   /// It is equivalent to doing:
@@ -1032,12 +2489,12 @@ extension PlayerStatePatterns on PlayerState {
 
   @optionalTypeArgs
   TResult maybeMap<TResult extends Object?>(
-    TResult Function(_PlayerState value)? $default, {
+    TResult Function(_DspSlice value)? $default, {
     required TResult orElse(),
   }) {
     final _that = this;
     switch (_that) {
-      case _PlayerState() when $default != null:
+      case _DspSlice() when $default != null:
         return $default(_that);
       case _:
         return orElse();
@@ -1059,11 +2516,11 @@ extension PlayerStatePatterns on PlayerState {
 
   @optionalTypeArgs
   TResult map<TResult extends Object?>(
-    TResult Function(_PlayerState value) $default,
+    TResult Function(_DspSlice value) $default,
   ) {
     final _that = this;
     switch (_that) {
-      case _PlayerState():
+      case _DspSlice():
         return $default(_that);
       case _:
         throw StateError('Unexpected subclass');
@@ -1084,11 +2541,11 @@ extension PlayerStatePatterns on PlayerState {
 
   @optionalTypeArgs
   TResult? mapOrNull<TResult extends Object?>(
-    TResult? Function(_PlayerState value)? $default,
+    TResult? Function(_DspSlice value)? $default,
   ) {
     final _that = this;
     switch (_that) {
-      case _PlayerState() when $default != null:
+      case _DspSlice() when $default != null:
         return $default(_that);
       case _:
         return null;
@@ -1110,22 +2567,6 @@ extension PlayerStatePatterns on PlayerState {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>(
     TResult Function(
-            SongsTableData? currentSong,
-            bool isPlaying,
-            Duration position,
-            Duration duration,
-            bool isShuffle,
-            PlayerRepeatMode repeatMode,
-            List<SongsTableData> queue,
-            int currentIndex,
-            bool isExpanded,
-            Color? dominantColor,
-            Duration? sleepTimerRemaining,
-            List<LyricsLine> lyrics,
-            LyricsSource lyricsSource,
-            bool isLoadingLyrics,
-            bool isLyricsVisible,
-            bool isQueueVisible,
             EqPreset eqPreset,
             bool isEqEnabled,
             bool isVirtualizerEnabled,
@@ -1193,22 +2634,6 @@ extension PlayerStatePatterns on PlayerState {
             int dynamicBassPreset,
             bool hasOemAudio,
             List<String> detectedOemEngines,
-            int activeQueueSlot,
-            double playbackSpeed,
-            double playbackPitch,
-            int? audioSessionId,
-            String? errorMessage,
-            bool abLoopEnabled,
-            Duration? abPointA,
-            Duration? abPointB,
-            int trackDelayMs,
-            Duration? bookmarkPosition,
-            int silenceSkipSensitivity,
-            int currentSongRating,
-            String? currentSongEqOverride,
-            double currentSongVolumeOverrideDb,
-            List<ChapterInfo> cueChapters,
-            int currentCueIndex,
             bool isQuranModeEnabled,
             QuranReciterStyle quranReciterStyle)?
         $default, {
@@ -1216,24 +2641,8 @@ extension PlayerStatePatterns on PlayerState {
   }) {
     final _that = this;
     switch (_that) {
-      case _PlayerState() when $default != null:
+      case _DspSlice() when $default != null:
         return $default(
-            _that.currentSong,
-            _that.isPlaying,
-            _that.position,
-            _that.duration,
-            _that.isShuffle,
-            _that.repeatMode,
-            _that.queue,
-            _that.currentIndex,
-            _that.isExpanded,
-            _that.dominantColor,
-            _that.sleepTimerRemaining,
-            _that.lyrics,
-            _that.lyricsSource,
-            _that.isLoadingLyrics,
-            _that.isLyricsVisible,
-            _that.isQueueVisible,
             _that.eqPreset,
             _that.isEqEnabled,
             _that.isVirtualizerEnabled,
@@ -1301,22 +2710,6 @@ extension PlayerStatePatterns on PlayerState {
             _that.dynamicBassPreset,
             _that.hasOemAudio,
             _that.detectedOemEngines,
-            _that.activeQueueSlot,
-            _that.playbackSpeed,
-            _that.playbackPitch,
-            _that.audioSessionId,
-            _that.errorMessage,
-            _that.abLoopEnabled,
-            _that.abPointA,
-            _that.abPointB,
-            _that.trackDelayMs,
-            _that.bookmarkPosition,
-            _that.silenceSkipSensitivity,
-            _that.currentSongRating,
-            _that.currentSongEqOverride,
-            _that.currentSongVolumeOverrideDb,
-            _that.cueChapters,
-            _that.currentCueIndex,
             _that.isQuranModeEnabled,
             _that.quranReciterStyle);
       case _:
@@ -1340,22 +2733,6 @@ extension PlayerStatePatterns on PlayerState {
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
     TResult Function(
-            SongsTableData? currentSong,
-            bool isPlaying,
-            Duration position,
-            Duration duration,
-            bool isShuffle,
-            PlayerRepeatMode repeatMode,
-            List<SongsTableData> queue,
-            int currentIndex,
-            bool isExpanded,
-            Color? dominantColor,
-            Duration? sleepTimerRemaining,
-            List<LyricsLine> lyrics,
-            LyricsSource lyricsSource,
-            bool isLoadingLyrics,
-            bool isLyricsVisible,
-            bool isQueueVisible,
             EqPreset eqPreset,
             bool isEqEnabled,
             bool isVirtualizerEnabled,
@@ -1423,46 +2800,14 @@ extension PlayerStatePatterns on PlayerState {
             int dynamicBassPreset,
             bool hasOemAudio,
             List<String> detectedOemEngines,
-            int activeQueueSlot,
-            double playbackSpeed,
-            double playbackPitch,
-            int? audioSessionId,
-            String? errorMessage,
-            bool abLoopEnabled,
-            Duration? abPointA,
-            Duration? abPointB,
-            int trackDelayMs,
-            Duration? bookmarkPosition,
-            int silenceSkipSensitivity,
-            int currentSongRating,
-            String? currentSongEqOverride,
-            double currentSongVolumeOverrideDb,
-            List<ChapterInfo> cueChapters,
-            int currentCueIndex,
             bool isQuranModeEnabled,
             QuranReciterStyle quranReciterStyle)
         $default,
   ) {
     final _that = this;
     switch (_that) {
-      case _PlayerState():
+      case _DspSlice():
         return $default(
-            _that.currentSong,
-            _that.isPlaying,
-            _that.position,
-            _that.duration,
-            _that.isShuffle,
-            _that.repeatMode,
-            _that.queue,
-            _that.currentIndex,
-            _that.isExpanded,
-            _that.dominantColor,
-            _that.sleepTimerRemaining,
-            _that.lyrics,
-            _that.lyricsSource,
-            _that.isLoadingLyrics,
-            _that.isLyricsVisible,
-            _that.isQueueVisible,
             _that.eqPreset,
             _that.isEqEnabled,
             _that.isVirtualizerEnabled,
@@ -1530,22 +2875,6 @@ extension PlayerStatePatterns on PlayerState {
             _that.dynamicBassPreset,
             _that.hasOemAudio,
             _that.detectedOemEngines,
-            _that.activeQueueSlot,
-            _that.playbackSpeed,
-            _that.playbackPitch,
-            _that.audioSessionId,
-            _that.errorMessage,
-            _that.abLoopEnabled,
-            _that.abPointA,
-            _that.abPointB,
-            _that.trackDelayMs,
-            _that.bookmarkPosition,
-            _that.silenceSkipSensitivity,
-            _that.currentSongRating,
-            _that.currentSongEqOverride,
-            _that.currentSongVolumeOverrideDb,
-            _that.cueChapters,
-            _that.currentCueIndex,
             _that.isQuranModeEnabled,
             _that.quranReciterStyle);
       case _:
@@ -1568,22 +2897,6 @@ extension PlayerStatePatterns on PlayerState {
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>(
     TResult? Function(
-            SongsTableData? currentSong,
-            bool isPlaying,
-            Duration position,
-            Duration duration,
-            bool isShuffle,
-            PlayerRepeatMode repeatMode,
-            List<SongsTableData> queue,
-            int currentIndex,
-            bool isExpanded,
-            Color? dominantColor,
-            Duration? sleepTimerRemaining,
-            List<LyricsLine> lyrics,
-            LyricsSource lyricsSource,
-            bool isLoadingLyrics,
-            bool isLyricsVisible,
-            bool isQueueVisible,
             EqPreset eqPreset,
             bool isEqEnabled,
             bool isVirtualizerEnabled,
@@ -1651,46 +2964,14 @@ extension PlayerStatePatterns on PlayerState {
             int dynamicBassPreset,
             bool hasOemAudio,
             List<String> detectedOemEngines,
-            int activeQueueSlot,
-            double playbackSpeed,
-            double playbackPitch,
-            int? audioSessionId,
-            String? errorMessage,
-            bool abLoopEnabled,
-            Duration? abPointA,
-            Duration? abPointB,
-            int trackDelayMs,
-            Duration? bookmarkPosition,
-            int silenceSkipSensitivity,
-            int currentSongRating,
-            String? currentSongEqOverride,
-            double currentSongVolumeOverrideDb,
-            List<ChapterInfo> cueChapters,
-            int currentCueIndex,
             bool isQuranModeEnabled,
             QuranReciterStyle quranReciterStyle)?
         $default,
   ) {
     final _that = this;
     switch (_that) {
-      case _PlayerState() when $default != null:
+      case _DspSlice() when $default != null:
         return $default(
-            _that.currentSong,
-            _that.isPlaying,
-            _that.position,
-            _that.duration,
-            _that.isShuffle,
-            _that.repeatMode,
-            _that.queue,
-            _that.currentIndex,
-            _that.isExpanded,
-            _that.dominantColor,
-            _that.sleepTimerRemaining,
-            _that.lyrics,
-            _that.lyricsSource,
-            _that.isLoadingLyrics,
-            _that.isLyricsVisible,
-            _that.isQueueVisible,
             _that.eqPreset,
             _that.isEqEnabled,
             _that.isVirtualizerEnabled,
@@ -1758,22 +3039,6 @@ extension PlayerStatePatterns on PlayerState {
             _that.dynamicBassPreset,
             _that.hasOemAudio,
             _that.detectedOemEngines,
-            _that.activeQueueSlot,
-            _that.playbackSpeed,
-            _that.playbackPitch,
-            _that.audioSessionId,
-            _that.errorMessage,
-            _that.abLoopEnabled,
-            _that.abPointA,
-            _that.abPointB,
-            _that.trackDelayMs,
-            _that.bookmarkPosition,
-            _that.silenceSkipSensitivity,
-            _that.currentSongRating,
-            _that.currentSongEqOverride,
-            _that.currentSongVolumeOverrideDb,
-            _that.cueChapters,
-            _that.currentCueIndex,
             _that.isQuranModeEnabled,
             _that.quranReciterStyle);
       case _:
@@ -1784,25 +3049,9 @@ extension PlayerStatePatterns on PlayerState {
 
 /// @nodoc
 
-class _PlayerState extends PlayerState {
-  const _PlayerState(
-      {this.currentSong,
-      this.isPlaying = false,
-      this.position = Duration.zero,
-      this.duration = Duration.zero,
-      this.isShuffle = false,
-      this.repeatMode = PlayerRepeatMode.off,
-      List<SongsTableData> queue = const [],
-      this.currentIndex = 0,
-      this.isExpanded = false,
-      this.dominantColor,
-      this.sleepTimerRemaining,
-      List<LyricsLine> lyrics = const [],
-      this.lyricsSource = LyricsSource.none,
-      this.isLoadingLyrics = false,
-      this.isLyricsVisible = false,
-      this.isQueueVisible = false,
-      this.eqPreset =
+class _DspSlice extends DspSlice {
+  const _DspSlice(
+      {this.eqPreset =
           const EqPreset(name: 'Flat', gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
       this.isEqEnabled = false,
       this.isVirtualizerEnabled = false,
@@ -1870,88 +3119,12 @@ class _PlayerState extends PlayerState {
       this.dynamicBassPreset = 0,
       this.hasOemAudio = false,
       List<String> detectedOemEngines = const [],
-      this.activeQueueSlot = 0,
-      this.playbackSpeed = 1.0,
-      this.playbackPitch = 1.0,
-      this.audioSessionId,
-      this.errorMessage,
-      this.abLoopEnabled = false,
-      this.abPointA,
-      this.abPointB,
-      this.trackDelayMs = 0,
-      this.bookmarkPosition,
-      this.silenceSkipSensitivity = 0,
-      this.currentSongRating = 0,
-      this.currentSongEqOverride,
-      this.currentSongVolumeOverrideDb = 0.0,
-      List<ChapterInfo> cueChapters = const [],
-      this.currentCueIndex = 0,
       this.isQuranModeEnabled = false,
       this.quranReciterStyle = QuranReciterStyle.murattal})
-      : _queue = queue,
-        _lyrics = lyrics,
-        _dynamicEqBands = dynamicEqBands,
+      : _dynamicEqBands = dynamicEqBands,
         _detectedOemEngines = detectedOemEngines,
-        _cueChapters = cueChapters,
         super._();
 
-  @override
-  final SongsTableData? currentSong;
-  @override
-  @JsonKey()
-  final bool isPlaying;
-  @override
-  @JsonKey()
-  final Duration position;
-  @override
-  @JsonKey()
-  final Duration duration;
-  @override
-  @JsonKey()
-  final bool isShuffle;
-  @override
-  @JsonKey()
-  final PlayerRepeatMode repeatMode;
-  final List<SongsTableData> _queue;
-  @override
-  @JsonKey()
-  List<SongsTableData> get queue {
-    if (_queue is EqualUnmodifiableListView) return _queue;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(_queue);
-  }
-
-  @override
-  @JsonKey()
-  final int currentIndex;
-  @override
-  @JsonKey()
-  final bool isExpanded;
-  @override
-  final Color? dominantColor;
-  @override
-  final Duration? sleepTimerRemaining;
-  final List<LyricsLine> _lyrics;
-  @override
-  @JsonKey()
-  List<LyricsLine> get lyrics {
-    if (_lyrics is EqualUnmodifiableListView) return _lyrics;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(_lyrics);
-  }
-
-  @override
-  @JsonKey()
-  final LyricsSource lyricsSource;
-  @override
-  @JsonKey()
-  final bool isLoadingLyrics;
-  @override
-  @JsonKey()
-  final bool isLyricsVisible;
-  @override
-  @JsonKey()
-  final bool isQueueVisible;
   @override
   @JsonKey()
   final EqPreset eqPreset;
@@ -2167,102 +3340,24 @@ class _PlayerState extends PlayerState {
 
   @override
   @JsonKey()
-  final int activeQueueSlot;
-  @override
-  @JsonKey()
-  final double playbackSpeed;
-  @override
-  @JsonKey()
-  final double playbackPitch;
-  @override
-  final int? audioSessionId;
-  @override
-  final String? errorMessage;
-  @override
-  @JsonKey()
-  final bool abLoopEnabled;
-  @override
-  final Duration? abPointA;
-  @override
-  final Duration? abPointB;
-  @override
-  @JsonKey()
-  final int trackDelayMs;
-  @override
-  final Duration? bookmarkPosition;
-  @override
-  @JsonKey()
-  final int silenceSkipSensitivity;
-  @override
-  @JsonKey()
-  final int currentSongRating;
-  @override
-  final String? currentSongEqOverride;
-  @override
-  @JsonKey()
-  final double currentSongVolumeOverrideDb;
-  final List<ChapterInfo> _cueChapters;
-  @override
-  @JsonKey()
-  List<ChapterInfo> get cueChapters {
-    if (_cueChapters is EqualUnmodifiableListView) return _cueChapters;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(_cueChapters);
-  }
-
-  @override
-  @JsonKey()
-  final int currentCueIndex;
-  @override
-  @JsonKey()
   final bool isQuranModeEnabled;
   @override
   @JsonKey()
   final QuranReciterStyle quranReciterStyle;
 
-  /// Create a copy of PlayerState
+  /// Create a copy of DspSlice
   /// with the given fields replaced by the non-null parameter values.
   @override
   @JsonKey(includeFromJson: false, includeToJson: false)
   @pragma('vm:prefer-inline')
-  _$PlayerStateCopyWith<_PlayerState> get copyWith =>
-      __$PlayerStateCopyWithImpl<_PlayerState>(this, _$identity);
+  _$DspSliceCopyWith<_DspSlice> get copyWith =>
+      __$DspSliceCopyWithImpl<_DspSlice>(this, _$identity);
 
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
-            other is _PlayerState &&
-            (identical(other.currentSong, currentSong) ||
-                other.currentSong == currentSong) &&
-            (identical(other.isPlaying, isPlaying) ||
-                other.isPlaying == isPlaying) &&
-            (identical(other.position, position) ||
-                other.position == position) &&
-            (identical(other.duration, duration) ||
-                other.duration == duration) &&
-            (identical(other.isShuffle, isShuffle) ||
-                other.isShuffle == isShuffle) &&
-            (identical(other.repeatMode, repeatMode) ||
-                other.repeatMode == repeatMode) &&
-            const DeepCollectionEquality().equals(other.queue, _queue) &&
-            (identical(other.currentIndex, currentIndex) ||
-                other.currentIndex == currentIndex) &&
-            (identical(other.isExpanded, isExpanded) ||
-                other.isExpanded == isExpanded) &&
-            (identical(other.dominantColor, dominantColor) ||
-                other.dominantColor == dominantColor) &&
-            (identical(other.sleepTimerRemaining, sleepTimerRemaining) ||
-                other.sleepTimerRemaining == sleepTimerRemaining) &&
-            const DeepCollectionEquality().equals(other.lyrics, _lyrics) &&
-            (identical(other.lyricsSource, lyricsSource) ||
-                other.lyricsSource == lyricsSource) &&
-            (identical(other.isLoadingLyrics, isLoadingLyrics) ||
-                other.isLoadingLyrics == isLoadingLyrics) &&
-            (identical(other.isLyricsVisible, isLyricsVisible) ||
-                other.isLyricsVisible == isLyricsVisible) &&
-            (identical(other.isQueueVisible, isQueueVisible) ||
-                other.isQueueVisible == isQueueVisible) &&
+            other is _DspSlice &&
             (identical(other.eqPreset, eqPreset) ||
                 other.eqPreset == eqPreset) &&
             (identical(other.isEqEnabled, isEqEnabled) ||
@@ -2316,14 +3411,22 @@ class _PlayerState extends PlayerState {
             (identical(other.monoMix, monoMix) || other.monoMix == monoMix) &&
             (identical(other.isSincResamplerEnabled, isSincResamplerEnabled) ||
                 other.isSincResamplerEnabled == isSincResamplerEnabled) &&
-            (identical(other.isDitherEnabled, isDitherEnabled) || other.isDitherEnabled == isDitherEnabled) &&
-            (identical(other.ditherTargetBitDepth, ditherTargetBitDepth) || other.ditherTargetBitDepth == ditherTargetBitDepth) &&
-            (identical(other.isSaturationEnabled, isSaturationEnabled) || other.isSaturationEnabled == isSaturationEnabled) &&
-            (identical(other.saturationDrive, saturationDrive) || other.saturationDrive == saturationDrive) &&
-            (identical(other.saturationMix, saturationMix) || other.saturationMix == saturationMix) &&
-            (identical(other.saturationTilt, saturationTilt) || other.saturationTilt == saturationTilt) &&
-            (identical(other.saturationMultiband, saturationMultiband) || other.saturationMultiband == saturationMultiband) &&
-            (identical(other.isStereoWidthEnabled, isStereoWidthEnabled) || other.isStereoWidthEnabled == isStereoWidthEnabled) &&
+            (identical(other.isDitherEnabled, isDitherEnabled) ||
+                other.isDitherEnabled == isDitherEnabled) &&
+            (identical(other.ditherTargetBitDepth, ditherTargetBitDepth) ||
+                other.ditherTargetBitDepth == ditherTargetBitDepth) &&
+            (identical(other.isSaturationEnabled, isSaturationEnabled) ||
+                other.isSaturationEnabled == isSaturationEnabled) &&
+            (identical(other.saturationDrive, saturationDrive) ||
+                other.saturationDrive == saturationDrive) &&
+            (identical(other.saturationMix, saturationMix) ||
+                other.saturationMix == saturationMix) &&
+            (identical(other.saturationTilt, saturationTilt) ||
+                other.saturationTilt == saturationTilt) &&
+            (identical(other.saturationMultiband, saturationMultiband) ||
+                other.saturationMultiband == saturationMultiband) &&
+            (identical(other.isStereoWidthEnabled, isStereoWidthEnabled) ||
+                other.isStereoWidthEnabled == isStereoWidthEnabled) &&
             (identical(other.stereoWidth, stereoWidth) || other.stereoWidth == stereoWidth) &&
             (identical(other.isLoudnessContourEnabled, isLoudnessContourEnabled) || other.isLoudnessContourEnabled == isLoudnessContourEnabled) &&
             (identical(other.loudnessContourIntensity, loudnessContourIntensity) || other.loudnessContourIntensity == loudnessContourIntensity) &&
@@ -2356,22 +3459,6 @@ class _PlayerState extends PlayerState {
             (identical(other.dynamicBassPreset, dynamicBassPreset) || other.dynamicBassPreset == dynamicBassPreset) &&
             (identical(other.hasOemAudio, hasOemAudio) || other.hasOemAudio == hasOemAudio) &&
             const DeepCollectionEquality().equals(other.detectedOemEngines, _detectedOemEngines) &&
-            (identical(other.activeQueueSlot, activeQueueSlot) || other.activeQueueSlot == activeQueueSlot) &&
-            (identical(other.playbackSpeed, playbackSpeed) || other.playbackSpeed == playbackSpeed) &&
-            (identical(other.playbackPitch, playbackPitch) || other.playbackPitch == playbackPitch) &&
-            (identical(other.audioSessionId, audioSessionId) || other.audioSessionId == audioSessionId) &&
-            (identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage) &&
-            (identical(other.abLoopEnabled, abLoopEnabled) || other.abLoopEnabled == abLoopEnabled) &&
-            (identical(other.abPointA, abPointA) || other.abPointA == abPointA) &&
-            (identical(other.abPointB, abPointB) || other.abPointB == abPointB) &&
-            (identical(other.trackDelayMs, trackDelayMs) || other.trackDelayMs == trackDelayMs) &&
-            (identical(other.bookmarkPosition, bookmarkPosition) || other.bookmarkPosition == bookmarkPosition) &&
-            (identical(other.silenceSkipSensitivity, silenceSkipSensitivity) || other.silenceSkipSensitivity == silenceSkipSensitivity) &&
-            (identical(other.currentSongRating, currentSongRating) || other.currentSongRating == currentSongRating) &&
-            (identical(other.currentSongEqOverride, currentSongEqOverride) || other.currentSongEqOverride == currentSongEqOverride) &&
-            (identical(other.currentSongVolumeOverrideDb, currentSongVolumeOverrideDb) || other.currentSongVolumeOverrideDb == currentSongVolumeOverrideDb) &&
-            const DeepCollectionEquality().equals(other.cueChapters, _cueChapters) &&
-            (identical(other.currentCueIndex, currentCueIndex) || other.currentCueIndex == currentCueIndex) &&
             (identical(other.isQuranModeEnabled, isQuranModeEnabled) || other.isQuranModeEnabled == isQuranModeEnabled) &&
             (identical(other.quranReciterStyle, quranReciterStyle) || other.quranReciterStyle == quranReciterStyle));
   }
@@ -2380,22 +3467,6 @@ class _PlayerState extends PlayerState {
   int get hashCode {
     return Object.hashAll([
       runtimeType,
-      currentSong,
-      isPlaying,
-      position,
-      duration,
-      isShuffle,
-      repeatMode,
-      const DeepCollectionEquality().hash(_queue),
-      currentIndex,
-      isExpanded,
-      dominantColor,
-      sleepTimerRemaining,
-      const DeepCollectionEquality().hash(_lyrics),
-      lyricsSource,
-      isLoadingLyrics,
-      isLyricsVisible,
-      isQueueVisible,
       eqPreset,
       isEqEnabled,
       isVirtualizerEnabled,
@@ -2463,22 +3534,6 @@ class _PlayerState extends PlayerState {
       dynamicBassPreset,
       hasOemAudio,
       const DeepCollectionEquality().hash(_detectedOemEngines),
-      activeQueueSlot,
-      playbackSpeed,
-      playbackPitch,
-      audioSessionId,
-      errorMessage,
-      abLoopEnabled,
-      abPointA,
-      abPointB,
-      trackDelayMs,
-      bookmarkPosition,
-      silenceSkipSensitivity,
-      currentSongRating,
-      currentSongEqOverride,
-      currentSongVolumeOverrideDb,
-      const DeepCollectionEquality().hash(_cueChapters),
-      currentCueIndex,
       isQuranModeEnabled,
       quranReciterStyle
     ]);
@@ -2486,36 +3541,19 @@ class _PlayerState extends PlayerState {
 
   @override
   String toString() {
-    return 'PlayerState(currentSong: $currentSong, isPlaying: $isPlaying, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, queue: $queue, currentIndex: $currentIndex, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, lyrics: $lyrics, lyricsSource: $lyricsSource, isLoadingLyrics: $isLoadingLyrics, isLyricsVisible: $isLyricsVisible, isQueueVisible: $isQueueVisible, eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isVirtualizerSupported: $isVirtualizerSupported, isDynamicsEnabled: $isDynamicsEnabled, isDynamicsSupported: $isDynamicsSupported, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, isVolumeBoostSupported: $isVolumeBoostSupported, isBassBoostSupported: $isBassBoostSupported, isCrossfeedEnabled: $isCrossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, crossfeedMode: $crossfeedMode, isLimiterEnabled: $isLimiterEnabled, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, isReverbEnabled: $isReverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, isSincResamplerEnabled: $isSincResamplerEnabled, isDitherEnabled: $isDitherEnabled, ditherTargetBitDepth: $ditherTargetBitDepth, isSaturationEnabled: $isSaturationEnabled, saturationDrive: $saturationDrive, saturationMix: $saturationMix, saturationTilt: $saturationTilt, saturationMultiband: $saturationMultiband, isStereoWidthEnabled: $isStereoWidthEnabled, stereoWidth: $stereoWidth, isLoudnessContourEnabled: $isLoudnessContourEnabled, loudnessContourIntensity: $loudnessContourIntensity, isSubCrossoverEnabled: $isSubCrossoverEnabled, subCrossoverCornerHz: $subCrossoverCornerHz, subCrossoverSlopeDbPerOct: $subCrossoverSlopeDbPerOct, subCrossoverGain: $subCrossoverGain, subCrossoverBassMono: $subCrossoverBassMono, subCrossoverAntiPop: $subCrossoverAntiPop, stereoWidthMultiband: $stereoWidthMultiband, stereoWidthLow: $stereoWidthLow, stereoWidthMid: $stereoWidthMid, stereoWidthHigh: $stereoWidthHigh, stereoWidthLowCrossoverHz: $stereoWidthLowCrossoverHz, stereoWidthHighCrossoverHz: $stereoWidthHighCrossoverHz, multibandCompressorF0: $multibandCompressorF0, multibandCompressorF1: $multibandCompressorF1, multibandCompressorF2: $multibandCompressorF2, isDynamicEqEnabled: $isDynamicEqEnabled, dynamicEqBands: $dynamicEqBands, isViperDdcEnabled: $isViperDdcEnabled, viperDdcProfileName: $viperDdcProfileName, isArbitraryEqEnabled: $isArbitraryEqEnabled, arbitraryEqString: $arbitraryEqString, isLiveProgEnabled: $isLiveProgEnabled, liveProgCode: $liveProgCode, liveProgStatus: $liveProgStatus, isDynamicBassEnabled: $isDynamicBassEnabled, dynamicBassStrength: $dynamicBassStrength, dynamicBassPreset: $dynamicBassPreset, hasOemAudio: $hasOemAudio, detectedOemEngines: $detectedOemEngines, activeQueueSlot: $activeQueueSlot, playbackSpeed: $playbackSpeed, playbackPitch: $playbackPitch, audioSessionId: $audioSessionId, errorMessage: $errorMessage, abLoopEnabled: $abLoopEnabled, abPointA: $abPointA, abPointB: $abPointB, trackDelayMs: $trackDelayMs, bookmarkPosition: $bookmarkPosition, silenceSkipSensitivity: $silenceSkipSensitivity, currentSongRating: $currentSongRating, currentSongEqOverride: $currentSongEqOverride, currentSongVolumeOverrideDb: $currentSongVolumeOverrideDb, cueChapters: $cueChapters, currentCueIndex: $currentCueIndex, isQuranModeEnabled: $isQuranModeEnabled, quranReciterStyle: $quranReciterStyle)';
+    return 'DspSlice(eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isVirtualizerSupported: $isVirtualizerSupported, isDynamicsEnabled: $isDynamicsEnabled, isDynamicsSupported: $isDynamicsSupported, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, isVolumeBoostSupported: $isVolumeBoostSupported, isBassBoostSupported: $isBassBoostSupported, isCrossfeedEnabled: $isCrossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, crossfeedMode: $crossfeedMode, isLimiterEnabled: $isLimiterEnabled, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, isReverbEnabled: $isReverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, isSincResamplerEnabled: $isSincResamplerEnabled, isDitherEnabled: $isDitherEnabled, ditherTargetBitDepth: $ditherTargetBitDepth, isSaturationEnabled: $isSaturationEnabled, saturationDrive: $saturationDrive, saturationMix: $saturationMix, saturationTilt: $saturationTilt, saturationMultiband: $saturationMultiband, isStereoWidthEnabled: $isStereoWidthEnabled, stereoWidth: $stereoWidth, isLoudnessContourEnabled: $isLoudnessContourEnabled, loudnessContourIntensity: $loudnessContourIntensity, isSubCrossoverEnabled: $isSubCrossoverEnabled, subCrossoverCornerHz: $subCrossoverCornerHz, subCrossoverSlopeDbPerOct: $subCrossoverSlopeDbPerOct, subCrossoverGain: $subCrossoverGain, subCrossoverBassMono: $subCrossoverBassMono, subCrossoverAntiPop: $subCrossoverAntiPop, stereoWidthMultiband: $stereoWidthMultiband, stereoWidthLow: $stereoWidthLow, stereoWidthMid: $stereoWidthMid, stereoWidthHigh: $stereoWidthHigh, stereoWidthLowCrossoverHz: $stereoWidthLowCrossoverHz, stereoWidthHighCrossoverHz: $stereoWidthHighCrossoverHz, multibandCompressorF0: $multibandCompressorF0, multibandCompressorF1: $multibandCompressorF1, multibandCompressorF2: $multibandCompressorF2, isDynamicEqEnabled: $isDynamicEqEnabled, dynamicEqBands: $dynamicEqBands, isViperDdcEnabled: $isViperDdcEnabled, viperDdcProfileName: $viperDdcProfileName, isArbitraryEqEnabled: $isArbitraryEqEnabled, arbitraryEqString: $arbitraryEqString, isLiveProgEnabled: $isLiveProgEnabled, liveProgCode: $liveProgCode, liveProgStatus: $liveProgStatus, isDynamicBassEnabled: $isDynamicBassEnabled, dynamicBassStrength: $dynamicBassStrength, dynamicBassPreset: $dynamicBassPreset, hasOemAudio: $hasOemAudio, detectedOemEngines: $detectedOemEngines, isQuranModeEnabled: $isQuranModeEnabled, quranReciterStyle: $quranReciterStyle)';
   }
 }
 
 /// @nodoc
-abstract mixin class _$PlayerStateCopyWith<$Res>
-    implements $PlayerStateCopyWith<$Res> {
-  factory _$PlayerStateCopyWith(
-          _PlayerState value, $Res Function(_PlayerState) _then) =
-      __$PlayerStateCopyWithImpl;
+abstract mixin class _$DspSliceCopyWith<$Res>
+    implements $DspSliceCopyWith<$Res> {
+  factory _$DspSliceCopyWith(_DspSlice value, $Res Function(_DspSlice) _then) =
+      __$DspSliceCopyWithImpl;
   @override
   @useResult
   $Res call(
-      {SongsTableData? currentSong,
-      bool isPlaying,
-      Duration position,
-      Duration duration,
-      bool isShuffle,
-      PlayerRepeatMode repeatMode,
-      List<SongsTableData> queue,
-      int currentIndex,
-      bool isExpanded,
-      Color? dominantColor,
-      Duration? sleepTimerRemaining,
-      List<LyricsLine> lyrics,
-      LyricsSource lyricsSource,
-      bool isLoadingLyrics,
-      bool isLyricsVisible,
-      bool isQueueVisible,
-      EqPreset eqPreset,
+      {EqPreset eqPreset,
       bool isEqEnabled,
       bool isVirtualizerEnabled,
       double virtualizerStrength,
@@ -2582,54 +3620,22 @@ abstract mixin class _$PlayerStateCopyWith<$Res>
       int dynamicBassPreset,
       bool hasOemAudio,
       List<String> detectedOemEngines,
-      int activeQueueSlot,
-      double playbackSpeed,
-      double playbackPitch,
-      int? audioSessionId,
-      String? errorMessage,
-      bool abLoopEnabled,
-      Duration? abPointA,
-      Duration? abPointB,
-      int trackDelayMs,
-      Duration? bookmarkPosition,
-      int silenceSkipSensitivity,
-      int currentSongRating,
-      String? currentSongEqOverride,
-      double currentSongVolumeOverrideDb,
-      List<ChapterInfo> cueChapters,
-      int currentCueIndex,
       bool isQuranModeEnabled,
       QuranReciterStyle quranReciterStyle});
 }
 
 /// @nodoc
-class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
-  __$PlayerStateCopyWithImpl(this._self, this._then);
+class __$DspSliceCopyWithImpl<$Res> implements _$DspSliceCopyWith<$Res> {
+  __$DspSliceCopyWithImpl(this._self, this._then);
 
-  final _PlayerState _self;
-  final $Res Function(_PlayerState) _then;
+  final _DspSlice _self;
+  final $Res Function(_DspSlice) _then;
 
-  /// Create a copy of PlayerState
+  /// Create a copy of DspSlice
   /// with the given fields replaced by the non-null parameter values.
   @override
   @pragma('vm:prefer-inline')
   $Res call({
-    Object? currentSong = freezed,
-    Object? isPlaying = null,
-    Object? position = null,
-    Object? duration = null,
-    Object? isShuffle = null,
-    Object? repeatMode = null,
-    Object? queue = null,
-    Object? currentIndex = null,
-    Object? isExpanded = null,
-    Object? dominantColor = freezed,
-    Object? sleepTimerRemaining = freezed,
-    Object? lyrics = null,
-    Object? lyricsSource = null,
-    Object? isLoadingLyrics = null,
-    Object? isLyricsVisible = null,
-    Object? isQueueVisible = null,
     Object? eqPreset = null,
     Object? isEqEnabled = null,
     Object? isVirtualizerEnabled = null,
@@ -2697,90 +3703,10 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
     Object? dynamicBassPreset = null,
     Object? hasOemAudio = null,
     Object? detectedOemEngines = null,
-    Object? activeQueueSlot = null,
-    Object? playbackSpeed = null,
-    Object? playbackPitch = null,
-    Object? audioSessionId = freezed,
-    Object? errorMessage = freezed,
-    Object? abLoopEnabled = null,
-    Object? abPointA = freezed,
-    Object? abPointB = freezed,
-    Object? trackDelayMs = null,
-    Object? bookmarkPosition = freezed,
-    Object? silenceSkipSensitivity = null,
-    Object? currentSongRating = null,
-    Object? currentSongEqOverride = freezed,
-    Object? currentSongVolumeOverrideDb = null,
-    Object? cueChapters = null,
-    Object? currentCueIndex = null,
     Object? isQuranModeEnabled = null,
     Object? quranReciterStyle = null,
   }) {
-    return _then(_PlayerState(
-      currentSong: freezed == currentSong
-          ? _self.currentSong
-          : currentSong // ignore: cast_nullable_to_non_nullable
-              as SongsTableData?,
-      isPlaying: null == isPlaying
-          ? _self.isPlaying
-          : isPlaying // ignore: cast_nullable_to_non_nullable
-              as bool,
-      position: null == position
-          ? _self.position
-          : position // ignore: cast_nullable_to_non_nullable
-              as Duration,
-      duration: null == duration
-          ? _self.duration
-          : duration // ignore: cast_nullable_to_non_nullable
-              as Duration,
-      isShuffle: null == isShuffle
-          ? _self.isShuffle
-          : isShuffle // ignore: cast_nullable_to_non_nullable
-              as bool,
-      repeatMode: null == repeatMode
-          ? _self.repeatMode
-          : repeatMode // ignore: cast_nullable_to_non_nullable
-              as PlayerRepeatMode,
-      queue: null == queue
-          ? _self._queue
-          : queue // ignore: cast_nullable_to_non_nullable
-              as List<SongsTableData>,
-      currentIndex: null == currentIndex
-          ? _self.currentIndex
-          : currentIndex // ignore: cast_nullable_to_non_nullable
-              as int,
-      isExpanded: null == isExpanded
-          ? _self.isExpanded
-          : isExpanded // ignore: cast_nullable_to_non_nullable
-              as bool,
-      dominantColor: freezed == dominantColor
-          ? _self.dominantColor
-          : dominantColor // ignore: cast_nullable_to_non_nullable
-              as Color?,
-      sleepTimerRemaining: freezed == sleepTimerRemaining
-          ? _self.sleepTimerRemaining
-          : sleepTimerRemaining // ignore: cast_nullable_to_non_nullable
-              as Duration?,
-      lyrics: null == lyrics
-          ? _self._lyrics
-          : lyrics // ignore: cast_nullable_to_non_nullable
-              as List<LyricsLine>,
-      lyricsSource: null == lyricsSource
-          ? _self.lyricsSource
-          : lyricsSource // ignore: cast_nullable_to_non_nullable
-              as LyricsSource,
-      isLoadingLyrics: null == isLoadingLyrics
-          ? _self.isLoadingLyrics
-          : isLoadingLyrics // ignore: cast_nullable_to_non_nullable
-              as bool,
-      isLyricsVisible: null == isLyricsVisible
-          ? _self.isLyricsVisible
-          : isLyricsVisible // ignore: cast_nullable_to_non_nullable
-              as bool,
-      isQueueVisible: null == isQueueVisible
-          ? _self.isQueueVisible
-          : isQueueVisible // ignore: cast_nullable_to_non_nullable
-              as bool,
+    return _then(_DspSlice(
       eqPreset: null == eqPreset
           ? _self.eqPreset
           : eqPreset // ignore: cast_nullable_to_non_nullable
@@ -3049,70 +3975,6 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
           ? _self._detectedOemEngines
           : detectedOemEngines // ignore: cast_nullable_to_non_nullable
               as List<String>,
-      activeQueueSlot: null == activeQueueSlot
-          ? _self.activeQueueSlot
-          : activeQueueSlot // ignore: cast_nullable_to_non_nullable
-              as int,
-      playbackSpeed: null == playbackSpeed
-          ? _self.playbackSpeed
-          : playbackSpeed // ignore: cast_nullable_to_non_nullable
-              as double,
-      playbackPitch: null == playbackPitch
-          ? _self.playbackPitch
-          : playbackPitch // ignore: cast_nullable_to_non_nullable
-              as double,
-      audioSessionId: freezed == audioSessionId
-          ? _self.audioSessionId
-          : audioSessionId // ignore: cast_nullable_to_non_nullable
-              as int?,
-      errorMessage: freezed == errorMessage
-          ? _self.errorMessage
-          : errorMessage // ignore: cast_nullable_to_non_nullable
-              as String?,
-      abLoopEnabled: null == abLoopEnabled
-          ? _self.abLoopEnabled
-          : abLoopEnabled // ignore: cast_nullable_to_non_nullable
-              as bool,
-      abPointA: freezed == abPointA
-          ? _self.abPointA
-          : abPointA // ignore: cast_nullable_to_non_nullable
-              as Duration?,
-      abPointB: freezed == abPointB
-          ? _self.abPointB
-          : abPointB // ignore: cast_nullable_to_non_nullable
-              as Duration?,
-      trackDelayMs: null == trackDelayMs
-          ? _self.trackDelayMs
-          : trackDelayMs // ignore: cast_nullable_to_non_nullable
-              as int,
-      bookmarkPosition: freezed == bookmarkPosition
-          ? _self.bookmarkPosition
-          : bookmarkPosition // ignore: cast_nullable_to_non_nullable
-              as Duration?,
-      silenceSkipSensitivity: null == silenceSkipSensitivity
-          ? _self.silenceSkipSensitivity
-          : silenceSkipSensitivity // ignore: cast_nullable_to_non_nullable
-              as int,
-      currentSongRating: null == currentSongRating
-          ? _self.currentSongRating
-          : currentSongRating // ignore: cast_nullable_to_non_nullable
-              as int,
-      currentSongEqOverride: freezed == currentSongEqOverride
-          ? _self.currentSongEqOverride
-          : currentSongEqOverride // ignore: cast_nullable_to_non_nullable
-              as String?,
-      currentSongVolumeOverrideDb: null == currentSongVolumeOverrideDb
-          ? _self.currentSongVolumeOverrideDb
-          : currentSongVolumeOverrideDb // ignore: cast_nullable_to_non_nullable
-              as double,
-      cueChapters: null == cueChapters
-          ? _self._cueChapters
-          : cueChapters // ignore: cast_nullable_to_non_nullable
-              as List<ChapterInfo>,
-      currentCueIndex: null == currentCueIndex
-          ? _self.currentCueIndex
-          : currentCueIndex // ignore: cast_nullable_to_non_nullable
-              as int,
       isQuranModeEnabled: null == isQuranModeEnabled
           ? _self.isQuranModeEnabled
           : isQuranModeEnabled // ignore: cast_nullable_to_non_nullable
@@ -3122,6 +3984,469 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
           : quranReciterStyle // ignore: cast_nullable_to_non_nullable
               as QuranReciterStyle,
     ));
+  }
+}
+
+/// @nodoc
+mixin _$PlayerState {
+  PlaybackSlice get playback;
+  QueueSlice get queueSlice;
+  DspSlice get dsp;
+  LyricsSlice get lyricsSlice;
+
+  /// Create a copy of PlayerState
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @pragma('vm:prefer-inline')
+  $PlayerStateCopyWith<PlayerState> get copyWith =>
+      _$PlayerStateCopyWithImpl<PlayerState>(this as PlayerState, _$identity);
+
+  @override
+  bool operator ==(Object other) {
+    final _this = this as PlayerState;
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is PlayerState &&
+            (identical(other.playback, _this.playback) ||
+                other.playback == _this.playback) &&
+            (identical(other.queueSlice, _this.queueSlice) ||
+                other.queueSlice == _this.queueSlice) &&
+            (identical(other.dsp, _this.dsp) || other.dsp == _this.dsp) &&
+            (identical(other.lyricsSlice, _this.lyricsSlice) ||
+                other.lyricsSlice == _this.lyricsSlice));
+  }
+
+  @override
+  int get hashCode {
+    final _this = this as PlayerState;
+    return Object.hash(runtimeType, _this.playback, _this.queueSlice, _this.dsp,
+        _this.lyricsSlice);
+  }
+
+  @override
+  String toString() {
+    final _this = this as PlayerState;
+    return 'PlayerState(playback: ${_this.playback}, queueSlice: ${_this.queueSlice}, dsp: ${_this.dsp}, lyricsSlice: ${_this.lyricsSlice})';
+  }
+}
+
+/// @nodoc
+abstract mixin class $PlayerStateCopyWith<$Res> {
+  factory $PlayerStateCopyWith(
+          PlayerState value, $Res Function(PlayerState) _then) =
+      _$PlayerStateCopyWithImpl;
+  @useResult
+  $Res call(
+      {PlaybackSlice playback,
+      QueueSlice queueSlice,
+      DspSlice dsp,
+      LyricsSlice lyricsSlice});
+
+  $PlaybackSliceCopyWith<$Res> get playback;
+  $QueueSliceCopyWith<$Res> get queueSlice;
+  $DspSliceCopyWith<$Res> get dsp;
+  $LyricsSliceCopyWith<$Res> get lyricsSlice;
+}
+
+/// @nodoc
+class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
+  _$PlayerStateCopyWithImpl(this._self, this._then);
+
+  final PlayerState _self;
+  final $Res Function(PlayerState) _then;
+
+  /// Create a copy of PlayerState
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? playback = null,
+    Object? queueSlice = null,
+    Object? dsp = null,
+    Object? lyricsSlice = null,
+  }) {
+    return _then(PlayerState(
+      playback: null == playback
+          ? _self.playback
+          : playback // ignore: cast_nullable_to_non_nullable
+              as PlaybackSlice,
+      queueSlice: null == queueSlice
+          ? _self.queueSlice
+          : queueSlice // ignore: cast_nullable_to_non_nullable
+              as QueueSlice,
+      dsp: null == dsp
+          ? _self.dsp
+          : dsp // ignore: cast_nullable_to_non_nullable
+              as DspSlice,
+      lyricsSlice: null == lyricsSlice
+          ? _self.lyricsSlice
+          : lyricsSlice // ignore: cast_nullable_to_non_nullable
+              as LyricsSlice,
+    ));
+  }
+
+  /// Create a copy of PlayerState
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $PlaybackSliceCopyWith<$Res> get playback {
+    return $PlaybackSliceCopyWith<$Res>(_self.playback, (value) {
+      return _then(_self.copyWith(playback: value));
+    });
+  }
+
+  /// Create a copy of PlayerState
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $QueueSliceCopyWith<$Res> get queueSlice {
+    return $QueueSliceCopyWith<$Res>(_self.queueSlice, (value) {
+      return _then(_self.copyWith(queueSlice: value));
+    });
+  }
+
+  /// Create a copy of PlayerState
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $DspSliceCopyWith<$Res> get dsp {
+    return $DspSliceCopyWith<$Res>(_self.dsp, (value) {
+      return _then(_self.copyWith(dsp: value));
+    });
+  }
+
+  /// Create a copy of PlayerState
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $LyricsSliceCopyWith<$Res> get lyricsSlice {
+    return $LyricsSliceCopyWith<$Res>(_self.lyricsSlice, (value) {
+      return _then(_self.copyWith(lyricsSlice: value));
+    });
+  }
+}
+
+/// Adds pattern-matching-related methods to [PlayerState].
+extension PlayerStatePatterns on PlayerState {
+  /// A variant of `map` that fallback to returning `orElse`.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case _:
+  ///     return orElse();
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>(
+    TResult Function(_PlayerState value)? $default, {
+    required TResult orElse(),
+  }) {
+    final _that = this;
+    switch (_that) {
+      case _PlayerState() when $default != null:
+        return $default(_that);
+      case _:
+        return orElse();
+    }
+  }
+
+  /// A `switch`-like method, using callbacks.
+  ///
+  /// Callbacks receives the raw object, upcasted.
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case final Subclass2 value:
+  ///     return ...;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>(
+    TResult Function(_PlayerState value) $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _PlayerState():
+        return $default(_that);
+      case _:
+        throw StateError('Unexpected subclass');
+    }
+  }
+
+  /// A variant of `map` that fallback to returning `null`.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case _:
+  ///     return null;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>(
+    TResult? Function(_PlayerState value)? $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _PlayerState() when $default != null:
+        return $default(_that);
+      case _:
+        return null;
+    }
+  }
+
+  /// A variant of `when` that fallback to an `orElse` callback.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case _:
+  ///     return orElse();
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>(
+    TResult Function(PlaybackSlice playback, QueueSlice queueSlice,
+            DspSlice dsp, LyricsSlice lyricsSlice)?
+        $default, {
+    required TResult orElse(),
+  }) {
+    final _that = this;
+    switch (_that) {
+      case _PlayerState() when $default != null:
+        return $default(
+            _that.playback, _that.queueSlice, _that.dsp, _that.lyricsSlice);
+      case _:
+        return orElse();
+    }
+  }
+
+  /// A `switch`-like method, using callbacks.
+  ///
+  /// As opposed to `map`, this offers destructuring.
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case Subclass2(:final field2):
+  ///     return ...;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>(
+    TResult Function(PlaybackSlice playback, QueueSlice queueSlice,
+            DspSlice dsp, LyricsSlice lyricsSlice)
+        $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _PlayerState():
+        return $default(
+            _that.playback, _that.queueSlice, _that.dsp, _that.lyricsSlice);
+      case _:
+        throw StateError('Unexpected subclass');
+    }
+  }
+
+  /// A variant of `when` that fallback to returning `null`
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case _:
+  ///     return null;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>(
+    TResult? Function(PlaybackSlice playback, QueueSlice queueSlice,
+            DspSlice dsp, LyricsSlice lyricsSlice)?
+        $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _PlayerState() when $default != null:
+        return $default(
+            _that.playback, _that.queueSlice, _that.dsp, _that.lyricsSlice);
+      case _:
+        return null;
+    }
+  }
+}
+
+/// @nodoc
+
+class _PlayerState extends PlayerState {
+  const _PlayerState(
+      {this.playback = const PlaybackSlice(),
+      this.queueSlice = const QueueSlice(),
+      this.dsp = const DspSlice(),
+      this.lyricsSlice = const LyricsSlice()})
+      : super._();
+
+  @override
+  @JsonKey()
+  final PlaybackSlice playback;
+  @override
+  @JsonKey()
+  final QueueSlice queueSlice;
+  @override
+  @JsonKey()
+  final DspSlice dsp;
+  @override
+  @JsonKey()
+  final LyricsSlice lyricsSlice;
+
+  /// Create a copy of PlayerState
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @pragma('vm:prefer-inline')
+  _$PlayerStateCopyWith<_PlayerState> get copyWith =>
+      __$PlayerStateCopyWithImpl<_PlayerState>(this, _$identity);
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _PlayerState &&
+            (identical(other.playback, playback) ||
+                other.playback == playback) &&
+            (identical(other.queueSlice, queueSlice) ||
+                other.queueSlice == queueSlice) &&
+            (identical(other.dsp, dsp) || other.dsp == dsp) &&
+            (identical(other.lyricsSlice, lyricsSlice) ||
+                other.lyricsSlice == lyricsSlice));
+  }
+
+  @override
+  int get hashCode {
+    return Object.hash(runtimeType, playback, queueSlice, dsp, lyricsSlice);
+  }
+
+  @override
+  String toString() {
+    return 'PlayerState(playback: $playback, queueSlice: $queueSlice, dsp: $dsp, lyricsSlice: $lyricsSlice)';
+  }
+}
+
+/// @nodoc
+abstract mixin class _$PlayerStateCopyWith<$Res>
+    implements $PlayerStateCopyWith<$Res> {
+  factory _$PlayerStateCopyWith(
+          _PlayerState value, $Res Function(_PlayerState) _then) =
+      __$PlayerStateCopyWithImpl;
+  @override
+  @useResult
+  $Res call(
+      {PlaybackSlice playback,
+      QueueSlice queueSlice,
+      DspSlice dsp,
+      LyricsSlice lyricsSlice});
+
+  @override
+  $PlaybackSliceCopyWith<$Res> get playback;
+  @override
+  $QueueSliceCopyWith<$Res> get queueSlice;
+  @override
+  $DspSliceCopyWith<$Res> get dsp;
+  @override
+  $LyricsSliceCopyWith<$Res> get lyricsSlice;
+}
+
+/// @nodoc
+class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
+  __$PlayerStateCopyWithImpl(this._self, this._then);
+
+  final _PlayerState _self;
+  final $Res Function(_PlayerState) _then;
+
+  /// Create a copy of PlayerState
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $Res call({
+    Object? playback = null,
+    Object? queueSlice = null,
+    Object? dsp = null,
+    Object? lyricsSlice = null,
+  }) {
+    return _then(_PlayerState(
+      playback: null == playback
+          ? _self.playback
+          : playback // ignore: cast_nullable_to_non_nullable
+              as PlaybackSlice,
+      queueSlice: null == queueSlice
+          ? _self.queueSlice
+          : queueSlice // ignore: cast_nullable_to_non_nullable
+              as QueueSlice,
+      dsp: null == dsp
+          ? _self.dsp
+          : dsp // ignore: cast_nullable_to_non_nullable
+              as DspSlice,
+      lyricsSlice: null == lyricsSlice
+          ? _self.lyricsSlice
+          : lyricsSlice // ignore: cast_nullable_to_non_nullable
+              as LyricsSlice,
+    ));
+  }
+
+  /// Create a copy of PlayerState
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $PlaybackSliceCopyWith<$Res> get playback {
+    return $PlaybackSliceCopyWith<$Res>(_self.playback, (value) {
+      return _then(_self.copyWith(playback: value));
+    });
+  }
+
+  /// Create a copy of PlayerState
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $QueueSliceCopyWith<$Res> get queueSlice {
+    return $QueueSliceCopyWith<$Res>(_self.queueSlice, (value) {
+      return _then(_self.copyWith(queueSlice: value));
+    });
+  }
+
+  /// Create a copy of PlayerState
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $DspSliceCopyWith<$Res> get dsp {
+    return $DspSliceCopyWith<$Res>(_self.dsp, (value) {
+      return _then(_self.copyWith(dsp: value));
+    });
+  }
+
+  /// Create a copy of PlayerState
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $LyricsSliceCopyWith<$Res> get lyricsSlice {
+    return $LyricsSliceCopyWith<$Res>(_self.lyricsSlice, (value) {
+      return _then(_self.copyWith(lyricsSlice: value));
+    });
   }
 }
 

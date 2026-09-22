@@ -176,19 +176,24 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     }));
   }
 
-  void _onTaskEvent(DownloadTask task) {
+  Future<void> _onTaskEvent(DownloadTask task) async {
     if (isClosed) return;
     // Events are flowing again: reset the resubscribe backoff.
     _resubscribeAttempts = 0;
 
-    final now = _nowMs;
-    _deletedAtMsByVideoId
-        .removeWhere((_, deletedAt) => now - deletedAt >= _deletedIgnoreWindowMs);
-    if (_deletedAtMsByVideoId.containsKey(task.videoId)) {
+    final shouldIgnore = await _deleteMutex.protect(() async {
+      final now = _nowMs;
+      _deletedAtMsByVideoId
+          .removeWhere((_, deletedAt) => now - deletedAt >= _deletedIgnoreWindowMs);
+      return _deletedAtMsByVideoId.containsKey(task.videoId);
+    });
+    if (shouldIgnore || isClosed) {
       return;
     }
 
-    final existingTask = state.tasks[task.videoId];
+    final currentTasks = state.tasks;
+    final now = _nowMs;
+    final existingTask = currentTasks[task.videoId];
 
     // True dedupe first: with value equality on DownloadTask this drops no-op
     // ticks regardless of which fields the event carries. (The throttle below

@@ -50,17 +50,21 @@ void main() {
   }) {
     when(() => playerCubit.state).thenReturn(
       PlayerState(
-        currentSong: hasSong ? testSong : null,
-        isPlaying: true,
-        duration: const Duration(minutes: 3),
+        playback: PlaybackSlice(
+          currentSong: hasSong ? testSong : null,
+          isPlaying: true,
+          duration: const Duration(minutes: 3),
+        ),
       ),
     );
     when(() => playerCubit.stream).thenAnswer(
       (_) => Stream.value(
         PlayerState(
-          currentSong: hasSong ? testSong : null,
-          isPlaying: true,
-          duration: const Duration(minutes: 3),
+          playback: PlaybackSlice(
+            currentSong: hasSong ? testSong : null,
+            isPlaying: true,
+            duration: const Duration(minutes: 3),
+          ),
         ),
       ),
     );

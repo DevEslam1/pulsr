@@ -5,12 +5,35 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
-import '../../../../domain/models/lyrics_line.dart';
 import '../../../player/presentation/widgets/lyrics_view.dart';
 import '../../../player/presentation/widgets/now_playing_queue_view.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+
+@immutable
+class _TabletLyricsData {
+  final int? songId;
+  final String? remoteId;
+  final LyricsSlice lyricsSlice;
+
+  const _TabletLyricsData({
+    required this.songId,
+    required this.remoteId,
+    required this.lyricsSlice,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _TabletLyricsData &&
+          songId == other.songId &&
+          remoteId == other.remoteId &&
+          lyricsSlice == other.lyricsSlice;
+
+  @override
+  int get hashCode => Object.hash(songId, remoteId, lyricsSlice);
+}
 
 class TabletSideInspector extends StatefulWidget {
   final VoidCallback onClose;
@@ -173,25 +196,18 @@ class _TabletSideInspectorState extends State<TabletSideInspector> {
                   )
                 : Padding(
                     padding: const EdgeInsets.all(AppSpacing.xs),
-                    child: BlocSelector<PlayerCubit, PlayerState, ({
-                      String songKey,
-                      List<LyricsLine> lyrics,
-                      bool isLoading,
-                      LyricsSource source,
-                    })>(
-                      selector: (state) => (
-                        songKey:
-                            '${state.currentSong?.id}_${state.currentSong?.remoteId}',
-                        lyrics: state.lyrics,
-                        isLoading: state.isLoadingLyrics,
-                        source: state.lyricsSource,
+                    child: BlocSelector<PlayerCubit, PlayerState, _TabletLyricsData>(
+                      selector: (state) => _TabletLyricsData(
+                        songId: state.currentSong?.id,
+                        remoteId: state.currentSong?.remoteId,
+                        lyricsSlice: state.lyricsSlice,
                       ),
-                      builder: (context, lyricsState) => LyricsView(
-                        key: ValueKey('lyrics_${lyricsState.songKey}'),
-                        lyrics: lyricsState.lyrics,
-                        isLoading: lyricsState.isLoading,
+                      builder: (context, lyricsData) => LyricsView(
+                        key: ValueKey('lyrics_${lyricsData.songId}_${lyricsData.remoteId}'),
+                        lyrics: lyricsData.lyricsSlice.lyrics,
+                        isLoading: lyricsData.lyricsSlice.isLoadingLyrics,
                         activeColor: activeColor,
-                        source: lyricsState.source,
+                        source: lyricsData.lyricsSlice.lyricsSource,
                         onLineTapped: (pos) =>
                             context.read<PlayerCubit>().seek(pos),
                       ),

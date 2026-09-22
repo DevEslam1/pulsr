@@ -37,16 +37,20 @@ void main() {
 
     test('NowPlayingScreen buildWhen skips position-only state emissions (0 rebuilds)', () {
       var state = const PlayerState(
-        currentSong: testSong,
-        isPlaying: true,
-        duration: Duration(minutes: 4),
-        position: Duration(seconds: 1),
+        playback: PlaybackSlice(
+          currentSong: testSong,
+          isPlaying: true,
+          duration: Duration(minutes: 4),
+          position: Duration(seconds: 1),
+        ),
       );
 
       var rebuildCount = 0;
       // Simulate 50 position ticks (e.g. 5Hz over 10 seconds)
       for (int i = 2; i <= 50; i++) {
-        final nextState = state.copyWith(position: Duration(seconds: i));
+        final nextState = state.copyWith(
+          playback: state.playback.copyWith(position: Duration(seconds: i)),
+        );
         final shouldRebuild = state.differsFromBeyondPosition(nextState);
         if (shouldRebuild) {
           rebuildCount++;
@@ -69,17 +73,21 @@ void main() {
           a.currentIndex != b.currentIndex;
 
       const state1 = PlayerState(
-        currentSong: testSong,
-        isPlaying: true,
-        duration: Duration(minutes: 4),
-        position: Duration(seconds: 5),
+        playback: PlaybackSlice(
+          currentSong: testSong,
+          isPlaying: true,
+          duration: Duration(minutes: 4),
+          position: Duration(seconds: 5),
+        ),
       );
 
       const state2 = PlayerState(
-        currentSong: testSong,
-        isPlaying: true,
-        duration: Duration(minutes: 4),
-        position: Duration(seconds: 15),
+        playback: PlaybackSlice(
+          currentSong: testSong,
+          isPlaying: true,
+          duration: Duration(minutes: 4),
+          position: Duration(seconds: 15),
+        ),
       );
 
       expect(miniPlayerBuildWhen(state1, state2), isFalse,
@@ -145,13 +153,19 @@ void main() {
 
     test('Equalizer sub-state comparator excludes position ticks', () {
       const stateA = PlayerState(
-        isEqEnabled: true,
-        eqPreset: EqPreset(name: 'Rock', gains: [1.0, 2.0]),
-        position: Duration(seconds: 10),
+        dsp: DspSlice(
+          isEqEnabled: true,
+          eqPreset: EqPreset(name: 'Rock', gains: [1.0, 2.0]),
+        ),
+        playback: PlaybackSlice(
+          position: Duration(seconds: 10),
+        ),
       );
 
       final stateB = stateA.copyWith(
-        position: Duration(seconds: 30),
+        playback: stateA.playback.copyWith(
+          position: Duration(seconds: 30),
+        ),
       );
 
       // Both states share identical DSP parameters

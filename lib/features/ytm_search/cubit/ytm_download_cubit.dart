@@ -76,6 +76,7 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
   /// Video ids whose completed task has already been folded back into the
   /// queue/DB, so the completion side effects run exactly once.
   final LinkedHashSet<String> _reconciledVideoIds = LinkedHashSet<String>();
+  final Map<String, bool> _reconcileLocks = {};
   // FIX-C12: Shield recently completed tasks with a 10-second TTL
   final Map<String, int> _recentlyCompleted = {};
   static const int _recentlyCompletedTtlMs = 10000;
@@ -98,10 +99,14 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
     _sub = autoSub(_downloads.stream, _onDownloadsState);
   }
 
+  // Monotonic clock for recently completed TTL checks
+  static final Stopwatch _clock = Stopwatch()..start();
+  static int get _nowMs => _clock.elapsedMilliseconds;
+
   void _onDownloadsState(DownloadsState downloads) {
     if (isClosed) return;
 
-    final now = DateTime.now().millisecondsSinceEpoch;
+    final now = _nowMs;
     // FIX-C12: Prune recently completed tasks past TTL
     _recentlyCompleted.removeWhere((_, completedAt) => now - completedAt >= _recentlyCompletedTtlMs);
 
@@ -131,14 +136,18 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
 
     for (final task in downloads.tasks.values) {
       if (task.status == DownloadStatus.complete &&
-          !_reconciledVideoIds.contains(task.videoId)) {
+          !_reconciledVideoIds.contains(task.videoId) &&
+          !(_reconcileLocks[task.videoId] ?? false)) {
+        _reconcileLocks[task.videoId] = true;
         _reconciledVideoIds.add(task.videoId);
         _recentlyCompleted[task.videoId] = now;
         // FIX-H04 / B-06: Cap reconciled IDs at 500, evicting oldest (insertion order)
         while (_reconciledVideoIds.length > 250) {
           _reconciledVideoIds.remove(_reconciledVideoIds.first);
         }
-        unawaited(_onDownloadComplete(task));
+        unawaited(_onDownloadComplete(task).whenComplete(() {
+          _reconcileLocks.remove(task.videoId);
+        }));
       }
     }
   }
@@ -348,6 +357,7 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
     _sub = null;
     _lastEmitTimeByVideoId.clear();
     _reconciledVideoIds.clear();
+    _reconcileLocks.clear();
     return super.close();
   }
 }
