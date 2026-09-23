@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' show DisplayFeature, DisplayFeatureType;
 import 'package:flutter/material.dart';
 
@@ -10,6 +11,51 @@ abstract class Adaptive {
   static const double railExtendedBreakpoint = 1000;
   static const double maxContentWidth = 1160;
   static const double maxSheetWidth = 620;
+
+  /// Standard baseline reference screen dimensions used for responsive calculations.
+  static const double designWidth = 390.0;
+  static const double designHeight = 844.0;
+
+  /// Proportional width scaling factor relative to baseline design width (390dp).
+  static double scaleFactorW(
+    BuildContext context, {
+    double minScale = 0.80,
+    double maxScale = 1.35,
+  }) {
+    final w = widthOf(context);
+    final effectiveW = isTablet(context) ? (w.clamp(360.0, maxSheetWidth)) : w;
+    return (effectiveW / designWidth).clamp(minScale, maxScale);
+  }
+
+  /// Proportional height scaling factor relative to baseline design height (844dp).
+  static double scaleFactorH(
+    BuildContext context, {
+    double minScale = 0.70,
+    double maxScale = 1.30,
+  }) {
+    final h = heightOf(context);
+    return (h / designHeight).clamp(minScale, maxScale);
+  }
+
+  /// Combined scaling factor choosing the smaller axis to preserve aspect ratio.
+  static double scaleFactorR(
+    BuildContext context, {
+    double minScale = 0.80,
+    double maxScale = 1.30,
+  }) {
+    final sw = scaleFactorW(context, minScale: minScale, maxScale: maxScale);
+    final sh = scaleFactorH(context, minScale: minScale, maxScale: maxScale);
+    return math.min(sw, sh);
+  }
+
+  /// Proportional font scaling factor.
+  static double fontScale(
+    BuildContext context, {
+    double minScale = 0.85,
+    double maxScale = 1.25,
+  }) {
+    return scaleFactorW(context, minScale: minScale, maxScale: maxScale);
+  }
 
   static double widthOf(BuildContext context) =>
       MediaQuery.sizeOf(context).width;
@@ -117,6 +163,30 @@ extension AdaptiveContextX on BuildContext {
   int get trackGridColumns => Adaptive.trackGridColumns(this);
   double get pagePadding => Adaptive.pagePadding(this);
   WindowClass get windowClass => Adaptive.windowOf(this);
+
+  /// Scaling factors for this context.
+  double get scaleFactorW => Adaptive.scaleFactorW(this);
+  double get scaleFactorH => Adaptive.scaleFactorH(this);
+  double get scaleFactorR => Adaptive.scaleFactorR(this);
+  double get fontScale => Adaptive.fontScale(this);
+
+  /// Scales a width or horizontal value responsively.
+  double scaleW(double value) => value * scaleFactorW;
+
+  /// Scales a height or vertical value responsively.
+  double scaleH(double value) => value * scaleFactorH;
+
+  /// Scales font size responsively while clamped to balanced limits.
+  double scaleSp(double value) => value * fontScale;
+
+  /// Scales a radius or uniform dimension responsively.
+  double scaleR(double value) => value * scaleFactorR;
+
+  /// Short aliases for convenience
+  double rw(double value) => scaleW(value);
+  double rh(double value) => scaleH(value);
+  double rsp(double value) => scaleSp(value);
+  double rr(double value) => scaleR(value);
 
   T responsive<T>({
     required T phone,

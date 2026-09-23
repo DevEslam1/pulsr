@@ -7,15 +7,20 @@ class DownloadsState {
   final bool isLoading;
   final String? errorMessage;
 
+  final List<DownloadTask>? _cachedTaskList;
+
   const DownloadsState({
     this.tasks = const {},
     this.storageStats = const StorageStats(),
     this.isLoading = false,
     this.errorMessage,
-  });
+    List<DownloadTask>? cachedTaskList,
+  }) : _cachedTaskList = cachedTaskList;
 
-  List<DownloadTask> get taskList => tasks.values.toList()
-    ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  List<DownloadTask> get taskList =>
+      _cachedTaskList ??
+      (tasks.values.toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt)));
 
   int get activeCount =>
       tasks.values.where((t) => t.status.isActive).length;
@@ -30,12 +35,18 @@ class DownloadsState {
     String? errorMessage,
     bool clearErrorMessage = false,
   }) {
+    final nextTasks = tasks ?? this.tasks;
+    final precomputedList = tasks != null
+        ? (nextTasks.values.toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt)))
+        : _cachedTaskList;
     return DownloadsState(
-      tasks: tasks ?? this.tasks,
+      tasks: nextTasks,
       storageStats: storageStats ?? this.storageStats,
       isLoading: isLoading ?? this.isLoading,
       errorMessage:
           clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      cachedTaskList: precomputedList,
     );
   }
 

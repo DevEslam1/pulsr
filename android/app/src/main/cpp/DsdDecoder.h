@@ -42,6 +42,7 @@ private:
     static constexpr int DECIMATION_TAPS = 383;
     static constexpr int DECIMATION_HALF = DECIMATION_TAPS / 2;
     float decimationCoeffs_[DECIMATION_TAPS] = {};
+    float reversedDecimationCoeffs_[DECIMATION_TAPS] = {};
 
     // CIC stage 1 integrators & combs (unsigned 64-bit: CIC filters rely on
     // modular wrap-around arithmetic; signed overflow is UB in C++)
@@ -53,9 +54,9 @@ private:
     CicState cicR_;
     int cicCount_ = 0;
 
-    // Stage 2 ring buffer
-    float stage2RingL_[DECIMATION_TAPS] = {};
-    float stage2RingR_[DECIMATION_TAPS] = {};
+    // Stage 2 ring buffer (doubled for contiguous FIR reads without modulo)
+    float stage2RingL_[DECIMATION_TAPS * 2] = {};
+    float stage2RingR_[DECIMATION_TAPS * 2] = {};
     int stage2WriteIdx_ = 0;
 
     // 5Hz DC blocker states

@@ -103,12 +103,12 @@ private:
     size_t urbStride_ = 0;
     int numUrbs_ = 0;
 
-    // Bounded byte ring buffer (format-agnostic), guarded by ringMutex_.
-    std::mutex ringMutex_;
+    // Lock-free single-producer single-consumer (SPSC) byte ring buffer.
+    // Audio thread produces; USB worker thread consumes. Wait-free for audio thread.
     std::vector<uint8_t> ring_;
-    size_t ringRead_ = 0;
-    size_t ringWrite_ = 0;
-    size_t ringCount_ = 0;
+    size_t ringMask_ = 0;
+    alignas(64) std::atomic<size_t> ringWrite_{0};
+    alignas(64) std::atomic<size_t> ringRead_{0};
 };
 
 } // namespace pulsr

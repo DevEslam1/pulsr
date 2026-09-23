@@ -143,11 +143,16 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
     _maybeUpdateDock(height: dockHeight, miniPlayer: true);
   }
 
+  bool? _lastKnownHasSong;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final hasSong = context.read<PlayerCubit>().state.currentSong != null;
-    _syncDock(hasSong: hasSong);
+    if (_lastKnownHasSong != hasSong) {
+      _lastKnownHasSong = hasSong;
+      _syncDock(hasSong: hasSong);
+    }
   }
 
   @override
@@ -155,6 +160,7 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.mode != widget.mode) {
       final hasSong = context.read<PlayerCubit>().state.currentSong != null;
+      _lastKnownHasSong = hasSong;
       _syncDock(hasSong: hasSong);
     }
   }

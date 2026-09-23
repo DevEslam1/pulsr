@@ -1,13 +1,42 @@
-// test/audit_bug_fixes_test.dart
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart' hide PlayerState;
 import 'package:pulsr/core/utils/list_content_diff.dart';
 import 'package:pulsr/data/db/app_database.dart';
+import 'package:fpdart/fpdart.dart';
+import 'package:pulsr/core/errors/failures.dart';
+import 'package:pulsr/domain/models/download_task.dart';
+import 'package:pulsr/domain/models/smart_playlist_criteria.dart';
+import 'package:pulsr/domain/repositories/smart_playlist_engine_interface.dart';
+import 'package:pulsr/domain/usecases/playlist_usecases.dart';
+import 'package:pulsr/features/downloads/cubit/downloads_state.dart';
+import 'package:pulsr/features/player/cubit/dsp_telemetry_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
+import 'package:pulsr/features/smart_playlist_builder/smart_playlist_builder_cubit.dart';
 import 'mocks/fake_audio_player_backend.dart';
 
+class _FakeSmartPlaylistEngine extends Fake implements ISmartPlaylistEngine {
+  @override
+  Stream<List<SongsTableData>> watchCriteria(SmartCriteria criteria) => const Stream.empty();
+  @override
+  Future<List<SongsTableData>> evaluateCriteria(SmartCriteria criteria) async => [];
+  @override
+  List<SmartRule> validateRules(SmartCriteria criteria) => const [];
+}
+
+class _FakePlaylistUseCases extends Fake implements PlaylistUseCases {
+  @override
+  Future<Either<AppFailure, int>> createPlaylist(
+    String name, {
+    bool isSmart = false,
+    String? smartCriteria,
+  }) async =>
+      const Right(1);
+}
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('Audit Bug Fixes Tests', () {
     test('MediaItem extras preserves remoteId, source, isDownloaded, and remoteArtworkUrl', () {
       const original = SongsTableData(
@@ -291,6 +320,92 @@ void main() {
       expect(backend.playing, isTrue);
 
       await backend.dispose();
+    });
+
+    test('DownloadsState precomputes and caches taskList sorted descending by createdAt', () {
+      final t1 = DownloadTask(
+        id: 'v1',
+        videoId: 'v1',
+        title: 'Song 1',
+        artist: 'Artist 1',
+        artworkUrl: '',
+        format: 'm4a',
+        createdAt: DateTime.fromMillisecondsSinceEpoch(1000),
+      );
+      final t2 = DownloadTask(
+        id: 'v2',
+        videoId: 'v2',
+        title: 'Song 2',
+        artist: 'Artist 2',
+        artworkUrl: '',
+        format: 'm4a',
+        createdAt: DateTime.fromMillisecondsSinceEpoch(2000),
+      );
+
+      final state = const DownloadsState().copyWith(tasks: {'v1': t1, 'v2': t2});
+      final listA = state.taskList;
+      final listB = state.taskList;
+
+      // Identity check: must return the exact same precomputed instance without re-allocating
+      expect(identical(listA, listB), isTrue);
+      expect(listA.length, 2);
+      expect(listA.first.videoId, 'v2');
+      expect(listA.last.videoId, 'v1');
+
+      // State update without task modification preserves cached list instance
+      final updatedLoading = state.copyWith(isLoading: true);
+      expect(identical(updatedLoading.taskList, listA), isTrue);
+    });
+
+    test('DspTelemetryCubit accepts and configures custom polling intervals', () {
+      final defaultCubit = DspTelemetryCubit();
+      expect(defaultCubit.pollingInterval, const Duration(milliseconds: 200));
+      defaultCubit.close();
+
+      final customCubit = DspTelemetryCubit(pollingInterval: const Duration(milliseconds: 100));
+      expect(customCubit.pollingInterval, const Duration(milliseconds: 100));
+      customCubit.close();
+    });
+
+    test('SmartPlaylistBuilderCubit validates empty name and empty rules', () async {
+      final engine = _FakeSmartPlaylistEngine();
+      final useCases = _FakePlaylistUseCases();
+      final cubit = SmartPlaylistBuilderCubit(engine, useCases);
+
+      // Initially has 1 default rule with value '0' but empty name
+      expect(cubit.state.name, isEmpty);
+      var saved = await cubit.savePlaylist();
+      expect(saved, isFalse);
+      expect(cubit.state.errorMessage, 'Please enter a playlist name');
+
+      // With name but no rules
+      cubit.updateName('My Smart Playlist');
+      cubit.removeRule(0);
+      expect(cubit.state.criteria.rules, isEmpty);
+      saved = await cubit.savePlaylist();
+      expect(saved, isFalse);
+      expect(cubit.state.errorMessage, 'Please add at least one rule');
+
+      // With a rule having empty value
+      cubit.addRule(const SmartRule(
+        field: SmartRuleField.title,
+        operator: SmartOperator.contains,
+        value: '   ',
+      ));
+      saved = await cubit.savePlaylist();
+      expect(saved, isFalse);
+      expect(cubit.state.errorMessage, 'Please enter a value for rule #1');
+
+      // With valid name and rule
+      cubit.updateRule(0, const SmartRule(
+        field: SmartRuleField.title,
+        operator: SmartOperator.contains,
+        value: 'Rock',
+      ));
+      saved = await cubit.savePlaylist();
+      expect(saved, isTrue);
+
+      await cubit.close();
     });
   });
 }

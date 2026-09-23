@@ -56,7 +56,7 @@ class PlayerThemeMetrics {
         (context.isTwoPane || constraints.maxWidth >= 680);
 
     final double heightRatio =
-        (constraints.maxHeight / 720.0).clamp(0.85, 1.25);
+        (constraints.maxHeight / 720.0).clamp(0.55, 1.25);
     final double spacingTrackToSeek = (isTablet ? 10.0 : 6.0) * heightRatio;
     final double spacingSeekToControls = (isTablet ? 12.0 : 8.0) * heightRatio;
     final double spacingControlsToDock = (isTablet ? 12.0 : 8.0) * heightRatio;
@@ -65,10 +65,10 @@ class PlayerThemeMetrics {
     final double switcherBottomPad = (isTablet ? 6.0 : 3.0) * heightRatio;
 
     final double pillBarWidth = math.min(
-      constraints.maxWidth - (isTablet ? 64 : 36),
+      constraints.maxWidth - (isTablet ? 64 : 28),
       isTablet ? 440.0 : 336.0,
     );
-    final double pillBarHeight = isTablet ? 50.0 : 44.0;
+    final double pillBarHeight = (isTablet ? 50.0 : 44.0) * heightRatio.clamp(0.85, 1.15);
 
     return PlayerThemeMetrics(
       constraints: constraints,
@@ -84,6 +84,19 @@ class PlayerThemeMetrics {
       pillBarWidth: pillBarWidth,
       pillBarHeight: pillBarHeight,
     );
+  }
+
+  /// Computes a safe artwork or deck dimension that never overflows available bounds.
+  static double safeArtworkSize({
+    required double availableWidth,
+    required double availableHeight,
+    required bool isTablet,
+    double? maxAllowedOverride,
+  }) {
+    final double maxAllowed = maxAllowedOverride ?? (isTablet ? 560.0 : 420.0);
+    final double raw = math.min(availableWidth, availableHeight);
+    if (raw <= 0) return 0.0;
+    return math.min(raw, maxAllowed);
   }
 }
 

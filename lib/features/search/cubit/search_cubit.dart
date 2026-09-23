@@ -34,7 +34,10 @@ class SearchCubit extends PulsrCubit<SearchState> {
       final prefs = await SharedPreferences.getInstance();
       final list = prefs.getStringList(_historyKey) ?? [];
       if (!isClosed) safeEmit(state.copyWith(history: list));
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load search history',
+          error: e, stackTrace: st, category: 'SearchCubit');
+    }
   }
 
   void _loadHistory() { unawaited(_loadHistoryAsync()); }
@@ -235,16 +238,23 @@ class SearchCubit extends PulsrCubit<SearchState> {
     return out;
   }
 
+  Timer? _historyDebounceTimer;
+
   Future<void> _persistHistory(String query) async {
     final q = query.trim();
     if (q.isEmpty || q.length < 2) return;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final existing = prefs.getStringList(_historyKey) ?? List.from(state.history);
-      final updated = [q, ...existing.where((h) => h.toLowerCase() != q.toLowerCase())].take(historyMax).toList();
-      await prefs.setStringList(_historyKey, updated);
-      if (!isClosed) safeEmit(state.copyWith(history: updated));
-    } catch (_) {}
+    _historyDebounceTimer?.cancel();
+    _historyDebounceTimer = autoTimer(Timer(const Duration(milliseconds: 400), () async {
+      if (isClosed) return;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        if (isClosed) return;
+        final existing = prefs.getStringList(_historyKey) ?? List.from(state.history);
+        final updated = [q, ...existing.where((h) => h.toLowerCase() != q.toLowerCase())].take(historyMax).toList();
+        await prefs.setStringList(_historyKey, updated);
+        if (!isClosed) safeEmit(state.copyWith(history: updated));
+      } catch (_) {}
+    }));
   }
 
   Future<void> clearHistory() async {
@@ -389,6 +399,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
   @override
   Future<void> close() async {
     _debounceTimer?.cancel();
+    _historyDebounceTimer?.cancel();
     _searchSub?.cancel();
     await super.close();
     // Dispose after the cubit is marked closed so in-flight loads/saves bail out

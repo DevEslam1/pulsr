@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 
@@ -59,11 +58,6 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
   /// `downloading` forever would otherwise leak an entry each.
   static const int _maxThrottleEntries = 128;
 
-  // FIX-C4: Track boot timestamp for monotonic comparison across re-initialization
-  int _bootTimestamp = DateTime.now().millisecondsSinceEpoch;
-  @visibleForTesting
-  int get bootTimestamp => _bootTimestamp;
-
   DownloadsCubit(
     this._queueDownloadUseCase,
     this._pauseDownloadUseCase,
@@ -86,11 +80,10 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
   }
 
   Future<void> _init() async {
-    // FIX-C4: Reset tombstones and update boot timestamp at start of init
+    // Reset tombstones at start of init
     await _deleteMutex.protect(() async {
       _deletedAtMsByVideoId.clear();
     });
-    _bootTimestamp = DateTime.now().millisecondsSinceEpoch;
     await _pruneDeletedTombstones();
     safeEmit(state.copyWith(isLoading: true));
     try {
@@ -181,40 +174,33 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     // Events are flowing again: reset the resubscribe backoff.
     _resubscribeAttempts = 0;
 
-    final shouldIgnore = await _deleteMutex.protect(() async {
+    final shouldDrop = await _deleteMutex.protect(() async {
       final now = _nowMs;
       _deletedAtMsByVideoId
           .removeWhere((_, deletedAt) => now - deletedAt >= _deletedIgnoreWindowMs);
-      return _deletedAtMsByVideoId.containsKey(task.videoId);
+      if (_deletedAtMsByVideoId.containsKey(task.videoId)) return true;
+
+      final currentTasks = state.tasks;
+      final existingTask = currentTasks[task.videoId];
+      if (existingTask != null && existingTask == task) return true;
+
+      final lastEmit = _lastEmitTimeByVideoId[task.videoId] ?? 0;
+      final isProgressOnly = existingTask != null &&
+          existingTask.status == task.status &&
+          task.status == DownloadStatus.downloading &&
+          task.progress < 1.0;
+
+      if (isProgressOnly && (now - lastEmit < 100)) {
+        return true;
+      }
+
+      _lastEmitTimeByVideoId[task.videoId] = now;
+      return false;
     });
-    if (shouldIgnore || isClosed) {
+    if (shouldDrop || isClosed) {
       return;
     }
 
-    final currentTasks = state.tasks;
-    final now = _nowMs;
-    final existingTask = currentTasks[task.videoId];
-
-    // True dedupe first: with value equality on DownloadTask this drops no-op
-    // ticks regardless of which fields the event carries. (The throttle below
-    // only guards progress churn.)
-    if (existingTask != null && existingTask == task) return;
-
-    final lastEmit = _lastEmitTimeByVideoId[task.videoId] ?? 0;
-
-    // Coalesce intermediate progress at ~10Hz (100ms) — prevents rebuild storms
-    // from 1000/s chunk callbacks (native parallel emits at ~80ms). Immediate on
-    // status transitions / terminal states so pause/complete feels instant.
-    final isProgressOnly = existingTask != null &&
-        existingTask.status == task.status &&
-        task.status == DownloadStatus.downloading &&
-        task.progress < 1.0;
-
-    if (isProgressOnly && (now - lastEmit < 100)) {
-      return;
-    }
-
-    _lastEmitTimeByVideoId[task.videoId] = now;
     final updatedTasks = Map<String, DownloadTask>.unmodifiable({
       ...state.tasks,
       task.videoId: task,
@@ -222,37 +208,43 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
 
     safeEmit(state.copyWith(tasks: updatedTasks));
 
-    // Prune throttle bookkeeping: tasks that never reach a terminal state
-    // would otherwise leak an entry forever.
-    if (_lastEmitTimeByVideoId.length > _maxThrottleEntries) {
-      _lastEmitTimeByVideoId.removeWhere((videoId, _) {
-        final t = updatedTasks[videoId];
-        return t == null ||
-            t.status.isTerminal ||
-            t.status == DownloadStatus.paused;
-      });
-      // B-12: Replace fallback clear() with targeted eviction of non-active/terminal tasks and oldest entries
+    await _deleteMutex.protect(() async {
+      // Prune throttle bookkeeping: tasks that never reach a terminal state
+      // would otherwise leak an entry forever.
       if (_lastEmitTimeByVideoId.length > _maxThrottleEntries) {
         _lastEmitTimeByVideoId.removeWhere((videoId, _) {
           final t = updatedTasks[videoId];
-          return t == null || t.status.isTerminal;
+          return t == null ||
+              t.status.isTerminal ||
+              t.status == DownloadStatus.paused;
         });
         if (_lastEmitTimeByVideoId.length > _maxThrottleEntries) {
-          final entries = _lastEmitTimeByVideoId.entries.toList()
-            ..sort((a, b) => a.value.compareTo(b.value));
-          final toRemove = entries.take(_lastEmitTimeByVideoId.length - _maxThrottleEntries);
-          for (final e in toRemove) {
-            _lastEmitTimeByVideoId.remove(e.key);
+          _lastEmitTimeByVideoId.removeWhere((videoId, _) {
+            final t = updatedTasks[videoId];
+            return t == null || t.status.isTerminal;
+          });
+          if (_lastEmitTimeByVideoId.length > _maxThrottleEntries) {
+            final entries = _lastEmitTimeByVideoId.entries.toList()
+              ..sort((a, b) => a.value.compareTo(b.value));
+            final toRemove = entries.take(_lastEmitTimeByVideoId.length - _maxThrottleEntries);
+            for (final e in toRemove) {
+              _lastEmitTimeByVideoId.remove(e.key);
+            }
           }
         }
       }
-    }
 
-    // FIX-H03: Clean up throttle entry for all terminal states
+      // FIX-H03: Clean up throttle entry for all terminal states
+      if (task.status.isTerminal ||
+          task.status == DownloadStatus.complete ||
+          task.status == DownloadStatus.failed) {
+        _lastEmitTimeByVideoId.remove(task.videoId);
+      }
+    });
+
     if (task.status.isTerminal ||
         task.status == DownloadStatus.complete ||
         task.status == DownloadStatus.failed) {
-      _lastEmitTimeByVideoId.remove(task.videoId);
       _scheduleDebouncedStorageStats(); // FIX-A14: debounce rapid updates
     }
   }
@@ -296,7 +288,9 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     if (result.isRight()) {
       // A fresh queue for this video supersedes any delete tombstone, so the
       // queued event is not swallowed by the stale-emission guard.
-      _deletedAtMsByVideoId.remove(task.videoId);
+      await _deleteMutex.protect(() async {
+        _deletedAtMsByVideoId.remove(task.videoId);
+      });
     }
     _applyActionResult(result);
   }
@@ -321,22 +315,23 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
   /// (unavailable/geo/auth) will fail again individually; transient ones get
   /// the staggered spacing they need. Returns the number re-queued.
   Future<int> retryAllFailed({int delayMs = 500}) async {
-    final failed = state.tasks.values
+    final failedIds = state.tasks.values
         .where((t) => t.status == DownloadStatus.failed)
+        .map((t) => t.videoId)
         .toList();
     var queued = 0;
-    for (var i = 0; i < failed.length; i++) {
+    for (var i = 0; i < failedIds.length; i++) {
       if (isClosed) break;
       if (i > 0 && delayMs > 0) {
         await Future.delayed(Duration(milliseconds: delayMs));
       }
       if (isClosed) break;
-      final result = await _retryDownloadUseCase(failed[i].videoId);
+      final result = await _retryDownloadUseCase(failedIds[i]);
       // FIX-M07: Check isClosed immediately after async retry use-case
       if (isClosed) break;
       if (result.isRight()) queued++;
     }
-    if (!isClosed && failed.isNotEmpty && queued == 0) {
+    if (!isClosed && failedIds.isNotEmpty && queued == 0) {
       safeEmit(state.copyWith(
           errorMessage: 'Could not retry failed downloads'));
     }
@@ -355,8 +350,8 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     result.fold(
       (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
       (_) async {
-        _lastEmitTimeByVideoId.remove(videoId);
         await _deleteMutex.protect(() async {
+          _lastEmitTimeByVideoId.remove(videoId);
           _deletedAtMsByVideoId[videoId] = _nowMs;
         });
         final remaining = Map<String, DownloadTask>.from(state.tasks)

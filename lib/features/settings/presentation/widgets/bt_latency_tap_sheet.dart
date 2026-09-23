@@ -60,23 +60,32 @@ class _BtLatencyTapSheetState extends State<BtLatencyTapSheet> {
   final List<int> _deltas = [];
   bool _running = false;
   int? _resultMs;
-  late final AudioPlayer _player;
+  AudioPlayer? _player;
+  bool _initError = false;
   late final Uint8List _beepWav;
 
   @override
   void initState() {
     super.initState();
-    _player = AudioPlayer();
     _beepWav = RoomCorrectionService.synthSweepWav([880.0], toneMs: 60, fadeMs: 4, amp: 0.5);
+    _initPlayer();
+  }
+
+  Future<void> _initPlayer() async {
+    final player = AudioPlayer();
+    _player = player;
     try {
-      _player.setAudioSource(_BeepSource(_beepWav)).catchError((e, st) {
-        ErrorLogger.log('Failed to set audio source for BT latency test',
-            error: e, stackTrace: st, category: 'BtLatency');
-        return null;
-      });
+      await player.setAudioSource(_BeepSource(_beepWav));
     } catch (e, st) {
       ErrorLogger.log('Failed to initialize AudioPlayer in BT latency test',
           error: e, stackTrace: st, category: 'BtLatency');
+      try {
+        await player.dispose();
+      } catch (_) {}
+      if (identical(_player, player)) {
+        _player = null;
+      }
+      if (mounted) setState(() => _initError = true);
     }
   }
 
@@ -84,16 +93,18 @@ class _BtLatencyTapSheetState extends State<BtLatencyTapSheet> {
   void dispose() {
     _timer?.cancel();
     try {
-      _player.stop();
-      _player.dispose();
+      _player?.stop();
+      _player?.dispose();
     } catch (e, st) {
       ErrorLogger.log('Failed to dispose player in BT latency test',
           error: e, stackTrace: st, category: 'BtLatency');
     }
+    _player = null;
     super.dispose();
   }
 
   void _start() {
+    if (_initError || _player == null) return;
     _timer?.cancel();
     setState(() {
       _beepsEmitted = 0;
@@ -116,10 +127,11 @@ class _BtLatencyTapSheetState extends State<BtLatencyTapSheet> {
   }
 
   void _emitBeep() {
+    if (_player == null) return;
     _lastBeepAt = DateTime.now();
     _beepsEmitted++;
     try {
-      unawaited(_player.seek(Duration.zero).then((_) => _player.play()).catchError((e, st) {
+      unawaited(_player!.seek(Duration.zero).then((_) => _player?.play()).catchError((e, st) {
         ErrorLogger.log('Failed to play beep in BT latency test',
             error: e, stackTrace: st, category: 'BtLatency');
       }));
@@ -248,7 +260,7 @@ class _BtLatencyTapSheetState extends State<BtLatencyTapSheet> {
                 const Spacer(),
                 if (_resultMs == null)
                   FilledButton.icon(
-                    onPressed: _running ? null : _start,
+                    onPressed: (_running || _initError || _player == null) ? null : _start,
                     icon: const Icon(Icons.play_arrow_rounded, size: 18),
                     label: Text(context.l10n.rcStart),
                   )

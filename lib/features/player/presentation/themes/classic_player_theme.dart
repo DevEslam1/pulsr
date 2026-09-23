@@ -302,29 +302,29 @@ class ClassicPlayerTheme extends StatelessWidget {
 
                     // Dynamic vertical spacing ratio for balanced, centered content distribution
                     final double heightRatio =
-                        (constraints.maxHeight / 720.0).clamp(0.85, 1.25);
+                        (constraints.maxHeight / 720.0).clamp(0.55, 1.25);
                     final double spacingTrackToSeek =
-                        (isTablet ? 16.0 : 12.0) * heightRatio;
+                        (isTablet ? 16.0 : 10.0) * heightRatio;
                     final double spacingSeekToControls =
-                        (isTablet ? 18.0 : 14.0) * heightRatio;
+                        (isTablet ? 18.0 : 12.0) * heightRatio;
                     final double spacingControlsToDock =
-                        (isTablet ? 18.0 : 14.0) * heightRatio;
+                        (isTablet ? 18.0 : 12.0) * heightRatio;
                     final double spacingBelowDock =
-                        (isTablet ? 14.0 : 10.0) * heightRatio;
+                        (isTablet ? 14.0 : 8.0) * heightRatio;
                     final double switcherTopPad =
                         (isTablet ? 8.0 : 4.0) * heightRatio;
                     final double switcherBottomPad =
                         (isTablet ? 10.0 : 6.0) * heightRatio;
 
                     final double landscapeArtSize =
-                        (constraints.maxHeight - 36).clamp(280.0, 520.0);
+                        (constraints.maxHeight - 36).clamp(240.0, 520.0);
 
                     // Symmetrical twin pill capsule dimensions for top (view switcher) & bottom (eq dock)
                     final double pillBarWidth = math.min(
-                      constraints.maxWidth - (isTablet ? 64 : 36),
+                      constraints.maxWidth - (isTablet ? 64 : 28),
                       isTablet ? 440.0 : 336.0,
                     );
-                    final double pillBarHeight = isTablet ? 50.0 : 44.0;
+                    final double pillBarHeight = (isTablet ? 50.0 : 44.0) * heightRatio.clamp(0.85, 1.15);
 
                     final viewSwitcher = PlayerViewSwitcher(
                       state: state,
@@ -639,7 +639,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                           abLoopActive: state.abLoopEnabled,
                           primaryColor: activeColor,
                           mainButtonSize:
-                              isTablet ? 74 : (isLandscape ? 58 : 66),
+                              (isTablet ? 74.0 : (isLandscape ? 58.0 : 66.0)) * heightRatio.clamp(0.85, 1.10),
                           onPlayPause: () => cubit.togglePlayPause(),
                           onNext: () => cubit.next(),
                           onPrevious: () => cubit.previous(),
@@ -735,10 +735,11 @@ class ClassicPlayerTheme extends StatelessWidget {
                                       (isTablet ? 24.0 : 12.0);
                               final double maxAllowed =
                                   isTablet ? 560.0 : 420.0;
-                              final double dynamicArtSize = math.min(
-                                math.min(availableWidth, availableHeight),
-                                maxAllowed,
-                              ).clamp(180.0, double.infinity);
+                              final double rawSize =
+                                  math.min(availableWidth, availableHeight);
+                              final double dynamicArtSize = rawSize <= 0
+                                  ? 0.0
+                                  : math.min(rawSize, maxAllowed);
 
                               return Center(
                                 child: ConstrainedBox(

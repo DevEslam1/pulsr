@@ -9,6 +9,8 @@
 #include <memory>
 #include <string>
 #include <atomic>
+#include <thread>
+#include <condition_variable>
 
 enum class ReverbPreset {
     Studio = 0,
@@ -22,6 +24,12 @@ enum class ReverbPreset {
     Custom = 8
 };
 
+enum class ReverbThreadingMode {
+    SingleThread = 0,
+    MultiThread = 1,
+    Auto = 2
+};
+
 class ConvolutionReverb {
 public:
     static constexpr int PARTITION_SIZE = 512;
@@ -30,6 +38,7 @@ public:
     static constexpr int MAX_PREALLOC_PARTITIONS = 512;
 
     ConvolutionReverb();
+    ~ConvolutionReverb();
     void setSampleRate(double sampleRate, bool updateIr = true);
     void setPreset(ReverbPreset preset);
     void setWetDry(double wet); // 0.0 (dry) to 1.0 (wet)
@@ -37,8 +46,18 @@ public:
     void setDamping(double damping); // 0.0 (bright) to 1.0 (dark/damped)
     void setCrossChannel(double crossChannel) { crossChannel_ = std::clamp(crossChannel, 0.0, 1.0); }
     double getCrossChannel() const { return crossChannel_; }
-    void setEnabled(bool enabled);
-    bool isEnabled() const { return enabled_; }
+    void setEnabled(bool enabled) {
+        enabled_.store(enabled, std::memory_order_relaxed);
+        targetEnabledMix_.store(enabled ? 1.0f : 0.0f, std::memory_order_release);
+    }
+    bool isEnabled() const {
+        return targetEnabledMix_.load(std::memory_order_relaxed) > 1e-4f;
+    }
+    bool isRamping() const {
+        return (smoothedEnabledMix_ > 1e-4f) || (targetEnabledMix_.load(std::memory_order_relaxed) > 1e-4f);
+    }
+    void setThreadingMode(ReverbThreadingMode mode) { threadingMode_.store(mode, std::memory_order_relaxed); }
+    ReverbThreadingMode getThreadingMode() const { return threadingMode_.load(std::memory_order_relaxed); }
     void applyParams(const ReverbParamSet& params);
     void reset();
 
@@ -46,12 +65,8 @@ public:
     std::shared_ptr<const PreparedIr> getPreparedIr() const { return preparedIr_; }
     ReverbPreset getPreset() const { return preset_; }
 
-    // Reverb wet-path block latency: 512 samples in partitioned mode, 0 in direct FIR.
-    // Reads only atomics: this is queried from the JNI/control thread while the
-    // audio thread may be swapping preparedIr_, so it must never dereference the
-    // shared_ptr here (that would be a data race / torn pointer).
     int getReverbLatencyFrames() const {
-        if (!enabled_.load(std::memory_order_relaxed)) return 0;
+        if (!isEnabled()) return 0;
         return reverbLatencyFrames_.load(std::memory_order_relaxed);
     }
 
@@ -66,7 +81,7 @@ private:
     std::shared_ptr<const PreparedIr> retiredRing_[kMaxRetired];
     std::atomic<int> retiredHead_{0};
     std::atomic<int> retiredTail_{0};
-    static constexpr int kMaxEmergencyOverflow = 64;
+    static constexpr int kMaxEmergencyOverflow = 256;
     std::shared_ptr<const PreparedIr> overflowSlots_[kMaxEmergencyOverflow];
     std::atomic<int> overflowCount_{0};
 
@@ -75,7 +90,8 @@ private:
     void preparePartitions();
     void ensurePredelayCapacity();
     void ensureScratchCapacity(int frames);
-    void processCore(const float* inL, const float* inR, float* outL, float* outR, int frames, float dryGain, float wetGain);
+    void processCore(const float* inL, const float* inR, float* outL, float* outR, int frames,
+                     float startMix, float mixStep, double startWet, double wetStep);
 
     double sampleRate_ = 48000.0;
     double coreRate_ = 48000.0;
@@ -87,6 +103,11 @@ private:
     float smoothedPredelaySamples_ = 0.0f;
     double damping_ = 0.5;
     std::atomic<bool> enabled_{false};
+    std::atomic<float> targetEnabledMix_{0.0f};
+    float smoothedEnabledMix_{0.0f};
+    int irCrossfadeSamples_{0};
+    int irCrossfadeTotal_{0};
+    std::atomic<ReverbThreadingMode> threadingMode_{ReverbThreadingMode::Auto};
 
     // Fixed-rate wet path resamplers for sample rates > 48kHz
     SincResampler wetInResampler_;
@@ -129,11 +150,11 @@ private:
     std::vector<float> predelayRingR_;
     int predelayWritePos_ = 0;
 
-    // Dry-path delay line (PARTITION_SIZE) used in the partitioned path to
-    // time-align dry with the wet convolution output (which lags by one block).
+    // Dry-path delay line (PARTITION_SIZE) used in partitioned mode to time-align dry with wet
     std::vector<float> dryDelayL_;
     std::vector<float> dryDelayR_;
     int dryDelayPos_ = 0;
+
 
     // Working buffers
     std::vector<FftUtil::Complex> fftWorkL_;
@@ -153,4 +174,18 @@ private:
     int rawCustomChannels_ = 2;
     double rawCustomSampleRate_ = 48000.0;
     double crossChannel_ = 0.0;
+
+    void processLeftChannelPartition(int numPartitions);
+    void processRightChannelPartition(int numPartitions);
+    void workerLoop();
+
+    std::thread workerThread_;
+    std::mutex workerMutex_;
+    std::condition_variable workerCv_;
+    std::mutex workerDoneMutex_;
+    std::condition_variable workerCvDone_;
+    std::atomic<bool> workerRunning_{false};
+    std::atomic<bool> workerJobReady_{false};
+    std::atomic<bool> workerJobDone_{false};
+    std::atomic<int> workerNumPartitions_{0};
 };

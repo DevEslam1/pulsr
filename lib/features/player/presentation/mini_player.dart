@@ -133,9 +133,15 @@ class _MiniPlayerState extends State<MiniPlayer> {
     // the latch once the skip it triggered has completed.
     if (_isUserDragging || _swipeInFlight) return;
     if (_lastKnownIndex != safeIndex) {
-      if (controller.hasClients &&
-          controller.position.hasContentDimensions &&
-          controller.page?.round() != safeIndex) {
+      if (!controller.hasClients || !controller.position.hasContentDimensions) {
+        // Retry in post frame callback if dimensions are not yet available,
+        // preventing permanent desync.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _syncPageController(targetIndex, queueLength);
+        });
+        return;
+      }
+      if (controller.page?.round() != safeIndex) {
         try {
           final maxPage = controller.position.viewportDimension > 0
               ? (controller.position.maxScrollExtent / controller.position.viewportDimension).round()

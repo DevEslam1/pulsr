@@ -4,7 +4,7 @@ project("pulsr_dsp")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_compile_options(-Wall -Wextra)
+add_compile_options(-Wall -Wextra -fno-strict-aliasing)
 
 # ASan/UBSan need the clang runtime (libclang_rt.asan-<abi>-android.so) to be
 # packaged with the APK - it is not, so enabling this in a normal build makes

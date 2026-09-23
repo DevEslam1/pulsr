@@ -1,6 +1,15 @@
 // android/app/src/main/cpp/MultibandCompressor.cpp
 #include "MultibandCompressor.h"
 
+#if defined(__ARM_NEON) || defined(__ARM_NEON__)
+#include <arm_neon.h>
+#define PULSR_HAS_NEON 1
+#elif defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+#include <emmintrin.h>
+#include <xmmintrin.h>
+#define PULSR_HAS_SSE 1
+#endif
+
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -164,7 +173,47 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
         }
 
         // 3. Recombine all 4 bands into output buffer
-        for (int i = 0; i < chunkFrames; ++i) {
+        int i = 0;
+        if (channels == 2) {
+#if defined(PULSR_HAS_NEON)
+            for (; i + 4 <= chunkFrames; i += 4) {
+                float32x4_t v0L = vld1q_f32(&bandBufferL_[0][i]);
+                float32x4_t v1L = vld1q_f32(&bandBufferL_[1][i]);
+                float32x4_t v2L = vld1q_f32(&bandBufferL_[2][i]);
+                float32x4_t v3L = vld1q_f32(&bandBufferL_[3][i]);
+                float32x4_t sumL = vaddq_f32(vaddq_f32(v0L, v1L), vaddq_f32(v2L, v3L));
+
+                float32x4_t v0R = vld1q_f32(&bandBufferR_[0][i]);
+                float32x4_t v1R = vld1q_f32(&bandBufferR_[1][i]);
+                float32x4_t v2R = vld1q_f32(&bandBufferR_[2][i]);
+                float32x4_t v3R = vld1q_f32(&bandBufferR_[3][i]);
+                float32x4_t sumR = vaddq_f32(vaddq_f32(v0R, v1R), vaddq_f32(v2R, v3R));
+
+                float32x4x2_t vOut = { sumL, sumR };
+                vst2q_f32(buffer + (offset + i) * 2, vOut);
+            }
+#elif defined(PULSR_HAS_SSE)
+            for (; i + 4 <= chunkFrames; i += 4) {
+                __m128 v0L = _mm_loadu_ps(&bandBufferL_[0][i]);
+                __m128 v1L = _mm_loadu_ps(&bandBufferL_[1][i]);
+                __m128 v2L = _mm_loadu_ps(&bandBufferL_[2][i]);
+                __m128 v3L = _mm_loadu_ps(&bandBufferL_[3][i]);
+                __m128 sumL = _mm_add_ps(_mm_add_ps(v0L, v1L), _mm_add_ps(v2L, v3L));
+
+                __m128 v0R = _mm_loadu_ps(&bandBufferR_[0][i]);
+                __m128 v1R = _mm_loadu_ps(&bandBufferR_[1][i]);
+                __m128 v2R = _mm_loadu_ps(&bandBufferR_[2][i]);
+                __m128 v3R = _mm_loadu_ps(&bandBufferR_[3][i]);
+                __m128 sumR = _mm_add_ps(_mm_add_ps(v0R, v1R), _mm_add_ps(v2R, v3R));
+
+                __m128 lo = _mm_unpacklo_ps(sumL, sumR);
+                __m128 hi = _mm_unpackhi_ps(sumL, sumR);
+                _mm_storeu_ps(buffer + (offset + i) * 2, lo);
+                _mm_storeu_ps(buffer + (offset + i) * 2 + 4, hi);
+            }
+#endif
+        }
+        for (; i < chunkFrames; ++i) {
             const int outIdx = (offset + i) * channels;
             buffer[outIdx] = bandBufferL_[0][i] + bandBufferL_[1][i] + bandBufferL_[2][i] + bandBufferL_[3][i];
             buffer[outIdx + 1] = bandBufferR_[0][i] + bandBufferR_[1][i] + bandBufferR_[2][i] + bandBufferR_[3][i];

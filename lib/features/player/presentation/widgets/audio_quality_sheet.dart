@@ -50,10 +50,9 @@ class AudioQualitySheet extends StatelessWidget {
     final p = context.palette;
     final settingsCubit = context.read<SettingsCubit?>();
     final settingsState = settingsCubit?.state;
-    final streamingQuality = context.select<SettingsCubit, YtmAudioQuality?>(
-        (c) => c.state.streamingQuality);
-    final outputDevice = context.select<SettingsCubit, AudioOutputInfo?>(
-        (c) => c.state.currentOutputDevice);
+    final (streamingQuality, outputDevice) =
+        context.select<SettingsCubit, (YtmAudioQuality?, AudioOutputInfo?)>(
+            (c) => (c.state.streamingQuality, c.state.currentOutputDevice));
     final info = AudioQualityInfo.fromSong(
       song,
       streamingQuality: streamingQuality,

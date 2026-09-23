@@ -87,66 +87,84 @@ class HomeCubit extends PulsrCubit<HomeState> {
     ));
   }
 
+  static const int _maxCachedCategories = 20;
+
   /// Returns the cached future for [category], refetching once its TTL lapses.
   Future<List<YtmTrack>> categoryFuture(String category) {
-    if (_inFlightCategories.contains(category)) {
-      return _categoryFutures[category] ?? Future.value(<YtmTrack>[]);
-    }
-    final nowMs = _monotonicClock.elapsedMilliseconds;
-    final lastFetchMs = _categoryFetchTimestamps[category];
-    // FIX-H6 / FIX-G3: If TTL expired but fetch is still in flight, do not evict to avoid race conditions
-    if (lastFetchMs != null &&
-        (nowMs - lastFetchMs > categoryTtl.inMilliseconds) &&
-        !_inFlightCategories.contains(category)) {
+    final existingFuture = _categoryFutures[category];
+    if (existingFuture != null) {
+      if (_inFlightCategories.contains(category)) {
+        return existingFuture;
+      }
+      final nowMs = _monotonicClock.elapsedMilliseconds;
+      final lastFetchMs = _categoryFetchTimestamps[category];
+      if (lastFetchMs != null &&
+          (nowMs - lastFetchMs <= categoryTtl.inMilliseconds)) {
+        return existingFuture;
+      }
+      // TTL expired and not in-flight: evict stale entry
       _categoryFutures.remove(category);
       _categoryFetchTimestamps.remove(category);
     }
 
-    return _categoryFutures.putIfAbsent(
-      category,
-      () async {
-        _inFlightCategories.add(category);
-        _categoryFetchTimestamps[category] = _monotonicClock.elapsedMilliseconds;
-        try {
-          if (category == 'Recommended For You') {
-            if (_account.isLoggedIn) {
-              try {
-                final recs =
-                    await _account.fetchHomeRecommendations(maxTracks: 50);
-                if (recs.isNotEmpty) return recs;
-              } catch (_) {}
-            }
+    // Prune oldest non-in-flight entries if exceeding capacity
+    if (_categoryFutures.length >= _maxCachedCategories) {
+      final evictable = _categoryFetchTimestamps.entries
+          .where((e) => !_inFlightCategories.contains(e.key))
+          .toList()
+        ..sort((a, b) => a.value.compareTo(b.value));
+      for (final e in evictable.take(_categoryFutures.length - _maxCachedCategories + 1)) {
+        _categoryFutures.remove(e.key);
+        _categoryFetchTimestamps.remove(e.key);
+      }
+    }
+
+    _inFlightCategories.add(category);
+    _categoryFetchTimestamps[category] = _monotonicClock.elapsedMilliseconds;
+
+    final future = () async {
+      try {
+        if (category == 'Recommended For You') {
+          if (_account.isLoggedIn) {
             try {
-              final trending = await _ytm.trending(limit: 25);
-              if (trending.isNotEmpty) return trending;
+              final recs =
+                  await _account.fetchHomeRecommendations(maxTracks: 50);
+              if (recs.isNotEmpty) return recs;
             } catch (_) {}
-            return await _ytm.searchWithFallback(
-                categoryQueries['Recommended For You'] ?? 'top hits music',
-                limit: 25);
           }
-          if (category == 'Trending Egypt') {
-            try {
-              final trending = await _ytm.trending(limit: 25);
-              if (trending.isNotEmpty) return trending;
-            } catch (_) {}
-            return await _ytm.searchWithFallback(
-                categoryQueries['Trending Egypt'] ?? 'أغاني مصرية جديدة تريند',
-                limit: 25);
-          }
-          final query = categoryQueries[category] ?? '$category songs';
-          return await _ytm.searchWithFallback(query, limit: 25);
-        } catch (e, st) {
-          _categoryFutures.remove(category);
-          _categoryFetchTimestamps.remove(category);
-          // FIX-H05: Return empty list and log error instead of unhandled rethrow in widget FutureBuilder
-          ErrorLogger.log('Failed to fetch home category $category',
-              error: e, stackTrace: st, category: 'HomeCubit');
-          return <YtmTrack>[];
-        } finally {
-          _inFlightCategories.remove(category);
+          try {
+            final trending = await _ytm.trending(limit: 25);
+            if (trending.isNotEmpty) return trending;
+          } catch (_) {}
+          return await _ytm.searchWithFallback(
+              categoryQueries['Recommended For You'] ?? 'top hits music',
+              limit: 25);
         }
-      },
-    );
+        if (category == 'Trending Egypt') {
+          try {
+            final trending = await _ytm.trending(limit: 25);
+            if (trending.isNotEmpty) return trending;
+          } catch (_) {}
+          return await _ytm.searchWithFallback(
+              categoryQueries['Trending Egypt'] ?? 'أغاني مصرية جديدة تريند',
+              limit: 25);
+        }
+        final query = categoryQueries[category] ?? '$category songs';
+        return await _ytm.searchWithFallback(query, limit: 25);
+      } catch (e, st) {
+        _categoryFutures.remove(category);
+        _categoryFetchTimestamps.remove(category);
+        // FIX-H05: Return empty list and log error instead of unhandled rethrow in widget FutureBuilder
+        ErrorLogger.log('Failed to fetch home category $category',
+            error: e, stackTrace: st, category: 'HomeCubit');
+        return <YtmTrack>[];
+      } finally {
+        _inFlightCategories.remove(category);
+      }
+    }();
+
+    _categoryFutures[category] = future;
+    return future;
   }
 
   void retryCategory(String category) {

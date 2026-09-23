@@ -242,7 +242,8 @@ tasks.register("testNative") {
             "ViperDdc.cpp",
             "ArbitraryResponseEq.cpp",
             "LiveProg.cpp",
-            "AudioDspEngine.cpp"
+            "AudioDspEngine.cpp",
+            "UsbAudioSink.cpp"
         ).map { file("${mainDir.absolutePath}/$it").absolutePath }
 
         // 1. Build & Run (a): Parity Build with exact production flags (-O3 -std=c++20)
@@ -252,6 +253,7 @@ tasks.register("testNative") {
             addAll(targetFlags)
             add("-std=c++20")
             add("-O3")
+            add("-fno-strict-aliasing")
             add("-I")
             add(mainDir.absolutePath)
             add(file("${testDir.absolutePath}/test_native_all.cpp").absolutePath)
@@ -261,16 +263,22 @@ tasks.register("testNative") {
             add(exeParity.absolutePath)
         }
 
-        val parityCompileRes = ProcessBuilder(parityCompileCmd).inheritIO().start().waitFor()
-        if (parityCompileRes != 0) {
-            throw GradleException("Native DSP parity test compilation failed with exit code $parityCompileRes")
+        fun executeCmd(cmd: List<String>, desc: String) {
+            val pb = ProcessBuilder(cmd).redirectErrorStream(true)
+            val proc = pb.start()
+            proc.inputStream.bufferedReader().useLines { lines ->
+                lines.forEach { println("[$desc] $it") }
+            }
+            val res = proc.waitFor()
+            if (res != 0) {
+                throw GradleException("$desc failed with exit code $res")
+            }
         }
 
+        executeCmd(parityCompileCmd, "testNative-compile-parity")
+
         println("[testNative] Running parity test suite...")
-        val parityRunRes = ProcessBuilder(exeParity.absolutePath).inheritIO().start().waitFor()
-        if (parityRunRes != 0) {
-            throw GradleException("Native DSP parity test execution failed with exit code $parityRunRes")
-        }
+        executeCmd(listOf(exeParity.absolutePath), "testNative-run-parity")
 
         // 2. Build & Run (b): Sanitizer / Debug build
         println("[testNative] Compiling debug/sanitizer build...")
@@ -285,6 +293,7 @@ tasks.register("testNative") {
             add(compiler)
             addAll(targetFlags)
             addAll(sanitizerArgs)
+            add("-fno-strict-aliasing")
             add("-I")
             add(mainDir.absolutePath)
             add(file("${testDir.absolutePath}/test_native_all.cpp").absolutePath)
@@ -295,16 +304,10 @@ tasks.register("testNative") {
             add(exeDebug.absolutePath)
         }
 
-        val debugCompileRes = ProcessBuilder(debugCompileCmd).inheritIO().start().waitFor()
-        if (debugCompileRes != 0) {
-            throw GradleException("Native DSP sanitizer/debug test compilation failed with exit code $debugCompileRes")
-        }
+        executeCmd(debugCompileCmd, "testNative-compile-debug")
 
         println("[testNative] Running debug/sanitizer test suite...")
-        val debugRunRes = ProcessBuilder(exeDebug.absolutePath).inheritIO().start().waitFor()
-        if (debugRunRes != 0) {
-            throw GradleException("Native DSP sanitizer/debug test execution failed with exit code $debugRunRes")
-        }
+        executeCmd(listOf(exeDebug.absolutePath), "testNative-run-debug")
 
         println("[testNative] PASSED: Both parity (-O3) and debug/sanitizer test suites passed 100%.")
     }

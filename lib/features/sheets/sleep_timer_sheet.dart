@@ -305,41 +305,54 @@ class SleepTimerSheet extends StatelessWidget {
   Future<int?> _showCustomMinutesDialog(BuildContext context) async {
     final controller = TextEditingController();
     final p = context.palette;
+    String? errorText;
     return showDialog<int>(
       context: context,
       useRootNavigator: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: p.surfaceContainer,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.r18)),
-        title: Text(
-          context.l10n.customTime,
-          style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700),
-        ),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Duration (minutes)',
-            hintText: 'e.g. 25',
-            suffixText: 'min',
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          backgroundColor: p.surfaceContainer,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.r18)),
+          title: Text(
+            context.l10n.customTime,
+            style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(context.l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () {
-              final val = int.tryParse(controller.text.trim());
-              if (val != null && val > 0 && val <= 720) {
-                Navigator.pop(ctx, val);
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            autofocus: true,
+            onChanged: (_) {
+              if (errorText != null) {
+                setState(() => errorText = null);
               }
             },
-            child: Text(context.l10n.ok),
+            decoration: InputDecoration(
+              labelText: 'Duration (minutes)',
+              hintText: 'e.g. 25',
+              suffixText: 'min',
+              errorText: errorText,
+            ),
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(context.l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () {
+                final val = int.tryParse(controller.text.trim());
+                if (val != null && val > 0 && val <= 720) {
+                  Navigator.pop(ctx, val);
+                } else {
+                  setState(() {
+                    errorText = 'Enter 1 to 720 minutes';
+                  });
+                }
+              },
+              child: Text(context.l10n.ok),
+            ),
+          ],
+        ),
       ),
     );
   }

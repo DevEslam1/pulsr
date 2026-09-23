@@ -154,6 +154,19 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
       return false;
     }
 
+    if (state.criteria.rules.isEmpty) {
+      safeEmit(state.copyWith(errorMessage: 'Please add at least one rule'));
+      return false;
+    }
+
+    for (int i = 0; i < state.criteria.rules.length; i++) {
+      final rule = state.criteria.rules[i];
+      if (rule.value.trim().isEmpty) {
+        safeEmit(state.copyWith(errorMessage: 'Please enter a value for rule #${i + 1}'));
+        return false;
+      }
+    }
+
     safeEmit(state.copyWith(isSubmitting: true, errorMessage: null));
 
     try {

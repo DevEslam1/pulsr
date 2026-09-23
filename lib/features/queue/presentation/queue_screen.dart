@@ -209,14 +209,28 @@ class QueueScreen extends StatelessWidget {
                 // ignore: deprecated_member_use — onReorderItem is 3.41+; keep onReorder for stable channel compat
                 onReorder: (oldIdx, newIdx) {
                   if (newIdx > oldIdx) newIdx -= 1;
+                  if (oldIdx == newIdx) return;
                   context.read<PlayerCubit>().reorderQueue(oldIdx, newIdx);
+                  ScaffoldMessenger.of(context).clearSnackBars();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(context.l10n.queue),
+                      duration: const Duration(seconds: 4),
+                      action: SnackBarAction(
+                        label: context.l10n.undo,
+                        onPressed: () {
+                          context.read<PlayerCubit>().reorderQueue(newIdx, oldIdx);
+                        },
+                      ),
+                    ),
+                  );
                 },
                 itemBuilder: (context, index) {
                   final song = queue[index];
                   final isCurrent = song.id == currentSong?.id;
 
                   return Container(
-                    key: ValueKey('${song.id}-$index'),
+                    key: ValueKey('queue_${song.id}_${song.remoteId ?? song.path}_$index'),
                     margin: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
                     decoration: BoxDecoration(
                       borderRadius: AppRadii.cardRadius,

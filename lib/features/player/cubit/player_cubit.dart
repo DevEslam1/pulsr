@@ -310,12 +310,20 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     }
   }
 
+  final Map<String, int> _remoteIdToNegativeId = {};
+  int _nextAssignedNegativeId = -2;
+
   int _resolveMediaItemId(String id) {
     final parsed = int.tryParse(id);
     if (parsed != null) return parsed;
-    // Map non-numeric IDs into negative integer space to prevent collisions with positive DB auto-increment IDs
-    final h = id.hashCode.abs();
-    return h == 0 ? -1 : -h;
+    // Map non-numeric IDs into collision-free negative integer space (never colliding on 0 or positive DB IDs)
+    return _remoteIdToNegativeId.putIfAbsent(id, () {
+      final h = -(id.hashCode.abs() % 1000000000 + 2);
+      if (!_remoteIdToNegativeId.containsValue(h)) {
+        return h;
+      }
+      return _nextAssignedNegativeId--;
+    });
   }
 
   void _listenToAudioService() {
@@ -607,6 +615,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       ErrorLogger.log('PlayerCubit close queueController failed',
           error: e, stackTrace: st, category: 'PlayerCubit');
     }
+    _remoteIdToNegativeId.clear();
     await super.close();
   }
 }

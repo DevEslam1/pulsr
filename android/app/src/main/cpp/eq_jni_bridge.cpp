@@ -23,6 +23,7 @@ JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeResyncForTrack(
         JNIEnv* /* env */, jobject /* thiz */, jdouble sampleRate, jint channels) {
     AudioDspEngine::instance().resyncForTrack(sampleRate, channels);
+    DspEngineRegistry::instance().drainRetireQueues();
 }
 
 JNIEXPORT jlong JNICALL
@@ -502,9 +503,34 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeGetRollingRtf(
     return DspEngineRegistry::instance().getRollingRtf();
 }
 
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetPerformanceProfile(
+        JNIEnv* /* env */, jobject /* thiz */, jint profile) {
+    const auto prof = (profile == 0) ? DspPerformanceProfile::Audiophile
+                    : (profile == 2) ? DspPerformanceProfile::PowerSaver
+                    : DspPerformanceProfile::Performance;
+    DspEngineRegistry::instance().setPerformanceProfile(prof);
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetThermalLevel(
+        JNIEnv* /* env */, jobject /* thiz */, jint level) {
+    DspEngineRegistry::instance().setThermalLevel(static_cast<int>(level));
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReverbThreadingMode(
+        JNIEnv* /* env */, jobject /* thiz */, jint mode) {
+    const auto m = (mode == 0) ? ReverbThreadingMode::SingleThread
+                 : (mode == 1) ? ReverbThreadingMode::MultiThread
+                 : ReverbThreadingMode::Auto;
+    DspEngineRegistry::instance().setReverbThreadingMode(m);
+}
+
 JNIEXPORT jdoubleArray JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeGetTelemetry(
         JNIEnv* env, jobject /* thiz */) {
+    DspEngineRegistry::instance().drainRetireQueues();
     double telemetry[17] = {};
     DspEngineRegistry::instance().getTelemetry(telemetry, 17);
     jdoubleArray result = env->NewDoubleArray(17);
@@ -1061,6 +1087,16 @@ Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamStart(
         jint interfaceNumber, jint altSetting, jint sampleRate, jint channels) {
     auto res = pulsr::UsbAudioSink::instance().Open(
                fd, endpoint, interfaceNumber, altSetting, sampleRate, channels, 2);
+    return static_cast<jint>(res);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamStartWithFormat(
+        JNIEnv* /* env */, jobject /* thiz */, jint fd, jint endpoint,
+        jint interfaceNumber, jint altSetting, jint sampleRate, jint channels, jint bytesPerSample) {
+    const int bps = (bytesPerSample == 3 || bytesPerSample == 4) ? static_cast<int>(bytesPerSample) : 2;
+    auto res = pulsr::UsbAudioSink::instance().Open(
+               fd, endpoint, interfaceNumber, altSetting, sampleRate, channels, bps);
     return static_cast<jint>(res);
 }
 

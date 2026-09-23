@@ -99,6 +99,12 @@ class SettingsCubit extends PulsrCubit<SettingsState>
   @override
   final FlutterSecureStorage _secureStorage;
   ThemeScheduleController? _themeScheduleController;
+  SharedPreferences? _cachedPrefs;
+
+  /// Cached SharedPreferences instance to avoid repeated disk lookup
+  Future<SharedPreferences> getPrefs() async =>
+      _cachedPrefs ??= await SharedPreferences.getInstance();
+
   @override
   String _proxyPassword = '';
   // FIX-C6: Flag to track if proxy password was loaded, preventing overwrites
@@ -746,8 +752,9 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       // FIX-H07: Edits made while this load was in flight must win over the
       // on-disk snapshot, otherwise the user's changes silently revert.
       final previous = state;
+      final reconciledDirty = Set<String>.from(_dirtyFields);
       var loadedState = runningState;
-      if (_dirtyFields.contains('proxy')) {
+      if (reconciledDirty.contains('proxy')) {
         loadedState = loadedState.copyWith(
           proxyEnabled: previous.proxyEnabled,
           proxyType: previous.proxyType,
@@ -759,46 +766,46 @@ class SettingsCubit extends PulsrCubit<SettingsState>
           proxyList: previous.proxyList,
         );
       }
-      if (_dirtyFields.contains('themeMode')) loadedState = loadedState.copyWith(themeMode: previous.themeMode);
-      if (_dirtyFields.contains('customAccentColorValue')) loadedState = loadedState.copyWith(customAccentColorValue: previous.customAccentColorValue);
-      if (_dirtyFields.contains('themeColorSource')) loadedState = loadedState.copyWith(themeColorSource: previous.themeColorSource);
-      if (_dirtyFields.contains('gaplessPlayback')) loadedState = loadedState.copyWith(gaplessPlayback: previous.gaplessPlayback);
-      if (_dirtyFields.contains('crossfadeSeconds')) loadedState = loadedState.copyWith(crossfadeSeconds: previous.crossfadeSeconds);
-      if (_dirtyFields.contains('minDurationSec')) loadedState = loadedState.copyWith(minDurationSec: previous.minDurationSec);
-      if (_dirtyFields.contains('autoHideSystemMedia')) loadedState = loadedState.copyWith(autoHideSystemMedia: previous.autoHideSystemMedia);
-      if (_dirtyFields.contains('resumeAfterInterruption')) loadedState = loadedState.copyWith(resumeAfterInterruption: previous.resumeAfterInterruption);
-      if (_dirtyFields.contains('waveformSeekBarEnabled')) loadedState = loadedState.copyWith(waveformSeekBarEnabled: previous.waveformSeekBarEnabled);
-      if (_dirtyFields.contains('autoThemeByTime')) loadedState = loadedState.copyWith(autoThemeByTime: previous.autoThemeByTime);
-      if (_dirtyFields.contains('highContrast')) loadedState = loadedState.copyWith(highContrast: previous.highContrast);
-      if (_dirtyFields.contains('dimWhitePoint')) loadedState = loadedState.copyWith(dimWhitePoint: previous.dimWhitePoint);
-      if (_dirtyFields.contains('reduceMotion')) loadedState = loadedState.copyWith(reduceMotion: previous.reduceMotion);
-      if (_dirtyFields.contains('liquidGlassTint')) loadedState = loadedState.copyWith(liquidGlassTint: previous.liquidGlassTint);
-      if (_dirtyFields.contains('languageCode')) loadedState = loadedState.copyWith(languageCode: previous.languageCode);
-      if (_dirtyFields.contains('customThemeRadius')) loadedState = loadedState.copyWith(customThemeRadius: previous.customThemeRadius);
-      if (_dirtyFields.contains('customThemeGlow')) loadedState = loadedState.copyWith(customThemeGlow: previous.customThemeGlow);
-      if (_dirtyFields.contains('playerThemeMode')) loadedState = loadedState.copyWith(playerThemeMode: previous.playerThemeMode);
-      if (_dirtyFields.contains('visualizerStyle')) loadedState = loadedState.copyWith(visualizerStyle: previous.visualizerStyle);
-      if (_dirtyFields.contains('miniPlayerSwipeLeft')) loadedState = loadedState.copyWith(miniPlayerSwipeLeft: previous.miniPlayerSwipeLeft);
-      if (_dirtyFields.contains('miniPlayerSwipeRight')) loadedState = loadedState.copyWith(miniPlayerSwipeRight: previous.miniPlayerSwipeRight);
-      if (_dirtyFields.contains('nowPlayingDoubleTap')) loadedState = loadedState.copyWith(nowPlayingDoubleTap: previous.nowPlayingDoubleTap);
-      if (_dirtyFields.contains('nowPlayingArtworkSwipe')) loadedState = loadedState.copyWith(nowPlayingArtworkSwipe: previous.nowPlayingArtworkSwipe);
-      if (_dirtyFields.contains('streamingQuality')) loadedState = loadedState.copyWith(streamingQuality: previous.streamingQuality);
-      if (_dirtyFields.contains('downloadQuality')) loadedState = loadedState.copyWith(downloadQuality: previous.downloadQuality);
-      if (_dirtyFields.contains('wifiOnlyMode')) loadedState = loadedState.copyWith(wifiOnlyMode: previous.wifiOnlyMode);
-      if (_dirtyFields.contains('offlineOnlyMode')) loadedState = loadedState.copyWith(offlineOnlyMode: previous.offlineOnlyMode);
-      if (_dirtyFields.contains('experienceMode')) loadedState = loadedState.copyWith(experienceMode: previous.experienceMode);
-      if (_dirtyFields.contains('strictBitPerfect')) loadedState = loadedState.copyWith(strictBitPerfect: previous.strictBitPerfect);
-      if (_dirtyFields.contains('bitPerfectOutput')) loadedState = loadedState.copyWith(bitPerfectOutput: previous.bitPerfectOutput);
-      if (_dirtyFields.contains('bypassDspOnBitPerfect')) loadedState = loadedState.copyWith(bypassDspOnBitPerfect: previous.bypassDspOnBitPerfect);
-      if (_dirtyFields.contains('followTrackSampleRate')) loadedState = loadedState.copyWith(followTrackSampleRate: previous.followTrackSampleRate);
-      if (_dirtyFields.contains('dsdOutputMode')) loadedState = loadedState.copyWith(dsdOutputMode: previous.dsdOutputMode);
-      if (_dirtyFields.contains('multiOutputMode')) loadedState = loadedState.copyWith(multiOutputMode: previous.multiOutputMode);
+      if (reconciledDirty.contains('themeMode')) loadedState = loadedState.copyWith(themeMode: previous.themeMode);
+      if (reconciledDirty.contains('customAccentColorValue')) loadedState = loadedState.copyWith(customAccentColorValue: previous.customAccentColorValue);
+      if (reconciledDirty.contains('themeColorSource')) loadedState = loadedState.copyWith(themeColorSource: previous.themeColorSource);
+      if (reconciledDirty.contains('gaplessPlayback')) loadedState = loadedState.copyWith(gaplessPlayback: previous.gaplessPlayback);
+      if (reconciledDirty.contains('crossfadeSeconds')) loadedState = loadedState.copyWith(crossfadeSeconds: previous.crossfadeSeconds);
+      if (reconciledDirty.contains('minDurationSec')) loadedState = loadedState.copyWith(minDurationSec: previous.minDurationSec);
+      if (reconciledDirty.contains('autoHideSystemMedia')) loadedState = loadedState.copyWith(autoHideSystemMedia: previous.autoHideSystemMedia);
+      if (reconciledDirty.contains('resumeAfterInterruption')) loadedState = loadedState.copyWith(resumeAfterInterruption: previous.resumeAfterInterruption);
+      if (reconciledDirty.contains('waveformSeekBarEnabled')) loadedState = loadedState.copyWith(waveformSeekBarEnabled: previous.waveformSeekBarEnabled);
+      if (reconciledDirty.contains('autoThemeByTime')) loadedState = loadedState.copyWith(autoThemeByTime: previous.autoThemeByTime);
+      if (reconciledDirty.contains('highContrast')) loadedState = loadedState.copyWith(highContrast: previous.highContrast);
+      if (reconciledDirty.contains('dimWhitePoint')) loadedState = loadedState.copyWith(dimWhitePoint: previous.dimWhitePoint);
+      if (reconciledDirty.contains('reduceMotion')) loadedState = loadedState.copyWith(reduceMotion: previous.reduceMotion);
+      if (reconciledDirty.contains('liquidGlassTint')) loadedState = loadedState.copyWith(liquidGlassTint: previous.liquidGlassTint);
+      if (reconciledDirty.contains('languageCode')) loadedState = loadedState.copyWith(languageCode: previous.languageCode);
+      if (reconciledDirty.contains('customThemeRadius')) loadedState = loadedState.copyWith(customThemeRadius: previous.customThemeRadius);
+      if (reconciledDirty.contains('customThemeGlow')) loadedState = loadedState.copyWith(customThemeGlow: previous.customThemeGlow);
+      if (reconciledDirty.contains('playerThemeMode')) loadedState = loadedState.copyWith(playerThemeMode: previous.playerThemeMode);
+      if (reconciledDirty.contains('visualizerStyle')) loadedState = loadedState.copyWith(visualizerStyle: previous.visualizerStyle);
+      if (reconciledDirty.contains('miniPlayerSwipeLeft')) loadedState = loadedState.copyWith(miniPlayerSwipeLeft: previous.miniPlayerSwipeLeft);
+      if (reconciledDirty.contains('miniPlayerSwipeRight')) loadedState = loadedState.copyWith(miniPlayerSwipeRight: previous.miniPlayerSwipeRight);
+      if (reconciledDirty.contains('nowPlayingDoubleTap')) loadedState = loadedState.copyWith(nowPlayingDoubleTap: previous.nowPlayingDoubleTap);
+      if (reconciledDirty.contains('nowPlayingArtworkSwipe')) loadedState = loadedState.copyWith(nowPlayingArtworkSwipe: previous.nowPlayingArtworkSwipe);
+      if (reconciledDirty.contains('streamingQuality')) loadedState = loadedState.copyWith(streamingQuality: previous.streamingQuality);
+      if (reconciledDirty.contains('downloadQuality')) loadedState = loadedState.copyWith(downloadQuality: previous.downloadQuality);
+      if (reconciledDirty.contains('wifiOnlyMode')) loadedState = loadedState.copyWith(wifiOnlyMode: previous.wifiOnlyMode);
+      if (reconciledDirty.contains('offlineOnlyMode')) loadedState = loadedState.copyWith(offlineOnlyMode: previous.offlineOnlyMode);
+      if (reconciledDirty.contains('experienceMode')) loadedState = loadedState.copyWith(experienceMode: previous.experienceMode);
+      if (reconciledDirty.contains('strictBitPerfect')) loadedState = loadedState.copyWith(strictBitPerfect: previous.strictBitPerfect);
+      if (reconciledDirty.contains('bitPerfectOutput')) loadedState = loadedState.copyWith(bitPerfectOutput: previous.bitPerfectOutput);
+      if (reconciledDirty.contains('bypassDspOnBitPerfect')) loadedState = loadedState.copyWith(bypassDspOnBitPerfect: previous.bypassDspOnBitPerfect);
+      if (reconciledDirty.contains('followTrackSampleRate')) loadedState = loadedState.copyWith(followTrackSampleRate: previous.followTrackSampleRate);
+      if (reconciledDirty.contains('dsdOutputMode')) loadedState = loadedState.copyWith(dsdOutputMode: previous.dsdOutputMode);
+      if (reconciledDirty.contains('multiOutputMode')) loadedState = loadedState.copyWith(multiOutputMode: previous.multiOutputMode);
 
       // Emit before the platform round-trips below: main.dart drives themeMode,
       // accent and locale from this state, so deferring it renders the default
       // theme and locale for as long as the native calls take.
       safeEmit(loadedState);
-      _dirtyFields.clear();
+      _dirtyFields.removeAll(reconciledDirty);
 
       if (getIt.isRegistered<EqualizerManager>()) {
         await getIt<EqualizerManager>().setDspPreference(loadedState.dspPreference);
@@ -861,6 +868,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
   @override
   Future<void> setGapless(bool value) async {
     markDirty('gaplessPlayback');
+    final previousState = state;
     // Prevent gapless + crossfade together — auto-disable crossfade and inform user
     if (value && state.crossfadeSeconds > 0.01) {
       markDirty('crossfadeSeconds');
@@ -874,14 +882,28 @@ class SettingsCubit extends PulsrCubit<SettingsState>
               'Crossfade disabled: gapless requires 0 s.',
         ),
       );
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_keyGapless, true);
-      await prefs.setDouble(_keyCrossfade, 0.0);
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(_keyGapless, true);
+        await prefs.setDouble(_keyCrossfade, 0.0);
+      } catch (e, st) {
+        ErrorLogger.log('Failed to persist gapless/crossfade settings',
+            error: e, stackTrace: st, category: 'SettingsCubit');
+        safeEmit(previousState.copyWith(
+            errorMessage: 'Failed to persist settings: $e'));
+      }
       return;
     }
     safeEmit(state.copyWith(gaplessPlayback: value, errorMessage: null));
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyGapless, value);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keyGapless, value);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist gapless setting',
+          error: e, stackTrace: st, category: 'SettingsCubit');
+      safeEmit(previousState.copyWith(
+          errorMessage: 'Failed to persist settings: $e'));
+    }
   }
 
   @override
