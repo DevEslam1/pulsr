@@ -25,12 +25,6 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeResyncForTrack(
     AudioDspEngine::instance().resyncForTrack(sampleRate, channels);
 }
 
-JNIEXPORT jdouble JNICALL
-Java_com_pulsr_music_AudioEffectsPlugin_nativeGetAppliedSampleRate(
-        JNIEnv* /* env */, jobject /* thiz */) {
-    return AudioDspEngine::instance().getAppliedSampleRate();
-}
-
 JNIEXPORT jlong JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeGetLastAppliedGeneration(
         JNIEnv* /* env */, jobject /* thiz */) {
@@ -253,9 +247,7 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReverbPreset(
     }
     AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
         snap.reverb.preset = preset;
-        if (ir) {
-            snap.reverb.preparedIr = ir;
-        }
+        snap.reverb.preparedIr = ir;
     });
 }
 
@@ -389,6 +381,8 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeDecodeDsd(
         JNIEnv* env, jobject /* thiz */,
         jbyteArray dsdL, jbyteArray dsdR, jint byteCount, jint dsdRate, jint targetPcmSampleRate, jint bitOrder) {
     if (!dsdL || !dsdR || byteCount <= 0) return nullptr;
+    constexpr int kMaxDsdByteCount = 16 * 1024 * 1024; // 16 MB max per chunk
+    if (byteCount > kMaxDsdByteCount) return nullptr;
     if (env->GetArrayLength(dsdL) < byteCount || env->GetArrayLength(dsdR) < byteCount) return nullptr;
     if (dsdRate != static_cast<jint>(DsdDecoder::DsdRate::DSD64) &&
         dsdRate != static_cast<jint>(DsdDecoder::DsdRate::DSD128) &&
@@ -405,21 +399,38 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeDecodeDsd(
         return nullptr;
     }
 
-    try {
-        // bitOrder contract: 0 = LSB first (DSF), 1 = MSB first (DFF), matching
-        // the DsdBitOrder enum (DsdDecoder.h), the DSF/DFF specifications and
-        // the Dart/Kotlin callers (decodeDsd in AudioEffectsPlugin.kt). The
-        // previous mapping was inverted, so DSF (the common format) was decoded
-        // MSB-first -> bit-reversed noise.
-        auto dsdBitOrder = (bitOrder == 0) ? DsdDecoder::DsdBitOrder::LSB_FIRST : DsdDecoder::DsdBitOrder::MSB_FIRST;
+    struct CachedDsdDecoder {
         DsdDecoder decoder;
-        decoder.configure(
-                static_cast<DsdDecoder::DsdRate>(dsdRate), targetPcmSampleRate, dsdBitOrder);
+        jint dsdRate = -1;
+        jint targetRate = -1;
+        jint bitOrder = -1;
+    };
+    static thread_local CachedDsdDecoder sDecoderCache;
 
-        int maxOutFrames = decoder.getExpectedPcmFrames(byteCount);
+    try {
+        // bitOrder contract: 0 = LSB first (DSF), 1 = MSB first (DFF)
+        auto dsdBitOrder = (bitOrder == 0) ? DsdDecoder::DsdBitOrder::LSB_FIRST : DsdDecoder::DsdBitOrder::MSB_FIRST;
+        if (sDecoderCache.dsdRate != dsdRate ||
+            sDecoderCache.targetRate != targetPcmSampleRate ||
+            sDecoderCache.bitOrder != bitOrder) {
+            sDecoderCache.decoder.configure(
+                static_cast<DsdDecoder::DsdRate>(dsdRate), targetPcmSampleRate, dsdBitOrder);
+            sDecoderCache.dsdRate = dsdRate;
+            sDecoderCache.targetRate = targetPcmSampleRate;
+            sDecoderCache.bitOrder = bitOrder;
+        }
+
+        int maxOutFrames = sDecoderCache.decoder.getExpectedPcmFrames(byteCount);
+        constexpr int kMaxPcmFrames = 4 * 1024 * 1024;
+        if (maxOutFrames <= 0 || maxOutFrames > kMaxPcmFrames) {
+            env->ReleaseByteArrayElements(dsdL, lData, JNI_ABORT);
+            env->ReleaseByteArrayElements(dsdR, rData, JNI_ABORT);
+            return nullptr;
+        }
+
         std::vector<float> pcmOut(maxOutFrames * 2);
 
-        int actualFrames = decoder.decodeDsdBytes(
+        int actualFrames = sDecoderCache.decoder.decodeDsdBytes(
                 reinterpret_cast<const uint8_t*>(lData),
                 reinterpret_cast<const uint8_t*>(rData),
                 byteCount,
@@ -464,7 +475,90 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeReset(
 JNIEXPORT jint JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeGetAutoDegradedStages(
         JNIEnv* /* env */, jobject /* thiz */) {
-    return static_cast<jint>(AudioDspEngine::instance().getAutoDegradedStages());
+    return static_cast<jint>(DspEngineRegistry::instance().getAutoDegradedStages());
+}
+
+JNIEXPORT jdouble JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeGetLimiterGrDb(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return static_cast<jdouble>(DspEngineRegistry::instance().getLimiterGrDb());
+}
+
+JNIEXPORT jdouble JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeGetDynEqGrDb(
+        JNIEnv* /* env */, jobject /* thiz */, jint band) {
+    return static_cast<jdouble>(DspEngineRegistry::instance().getDynEqGrDb(static_cast<int>(band)));
+}
+
+JNIEXPORT jdouble JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeGetMultibandGrDb(
+        JNIEnv* /* env */, jobject /* thiz */, jint band) {
+    return static_cast<jdouble>(DspEngineRegistry::instance().getMultibandGrDb(static_cast<int>(band)));
+}
+
+JNIEXPORT jdouble JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeGetRollingRtf(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return DspEngineRegistry::instance().getRollingRtf();
+}
+
+JNIEXPORT jdoubleArray JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeGetTelemetry(
+        JNIEnv* env, jobject /* thiz */) {
+    double telemetry[17] = {};
+    DspEngineRegistry::instance().getTelemetry(telemetry, 17);
+    jdoubleArray result = env->NewDoubleArray(17);
+    if (result) {
+        env->SetDoubleArrayRegion(result, 0, 17, telemetry);
+    }
+    return result;
+}
+
+// ---- Feature 4: Headphone Safety & Sound Dose Tracking (EN 62368-1 / WHO-ITU H.870) ----
+
+JNIEXPORT jdouble JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeGetWeeklyDose(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return DspEngineRegistry::instance().getWeeklyDose();
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeResetWeeklyDose(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    DspEngineRegistry::instance().resetWeeklyDose();
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeIsSafetyAttenuationActive(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return DspEngineRegistry::instance().isSafetyAttenuationActive() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetHeadphoneSafetyParams(
+        JNIEnv* /* env */, jobject /* thiz */, jboolean enabled, jdouble threshold, jdouble ceilingDb) {
+    const double safeThreshold = (std::isfinite(threshold) && threshold > 0.0)
+        ? std::clamp(static_cast<double>(threshold), 0.01, 10.0)
+        : 1.0;
+    const double safeCeilingDb = std::isfinite(ceilingDb)
+        ? std::clamp(static_cast<double>(ceilingDb), -24.0, 0.0)
+        : -6.0;
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        snap.headphoneSafety.enabled = enabled;
+        snap.headphoneSafety.doseThreshold = safeThreshold;
+        snap.headphoneSafety.safetyCeilingDb = safeCeilingDb;
+        if (enabled) {
+            snap.activeStages |= STAGE_HEADPHONE_SAFETY;
+        } else {
+            snap.activeStages &= ~STAGE_HEADPHONE_SAFETY;
+        }
+    });
+}
+
+JNIEXPORT jdouble JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeGetAppliedSampleRate(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return DspEngineRegistry::instance().getAppliedSampleRate();
 }
 
 // ---- Phase 1 DSP expansion: Harmonic Saturation / Exciter ----
@@ -890,6 +984,10 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetLiveProgSlider(
         else if (index == 2) snap.liveProg.slider2 = value;
         else if (index == 3) snap.liveProg.slider3 = value;
         else if (index == 4) snap.liveProg.slider4 = value;
+        else if (index == 5) snap.liveProg.slider5 = value;
+        else if (index == 6) snap.liveProg.slider6 = value;
+        else if (index == 7) snap.liveProg.slider7 = value;
+        else if (index == 8) snap.liveProg.slider8 = value;
     });
 }
 
@@ -957,14 +1055,25 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeResyncForTrack(
 
 // ---- USB UAC2 isochronous exclusive streaming (UsbExclusivePlugin) ----
 
-JNIEXPORT jboolean JNICALL
+JNIEXPORT jint JNICALL
 Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamStart(
         JNIEnv* /* env */, jobject /* thiz */, jint fd, jint endpoint,
         jint interfaceNumber, jint altSetting, jint sampleRate, jint channels) {
-    return pulsr::UsbAudioSink::instance().Open(
-               fd, endpoint, interfaceNumber, altSetting, sampleRate, channels, 2)
-        ? JNI_TRUE
-        : JNI_FALSE;
+    auto res = pulsr::UsbAudioSink::instance().Open(
+               fd, endpoint, interfaceNumber, altSetting, sampleRate, channels, 2);
+    return static_cast<jint>(res);
+}
+
+JNIEXPORT jintArray JNICALL
+Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbQuerySupportedRates(
+        JNIEnv* env, jobject /* thiz */, jint fd, jint interfaceNumber) {
+    std::vector<int> rates = pulsr::UsbAudioSink::QuerySupportedRates(fd, interfaceNumber);
+    jintArray result = env->NewIntArray(static_cast<jsize>(rates.size()));
+    if (result != nullptr && !rates.empty()) {
+        env->SetIntArrayRegion(result, 0, static_cast<jsize>(rates.size()),
+                               reinterpret_cast<const jint*>(rates.data()));
+    }
+    return result;
 }
 
 JNIEXPORT void JNICALL
@@ -977,6 +1086,30 @@ JNIEXPORT jboolean JNICALL
 Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamIsActive(
         JNIEnv* /* env */, jobject /* thiz */) {
     return pulsr::UsbAudioSink::instance().IsActive() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamGetLastError(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return pulsr::UsbAudioSink::instance().GetLastError();
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamGetUnderrunCount(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return static_cast<jlong>(pulsr::UsbAudioSink::instance().GetUnderrunCount());
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamGetOverrunCount(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return static_cast<jlong>(pulsr::UsbAudioSink::instance().GetOverrunCount());
+}
+
+JNIEXPORT jdouble JNICALL
+Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamGetBufferedMs(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return pulsr::UsbAudioSink::instance().GetBufferedMs();
 }
 
 } // extern "C"

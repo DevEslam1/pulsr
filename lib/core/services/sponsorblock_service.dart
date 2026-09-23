@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -30,9 +31,14 @@ class SponsorBlockService {
   static final SponsorBlockService instance = SponsorBlockService();
 
   final http.Client _client;
-  final Map<String, List<SponsorBlockSegment>> _cache = {};
+  final LinkedHashMap<String, List<SponsorBlockSegment>> _cache =
+      LinkedHashMap<String, List<SponsorBlockSegment>>();
 
   SponsorBlockService([http.Client? client]) : _client = client ?? http.Client();
+
+  void dispose() {
+    _client.close();
+  }
 
   /// Categories the service can request and skip. Order is used by the UI.
   static const List<String> supportedCategories = [
@@ -98,14 +104,18 @@ class SponsorBlockService {
     // user has disabled every category.
     if (!_enabled || _enabledCategories.isEmpty) return const [];
 
-    // Bound the in-memory cache so a long session cannot grow it unbounded.
-    if (_cache.length > 256) _cache.clear();
-
     final cleanId = videoId.trim();
     if (cleanId.isEmpty) return const [];
 
     if (_cache.containsKey(cleanId)) {
-      return _cache[cleanId]!;
+      final cached = _cache.remove(cleanId)!;
+      _cache[cleanId] = cached; // LRU refresh
+      return cached;
+    }
+
+    // Bound the in-memory cache using LRU eviction so a long session cannot grow unbounded.
+    while (_cache.length >= 256) {
+      _cache.remove(_cache.keys.first);
     }
 
     try {

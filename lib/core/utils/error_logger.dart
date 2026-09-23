@@ -57,6 +57,7 @@ class ErrorLogger {
       );
     }
     if (error != null) {
+      debugPrint('[Pulsr.Error][$category] $sanitizedMessage: $error');
       onCrashReported?.call(error, stackTrace, category);
       if (Sentry.isEnabled) {
         Sentry.captureException(

@@ -5,6 +5,7 @@ import '../../../../domain/models/audio_output_info.dart';
 import '../../../../domain/models/audio_quality_info.dart';
 import '../../../../domain/models/ytm_audio_quality.dart';
 import '../../../settings/cubit/settings_cubit.dart';
+import '../../../../domain/services/usb_exclusive_service.dart';
 import 'audio_quality_sheet.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -40,6 +41,7 @@ class AudioQualityBadge extends StatelessWidget {
         AudioQualityInfo.fromSong(song, streamingQuality: streamingQuality);
     final isUsb = output?.isUsbDac == true;
     final isBitPerfect = output?.isBitPerfectActive == true;
+    final isUsbStreaming = isUsb && UsbExclusiveService().lastStatus.streamingActive;
 
     final outputRate = (output != null && output.targetSampleRate > 0)
         ? output.targetSampleRate ~/ 1000
@@ -127,9 +129,11 @@ class AudioQualityBadge extends StatelessWidget {
                   ),
                   const SizedBox(width: AppSpacing.s6),
                   Text(
-                    isBitPerfect
-                        ? '$deviceShortName • Direct'
-                        : '$deviceShortName • ${outputRate}kHz/${outputBitDepth}b',
+                    isUsbStreaming
+                        ? 'Exclusive USB Active'
+                        : (isBitPerfect
+                            ? '$deviceShortName • Direct'
+                            : '$deviceShortName • ${outputRate}kHz/${outputBitDepth}b'),
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.9),
                       fontSize: compact ? AppFontSize.tiny : AppFontSize.caption,

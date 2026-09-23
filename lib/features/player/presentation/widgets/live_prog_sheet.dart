@@ -27,6 +27,10 @@ class _LiveProgSheetState extends State<LiveProgSheet> {
     2: 0.5,
     3: 0.0,
     4: 0.0,
+    5: 0.0,
+    6: 0.0,
+    7: 0.0,
+    8: 0.0,
   };
 
   static const Map<String, String> _scriptPresets = {
@@ -288,7 +292,7 @@ spl1 = spl1 + lp1 * amount;''',
                 ),
                 const SizedBox(height: AppSpacing.s20),
 
-                // Real-time Slider Controls (slider1, slider2)
+                // Real-time Slider Controls (slider1..slider8)
                 Text(context.l10n.liveSliders,
                   style: TextStyle(
                     color: p.textPrimary,
@@ -297,28 +301,20 @@ spl1 = spl1 + lp1 * amount;''',
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xs),
-                _buildSlider(
-                  label: context.l10n.dspSlider1Label,
-                  value: _sliderValues[1] ?? 5.0,
-                  min: 0.1,
-                  max: 20.0,
-                  onChanged: (val) {
-                    setState(() => _sliderValues[1] = val);
-                    cubit.setLiveProgSlider(1, val);
-                  },
-                  p: p,
-                ),
-                _buildSlider(
-                  label: context.l10n.dspSlider2Label,
-                  value: _sliderValues[2] ?? 0.5,
-                  min: 0.0,
-                  max: 1.0,
-                  onChanged: (val) {
-                    setState(() => _sliderValues[2] = val);
-                    cubit.setLiveProgSlider(2, val);
-                  },
-                  p: p,
-                ),
+                for (int i = 1; i <= 8; ++i)
+                  _buildSlider(
+                    label: i == 1
+                        ? context.l10n.dspSlider1Label
+                        : (i == 2 ? context.l10n.dspSlider2Label : 'slider$i'),
+                    value: _sliderValues[i] ?? (i == 1 ? 5.0 : (i == 2 ? 0.5 : 0.0)),
+                    min: i == 1 ? 0.1 : 0.0,
+                    max: i == 1 ? 20.0 : 1.0,
+                    onChanged: (val) {
+                      setState(() => _sliderValues[i] = val);
+                      cubit.setLiveProgSlider(i, val);
+                    },
+                    p: p,
+                  ),
                 const SizedBox(height: AppSpacing.s20),
 
                 Text(context.l10n.exampleScripts,

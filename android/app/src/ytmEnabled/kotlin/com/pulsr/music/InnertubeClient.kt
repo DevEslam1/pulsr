@@ -1422,6 +1422,7 @@ internal class InnertubeClient(
 
         val playbackContext = JSONObject()
         val sts = runCatching { JsDecipherCache.getInstance(context).getSignatureTimestamp() }.getOrNull()
+            ?: runCatching { PlayerJavaScript.signatureTimestamp() }.getOrNull()
         val contentPlaybackContext = JSONObject().apply {
             put("html5Preference", "HTML5_PREF_WANTS")
             if (sts != null) put("signatureTimestamp", sts)
@@ -1449,12 +1450,14 @@ internal class InnertubeClient(
                     PoTokenManager.poTokenForSync(videoId)
                 }
                 if (poToken.isNotEmpty()) {
-                    root.put(
-                        "serviceIntegrityDimensions",
-                        JSONObject().put("poToken", poToken),
-                    )
+                    if (clientType.isWeb) {
+                        root.put(
+                            "serviceIntegrityDimensions",
+                            JSONObject().put("poToken", poToken),
+                        )
+                    }
                     contentPlaybackContext.put("poToken", poToken)
-                    Log.d(TAG, "[$clientType] Attached player poToken (len=${poToken.length}, video=$videoId)")
+                    Log.d(TAG, "[$clientType] Attached player poToken (len=${poToken.length}, video=$videoId, isWeb=${clientType.isWeb})")
                 }
             }
         }

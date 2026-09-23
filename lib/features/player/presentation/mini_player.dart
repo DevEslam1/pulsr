@@ -101,9 +101,10 @@ class _MiniPlayerState extends State<MiniPlayer> {
   @override
   void initState() {
     super.initState();
-    // Created eagerly so the PageView is always driven by this controller and
-    // synchronisation never has to run inside build (A-9).
-    _pageController = PageController();
+    final initialIndex = context.read<PlayerCubit>().state.currentIndex;
+    final safeInitial = initialIndex >= 0 ? initialIndex : 0;
+    _lastKnownIndex = safeInitial;
+    _pageController = PageController(initialPage: safeInitial);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final playerCubit = context.read<PlayerCubit>();
@@ -132,7 +133,6 @@ class _MiniPlayerState extends State<MiniPlayer> {
     // the latch once the skip it triggered has completed.
     if (_isUserDragging || _swipeInFlight) return;
     if (_lastKnownIndex != safeIndex) {
-      _lastKnownIndex = safeIndex;
       if (controller.hasClients &&
           controller.position.hasContentDimensions &&
           controller.page?.round() != safeIndex) {
@@ -142,11 +142,14 @@ class _MiniPlayerState extends State<MiniPlayer> {
               : queueLength - 1;
           if (safeIndex <= maxPage) {
             controller.jumpToPage(safeIndex);
+            _lastKnownIndex = safeIndex;
           }
         } catch (e, st) {
           ErrorLogger.log('MiniPlayer PageController jumpToPage failed',
               error: e, stackTrace: st, category: 'MiniPlayer');
         }
+      } else {
+        _lastKnownIndex = safeIndex;
       }
     }
   }
@@ -675,7 +678,8 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
   }
 
   void _syncWave() {
-    final isTest = const bool.fromEnvironment('FLUTTER_TEST');
+    final isTest = const bool.fromEnvironment('FLUTTER_TEST') ||
+        (WidgetsBinding.instance is! WidgetsFlutterBinding);
     final shouldAnimate = _isAppActive &&
         widget.isPlaying &&
         context.motionEnabled &&

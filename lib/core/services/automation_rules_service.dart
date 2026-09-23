@@ -74,18 +74,7 @@ class AutomationRulesService {
       ErrorLogger.log('Failed to load automation rules',
           error: e, stackTrace: st, category: 'AutomationRulesService');
     }
-    return const [
-      AutomationRule(
-        id: 'rule_car_bt',
-        trigger: AutomationTrigger.bluetoothConnected,
-        targetProfileId: 'profile_car',
-      ),
-      AutomationRule(
-        id: 'rule_headphones',
-        trigger: AutomationTrigger.headphonesPlugged,
-        targetProfileId: 'profile_home',
-      ),
-    ];
+    return const [];
   }
 
   Future<void> saveRule(AutomationRule rule) async {
@@ -100,5 +89,18 @@ class AutomationRulesService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
         _keyRules, json.encode(updated.map((r) => r.toJson()).toList()));
+  }
+
+  Future<void> deleteRule(String id) async {
+    final rules = await getRules();
+    final updated = rules.where((r) => r.id != id).toList();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+        _keyRules, json.encode(updated.map((r) => r.toJson()).toList()));
+  }
+
+  Future<void> clearRules() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keyRules);
   }
 }

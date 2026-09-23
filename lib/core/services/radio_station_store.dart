@@ -1,21 +1,31 @@
 // lib/core/services/radio_station_store.dart
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/models/radio_station.dart';
 import '../utils/error_logger.dart';
 
-/// Persists the user's internet radio stations as a JSON list in
-/// [SharedPreferences]. Plain class (no injectable annotation): constructed
-/// directly like [BpmOverrideStore] to avoid regenerating the DI graph.
-/// The station list is static-shared so direct-constructed instances (radio
-/// screen, player queue mixin) never diverge within a session.
+/// Persists the user's internet radio stations as a JSON list in [SharedPreferences].
+///
+/// **Design Note:**
+/// This class uses an intentional in-memory static store (`_stations`) across all
+/// direct-constructed instances within the isolate session (e.g. between the radio
+/// browsing screens and player queue mixins) to guarantee instantaneous UI consistency
+/// without incurring cross-widget synchronization latency or DI graph churn.
+///
+/// For test isolation, use [resetForTesting] in `setUp`/`tearDown`.
 class RadioStationStore {
   static const String prefsKey = 'radio_stations_v1';
   static const int maxEntries = 500;
 
   static final List<RadioStation> _stations = [];
   late final Future<void> ready;
+
+  @visibleForTesting
+  static void resetForTesting() {
+    _stations.clear();
+  }
 
   RadioStationStore() {
     ready = load();

@@ -405,7 +405,7 @@ std::shared_ptr<const PreparedIr> PreparedIr::createCustom(
         }
 
         if (sCurrentCacheBytes + entrySize > budget) {
-            return nullptr; // Custom IRs currently alive exceed remaining budget
+            return created; // Usable but uncached instead of nullptr (consistent UX)
         }
 
         sCurrentCacheBytes += entrySize;
@@ -433,8 +433,8 @@ ConvolutionReverb::ConvolutionReverb() {
     // A8 (N-03): Eagerly allocating 512 partitions to prevent RT allocation
     inputHistoryFreqL_.resize(MAX_PREALLOC_PARTITIONS, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
     inputHistoryFreqR_.resize(MAX_PREALLOC_PARTITIONS, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
-    directRingL_.assign(1024 * 2 + 16, 0.0f);
-    directRingR_.assign(1024 * 2 + 16, 0.0f);
+    directRingL_.assign(4096, 0.0f);
+    directRingR_.assign(4096, 0.0f);
     dryDelayL_.assign(PARTITION_SIZE, 0.0f);
     dryDelayR_.assign(PARTITION_SIZE, 0.0f);
 
@@ -444,10 +444,20 @@ ConvolutionReverb::ConvolutionReverb() {
 }
 
 void ConvolutionReverb::drainRetiredIrs() {
-    for (int i = 0; i < retiredCount_; ++i) {
-        retiredIrs_[i].reset();
+    int tail = retiredTail_.load(std::memory_order_relaxed);
+    while (tail != retiredHead_.load(std::memory_order_acquire)) {
+        retiredRing_[tail].reset();
+        tail = (tail + 1) % kMaxRetired;
     }
-    retiredCount_ = 0;
+    retiredTail_.store(tail, std::memory_order_release);
+
+    int overflow = overflowCount_.load(std::memory_order_acquire);
+    if (overflow > 0) {
+        for (int i = 0; i < overflow && i < kMaxEmergencyOverflow; ++i) {
+            overflowSlots_[i].reset();
+        }
+        overflowCount_.store(0, std::memory_order_release);
+    }
 }
 
 void ConvolutionReverb::ensurePredelayCapacity() {
@@ -480,7 +490,7 @@ void ConvolutionReverb::ensureScratchCapacity(int frames) {
     }
 }
 
-void ConvolutionReverb::setSampleRate(double sampleRate) {
+void ConvolutionReverb::setSampleRate(double sampleRate, bool updateIr) {
     if (sampleRate <= 0.0 || std::abs(sampleRate_ - sampleRate) < 1.0) return;
     sampleRate_ = sampleRate;
     coreRate_ = std::min(sampleRate_, 48000.0);
@@ -500,6 +510,8 @@ void ConvolutionReverb::setSampleRate(double sampleRate) {
         wetOutResampler_.setEnabled(false);
         wetOutResampler_.reset();
     }
+
+    if (!updateIr) return; // RT-safe path: defer IR swap to applyParams
 
     // A2 (B-05): Regenerate prepared IR for non-custom presets if not matching effective core rate
     if (preset_ != ReverbPreset::Custom) {
@@ -531,8 +543,21 @@ void ConvolutionReverb::updatePreparedIr() {
 }
 
 void ConvolutionReverb::setPreparedIrPtr(std::shared_ptr<const PreparedIr> ir) {
-    if (preparedIr_ && retiredCount_ < kMaxRetired) {
-        retiredIrs_[retiredCount_++] = preparedIr_;
+    if (preparedIr_) {
+        const int head = retiredHead_.load(std::memory_order_relaxed);
+        const int nextHead = (head + 1) % kMaxRetired;
+        if (nextHead != retiredTail_.load(std::memory_order_acquire)) {
+            retiredRing_[head] = std::move(preparedIr_);
+            retiredHead_.store(nextHead, std::memory_order_release);
+        } else {
+            // Ring is full: preserve ownership in pre-allocated emergency overflow slot
+            // avoiding destroying multi-MB FFT partitions on the real-time audio thread.
+            int idx = overflowCount_.load(std::memory_order_relaxed);
+            if (idx < kMaxEmergencyOverflow) {
+                overflowSlots_[idx] = std::move(preparedIr_);
+                overflowCount_.store(idx + 1, std::memory_order_release);
+            }
+        }
     }
     preparedIr_ = std::move(ir);
     reverbLatencyFrames_.store(
@@ -572,6 +597,13 @@ void ConvolutionReverb::applyParams(const ReverbParamSet& params) {
         if (params.preparedIr != preparedIr_) {
             setPreparedIrPtr(params.preparedIr);
             preset_ = static_cast<ReverbPreset>(params.preset);
+            preparePartitions();
+        }
+    } else if (params.preset == static_cast<int>(ReverbPreset::Custom)) {
+        // N3: If custom preset is requested without an IR, clear the stale IR so it plays dry
+        if (preparedIr_ != nullptr) {
+            setPreparedIrPtr(nullptr);
+            preset_ = ReverbPreset::Custom;
             preparePartitions();
         }
     }

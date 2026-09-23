@@ -732,7 +732,9 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
       _lastGaplessIndex = targetIndex;
       _gaplessTargetIndex = targetIndex;
       _gaplessTargetReached = false;
-      _gaplessLoadTime = DateTime.now();
+      _gaplessStopwatch
+        ..reset()
+        ..start();
       _consecutiveFailures = 0;
       _rapidGaplessChangeCount = 0;
       _lastGaplessChangeTime = null;
@@ -877,7 +879,9 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
     _lastGaplessIndex = targetIndex;
     _gaplessTargetIndex = targetIndex;
     _gaplessTargetReached = false;
-    _gaplessLoadTime = DateTime.now();
+    _gaplessStopwatch
+      ..reset()
+      ..start();
 
     final song = _songs[targetIndex];
     final fastArtUri =
@@ -946,7 +950,9 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
       } catch (_) {}
       _gaplessLoaded = true;
       _lastGaplessIndex = targetIndex;
-      _gaplessLoadTime = DateTime.now();
+      _gaplessStopwatch
+        ..reset()
+        ..start();
       if (_activePlayer.currentIndex == targetIndex) {
         _gaplessTargetReached = true;
         _gaplessTargetIndex = null;
@@ -1081,8 +1087,8 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
         _gaplessTargetReached = true;
         _gaplessTargetIndex = null;
       } else if (!_gaplessTargetReached) {
-        final elapsed = _gaplessLoadTime != null
-            ? DateTime.now().difference(_gaplessLoadTime!).inMilliseconds
+        final elapsed = _gaplessStopwatch.isRunning
+            ? _gaplessStopwatch.elapsedMilliseconds
             : 99999;
         if (elapsed < 3000) {
           debugPrint(
@@ -1747,8 +1753,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
   Future<void> _fadeOutForSwitch(AudioPlayer player);
 
   // Requires: provided by the composing class (same library).
-  DateTime? get _gaplessLoadTime;
-  set _gaplessLoadTime(DateTime? value);
+  Stopwatch get _gaplessStopwatch;
 
   // Requires: provided by the composing class (same library).
   bool get _gaplessLoaded;

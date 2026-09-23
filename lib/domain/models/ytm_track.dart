@@ -153,6 +153,36 @@ class YtmStream {
     this.expiresAt,
   });
 
+  YtmStream copyWith({
+    String? videoId,
+    String? url,
+    String? mimeType,
+    String? container,
+    int? bitrateKbps,
+    Duration? duration,
+    String? title,
+    String? artist,
+    String? artworkUrl,
+    String? userAgent,
+    String? cookies,
+    int? expiresAt,
+  }) {
+    return YtmStream(
+      videoId: videoId ?? this.videoId,
+      url: url ?? this.url,
+      mimeType: mimeType ?? this.mimeType,
+      container: container ?? this.container,
+      bitrateKbps: bitrateKbps ?? this.bitrateKbps,
+      duration: duration ?? this.duration,
+      title: title ?? this.title,
+      artist: artist ?? this.artist,
+      artworkUrl: artworkUrl ?? this.artworkUrl,
+      userAgent: userAgent ?? this.userAgent,
+      cookies: cookies ?? this.cookies,
+      expiresAt: expiresAt ?? this.expiresAt,
+    );
+  }
+
   bool get isTaggable => container == 'm4a';
 
   DateTime? get expiresAtDateTime =>

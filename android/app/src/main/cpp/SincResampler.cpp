@@ -3,6 +3,7 @@
 #include <cstring>
 #include <cstdio>
 #include <algorithm>
+#include <atomic>
 #if defined(__ANDROID__)
 #include <android/log.h>
 #endif
@@ -105,7 +106,19 @@ void SincResampler::reset() {
 
 int SincResampler::processInterleaved(float* buffer, int frames, int channels) {
     (void)channels;
+    (void)buffer;
     if (!enabled_ || frames <= 0) return frames;
+
+    static std::atomic<bool> sWarned{false};
+    if (!isBypassed() && !sWarned.exchange(true)) {
+#if defined(__ANDROID__)
+        __android_log_print(ANDROID_LOG_WARN, "PulsrDSP",
+            "SincResampler: in-place processInterleaved cannot alter frame count (ratio %f); audio passed through. Relying on AAudio/HAL rate conversion.", ratio_);
+#else
+        fprintf(stderr,
+            "SincResampler: in-place processInterleaved cannot alter frame count (ratio %f); audio passed through. Relying on host/HAL rate conversion.\n", ratio_);
+#endif
+    }
 
     // The engine passes a fixed block and reuses the same buffer downstream, so
     // the frame count must not change. A causal sample-rate converter cannot

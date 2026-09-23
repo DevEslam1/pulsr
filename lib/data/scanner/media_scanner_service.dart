@@ -269,7 +269,7 @@ class MediaScannerService {
 
       // Offload CPU-heavy metadata parsing and aggregation to background isolate
       final parseInput = _ScanMediaInput(
-        rawSongs: songs.map((s) => s.getMap).toList(),
+        rawSongs: songs.map((s) => Map<String, dynamic>.from(s.getMap)).toList(),
         songGenres: songGenres,
         excludedFolders: excludedFolders,
         minDurationMs: minDurationMs,
@@ -464,7 +464,7 @@ class MediaScannerService {
 }
 
 class _ScanMediaInput {
-  final List<Map<dynamic, dynamic>> rawSongs;
+  final List<Map<String, dynamic>> rawSongs;
   final Map<int, String> songGenres;
   final List<String> excludedFolders;
   final int minDurationMs;

@@ -57,9 +57,10 @@ void MultibandCompressor::reset() {
 
 double MultibandCompressor::computeBandGain(int band, double envDb) {
     const auto& bp = params_.bands[band];
-    if (!bp.enabled || bp.ratio <= 1.001) {
+    if (!enabled_ || !bp.enabled || bp.ratio <= 1.001) {
         // Release the applied gain to unity instead of snapping to 0 dB, so
-        // toggling a band off (or its ratio to 1) ramps out rather than clicks.
+        // toggling a band off (or its ratio to 1, or disabling the whole stage)
+        // ramps out rather than clicks.
         smoothedGainDb_[band] += (1.0 - releaseCoeff_[band]) * (0.0 - smoothedGainDb_[band]);
         if (std::abs(smoothedGainDb_[band]) < 0.01) smoothedGainDb_[band] = 0.0;
         currentGainReductionDb_[band] = smoothedGainDb_[band];
@@ -100,7 +101,15 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
         paramsChanged_.store(false, std::memory_order_release);
     }
 
-    if (!enabled_ || !buffer || frames <= 0 || channels != 2) return;
+    bool allBandsZero = true;
+    for (int b = 0; b < NUM_BANDS; ++b) {
+        if (std::abs(smoothedGainDb_[b]) > 0.01) {
+            allBandsZero = false;
+            break;
+        }
+    }
+    if (!enabled_ && allBandsZero) return;
+    if (!buffer || frames <= 0 || channels < 2) return;
 
     int framesRemaining = frames;
     int offset = 0;
@@ -110,7 +119,7 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
 
         // 1. Split chunk into 4 frequency bands via Linkwitz-Riley 4th order crossovers
         for (int i = 0; i < chunkFrames; ++i) {
-            const int inIdx = (offset + i) * 2;
+            const int inIdx = (offset + i) * channels;
             const double inL = buffer[inIdx];
             const double inR = buffer[inIdx + 1];
 
@@ -140,9 +149,7 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
                 const float sR = bandBufferR_[b][i];
 
                 // Level detector: instantaneous peak. Ballistics (attack/release)
-                // are applied once, to the gain in computeBandGain(). Previously
-                // the envelope follower AND the gain smoother each applied the
-                // same time constants, roughly doubling the effective times.
+                // are applied once, to the gain in computeBandGain().
                 const double peak = std::max(std::abs(sL), std::abs(sR));
                 envelopeDb_[b] = peak;
 
@@ -158,7 +165,7 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
 
         // 3. Recombine all 4 bands into output buffer
         for (int i = 0; i < chunkFrames; ++i) {
-            const int outIdx = (offset + i) * 2;
+            const int outIdx = (offset + i) * channels;
             buffer[outIdx] = bandBufferL_[0][i] + bandBufferL_[1][i] + bandBufferL_[2][i] + bandBufferL_[3][i];
             buffer[outIdx + 1] = bandBufferR_[0][i] + bandBufferR_[1][i] + bandBufferR_[2][i] + bandBufferR_[3][i];
         }

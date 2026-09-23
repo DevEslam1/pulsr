@@ -395,6 +395,15 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeSetActiveStages(bitmask: Int)
     private external fun nativeSetCacheBudgetBytes(budgetBytes: Long)
     private external fun nativeGetAutoDegradedStages(): Int
+    private external fun nativeGetLimiterGrDb(): Double
+    private external fun nativeGetDynEqGrDb(band: Int): Double
+    private external fun nativeGetMultibandGrDb(band: Int): Double
+    private external fun nativeGetRollingRtf(): Double
+    private external fun nativeGetTelemetry(): DoubleArray?
+    private external fun nativeGetWeeklyDose(): Double
+    private external fun nativeResetWeeklyDose()
+    private external fun nativeIsSafetyAttenuationActive(): Boolean
+    private external fun nativeSetHeadphoneSafetyParams(enabled: Boolean, threshold: Double, ceilingDb: Double)
     private external fun nativeReset()
 
     fun configureNativeMemoryBudget(ctx: Context) {
@@ -1008,7 +1017,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "resyncForTrack", "setDynamicsPreset", "setEqEnabled", "setEqBands",
                 "setEqBandGain", "setEqBandGains", "setEqPreamp", "setNativeEqBand",
                 "setNativeEqBandsBulk", "setNativeEqBandCount", "setNativeEqEnabled",
-                "getPipelineLatencyFrames", "setBandSolo", "setBandMute" -> {
+                "getPipelineLatencyFrames", "getAppliedSampleRate", "setBandSolo", "setBandMute" -> {
                     synchronized(stateLock) {
                         handleCoreAndHalCall(call, result)
                     }
@@ -1027,7 +1036,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "setSubCrossoverEnabled", "setSubCrossoverParams",
                 "setDynamicEqEnabled", "setDynamicEqBandCount", "setDynamicEqBand",
                 "setMultibandCompressorEnabled", "setMultibandCompressorBand", "setMultibandCompressorCrossovers",
-                "setDynamicBassParams" -> {
+                "setDynamicBassParams", "getTelemetry", "getLimiterGrDb", "getDynEqGrDb", "getMultibandGrDb", "getRollingRtf",
+                "getWeeklyDose", "resetWeeklyDose", "isSafetyAttenuationActive", "setHeadphoneSafetyParams" -> {
                     synchronized(stateLock) {
                         handleNativeDspCall(call, result)
                     }
@@ -1287,6 +1297,18 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         }
                     } else {
                         result.success(0)
+                    }
+                }
+
+                "getAppliedSampleRate" -> {
+                    if (isNativeDspLoaded) {
+                        try {
+                            result.success(nativeGetAppliedSampleRate())
+                        } catch (e: Exception) {
+                            result.success(48000.0)
+                        }
+                    } else {
+                        result.success(48000.0)
                     }
                 }
 
@@ -1609,6 +1631,127 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         }
                     } else {
                         result.success(0)
+                    }
+                }
+
+                "getTelemetry" -> {
+                    if (isNativeDspLoaded) {
+                        try {
+                            val telemetry = nativeGetTelemetry()
+                            if (telemetry != null) {
+                                result.success(telemetry.toList())
+                            } else {
+                                result.success(DoubleArray(15).toList())
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeGetTelemetry failed: ${e.message}")
+                            result.success(DoubleArray(15).toList())
+                        }
+                    } else {
+                        result.success(DoubleArray(15).toList())
+                    }
+                }
+
+                "getLimiterGrDb" -> {
+                    if (isNativeDspLoaded) {
+                        try {
+                            result.success(nativeGetLimiterGrDb())
+                        } catch (e: Exception) {
+                            result.success(0.0)
+                        }
+                    } else {
+                        result.success(0.0)
+                    }
+                }
+
+                "getDynEqGrDb" -> {
+                    val band = (call.argument<Number>("band"))?.toInt() ?: 0
+                    if (isNativeDspLoaded) {
+                        try {
+                            result.success(nativeGetDynEqGrDb(band))
+                        } catch (e: Exception) {
+                            result.success(0.0)
+                        }
+                    } else {
+                        result.success(0.0)
+                    }
+                }
+
+                "getMultibandGrDb" -> {
+                    val band = (call.argument<Number>("band"))?.toInt() ?: 0
+                    if (isNativeDspLoaded) {
+                        try {
+                            result.success(nativeGetMultibandGrDb(band))
+                        } catch (e: Exception) {
+                            result.success(0.0)
+                        }
+                    } else {
+                        result.success(0.0)
+                    }
+                }
+
+                "getRollingRtf" -> {
+                    if (isNativeDspLoaded) {
+                        try {
+                            result.success(nativeGetRollingRtf())
+                        } catch (e: Exception) {
+                            result.success(0.0)
+                        }
+                    } else {
+                        result.success(0.0)
+                    }
+                }
+
+                "getWeeklyDose" -> {
+                    if (isNativeDspLoaded) {
+                        try {
+                            result.success(nativeGetWeeklyDose())
+                        } catch (e: Exception) {
+                            result.success(0.0)
+                        }
+                    } else {
+                        result.success(0.0)
+                    }
+                }
+
+                "resetWeeklyDose" -> {
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeResetWeeklyDose()
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.success(false)
+                        }
+                    } else {
+                        result.success(false)
+                    }
+                }
+
+                "isSafetyAttenuationActive" -> {
+                    if (isNativeDspLoaded) {
+                        try {
+                            result.success(nativeIsSafetyAttenuationActive())
+                        } catch (e: Exception) {
+                            result.success(false)
+                        }
+                    } else {
+                        result.success(false)
+                    }
+                }
+
+                "setHeadphoneSafetyParams" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: true
+                    val threshold = (call.argument<Number>("doseThreshold"))?.toDouble() ?: 1.0
+                    val ceilingDb = (call.argument<Number>("safetyCeilingDb"))?.toDouble() ?: -6.0
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeSetHeadphoneSafetyParams(enabled, threshold, ceilingDb)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.success(notApplied("Failed to set headphone safety: ${e.message}"))
+                        }
+                    } else {
+                        result.success(true)
                     }
                 }
 

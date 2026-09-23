@@ -23,6 +23,7 @@ import '../../cubit/settings_state.dart';
 import 'battery_optimization_card.dart';
 import 'bt_latency_tap_sheet.dart';
 import 'cast_section.dart';
+import 'headphone_safety_sheet.dart';
 import 'room_correction_sheet.dart';
 import 'settings_conflict_card.dart';
 import 'settings_section.dart';

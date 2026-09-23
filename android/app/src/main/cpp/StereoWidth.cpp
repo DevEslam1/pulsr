@@ -53,16 +53,18 @@ void StereoWidth::reset() {
 }
 
 void StereoWidth::process(float* L, float* R, int frames) {
-    if (!enabled_ || !L || !R || frames <= 0) return;
+    if (!L || !R || frames <= 0) return;
 
     constexpr double kTau = 0.015;
     const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
 
     if (!multiband_) {
         // Broadband mode
-        smoothedWidth_ += smoothFactor * (targetWidth_ - smoothedWidth_);
+        const double effTarget = enabled_ ? targetWidth_ : 1.0;
+        smoothedWidth_ += smoothFactor * (effTarget - smoothedWidth_);
         if (smoothedWidth_ < 1e-15) smoothedWidth_ = 0.0;
-        if (std::abs(smoothedWidth_ - 1.0) < 1e-5 && std::abs(targetWidth_ - 1.0) < 1e-5) return;
+        if (!enabled_ && std::abs(smoothedWidth_ - 1.0) < 1e-4) return;
+        if (std::abs(smoothedWidth_ - 1.0) < 1e-5 && std::abs(effTarget - 1.0) < 1e-5) return;
 
         const float w = static_cast<float>(smoothedWidth_);
         for (int i = 0; i < frames; ++i) {
@@ -77,9 +79,17 @@ void StereoWidth::process(float* L, float* R, int frames) {
     }
 
     // 3-Band Multiband Stereo Imager with Bass Mono
-    smoothedLowWidth_ += smoothFactor * (targetLowWidth_ - smoothedLowWidth_);
-    smoothedMidWidth_ += smoothFactor * (targetMidWidth_ - smoothedMidWidth_);
-    smoothedHighWidth_ += smoothFactor * (targetHighWidth_ - smoothedHighWidth_);
+    const double effLow = enabled_ ? targetLowWidth_ : 1.0;
+    const double effMid = enabled_ ? targetMidWidth_ : 1.0;
+    const double effHigh = enabled_ ? targetHighWidth_ : 1.0;
+    smoothedLowWidth_ += smoothFactor * (effLow - smoothedLowWidth_);
+    smoothedMidWidth_ += smoothFactor * (effMid - smoothedMidWidth_);
+    smoothedHighWidth_ += smoothFactor * (effHigh - smoothedHighWidth_);
+
+    if (!enabled_ && std::abs(smoothedLowWidth_ - 1.0) < 1e-4 &&
+        std::abs(smoothedMidWidth_ - 1.0) < 1e-4 && std::abs(smoothedHighWidth_ - 1.0) < 1e-4) {
+        return;
+    }
 
     const float wLow = static_cast<float>(smoothedLowWidth_);
     const float wMid = static_cast<float>(smoothedMidWidth_);
@@ -123,16 +133,18 @@ void StereoWidth::process(float* L, float* R, int frames) {
 }
 
 void StereoWidth::processInterleaved(float* buffer, int frames, int channels) {
-    if (!enabled_ || !buffer || frames <= 0 || channels < 2) return;
+    if (!buffer || frames <= 0 || channels < 2) return;
 
     constexpr double kTau = 0.015;
     const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
 
     if (!multiband_) {
         // Broadband mode
-        smoothedWidth_ += smoothFactor * (targetWidth_ - smoothedWidth_);
+        const double effTarget = enabled_ ? targetWidth_ : 1.0;
+        smoothedWidth_ += smoothFactor * (effTarget - smoothedWidth_);
         if (smoothedWidth_ < 1e-15) smoothedWidth_ = 0.0;
-        if (std::abs(smoothedWidth_ - 1.0) < 1e-5 && std::abs(targetWidth_ - 1.0) < 1e-5) return;
+        if (!enabled_ && std::abs(smoothedWidth_ - 1.0) < 1e-4) return;
+        if (std::abs(smoothedWidth_ - 1.0) < 1e-5 && std::abs(effTarget - 1.0) < 1e-5) return;
 
         const float w = static_cast<float>(smoothedWidth_);
         for (int i = 0; i < frames; ++i) {
@@ -149,9 +161,17 @@ void StereoWidth::processInterleaved(float* buffer, int frames, int channels) {
     }
 
     // 3-Band Multiband Stereo Imager with Bass Mono
-    smoothedLowWidth_ += smoothFactor * (targetLowWidth_ - smoothedLowWidth_);
-    smoothedMidWidth_ += smoothFactor * (targetMidWidth_ - smoothedMidWidth_);
-    smoothedHighWidth_ += smoothFactor * (targetHighWidth_ - smoothedHighWidth_);
+    const double effLow = enabled_ ? targetLowWidth_ : 1.0;
+    const double effMid = enabled_ ? targetMidWidth_ : 1.0;
+    const double effHigh = enabled_ ? targetHighWidth_ : 1.0;
+    smoothedLowWidth_ += smoothFactor * (effLow - smoothedLowWidth_);
+    smoothedMidWidth_ += smoothFactor * (effMid - smoothedMidWidth_);
+    smoothedHighWidth_ += smoothFactor * (effHigh - smoothedHighWidth_);
+
+    if (!enabled_ && std::abs(smoothedLowWidth_ - 1.0) < 1e-4 &&
+        std::abs(smoothedMidWidth_ - 1.0) < 1e-4 && std::abs(smoothedHighWidth_ - 1.0) < 1e-4) {
+        return;
+    }
 
     const float wLow = static_cast<float>(smoothedLowWidth_);
     const float wMid = static_cast<float>(smoothedMidWidth_);

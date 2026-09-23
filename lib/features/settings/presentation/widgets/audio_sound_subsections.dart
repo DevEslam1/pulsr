@@ -1030,6 +1030,14 @@ class _DiagnosticSection extends StatelessWidget {
           trailing: Icon(Icons.chevron_right_rounded, color: p.textSecondary),
           onTap: () => onExportLogs(context),
         ),
+        settingsCardDivider(p),
+        SettingsNavTile(
+          Icons.health_and_safety_rounded,
+          'Headphone Safety & Sound Dose',
+          'WHO-ITU H.870 acoustic exposure monitoring & safety limiter',
+          trailing: Icon(Icons.chevron_right_rounded, color: p.textSecondary),
+          onTap: () => HeadphoneSafetySheet.show(context),
+        ),
         const BatteryOptimizationCard(),
       ],
     );

@@ -117,6 +117,14 @@ int DsdDecoder::decodeDsdBytes(const uint8_t* dsdL, const uint8_t* dsdR, int byt
             cicR_.int2 += cicR_.int1;
             cicR_.int3 += cicR_.int2;
 
+            // Slow leak on the integrators to prevent int64 overflow on prolonged pathological DC (> 240 dB down)
+            cicL_.int1 -= (cicL_.int1 >> 40);
+            cicL_.int2 -= (cicL_.int2 >> 40);
+            cicL_.int3 -= (cicL_.int3 >> 40);
+            cicR_.int1 -= (cicR_.int1 >> 40);
+            cicR_.int2 -= (cicR_.int2 >> 40);
+            cicR_.int3 -= (cicR_.int3 >> 40);
+
             cicCount_++;
 
             // Decimate 8x in CIC stage
@@ -138,9 +146,9 @@ int DsdDecoder::decodeDsdBytes(const uint8_t* dsdL, const uint8_t* dsdR, int byt
                 int64_t c3R = c2R - cicR_.comb3_d;
                 cicR_.comb3_d = c2R;
 
-                // Scale CIC output (8^3 = 512 gain)
-                const float cicOutL = static_cast<float>(c3L) * (1.0f / 512.0f);
-                const float cicOutR = static_cast<float>(c3R) * (1.0f / 512.0f);
+                // Scale CIC output (8^3 = 512 gain) and clamp to [-2.0f, 2.0f] to prevent runaway on corrupted streams
+                const float cicOutL = std::clamp(static_cast<float>(c3L) * (1.0f / 512.0f), -2.0f, 2.0f);
+                const float cicOutR = std::clamp(static_cast<float>(c3R) * (1.0f / 512.0f), -2.0f, 2.0f);
 
                 // --- STAGE 2: Anti-Aliasing Decimation Filter ---
                 stage2RingL_[stage2WriteIdx_] = cicOutL;
@@ -166,16 +174,18 @@ int DsdDecoder::decodeDsdBytes(const uint8_t* dsdL, const uint8_t* dsdR, int byt
                     const float sL = decimationOutL * headroomScale;
                     const float sR = decimationOutR * headroomScale;
 
-                    const float dcOutL = sL - dcPrevInL_ + dcPole_ * dcPrevOutL_;
-                    const float dcOutR = sR - dcPrevInR_ + dcPole_ * dcPrevOutR_;
+                    float dcOutL = sL - dcPrevInL_ + dcPole_ * dcPrevOutL_;
+                    float dcOutR = sR - dcPrevInR_ + dcPole_ * dcPrevOutR_;
+                    if (!std::isfinite(dcOutL)) dcOutL = 0.0f;
+                    if (!std::isfinite(dcOutR)) dcOutR = 0.0f;
 
                     dcPrevInL_ = sL;
                     dcPrevOutL_ = dcOutL;
                     dcPrevInR_ = sR;
                     dcPrevOutR_ = dcOutR;
 
-                    pcmOutInterleaved[outFrames * 2] = dcOutL;
-                    pcmOutInterleaved[outFrames * 2 + 1] = dcOutR;
+                    pcmOutInterleaved[outFrames * 2] = std::clamp(dcOutL, -1.0f, 1.0f);
+                    pcmOutInterleaved[outFrames * 2 + 1] = std::clamp(dcOutR, -1.0f, 1.0f);
                     outFrames++;
                 }
             }

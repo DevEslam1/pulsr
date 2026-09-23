@@ -3972,7 +3972,16 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
       print("Proxy request failed: $e\n$st");
 
       request.response.headers.clear();
-      request.response.statusCode = HttpStatus.internalServerError;
+      var statusCode = HttpStatus.internalServerError;
+      try {
+        final dynamic dynErr = e;
+        if (dynErr.httpStatusCode is int) {
+          statusCode = dynErr.httpStatusCode as int;
+        } else if (dynErr.statusCode is int) {
+          statusCode = dynErr.statusCode as int;
+        }
+      } catch (_) {}
+      request.response.statusCode = statusCode;
       await request.response.close();
       return;
     }

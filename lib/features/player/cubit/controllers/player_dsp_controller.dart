@@ -180,8 +180,9 @@ class PlayerDspController {
       return;
     }
     final state = _getState();
+    final previousDsp = state.dsp;
     _emit(state.copyWith(
-      dsp: updateDsp(state.dsp),
+      dsp: updateDsp(previousDsp),
       playback: state.playback.copyWith(errorMessage: null),
     ));
     try {
@@ -190,6 +191,7 @@ class PlayerDspController {
       _syncAudioEffects();
       final s = _getState();
       _emit(s.copyWith(
+        dsp: previousDsp,
         playback: s.playback.copyWith(
           errorMessage: failureMessage ??
               'Failed to set ${featureName.toLowerCase()}: $e',
@@ -214,6 +216,7 @@ class PlayerDspController {
       globalHeadphoneProfileBackup = null;
     }
     final state = _getState();
+    final previousDsp = state.dsp;
     _emit(state.copyWith(
       dsp: state.dsp.copyWith(
         isEqEnabled: true,
@@ -222,19 +225,22 @@ class PlayerDspController {
       ),
       playback: state.playback.copyWith(errorMessage: null),
     ));
-    await _audioHandler.setEqualizerEnabled(true);
-    await _audioHandler.applyPreset(preset);
+    try {
+      await _audioHandler.setEqualizerEnabled(true);
+      await _audioHandler.applyPreset(preset);
+    } catch (e) {
+      final s = _getState();
+      _emit(s.copyWith(dsp: previousDsp, playback: s.playback.copyWith(errorMessage: 'Failed to apply preset: $e')));
+    }
   }
 
-  Future<void> resetEqualizer() async {
-    final flat = EqPreset.defaultPresets.first;
-    await applyPreset(flat);
-  }
+  Future<void> resetEqualizer() => applyPreset(EqPreset.defaultPresets.first);
 
   Future<void> applyHeadphoneProfile(HeadphoneProfile? profile,
       {bool isPerSongRestore = false}) async {
-    if (profile != null && !guardDsp('AutoEQ')) return;
+    if (profile != null && !guardDsp('AutoEQ', showError: true)) return;
     final state = _getState();
+    final previousDsp = state.dsp;
     if (profile != null) {
       if (perSongOverrideActive && !isPerSongRestore) {
         globalEqBackup = EqPreset(
@@ -256,13 +262,33 @@ class PlayerDspController {
         ),
         playback: state.playback.copyWith(errorMessage: null),
       ));
-      await _audioHandler.setEqualizerEnabled(true);
-      await _audioHandler.applyHeadphoneProfile(profile);
+      try {
+        await _audioHandler.setEqualizerEnabled(true);
+        await _audioHandler.applyHeadphoneProfile(profile);
+      } catch (e) {
+        final s = _getState();
+        _emit(s.copyWith(
+          dsp: previousDsp,
+          playback: s.playback.copyWith(
+            errorMessage: 'Failed to apply AutoEQ profile: $e',
+          ),
+        ));
+      }
     } else {
       _emit(state.copyWith(
         dsp: state.dsp.copyWith(selectedHeadphoneProfile: null),
       ));
-      await _audioHandler.applyHeadphoneProfile(null);
+      try {
+        await _audioHandler.applyHeadphoneProfile(null);
+      } catch (e) {
+        final s = _getState();
+        _emit(s.copyWith(
+          dsp: previousDsp,
+          playback: s.playback.copyWith(
+            errorMessage: 'Failed to reset headphone profile: $e',
+          ),
+        ));
+      }
     }
   }
 
@@ -272,6 +298,7 @@ class PlayerDspController {
     if (!guardDsp('Band Gain', showError: false)) return;
     final clamped = gain.clamp(-15.0, 15.0);
     final state = _getState();
+    final previousDsp = state.dsp;
     final currentGains = List<double>.from(state.eqPreset.gains);
     if (bandIndex >= 0 && bandIndex < currentGains.length) {
       currentGains[bandIndex] = clamped;
@@ -292,6 +319,7 @@ class PlayerDspController {
       _syncAudioEffects();
       final s = _getState();
       _emit(s.copyWith(
+          dsp: previousDsp,
           playback:
               s.playback.copyWith(errorMessage: 'Failed to set band gain: $e')));
     }
@@ -312,13 +340,8 @@ class PlayerDspController {
     }
   }
 
-  Future<void> startAbComparison() async {
-    await _audioHandler.startAbComparison();
-  }
-
-  Future<void> endAbComparison() async {
-    await _audioHandler.endAbComparison();
-  }
+  Future<void> startAbComparison() => _audioHandler.startAbComparison();
+  Future<void> endAbComparison() => _audioHandler.endAbComparison();
 
   Future<void> setBandMode(int count) async {
     if (count == 10 || count == 32) {
@@ -329,15 +352,13 @@ class PlayerDspController {
       return;
     }
     final state = _getState();
-    _emit(state.copyWith(
-        dsp: state.dsp.copyWith(eqPreset: _audioHandler.currentPreset)));
+    _emit(state.copyWith(dsp: state.dsp.copyWith(eqPreset: _audioHandler.currentPreset)));
   }
 
   Future<void> switchComparisonSlot(ComparisonSlot slot) async {
     await _audioHandler.switchComparisonSlot(slot);
     final state = _getState();
-    _emit(state.copyWith(
-        dsp: state.dsp.copyWith(eqPreset: _audioHandler.currentPreset)));
+    _emit(state.copyWith(dsp: state.dsp.copyWith(eqPreset: _audioHandler.currentPreset)));
   }
 
   String exportPresetToJson() => _audioHandler.exportPresetToJson();
@@ -352,29 +373,22 @@ class PlayerDspController {
     return ok;
   }
 
-  List<double> mergeRoomCorrectionWithHeadphoneCurve(
-    List<double> roomGains, {
-    double maxGainDb = 15.0,
-  }) {
-    final profile = _getState().selectedHeadphoneProfile;
-    return RoomCorrectionService.mergeWithHeadphoneCurve(
-      roomGains,
-      profile?.gains ?? const <double>[],
-      maxGainDb: maxGainDb,
-    );
-  }
+  List<double> mergeRoomCorrectionWithHeadphoneCurve(List<double> roomGains, {double maxGainDb = 15.0}) =>
+      RoomCorrectionService.mergeWithHeadphoneCurve(
+        roomGains,
+        _getState().selectedHeadphoneProfile?.gains ?? const <double>[],
+        maxGainDb: maxGainDb,
+      );
 
   List<double> exportCorrectionImpulseResponse(
     List<double> gains, {
     List<double>? centers,
     int sampleRate = RoomCorrectionService.captureSampleRate,
     int taps = 127,
-  }) {
-    return RoomCorrectionService.exportCorrectionImpulseResponse(
-      gains,
-      centers: centers ?? EqPreset.centerFrequencies,
-      sampleRate: sampleRate,
-      taps: taps,
-    );
-  }
+  }) => RoomCorrectionService.exportCorrectionImpulseResponse(
+        gains,
+        centers: centers ?? EqPreset.centerFrequencies,
+        sampleRate: sampleRate,
+        taps: taps,
+      );
 }

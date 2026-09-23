@@ -24,6 +24,7 @@ void DynamicBass::reset() {
     xHpBass_.reset();
     xLpBass_.reset();
     envelope_ = 0.0;
+    smoothedStrength_ = enabled_ ? strength_ : 0.0;
 }
 
 void DynamicBass::getPresetValues(int preset, int& xLow, int& xHigh,
@@ -106,16 +107,26 @@ void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
         paramsChanged_.store(false, std::memory_order_release);
     }
 
-    if (!enabled_ || channels != 2 || strength_ <= 0.001 || buffer == nullptr || frames <= 0) {
+    const double targetStr = enabled_ ? strength_ : 0.0;
+    if (!enabled_ && smoothedStrength_ < 1e-4) {
+        return;
+    }
+    if (buffer == nullptr || frames <= 0 || channels < 2) {
         return;
     }
 
-    const double str = strength_;
+    constexpr double kTau = 0.015;
+    const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
+    const double startStr = smoothedStrength_;
+    smoothedStrength_ += smoothFactor * (targetStr - smoothedStrength_);
+    const double strStep = (smoothedStrength_ - startStr) / static_cast<double>(frames);
+    double currentStr = startStr;
+
     const double sLow = sideGainLow_;
     const double sHigh = sideGainHigh_;
 
     for (int i = 0; i < frames; ++i) {
-        const int idx = i * 2;
+        const int idx = i * channels;
         const double L = buffer[idx];
         const double R = buffer[idx + 1];
 
@@ -144,7 +155,7 @@ void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
         // 4. Dynamic gain computer:
         //    Boosts quiet/medium bass passages with smooth soft saturation (tanh)
         //    when envelope is large to prevent digital clipping
-        const double dynamicGain = str / (1.0 + 1.8 * envelope_);
+        const double dynamicGain = currentStr / (1.0 + 1.8 * envelope_);
         double bassBoost = midY * dynamicGain;
 
         // Psychoacoustic harmonic excitation for earphone reproduction. Uses a
@@ -167,5 +178,6 @@ void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
         }
         buffer[idx] = static_cast<float>(midOut + sideProcessed);
         buffer[idx + 1] = static_cast<float>(midOut - sideProcessed);
+        currentStr += strStep;
     }
 }

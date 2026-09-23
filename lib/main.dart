@@ -123,7 +123,7 @@ Future<void> main() async {
     try {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
-      ).timeout(const Duration(seconds: 8));
+      ).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Firebase.initializeApp failed — Auth runs offline-only',
           error: e, stackTrace: st, category: 'Startup');
@@ -152,25 +152,27 @@ Future<void> main() async {
   // Defer heavy post-DI tasks to AFTER runApp to eliminate Davey! 1223ms jank on OnePlus
   // Previously awaited 3x8s before first frame -> Skipped 121 frames. Now fire-and-forget.
   void firePostStartupTasks() {
-    // Run in next microtask so first frame draws before any I/O
-    Future.microtask(() async {
+    // Run after first frame renders on screen so startup paints without jank
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       // Respect the user's offline-only setting at cold start: it must disable
       // every online initializer, not just the UI surfaces (mirrors
       // CloudSyncService's runtime gate).
       var offlineOnly = false;
       try {
-        final prefs = await SharedPreferences.getInstance();
-        offlineOnly = prefs.getBool('setting_offline_only_mode') ?? false;
+        final prefs = SharedPreferences.getInstance();
+        prefs.then((p) {
+          offlineOnly = p.getBool('setting_offline_only_mode') ?? false;
+        }).catchError((_) {});
       } catch (_) {}
       final onlineAllowed = AppConfig.ytmEnabled && !offlineOnly;
       try {
-        await Future.wait([
+        Future.wait([
           // Pure builds have no INTERNET permission: skip every online
           // initializer so Pulsr Pure performs zero network work at startup.
           if (onlineAllowed)
             YtmRateLimiter.shared
                 .restore()
-                .timeout(const Duration(seconds: 8))
+                .timeout(const Duration(seconds: 4))
                 .catchError((e, st) {
               ErrorLogger.log('YtmRateLimiter restore failed or timed out',
                   error: e, stackTrace: st, category: 'Startup');
@@ -178,7 +180,7 @@ Future<void> main() async {
           if (AppConfig.isCloudSyncAllowed && !offlineOnly)
             getIt<AuthService>()
                 .initialize()
-                .timeout(const Duration(seconds: 8))
+                .timeout(const Duration(seconds: 4))
                 .catchError((e, st) {
               ErrorLogger.log('AuthService initialize failed or timed out',
                   error: e, stackTrace: st, category: 'Startup');

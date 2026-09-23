@@ -109,6 +109,13 @@ Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeGetXRunCount(
     return 0;
 }
 
+extern "C" JNIEXPORT jint JNICALL
+Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeGetXRunDelta(
+    JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
+    if (auto* sink = AsSink(handle)) return sink->XRunDelta();
+    return 0;
+}
+
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeIsExclusive(
     JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
@@ -120,4 +127,18 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeSetVolume(
     JNIEnv* /*env*/, jclass /*clazz*/, jlong handle, jfloat volume) {
     if (auto* sink = AsSink(handle)) sink->SetVolume(volume);
+}
+
+extern "C" JNIEXPORT jdouble JNICALL
+Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeGetOutputLatencyMs(
+    JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
+    if (auto* sink = AsSink(handle)) return sink->GetOutputLatencyMs();
+    return 0.0;
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeGetFramesPerBurst(
+    JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
+    if (auto* sink = AsSink(handle)) return sink->FramesPerBurst();
+    return 0;
 }

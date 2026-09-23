@@ -33,6 +33,8 @@ public:
     double getCornerHz() const { return cornerHz_; }
     double getSlopeDbPerOct() const { return slopeDbPerOct_; }
     double getSubGain() const { return subGain_; }
+    double getSmoothedEnabledMix() const { return smoothedEnabledMix_; }
+    bool isRamping() const { return smoothedEnabledMix_ > 1e-4; }
     bool isBassMono() const { return bassMono_; }
     bool isAntiPop() const { return antiPop_; }
 
@@ -63,6 +65,7 @@ private:
     bool bassMono_ = true;
     bool antiPop_ = true;
     bool enabled_ = false;
+    double smoothedEnabledMix_ = 0.0;
     bool cascade_ = true; // 24 dB/oct = two cascaded sections
 
     static constexpr int MAX_PAIRS = MAX_CHANNELS / 2; // 4 stereo pairs

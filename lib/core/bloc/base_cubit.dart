@@ -62,7 +62,7 @@ abstract class PulsrCubit<S> extends Cubit<S> {
 
   /// Safe emit that strictly guards closed cubits.
   void safeEmit(S newState) {
-    if (!isClosed) {
+    if (!_closed && !isClosed) {
       emit(newState);
     }
   }
@@ -70,7 +70,7 @@ abstract class PulsrCubit<S> extends Cubit<S> {
   /// Emits [effect] on the transient event stream. No-op after close.
   /// Never throws, never stores the effect in state.
   void emitEffect(UiEffect effect) {
-    if (!isClosed && !_effectController.isClosed) {
+    if (!_closed && !isClosed && !_effectController.isClosed) {
       _effectController.add(effect);
     }
   }
@@ -93,7 +93,7 @@ abstract class PulsrCubit<S> extends Cubit<S> {
     }
     final sub = stream.listen(
       (data) {
-        if (!isClosed) {
+        if (!_closed && !isClosed) {
           onData(data);
         }
       },
@@ -143,7 +143,7 @@ abstract class PulsrCubit<S> extends Cubit<S> {
     return autoSub(
       stream,
       (data) {
-        if (!isClosed) {
+        if (!_closed && !isClosed) {
           emit(reducer(state, data));
         }
       },

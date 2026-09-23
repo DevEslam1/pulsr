@@ -97,13 +97,18 @@ class _UsbDacSectionState extends State<UsbDacSection> {
           final granted = await _service.requestPermission();
           if (!granted) return;
         }
-        final ok = await _service.startStreaming(sampleRate: 48000);
+        final res = await _service.startStreaming(sampleRate: 48000);
         if (!mounted) return;
-        if (!ok) {
+        if (!res.isOk) {
           await _refresh();
           if (mounted) {
             ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
-              content: Text(context.l10n.usbBpFailed),
+              content: Text('${context.l10n.usbBpFailed}: ${res.toUserMessage()} (48.0 kHz)'),
+              action: SnackBarAction(
+                label: 'Retry',
+                onPressed: () => _toggleStreaming(true),
+              ),
+              duration: const Duration(seconds: 5),
             ));
           }
         }

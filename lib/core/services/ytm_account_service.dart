@@ -19,9 +19,11 @@ import '../../domain/models/lyrics_line.dart';
 import '../../domain/models/ytm_track.dart';
 import '../constants/channels.dart';
 import '../constants/embedded_browser_ua.dart';
+import '../errors/ytm_error_classifier.dart';
 import '../utils/error_logger.dart';
 import '../utils/input_sanitizer.dart';
 import '../utils/lrc_parser.dart';
+import '../utils/ytm_locale.dart';
 import '../utils/ytm_rate_limiter.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart'
     hide AndroidOptions;
@@ -149,6 +151,37 @@ class YtmAccountService {
   /// cookie jar, and cookie sessions carry no bearer.
   String? _oauthAccessToken;
 
+  /// Clients whose formats had no playable URLs (SABR enforcement).
+  /// Demoted to tail of resolution chain for 10 minutes.
+  final Map<String, DateTime> _sabrDemotedUntil = {};
+
+  void _markSabrDemoted(String client) {
+    _sabrDemotedUntil[client] = DateTime.now().add(const Duration(minutes: 10));
+    debugPrint('[YTM_ACCOUNT] Client $client marked SABR demoted for 10 minutes');
+  }
+
+  bool _isSabrDemoted(String client) {
+    final until = _sabrDemotedUntil[client];
+    if (until == null) return false;
+    if (DateTime.now().isAfter(until)) {
+      _sabrDemotedUntil.remove(client);
+      return false;
+    }
+    return true;
+  }
+
+  static const _botSubstrings = [
+    'not a bot',
+    'robot',
+    'recaptcha',
+    'confirm you\'re not a bot',
+    'confirm that you\'re not a bot',
+    'automated queries',
+    'unusual traffic',
+    'botguard',
+    'verification required',
+  ];
+
   /// Notifies listeners whenever the YTM login state changes (login/logout).
   final loginState = ValueNotifier<bool>(false);
 
@@ -191,33 +224,40 @@ class YtmAccountService {
       } else {
         _cookies = await _readStoredCookies();
       }
-      if (_cookies != null && _cookies!.isNotEmpty) {
-        final ok = await validateSession();
-        if (!ok) {
-          await _deleteStoredCookies(); // dead session: wipe, don't poison WebView
-          _cookies = null;
-        } else {
-          final ytmService = getIt<YtmService>();
-          await ytmService
-              .syncCookies(_cookies!); // inject ONLY validated cookies
-          final dsid = _dataSyncId;
-          if (dsid != null && dsid.isNotEmpty) {
-            await ytmService.setDataSyncId(dsid);
-          }
-          // One-time migration: move any legacy plaintext copy into secure
-          // storage and drop the plaintext key.
-          unawaited(_persistCookies(_cookies!));
-        }
-      }
       final prefs = await SharedPreferences.getInstance();
       _accountName = prefs.getString(_accountNamePrefKey);
       _accountAvatar = prefs.getString(_accountAvatarPrefKey);
-      // `??=`, not `=`: the validateSession() above harvests the datasyncId off
-      // the live response and has already handed it to YtmService, so a plain
-      // assignment here overwrote a fresh id with the stored one — or with null
-      // on a first run — leaving Dart and native disagreeing about which account
-      // the poToken is bound to.
       _dataSyncId ??= prefs.getString(_dataSyncIdPrefKey);
+
+      if (_cookies != null && _cookies!.isNotEmpty) {
+        final ytmService = getIt<YtmService>();
+        unawaited(ytmService.syncCookies(_cookies!));
+        final dsid = _dataSyncId;
+        if (dsid != null && dsid.isNotEmpty) {
+          unawaited(ytmService.setDataSyncId(dsid));
+        }
+
+        // Validate session asynchronously off the startup critical path so init() does
+        // not block app launch or hit the 8-second startup timeout.
+        unawaited(() async {
+          try {
+            final ok = await validateSession();
+            if (!ok) {
+              await _deleteStoredCookies(); // dead session: wipe, don't poison WebView
+              _cookies = null;
+              loginState.value = false;
+            } else {
+              final freshDsid = _dataSyncId;
+              if (freshDsid != null && freshDsid.isNotEmpty) {
+                await ytmService.setDataSyncId(freshDsid);
+              }
+              await _persistCookies(_cookies!);
+            }
+          } catch (e) {
+            debugPrint('[YTM_ACCOUNT] Background session validation error: $e');
+          }
+        }());
+      }
 
       // Adopt a Google TV OAuth session when no cookie jar is present. This is
       // the captcha-free login path: library/browse/playlist calls use the
@@ -264,7 +304,8 @@ class YtmAccountService {
           'context': _buildClientContext('WEB_REMIX'),
           'browseId': 'FEmusic_home',
         }),
-        baseTimeoutSeconds: 8,
+        baseTimeoutSeconds: 5,
+        maxAttempts: 1,
       );
       // A 401 is Innertube rejecting the credential itself, which is as
       // definitive as a logged-out body; answering `unknown` for it kept a dead
@@ -484,33 +525,28 @@ class YtmAccountService {
     loginState.value = true;
 
     // Eagerly bootstrap session state in the background so dataSyncId is ready
-    // before the first playSong call. Without this, the first playback attempt
-    // fires before _warmSession finishes, _dataSyncId is null, and the code
-    // falls back to a guest poToken + auth cookies — a combination YouTube
-    // rejects for every client in the chain (the LOGIN_REQUIRED / UNPLAYABLE
-    // cascade seen after login). Awaiting _warmSession here (still unawaited
-    // from the caller's perspective via the outer unawaited) lets us chain a
-    // _bootstrapDataSyncId call so the ID is populated in a single background
-    // trip rather than waiting until the first resolvePlayerStream call.
-    try {
-      await _warmSession();
-    } catch (e) {
-      debugPrint('[YTM_ACCOUNT] Session warming failed (non-fatal): $e');
-    }
-    // If _warmSession didn't harvest a dataSyncId (e.g. home browse returned
-    // an unexpected shape), do an explicit lightweight bootstrap fetch.
-    if (_dataSyncId == null || _dataSyncId!.isEmpty) {
-      debugPrint('[YTM_ACCOUNT] dataSyncId not yet available after warm, bootstrapping...');
-      await _bootstrapDataSyncId();
-    }
-    if (_dataSyncId != null && _dataSyncId!.isNotEmpty) {
-      // The id itself is an account identifier and the poToken binding — log
-      // that it arrived, never its value.
-      debugPrint('[YTM_ACCOUNT] dataSyncId ready after login');
-    } else {
-      debugPrint('[YTM_ACCOUNT] dataSyncId still null after bootstrap — '
-          'Tier-1 will resolve as a guest until populated');
-    }
+    // before the first playSong call. Run in unawaited block so saveSession
+    // returns immediately to the login UI without hanging for up to 45s.
+    unawaited(() async {
+      try {
+        await _warmSession();
+      } catch (e) {
+        debugPrint('[YTM_ACCOUNT] Session warming failed (non-fatal): $e');
+      }
+      // If _warmSession didn't harvest a dataSyncId (e.g. home browse returned
+      // an unexpected shape), do an explicit lightweight bootstrap fetch.
+      if (_dataSyncId == null || _dataSyncId!.isEmpty) {
+        debugPrint('[YTM_ACCOUNT] dataSyncId not yet available after warm, bootstrapping...');
+        await _bootstrapDataSyncId();
+      }
+      if (_dataSyncId != null && _dataSyncId!.isNotEmpty) {
+        debugPrint('[YTM_ACCOUNT] dataSyncId ready after login');
+      } else {
+        debugPrint('[YTM_ACCOUNT] dataSyncId still null after bootstrap — '
+            'Tier-1 will resolve as a guest until populated');
+      }
+    }());
+
     return true;
   }
 
@@ -789,11 +825,11 @@ class YtmAccountService {
       'x-origin': origin,
       'x-youtube-client-name': '67',
       'x-youtube-client-version': _clientVersion,
-      'x-goog-authuser': '0',
       'X-Goog-Api-Key': _apiKey,
     };
 
     if (_cookies != null && _cookies!.isNotEmpty) {
+      headers['x-goog-authuser'] = '0';
       headers['Cookie'] = _cookies!;
       final authHeader = buildAuthorizationHeader(_cookies!, origin: origin);
       if (authHeader != null) {
@@ -930,35 +966,26 @@ class YtmAccountService {
       [String? videoId]) {
     final clientMap = <String, dynamic>{
       'clientName': clientType,
-      // Use the resolved client version for WEB_REMIX; explicit per-client
-      // versions for the named mobile clients; fall back to WEB_REMIX version
-      // rather than the stale '19.29.37' for anything else.
-      'clientVersion': clientType == 'WEB_REMIX'
-          ? _clientVersion
-          : clientType == 'ANDROID_MUSIC'
-              ? '8.32.50'
-              : clientType == 'IOS_MUSIC'
-                  ? '8.32.1'
-                  : _clientVersion,
-      'hl': 'en',
-      'gl': 'EG',
+      'clientVersion': _versionResolver.clientVersionFor(clientType),
+      'hl': YtmLocale.hl(),
+      'gl': YtmLocale.gl(),
     };
 
     if (clientType == 'ANDROID_MUSIC') {
-      clientMap['clientVersion'] = '8.32.50';
+      clientMap['clientVersion'] = _versionResolver.androidMusicVersion;
       clientMap['androidSdkVersion'] = 34;
       clientMap['osName'] = 'Android';
       clientMap['osVersion'] = '14';
       clientMap['platform'] = 'MOBILE';
     } else if (clientType == 'IOS_MUSIC') {
-      clientMap['clientVersion'] = '8.32.1';
+      clientMap['clientVersion'] = _versionResolver.iosMusicVersion;
       clientMap['deviceMake'] = 'Apple';
       clientMap['deviceModel'] = 'iPhone15,3';
       clientMap['osName'] = 'iOS';
       clientMap['osVersion'] = '18.0';
       clientMap['platform'] = 'MOBILE';
     } else if (clientType == 'ANDROID_VR') {
-      clientMap['clientVersion'] = '1.63.27';
+      clientMap['clientVersion'] = _versionResolver.androidVrVersion;
       clientMap['androidSdkVersion'] = 32;
       clientMap['deviceMake'] = 'Oculus';
       clientMap['deviceModel'] = 'Quest 2';
@@ -966,7 +993,7 @@ class YtmAccountService {
       clientMap['osVersion'] = '12';
       clientMap['platform'] = 'MOBILE';
     } else if (clientType == 'ANDROID_CREATOR') {
-      clientMap['clientVersion'] = '24.45.100';
+      clientMap['clientVersion'] = _versionResolver.androidCreatorVersion;
       clientMap['androidSdkVersion'] = 33;
       clientMap['osName'] = 'Android';
       clientMap['osVersion'] = '13';
@@ -1023,6 +1050,23 @@ class YtmAccountService {
     int maxAttempts = 3,
     int baseTimeoutSeconds = 15,
   }) async {
+    final breaker =
+        getIt.isRegistered<YtmService>() ? getIt<YtmService>().breaker : null;
+    if (breaker != null) {
+      if (!breaker.shouldAllow(YtmBlockSignal.rateLimited)) {
+        throw const YtmException(
+            'RATE_LIMITED', 'Rate limiter circuit breaker open');
+      }
+      if (!breaker.shouldAllow(YtmBlockSignal.botChallenge)) {
+        throw const YtmException(
+            'BOT_CHALLENGE', 'Bot challenge circuit breaker open');
+      }
+      if (!breaker.shouldAllow(YtmBlockSignal.ipBlocked)) {
+        throw const YtmException(
+            'IP_BLOCKED', 'IP block circuit breaker open');
+      }
+    }
+
     // Keep the OAuth bearer fresh before the first request of a paging walk.
     if (isOAuthSession) {
       try {
@@ -1059,9 +1103,26 @@ class YtmAccountService {
           await logout();
           return res;
         }
-        if (res.statusCode == 429 || res.statusCode >= 500) {
+
+        // A 403 on a cookie session: attempt a single retry with re-signed headers
+        if (res.statusCode == 403 &&
+            !isOAuthSession &&
+            attempt == 0 &&
+            maxAttempts > 1) {
+          debugPrint(
+              '[YTM_ACCOUNT] HTTP 403 on cookie session, retrying once before failure');
+          await Future.delayed(const Duration(milliseconds: 500));
+          continue;
+        }
+
+        if (res.statusCode == 429 ||
+            res.statusCode >= 500 ||
+            res.statusCode == 403) {
           if (res.statusCode == 429) {
             YtmRateLimiter.shared.onRateLimited();
+            breaker?.recordFailure(YtmBlockSignal.rateLimited);
+          } else if (res.statusCode == 403) {
+            breaker?.recordFailure(YtmBlockSignal.ipBlocked);
           }
           final backoffSec = (1 << attempt) + Random().nextInt(2);
           debugPrint(
@@ -1076,6 +1137,7 @@ class YtmAccountService {
         // an active cooling window back to "all clear".
         if (res.statusCode >= 200 && res.statusCode < 300) {
           YtmRateLimiter.shared.onSuccess();
+          breaker?.recordSuccess();
           // Google rotates the session cookies (notably the `__Secure-*PSID*`
           // family and `SIDCC`) on ordinary authenticated traffic, and drops the
           // old values when the rotation is never acknowledged. Ingesting only
@@ -1274,6 +1336,8 @@ class YtmAccountService {
             // `json` is reassigned below when that path is taken.
             var currentJson = json;
 
+            final seenVideoIds = tracks.map((t) => t.videoId).toSet();
+
             // Fetch continuation pages until maxTracks is satisfied.
             var pageCount = 0;
             const maxPages = 100;
@@ -1299,13 +1363,16 @@ class YtmAccountService {
                   currentJson =
                       jsonDecode(contResponse.body) as Map<String, dynamic>;
                   final contTracks = _parsePlaylistTracks(currentJson);
-                  if (contTracks.isEmpty) {
+                  final newTracks = contTracks
+                      .where((t) => seenVideoIds.add(t.videoId))
+                      .toList();
+                  if (newTracks.isEmpty) {
                     consecutiveEmptyPages++;
                     if (consecutiveEmptyPages >= 3) break;
                     continue;
                   }
                   consecutiveEmptyPages = 0;
-                  allTracks.addAll(contTracks);
+                  allTracks.addAll(newTracks);
                 } else {
                   break;
                 }
@@ -1320,14 +1387,7 @@ class YtmAccountService {
                   '[YTM_ACCOUNT] Hit max continuation pages ($maxPages)');
             }
 
-            final seenIds = <String>{};
-            final uniqueTracks = <YtmTrack>[];
-            for (final t in allTracks) {
-              if (seenIds.add(t.videoId)) {
-                uniqueTracks.add(t);
-              }
-            }
-            return uniqueTracks.take(maxTracks).toList();
+            return allTracks.take(maxTracks).toList();
           }
         }
       } catch (e) {
@@ -1569,6 +1629,7 @@ class YtmAccountService {
           }
 
           if (tracks.isNotEmpty) {
+            final seenVideoIds = tracks.map((t) => t.videoId).toSet();
             final allTracks = List<YtmTrack>.from(tracks);
             var currentJson = json;
 
@@ -1596,25 +1657,22 @@ class YtmAccountService {
               if (contRes.statusCode == 200) {
                 currentJson = jsonDecode(contRes.body) as Map<String, dynamic>;
                 final contTracks = _parsePlaylistTracks(currentJson);
-                if (contTracks.isEmpty) {
+                final newTracks = contTracks
+                    .where((t) => seenVideoIds.add(t.videoId))
+                    .toList();
+                if (newTracks.isEmpty) {
                   consecutiveEmpty++;
                   if (consecutiveEmpty >= 2) break;
                   continue;
                 }
                 consecutiveEmpty = 0;
-                allTracks.addAll(contTracks);
+                allTracks.addAll(newTracks);
               } else {
                 break;
               }
             }
 
-            final seenIds = <String>{};
-            final uniqueTracks = <YtmTrack>[];
-            for (final t in allTracks) {
-              if (seenIds.add(t.videoId)) {
-                uniqueTracks.add(t);
-              }
-            }
+            final uniqueTracks = allTracks;
 
             playlistArtwork ??= uniqueTracks.firstOrNull?.artworkUrl;
 
@@ -2009,10 +2067,10 @@ class YtmAccountService {
       {String quality = 'high'}) async {
     try {
       return await _resolvePlayerStreamInternal(videoId, quality: quality)
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 50));
     } on TimeoutException {
       debugPrint(
-          '[YTM_ACCOUNT] Global stream resolution timed out after 15s for $videoId');
+          '[YTM_ACCOUNT] Global stream resolution timed out after 50s for $videoId');
       return null;
     }
   }
@@ -2119,7 +2177,7 @@ class YtmAccountService {
       }
     }
 
-    final clientChain = useSessionAuth
+    final rawChain = useSessionAuth
         ? [
             'WEB_REMIX', // the only client that carries the session
             'ANDROID_VR', // guest fallbacks from here down
@@ -2142,6 +2200,15 @@ class YtmAccountService {
             'ANDROID_CREATOR',
             'ANDROID_TESTSUITE',
           ];
+
+    final clientChain = List<String>.from(rawChain)
+      ..sort((a, b) {
+        final aDemoted = _isSabrDemoted(a);
+        final bDemoted = _isSabrDemoted(b);
+        if (aDemoted && !bDemoted) return 1;
+        if (!aDemoted && bDemoted) return -1;
+        return 0;
+      });
 
     // Track consecutive IP-level blocks to short-circuit early (like the
     // native InnertubeClient chain). When 2+ clients return LOGIN_REQUIRED or
@@ -2185,31 +2252,15 @@ class YtmAccountService {
           'Content-Type': 'application/json',
           'X-Goog-Api-Key': _apiKey,
           'x-youtube-client-name': _clientNameIds[client] ?? '67',
-          'x-youtube-client-version': client == 'ANDROID_MUSIC'
-              ? '8.32.50'
-              : (client == 'IOS_MUSIC'
-                  ? '8.32.1'
-                  : (client == 'ANDROID_VR'
-                      ? '1.63.27'
-                      : (client == 'MWEB'
-                          ? '2.20260825.01.00'
-                          : (client == 'WEB_EMBEDDED_PLAYER'
-                              ? '1.20260825.01.00'
-                              : (client == 'ANDROID_CREATOR'
-                                  ? '24.45.100'
-                                  : (client == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER'
-                                      ? '2.0'
-                                      : (client == 'ANDROID_TESTSUITE'
-                                          ? '1.9'
-                                          : _clientVersion))))))),
+          'x-youtube-client-version': _versionResolver.clientVersionFor(client),
           'User-Agent': client == 'ANDROID_MUSIC'
-              ? 'com.google.android.apps.youtube.music/8.32.50 (Linux; U; Android 14; en_US) gzip'
+              ? 'com.google.android.apps.youtube.music/${_versionResolver.androidMusicVersion} (Linux; U; Android 14; en_US) gzip'
               : (client == 'IOS_MUSIC'
-                  ? 'com.google.ios.youtubemusic/8.32.1 (iPhone15,3; U; CPU iOS 18_0 like Mac OS X; en_US)'
+                  ? 'com.google.ios.youtubemusic/${_versionResolver.iosMusicVersion} (iPhone15,3; U; CPU iOS 18_0 like Mac OS X; en_US)'
                   : (client == 'ANDROID_VR'
-                      ? 'com.google.android.apps.youtube.vr.oculus/1.63.27 (Linux; U; Android 12; en_US; Quest 2) gzip'
+                      ? 'com.google.android.apps.youtube.vr.oculus/${_versionResolver.androidVrVersion} (Linux; U; Android 12; en_US; Quest 2) gzip'
                       : (client == 'ANDROID_CREATOR'
-                          ? 'com.google.android.apps.youtube.creator/24.45.100 (Linux; U; Android 13; en_US) gzip'
+                          ? 'com.google.android.apps.youtube.creator/${_versionResolver.androidCreatorVersion} (Linux; U; Android 13; en_US) gzip'
                           : (client == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER'
                               ? 'Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/4.0 Chrome/76.0.3809.146 TV Safari/537.36'
                               : (client == 'ANDROID_TESTSUITE'
@@ -2277,6 +2328,8 @@ class YtmAccountService {
           'playbackContext': {
             'contentPlaybackContext': {
               'html5Preference': 'HTML5_PREF_WANTS',
+              if (_versionResolver.sts > 0)
+                'signatureTimestamp': _versionResolver.sts,
               if (poToken != null && poToken.isNotEmpty) 'poToken': poToken,
             },
           },
@@ -2324,10 +2377,11 @@ class YtmAccountService {
             // remaining client will too — skip the rest of the chain.
             // Note: UNPLAYABLE indicates per-client catalog restriction, NOT a bot block.
             final isBotBlock = status.contains('BOT') ||
-                statusReason.toLowerCase().contains('not a bot') ||
-                statusReason.toLowerCase().contains('automated queries') ||
-                statusReason.toLowerCase().contains('unusual traffic');
-            if (isBotBlock) {
+                _botSubstrings.any((sub) =>
+                    statusReason.toLowerCase().contains(sub.toLowerCase()));
+            final isBlockSignal = isBotBlock ||
+                (!acceptsSessionAuth && status == 'LOGIN_REQUIRED');
+            if (isBlockSignal) {
               consecutiveBlockSignals++;
               if (consecutiveBlockSignals >= 2) {
                 debugPrint(
@@ -2413,6 +2467,9 @@ class YtmAccountService {
           } else {
             debugPrint(
                 '[YTM_ACCOUNT] Client $client returned status $status but no audio formats (adaptiveFormats: ${adaptive.length} total, streamingData: ${streamingData != null})');
+            if (adaptive.isNotEmpty) {
+              _markSabrDemoted(client);
+            }
           }
         } else if (response.statusCode == 429 || response.statusCode == 403) {
           debugPrint(
@@ -2545,17 +2602,20 @@ class YtmAccountService {
   /// Extracts the continuation token strictly from a playlist shelf or continuation.
   /// Never extracts from Suggestions or unrelated shelves.
   String? _extractPlaylistContinuationToken(Map<String, dynamic> root) {
-    // 1. Continuation response: continuationContents.musicPlaylistShelfContinuation
+    // 1. Continuation response: continuationContents.musicPlaylistShelfContinuation or musicShelfContinuation
     final contContents = root['continuationContents'] as Map<String, dynamic>?;
     final playlistCont = contContents?['musicPlaylistShelfContinuation']
             as Map<String, dynamic>? ??
-        _findShelfNode(root, 'musicPlaylistShelfContinuation');
+        contContents?['musicShelfContinuation'] as Map<String, dynamic>? ??
+        _findShelfNode(root, 'musicPlaylistShelfContinuation') ??
+        _findShelfNode(root, 'musicShelfContinuation');
     if (playlistCont != null) {
       return _extractTokenFromShelfContinuations(playlistCont);
     }
 
-    // 2. Initial browse response: musicPlaylistShelfRenderer
-    final playlistShelf = _findShelfNode(root, 'musicPlaylistShelfRenderer');
+    // 2. Initial browse response: musicPlaylistShelfRenderer or musicShelfRenderer
+    final playlistShelf = _findShelfNode(root, 'musicPlaylistShelfRenderer') ??
+        _findShelfNode(root, 'musicShelfRenderer');
     if (playlistShelf != null) {
       return _extractTokenFromShelfContinuations(playlistShelf);
     }
@@ -2593,11 +2653,13 @@ class YtmAccountService {
   /// Ignores "Suggestions", "Related", and carousels so playlists only contain
   /// their actual tracks.
   List<YtmTrack> _parsePlaylistTracks(Map<String, dynamic> root) {
-    // 1. Check for continuation response: musicPlaylistShelfContinuation
+    // 1. Check for continuation response: musicPlaylistShelfContinuation or musicShelfContinuation
     final contContents = root['continuationContents'] as Map<String, dynamic>?;
     final playlistCont = contContents?['musicPlaylistShelfContinuation']
             as Map<String, dynamic>? ??
-        _findShelfNode(root, 'musicPlaylistShelfContinuation');
+        contContents?['musicShelfContinuation'] as Map<String, dynamic>? ??
+        _findShelfNode(root, 'musicPlaylistShelfContinuation') ??
+        _findShelfNode(root, 'musicShelfContinuation');
     if (playlistCont != null) {
       final contents = playlistCont['contents'];
       if (contents is List) {
@@ -2616,8 +2678,9 @@ class YtmAccountService {
       }
     }
 
-    // 2. Check for initial browse response: musicPlaylistShelfRenderer
-    final playlistShelf = _findShelfNode(root, 'musicPlaylistShelfRenderer');
+    // 2. Check for initial browse response: musicPlaylistShelfRenderer or musicShelfRenderer
+    final playlistShelf = _findShelfNode(root, 'musicPlaylistShelfRenderer') ??
+        _findShelfNode(root, 'musicShelfRenderer');
     if (playlistShelf != null) {
       final contents = playlistShelf['contents'];
       if (contents is List) {
@@ -2641,14 +2704,15 @@ class YtmAccountService {
     return _parseInnertubePlaylistTracks(root, ignoreSuggestions: true);
   }
 
-  /// Reads the account `datasyncId` from `responseContext.mainAppWebResponseContext.datasyncId`.
+  /// Reads the account `datasyncId` from `responseContext.mainAppWebResponseContext.datasyncId`
+  /// with fallbacks to `responseContext.datasyncId` or root `json['datasyncId']`.
   /// This is the raw content-binding for the account poToken (kept verbatim, incl. trailing `||`).
   String? _extractDataSyncId(Map<String, dynamic> json) {
     final rc = json['responseContext'];
-    if (rc is! Map<String, dynamic>) return null;
-    final mainApp = rc['mainAppWebResponseContext'];
-    if (mainApp is! Map<String, dynamic>) return null;
-    final id = mainApp['datasyncId'];
+    final mainApp = rc is Map<String, dynamic> ? rc['mainAppWebResponseContext'] : null;
+    final id = (mainApp is Map<String, dynamic> ? mainApp['datasyncId'] : null) ??
+        (rc is Map<String, dynamic> ? rc['datasyncId'] : null) ??
+        json['datasyncId'];
     if (id is String && id.isNotEmpty) return id;
     return null;
   }

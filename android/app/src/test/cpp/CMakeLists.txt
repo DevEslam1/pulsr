@@ -28,6 +28,9 @@ set(DSP_SRCS
     ${MAIN_CPP}/DynamicEQ.cpp
     ${MAIN_CPP}/MultibandCompressor.cpp
     ${MAIN_CPP}/DynamicBass.cpp
+    ${MAIN_CPP}/ViperDdc.cpp
+    ${MAIN_CPP}/ArbitraryResponseEq.cpp
+    ${MAIN_CPP}/LiveProg.cpp
     ${MAIN_CPP}/AudioDspEngine.cpp
 )
 

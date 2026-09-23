@@ -49,6 +49,7 @@ enum DspStageMask {
     STAGE_VIPER_DDC = 1 << 14,
     STAGE_ARBITRARY_EQ = 1 << 15,
     STAGE_LIVE_PROG = 1 << 16,
+    STAGE_HEADPHONE_SAFETY = 1 << 17,
 };
 
 template<typename T>
@@ -156,6 +157,25 @@ public:
     bool isAutoDegradeMonitorEnabled() const { return autoDegradeMonitorEnabled_.load(); }
     void setSimulatedBlockRtf(double rtf) { simulatedBlockRtf_.store(rtf); }
     double getRollingRtf() const { return rollingRtf_.load(); }
+    float getLimiterGrDb() const { return limiterGrDb_.load(std::memory_order_relaxed); }
+    float getDynEqGrDb(int band) const {
+        if (band >= 0 && band < DynamicEqParamSet::MAX_BANDS) {
+            return dynEqGrDb_[band].load(std::memory_order_relaxed);
+        }
+        return 0.0f;
+    }
+    float getMultibandGrDb(int band) const {
+        if (band >= 0 && band < MultibandCompressor::NUM_BANDS) {
+            return mbCompGrDb_[band].load(std::memory_order_relaxed);
+        }
+        return 0.0f;
+    }
+
+    // Headphone Safety & Sound Dose Tracking (EN 62368-1 / WHO-ITU H.870)
+    double getWeeklyDose() const { return weeklyDose_.load(std::memory_order_relaxed); }
+    void resetWeeklyDose() { weeklyDose_.store(0.0, std::memory_order_relaxed); }
+    void setWeeklyDose(double dose) { weeklyDose_.store(dose, std::memory_order_relaxed); }
+    bool isSafetyAttenuationActive() const { return safetyAttenuationActive_.load(std::memory_order_relaxed); }
 
     int processInterleaved(float* buffer, int frames, int channels = 2);
     void reset();
@@ -168,6 +188,7 @@ public:
             tail = (tail + 1) % kRetireQueueSize;
         }
         retireTail_.store(tail, std::memory_order_release);
+        reverb_.drainRetiredIrs();
     }
 
 private:
@@ -254,6 +275,17 @@ private:
     ViperDdc viperDdc_;
     ArbitraryResponseEq arbitraryEq_;
     LiveProg liveProg_;
+
+    // Telemetry cache (lock-free atomics, updated per audio buffer)
+    std::atomic<float> limiterGrDb_{0.0f};
+    std::atomic<float> dynEqGrDb_[DynamicEqParamSet::MAX_BANDS]{};
+    std::atomic<float> mbCompGrDb_[MultibandCompressor::NUM_BANDS]{};
+
+    // Headphone Safety & Sound Dose Tracking (EN 62368-1 / WHO-ITU H.870)
+    LookaheadLimiter safetyLimiter_;
+    std::atomic<double> weeklyDose_{0.0};
+    std::atomic<bool> safetyAttenuationActive_{false};
+    double smoothedSafetyGain_{1.0};
 };
 
 class DspEngineRegistry {
@@ -269,6 +301,17 @@ public:
     /// objects are unconfigured and always report 0; latency must be read from
     /// the engines that actually render audio (one per NativeDspAudioProcessor).
     int getMaxPipelineLatencyFrames();
+
+    float getLimiterGrDb();
+    float getDynEqGrDb(int band);
+    float getMultibandGrDb(int band);
+    double getRollingRtf();
+    uint32_t getAutoDegradedStages();
+    void getTelemetry(double* outArray, int size);
+    double getWeeklyDose();
+    void resetWeeklyDose();
+    bool isSafetyAttenuationActive();
+    double getAppliedSampleRate();
 
 private:
     std::mutex mutex_;

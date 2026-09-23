@@ -324,15 +324,16 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       final res = await _repository.getSongById(newSongOrId);
       newSong = res.fold((_) => null, (s) => s);
     }
-    if (newSong == null || oldId == newSong.id) return;
+    final safeNewSong = newSong;
+    if (safeNewSong == null || oldId == safeNewSong.id) return;
 
-    _slotLookupCache[newSong.id] = newSong;
+    _slotLookupCache[safeNewSong.id] = safeNewSong;
     _slotLookupCache.remove(oldId);
     await _queueMutex.protect(() async {
       _queueSlots.updateAll((slot, data) {
         if (!data.songIds.contains(oldId)) return data;
         return QueueSlotData(
-          songIds: data.songIds.map((id) => id == oldId ? newSong!.id : id).toList(),
+          songIds: data.songIds.map((id) => id == oldId ? safeNewSong.id : id).toList(),
           currentIndex: data.currentIndex,
           position: data.position,
           speed: data.speed,
@@ -346,18 +347,18 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       _bumpQueueVersion();
       _emit(state.copyWith(
         queueSlice: state.queueSlice.copyWith(
-          queue: state.queue.map((s) => s.id == oldId ? newSong! : s).toList(),
+          queue: state.queue.map((s) => s.id == oldId ? safeNewSong : s).toList(),
         ),
         playback: state.playback.copyWith(
           currentSong:
-              state.currentSong?.id == oldId ? newSong : state.currentSong,
+              state.currentSong?.id == oldId ? safeNewSong : state.currentSong,
         ),
       ));
       _updateWidgetThrottled(force: true);
     }
 
     try {
-      _audioHandler.swapReconciledSong(oldId, newSong);
+      _audioHandler.swapReconciledSong(oldId, safeNewSong);
     } catch (_) {}
   }
 
@@ -414,6 +415,10 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
 
   Future<void> playNext(SongsTableData song) async {
     final state = _getState();
+    if (state.queue.isEmpty) {
+      await addToQueue(song);
+      return;
+    }
     if (state.queue.length >= PlayerQueueController.maxQueueSize) {
       _emit(state.copyWith(
         playback: state.playback.copyWith(

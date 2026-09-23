@@ -49,13 +49,13 @@ ArbitraryResponseEq::ArbitraryResponseEq() {
     reset();
 }
 
-void ArbitraryResponseEq::setSampleRate(double sampleRate) {
+void ArbitraryResponseEq::setSampleRate(double sampleRate, bool resynthesize) {
     if (sampleRate < 8000.0) sampleRate = 8000.0;
     if (sampleRate > 768000.0) sampleRate = 768000.0;
     sampleRate_ = sampleRate;
-    // Only re-derive the FIR when a response is loaded; otherwise the
-    // constructor's passthrough impulse must be preserved.
-    if (hasResponse_) {
+    // Only re-derive the FIR when requested (off-audio-thread) and a response is loaded;
+    // otherwise the constructor's passthrough impulse must be preserved.
+    if (resynthesize && hasResponse_) {
         synthesizeFir();
     }
     reset();
@@ -140,7 +140,7 @@ void ArbitraryResponseEq::applyPreparedNodes(
     const std::shared_ptr<const std::vector<std::pair<double, double>>>& nodes,
     bool linearPhase) {
     if (!nodes) return;
-    if (nodes == preparedNodesRef_) {
+    if (nodes == preparedNodesRef_ && std::abs(firSynthesizedRate_ - sampleRate_) < 0.5) {
         linearPhase_ = linearPhase;
         return;
     }
@@ -159,6 +159,7 @@ void ArbitraryResponseEq::synthesizeFir() {
         hasResponse_ = false;
         firFilter_.assign(FIR_TAPS, 0.0f);
         firFilter_[0] = 1.0f;
+        firSynthesizedRate_ = sampleRate_;
         return;
     }
 
@@ -211,6 +212,7 @@ void ArbitraryResponseEq::synthesizeFir() {
         firFilter_[i] = std::isfinite(tap) ? tap : 0.0f;
     }
     hasResponse_ = true;
+    firSynthesizedRate_ = sampleRate_;
 }
 
 void ArbitraryResponseEq::applyParams(const ArbitraryEqParamSet& params) {
@@ -219,7 +221,7 @@ void ArbitraryResponseEq::applyParams(const ArbitraryEqParamSet& params) {
     // setter (see nativeLoadArbitraryEq), so applyParams performs no parsing
     // and no heap allocation.
     if (params.parsedNodes) {
-        if (params.parsedNodes != preparedNodesRef_) {
+        if (params.parsedNodes != preparedNodesRef_ || std::abs(firSynthesizedRate_ - sampleRate_) >= 0.5) {
             loadedString_ = params.graphicEqString;
             applyPreparedNodes(params.parsedNodes, params.linearPhase);
         }
@@ -243,19 +245,24 @@ void ArbitraryResponseEq::process(float* L, float* R, int frames) {
         if (!std::isfinite(inL)) inL = 0.0f;
         if (!std::isfinite(inR)) inR = 0.0f;
 
-        // Circular buffer write — O(1) instead of O(N) shift
+        // Doubled circular buffer write: write at historyIdx_ and historyIdx_ + taps
         historyL_[historyIdx_] = inL;
+        historyL_[historyIdx_ + taps] = inL;
         historyR_[historyIdx_] = inR;
+        historyR_[historyIdx_ + taps] = inR;
+
+        const float* ptrL = &historyL_[historyIdx_ + taps];
+        const float* ptrR = &historyR_[historyIdx_ + taps];
 
         float outL = 0.0f;
         float outR = 0.0f;
         for (int t = 0; t < taps; ++t) {
-            int idx = (historyIdx_ - t + taps) % taps;
-            outL += h[t] * historyL_[idx];
-            outR += h[t] * historyR_[idx];
+            outL += h[t] * ptrL[-t];
+            outR += h[t] * ptrR[-t];
         }
 
-        historyIdx_ = (historyIdx_ + 1) % taps;
+        historyIdx_ = historyIdx_ + 1;
+        if (historyIdx_ >= taps) historyIdx_ = 0;
 
         L[i] = outL;
         R[i] = outR;
@@ -274,19 +281,24 @@ void ArbitraryResponseEq::processInterleaved(float* buffer, int frames, int chan
         if (!std::isfinite(inL)) inL = 0.0f;
         if (!std::isfinite(inR)) inR = 0.0f;
 
-        // Circular buffer write — O(1) instead of O(N) shift
+        // Doubled circular buffer write: write at historyIdx_ and historyIdx_ + taps
         historyL_[historyIdx_] = inL;
+        historyL_[historyIdx_ + taps] = inL;
         historyR_[historyIdx_] = inR;
+        historyR_[historyIdx_ + taps] = inR;
+
+        const float* ptrL = &historyL_[historyIdx_ + taps];
+        const float* ptrR = &historyR_[historyIdx_ + taps];
 
         float outL = 0.0f;
         float outR = 0.0f;
         for (int t = 0; t < taps; ++t) {
-            int idx = (historyIdx_ - t + taps) % taps;
-            outL += h[t] * historyL_[idx];
-            outR += h[t] * historyR_[idx];
+            outL += h[t] * ptrL[-t];
+            outR += h[t] * ptrR[-t];
         }
 
-        historyIdx_ = (historyIdx_ + 1) % taps;
+        historyIdx_ = historyIdx_ + 1;
+        if (historyIdx_ >= taps) historyIdx_ = 0;
 
         buffer[i * channels] = outL;
         buffer[i * channels + 1] = outR;

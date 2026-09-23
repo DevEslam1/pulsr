@@ -9,4 +9,8 @@ abstract class ISmartPlaylistEngine {
 
   /// Reactively observes database mutations and emits updated matching songs debounced by 500ms.
   Stream<List<SongsTableData>> watchCriteria(SmartCriteria criteria);
+
+  /// Validates [criteria] rules and returns any rules that cannot be evaluated
+  /// (e.g. empty required strings or invalid numeric formats).
+  List<SmartRule> validateRules(SmartCriteria criteria) => const [];
 }

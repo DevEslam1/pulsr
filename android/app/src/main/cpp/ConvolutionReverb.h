@@ -30,7 +30,7 @@ public:
     static constexpr int MAX_PREALLOC_PARTITIONS = 512;
 
     ConvolutionReverb();
-    void setSampleRate(double sampleRate);
+    void setSampleRate(double sampleRate, bool updateIr = true);
     void setPreset(ReverbPreset preset);
     void setWetDry(double wet); // 0.0 (dry) to 1.0 (wet)
     void setPredelay(double predelayMs); // 0.0 to 150.0 ms
@@ -62,9 +62,13 @@ public:
     void drainRetiredIrs();
 
 private:
-    static constexpr int kMaxRetired = 4;
-    std::shared_ptr<const PreparedIr> retiredIrs_[kMaxRetired];
-    int retiredCount_ = 0;
+    static constexpr int kMaxRetired = 256;
+    std::shared_ptr<const PreparedIr> retiredRing_[kMaxRetired];
+    std::atomic<int> retiredHead_{0};
+    std::atomic<int> retiredTail_{0};
+    static constexpr int kMaxEmergencyOverflow = 64;
+    std::shared_ptr<const PreparedIr> overflowSlots_[kMaxEmergencyOverflow];
+    std::atomic<int> overflowCount_{0};
 
     void updatePreparedIr();
     void setPreparedIrPtr(std::shared_ptr<const PreparedIr> ir);

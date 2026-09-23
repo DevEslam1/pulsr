@@ -41,6 +41,7 @@ public:
     // always centred at HALF_TAPS regardless of quality truncation, so the
     // group delay is HALF_TAPS (not the truncation half-width).
     int getLatencyFrames() const { return linearQuality_ ? 0 : HALF_TAPS; }
+    bool isInterleavedSupported() const { return false; }
 
     // HARD CONTRACT: Consumes N input frames and returns exactly N output frames.
     //

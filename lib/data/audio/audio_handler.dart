@@ -356,7 +356,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   int? _gaplessTargetIndex;
   @override
-  DateTime? _gaplessLoadTime;
+  final Stopwatch _gaplessStopwatch = Stopwatch();
   @override
   bool _gaplessTargetReached = false;
 
@@ -1228,11 +1228,15 @@ class PulsrAudioHandler extends BaseAudioHandler
     _subscriptions.add(
       Stream.periodic(const Duration(seconds: 45)).listen((_) async {
         final level = await BatteryOptimizationService.getBatteryLevel();
-        _batteryAwarePlayback.onBatteryLevelChanged(level);
+        if (level != null) {
+          _batteryAwarePlayback.onBatteryLevelChanged(level);
+        }
       }),
     );
     BatteryOptimizationService.getBatteryLevel().then((level) {
-      _batteryAwarePlayback.onBatteryLevelChanged(level);
+      if (level != null) {
+        _batteryAwarePlayback.onBatteryLevelChanged(level);
+      }
     }).catchError((_) {});
 
     void setupPlayerListeners(AudioPlayer player, bool isPlayerA) {

@@ -47,13 +47,22 @@ class PlayerScrobbleCoordinator {
       SongsTableData song, Duration position, bool isPlaying) {
     if (_isClosed()) return;
     final posMs = position.inMilliseconds;
-    // FIX-C06: Detect same-song replay/restart (position went backwards)
-    final isSongRestart =
-        _lastSongId == song.id && _lastPosMs != null && posMs < _lastPosMs!;
+    // Differentiate true track restart (returning near zero from >10s into playback)
+    // from a standard backward scrub within the track.
+    final isTrueRestart =
+        _lastSongId == song.id && _lastPosMs != null && posMs < 3000 && _lastPosMs! > 10000;
+    final isSongRestart = isTrueRestart;
     final isSongChange = _lastSongId != song.id || isSongRestart;
     final isPlayStateChange = _lastIsPlaying != isPlaying;
     final isMajorSeek =
         !isSongRestart && _lastPosMs != null && (posMs - _lastPosMs!).abs() >= 5000;
+
+    // Strict track-change cleanup: ensure pending timers from previous track are canceled immediately
+    if (_lastSongId != song.id) {
+      _debounce?.cancel();
+      _debounce = null;
+      _pendingSong = null;
+    }
 
     _lastSongId = song.id;
     _lastIsPlaying = isPlaying;

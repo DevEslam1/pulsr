@@ -53,13 +53,52 @@ class YtmClientVersionResolver {
   );
   static const Duration _cacheTtl = Duration(hours: 24);
   static const Duration _maxStaleTtl = Duration(days: 30);
+  static const String _prefKeySts = 'ytm_cached_sts';
 
   late String _clientVersion = fallbackClientVersion;
   String _apiKey = fallbackApiKey;
+  int? _sts;
   bool _isInitialized = false;
 
   String get clientVersion => _clientVersion;
   String get apiKey => _apiKey;
+  int get sts => _sts ?? (DateTime.now().toUtc().millisecondsSinceEpoch ~/ 86400000);
+
+  String get androidMusicVersion =>
+      const String.fromEnvironment('YTM_ANDROID_MUSIC_VERSION', defaultValue: '8.32.50');
+  String get iosMusicVersion =>
+      const String.fromEnvironment('YTM_IOS_MUSIC_VERSION', defaultValue: '8.32.1');
+  String get androidVrVersion =>
+      const String.fromEnvironment('YTM_ANDROID_VR_VERSION', defaultValue: '1.63.27');
+  String get androidVersion =>
+      const String.fromEnvironment('YTM_ANDROID_VERSION', defaultValue: '19.44.38');
+  String get androidCreatorVersion =>
+      const String.fromEnvironment('YTM_ANDROID_CREATOR_VERSION', defaultValue: '24.45.100');
+
+  String clientVersionFor(String clientType) {
+    switch (clientType) {
+      case 'WEB_REMIX':
+      case 'MWEB':
+      case 'WEB_EMBEDDED_PLAYER':
+        return _clientVersion;
+      case 'ANDROID_MUSIC':
+        return androidMusicVersion;
+      case 'IOS_MUSIC':
+        return iosMusicVersion;
+      case 'ANDROID_VR':
+        return androidVrVersion;
+      case 'ANDROID':
+        return androidVersion;
+      case 'ANDROID_CREATOR':
+        return androidCreatorVersion;
+      case 'TVHTML5_SIMPLY_EMBEDDED_PLAYER':
+        return '2.0';
+      case 'ANDROID_TESTSUITE':
+        return '1.9';
+      default:
+        return _clientVersion;
+    }
+  }
 
   Future<void> init() async {
     if (_isInitialized) return;
@@ -81,6 +120,10 @@ class YtmClientVersionResolver {
       if (!isStale && savedKey != null && savedKey.isNotEmpty) {
         _apiKey = savedKey;
       }
+      final savedSts = prefs.getInt(_prefKeySts);
+      if (savedSts != null && savedSts > 0) {
+        _sts = savedSts;
+      }
 
       _isInitialized = true;
 
@@ -96,15 +139,28 @@ class YtmClientVersionResolver {
 
   Future<void> refresh() async {
     try {
-      final response = await http.get(
-        Uri.parse('https://music.youtube.com'),
-        headers: {
-          'User-Agent': EmbeddedBrowserUa.desktop,
-          'Accept-Language': 'en-US,en;q=0.9',
-        },
-      ).timeout(const Duration(seconds: 10));
+      http.Response? response;
+      try {
+        response = await http.get(
+          Uri.parse('https://music.youtube.com'),
+          headers: {
+            'User-Agent': EmbeddedBrowserUa.desktop,
+            'Accept-Language': 'en-US,en;q=0.9',
+          },
+        ).timeout(const Duration(seconds: 15));
+      } catch (_) {
+        try {
+          response = await http.get(
+            Uri.parse('https://www.youtube.com'),
+            headers: {
+              'User-Agent': EmbeddedBrowserUa.desktop,
+              'Accept-Language': 'en-US,en;q=0.9',
+            },
+          ).timeout(const Duration(seconds: 8));
+        } catch (_) {}
+      }
 
-      if (response.statusCode == 200) {
+      if (response != null && response.statusCode == 200) {
         final body = response.body;
 
         // 1. Extract clientVersion
@@ -121,7 +177,19 @@ class YtmClientVersionResolver {
                 RegExp(r'"innertubeApiKey":\s*"([^"]+)"').firstMatch(body) ??
                 RegExp(r'key=([a-zA-Z0-9_-]{39})').firstMatch(body);
 
+        // 3. Extract STS (signatureTimestamp)
+        final stsMatch = RegExp(r'"STS":\s*(\d+)').firstMatch(body) ??
+            RegExp(r'"signatureTimestamp":\s*(\d+)').firstMatch(body);
+
         final prefs = await SharedPreferences.getInstance();
+
+        if (stsMatch != null && stsMatch.group(1) != null) {
+          final parsed = int.tryParse(stsMatch.group(1)!);
+          if (parsed != null && parsed > 0) {
+            _sts = parsed;
+            await prefs.setInt(_prefKeySts, parsed);
+          }
+        }
 
         if (versionMatch != null && versionMatch.group(1) != null) {
           final resolvedVersion = versionMatch.group(1)!;

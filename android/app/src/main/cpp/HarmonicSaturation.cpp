@@ -151,6 +151,8 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
                     wetR += polyphase4x_[p][t] * decimHistory_[1][hIdx];
                 }
             }
+            wetL *= (1.0f / static_cast<float>(OVERSAMPLE_FACTOR));
+            wetR *= (1.0f / static_cast<float>(OVERSAMPLE_FACTOR));
 
             // DC blocker for asymmetric modes
             if (mode != 0) {
@@ -234,6 +236,7 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
                         wet += polyphase4x_[p][t] * decimHistory_[ch][hIdx];
                     }
                 }
+                wet *= (1.0f / static_cast<float>(OVERSAMPLE_FACTOR));
 
                 if (mode != 0) {
                     float y = wet - dcX_[ch] + dcCoeff_ * dcY_[ch];
